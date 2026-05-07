@@ -290,9 +290,9 @@ jobs:
         run: |
           set -euo pipefail
           VERSION='${{ needs.gate-and-tag.outputs.release_version }}'
-          ARCHIVE="atm_${VERSION}_${{ matrix.target }}.tar.gz"
+          ARCHIVE="sc-lint-boundary_${VERSION}_${{ matrix.target }}.tar.gz"
           cd target/${{ matrix.target }}/release
-          tar czf "../../../${ARCHIVE}" atm
+          tar czf "../../../${ARCHIVE}" sc-lint-boundary
           cd ../../..
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
 
@@ -301,8 +301,8 @@ jobs:
         shell: pwsh
         run: |
           $VERSION = '${{ needs.gate-and-tag.outputs.release_version }}'
-          $ARCHIVE = "atm_${VERSION}_${{ matrix.target }}.zip"
-          Compress-Archive -Path "target/${{ matrix.target }}/release/atm.exe" -DestinationPath $ARCHIVE
+          $ARCHIVE = "sc-lint-boundary_${VERSION}_${{ matrix.target }}.zip"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/sc-lint-boundary.exe" -DestinationPath $ARCHIVE
           echo "ARCHIVE=$ARCHIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact
@@ -343,68 +343,3 @@ jobs:
           generate_release_notes: true
           files: |
             release/*
-
-  update-homebrew:
-    needs: [gate-and-tag, release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout homebrew-tap
-        uses: actions/checkout@v4
-        with:
-          repository: randlee/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: homebrew-tap
-
-      - name: Compute release tarball SHA256
-        id: sha
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag='${{ needs.gate-and-tag.outputs.release_tag }}'
-          version='${{ needs.gate-and-tag.outputs.release_version }}'
-          tarball_path="${RUNNER_TEMP:?RUNNER_TEMP is required}/release.tar.gz"
-          # Homebrew automation requires HOMEBREW_TAP_TOKEN to be configured on the atm-core repo.
-          tarball_url="https://github.com/randlee/atm-core/releases/download/${tag}/atm_${version}_aarch64-apple-darwin.tar.gz"
-          echo "tarball_url=${tarball_url}" >> "$GITHUB_OUTPUT"
-          curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors -o "${tarball_path}" "${tarball_url}"
-          sha256=$(sha256sum "${tarball_path}" | awk '{print $1}')
-          echo "sha256=${sha256}" >> "$GITHUB_OUTPUT"
-
-      - name: Update Homebrew formulas
-        shell: bash
-        run: |
-          set -euo pipefail
-          version='${{ needs.gate-and-tag.outputs.release_version }}'
-          sha256='${{ steps.sha.outputs.sha256 }}'
-          tarball_url='${{ steps.sha.outputs.tarball_url }}'
-          for formula in homebrew-tap/Formula/agent-team-mail.rb homebrew-tap/Formula/atm.rb; do
-            sed -i "s|version \"[^\"]*\"|version \"${version}\"|g" "$formula"
-            sed -i "s|url \"[^\"]*\"|url \"${tarball_url}\"|g" "$formula"
-            sed -i "s|sha256 \"[^\"]*\"|sha256 \"${sha256}\"|g" "$formula"
-          done
-
-      - name: Commit and push to homebrew-tap
-        shell: bash
-        run: |
-          set -euo pipefail
-          version='${{ needs.gate-and-tag.outputs.release_version }}'
-          cd homebrew-tap
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/agent-team-mail.rb Formula/atm.rb
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "chore: bump agent-team-mail to v${version}"
-          git push
-
-  publish-winget:
-    needs: [gate-and-tag, release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish to winget
-        uses: vedantmgoyal2009/winget-releaser@v2
-        with:
-          # Initial bootstrap still requires a one-time manual manifest submission to microsoft/winget-pkgs.
-          identifier: randlee.agent-team-mail
-          installers-regex: 'atm_.*_x86_64-pc-windows-msvc\.zip$'
-          release-tag: ${{ needs.gate-and-tag.outputs.release_tag }}
-          token: ${{ secrets.GITHUB_TOKEN }}
