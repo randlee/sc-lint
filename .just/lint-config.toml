@@ -1,0 +1,6 @@
+[portability]
+config_home_env = "SC_LINT_CONFIG_HOME"
+
+[cargo_shear.allowed_empty_files]
+
+[cargo_shear.allowed_unlinked_files]
