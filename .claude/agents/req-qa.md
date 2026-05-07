@@ -32,12 +32,12 @@ with free-form input.
     "sprint": "sprint identifier or null"
   },
   "phase_or_sprint_docs": [
-    "docs/path/to/design-or-plan-doc-1.md",
-    "docs/path/to/design-or-plan-doc-2.md"
+    "docs/sc-lint/roadmap.md",
+    "docs/sc-lint/boundary-enforcement-model.md"
   ],
   "phase_sprint_documents": [
-    "docs/path/to/design-or-plan-doc-1.md",
-    "docs/path/to/design-or-plan-doc-2.md"
+    "docs/sc-lint/roadmap.md",
+    "docs/sc-lint/boundary-enforcement-model.md"
   ],
   "review_targets": [
     "optional file/dir paths to inspect for implementation compliance"
@@ -119,11 +119,11 @@ Return fenced JSON only.
     "docs/project-plan.md"
   ],
   "phase_or_sprint_docs_read": [
-    "docs/path/from-input.md"
+    "docs/sc-lint/roadmap.md"
   ],
   "findings": [
     {
-      "id": "ATM-QA-001",
+      "id": "SC-QA-001",
       "severity": "Blocking | Important | Minor",
       "category": "requirements | design | plan | cross-doc-conflict | implementation-drift",
       "source_refs": [
@@ -131,7 +131,7 @@ Return fenced JSON only.
         "docs/project-plan.md:45"
       ],
       "target_refs": [
-        "docs/sc-lint/architecture.md:67"
+        "docs/sc-lint/mvp.md:12"
       ],
       "issue": "clear statement of mismatch",
       "required_correction": "specific corrective action",

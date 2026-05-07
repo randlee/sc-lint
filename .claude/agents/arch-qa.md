@@ -226,7 +226,7 @@ Emit a single fenced JSON block:
       "id": "ARCH-001",
       "rule": "RULE-001",
       "severity": "BLOCKING|IMPORTANT|MINOR",
-      "file": "crates/sc-lint/src/module.rs",
+      "file": "crates/sc-lint-boundary/src/lib.rs",
       "line": 46,
       "description": "Short description of the structural violation.",
       "remediation": "Specific remediation."
