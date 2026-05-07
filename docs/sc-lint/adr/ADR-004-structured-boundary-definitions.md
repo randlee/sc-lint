@@ -5,7 +5,7 @@
 | ID | ADR-004 |
 | Status | **Accepted** |
 | Date | 2026-05-06 |
-| Deciders | arch-inj, team-lead, arch-ctm |
+| Deciders | arch-inj, team-lead, clint |
 | Relates to | REQ-SCB-001 through REQ-SCB-014 |
 
 ---

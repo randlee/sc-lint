@@ -4,7 +4,7 @@ Rust lint tools for agent orchestration.
 
 ## Workspace
 
-This repository follows the same high-level layout as `atm-core`:
+This repository uses the standard sc-lint workspace layout:
 
 - `.github/workflows/`
 - `crates/`
