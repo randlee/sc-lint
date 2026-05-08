@@ -23,6 +23,15 @@ Planned next crate:
   - top-level CLI crate
   - stable user-facing command surface
   - command parsing, config loading, output normalization, tool dispatch
+  - planned lint profiles:
+    - `fast`
+    - `full`
+    - `ci`
+  - planned top-level CI-equivalent command:
+    - `sc-lint ci`
+  - planned Windows preflight commands when `cargo xwin` is installed:
+    - `sc-lint check xwin`
+    - `sc-lint clippy xwin`
 
 Reason:
 
@@ -196,6 +205,21 @@ Current integration state:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
+Current planned local/CI profile split:
+
+- `fast`
+  - low-latency local developer gate
+  - may include `xwin check` when available
+- `full`
+  - stronger local pre-push gate
+  - may include `xwin check` and `xwin clippy` when available
+- `ci`
+  - lint-only CI-parity profile
+  - intentionally excludes `xwin` because real Windows CI remains
+    authoritative
+- top-level `ci`
+  - lint plus tests
+
 ## Default Rule Policy
 
 `sc-lint-boundary` ships with an embedded default rule config at:
@@ -234,6 +258,26 @@ Current direction for both items:
   overdue
 - TOML should become the canonical source for new boundary features as soon as
   TOML loading exists
+
+## Consumer-Proven Rule Promotion
+
+The current plan explicitly treats some rule families as consumer-proven first
+and productized second.
+
+Reusable analyzer families first proven on `atm-core` and planned for
+standalone `sc-lint`:
+
+- `PORT-004`
+- `PORT-005`
+- `SCB-RUNTIME-001`
+- `SCB-RUNTIME-002`
+
+Consumer-local policy families that stay out of `sc-lint` unless extracted as
+configurable framework:
+
+- duplicate semantic string-literal policy
+- fixed-sleep test-hygiene policy
+- triage Turtle consistency policy
 
 Related ADR:
 

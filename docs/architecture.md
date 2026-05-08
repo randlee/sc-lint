@@ -103,6 +103,27 @@ At the current phase boundary, these TOML records exist as canonical planning
 inputs. Default lint enforcement against them becomes active when boundary
 inventory loading is moved into `sc-lint-boundary`.
 
+## Current Canonical Boundary Facades
+
+The current boundary definitions and planned CLI surface explicitly name the
+important public facades and implementation types for the release-1 line:
+
+- `BOUNDARY-DirectiveModel`
+  - facade: `AttributeInput`
+  - implementation type: `AttributeInput`
+- `BOUNDARY-ScLintAttributeSurface`
+  - facade: `sc_lint`
+  - implementation type: `sc_lint`
+- `BOUNDARY-ScLintBoundaryAnalyzer`
+  - facade: `analyze_workspace`
+  - implementation type: `analyze_workspace`
+- `BOUNDARY-ScLintCli`
+  - facade: `Cli`
+  - implementation type: `Cli`
+
+These definitions are canonical in `boundaries/` and should stay aligned with
+the implemented Rust item names as the CLI crate lands.
+
 ## Repo-local Automation
 
 `sc-lint` currently uses:
@@ -232,6 +253,8 @@ checks are stable.
   - see [docs/sc-lint/graph-schema.md](./sc-lint/graph-schema.md)
 - structured boundary definitions ADR
   - see [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](./sc-lint/adr/ADR-004-structured-boundary-definitions.md)
+- CLI/profile/xwin execution-model ADR
+  - see [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 
 ## Architecture Management
 

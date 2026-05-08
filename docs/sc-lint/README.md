@@ -32,6 +32,15 @@ Current intended crate split:
 - `sc-lint`
   - planned top-level CLI crate
   - command parsing, config loading, output normalization, tool dispatch
+  - planned profiles:
+    - `fast`
+    - `full`
+    - `ci`
+  - planned top-level CI-equivalent command:
+    - `sc-lint ci`
+  - planned Windows preflight commands when `cargo xwin` is installed:
+    - `sc-lint check xwin`
+    - `sc-lint clippy xwin`
 - `sc-lint-directives`
   - shared directive parsing/types
 - `sc-lint-boundary`
@@ -109,6 +118,20 @@ Current repo integration status:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
+Current planned profile policy:
+
+- `fast`
+  - local low-latency lint profile
+  - may include `xwin check` when available
+- `full`
+  - stronger local pre-push lint profile
+  - may include `xwin check` and `xwin clippy` when available
+- `ci`
+  - lint-only CI-parity profile
+  - excludes `xwin`
+- top-level `ci`
+  - lint plus tests
+
 Current repo boundary source status:
 
 - canonical boundary TOML is expected under `boundaries/`
@@ -150,3 +173,5 @@ Related architecture decision:
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
   — canonical TOML boundary source plus planning-aware inventory-parity
   enforcement
+- [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+  — top-level CLI profile semantics plus capability-driven `xwin` preflight

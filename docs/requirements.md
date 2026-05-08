@@ -19,12 +19,13 @@ The product should support both:
 
 ## Product Surfaces
 
-`sc-lint` has four product surfaces:
+`sc-lint` has five product surfaces:
 
 1. top-level CLI
 2. backend analyzer/tool crates
 3. repo-local automation and wrappers
 4. structured boundary definitions and planning metadata
+5. development and CI profile orchestration
 
 ## Core Product Requirements
 
@@ -196,6 +197,8 @@ The current execution phase requires:
 - canonical TOML boundary definitions for the current `sc-lint` crates
 - a default local development lint gate that runs the repo's own analyzer
   checks
+- documented `fast` / `full` / `ci` profile semantics and the distinction
+  between `sc-lint lint ci` and top-level `sc-lint ci`
 - a staged migration plan for:
   - generic Python utilities
   - boundary inventory and manifest-policy logic moving into Rust

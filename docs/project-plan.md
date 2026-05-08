@@ -46,9 +46,9 @@ This phase should execute in the following order:
 3. add the top-level `sc-lint` CLI crate
 4. extract generic Python utilities
 5. backport reusable `atm-core`-proven analyzer families into `sc-lint`
-6. migrate boundary inventory + manifest policy from Python into
+6. define the cross-target preflight strategy for local and CI lint flows
+7. migrate boundary inventory + manifest policy from Python into
    `sc-lint-boundary`
-7. define the cross-target preflight strategy for local and CI lint flows
 8. run parity validation before deprecating Python boundary logic
 
 ## Release 1 Target
