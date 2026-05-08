@@ -52,6 +52,14 @@ boundaries/
 This is the preferred first-rollout layout and matches the recommended
 implementation defaults later in this document.
 
+Those names are illustrative. The current `sc-lint` repo uses the same layout
+pattern for its own package/tool surfaces under directories such as:
+
+- `boundaries/sc-lint-directives/`
+- `boundaries/sc-lint-attributes/`
+- `boundaries/sc-lint-boundary/`
+- `boundaries/sc-lint/`
+
 ### Human documentation
 
 Markdown boundary docs continue to exist, but they are no longer the

@@ -1,0 +1,162 @@
+# sc-lint Foundation Phase Plan
+
+This document is the detailed execution plan for the current `sc-lint` phase.
+
+## Objective
+
+Turn `sc-lint` from an extracted code workspace into a self-hosting lint tool
+repo with:
+
+- canonical crate boundaries
+- a default local development gate that exercises the repo's own analyzer
+- a concrete plan for the top-level `sc-lint` CLI
+- a sequenced migration path for generic Python utilities and boundary logic
+
+## Workstreams
+
+### Workstream 1: Repo boundaries
+
+Define canonical TOML boundary records for the current `sc-lint` crates and the
+planned top-level CLI.
+
+Required outputs:
+
+- `boundaries/sc-lint-directives/*.toml`
+- `boundaries/sc-lint-attributes/*.toml`
+- `boundaries/sc-lint-boundary/*.toml`
+- `boundaries/sc-lint/*.toml`
+- `boundaries/planning.toml`
+
+Required policy intent:
+
+- `sc-lint-directives` is the shared directive parser crate
+- `sc-lint-attributes` depends on `sc-lint-directives`
+- `sc-lint-boundary` depends on `sc-lint-directives`
+- future `sc-lint` CLI coordinates backend tools but does not force backend
+  crate cross-dependencies
+
+Current phase note:
+
+- these boundary files are canonical planning inputs now
+- default lint enforcement against them activates when boundary inventory
+  loading is moved into `sc-lint-boundary`
+
+### Workstream 2: Self-hosting lint gate
+
+Make `just lint` reflect the development needs of this repo.
+
+Required changes:
+
+- keep generic repo gates:
+  - fmt
+  - clippy
+  - deny
+  - shear
+  - version
+  - manifests
+  - spell
+  - pytests
+- include:
+  - `sc-boundary`
+  - `sc-portability`
+  in the default local lint gate for this repo
+- keep `modules` advisory/manual
+
+Acceptance criteria:
+
+- `just lint` passes on `sc-lint`
+- `just lint sc-boundary` passes
+- `just lint sc-portability` passes
+
+### Workstream 3: Top-level CLI
+
+Introduce the top-level `sc-lint` CLI as the stable user-facing entry point.
+
+Phase goals:
+
+- create the crate
+- define command structure
+- define output and exit-code conventions
+- load config once at the top level
+- dispatch to self-contained backends
+
+Initial command shape:
+
+- `sc-lint lint <tool>`
+- `sc-lint view <tool>`
+- `sc-lint version`
+
+### Workstream 4: Generic Python utility extraction
+
+Extract the current consumer-neutral Python tools into `sc-lint`.
+
+Priority order:
+
+1. line-count lint
+2. identity literal lint
+3. generic view plumbing
+
+Requirements:
+
+- consumer-neutral naming
+- standalone fixture tests
+- top-level CLI exposure once the CLI exists
+
+### Workstream 5: Boundary logic migration to Rust
+
+Move boundary inventory and manifest-policy enforcement from Python into
+`sc-lint-boundary`.
+
+Required phases:
+
+1. TOML boundary inventory loading
+2. schema validation
+3. duplicate-source/id handling
+4. manifest ownership rules
+5. manifest section rules
+6. parity validation against the Python implementation
+
+## Sequence
+
+The current phase should execute in this order:
+
+1. define repo boundaries
+2. tighten `just lint` for self-hosting
+3. add the top-level `sc-lint` CLI
+4. extract generic Python utilities
+5. migrate boundary inventory and manifest-policy logic into Rust
+6. keep Python parity validation during the migration window
+
+## Exit Criteria
+
+This phase is complete when:
+
+- canonical `sc-lint` boundaries exist in TOML
+- `just lint` is the correct default gate for `sc-lint` development
+- the top-level CLI exists and is the preferred user-facing entry point
+- generic Python utilities scheduled for extraction are planned or migrated
+- boundary inventory and manifest-policy migration to Rust is staged with
+  parity validation
+
+## Release 1 Alignment
+
+This phase is the foundation for release `0.1.x`.
+
+For release `0.1.x`, the repo should be able to demonstrate:
+
+- self-hosting lint discipline
+- canonical boundary ownership for current and planned tool surfaces
+- a stable CLI plan ready for implementation
+- a sequenced migration path rather than ad hoc extraction work
+
+This phase is intentionally a foundation phase. It prepares release `0.1.x`,
+rather than claiming that the full release-1 feature set is already shipped.
+
+## Deferred Items
+
+The following stay out of this phase unless explicitly pulled in:
+
+- ATM-specific daemon/test-runtime lints
+- forced Rust rewrites of simple Python utilities
+- graph-db integration
+- generalized view-site polish beyond what is needed for extraction

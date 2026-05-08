@@ -1,0 +1,17 @@
+[planning]
+current_sprint = "S.1"
+
+[planned_items."BOUNDARY-ScLintCli.implementation.module"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"
+
+[planned_items."BOUNDARY-ScLintCli.implementation.type"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"
+
+[planned_items."BOUNDARY-ScLintCli.public.facade"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"

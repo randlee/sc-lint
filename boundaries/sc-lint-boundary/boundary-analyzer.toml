@@ -1,0 +1,36 @@
+boundary_id = "BOUNDARY-ScLintBoundaryAnalyzer"
+owner_package = "sc-lint-boundary"
+owner_crate_path = "sc_lint_boundary"
+name = "ScLintBoundaryAnalyzer"
+
+[public]
+facade = "analyze_workspace"
+
+[implementation]
+type = "analyze_workspace"
+module = "sc_lint_boundary"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = ["sc-lint-directives"]
+forbidden_edges = ["sc-lint-boundary -> sc-lint-attributes"]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
+review_gates = ["no_proc_macro_dependency"]
+
+[status]
+state = "concrete_landed"

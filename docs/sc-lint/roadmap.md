@@ -6,23 +6,37 @@ These points are considered settled for the initial spike.
 
 ### Crate split
 
-Two crates from the start:
+Current implemented crates:
 
+- `sc-lint-directives`
+  - shared directive parsing/types
 - `sc-lint-boundary`
   - analyzer CLI + library
-  - own version line starting at `0.1.0`
+  - currently shares the workspace `0.1.0` version line
 - `sc-lint-attributes`
   - proc-macro attribute crate
-  - own version line starting at `0.1.0`
+  - currently shares the workspace `0.1.0` version line
+
+Planned next crate:
+
+- `sc-lint`
+  - top-level CLI crate
+  - stable user-facing command surface
+  - command parsing, config loading, output normalization, tool dispatch
 
 Reason:
 
 - real Rust attributes need a proc-macro crate anyway
 - creating it early avoids late packaging churn
 - the analyzer crate should not carry proc-macro concerns
+- the top-level CLI should coordinate backends rather than forcing backend
+  crate cross-dependencies
 
 Current scaffold state:
 
+- `sc-lint-directives`
+  - created
+  - compile-valid
 - `sc-lint-attributes`
   - created
   - compile-valid
@@ -33,6 +47,10 @@ Current scaffold state:
   - initial `sc_lint` attribute ingestion in place now
   - first owner-graph cycle rules in place now
   - first boundary enforcement rules in place now
+- `sc-lint`
+  - planned
+  - detailed CLI requirements/architecture defined
+  - implementation not started yet
 
 ### Analyzer strategy
 
@@ -141,18 +159,21 @@ Current implementation status:
 
 ## Extraction Path
 
-The intended rollout is:
+The extraction step is complete; `sc-lint` now has its own standalone
+repository.
 
-1. internal workspace crates now
-2. prove the model on the first consumer repository
-3. stabilize:
+The current rollout is:
+
+1. stabilize:
    - CLI contract
    - JSON findings shape
    - graph export shape
    - graph schema versioning
    - attribute namespace
-4. extract to a separate repository
-5. publish to crates.io
+2. define and enforce canonical repo boundaries
+3. introduce the top-level CLI
+4. migrate remaining generic tooling
+5. prepare the standalone repo for crates.io publication
 
 ## Near-Term Integration Expectation
 
@@ -169,8 +190,11 @@ Likely future integration:
 Current integration state:
 
 - `just lint sc-boundary`
-  - exists now as a separate preliminary/manual target
-  - is intentionally not part of default `just lint` yet
+  - exists now as a named target
+  - is part of default `just lint` for this repo
+- `just lint sc-portability`
+  - exists now as a named target
+  - is part of default `just lint` for this repo
 
 ## Default Rule Policy
 
@@ -214,3 +238,15 @@ Current direction for both items:
 Related ADR:
 
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
+
+## Release 1 Direction
+
+Release `0.1.x` should establish:
+
+- stable repo-local lint gating
+- canonical TOML boundaries for current and planned tool surfaces
+- a documented top-level CLI contract ready for implementation
+- a staged extraction and migration path for remaining generic tooling
+
+This is the release-1 direction, not a claim that every release-1 target is
+already implemented today.

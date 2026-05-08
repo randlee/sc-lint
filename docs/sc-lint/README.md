@@ -17,9 +17,23 @@ Current contents:
 - [`boundary-toml-migration.md`](./boundary-toml-migration.md) — migration plan
   for moving canonical boundary data from Markdown-embedded records to
   standalone TOML
+- [`extraction-plan.md`](./extraction-plan.md) — extraction plan for remaining
+  generic lint/view tooling and the Python-to-Rust boundary migration
+- [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
+  execution plan for repo self-hosting, boundaries, CLI introduction, and
+  extraction order
+- [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
+  the planned top-level `sc-lint` CLI
+- [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
+  the planned top-level `sc-lint` CLI
 
 Current intended crate split:
 
+- `sc-lint`
+  - planned top-level CLI crate
+  - command parsing, config loading, output normalization, tool dispatch
+- `sc-lint-directives`
+  - shared directive parsing/types
 - `sc-lint-boundary`
   - analyzer CLI + library
   - AST parsing, graph construction, semantic rule evaluation
@@ -31,16 +45,20 @@ Current intended crate split:
 
 Current scaffold status:
 
+- `sc-lint-directives`
+  - exists now
+  - currently shares the workspace `0.1.0` version line
+  - currently provides shared parsing for `#[sc_lint(...)]` directives
 - `sc-lint-attributes`
   - exists now
-  - versioned independently at `0.1.0`
+  - currently shares the workspace `0.1.0` version line
   - currently provides compile-valid, no-op `#[sc_lint(...)]` support for:
     - `boundary.allow("cycle.type_method_self_loop")`
     - `boundary.allow("cycle.recursive_value_container")`
     - `boundary.internal_only`
 - `sc-lint-boundary`
   - exists now
-  - versioned independently at `0.1.0`
+  - currently shares the workspace `0.1.0` version line
   - currently provides:
     - workspace discovery through `cargo_metadata`
     - module-driven source traversal through `syn`
@@ -75,19 +93,28 @@ Current scaffold status:
     - graph export in:
       - JSON
       - Turtle
+- `sc-lint`
+  - planned now
+  - not implemented yet
+  - detailed CLI requirements and architecture are defined in:
+    - [`cli-requirements.md`](./cli-requirements.md)
+    - [`cli-architecture.md`](./cli-architecture.md)
 
 Current repo integration status:
 
 - `just lint sc-boundary`
-  - exists now as a separate preliminary/manual target
-  - is intentionally not part of default `just lint` yet
-  - default `just lint` integration remains deferred until the manual/preliminary
-    gate criteria are explicitly approved
+  - exists now as a named target
+  - is part of default `just lint` for this repo
 - `just lint sc-portability`
-  - exists now as a separate preliminary/manual target
-  - is intentionally not part of default `just lint` yet
-  - default `just lint` integration remains deferred until the manual/preliminary
-    gate criteria are explicitly approved
+  - exists now as a named target
+  - is part of default `just lint` for this repo
+
+Current repo boundary source status:
+
+- canonical boundary TOML is expected under `boundaries/`
+- `sc-lint` crate boundaries are now defined there for current phase planning
+- default lint enforcement against those records is scheduled to land with the
+  Rust boundary inventory loader migration
 
 Planned rule families not implemented yet:
 
@@ -107,11 +134,16 @@ boundaries/
   planning.toml
 ```
 
+That layout remains the generic long-term pattern. This repo now also uses the
+same canonical `boundaries/` root for its own current and planned tool
+surfaces.
+
 Future documents that should also live here:
 
 - crate layout
 - rule inventory
 - deeper RDF/Oxygraph integration notes
+- release-1 acceptance notes
 
 Related architecture decision:
 

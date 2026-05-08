@@ -1,0 +1,40 @@
+boundary_id = "BOUNDARY-ScLintCli"
+owner_package = "sc-lint"
+owner_crate_path = "sc_lint"
+name = "ScLintCli"
+
+[public]
+facade = "Cli"
+
+[implementation]
+type = "Cli"
+module = "sc_lint"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["sc-lint-boundary"]
+forbidden_edges = [
+  "sc-lint-directives -> sc-lint",
+  "sc-lint-attributes -> sc-lint",
+  "sc-lint-boundary -> sc-lint",
+]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-CLI-DISPATCH"]
+review_gates = ["no_backend_cross_dependencies"]
+
+[status]
+state = "planned"

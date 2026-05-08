@@ -32,16 +32,16 @@ consumer-specific tool.
 - package: `sc-lint-boundary`
 - library crate: `sc_lint_boundary`
 - binary: `sc-lint-boundary`
-- initial crate version: `0.1.0`
+- initial workspace crate version: `0.1.0`
 
 Implemented paired attribute crate:
 
 - package: `sc-lint-attributes`
 - library crate: `sc_lint_attributes`
-- initial crate version: `0.1.0`
+- initial workspace crate version: `0.1.0`
 
-These crates should **not** inherit the host workspace package version. They are
-new tool crates with their own version line starting at `0.1.0`.
+These crates share the `sc-lint` workspace version line, which currently starts
+at `0.1.0`.
 
 ## Non-Goals
 
