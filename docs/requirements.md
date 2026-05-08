@@ -56,6 +56,29 @@ The product should support both:
   The product must support mixed implementation backends behind one stable CLI
   surface during migration periods.
 
+- `REQ-PRODUCT-006A`
+  Reusable lint families proven first in a consumer repository must have an
+  explicit migration path into `sc-lint` when their semantics are
+  consumer-neutral.
+
+- `REQ-PRODUCT-006B`
+  Consumer-specific policy lints must not migrate into `sc-lint` unchanged;
+  only the reusable rule family or a configurable framework may be extracted.
+
+- `REQ-PRODUCT-006C`
+  The product should provide a documented cross-target preflight strategy for
+  surfacing likely platform-specific compile failures before CI where that can
+  be done without requiring native execution on every target platform.
+
+- `REQ-PRODUCT-006D`
+  The initial cross-target preflight target should be Windows via `cargo xwin`
+  when that path proves reliable in consumer-repo validation.
+
+- `REQ-PRODUCT-006E`
+  When `cargo xwin` is installed, the product should expose `xwin`-backed
+  Windows preflight support everywhere it can provide meaningful signal
+  without requiring separate manual wiring per tool.
+
 ### Boundary definitions
 
 - `REQ-PRODUCT-007`
@@ -84,6 +107,34 @@ The product should support both:
   Advisory/manual lint targets may remain outside the default gate only when
   they are not yet stable enough for default development use.
 
+- `REQ-PRODUCT-012A`
+  Cross-target preflight checks may live in a separate lint path before they
+  join the default local gate, but the project plan must state the intended
+  promotion criteria and expected platform coverage.
+
+- `REQ-PRODUCT-012B`
+  The default promotion candidate for cross-target preflight is `cargo xwin
+  check`, while `cargo xwin clippy` should remain a stronger non-default path
+  until timing and noise are proven acceptable.
+
+- `REQ-PRODUCT-012C`
+  `xwin` availability should be capability-detected. When unavailable, the
+  product should skip `xwin`-specific preflight paths cleanly rather than
+  failing unrelated local lint flows.
+
+- `REQ-PRODUCT-012D`
+  The product should define named lint profiles for:
+  - `fast`
+  - `full`
+  - `ci`
+  and should treat those profiles as product-level semantics rather than only
+  `Justfile` conventions.
+
+- `REQ-PRODUCT-012E`
+  If `cargo xwin` is installed, `xwin check` should be eligible for `fast`
+  and `full`, and `xwin clippy` should be eligible for `full`, but `xwin`
+  steps must stay out of the `ci` lint profile.
+
 ### Extraction and migration
 
 - `REQ-PRODUCT-013`
@@ -98,12 +149,25 @@ The product should support both:
   During the Rust migration, the Python boundary implementation must remain
   available as a parity validator until Rust behavior is proven stable.
 
+- `REQ-PRODUCT-015A`
+  Reusable postmortem analyzer families proven in `atm-core` must be recorded
+  in the project plan as either:
+  - migrate to `sc-lint`
+  - keep local to the consumer repo
+  - extract only as a configurable framework
+
 ### Release 1 objective
 
 - `REQ-PRODUCT-016`
   Release `0.1.x` must establish the stable repo-local lint gate, canonical
   TOML boundaries, the documented top-level CLI contract, and the staged
   extraction/migration path for remaining generic tooling.
+
+- `REQ-PRODUCT-016A`
+  Release `0.1.x` must define the relationship between:
+  - `sc-lint lint ci`
+  - `sc-lint ci`
+  so lint-only CI parity and full CI-equivalent execution are not ambiguous.
 
 - `REQ-PRODUCT-017`
   Canonical `sc-lint` boundary definitions may exist as planning inputs before
@@ -135,6 +199,10 @@ The current execution phase requires:
 - a staged migration plan for:
   - generic Python utilities
   - boundary inventory and manifest-policy logic moving into Rust
+- a documented partition for newly proven lint families so release `0.1.x`
+  does not blur reusable analyzer rules with consumer-local policy
+- a documented position on cross-target preflight checks for developer
+  confidence versus real multi-platform CI validation
 
 ## Requirement Management
 

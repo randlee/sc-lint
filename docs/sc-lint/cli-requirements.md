@@ -37,6 +37,32 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-lint view <tool>`
   - `sc-lint version`
 
+- `REQ-CLI-007A`
+  The CLI should support first-class execution modes for common developer
+  flows where that yields a clearer contract than burying them inside generic
+  lint target names.
+
+- `REQ-CLI-007B`
+  If `cargo xwin` is installed, the CLI should expose Windows preflight
+  commands directly, with the initial intended shape:
+  - `sc-lint check xwin`
+  - `sc-lint clippy xwin`
+
+- `REQ-CLI-007C`
+  The CLI should support named lint profiles rather than requiring callers to
+  reconstruct profile membership from individual tools.
+
+- `REQ-CLI-007D`
+  The initial lint profile names should be:
+  - `sc-lint lint fast`
+  - `sc-lint lint full`
+  - `sc-lint lint ci`
+
+- `REQ-CLI-007E`
+  The CLI should provide a top-level CI-equivalent command:
+  - `sc-lint ci`
+  which includes tests, while `sc-lint lint ci` remains lint-only.
+
 - `REQ-CLI-008`
   The CLI must preserve room for additional grouped subcommands without
   breaking the initial shape.
@@ -63,3 +89,12 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-013`
   Once Rust-native replacements exist, the CLI should be able to swap the
   backend implementation without changing the user-facing command contract.
+
+- `REQ-CLI-014`
+  If `cargo xwin` is installed, `xwin`-backed Windows preflight should join
+  the `fast` and `full` lint profiles where the specific command remains fast
+  enough for that profile.
+
+- `REQ-CLI-015`
+  `xwin`-backed preflight must not be part of the `ci` lint profile because
+  the product relies on real Windows CI runners for authoritative validation.

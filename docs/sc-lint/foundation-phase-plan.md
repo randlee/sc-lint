@@ -11,6 +11,7 @@ repo with:
 - a default local development gate that exercises the repo's own analyzer
 - a concrete plan for the top-level `sc-lint` CLI
 - a sequenced migration path for generic Python utilities and boundary logic
+- an explicit path for promoting reusable lint families from `atm-core`
 
 ## Workstreams
 
@@ -85,6 +86,18 @@ Initial command shape:
 - `sc-lint lint <tool>`
 - `sc-lint view <tool>`
 - `sc-lint version`
+- `sc-lint ci`
+
+Initial profile direction:
+
+- `sc-lint lint fast`
+- `sc-lint lint full`
+- `sc-lint lint ci`
+
+Initial Windows-preflight direction when `xwin` is installed:
+
+- `sc-lint check xwin`
+- `sc-lint clippy xwin`
 
 ### Workstream 4: Generic Python utility extraction
 
@@ -116,6 +129,50 @@ Required phases:
 5. manifest section rules
 6. parity validation against the Python implementation
 
+### Workstream 6: Promote reusable consumer-proven lint families
+
+Backport the reusable R.19 families that were first proven on `atm-core`.
+
+Current in-scope families:
+
+- `PORT-004`
+- `PORT-005`
+- `SCB-RUNTIME-001`
+- `SCB-RUNTIME-002`
+
+Requirements:
+
+- land them in standalone `sc-lint-boundary`
+- preserve their existing rule ids
+- keep ATM-local policy lints out of `sc-lint` unless extracted only as
+  configurable framework
+
+### Workstream 7: Cross-target preflight strategy
+
+Define how `sc-lint` should help developers surface likely Windows/Linux
+compile drift before CI while still preserving the distinction between
+preflight and true multi-platform validation.
+
+Required work:
+
+- document the supported cross-target preflight mode
+- document `cargo xwin` as the first Windows preflight candidate
+- determine the profile policy:
+  - `fast` may include `xwin check`
+  - `full` may include `xwin check` and `xwin clippy`
+  - `ci` excludes `xwin`
+- determine whether `cargo xwin clippy` remains an explicit stronger path
+  rather than part of the default gate
+- document the difference between:
+  - compile-time drift detection
+  - authoritative native-platform CI validation
+  - `sc-lint lint ci` and top-level `sc-lint ci`
+
+Current constraint:
+
+- do not present cross-target preflight as a replacement for Windows/macOS/Linux
+  CI runners
+
 ## Sequence
 
 The current phase should execute in this order:
@@ -124,8 +181,10 @@ The current phase should execute in this order:
 2. tighten `just lint` for self-hosting
 3. add the top-level `sc-lint` CLI
 4. extract generic Python utilities
-5. migrate boundary inventory and manifest-policy logic into Rust
-6. keep Python parity validation during the migration window
+5. backport reusable consumer-proven analyzer families
+6. define the cross-target preflight strategy
+7. migrate boundary inventory and manifest-policy logic into Rust
+8. keep Python parity validation during the migration window
 
 ## Exit Criteria
 
@@ -135,6 +194,10 @@ This phase is complete when:
 - `just lint` is the correct default gate for `sc-lint` development
 - the top-level CLI exists and is the preferred user-facing entry point
 - generic Python utilities scheduled for extraction are planned or migrated
+- reusable consumer-proven analyzer families are either migrated or explicitly
+  deferred with rationale
+- cross-target preflight expectations are documented, including what they can
+  and cannot guarantee
 - boundary inventory and manifest-policy migration to Rust is staged with
   parity validation
 

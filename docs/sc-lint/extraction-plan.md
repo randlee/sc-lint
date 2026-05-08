@@ -1,8 +1,11 @@
 # sc-lint Extraction and Migration Plan
 
 This document records the planned extraction of remaining generic lint/view
-tooling into `sc-lint`, with special focus on migrating boundary inventory and
-manifest-policy logic from Python into `sc-lint-boundary`.
+tooling into `sc-lint`, with special focus on:
+
+- migrating boundary inventory and manifest-policy logic from Python into
+  `sc-lint-boundary`
+- backporting reusable lint families that are first proven on `atm-core`
 
 It also records the planned introduction of a top-level `sc-lint` command-line
 entry point that provides one stable surface across mixed Rust/Python tool
@@ -10,7 +13,8 @@ implementations.
 
 ## Scope
 
-This plan covers five current tooling areas:
+This plan covers six current tooling areas and one proof-to-product migration
+track:
 
 1. boundary inventory and manifest-policy enforcement
    - current implementation: Python `lint_boundaries.py`
@@ -37,10 +41,24 @@ It also covers one repo-architecture item:
    - target: one stable command-line entry point with command parsing,
      consistent output, config loading, and tool dispatch
 
+7. postmortem lint families first proven on `atm-core`
+   - current implementation split:
+     - reusable analyzer rules proven in embedded `crates/sc-lint-*`
+     - ATM-local policy lints kept in `.just/`
+   - target:
+     - migrate reusable analyzer rules into standalone `sc-lint`
+     - keep ATM-local policy lints in the consumer repo unless only the
+       underlying framework is extracted
+
 ## Goals
 
 - consolidate generic lint and view tooling in `sc-lint`
 - keep ATM-specific runtime policy out of the shared repo
+- make the consumer-repo proving path explicit:
+  - prove on `atm-core`
+  - migrate only the reusable rule family or framework
+- define where cross-target compile preflight belongs in the product so
+  consumer repos can catch likely Windows/Linux drift earlier
 - move boundary inventory logic closer to the Rust analyzer that already owns
   AST-sensitive boundary rules
 - preserve parity during migration by keeping the Python implementation as a
@@ -51,6 +69,8 @@ It also covers one repo-architecture item:
 ## Non-Goals
 
 - migrating ATM-specific daemon/test-runtime lints
+- copying consumer-specific policy into `sc-lint` unchanged just because the
+  underlying implementation shape is reusable
 - forcing all current Python utilities into Rust
 - rewriting report/site-generation plumbing into Rust without a correctness
   benefit
@@ -68,6 +88,7 @@ Add a top-level `sc-lint` CLI crate that owns:
 - tool selection and dispatch
 - consistent output formatting
 - consistent exit-code behavior
+- future cross-target preflight orchestration
 
 The top-level CLI may call:
 
@@ -112,6 +133,11 @@ The following logic should migrate into `sc-lint-boundary`:
 - manifest section rules
 - inventory-parity checks
 - future boundary metadata checks that depend on the canonical boundary model
+- reusable postmortem analyzer families already proven on `atm-core`:
+  - `PORT-004` ungated `std::os::unix` imports in production code
+  - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
+  - `SCB-RUNTIME-001` bare production `Condvar::wait(...)`
+  - `SCB-RUNTIME-002` discarded `wait_timeout*` results in production code
 
 ### Stay in Python
 
@@ -122,6 +148,12 @@ proves otherwise:
 - generic identity literal/content scan
 - generic view plumbing
 - wrappers around external tools used for report generation
+
+Current ATM-local policy lints that should not migrate unchanged:
+
+- duplicate semantic string-literal policy in non-test production Rust code
+- fixed `thread::sleep(...)` test-hygiene policy
+- triage Turtle aggregate/branch consistency policy
 
 ### Mixed / later decision
 
@@ -157,6 +189,18 @@ Initial expected shape:
 - `sc-lint lint <tool>`
 - `sc-lint view <tool>`
 - `sc-lint version`
+- `sc-lint ci`
+
+Initial expected profile shape:
+
+- `sc-lint lint fast`
+- `sc-lint lint full`
+- `sc-lint lint ci`
+
+Initial expected `xwin` shape when capability is present:
+
+- `sc-lint check xwin`
+- `sc-lint clippy xwin`
 
 Deliverable:
 
@@ -184,6 +228,65 @@ Deliverable:
 - `sc-lint` owns the generic Python utilities
 - consumer repos call them through local wrappers or direct `sc-lint`
   invocation
+
+Phase 1 note on identity literals:
+
+- the current `atm-core` role-name gate is a consumer policy, not a shared
+  default
+- if extracted later, `sc-lint` should expose a configurable literal-policy
+  framework rather than hardcoding ATM role names
+
+### Phase 1.5: Backport proven reusable postmortem analyzer rules
+
+Move the reusable R.19 analyzer families from the embedded `atm-core`
+proving surface into standalone `sc-lint`.
+
+Required work:
+
+- port `PORT-004` and `PORT-005` into the standalone `sc-lint-boundary`
+  codebase
+- port `SCB-RUNTIME-001` and `SCB-RUNTIME-002` into the standalone
+  `sc-lint-boundary` codebase
+- add rule documentation and tests in `sc-lint`
+- keep the consumer repo (`atm-core`) as the first validation target after
+  the backport
+
+Deliverable:
+
+- `sc-lint` owns the reusable postmortem analyzer families that were proven on
+  `atm-core`
+- consumer repos can consume those families without copying ATM-local policy
+
+### Phase 1.6: Define cross-target preflight support
+
+Decide how `sc-lint` should orchestrate cross-target compile checks that can
+surface likely platform drift before CI.
+
+Required work:
+
+- document the supported targets and prerequisites
+- document `cargo xwin` as the initial Windows preflight mechanism if
+  consumer-repo validation continues to hold
+- define explicit `xwin`-aware command shapes rather than burying the feature
+  only inside generic lint-target names
+- measure developer-cost impact before adding any cross-target check to a
+  default gate
+- record the expected split between:
+  - `xwin check` as the likely first promotion candidate
+  - `xwin clippy` as a stronger follow-up path that may stay non-default
+- record the profile policy:
+  - `fast` may include `xwin check`
+  - `full` may include `xwin check` and `xwin clippy`
+  - `ci` excludes `xwin` because real Windows CI already exists
+
+Deliverable:
+
+- one documented cross-target preflight path
+- no ambiguity about the difference between cross-target compile checks and
+  authoritative native-platform CI validation
+- no ambiguity about the difference between:
+  - `sc-lint lint ci`
+  - `sc-lint ci`
 
 ### Phase 2: Introduce Rust boundary inventory loader
 
@@ -280,6 +383,31 @@ At minimum, add:
 - view plumbing tests for artifact collation and output layout
 - selected view target tests using standalone fixture repos where possible
 
+### Backported postmortem analyzer families
+
+At minimum, add:
+
+- positive and negative tests for:
+  - ungated `std::os::unix` imports
+  - `cfg_attr(not(unix), allow(dead_code))` suppressors
+  - bare `Condvar::wait(...)`
+  - discarded `wait_timeout*` results
+- consumer-repo validation runs proving the standalone `sc-lint` copy matches
+  the `atm-core` proving behavior
+
+### Cross-target preflight
+
+At minimum, add:
+
+- one documented target matrix for preflight support
+- fixture or sample validations proving the chosen command surfaces expected
+  `cfg`/import drift
+- timing measurements so the project can decide whether the check belongs in a
+  default local path or an explicit pre-push path
+- initial validation data for:
+  - `cargo xwin check --target x86_64-pc-windows-msvc`
+  - `cargo xwin clippy --target x86_64-pc-windows-msvc -- -D warnings`
+
 ## Config Work Needed
 
 Before extraction completes, `sc-lint` needs a consumer-neutral config contract
@@ -292,6 +420,8 @@ Expected config surfaces:
 - identity literal forbidden values and exemptions
 - view output directories and enabled targets
 - top-level CLI discovery and dispatch config where needed
+- any future configurable consumer-policy framework extracted from ATM-local
+  literal/content lints
 
 ## CLI Requirements
 
@@ -315,6 +445,8 @@ The following should remain in the consumer repo and not be extracted into
 - daemon-singleton/no-spawn lint
 - consumer-specific boundary inventories
 - runtime/test-policy rules tied to one application architecture
+- ATM role-name duplication policy as currently expressed
+- ATM triage-record consistency policy as currently expressed
 
 ## Completion Criteria
 

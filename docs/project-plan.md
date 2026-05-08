@@ -15,6 +15,11 @@ The current project focus is:
 - migrating generic lint/view tooling into `sc-lint`
 - moving boundary inventory and manifest-policy enforcement from Python into
   `sc-lint-boundary`
+- backporting reusable lint families that were first proven on `atm-core`
+- keeping consumer-specific policy lints local unless only their framework is
+  worth extracting
+- improving pre-CI developer confidence with cross-target compile checks where
+  those checks can surface platform drift before a push
 - preserving CI and lint-runner parity during extraction
 
 ## Current Detailed Planning References
@@ -40,9 +45,11 @@ This phase should execute in the following order:
 2. make `just lint` self-host the repo's own analyzer checks by default
 3. add the top-level `sc-lint` CLI crate
 4. extract generic Python utilities
-5. migrate boundary inventory + manifest policy from Python into
+5. backport reusable `atm-core`-proven analyzer families into `sc-lint`
+6. migrate boundary inventory + manifest policy from Python into
    `sc-lint-boundary`
-6. run parity validation before deprecating Python boundary logic
+7. define the cross-target preflight strategy for local and CI lint flows
+8. run parity validation before deprecating Python boundary logic
 
 ## Release 1 Target
 
@@ -52,6 +59,17 @@ Release `0.1.x` should establish:
 - canonical TOML boundaries for the repo's own tool surfaces
 - a documented and approved top-level `sc-lint` CLI contract
 - a detailed extraction and migration plan for remaining generic tooling
+- a documented partition for:
+  - reusable analyzer families that migrate into `sc-lint`
+  - consumer-local policy lints that stay in their proving repo
+- a documented strategy for surfacing likely Windows/Linux compile failures
+  before CI without pretending that cross-target checks replace real
+  multi-platform runners
+- an initial Windows preflight path based on `cargo xwin check`, with a clear
+  stance on whether and when `cargo xwin clippy` should be promoted
+- documented `fast/full/ci` profile semantics and the distinction between:
+  - `sc-lint lint ci`
+  - `sc-lint ci`
 - an implementation path for moving boundary inventory and manifest-policy
   logic into Rust with Python parity validation retained during migration
 

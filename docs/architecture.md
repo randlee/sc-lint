@@ -11,6 +11,8 @@ The `sc-lint` architecture should:
 - allow mixed Rust and Python implementations during migration
 - keep canonical machine policy in structured TOML
 - support consumer repositories without reintroducing ATM-specific coupling
+- support a prove-then-promote flow where reusable lint families can mature in
+  a consumer repo before they are backported into `sc-lint`
 
 ## Product Topology
 
@@ -113,6 +115,88 @@ These provide:
 - local development gate orchestration
 - external tool wrapping
 - Python-based utilities that are not yet migrated to Rust
+
+## Consumer-Proven Rule Promotion
+
+`sc-lint` should treat some rule families as consumer-proven first and
+productized second.
+
+Current planned promotion path from `atm-core`:
+
+- reusable analyzer families to backport into `sc-lint-boundary`:
+  - `PORT-004`
+  - `PORT-005`
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
+- consumer-local policy families that stay outside `sc-lint` unless extracted
+  as a configurable framework:
+  - duplicate semantic string-literal policy
+  - fixed-sleep test-hygiene policy
+  - triage Turtle consistency policy
+
+This preserves backend generality:
+
+- reusable analyzer logic migrates into `sc-lint`
+- consumer-specific governance rules remain local unless their framework is
+  worth sharing
+
+## Cross-Target Preflight Strategy
+
+`sc-lint` should distinguish between:
+
+- cross-target compile preflight
+- true multi-platform validation
+
+Cross-target compile preflight is intended to run from one host platform and
+surface likely drift such as:
+
+- missing `cfg` gates
+- platform-specific imports leaking into shared code
+- type or signature mismatches in gated modules
+
+Current likely first implementation:
+
+- `cargo xwin check --target x86_64-pc-windows-msvc`
+
+Current likely stronger follow-up path:
+
+- `cargo xwin clippy --target x86_64-pc-windows-msvc -- -D warnings`
+
+True multi-platform validation still belongs to real CI runners on the target
+platforms because cross-target compile checks do not prove:
+
+- runtime behavior
+- integration-test behavior
+- linker/toolchain behavior on the real host
+
+The architecture therefore supports:
+
+- optional or staged cross-target checks in the local lint flow
+- required native-platform CI validation for authoritative release confidence
+
+`xwin` support should be capability-driven:
+
+- if `cargo xwin` is installed, the tool family should expose Windows
+  preflight checks wherever they are meaningful
+- if `cargo xwin` is not installed, the tool family should degrade cleanly and
+  leave those checks unavailable rather than breaking unrelated lint paths
+
+The expected rollout order is:
+
+1. adopt `xwin check` as the first Windows preflight candidate
+2. measure timing and usefulness on consumer repos
+3. keep `xwin clippy` as a stronger explicit path until its cost is better
+   understood
+
+Profile policy:
+
+- `xwin` participation belongs in local lint profiles, not CI-parity profiles
+- if installed, `xwin check` may join `fast` and `full`
+- if installed, `xwin clippy` may join `full`
+- `ci` lint parity should stay aligned to real CI and therefore should not
+  depend on `xwin`
+- the top-level `ci` command should run lint plus tests, while `lint ci`
+  remains lint-only
 
 ## Current Development Gate
 

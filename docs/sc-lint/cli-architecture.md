@@ -45,6 +45,45 @@ sc-lint (CLI)
   - report and visualization tools
 - `version`
   - version and upgrade inspection
+- `ci`
+  - repo CI-equivalent orchestration including tests
+
+Planned direct platform-aware command family:
+
+- `check`
+  - native or cross-target compile checks
+- `clippy`
+  - native or cross-target clippy runs
+
+Initial `xwin`-aware command direction:
+
+- `sc-lint check xwin`
+- `sc-lint clippy xwin`
+
+Planned initial lint profiles:
+
+- `sc-lint lint fast`
+- `sc-lint lint full`
+- `sc-lint lint ci`
+
+Planned top-level CI-equivalent command:
+
+- `sc-lint ci`
+
+Profile semantics:
+
+- `fast`
+  - low-latency local developer gate
+  - includes `xwin` checks only when the individual command is fast enough
+- `full`
+  - stronger local pre-push gate
+  - may include slower `xwin` checks such as `clippy xwin`
+- `ci`
+  - lint-only profile aligned to what the project considers CI lint parity
+  - does not include `xwin`
+- top-level `ci`
+  - lint plus tests
+  - mirrors real CI intent rather than `xwin` preflight
 
 ## Config Flow
 
@@ -52,9 +91,18 @@ Expected flow:
 
 1. discover repo root
 2. load shared config
-3. resolve subcommand/tool target
+3. resolve subcommand/tool target and capability requirements
 4. dispatch to backend
 5. normalize output and exit code
+
+For `xwin`-aware commands, capability resolution includes:
+
+- detect whether `cargo xwin` is installed
+- select the supported Windows target set
+- add `xwin`-aware checks into `fast` or `full` only when the capability is
+  present
+- keep `ci` profile semantics independent from `xwin`
+- skip or error with a clear capability message depending on command mode
 
 ## Output Model
 
