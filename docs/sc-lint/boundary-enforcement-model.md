@@ -52,11 +52,16 @@ in code:
 
 - `implementation.module`
 - `implementation.type`
-- `public.trait`
+- `public.facade`
 - `composition.root`
 
 Later extensions may include other required architecture module families once
 they are represented in structured form.
+
+For release `0.1.x`, repo-local automation/profile orchestration surfaces are
+out of parity scope unless they are first promoted into explicit structured
+boundary records. CLI contract types recorded under
+`BOUNDARY-ScLintCli.composition.root.*` are in scope.
 
 ## Required Planning Inputs
 
@@ -81,9 +86,9 @@ path, not invented as freeform prose. Recommended shape:
 
 Examples:
 
-- `BOUNDARY-MailStore.public.trait`
+- `BOUNDARY-ScLintCli.public.facade`
 - `BOUNDARY-MailStore.implementation.type`
-- `BOUNDARY-MailStore.composition.root`
+- `BOUNDARY-ScLintCli.composition.root.CliError`
 
 ## Finding Classes
 

@@ -60,6 +60,7 @@ Release `0.1.x` should establish:
 
 - a stable repo-local development and CI gate
 - canonical TOML boundaries for the repo's own tool surfaces
+- canonical TOML boundaries for the planned top-level CLI contract items
 - a documented and approved top-level `sc-lint` CLI contract
 - explicit machine-contract decisions for:
   - canonical `--json` mode
@@ -67,6 +68,8 @@ Release `0.1.x` should establish:
   - reusable request/response seams
   - secondary interactive graph surfaces only
 - a detailed extraction and migration plan for remaining generic tooling
+- an explicit release-1 scope statement for which product surfaces are and are
+  not boundary-inventory enforced
 - a documented partition for:
   - reusable analyzer families that migrate into `sc-lint`
   - consumer-local policy lints that stay in their proving repo

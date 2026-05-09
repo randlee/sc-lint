@@ -152,10 +152,16 @@ planned top-level CLI surface should also name these important contract types:
 - `OutputMode`
   - `Human`
   - `Json`
+- `CommandEnvelope`
 - `CliError`
 
 These types are part of the intended architectural contract even before the
 full CLI crate is implemented.
+
+For release `0.1.x`, these planned CLI contract types should also be carried in
+machine-readable boundary/planning metadata as `BOUNDARY-ScLintCli`
+composition-root items so future inventory-parity work can reason about them
+mechanically.
 
 ## AI-First CLI Constraint
 
@@ -171,6 +177,10 @@ non-interactive commands:
 Future MCP wrappers, if added, should reuse the same business request/response
 models rather than translating or reshaping them into a second schema.
 
+The detailed top-level success/error normalization contract is documented in:
+
+- [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
+
 ## Repo-local Automation
 
 `sc-lint` currently uses:
@@ -183,6 +193,10 @@ These provide:
 - local development gate orchestration
 - external tool wrapping
 - Python-based utilities that are not yet migrated to Rust
+
+For release `0.1.x`, these repo-local automation/profile surfaces remain
+documented product surfaces but are intentionally out of boundary inventory
+enforcement scope unless later modeled as explicit boundary records.
 
 ## Consumer-Proven Rule Promotion
 
@@ -308,6 +322,8 @@ The architecture should not require:
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
 - CLI-specific architecture
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
+- CLI-specific contract
+  - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - graph/export contract
   - see [docs/sc-lint/graph-schema.md](./sc-lint/graph-schema.md)
 - structured boundary definitions ADR

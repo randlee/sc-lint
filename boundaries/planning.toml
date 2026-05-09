@@ -15,3 +15,28 @@ expires_when = "sprint_current_or_past"
 scheduled_sprint = "S.1"
 tracking_id = "SC-LINT-CLI-001"
 expires_when = "sprint_current_or_past"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.Command"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.LintProfile"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.OutputMode"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.CommandEnvelope"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.CliError"]
+scheduled_sprint = "S.1"
+tracking_id = "SC-LINT-CLI-001"
+expires_when = "sprint_current_or_past"

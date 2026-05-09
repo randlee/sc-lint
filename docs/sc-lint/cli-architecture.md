@@ -114,6 +114,8 @@ types explicitly:
   - enum with:
     - `Human`
     - `Json`
+- `CommandEnvelope<T>`
+  - top-level success/failure result family
 - `CliError`
   - structured machine-readable error contract carrying:
     - error kind/category
@@ -124,6 +126,9 @@ types explicitly:
 
 These names define the intended architectural seam even before all of them are
 fully implemented.
+
+For release `0.1.x`, these planned contract types should also be represented as
+`BOUNDARY-ScLintCli` composition-root items in the boundary/planning metadata.
 
 ## Machine Contract Model
 
@@ -167,6 +172,31 @@ Backend tools own:
 Future MCP wrappers should reuse the same request and response models rather
 than introducing a second business-payload schema.
 
+## Backend Normalization Path
+
+The end-to-end result path should be:
+
+```text
+backend-native success/error
+  -> top-level CLI normalization
+  -> CommandEnvelope<T> or CliError
+  -> human rendering or canonical --json output
+```
+
+Required normalization cases:
+
+- direct Rust-library backend error
+  - mapped into `CliError`
+- delegated Rust binary success
+  - parsed and wrapped into `CommandEnvelope<T>`
+- delegated Rust binary malformed machine output
+  - mapped into `CLI.BACKEND_PROTOCOL_ERROR`
+- delegated Rust binary execution failure without valid machine payload
+  - mapped into `CLI.BACKEND_EXEC_FAILURE`
+- delegated Python utility failure
+  - normalized into `CliError` rather than exposing raw traceback text as the
+    public machine contract
+
 ## Config Flow
 
 Expected flow:
@@ -194,6 +224,9 @@ The CLI should present:
 - stable machine-readable output for every non-interactive command
 - stable success/failure exit codes across delegated tools
 - stable machine-readable failure contracts in `--json` mode
+
+See [cli-contract.md](./cli-contract.md) for the detailed envelope and
+normalization contract.
 
 ## Interactive Constraint
 

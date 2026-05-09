@@ -55,6 +55,11 @@ The product should support both:
   Machine-readable failure results must include stable codes or categories and
   enough structured detail for automation to branch and recover.
 
+- `REQ-PRODUCT-002DA`
+  The top-level CLI must define one canonical success/failure envelope family
+  for non-interactive commands so backend-native machine contracts can be
+  normalized without leaking backend-specific contract drift.
+
 - `REQ-PRODUCT-002E`
   Human-readable output must remain a secondary presentation layer and must not
   contain machine-significant detail that is unavailable through machine mode.
@@ -125,6 +130,13 @@ The product should support both:
 - `REQ-PRODUCT-009`
   Structured planning metadata for planned boundary items must live alongside
   boundary definitions and remain machine-readable.
+
+- `REQ-PRODUCT-009A`
+  For release `0.1.x`, boundary inventory enforcement scope must include:
+  - crate/tool boundary surfaces
+  - planned top-level CLI contract items recorded as boundary composition roots
+  and must exclude repo-local automation/profile orchestration surfaces unless
+  a later phase models them explicitly in structured boundary records.
 
 ### Development gate
 
@@ -217,6 +229,7 @@ The product should support both:
   - see [docs/sc-lint/boundary-enforcement-model.md](./sc-lint/boundary-enforcement-model.md)
 - CLI-specific requirements
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
+  - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - Extraction and phase execution requirements
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)

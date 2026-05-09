@@ -47,6 +47,18 @@ specialized backend tools and mixed Rust/Python implementations.
   The CLI must document and preserve stable request and response models for
   command families exposed through the top-level machine contract.
 
+- `REQ-CLI-005F`
+  The CLI must define one stable top-level success envelope family for
+  machine-readable results, even when delegated backends expose their own
+  native machine payloads.
+
+- `REQ-CLI-005G`
+  The CLI must define one stable top-level failure envelope family using
+  `CliError`, and that envelope must remain valid for:
+  - direct library failures
+  - delegated backend execution failures
+  - delegated backend protocol/parse failures
+
 - `REQ-CLI-006`
   The CLI must support both direct Rust-library dispatch and delegated
   subprocess-based execution during migration periods.
@@ -131,6 +143,10 @@ specialized backend tools and mixed Rust/Python implementations.
   Future interactive graph-exploration surfaces must not replace the
   documented `OutputMode::Json` contract for machine use.
 
+- `REQ-CLI-008F`
+  `CommandEnvelope<T>` must be documented as the top-level machine-readable
+  result family for non-interactive command execution.
+
 ## Architecture Requirements
 
 - `REQ-CLI-009`
@@ -162,3 +178,11 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-015`
   `xwin`-backed preflight must not be part of the `ci` lint profile because
   the product relies on real Windows CI runners for authoritative validation.
+
+## Contract References
+
+- See [cli-contract.md](./cli-contract.md) for:
+  - top-level success envelope
+  - `CliError` failure envelope
+  - backend-to-CLI normalization rules
+  - exit-code mapping guidance

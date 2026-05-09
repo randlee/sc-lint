@@ -26,6 +26,8 @@ Current contents:
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
   the planned top-level `sc-lint` CLI
+- [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
+  envelope and backend-to-CLI normalization contract
 
 Current intended crate split:
 
