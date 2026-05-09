@@ -22,10 +22,10 @@ Current contents:
 - [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
   execution plan for repo self-hosting, boundaries, CLI introduction, and
   extraction order
-- [`sprint-S1.md`](./sprint-S1.md) — top-level CLI bootstrap sprint
-- [`sprint-S2.md`](./sprint-S2.md) — profiles and `xwin` sprint
-- [`sprint-S3.md`](./sprint-S3.md) — generic utility extraction sprint
-- [`sprint-S4.md`](./sprint-S4.md) — Rust boundary migration and analyzer
+- [`sprint-A1.md`](./sprint-A1.md) — top-level CLI bootstrap sprint
+- [`sprint-A2.md`](./sprint-A2.md) — profiles and `xwin` sprint
+- [`sprint-A3.md`](./sprint-A3.md) — generic utility extraction sprint
+- [`sprint-A4.md`](./sprint-A4.md) — Rust boundary migration and analyzer
   backport sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI

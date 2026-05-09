@@ -241,7 +241,7 @@ The product should support both:
 
 ## Current Phase Requirements
 
-The current execution phase requires:
+The current execution phase, Phase `A`, requires:
 
 - a top-level `sc-lint` CLI plan with crate-isolated backends
 - an AI-first top-level CLI contract with:

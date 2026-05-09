@@ -181,15 +181,15 @@ Example direction:
 
 ```toml
 [planning]
-current_sprint = "S.14"
+current_sprint = "A.14"
 
 [planned_items."BOUNDARY-ScLintCli.implementation.type"]
-scheduled_sprint = "S.14"
+scheduled_sprint = "A.14"
 tracking_id = "SCB-CHANGE-1234"
 expires_when = "sprint_before_current"
 ```
 
-This shape is illustrative, not final. The `S.N` notation is only an example;
+This shape is illustrative, not final. The `A.N` notation is only an example;
 quarter-based labels such as `Q.3` or release-phase labels such as `R.7` are
 equally valid if the repository defines a machine-parsable sprint ordering.
 
@@ -216,7 +216,7 @@ If the current-sprint source is missing, malformed, or cannot be parsed, the
 linter must classify planned-but-missing items as errors rather than warnings.
 
 Sprint comparison must use parsed sprint ordering, not lexical string
-comparison. For example, `S.10` must compare greater than `S.9`.
+comparison. For example, `A.10` must compare greater than `A.9`.
 
 For release `0.1.x`, the supported escalation condition should be:
 
@@ -300,7 +300,7 @@ At minimum, the implementation should ship with:
   - item key that points at no known boundary path
 - malformed-current-sprint-source test
 - sprint-ordering test:
-  - `S.9` vs `S.10`
+  - `A.9` vs `A.10`
   - current sprint vs future sprint
 - duplicate-planning-entry test
 - mixed-boundary test where one record contains pass/warn/error items together

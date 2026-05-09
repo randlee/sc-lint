@@ -1,6 +1,7 @@
 # sc-lint Foundation Phase Plan
 
-This document is the detailed execution plan for the current `sc-lint` phase.
+This document is the detailed execution plan for the current `sc-lint` phase,
+Phase `A`.
 
 ## Objective
 
@@ -200,18 +201,18 @@ The current phase should execute in this order:
 
 The scheduled implementation sprints for this phase are:
 
-1. `S.1`
+1. `A.1`
    - top-level CLI bootstrap
-   - sprint plan: `docs/sc-lint/sprint-S1.md`
-2. `S.2`
+   - sprint plan: `docs/sc-lint/sprint-A1.md`
+2. `A.2`
    - profile semantics and `xwin` capability support
-   - sprint plan: `docs/sc-lint/sprint-S2.md`
-3. `S.3`
+   - sprint plan: `docs/sc-lint/sprint-A2.md`
+3. `A.3`
    - generic utility extraction
-   - sprint plan: `docs/sc-lint/sprint-S3.md`
-4. `S.4`
+   - sprint plan: `docs/sc-lint/sprint-A3.md`
+4. `A.4`
    - Rust boundary inventory migration and reusable analyzer backports
-   - sprint plan: `docs/sc-lint/sprint-S4.md`
+   - sprint plan: `docs/sc-lint/sprint-A4.md`
 
 These sprint plans are the authoritative implementation breakdown of the
 foundation phase once execution begins. This phase document remains the
@@ -234,7 +235,7 @@ This phase is complete when:
 
 ## Release 1 Alignment
 
-This phase is the foundation for release `0.1.x`.
+Phase `A` is the foundation for release `0.1.x`.
 
 For release `0.1.x`, the repo should be able to demonstrate:
 

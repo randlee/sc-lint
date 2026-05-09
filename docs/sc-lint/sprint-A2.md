@@ -1,9 +1,9 @@
-# Sprint S.2 — Profiles And Windows Preflight
+# Sprint A.2 — Profiles And Windows Preflight
 
 ```yaml
 plan_type: sprint_plan
-phase: S
-sprint: "S.2"
+phase: A
+sprint: "A.2"
 worktree: /Users/randlee/Documents/github/sc-lint
 branch: develop
 status: planned
@@ -59,7 +59,7 @@ distinguishes:
 
 ## Prerequisites
 
-- Sprint S.1 complete with a functioning top-level CLI crate
+- Sprint A.1 complete with a functioning top-level CLI crate
 - one top-level delegated command already normalized through the CLI
 
 ## Hard Dependencies
@@ -122,7 +122,7 @@ distinguishes:
 
 ## Split Recommendation
 
-Keep S.2 together. Profiles and `xwin` capability behavior are tightly coupled;
+Keep A.2 together. Profiles and `xwin` capability behavior are tightly coupled;
 splitting them would create temporary contradictions about what `fast`, `full`,
 and `ci` actually mean.
 

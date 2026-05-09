@@ -1,9 +1,9 @@
-# Sprint S.4 — Rust Boundary Inventory Migration
+# Sprint A.4 — Rust Boundary Inventory Migration
 
 ```yaml
 plan_type: sprint_plan
-phase: S
-sprint: "S.4"
+phase: A
+sprint: "A.4"
 worktree: /Users/randlee/Documents/github/sc-lint
 branch: develop
 status: planned
@@ -49,7 +49,7 @@ analyzer families into the shared boundary analyzer.
 
 ## Prerequisites
 
-- S.1 through S.3 complete
+- A.1 through A.3 complete
 - TOML boundary records remain the canonical source of planning truth
 - Python boundary validator still available as a parity oracle
 
@@ -112,12 +112,12 @@ analyzer families into the shared boundary analyzer.
 
 ## Split Recommendation
 
-S.4 may split if needed:
+A.4 may split if needed:
 
-- S.4A boundary inventory + manifest-policy migration
-- S.4B reusable analyzer-family backports
+- A.4a boundary inventory + manifest-policy migration
+- A.4b reusable analyzer-family backports
 
-If split, S.4A must land first so the Rust boundary loader exists before more
+If split, A.4a must land first so the Rust boundary loader exists before more
 rules rely on it.
 
 ## Acceptance Criteria

@@ -40,10 +40,10 @@ The current project focus is:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - current phase execution plan
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
-  - see [docs/sc-lint/sprint-S1.md](./sc-lint/sprint-S1.md)
-  - see [docs/sc-lint/sprint-S2.md](./sc-lint/sprint-S2.md)
-  - see [docs/sc-lint/sprint-S3.md](./sc-lint/sprint-S3.md)
-  - see [docs/sc-lint/sprint-S4.md](./sc-lint/sprint-S4.md)
+  - see [docs/sc-lint/sprint-A1.md](./sc-lint/sprint-A1.md)
+  - see [docs/sc-lint/sprint-A2.md](./sc-lint/sprint-A2.md)
+  - see [docs/sc-lint/sprint-A3.md](./sc-lint/sprint-A3.md)
+  - see [docs/sc-lint/sprint-A4.md](./sc-lint/sprint-A4.md)
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
@@ -66,18 +66,18 @@ This phase should execute in the following order:
 
 The currently scheduled foundation sprints are:
 
-- `S.1`
+- `A.1`
   - CLI bootstrap
-  - `docs/sc-lint/sprint-S1.md`
-- `S.2`
+  - `docs/sc-lint/sprint-A1.md`
+- `A.2`
   - profiles and Windows preflight
-  - `docs/sc-lint/sprint-S2.md`
-- `S.3`
+  - `docs/sc-lint/sprint-A2.md`
+- `A.3`
   - generic utility extraction
-  - `docs/sc-lint/sprint-S3.md`
-- `S.4`
+  - `docs/sc-lint/sprint-A3.md`
+- `A.4`
   - Rust boundary inventory migration and reusable analyzer backports
-  - `docs/sc-lint/sprint-S4.md`
+  - `docs/sc-lint/sprint-A4.md`
 
 ## Release 1 Target
 
@@ -109,7 +109,7 @@ Release `0.1.x` should establish:
 - an implementation path for moving boundary inventory and manifest-policy
   logic into Rust with Python parity validation retained during migration
 
-The current phase is the release-1 foundation phase. It does not imply that
+The current phase, Phase `A`, is the release-1 foundation phase. It does not imply that
 every release-1 implementation item is already complete.
 
 ## Planning Conventions

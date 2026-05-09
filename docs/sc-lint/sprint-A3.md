@@ -1,9 +1,9 @@
-# Sprint S.3 — Generic Utility Extraction
+# Sprint A.3 — Generic Utility Extraction
 
 ```yaml
 plan_type: sprint_plan
-phase: S
-sprint: "S.3"
+phase: A
+sprint: "A.3"
 worktree: /Users/randlee/Documents/github/sc-lint
 branch: develop
 status: planned
@@ -42,8 +42,8 @@ standalone fixture coverage.
 
 ## Prerequisites
 
-- Sprint S.1 complete with top-level CLI dispatch
-- Sprint S.2 complete with stable profile semantics
+- Sprint A.1 complete with top-level CLI dispatch
+- Sprint A.2 complete with stable profile semantics
 
 ## Hard Dependencies
 
@@ -94,10 +94,10 @@ standalone fixture coverage.
 
 ## Split Recommendation
 
-If schedule pressure appears, split S.3 by utility family:
+If schedule pressure appears, split A.3 by utility family:
 
-- S.3A line-count + identity literal framework
-- S.3B generic view plumbing
+- A.3a line-count + identity literal framework
+- A.3b generic view plumbing
 
 The line-count utility should land first because it is the lowest-risk
 extraction.

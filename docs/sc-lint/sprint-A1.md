@@ -1,9 +1,9 @@
-# Sprint S.1 — Top-Level CLI Bootstrap
+# Sprint A.1 — Top-Level CLI Bootstrap
 
 ```yaml
 plan_type: sprint_plan
-phase: S
-sprint: "S.1"
+phase: A
+sprint: "A.1"
 worktree: /Users/randlee/Documents/github/sc-lint
 branch: develop
 status: planned
@@ -140,8 +140,8 @@ for non-interactive commands.
 
 ## Split Recommendation
 
-Keep S.1 together. The crate bootstrap, machine contract, and first backend
-dispatch seam should land in the same sprint so the product exits S.1 with a
+Keep A.1 together. The crate bootstrap, machine contract, and first backend
+dispatch seam should land in the same sprint so the product exits A.1 with a
 real top-level CLI rather than another paper design.
 
 ## Acceptance Criteria
