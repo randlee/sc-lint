@@ -3,6 +3,10 @@
 This document defines the detailed requirements for the planned top-level
 `sc-lint` CLI crate.
 
+Related ADRs:
+- [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+
 ## Purpose
 
 The CLI exists to provide one stable user-facing command surface across
@@ -21,6 +25,7 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
+  See [cli-contract.md](./cli-contract.md) for the planned exit-code mapping.
 
 - `REQ-CLI-005`
   The CLI must normalize user-facing output conventions across delegated tools.
@@ -37,7 +42,8 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-005C`
   Machine-readable failures must include stable error codes or categories,
   structured details, and caller-corrective guidance where recovery is
-  possible.
+  possible. See [cli-contract.md](./cli-contract.md) for the planned
+  top-level error kinds.
 
 - `REQ-CLI-005D`
   Human-readable output must not expose machine-significant information that is
@@ -77,6 +83,7 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-lint view <tool>`
   - `sc-lint check`
   - `sc-lint clippy`
+  - `sc-lint ci`
   - `sc-lint version`
 
 - `REQ-CLI-007A`
@@ -104,6 +111,8 @@ specialized backend tools and mixed Rust/Python implementations.
   The CLI should provide a top-level CI-equivalent command:
   - `sc-lint ci`
   which includes tests, while `sc-lint lint ci` remains lint-only.
+  This requirement satisfies the product-level release-1 requirement recorded
+  as `REQ-PRODUCT-016A`.
 
 - `REQ-CLI-008`
   The CLI must preserve room for additional grouped subcommands without
@@ -117,6 +126,7 @@ specialized backend tools and mixed Rust/Python implementations.
   - `Command`
   - `LintProfile`
   - `OutputMode`
+  - `CommandEnvelope<T>`
   - `CliError`
 
 - `REQ-CLI-008B`
@@ -145,7 +155,9 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-008F`
   `CommandEnvelope<T>` must be documented as the top-level machine-readable
-  result family for non-interactive command execution.
+  result family for non-interactive command execution and must remain
+  consistent with the canonical success/failure envelope documented in
+  [cli-contract.md](./cli-contract.md).
 
 ## Architecture Requirements
 

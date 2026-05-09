@@ -53,7 +53,9 @@ The product should support both:
 
 - `REQ-PRODUCT-002D`
   Machine-readable failure results must include stable codes or categories and
-  enough structured detail for automation to branch and recover.
+  enough structured detail for automation to branch and recover. See
+  [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md) for the planned
+  top-level error kinds and code mapping.
 
 - `REQ-PRODUCT-002DA`
   The top-level CLI must define one canonical success/failure envelope family
@@ -213,6 +215,9 @@ The product should support both:
   - `sc-lint lint ci`
   - `sc-lint ci`
   so lint-only CI parity and full CI-equivalent execution are not ambiguous.
+  The CLI-specific traceability for this requirement lives in
+  [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md) under
+  `REQ-CLI-007E`.
 
 - `REQ-PRODUCT-017`
   Canonical `sc-lint` boundary definitions may exist as planning inputs before

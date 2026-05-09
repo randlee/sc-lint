@@ -3,6 +3,10 @@
 This document defines the planned end-to-end contract for the top-level
 `sc-lint` CLI.
 
+Related ADRs:
+- [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+
 It exists to close the gap between:
 
 - backend-native result shapes
@@ -85,7 +89,7 @@ Illustrative shape:
 }
 ```
 
-Required `CliError` fields:
+`CliError` structure:
 
 - `kind`
 - `code`
@@ -109,6 +113,23 @@ The initial documented top-level error categories should include:
 
 These are CLI-level categories. Backends may carry more specific rule or
 domain codes beneath them.
+
+### Error kind to stable code mapping
+
+The initial documented mapping should be:
+
+| Error kind | Stable code family | Typical meaning |
+| --- | --- | --- |
+| `usage` | `CLI.USAGE_ERROR` | invalid arguments or unsupported command shape |
+| `config` | `CLI.CONFIG_ERROR` | repo config missing, malformed, or contradictory |
+| `capability` | `CLI.CAPABILITY_ERROR` | optional capability such as `cargo xwin` is required but unavailable |
+| `backend_failure` | `CLI.BACKEND_EXEC_FAILURE` | delegated backend failed to execute cleanly or returned a typed failure |
+| `backend_protocol` | `CLI.BACKEND_PROTOCOL_ERROR` | delegated backend returned malformed or unexpected machine output |
+| `internal` | `CLI.INTERNAL_ERROR` | top-level CLI bug or invariant violation |
+
+The exact string values may still be tuned before implementation, but the
+release-1 contract must define one stable mapping from top-level error kind to
+top-level stable code.
 
 ## Backend-to-CLI Normalization
 

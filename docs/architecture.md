@@ -144,6 +144,7 @@ the implemented Rust item names as the CLI crate lands.
 To keep the release-1 CLI architecture explicit rather than implicit, the
 planned top-level CLI surface should also name these important contract types:
 
+- `Cli`
 - `Command`
 - `LintProfile`
   - `Fast`
@@ -153,6 +154,9 @@ planned top-level CLI surface should also name these important contract types:
   - `Human`
   - `Json`
 - `CommandEnvelope`
+  - boundary/planning metadata tracks the generic family root name
+    `CommandEnvelope`, while the CLI contract documents the generic form
+    `CommandEnvelope<T>`
 - `CliError`
 
 These types are part of the intended architectural contract even before the

@@ -13,11 +13,17 @@ visibility = "public"
 constructor = "none"
 
 [composition]
+# `CommandEnvelope` records the generic success-envelope family documented in
+# the CLI contract as `CommandEnvelope<T>`.
 roots = ["Command", "LintProfile", "OutputMode", "CommandEnvelope", "CliError"]
 
 [dependencies]
+# Release 0.1.x permits direct linkage only to the shared support crate and
+# the boundary backend crate. Other backend execution may happen through
+# subprocess dispatch behind the CLI contract and therefore does not require a
+# direct crate dependency edge here.
 allowed_dependents = []
-allowed_dependencies = ["sc-lint-boundary"]
+allowed_dependencies = ["sc-lint-boundary", "sc-lint-directives"]
 forbidden_edges = [
   "sc-lint-directives -> sc-lint",
   "sc-lint-attributes -> sc-lint",
@@ -29,6 +35,9 @@ scope = "outside_owner_crate"
 forbidden = []
 
 [testing]
+# No test doubles or bypass paths are approved yet because release 0.1.x
+# treats the CLI as an integration-first contract surface. Additions here
+# require an explicit testability design decision rather than ad hoc mocks.
 allowed_test_double_paths = []
 forbidden_test_bypasses = []
 

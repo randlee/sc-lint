@@ -2,6 +2,7 @@
 
 Related ADR:
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
+- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 
 Related requirements:
 - [`./requirements.md`](./requirements.md)
@@ -34,7 +35,7 @@ That gap leaves room for two bad outcomes:
 Boundary lint should compare the structured boundary inventory against the code
 graph and classify missing documented items by planning status:
 
-- missing and planned in a future sprint: `WARN`
+- missing and planned in the current or a future sprint: `WARN`
 - missing and unplanned: `ERROR`
 - missing and overdue: `ERROR`
 
@@ -87,7 +88,7 @@ path, not invented as freeform prose. Recommended shape:
 Examples:
 
 - `BOUNDARY-ScLintCli.public.facade`
-- `BOUNDARY-MailStore.implementation.type`
+- `BOUNDARY-ScLintCli.implementation.type`
 - `BOUNDARY-ScLintCli.composition.root.CliError`
 
 ## Finding Classes
@@ -106,7 +107,7 @@ This is immediate architectural drift and should fail the lint.
 Use a warning when:
 
 - the documented item is missing from code
-- and it is explicitly scheduled for a future sprint
+- and it is explicitly scheduled for the current or a future sprint
 
 This warning should remain visible in lint output and logs, not be silently
 suppressed.
@@ -114,12 +115,33 @@ suppressed.
 ### Warning auto-escalation
 
 Warnings must automatically escalate to errors when the planned delivery point
-is current or past and the item still does not resolve.
+is older than the active sprint and the item still does not resolve.
 
 This prevents:
 
 - permanent warning debt
 - stale plan references becoming de facto suppressions
+
+### Current-sprint semantics
+
+For release planning, `[planning].current_sprint` means:
+
+- the currently active, in-progress sprint
+- not the most recently completed sprint
+
+That means a planned-but-missing item with:
+
+- `scheduled_sprint == current_sprint`
+
+is still warning-eligible while the sprint is active.
+
+An item becomes overdue only when:
+
+- `scheduled_sprint < current_sprint`
+
+Repositories that want a harder interpretation must advance
+`[planning].current_sprint` when the sprint closes rather than reusing the
+closed sprint label for post-closeout validation.
 
 ## Structured Planning Mapping
 
@@ -161,10 +183,10 @@ Example direction:
 [planning]
 current_sprint = "S.14"
 
-[planned_items."BOUNDARY-MailStore.implementation.type"]
+[planned_items."BOUNDARY-ScLintCli.implementation.type"]
 scheduled_sprint = "S.14"
 tracking_id = "SCB-CHANGE-1234"
-expires_when = "sprint_current_or_past"
+expires_when = "sprint_before_current"
 ```
 
 This shape is illustrative, not final. The `S.N` notation is only an example;
@@ -196,6 +218,15 @@ linter must classify planned-but-missing items as errors rather than warnings.
 Sprint comparison must use parsed sprint ordering, not lexical string
 comparison. For example, `S.10` must compare greater than `S.9`.
 
+For release `0.1.x`, the supported escalation condition should be:
+
+- `sprint_before_current`
+
+Meaning:
+
+- warn when `scheduled_sprint == current_sprint`
+- error when `scheduled_sprint < current_sprint`
+
 ## Finding Content
 
 Both warnings and errors should include:
@@ -217,9 +248,9 @@ Required rule families:
 - `SCB-INVENTORY-001`
   - missing documented item with no valid planning mapping
 - `SCB-INVENTORY-002`
-  - missing documented item scheduled for a future sprint
+  - missing documented item scheduled for the current or a future sprint
 - `SCB-INVENTORY-003`
-  - missing documented item whose planned sprint is current or past
+  - missing documented item whose planned sprint is before the current sprint
 
 ## Rule Behavior
 

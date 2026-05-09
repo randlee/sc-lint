@@ -32,6 +32,10 @@ The current project focus is:
   - see [docs/sc-lint/boundary-toml-migration.md](./sc-lint/boundary-toml-migration.md)
 - boundary enforcement model rollout
   - see [docs/sc-lint/boundary-enforcement-model.md](./sc-lint/boundary-enforcement-model.md)
+- CLI requirements and contract
+  - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
+  - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
+  - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - current phase execution plan

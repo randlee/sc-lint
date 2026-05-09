@@ -3,6 +3,10 @@
 This document records the intended architecture of the top-level `sc-lint` CLI
 crate.
 
+Related ADRs:
+- [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+
 ## Role
 
 The `sc-lint` CLI is the orchestration layer for the tool family.
@@ -39,6 +43,14 @@ owner for:
 - shared profile names
 - shared success/failure envelope conventions
 - capability-aware dispatch such as `xwin`
+
+For release `0.1.x`, the CLI may satisfy that role through a mix of:
+
+- direct library linkage to stable support/backend crates
+- delegated subprocess dispatch to backend binaries or Python adapters
+
+The stable contract is the top-level envelope and command surface, not the
+dispatch mechanism used behind it.
 
 ## Dispatch Principles
 
@@ -226,7 +238,7 @@ The CLI should present:
 - stable machine-readable failure contracts in `--json` mode
 
 See [cli-contract.md](./cli-contract.md) for the detailed envelope and
-normalization contract.
+normalization contract, including the planned exit-code mapping.
 
 ## Interactive Constraint
 

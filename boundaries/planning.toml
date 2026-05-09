@@ -1,42 +1,44 @@
 [planning]
+# current_sprint denotes the active, in-progress sprint. Planned items
+# scheduled for this sprint remain warning-eligible until the sprint advances.
 current_sprint = "S.1"
 
 [planned_items."BOUNDARY-ScLintCli.implementation.module"]
 scheduled_sprint = "S.1"
 tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.implementation.type"]
 scheduled_sprint = "S.1"
-tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+tracking_id = "SC-LINT-CLI-002"
+expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.public.facade"]
 scheduled_sprint = "S.1"
-tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+tracking_id = "SC-LINT-CLI-003"
+expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.composition.root.Command"]
 scheduled_sprint = "S.1"
-tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+tracking_id = "SC-LINT-CLI-004"
+expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.composition.root.LintProfile"]
 scheduled_sprint = "S.1"
-tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+tracking_id = "SC-LINT-CLI-005"
+expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.composition.root.OutputMode"]
 scheduled_sprint = "S.1"
-tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+tracking_id = "SC-LINT-CLI-006"
+expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.composition.root.CommandEnvelope"]
 scheduled_sprint = "S.1"
-tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+tracking_id = "SC-LINT-CLI-007"
+expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.composition.root.CliError"]
 scheduled_sprint = "S.1"
-tracking_id = "SC-LINT-CLI-001"
-expires_when = "sprint_current_or_past"
+tracking_id = "SC-LINT-CLI-008"
+expires_when = "sprint_before_current"
