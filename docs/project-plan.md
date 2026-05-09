@@ -50,6 +50,7 @@ The current project focus is:
   - see [docs/sc-lint/sprint-A5.md](./sc-lint/sprint-A5.md)
   - see [docs/sc-lint/sprint-A6.md](./sc-lint/sprint-A6.md)
   - see [docs/sc-lint/sprint-A7.md](./sc-lint/sprint-A7.md)
+  - see [docs/sc-lint/sprint-A8.md](./sc-lint/sprint-A8.md)
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
@@ -71,6 +72,8 @@ This phase should execute in the following order:
     into `sc-lint-boundary`
 11. migrate manifest policy into `sc-lint-boundary`
 12. run parity validation before deprecating Python boundary logic
+13. publish comprehensive per-tool user guides and rule-disable guidance for
+    the release-1 lint surface
 
 ## Scheduled Sprint Plans
 
@@ -97,6 +100,9 @@ The currently scheduled foundation sprints are:
 - `A.7`
   - Rust manifest-policy enforcement and Python parity window
   - `docs/sc-lint/sprint-A7.md`
+- `A.8`
+  - per-tool user guides and rule-disable documentation
+  - `docs/sc-lint/sprint-A8.md`
 
 ## Next Analyzer-Crate Additions
 
@@ -146,6 +152,12 @@ Release `0.1.x` should establish:
   - `sc-lint ci`
 - an implementation path for moving boundary inventory and manifest-policy
   logic into Rust with Python parity validation retained during migration
+- comprehensive user guides for each shipped linter tool, including:
+  - how the tool is invoked
+  - representative examples
+  - how rules are disabled or scoped out when policy permits
+  - one document per tool named after the lint tool and linked from the
+    repository-root `README.md`
 
 The current phase, Phase `A`, is the release-1 foundation phase. It does not imply that
 every release-1 implementation item is already complete.

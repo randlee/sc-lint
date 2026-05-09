@@ -225,6 +225,34 @@ Current constraint:
 - do not present cross-target preflight as a replacement for Windows/macOS/Linux
   CI runners
 
+### Workstream 9: Per-tool user guides
+
+Create one standalone user guide per shipped linter tool.
+
+Required work:
+
+- add one comprehensive document per tool
+- document:
+  - what the tool checks
+  - how it is invoked
+  - expected output shape
+  - representative pass/fail examples
+  - how rules or findings may be disabled when policy permits
+- keep the rule-disable guidance explicit about:
+  - source-level allowances
+  - config-driven suppressions
+  - tools or rules that intentionally have no disable path
+
+Required outputs for the current release line:
+
+- one guide for `sc-lint-boundary`
+- one guide for `sc-lint-portability`
+- one guide for each remaining shipped lint surface in the repo-local gate
+  that is treated as productized behavior
+- all guide files live under `docs/sc-lint/tools/`
+- all guide files are named after the tool they document
+- the repository-root `README.md` links every guide directly
+
 ## Sequence
 
 The current phase should execute in this order:
@@ -239,6 +267,7 @@ The current phase should execute in this order:
 8. migrate boundary inventory loading/schema/duplicate handling into Rust
 9. migrate manifest-policy logic into Rust
 10. keep Python parity validation during the migration window
+11. publish per-tool user guides for the release-1 lint surface
 
 ## Planned Sprint Sequence
 
@@ -265,6 +294,9 @@ The scheduled implementation sprints for this phase are:
 7. `A.7`
    - Rust manifest-policy migration and Python parity window
    - sprint plan: `docs/sc-lint/sprint-A7.md`
+8. `A.8`
+   - per-tool user guides and rule-disable documentation
+   - sprint plan: `docs/sc-lint/sprint-A8.md`
 
 These sprint plans are the authoritative implementation breakdown of the
 foundation phase once execution begins. This phase document remains the
@@ -284,6 +316,8 @@ This phase is complete when:
   and cannot guarantee
 - boundary inventory and manifest-policy migration to Rust is staged with
   parity validation
+- each shipped linter tool in the release-1 surface has a standalone user
+  guide with invocation, examples, and disable guidance
 
 ## Release 1 Alignment
 

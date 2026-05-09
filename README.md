@@ -152,3 +152,10 @@ Detailed design and planning material lives under:
 - [`docs/sc-lint/graph-schema.md`](docs/sc-lint/graph-schema.md)
 - [`docs/sc-lint/boundary-enforcement-model.md`](docs/sc-lint/boundary-enforcement-model.md)
 - [`docs/sc-lint/boundary-toml-migration.md`](docs/sc-lint/boundary-toml-migration.md)
+
+Planned per-tool guide convention:
+
+- per-tool guides will live under `docs/sc-lint/tools/`
+- each file will be named after the lint tool it documents
+- this root `README.md` will link every per-tool guide directly once Sprint
+  `A.8` lands

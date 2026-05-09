@@ -29,6 +29,7 @@ Current contents:
 - [`sprint-A5.md`](./sprint-A5.md) — runtime crate extraction sprint
 - [`sprint-A6.md`](./sprint-A6.md) — Rust boundary inventory loader sprint
 - [`sprint-A7.md`](./sprint-A7.md) — manifest-policy and parity sprint
+- [`sprint-A8.md`](./sprint-A8.md) — per-tool user-guide sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
@@ -233,6 +234,12 @@ Related architecture decision:
 
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
   — canonical TOML boundary source plus planning-aware inventory-parity
+
+Planned A.8 user-guide convention:
+
+- per-tool guides will live under `docs/sc-lint/tools/`
+- each file will be named after the tool it documents
+- the repository-root `README.md` will link every guide directly
   enforcement
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
   — top-level CLI profile semantics plus capability-driven `xwin` preflight
