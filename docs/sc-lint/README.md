@@ -25,8 +25,10 @@ Current contents:
 - [`sprint-A1.md`](./sprint-A1.md) — top-level CLI bootstrap sprint
 - [`sprint-A2.md`](./sprint-A2.md) — profiles and `xwin` sprint
 - [`sprint-A3.md`](./sprint-A3.md) — generic utility extraction sprint
-- [`sprint-A4.md`](./sprint-A4.md) — Rust boundary migration and analyzer
-  backport sprint
+- [`sprint-A4.md`](./sprint-A4.md) — portability crate extraction sprint
+- [`sprint-A5.md`](./sprint-A5.md) — runtime crate extraction sprint
+- [`sprint-A6.md`](./sprint-A6.md) — Rust boundary inventory loader sprint
+- [`sprint-A7.md`](./sprint-A7.md) — manifest-policy and parity sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
@@ -53,7 +55,14 @@ Current intended crate split:
   - shared directive parsing/types
 - `sc-lint-boundary`
   - analyzer CLI + library
-  - AST parsing, graph construction, semantic rule evaluation
+  - AST parsing, graph construction, semantic boundary rule evaluation
+- `sc-lint-portability`
+  - planned analyzer crate for shared OS/platform portability rules
+- `sc-lint-runtime`
+  - planned analyzer crate for shared std runtime/concurrency rules
+- `sc-lint-tokio`
+  - planned future analyzer crate for Tokio-specific rules
+  - represented now as a reserved future boundary surface only
 - `sc-lint-attributes`
   - proc-macro attribute crate
   - intentionally minimal at first
@@ -102,7 +111,7 @@ Current scaffold status:
       - `SCB-BOUNDARY-001` internal_only visibility violation
       - `SCB-BOUNDARY-002` internal_only external reference
       - `SCB-BOUNDARY-003` forbid_external_impls violation
-    - portability enforcement with:
+    - temporary portability enforcement inside `sc-lint-boundary` with:
       - `PORT-001` hardcoded Unix-only absolute paths in test code
       - `PORT-002` direct `dirs::home_dir()` without configured override check
       - `PORT-003` `std::env::set_var()` in test code
@@ -116,6 +125,50 @@ Current scaffold status:
   - detailed CLI requirements and architecture are defined in:
     - [`cli-requirements.md`](./cli-requirements.md)
     - [`cli-architecture.md`](./cli-architecture.md)
+
+Current code moves required for the planned partition:
+
+- move portability rules out of `crates/sc-lint-boundary/src/portability.rs`
+  into the future `sc-lint-portability` crate:
+  - `PORT-001`
+  - `PORT-002`
+  - `PORT-003`
+  - `PORT-004`
+  - `PORT-005`
+- import std runtime/concurrency rules from the current `atm-core` proving
+  surface into the future `sc-lint-runtime` crate:
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
+- retarget the current portability wrapper surface when that crate exists:
+  - `.just/lint_sc_portability.py`
+  - `.just/run_lint.py`
+
+Planned primary lint-target mapping for the top-level CLI:
+
+- `sc-lint lint sc-boundary`
+  - backend owner: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - backend owner: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - backend owner: `sc-lint-runtime`
+
+Grouped subset aliases may exist later, but these crate-mapped targets are the
+primary ownership-preserving command surface.
+
+Planned next shared rule imports from `atm-core`:
+
+- `sc-lint-portability`
+  - `PORT-004`
+  - `PORT-005`
+- `sc-lint-runtime`
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
+
+Kept local to consumer repos for now:
+
+- duplicate semantic string-literal policy
+- fixed-sleep test-hygiene policy
+- TTL triage consistency policy
 
 Current repo integration status:
 

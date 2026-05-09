@@ -9,7 +9,8 @@ tooling into `sc-lint`, with special focus on:
 
 It also records the planned introduction of a top-level `sc-lint` command-line
 entry point that provides one stable surface across mixed Rust/Python tool
-implementations.
+implementations, plus the planned distribution of imported analyzer families
+into narrow dedicated crates.
 
 ## Scope
 
@@ -122,7 +123,7 @@ This means, for example:
 - coordination belongs in the top-level `sc-lint` CLI, not in backend crate
   cross-calls
 
-### Move to Rust
+### Move to Rust / dedicated analyzer crates
 
 The following logic should migrate into `sc-lint-boundary`:
 
@@ -134,11 +135,24 @@ The following logic should migrate into `sc-lint-boundary`:
 - manifest section rules
 - inventory-parity checks
 - future boundary metadata checks that depend on the canonical boundary model
-- reusable postmortem analyzer families already proven on `atm-core`:
+
+The following reusable analyzer families should migrate into dedicated crates:
+
+- `sc-lint-portability`
+  - `PORT-001` hardcoded Unix-only absolute paths in test code
+  - `PORT-002` direct `dirs::home_dir()` without configured override check
+  - `PORT-003` `std::env::set_var()` in test code
   - `PORT-004` ungated `std::os::unix` imports in production code
   - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
+- `sc-lint-runtime`
   - `SCB-RUNTIME-001` bare production `Condvar::wait(...)`
   - `SCB-RUNTIME-002` discarded `wait_timeout*` results in production code
+
+Planned later crate:
+
+- `sc-lint-tokio`
+  - Tokio-specific runtime rules only
+  - not part of the current import scope
 
 ### Stay in Python
 
@@ -194,6 +208,12 @@ Initial expected shape:
 - `sc-lint version`
 - `sc-lint ci`
 
+Release-1 note:
+
+- `lint` owns the primary crate-mapped backend targets
+- `view` remains a narrower grouped surface whose targets are documented
+  individually as they become stable
+
 Initial expected profile shape:
 
 - `sc-lint lint fast`
@@ -210,6 +230,37 @@ Deliverable:
 - one stable CLI entry point for the repo
 - one explicit machine-readable contract for non-interactive command families
 - backend implementations remain self-contained behind the dispatcher
+
+### Phase 0.5: Define cross-target preflight support
+
+Decide how `sc-lint` should orchestrate cross-target compile checks that can
+surface likely platform drift before CI.
+
+Required work:
+
+- document the supported targets and prerequisites
+- document `cargo xwin` as the initial Windows preflight mechanism if
+  consumer-repo validation continues to hold
+- define explicit `xwin`-aware command shapes rather than burying the feature
+  only inside generic lint-target names
+- measure developer-cost impact before adding any cross-target check to a
+  default gate
+- record the expected split between:
+  - `xwin check` as the likely first promotion candidate
+  - `xwin clippy` as a stronger follow-up path that may stay non-default
+- record the profile policy:
+  - `fast` may include `xwin check`
+  - `full` may include `xwin check` and `xwin clippy`
+  - `ci` excludes `xwin` because real Windows CI already exists
+
+Deliverable:
+
+- one documented cross-target preflight path
+- no ambiguity about the difference between cross-target compile checks and
+  authoritative native-platform CI validation
+- no ambiguity about the difference between:
+  - `sc-lint lint ci`
+  - `sc-lint ci`
 
 ### Phase 1: Extract generic Python utilities
 
@@ -240,57 +291,50 @@ Phase 1 note on identity literals:
 - if extracted later, `sc-lint` should expose a configurable literal-policy
   framework rather than hardcoding ATM role names
 
-### Phase 1.5: Backport proven reusable postmortem analyzer rules
+### Phase 1.5: Add `sc-lint-portability`
 
-Move the reusable R.19 analyzer families from the embedded `atm-core`
-proving surface into standalone `sc-lint`.
+Create the dedicated portability analyzer crate and move all shared
+portability rules into it.
 
 Required work:
 
-- port `PORT-004` and `PORT-005` into the standalone `sc-lint-boundary`
-  codebase
-- port `SCB-RUNTIME-001` and `SCB-RUNTIME-002` into the standalone
-  `sc-lint-boundary` codebase
+- create `sc-lint-portability`
+- move the existing portability implementation out of
+  `crates/sc-lint-boundary/src/portability.rs`
+- keep `PORT-001/002/003` with the same rule ids under `sc-lint-portability`
+- port `PORT-004` and `PORT-005` into `sc-lint-portability`
+- retarget the current portability wrapper surface to the new crate once it
+  exists
 - add rule documentation and tests in `sc-lint`
 - keep the consumer repo (`atm-core`) as the first validation target after
   the backport
 
 Deliverable:
 
-- `sc-lint` owns the reusable postmortem analyzer families that were proven on
-  `atm-core`
-- consumer repos can consume those families without copying ATM-local policy
+- `sc-lint-portability` owns the shared portability rule family
+- the existing portability code path has moved out of `sc-lint-boundary`
+- consumer repos can consume the shared portability family without copying
+  ATM-local policy
 
-### Phase 1.6: Define cross-target preflight support
+### Phase 1.6: Add `sc-lint-runtime`
 
-Decide how `sc-lint` should orchestrate cross-target compile checks that can
-surface likely platform drift before CI.
+Create the dedicated std runtime/concurrency analyzer crate and move the
+shared runtime rules into it.
 
 Required work:
 
-- document the supported targets and prerequisites
-- document `cargo xwin` as the initial Windows preflight mechanism if
-  consumer-repo validation continues to hold
-- define explicit `xwin`-aware command shapes rather than burying the feature
-  only inside generic lint-target names
-- measure developer-cost impact before adding any cross-target check to a
-  default gate
-- record the expected split between:
-  - `xwin check` as the likely first promotion candidate
-  - `xwin clippy` as a stronger follow-up path that may stay non-default
-- record the profile policy:
-  - `fast` may include `xwin check`
-  - `full` may include `xwin check` and `xwin clippy`
-  - `ci` excludes `xwin` because real Windows CI already exists
+- create `sc-lint-runtime`
+- port `SCB-RUNTIME-001` and `SCB-RUNTIME-002` into `sc-lint-runtime`
+- add rule documentation and tests in `sc-lint`
+- keep the consumer repo (`atm-core`) as the first validation target after
+  the backport
 
 Deliverable:
 
-- one documented cross-target preflight path
-- no ambiguity about the difference between cross-target compile checks and
-  authoritative native-platform CI validation
-- no ambiguity about the difference between:
-  - `sc-lint lint ci`
-  - `sc-lint ci`
+- `sc-lint-runtime` owns the shared std runtime rule family
+- the imported runtime families land in a dedicated analyzer crate rather than
+  widening `sc-lint-boundary`
+- consumer repos can consume those rules without copying ATM-local policy
 
 ### Phase 2: Introduce Rust boundary inventory loader
 

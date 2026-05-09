@@ -6,7 +6,7 @@
 | Status | **Accepted** |
 | Date | 2026-05-09 |
 | Deciders | team-lead, quality-mgr, clint |
-| Relates to | REQ-PRODUCT-001 through REQ-PRODUCT-006F, REQ-CLI-001 through REQ-CLI-008E |
+| Relates to | REQ-PRODUCT-001 through REQ-PRODUCT-003B, REQ-PRODUCT-006F, REQ-CLI-001 through REQ-CLI-006B, REQ-CLI-007, REQ-CLI-007A, REQ-CLI-007AA, REQ-CLI-007AB, REQ-CLI-007F, REQ-CLI-007G, REQ-CLI-008 through REQ-CLI-008F |
 
 ---
 

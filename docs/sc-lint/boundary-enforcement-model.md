@@ -64,6 +64,10 @@ out of parity scope unless they are first promoted into explicit structured
 boundary records. CLI contract types recorded under
 `BOUNDARY-ScLintCli.composition.root.*` are in scope.
 
+Reserved future analyzer crates may also exist in structured boundary records
+before they are scheduled. They remain out of parity scope until a future
+sprint assigns planned items for their implementation/public contract fields.
+
 ## Required Planning Inputs
 
 The warning model is only valid when the planning metadata is complete enough to

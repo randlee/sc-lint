@@ -93,6 +93,46 @@ Planned top-level CI-equivalent command:
 
 - `sc-lint ci`
 
+For release `0.1.x`, the `view` family remains narrower than `lint`:
+
+- `lint`
+  - primary targets are crate-mapped and ownership-bearing
+- `view`
+  - reserved top-level grouping for report and visualization surfaces
+  - target names are documented individually as they become stable
+  - release-1 view targets may remain backed by repo-local Python/report
+    plumbing instead of one target per backend crate
+
+Primary lint-target mapping should follow backend-crate ownership:
+
+- `sc-lint lint sc-boundary`
+  - primary backend: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - primary backend: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - primary backend: `sc-lint-runtime`
+
+Future crate-backed additions should follow the same pattern, for example:
+
+- `sc-lint lint sc-tokio`
+  - primary backend: `sc-lint-tokio`
+
+Subset aliases such as `unix-gating` or `runtime-waits` may exist, but they
+must remain secondary convenience surfaces rather than replacing the
+crate-mapped primary command set.
+
+Release-1 integration mode for those targets is:
+
+- `sc-lint lint sc-boundary`
+  - direct linkage or delegated execution are both acceptable
+- `sc-lint lint sc-portability`
+  - initially expected to use delegated backend execution
+- `sc-lint lint sc-runtime`
+  - initially expected to use delegated backend execution
+
+Direct top-level crate dependencies on `sc-lint-portability` or
+`sc-lint-runtime` are a later design choice, not a release-1 assumption.
+
 Profile semantics:
 
 - `fast`

@@ -17,7 +17,7 @@ Current implemented crates:
   - proc-macro attribute crate
   - currently shares the workspace `0.1.0` version line
 
-Planned next crate:
+Planned next crates:
 
 - `sc-lint`
   - top-level CLI crate
@@ -33,12 +33,31 @@ Planned next crate:
   - planned Windows preflight commands when `cargo xwin` is installed:
     - `sc-lint check xwin`
     - `sc-lint clippy xwin`
+- `sc-lint-portability`
+  - platform/OS portability analyzer crate
+  - planned first moves/imports:
+    - `PORT-001`
+    - `PORT-002`
+    - `PORT-003`
+    - `PORT-004`
+    - `PORT-005`
+- `sc-lint-runtime`
+  - std runtime/concurrency analyzer crate
+  - planned first imports:
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
+
+Planned later crate:
+
+- `sc-lint-tokio`
+  - Tokio-specific analyzer crate reserved for async-runtime-specific rules
 
 Reason:
 
 - real Rust attributes need a proc-macro crate anyway
 - creating it early avoids late packaging churn
-- the analyzer crate should not carry proc-macro concerns
+- the boundary analyzer crate should not carry unrelated portability or
+  runtime-rule growth forever
 - the top-level CLI should coordinate backends rather than forcing backend
   crate cross-dependencies
 - the top-level CLI should own the stable machine contract instead of exposing
@@ -59,10 +78,56 @@ Current scaffold state:
   - initial `sc_lint` attribute ingestion in place now
   - first owner-graph cycle rules in place now
   - first boundary enforcement rules in place now
+- `sc-lint-portability`
+  - planned
+  - implementation not started yet
+- `sc-lint-runtime`
+  - planned
+  - implementation not started yet
 - `sc-lint`
   - planned
   - detailed CLI requirements/architecture defined
   - implementation not started yet
+- `sc-lint-tokio`
+  - reserved
+  - no implementation scope yet
+
+### Current code moves required
+
+The current implementation still contains portability rules inside
+`sc-lint-boundary`.
+
+Planned moves:
+
+- from `crates/sc-lint-boundary/src/portability.rs`
+  - `PORT-001`
+  - `PORT-002`
+  - `PORT-003`
+  - `PORT-004`
+  - `PORT-005`
+  - target crate: `sc-lint-portability`
+- from the current `atm-core` proving implementation
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
+  - target crate: `sc-lint-runtime`
+
+Wrapper retargets required after those moves:
+
+- `.just/lint_sc_portability.py`
+- `.just/run_lint.py`
+- help text and README references for `sc-portability`
+
+Planned primary CLI target mapping:
+
+- `sc-lint lint sc-boundary`
+  - backend owner: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - backend owner: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - backend owner: `sc-lint-runtime`
+
+Subset aliases may exist later, but they should remain secondary to the
+crate-mapped primary lint targets.
 
 ### Analyzer strategy
 
@@ -159,6 +224,7 @@ Current implementation status:
   - `forbid_external_impls` enforcement
 - deferred:
   - additional boundary declarations beyond current attribute set
+  - postmortem portability/runtime imports until their dedicated crates exist
 
 ## What Is Explicitly Deferred
 
@@ -241,8 +307,18 @@ families such as comparison, hashing, conversion, and serde traits.
 
 ## Next Planning Items
 
-The next planned boundary-enforcement work after the current implementation
+The next planned tool-distribution work after the current implementation
 branch merges is:
+
+1. create `sc-lint-portability`
+2. move existing `PORT-001/002/003` into `sc-lint-portability`
+3. import `PORT-004/005` into `sc-lint-portability`
+4. create `sc-lint-runtime`
+5. move `SCB-RUNTIME-001/002` into `sc-lint-runtime`
+6. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
+   implementation
+
+The next planned boundary-enforcement work after that is:
 
 1. boundary definition migration from Markdown parsing to TOML
 2. inventory-parity warn/error enforcement on top of the TOML-backed boundary

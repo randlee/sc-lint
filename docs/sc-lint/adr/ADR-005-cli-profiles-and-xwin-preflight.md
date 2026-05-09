@@ -6,7 +6,7 @@
 | Status | **Accepted** |
 | Date | 2026-05-08 |
 | Deciders | arch-inj, team-lead, clint |
-| Relates to | REQ-PRODUCT-001 through REQ-PRODUCT-016A, REQ-CLI-001 through REQ-CLI-015 |
+| Relates to | REQ-PRODUCT-006C through REQ-PRODUCT-006E, REQ-PRODUCT-012A through REQ-PRODUCT-012E, REQ-PRODUCT-016A, REQ-CLI-007, REQ-CLI-007B through REQ-CLI-007E, REQ-CLI-014, REQ-CLI-015 |
 
 ---
 

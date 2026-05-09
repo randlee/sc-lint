@@ -2,6 +2,12 @@
 
 This document defines the high-level product architecture for `sc-lint`.
 
+Related ADRs:
+- [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](./sc-lint/adr/ADR-004-structured-boundary-definitions.md)
+- [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
+- [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+
 ## Architecture Goals
 
 The `sc-lint` architecture should:
@@ -37,7 +43,20 @@ Current primary crates:
 - `sc-lint-attributes`
   - proc-macro attribute surface for `#[sc_lint(...)]`
 - `sc-lint-boundary`
-  - analyzer CLI and library for boundary and portability rules
+  - analyzer CLI and library for boundary rules
+- `sc-lint-portability`
+  - planned analyzer CLI and library for platform/OS portability rules
+- `sc-lint-runtime`
+  - planned analyzer CLI and library for std runtime/concurrency correctness
+    rules
+
+Planned later crate:
+
+- `sc-lint-tokio`
+  - reserved home for Tokio-specific async/runtime lint rules when Tokio-specific
+    dependencies or semantics justify a dedicated crate
+  - represented in structured boundary metadata as a reserved future crate
+  - out of current parity scope until a future sprint assigns planned items
 
 ## Top-level CLI Role
 
@@ -69,6 +88,25 @@ The top-level CLI should standardize on:
   - `full`
   - `ci`
 
+The primary `lint` target surface should preserve backend-crate ownership
+explicitly. Planned primary mappings are:
+
+- `sc-lint lint sc-boundary`
+  - backend owner: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - backend owner: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - backend owner: `sc-lint-runtime`
+
+Future crate-backed additions should follow the same rule, for example:
+
+- `sc-lint lint sc-tokio`
+  - backend owner: `sc-lint-tokio`
+
+Subset aliases such as `unix-gating` or `runtime-waits` may exist as secondary
+surfaces, but they must not replace the primary crate-mapped identifiers in
+the product contract.
+
 Backend-specific machine flags may still exist internally during migration, but
 the user-facing product contract should not depend on them.
 
@@ -90,6 +128,32 @@ This means coordination belongs in:
 and not in:
 
 - direct backend crate cross-calls
+
+### Rule-family distribution
+
+The release line should avoid growing large catch-all analyzer crates.
+
+Current intended distribution is:
+
+- `sc-lint-boundary`
+  - boundary inventory and ownership rules
+  - boundary declarations and attribute-driven boundary policy
+- `sc-lint-portability`
+  - OS/platform portability rules
+  - current planned moves/imports:
+    - `PORT-001`
+    - `PORT-002`
+    - `PORT-003`
+    - `PORT-004`
+    - `PORT-005`
+- `sc-lint-runtime`
+  - std runtime/concurrency correctness rules
+  - current planned imports:
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
+- `sc-lint-tokio`
+  - future Tokio-specific runtime rules
+  - must remain distinct from generic runtime rules
 
 ## Boundary and Planning Data
 
@@ -130,6 +194,15 @@ important public facades and implementation types for the release-1 line:
   - facade: `sc_lint`
   - implementation type: `sc_lint`
 - `BOUNDARY-ScLintBoundaryAnalyzer`
+  - facade: `analyze_workspace`
+  - implementation type: `analyze_workspace`
+- `BOUNDARY-ScLintPortabilityAnalyzer`
+  - facade: `analyze_workspace`
+  - implementation type: `analyze_workspace`
+- `BOUNDARY-ScLintRuntimeAnalyzer`
+  - facade: `analyze_workspace`
+  - implementation type: `analyze_workspace`
+- `BOUNDARY-ScLintTokioAnalyzer`
   - facade: `analyze_workspace`
   - implementation type: `analyze_workspace`
 - `BOUNDARY-ScLintCli`
@@ -209,11 +282,13 @@ productized second.
 
 Current planned promotion path from `atm-core`:
 
-- reusable analyzer families to backport into `sc-lint-boundary`:
-  - `PORT-004`
-  - `PORT-005`
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
+- reusable analyzer families to backport into dedicated tool crates:
+  - `sc-lint-portability`
+    - `PORT-004`
+    - `PORT-005`
+  - `sc-lint-runtime`
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
 - consumer-local policy families that stay outside `sc-lint` unless extracted
   as a configurable framework:
   - duplicate semantic string-literal policy

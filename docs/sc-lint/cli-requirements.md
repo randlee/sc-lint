@@ -75,6 +75,12 @@ specialized backend tools and mixed Rust/Python implementations.
   but backend-specific flag shapes must not become part of the stable
   top-level contract.
 
+- `REQ-CLI-006B`
+  For release `0.1.x`, `sc-lint lint sc-portability` and
+  `sc-lint lint sc-runtime` may be integrated through delegated backend
+  execution rather than direct top-level crate dependencies. Any promotion to
+  direct linkage requires an explicit boundary/architecture update.
+
 ## Command Surface Requirements
 
 - `REQ-CLI-007`
@@ -90,6 +96,29 @@ specialized backend tools and mixed Rust/Python implementations.
   The CLI should support first-class execution modes for common developer
   flows where that yields a clearer contract than burying them inside generic
   lint target names.
+
+- `REQ-CLI-007AA`
+  For release `0.1.x`, the `view` command family is reserved as a stable
+  top-level grouping, but its target inventory is narrower than `lint` and is
+  not required to map one-to-one to backend analyzer crates.
+
+- `REQ-CLI-007AB`
+  Release-1 `view` targets must be documented individually before exposure and
+  may remain backed by repo-local Python/report plumbing until a later phase
+  promotes them into a stronger product contract.
+
+- `REQ-CLI-007F`
+  The primary `sc-lint lint <tool>` identifiers must map one-to-one to backend
+  crate ownership boundaries. The planned initial analyzer target set is:
+  - `sc-boundary`
+  - `sc-portability`
+  - `sc-runtime`
+  and future crate-backed additions should follow the same pattern.
+
+- `REQ-CLI-007G`
+  Narrower grouped aliases such as `unix-gating` or `runtime-waits` may exist
+  as secondary convenience surfaces, but they must not replace the primary
+  backend-crate target names in product documentation or contract ownership.
 
 - `REQ-CLI-007B`
   If `cargo xwin` is installed, the CLI should expose Windows preflight

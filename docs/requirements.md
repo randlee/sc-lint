@@ -2,6 +2,11 @@
 
 This document defines the high-level product requirements for `sc-lint`.
 
+Related ADRs:
+- [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
+- [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+
 ## Product Purpose
 
 `sc-lint` is a standalone lint tool family for Rust repositories. It provides:
@@ -76,11 +81,32 @@ The product should support both:
   each other directly unless a later design review explicitly approves a shared
   support crate.
 
+- `REQ-PRODUCT-003A`
+  The top-level CLI should expose one primary lint target per backend analyzer
+  crate so the user-facing lint surface preserves crate ownership boundaries.
+
+- `REQ-PRODUCT-003B`
+  Narrower grouped aliases such as rule-subset or profile-oriented names may
+  exist, but they must remain secondary surfaces layered on top of the primary
+  backend-crate mapping rather than replacing it.
+
 ### Backend analyzers and tools
 
 - `REQ-PRODUCT-004`
-  `sc-lint-boundary` must remain the home for AST-sensitive boundary and
-  portability analysis.
+  `sc-lint-boundary` must remain the home for AST-sensitive boundary analysis.
+
+- `REQ-PRODUCT-004A`
+  `sc-lint-portability` must be the home for shared AST-sensitive
+  platform/OS portability rules.
+
+- `REQ-PRODUCT-004B`
+  `sc-lint-runtime` must be the home for shared AST-sensitive std
+  runtime/concurrency correctness rules.
+
+- `REQ-PRODUCT-004C`
+  Tokio-specific runtime rules must not land in `sc-lint-runtime` by default;
+  they should move into `sc-lint-tokio` when Tokio-specific dependencies or
+  semantics justify a dedicated crate.
 
 - `REQ-PRODUCT-005`
   Generic, non-AST-sensitive utilities may remain Python-based when Rust does
@@ -94,6 +120,11 @@ The product should support both:
   Reusable lint families proven first in a consumer repository must have an
   explicit migration path into `sc-lint` when their semantics are
   consumer-neutral.
+
+- `REQ-PRODUCT-006AA`
+  Reusable lint families imported from a consumer repo must be assigned to the
+  narrowest fitting analyzer crate rather than appended to an unrelated
+  catch-all crate.
 
 - `REQ-PRODUCT-006B`
   Consumer-specific policy lints must not migrate into `sc-lint` unchanged;
@@ -139,6 +170,11 @@ The product should support both:
   - planned top-level CLI contract items recorded as boundary composition roots
   and must exclude repo-local automation/profile orchestration surfaces unless
   a later phase models them explicitly in structured boundary records.
+
+- `REQ-PRODUCT-009B`
+  Reserved future analyzer crates may be represented in structured boundary
+  records before they are scheduled, but they remain out of inventory-parity
+  scope until a scheduled sprint and planned-item mapping are assigned.
 
 ### Development gate
 
@@ -202,6 +238,23 @@ The product should support both:
   - migrate to `sc-lint`
   - keep local to the consumer repo
   - extract only as a configurable framework
+
+- `REQ-PRODUCT-015B`
+  The current postmortem imports must distribute as:
+  - `PORT-004` and `PORT-005` -> `sc-lint-portability`
+  - `SCB-RUNTIME-001` and `SCB-RUNTIME-002` -> `sc-lint-runtime`
+
+- `REQ-PRODUCT-015C`
+  The current shared rule-family moves required for release `0.1.x` are:
+  - `PORT-001`
+  - `PORT-002`
+  - `PORT-003`
+  - `PORT-004`
+  - `PORT-005`
+  from `sc-lint-boundary` into `sc-lint-portability`, and:
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
+  into `sc-lint-runtime`.
 
 ### Release 1 objective
 

@@ -18,6 +18,8 @@ The current project focus is:
 - moving boundary inventory and manifest-policy enforcement from Python into
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`
+- splitting imported lint families into narrowly-scoped analyzer crates rather
+  than growing catch-all backends
 - keeping consumer-specific policy lints local unless only their framework is
   worth extracting
 - improving pre-CI developer confidence with cross-target compile checks where
@@ -36,6 +38,7 @@ The current project focus is:
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
+  - see [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - current phase execution plan
@@ -44,6 +47,9 @@ The current project focus is:
   - see [docs/sc-lint/sprint-A2.md](./sc-lint/sprint-A2.md)
   - see [docs/sc-lint/sprint-A3.md](./sc-lint/sprint-A3.md)
   - see [docs/sc-lint/sprint-A4.md](./sc-lint/sprint-A4.md)
+  - see [docs/sc-lint/sprint-A5.md](./sc-lint/sprint-A5.md)
+  - see [docs/sc-lint/sprint-A6.md](./sc-lint/sprint-A6.md)
+  - see [docs/sc-lint/sprint-A7.md](./sc-lint/sprint-A7.md)
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
@@ -55,12 +61,16 @@ This phase should execute in the following order:
 2. make `just lint` self-host the repo's own analyzer checks by default
 3. add the top-level `sc-lint` CLI crate and define its canonical machine
    contract
-4. extract generic Python utilities
-5. backport reusable `atm-core`-proven analyzer families into `sc-lint`
-6. define the cross-target preflight strategy for local and CI lint flows
-7. migrate boundary inventory + manifest policy from Python into
-   `sc-lint-boundary`
-8. run parity validation before deprecating Python boundary logic
+4. define the cross-target preflight strategy for local and CI lint flows
+5. extract generic Python utilities
+6. add the next analyzer crate needed for portability rule-family ownership
+7. move portability rules into `sc-lint-portability`
+8. add the next analyzer crate needed for std runtime rule-family ownership
+9. import runtime rules into `sc-lint-runtime`
+10. migrate boundary inventory loading/schema/duplicate handling from Python
+    into `sc-lint-boundary`
+11. migrate manifest policy into `sc-lint-boundary`
+12. run parity validation before deprecating Python boundary logic
 
 ## Scheduled Sprint Plans
 
@@ -76,8 +86,36 @@ The currently scheduled foundation sprints are:
   - generic utility extraction
   - `docs/sc-lint/sprint-A3.md`
 - `A.4`
-  - Rust boundary inventory migration and reusable analyzer backports
+  - `sc-lint-portability` crate creation and portability-rule moves/imports
   - `docs/sc-lint/sprint-A4.md`
+- `A.5`
+  - `sc-lint-runtime` crate creation and runtime-rule imports
+  - `docs/sc-lint/sprint-A5.md`
+- `A.6`
+  - Rust boundary inventory loading, schema validation, and duplicate handling
+  - `docs/sc-lint/sprint-A6.md`
+- `A.7`
+  - Rust manifest-policy enforcement and Python parity window
+  - `docs/sc-lint/sprint-A7.md`
+
+## Next Analyzer-Crate Additions
+
+The next planned tool crates after the current line are:
+
+- `sc-lint-portability`
+  - first moves/imports:
+    - `PORT-001`
+    - `PORT-002`
+    - `PORT-003`
+    - `PORT-004`
+    - `PORT-005`
+- `sc-lint-runtime`
+  - first moves/imports:
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
+- `sc-lint-tokio`
+  - planned crate reservation only for now
+  - no initial implementation scope until Tokio-specific rules justify it
 
 ## Release 1 Target
 

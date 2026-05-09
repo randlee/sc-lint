@@ -42,3 +42,33 @@ expires_when = "sprint_before_current"
 scheduled_sprint = "A.1"
 tracking_id = "SC-LINT-CLI-008"
 expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintPortabilityAnalyzer.public.facade"]
+scheduled_sprint = "A.4"
+tracking_id = "SC-LINT-PORT-001"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintPortabilityAnalyzer.implementation.type"]
+scheduled_sprint = "A.4"
+tracking_id = "SC-LINT-PORT-002"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintPortabilityAnalyzer.implementation.module"]
+scheduled_sprint = "A.4"
+tracking_id = "SC-LINT-PORT-003"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintRuntimeAnalyzer.public.facade"]
+scheduled_sprint = "A.5"
+tracking_id = "SC-LINT-RUNTIME-001"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintRuntimeAnalyzer.implementation.type"]
+scheduled_sprint = "A.5"
+tracking_id = "SC-LINT-RUNTIME-002"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintRuntimeAnalyzer.implementation.module"]
+scheduled_sprint = "A.5"
+tracking_id = "SC-LINT-RUNTIME-003"
+expires_when = "sprint_before_current"
