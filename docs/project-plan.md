@@ -40,6 +40,10 @@ The current project focus is:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - current phase execution plan
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
+  - see [docs/sc-lint/sprint-S1.md](./sc-lint/sprint-S1.md)
+  - see [docs/sc-lint/sprint-S2.md](./sc-lint/sprint-S2.md)
+  - see [docs/sc-lint/sprint-S3.md](./sc-lint/sprint-S3.md)
+  - see [docs/sc-lint/sprint-S4.md](./sc-lint/sprint-S4.md)
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
@@ -57,6 +61,23 @@ This phase should execute in the following order:
 7. migrate boundary inventory + manifest policy from Python into
    `sc-lint-boundary`
 8. run parity validation before deprecating Python boundary logic
+
+## Scheduled Sprint Plans
+
+The currently scheduled foundation sprints are:
+
+- `S.1`
+  - CLI bootstrap
+  - `docs/sc-lint/sprint-S1.md`
+- `S.2`
+  - profiles and Windows preflight
+  - `docs/sc-lint/sprint-S2.md`
+- `S.3`
+  - generic utility extraction
+  - `docs/sc-lint/sprint-S3.md`
+- `S.4`
+  - Rust boundary inventory migration and reusable analyzer backports
+  - `docs/sc-lint/sprint-S4.md`
 
 ## Release 1 Target
 

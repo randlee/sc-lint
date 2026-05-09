@@ -196,6 +196,27 @@ The current phase should execute in this order:
 7. migrate boundary inventory and manifest-policy logic into Rust
 8. keep Python parity validation during the migration window
 
+## Planned Sprint Sequence
+
+The scheduled implementation sprints for this phase are:
+
+1. `S.1`
+   - top-level CLI bootstrap
+   - sprint plan: `docs/sc-lint/sprint-S1.md`
+2. `S.2`
+   - profile semantics and `xwin` capability support
+   - sprint plan: `docs/sc-lint/sprint-S2.md`
+3. `S.3`
+   - generic utility extraction
+   - sprint plan: `docs/sc-lint/sprint-S3.md`
+4. `S.4`
+   - Rust boundary inventory migration and reusable analyzer backports
+   - sprint plan: `docs/sc-lint/sprint-S4.md`
+
+These sprint plans are the authoritative implementation breakdown of the
+foundation phase once execution begins. This phase document remains the
+umbrella scope and sequencing reference.
+
 ## Exit Criteria
 
 This phase is complete when:
