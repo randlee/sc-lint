@@ -34,8 +34,8 @@ resolver = "2"
         self.assertIn("shear", names)
         self.assertIn("spell", names)
         self.assertIn("pytests", names)
-        self.assertNotIn("sc-boundary", names)
-        self.assertNotIn("sc-portability", names)
+        self.assertIn("sc-boundary", names)
+        self.assertIn("sc-portability", names)
         self.assertNotIn("modules", names)
 
     def test_resolve_task_names_rejects_unknown_target(self) -> None:

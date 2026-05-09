@@ -6,23 +6,49 @@ These points are considered settled for the initial spike.
 
 ### Crate split
 
-Two crates from the start:
+Current implemented crates:
 
+- `sc-lint-directives`
+  - shared directive parsing/types
 - `sc-lint-boundary`
   - analyzer CLI + library
-  - own version line starting at `0.1.0`
+  - currently shares the workspace `0.1.0` version line
 - `sc-lint-attributes`
   - proc-macro attribute crate
-  - own version line starting at `0.1.0`
+  - currently shares the workspace `0.1.0` version line
+
+Planned next crate:
+
+- `sc-lint`
+  - top-level CLI crate
+  - stable user-facing command surface
+  - command parsing, config loading, output normalization, tool dispatch
+  - canonical AI-first machine contract for non-interactive commands
+  - planned lint profiles:
+    - `fast`
+    - `full`
+    - `ci`
+  - planned top-level CI-equivalent command:
+    - `sc-lint ci`
+  - planned Windows preflight commands when `cargo xwin` is installed:
+    - `sc-lint check xwin`
+    - `sc-lint clippy xwin`
 
 Reason:
 
 - real Rust attributes need a proc-macro crate anyway
 - creating it early avoids late packaging churn
 - the analyzer crate should not carry proc-macro concerns
+- the top-level CLI should coordinate backends rather than forcing backend
+  crate cross-dependencies
+- the top-level CLI should own the stable machine contract instead of exposing
+  backend-specific output conventions directly
 
 Current scaffold state:
 
+- `sc-lint-directives`
+  - created
+  - compile-valid
 - `sc-lint-attributes`
   - created
   - compile-valid
@@ -33,6 +59,10 @@ Current scaffold state:
   - initial `sc_lint` attribute ingestion in place now
   - first owner-graph cycle rules in place now
   - first boundary enforcement rules in place now
+- `sc-lint`
+  - planned
+  - detailed CLI requirements/architecture defined
+  - implementation not started yet
 
 ### Analyzer strategy
 
@@ -141,18 +171,23 @@ Current implementation status:
 
 ## Extraction Path
 
-The intended rollout is:
+The extraction step is complete; `sc-lint` now has its own standalone
+repository.
 
-1. internal workspace crates now
-2. prove the model on the first consumer repository
-3. stabilize:
+The current rollout is:
+
+1. stabilize:
    - CLI contract
+   - top-level `--json` machine mode
+   - stable machine-readable failure contract
    - JSON findings shape
    - graph export shape
    - graph schema versioning
    - attribute namespace
-4. extract to a separate repository
-5. publish to crates.io
+2. define and enforce canonical repo boundaries
+3. introduce the top-level CLI
+4. migrate remaining generic tooling
+5. prepare the standalone repo for crates.io publication
 
 ## Near-Term Integration Expectation
 
@@ -169,8 +204,26 @@ Likely future integration:
 Current integration state:
 
 - `just lint sc-boundary`
-  - exists now as a separate preliminary/manual target
-  - is intentionally not part of default `just lint` yet
+  - exists now as a named target
+  - is part of default `just lint` for this repo
+- `just lint sc-portability`
+  - exists now as a named target
+  - is part of default `just lint` for this repo
+
+Current planned local/CI profile split:
+
+- `fast`
+  - low-latency local developer gate
+  - may include `xwin check` when available
+- `full`
+  - stronger local pre-push gate
+  - may include `xwin check` and `xwin clippy` when available
+- `ci`
+  - lint-only CI-parity profile
+  - intentionally excludes `xwin` because real Windows CI remains
+    authoritative
+- top-level `ci`
+  - lint plus tests
 
 ## Default Rule Policy
 
@@ -211,6 +264,38 @@ Current direction for both items:
 - TOML should become the canonical source for new boundary features as soon as
   TOML loading exists
 
+## Consumer-Proven Rule Promotion
+
+The current plan explicitly treats some rule families as consumer-proven first
+and productized second.
+
+Reusable analyzer families first proven on `atm-core` and planned for
+standalone `sc-lint`:
+
+- `PORT-004`
+- `PORT-005`
+- `SCB-RUNTIME-001`
+- `SCB-RUNTIME-002`
+
+Consumer-local policy families that stay out of `sc-lint` unless extracted as
+configurable framework:
+
+- duplicate semantic string-literal policy
+- fixed-sleep test-hygiene policy
+- triage Turtle consistency policy
+
 Related ADR:
 
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
+
+## Release 1 Direction
+
+Release `0.1.x` should establish:
+
+- stable repo-local lint gating
+- canonical TOML boundaries for current and planned tool surfaces
+- a documented top-level CLI contract ready for implementation
+- a staged extraction and migration path for remaining generic tooling
+
+This is the release-1 direction, not a claim that every release-1 target is
+already implemented today.

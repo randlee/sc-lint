@@ -26,6 +26,7 @@ PYTHON_LINT_ORDER = (
     "pytests",
 )
 EXTRA_LINTS = ("modules", "sc-boundary", "sc-portability")
+DEFAULT_EXTRA_LINTS = ("sc-boundary", "sc-portability")
 CARGO_LINT_ORDER = ("fmt", "clippy", "deny", "shear")
 FAST_LINT_ORDER = ("fmt", "version", "manifests", "spell", "pytests")
 CRATE_INVENTORY_LINTS = {"fmt", "clippy", "modules", "sc-boundary", "sc-portability", "manifests"}
@@ -74,7 +75,7 @@ def build_tasks(repo_root: Path) -> dict[str, LintTask]:
 
 def resolve_task_names(target: str) -> list[str]:
     if target == "all":
-        return [*CARGO_LINT_ORDER, *PYTHON_LINT_ORDER]
+        return [*CARGO_LINT_ORDER, *PYTHON_LINT_ORDER, *DEFAULT_EXTRA_LINTS]
     if target == "fast":
         return list(FAST_LINT_ORDER)
     valid = {"all", "fast", *CARGO_LINT_ORDER, *PYTHON_LINT_ORDER, *EXTRA_LINTS}

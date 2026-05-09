@@ -1,0 +1,158 @@
+# Sprint A.2 — Profiles And Windows Preflight
+
+```yaml
+plan_type: sprint_plan
+phase: A
+sprint: "A.2"
+worktree: /Users/randlee/Documents/github/sc-lint
+branch: develop
+status: planned
+estimated_scope: M
+```
+
+## Goal
+
+Implement product-level `fast`, `full`, and `ci` lint profiles and add
+capability-driven `xwin` Windows preflight support without changing CI parity
+semantics.
+
+## Scope Summary
+
+This sprint operationalizes the profile and `xwin` strategy that is already
+documented. It must produce a stable developer-facing command model that
+distinguishes:
+
+- `sc-lint lint fast`
+- `sc-lint lint full`
+- `sc-lint lint ci`
+- `sc-lint ci`
+- `sc-lint check xwin`
+- `sc-lint clippy xwin`
+
+## Governing Requirements
+
+- `REQ-PRODUCT-006C`
+- `REQ-PRODUCT-006D`
+- `REQ-PRODUCT-006E`
+- `REQ-PRODUCT-012A`
+- `REQ-PRODUCT-012B`
+- `REQ-PRODUCT-012C`
+- `REQ-PRODUCT-012D`
+- `REQ-PRODUCT-012E`
+- `REQ-PRODUCT-016A`
+- `REQ-CLI-007`
+- `REQ-CLI-007B`
+- `REQ-CLI-007C`
+- `REQ-CLI-007D`
+- `REQ-CLI-007E`
+- `REQ-CLI-014`
+- `REQ-CLI-015`
+
+## Governing ADRs
+
+- `docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md`
+- `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
+
+## Governing Boundaries
+
+- `BOUNDARY-ScLintCli`
+
+## Prerequisites
+
+- Sprint A.1 complete with a functioning top-level CLI crate
+- one top-level delegated command already normalized through the CLI
+
+## Hard Dependencies
+
+- profile semantics must remain defined at the product level, not only in
+  `Justfile`
+- `xwin` support must remain optional local enhancement and must not redefine
+  what `ci` means
+
+## Non-Goals
+
+- replacing real Windows CI with cross-target preflight
+- adding `xwin` to the `ci` lint profile
+- porting Python utilities to Rust
+
+## Sub-Tasks
+
+1. Implement `LintProfile`
+   Development work:
+   - add `LintProfile::{Fast, Full, Ci}`
+   - define stable membership and dispatch rules for each profile
+   - expose `sc-lint lint fast|full|ci`
+   Required tests:
+   - profile parsing tests
+   - profile membership tests
+   Required doc or boundary updates:
+   - update CLI/profile docs if the implemented subcommand shape differs
+
+2. Implement top-level `sc-lint ci`
+   Development work:
+   - define `sc-lint ci` as lint + tests
+   - keep `sc-lint lint ci` lint-only
+   Required tests:
+   - tests proving `sc-lint ci` and `sc-lint lint ci` differ only by the test
+     execution layer
+   Required doc or boundary updates:
+   - keep `REQ-PRODUCT-016A` traceability aligned
+
+3. Implement `xwin` capability detection
+   Development work:
+   - detect `cargo xwin`
+   - expose `sc-lint check xwin`
+   - expose `sc-lint clippy xwin`
+   - ensure `fast` and `full` include `xwin` only when installed
+   Required tests:
+   - capability-present tests
+   - capability-absent tests
+   - profile-behavior tests for with/without `xwin`
+   Required doc or boundary updates:
+   - update profile docs if capability behavior narrows further
+
+4. Align repo-local wrappers with CLI semantics
+   Development work:
+   - ensure `just` wrappers call the intended `sc-lint` profile commands
+   - keep CI semantics explicit and independent from `xwin`
+   Required tests:
+   - `just lint` profile mapping checks
+   Required doc or boundary updates:
+   - update local development gate documentation if wrapper names change
+
+## Split Recommendation
+
+Keep A.2 together. Profiles and `xwin` capability behavior are tightly coupled;
+splitting them would create temporary contradictions about what `fast`, `full`,
+and `ci` actually mean.
+
+## Acceptance Criteria
+
+- `sc-lint lint fast`, `full`, and `ci` exist and are documented
+- `sc-lint ci` exists and includes tests
+- `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is
+  installed
+- local profile behavior changes when `xwin` is present, but `ci` remains
+  independent from `xwin`
+- real Windows CI remains the authoritative release gate
+
+## Required Validation
+
+- `cargo test --workspace`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `just lint`
+
+## Required Document Updates
+
+- `docs/sc-lint/cli-requirements.md`
+- `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/project-plan.md`
+- `docs/requirements.md`
+
+## Risks And Watchouts
+
+- do not let capability absence break unrelated local lint flows
+- do not make `xwin` part of the `ci` lint profile
+- do not bury profile semantics inside wrapper scripts where the product docs
+  cannot govern them
