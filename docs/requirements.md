@@ -38,6 +38,32 @@ The product should support both:
   The top-level CLI must own command parsing, config loading, output
   normalization, and exit-code normalization.
 
+- `REQ-PRODUCT-002A`
+  Every non-interactive top-level CLI command must expose a stable
+  machine-readable mode. The canonical top-level machine mode is `--json`.
+
+- `REQ-PRODUCT-002B`
+  Command families exposed through the top-level CLI must define stable request
+  and response contracts that can be reused outside the CLI entrypoint.
+
+- `REQ-PRODUCT-002C`
+  When machine mode is requested, both success and failure paths must remain
+  machine-readable and must use a stable contract family rather than falling
+  back to prose-only stderr.
+
+- `REQ-PRODUCT-002D`
+  Machine-readable failure results must include stable codes or categories and
+  enough structured detail for automation to branch and recover.
+
+- `REQ-PRODUCT-002E`
+  Human-readable output must remain a secondary presentation layer and must not
+  contain machine-significant detail that is unavailable through machine mode.
+
+- `REQ-PRODUCT-002F`
+  Future interactive or graph-exploration features must remain secondary
+  surfaces and must not become the only way to access machine-significant
+  information.
+
 - `REQ-PRODUCT-003`
   Specialized backend crates must remain self-contained and must not depend on
   each other directly unless a later design review explicitly approves a shared
@@ -79,6 +105,12 @@ The product should support both:
   When `cargo xwin` is installed, the product should expose `xwin`-backed
   Windows preflight support everywhere it can provide meaningful signal
   without requiring separate manual wiring per tool.
+
+- `REQ-PRODUCT-006F`
+  During migration periods, the top-level CLI may translate its canonical
+  machine contract to backend-specific machine-output flags or adapters, but
+  that translation must not leak backend-specific contract drift into the
+  stable user-facing surface.
 
 ### Boundary definitions
 
@@ -194,6 +226,10 @@ The product should support both:
 The current execution phase requires:
 
 - a top-level `sc-lint` CLI plan with crate-isolated backends
+- an AI-first top-level CLI contract with:
+  - canonical `--json` machine mode
+  - stable request/response seams
+  - structured machine-readable failures
 - canonical TOML boundary definitions for the current `sc-lint` crates
 - a default local development lint gate that runs the repo's own analyzer
   checks

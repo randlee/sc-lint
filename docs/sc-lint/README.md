@@ -32,6 +32,7 @@ Current intended crate split:
 - `sc-lint`
   - planned top-level CLI crate
   - command parsing, config loading, output normalization, tool dispatch
+  - canonical AI-first machine contract for non-interactive commands
   - planned profiles:
     - `fast`
     - `full`
@@ -175,3 +176,6 @@ Related architecture decision:
   enforcement
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
   — top-level CLI profile semantics plus capability-driven `xwin` preflight
+- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+  — top-level CLI as the stable machine-contract owner rather than a
+  dispatcher-only wrapper

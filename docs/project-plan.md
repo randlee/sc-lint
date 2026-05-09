@@ -11,6 +11,8 @@ The current project focus is:
 - defining canonical crate boundaries for `sc-lint` itself
 - establishing a self-hosting `just lint` development gate for this repo
 - planning and introducing a top-level `sc-lint` CLI
+- defining the top-level CLI as an AI-first machine contract rather than only
+  a human wrapper over backend tools
 - migrating boundary-definition handling to structured TOML sources
 - migrating generic lint/view tooling into `sc-lint`
 - moving boundary inventory and manifest-policy enforcement from Python into
@@ -43,7 +45,8 @@ This phase should execute in the following order:
 
 1. define canonical `sc-lint` boundaries in TOML
 2. make `just lint` self-host the repo's own analyzer checks by default
-3. add the top-level `sc-lint` CLI crate
+3. add the top-level `sc-lint` CLI crate and define its canonical machine
+   contract
 4. extract generic Python utilities
 5. backport reusable `atm-core`-proven analyzer families into `sc-lint`
 6. define the cross-target preflight strategy for local and CI lint flows
@@ -58,6 +61,11 @@ Release `0.1.x` should establish:
 - a stable repo-local development and CI gate
 - canonical TOML boundaries for the repo's own tool surfaces
 - a documented and approved top-level `sc-lint` CLI contract
+- explicit machine-contract decisions for:
+  - canonical `--json` mode
+  - stable machine-readable failures
+  - reusable request/response seams
+  - secondary interactive graph surfaces only
 - a detailed extraction and migration plan for remaining generic tooling
 - a documented partition for:
   - reusable analyzer families that migrate into `sc-lint`

@@ -7,6 +7,7 @@ This document defines the high-level product architecture for `sc-lint`.
 The `sc-lint` architecture should:
 
 - provide one stable user-facing CLI
+- make the primary CLI contract machine-first and AI-usable
 - keep backend tools self-contained
 - allow mixed Rust and Python implementations during migration
 - keep canonical machine policy in structured TOML
@@ -50,12 +51,26 @@ It should own:
 - output formatting conventions
 - exit-code conventions
 - dispatch to backend tools
+- the canonical top-level machine-readable contract
 
 It may dispatch to:
 
 - Rust library APIs
 - specialized binaries
 - Python utilities during migration periods
+
+The top-level CLI should standardize on:
+
+- canonical machine mode:
+  - `--json`
+- stable success/failure contract family
+- stable profile naming:
+  - `fast`
+  - `full`
+  - `ci`
+
+Backend-specific machine flags may still exist internally during migration, but
+the user-facing product contract should not depend on them.
 
 ## Backend Crate Isolation
 
@@ -123,6 +138,38 @@ important public facades and implementation types for the release-1 line:
 
 These definitions are canonical in `boundaries/` and should stay aligned with
 the implemented Rust item names as the CLI crate lands.
+
+## Planned CLI Contract Types
+
+To keep the release-1 CLI architecture explicit rather than implicit, the
+planned top-level CLI surface should also name these important contract types:
+
+- `Command`
+- `LintProfile`
+  - `Fast`
+  - `Full`
+  - `Ci`
+- `OutputMode`
+  - `Human`
+  - `Json`
+- `CliError`
+
+These types are part of the intended architectural contract even before the
+full CLI crate is implemented.
+
+## AI-First CLI Constraint
+
+The top-level `sc-lint` CLI should follow an AI-first contract model for
+non-interactive commands:
+
+- machine-readable mode is normative
+- top-level failures stay machine-readable when machine mode is requested
+- request/response models stay reusable outside the CLI entrypoint
+- human-readable output is secondary and must not contain machine-significant
+  information that is missing from machine mode
+
+Future MCP wrappers, if added, should reuse the same business request/response
+models rather than translating or reshaping them into a second schema.
 
 ## Repo-local Automation
 
@@ -237,6 +284,18 @@ For release `0.1.x`, the intended architecture is that this repo self-hosts
 its own analyzer checks through the default development gate wherever those
 checks are stable.
 
+## Interactive Surface Constraint
+
+Future graph exploration or type-graph navigation may add interactive
+subsurfaces, but those should remain secondary to the canonical machine
+contract.
+
+The architecture should not require:
+
+- TTY parsing for automation
+- interactive-only access to machine-significant graph data
+- richer interactive payloads that lack a corresponding machine-readable form
+
 ## Detailed Architecture References
 
 - analyzer MVP and crate roles
@@ -255,6 +314,8 @@ checks are stable.
   - see [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](./sc-lint/adr/ADR-004-structured-boundary-definitions.md)
 - CLI/profile/xwin execution-model ADR
   - see [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- AI-first CLI contract ADR
+  - see [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 
 ## Architecture Management
 

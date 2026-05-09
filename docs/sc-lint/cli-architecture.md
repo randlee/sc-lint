@@ -13,6 +13,7 @@ It owns:
 - config loading
 - output/exit-code normalization
 - dispatch to backend tools
+- the canonical top-level machine-readable contract
 
 It does not own:
 
@@ -30,12 +31,22 @@ sc-lint (CLI)
   -> Python utility, during migration windows
 ```
 
+The top-level CLI is not only a dispatcher. It is also the stable contract
+owner for:
+
+- top-level command grouping
+- canonical machine-mode selection through `--json`
+- shared profile names
+- shared success/failure envelope conventions
+- capability-aware dispatch such as `xwin`
+
 ## Dispatch Principles
 
 - backend crates remain self-contained
 - the CLI decides which backend is used
 - backend crates do not call each other directly
 - backend replacement should not require changing the CLI command contract
+- backend-specific machine flags must stay behind the CLI contract boundary
 
 ## Initial Command Families
 
@@ -85,6 +96,77 @@ Profile semantics:
   - lint plus tests
   - mirrors real CI intent rather than `xwin` preflight
 
+## Planned Contract Types
+
+The release-1 CLI design should name and preserve the following important
+types explicitly:
+
+- `Cli`
+  - top-level command root
+- `Command`
+  - grouped command family selector
+- `LintProfile`
+  - enum with:
+    - `Fast`
+    - `Full`
+    - `Ci`
+- `OutputMode`
+  - enum with:
+    - `Human`
+    - `Json`
+- `CliError`
+  - structured machine-readable error contract carrying:
+    - error kind/category
+    - stable code
+    - message
+    - optional details
+    - optional suggested action
+
+These names define the intended architectural seam even before all of them are
+fully implemented.
+
+## Machine Contract Model
+
+For non-interactive commands, `--json` is the canonical top-level machine
+contract mode.
+
+That means:
+
+- every non-interactive command family must support machine-readable output
+- top-level success and failure paths must stay inside one machine-contract
+  family
+- human-readable output is a presentation layer over the same underlying
+  command result
+
+During migration, the CLI may internally translate:
+
+- top-level `--json`
+
+into backend-specific flags such as:
+
+- `--format json`
+
+but that backend translation must remain an implementation detail.
+
+## Contract Ownership
+
+The top-level CLI owns:
+
+- top-level command names
+- profile names
+- output-mode semantics
+- top-level machine-readable envelope conventions
+- normalization of delegated tool results into stable success/failure behavior
+
+Backend tools own:
+
+- family-specific request/response payloads
+- analyzer-specific findings payloads
+- domain-specific diagnostics beneath the CLI surface
+
+Future MCP wrappers should reuse the same request and response models rather
+than introducing a second business-payload schema.
+
 ## Config Flow
 
 Expected flow:
@@ -109,8 +191,20 @@ For `xwin`-aware commands, capability resolution includes:
 The CLI should present:
 
 - consistent human-readable text output
-- stable machine-readable output modes where supported
+- stable machine-readable output for every non-interactive command
 - stable success/failure exit codes across delegated tools
+- stable machine-readable failure contracts in `--json` mode
+
+## Interactive Constraint
+
+Future graph exploration may justify interactive or TUI-oriented commands, but
+those must remain secondary surfaces.
+
+They must not:
+
+- become the only way to obtain machine-significant data
+- be richer than the documented machine-readable contract in a way that forces
+  automation to parse TTY output
 
 ## Migration Role
 

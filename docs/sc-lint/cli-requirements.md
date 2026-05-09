@@ -25,9 +25,37 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-005`
   The CLI must normalize user-facing output conventions across delegated tools.
 
+- `REQ-CLI-005A`
+  Every non-interactive CLI command must support the canonical machine-readable
+  mode:
+  - `--json`
+
+- `REQ-CLI-005B`
+  Machine-readable mode must use stable success and failure contract families
+  rather than falling back to prose-only stderr on top-level failures.
+
+- `REQ-CLI-005C`
+  Machine-readable failures must include stable error codes or categories,
+  structured details, and caller-corrective guidance where recovery is
+  possible.
+
+- `REQ-CLI-005D`
+  Human-readable output must not expose machine-significant information that is
+  unavailable through `--json`.
+
+- `REQ-CLI-005E`
+  The CLI must document and preserve stable request and response models for
+  command families exposed through the top-level machine contract.
+
 - `REQ-CLI-006`
   The CLI must support both direct Rust-library dispatch and delegated
   subprocess-based execution during migration periods.
+
+- `REQ-CLI-006A`
+  During migration, the top-level CLI may translate canonical `--json`
+  requests into backend-specific machine-output flags such as `--format json`,
+  but backend-specific flag shapes must not become part of the stable
+  top-level contract.
 
 ## Command Surface Requirements
 
@@ -35,6 +63,8 @@ specialized backend tools and mixed Rust/Python implementations.
   The initial command surface must include:
   - `sc-lint lint <tool>`
   - `sc-lint view <tool>`
+  - `sc-lint check`
+  - `sc-lint clippy`
   - `sc-lint version`
 
 - `REQ-CLI-007A`
@@ -66,6 +96,40 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-008`
   The CLI must preserve room for additional grouped subcommands without
   breaking the initial shape.
+
+## Planned Contract Types
+
+- `REQ-CLI-008A`
+  The planned CLI contract must explicitly define:
+  - `Cli`
+  - `Command`
+  - `LintProfile`
+  - `OutputMode`
+  - `CliError`
+
+- `REQ-CLI-008B`
+  `LintProfile` must define the product-level profile values:
+  - `Fast`
+  - `Full`
+  - `Ci`
+
+- `REQ-CLI-008C`
+  `OutputMode` must define:
+  - `Human`
+  - `Json`
+
+- `REQ-CLI-008D`
+  `CliError` must be documented as a structured machine-readable contract with
+  at least:
+  - error kind or category
+  - stable code
+  - message
+  - optional details
+  - optional suggested action
+
+- `REQ-CLI-008E`
+  Future interactive graph-exploration surfaces must not replace the
+  documented `OutputMode::Json` contract for machine use.
 
 ## Architecture Requirements
 

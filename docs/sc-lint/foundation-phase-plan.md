@@ -77,6 +77,7 @@ Phase goals:
 
 - create the crate
 - define command structure
+- define the canonical machine-readable contract
 - define output and exit-code conventions
 - load config once at the top level
 - dispatch to self-contained backends
@@ -98,6 +99,15 @@ Initial Windows-preflight direction when `xwin` is installed:
 
 - `sc-lint check xwin`
 - `sc-lint clippy xwin`
+
+Required contract decisions:
+
+- top-level machine mode is `--json`
+- non-interactive commands remain machine-readable on both success and failure
+- request/response seams stay reusable outside the CLI entrypoint
+- human-readable output remains a presentation layer, not the only tested
+  interface
+- future interactive graph features remain secondary surfaces
 
 ### Workstream 4: Generic Python utility extraction
 

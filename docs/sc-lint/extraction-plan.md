@@ -89,6 +89,7 @@ Add a top-level `sc-lint` CLI crate that owns:
 - consistent output formatting
 - consistent exit-code behavior
 - future cross-target preflight orchestration
+- the canonical top-level machine-readable contract
 
 The top-level CLI may call:
 
@@ -181,6 +182,8 @@ Required work:
 - create `sc-lint` CLI crate
 - define top-level command structure
 - define shared output/exit-code conventions
+- define shared machine-readable success/failure conventions
+- define the canonical top-level `--json` mode and backend translation policy
 - define config-loading behavior
 - implement dispatch to existing backends
 
@@ -205,6 +208,7 @@ Initial expected `xwin` shape when capability is present:
 Deliverable:
 
 - one stable CLI entry point for the repo
+- one explicit machine-readable contract for non-interactive command families
 - backend implementations remain self-contained behind the dispatcher
 
 ### Phase 1: Extract generic Python utilities

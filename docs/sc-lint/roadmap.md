@@ -23,6 +23,7 @@ Planned next crate:
   - top-level CLI crate
   - stable user-facing command surface
   - command parsing, config loading, output normalization, tool dispatch
+  - canonical AI-first machine contract for non-interactive commands
   - planned lint profiles:
     - `fast`
     - `full`
@@ -40,6 +41,8 @@ Reason:
 - the analyzer crate should not carry proc-macro concerns
 - the top-level CLI should coordinate backends rather than forcing backend
   crate cross-dependencies
+- the top-level CLI should own the stable machine contract instead of exposing
+  backend-specific output conventions directly
 
 Current scaffold state:
 
@@ -175,6 +178,8 @@ The current rollout is:
 
 1. stabilize:
    - CLI contract
+   - top-level `--json` machine mode
+   - stable machine-readable failure contract
    - JSON findings shape
    - graph export shape
    - graph schema versioning
