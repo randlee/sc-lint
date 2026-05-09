@@ -29,7 +29,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install just
-        uses: taiki-e/install-action@just
+        run: cargo install just --locked
 
       - name: Install cargo-deny
         uses: taiki-e/install-action@cargo-deny
