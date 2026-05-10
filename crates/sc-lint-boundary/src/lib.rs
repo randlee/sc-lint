@@ -28,6 +28,7 @@ use thiserror::Error;
 
 mod analysis;
 mod graph;
+mod inventory;
 mod portability;
 mod render;
 #[cfg(test)]
@@ -40,6 +41,12 @@ const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Error)]
 pub enum BoundaryError {
+    #[error("failed to load boundary inventory for root `{}`: {source:#}", root.display())]
+    InventoryLoad {
+        root: PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
     #[error("failed to analyze portability for root `{}`: {source:#}", root.display())]
     PortabilityAnalysis {
         root: PathBuf,
@@ -639,6 +646,12 @@ pub fn analyze_workspace(
 
     let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
+            root: options.root.clone(),
+            source,
+        }
+    })?;
+    inventory::load_boundary_inventory(&options.root).map_err(|source| {
+        BoundaryError::InventoryLoad {
             root: options.root.clone(),
             source,
         }

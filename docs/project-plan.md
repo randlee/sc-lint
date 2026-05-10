@@ -113,6 +113,7 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A5.md`
 - `A.6`
   - Rust boundary inventory loading, schema validation, and duplicate handling
+  - active implementation branch: `feature/sprint-A6`
   - `docs/sc-lint/sprint-A6.md`
 - `A.7`
   - Rust manifest-policy enforcement and Python parity window
