@@ -122,6 +122,7 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A7.md`
 - `A.8`
   - per-tool user guides and rule-disable documentation
+  - active implementation branch: `feature/sprint-A8`
   - `docs/sc-lint/sprint-A8.md`
 
 ## Recent Sprint Deltas
@@ -132,6 +133,10 @@ The currently scheduled foundation sprints are:
   - the Python parity oracle now exists at `.just/lint_boundaries.py`
   - fixture coverage now includes valid, invalid-schema, and duplicate
     inventory cases in `.just/tests/test_lint_boundaries.py`
+- `A.8`
+  - per-tool user guides now live under `docs/sc-lint/tools/`
+  - direct guide links are now published from both `README.md` and
+    `docs/sc-lint/README.md`
 
 ## Next Analyzer-Crate Additions
 
