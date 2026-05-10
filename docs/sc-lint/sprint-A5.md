@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.5"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: M
@@ -30,7 +30,10 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
 - `REQ-PRODUCT-006AA`
 - `REQ-PRODUCT-015A`
 - `REQ-PRODUCT-015B`
+- `REQ-PRODUCT-015C`
 - `REQ-CLI-007F`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -56,6 +59,17 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
 - Tokio-specific runtime linting
 - boundary inventory loader migration
 - manifest-policy migration
+
+## Primary Targets
+
+- `Cargo.toml`
+- `crates/sc-lint-runtime/`
+- `boundaries/sc-lint-runtime/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/sc-lint/README.md`
+- `docs/requirements.md`
+- `docs/architecture.md`
 
 ## Sub-Tasks
 
@@ -95,6 +109,19 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
    Required doc or boundary updates:
    - keep `sc-lint-tokio` present as a planned future crate only
 
+5. Plan analyzer logging for `sc-runtime`
+   Development work:
+   - define `sc-runtime` analyzer entry logging for delegated analyze
+     calls
+   - define completion logging with verdict and finding count
+   - keep logging initialization out of the backend crate and log only after
+     result normalization through `CommandEnvelope<T>` or `CliError`
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-runtime`
+     logging pattern
+
 ## Split Recommendation
 
 Keep A.5 together. The std runtime rule family is small enough to migrate in
@@ -106,6 +133,10 @@ one contained sprint and should not be split across two crates or two phases.
 - `SCB-RUNTIME-001` and `SCB-RUNTIME-002` live in `sc-lint-runtime`
 - product docs clearly separate generic std runtime rules from future
   Tokio-specific rules
+- `sc-lint-runtime` does not initialize the logger runtime and relies on
+  CLI-owned logging hooks only
+- runtime-tool entry/exit/error events are emitted only after top-level
+  normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 

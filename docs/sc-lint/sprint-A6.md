@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.6"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: M
@@ -30,6 +30,8 @@ item semantics can stabilize independently.
 - `REQ-PRODUCT-014`
 - `REQ-PRODUCT-015`
 - `REQ-PRODUCT-017`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -57,6 +59,17 @@ item semantics can stabilize independently.
 - manifest ownership rules
 - manifest section rules
 - parity retirement
+
+## Primary Targets
+
+- `crates/sc-lint-boundary/`
+- `boundaries/`
+- `.just/tests/`
+- `docs/sc-lint/boundary-toml-migration.md`
+- `docs/sc-lint/boundary-enforcement-model.md`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/project-plan.md`
 
 ## Sub-Tasks
 
@@ -90,6 +103,19 @@ item semantics can stabilize independently.
    - keep the boundary-enforcement model aligned with actual duplicate
      behavior
 
+4. Plan boundary-inventory logging for `sc-boundary`
+   Development work:
+   - define `sc-boundary` entry logging for boundary-inventory loader calls
+   - define completion logging with verdict plus schema/duplicate summary
+   - keep logger lifecycle ownership in the top-level CLI and log only after
+     result normalization through `CommandEnvelope<T>` or `CliError`
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-boundary`
+     inventory-loader logging
+     pattern
+
 ## Split Recommendation
 
 Keep A.6 together. Loader, schema validation, and duplicate handling form one
@@ -102,6 +128,10 @@ starts.
 - schema validation is Rust-native
 - duplicate boundary and planning-item handling is Rust-native
 - the Python validator still exists as a parity oracle
+- the boundary-inventory loader path does not initialize the logger runtime in
+  backend code
+- boundary-inventory entry/exit/error events are emitted only after top-level
+  normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 

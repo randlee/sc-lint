@@ -38,9 +38,15 @@ The current project focus is:
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
+  - see [docs/sc-lint/crate-architecture.md](./sc-lint/crate-architecture.md)
+  - see [docs/sc-lint/adr/README.md](./sc-lint/adr/README.md)
+  - see [docs/sc-lint/logging.md](./sc-lint/logging.md)
+  - see [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
   - see [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
+- known issues inventory
+  - see [docs/issues-inventory.md](./issues-inventory.md)
 - current phase execution plan
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
   - see [docs/sc-lint/sprint-A1a.md](./sc-lint/sprint-A1a.md)
@@ -63,8 +69,8 @@ This phase should execute in the following order:
 2. make `just lint` self-host the repo's own analyzer checks by default
 3. add the top-level `sc-lint` CLI crate and define its canonical machine
    contract
-4. review the implemented CLI contract against the needs of extracted Python
-   utilities and later analyzer backends
+4. complete the A.1a exit review of the CLI contract against the needs of
+   extracted Python utilities and later analyzer backends before A.1b starts
 5. add top-level config loading and the first delegated backend path
 6. define the cross-target preflight strategy for local and CI lint flows
 7. extract generic Python utilities
@@ -140,6 +146,7 @@ Release `0.1.x` should establish:
 - a documented and approved top-level `sc-lint` CLI contract
 - explicit machine-contract decisions for:
   - canonical `--json` mode
+  - one envelope and error pattern for every non-interactive command family
   - stable machine-readable failures
   - reusable request/response seams
   - secondary interactive graph surfaces only

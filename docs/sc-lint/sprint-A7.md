@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.7"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: M
@@ -27,6 +27,8 @@ ownership rules, manifest-section rules, and parity comparison.
 - `REQ-PRODUCT-014`
 - `REQ-PRODUCT-015`
 - `REQ-PRODUCT-017`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -51,6 +53,17 @@ ownership rules, manifest-section rules, and parity comparison.
 - retirement of the Python validator
 - new analyzer-family imports
 - graph-db integration
+
+## Primary Targets
+
+- `crates/sc-lint-boundary/`
+- `.just/tests/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/boundary-toml-migration.md`
+- `docs/sc-lint/boundary-enforcement-model.md`
+- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/project-plan.md`
 
 ## Sub-Tasks
 
@@ -79,6 +92,19 @@ ownership rules, manifest-section rules, and parity comparison.
    Required doc or boundary updates:
    - keep extraction/migration docs aligned with the parity window policy
 
+4. Plan manifest-policy logging
+   Development work:
+   - log one entry event for manifest-policy tool execution with the effective
+     config/parity mode used by the CLI
+   - log one completion event with verdict and elapsed time in ms
+   - log one error event per `CliError` after top-level normalization, while
+     keeping logger initialization in the CLI
+   Required tests:
+   - doc review proving manifest-policy execution follows the standard
+     entry/exit/error pattern
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the manifest-policy tool path
+
 ## Split Recommendation
 
 Keep A.7 together. Manifest-policy migration without the parity window would
@@ -91,6 +117,8 @@ leave the product in an ambiguous transition state.
 - Python remains the oracle until parity is approved stable
 - docs explicitly state what remains Python-backed and what has become
   Rust-native
+- manifest-policy entry/exit/error events follow the standard CLI event
+  pattern and do not initialize the logger in backend code
 
 ## Required Validation
 

@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.4"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: M
@@ -31,7 +31,10 @@ crate, moves the existing portability implementation out of
 - `REQ-PRODUCT-006B`
 - `REQ-PRODUCT-015A`
 - `REQ-PRODUCT-015B`
+- `REQ-PRODUCT-015C`
 - `REQ-CLI-007F`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -60,6 +63,20 @@ crate, moves the existing portability implementation out of
 - boundary inventory loader migration
 - manifest-policy migration
 - Tokio-specific rule work
+
+## Primary Targets
+
+- `Cargo.toml`
+- `crates/sc-lint-portability/`
+- `crates/sc-lint-boundary/`
+- `.just/lint_sc_portability.py`
+- `.just/run_lint.py`
+- `boundaries/sc-lint-portability/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/sc-lint/README.md`
+- `docs/requirements.md`
+- `docs/architecture.md`
 
 ## Sub-Tasks
 
@@ -108,6 +125,22 @@ crate, moves the existing portability implementation out of
    - keep the top-level CLI docs aligned so primary lint targets map to the
      backend crate boundary
 
+5. Plan analyzer logging baseline for `sc-portability`
+   Development work:
+   - keep the logging ownership boundary at the `analyze_workspace` seam:
+     the top-level CLI initializes the logger and analyzer crates only emit
+     structured events through log macros inside the delegated analysis path
+   - define `sc-portability` analyzer entry logging for delegated analyze
+     calls
+   - define completion logging with verdict and finding count
+   - keep emission ownership in the top-level CLI logging layer and log only
+     after result normalization through `CommandEnvelope<T>` or `CliError`
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-portability`
+     pattern
+
 ## Split Recommendation
 
 Keep A.4 together. The portability crate should land with all five shared
@@ -119,6 +152,10 @@ portability rules rather than leaving the rule family split across crates.
 - `PORT-001` through `PORT-005` live in `sc-lint-portability`
 - `sc-lint-boundary` no longer owns portability-rule business logic
 - wrapper and CLI docs identify portability as its own backend surface
+- `sc-lint-portability` does not initialize the logger runtime and relies on
+  CLI-owned logging hooks only
+- portability-tool entry/exit/error events are emitted only after top-level
+  normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 
