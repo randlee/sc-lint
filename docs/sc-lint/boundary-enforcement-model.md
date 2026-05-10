@@ -203,6 +203,14 @@ The important point is that:
 - the scheduling metadata is structured
 - the linter can evaluate it without parsing prose
 
+Current implementation boundary:
+
+- A.6 now provides the Rust-native TOML loader, schema validation, and
+  duplicate handling foundation for this model
+- planning-aware missing-item rule emission (`SCB-INVENTORY-001` through
+  `SCB-INVENTORY-003`) remains the next enforcement stage on top of that
+  loader foundation
+
 ## Sprint Evaluation Rule
 
 The linter must have one deterministic source for "current sprint" when it

@@ -130,6 +130,14 @@ Deliverable:
 - no behavior regression in existing boundary checks
 - duplicate authoritative records across formats fail loudly
 
+Current implementation note:
+
+- the A.6 branch now loads canonical TOML boundary records directly from
+  `boundaries/<owner-package>/*.toml`
+- planning metadata is loaded from `boundaries/planning.toml`
+- strict TOML schema validation, owner/path validation, and duplicate-id/item
+  rejection are implemented in Rust
+
 ### Phase 2: Canonical TOML Rollout
 
 Start migrating the existing boundary inventory into TOML.

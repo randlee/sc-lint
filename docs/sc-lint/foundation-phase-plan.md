@@ -310,8 +310,9 @@ The scheduled implementation sprints for this phase are:
   - active implementation branch: `feature/sprint-A5`
   - sprint plan: `docs/sc-lint/sprint-A5.md`
 7. `A.6`
-   - Rust boundary inventory loader/schema/duplicate handling
-   - sprint plan: `docs/sc-lint/sprint-A6.md`
+  - Rust boundary inventory loader/schema/duplicate handling
+  - active implementation branch: `feature/sprint-A6`
+  - sprint plan: `docs/sc-lint/sprint-A6.md`
 8. `A.7`
    - Rust manifest-policy migration and Python parity window
    - sprint plan: `docs/sc-lint/sprint-A7.md`

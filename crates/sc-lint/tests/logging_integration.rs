@@ -603,6 +603,13 @@ impl WorkspaceFixture {
         );
         std::fs::create_dir_all(fixture.root().join("boundaries")).expect("create boundaries dir");
         fixture.write(
+            "boundaries/planning.toml",
+            r#"
+                [planning]
+                current_sprint = "A.6"
+            "#,
+        );
+        fixture.write(
             "crates/example/Cargo.toml",
             r#"
                 [package]

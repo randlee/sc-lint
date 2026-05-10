@@ -33,6 +33,7 @@ use thiserror::Error;
 
 mod analysis;
 mod graph;
+mod inventory;
 mod render;
 #[cfg(test)]
 mod tests;
@@ -44,6 +45,12 @@ const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Error)]
 pub enum BoundaryError {
+    #[error("failed to load boundary inventory for root `{}`: {source:#}", root.display())]
+    InventoryLoad {
+        root: PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
     #[error("failed to build workspace graph for root `{}`: {source:#}", root.display())]
     WorkspaceGraphBuild {
         root: PathBuf,
@@ -416,13 +423,20 @@ impl GraphBuilder {
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
+    let inventory = inventory::load_boundary_inventory(&options.root).map_err(|source| {
+        BoundaryError::InventoryLoad {
+            root: options.root.clone(),
+            source,
+        }
+    })?;
     let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
             root: options.root.clone(),
             source,
         }
     })?;
-    let mut findings = Vec::new();
+    let inventory_summary = inventory.summary();
+    let mut findings = Vec::with_capacity(inventory_summary.recommended_finding_capacity());
     let filter = options.rule;
     if filter.is_none() || filter == Some(RuleFilter::Cycles) {
         findings.extend(analysis::analyze_cycles(&graph));

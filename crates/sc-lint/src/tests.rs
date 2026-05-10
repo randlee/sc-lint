@@ -673,6 +673,11 @@ impl AnalysisFixture {
         )
         .expect("workspace root");
         std::fs::create_dir_all(self.root().join("boundaries")).expect("boundaries");
+        std::fs::write(
+            self.root().join("boundaries/planning.toml"),
+            "[planning]\ncurrent_sprint = \"A.6\"\n",
+        )
+        .expect("planning");
     }
 
     fn write_package_manifest(&self, package_name: &str) {

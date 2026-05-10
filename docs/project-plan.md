@@ -115,6 +115,7 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A5.md`
 - `A.6`
   - Rust boundary inventory loading, schema validation, and duplicate handling
+  - active implementation branch: `feature/sprint-A6`
   - `docs/sc-lint/sprint-A6.md`
 - `A.7`
   - Rust manifest-policy enforcement and Python parity window
@@ -122,6 +123,15 @@ The currently scheduled foundation sprints are:
 - `A.8`
   - per-tool user guides and rule-disable documentation
   - `docs/sc-lint/sprint-A8.md`
+
+## Recent Sprint Deltas
+
+- `A.6`
+  - Rust-native TOML boundary inventory loading, schema validation, and
+    duplicate handling now live in `sc-lint-boundary`
+  - the Python parity oracle now exists at `.just/lint_boundaries.py`
+  - fixture coverage now includes valid, invalid-schema, and duplicate
+    inventory cases in `.just/tests/test_lint_boundaries.py`
 
 ## Next Analyzer-Crate Additions
 

@@ -359,6 +359,8 @@ Required work:
 Deliverable:
 
 - Rust can load and validate boundary inventory without Python assistance
+- the canonical `boundaries/` TOML layout and `boundaries/planning.toml`
+  planning registry are validated in the Rust loader before graph analysis
 
 ### Phase 3: Add manifest-policy enforcement to Rust
 

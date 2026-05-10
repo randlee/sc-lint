@@ -324,8 +324,11 @@ Requirement coverage:
     `lint.sc-runtime` command identity and `sc-runtime` service name after
     top-level normalization
 - `A.6`
-  - add boundary-inventory loader entry/exit/error logging to the
-    `sc-boundary` tool path
+  - the `sc-boundary` tool path now covers boundary-inventory loader
+    validation before graph analysis
+  - loader and schema failures surface through the existing top-level
+    `sc-boundary` command normalization and therefore reuse the standard
+    entry/completion/error event pattern
 - `A.7`
   - add manifest-policy entry/exit/error logging to the `sc-boundary` tool
     path during the parity window
