@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-NEW-001>
+  a triage:Finding ;
+  triage:findingId "RBP-NEW-001" ;
+  triage:title "BoundaryRecord owner fields lack newtypes — raw String for structured identifiers" ;
+  triage:description "BoundaryRecord owner fields use raw String where validated newtypes would enforce invariants at construction. RBP-004 pattern — same as RBP-F003 fix but for owner fields." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-NEW-001/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-NEW-001/integration-phase-A/2> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/fff8b88> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/RBP-NEW-001/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/inventory.rs" ;
+  triage:line 194 ;
+  triage:snippet "    pub(crate) owner_package: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/RBP-NEW-001/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/inventory.rs" ;
+  triage:line 195 ;
+  triage:snippet "    pub(crate) owner_crate_path: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:worktree/integration-phase-A/fff8b88>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:orderIndex 99 .

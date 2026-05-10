@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-NEW-002>
+  a triage:Finding ;
+  triage:findingId "RBP-NEW-002" ;
+  triage:title "planned_items map key is plain String — no PlanningKey newtype" ;
+  triage:description "planned_items uses BTreeMap<String, ...> as its key type where a PlanningKey newtype with validation would prevent invalid keys. RBP-004 pattern." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-NEW-002/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/fff8b88> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/RBP-NEW-002/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/inventory.rs" ;
+  triage:line 269 ;
+  triage:snippet "    pub(crate) planned_items: BTreeMap<String, PlannedItem>," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:worktree/integration-phase-A/fff8b88>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:orderIndex 99 .

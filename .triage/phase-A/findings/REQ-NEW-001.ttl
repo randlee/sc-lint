@@ -1,0 +1,62 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/REQ-NEW-001>
+  a triage:Finding ;
+  triage:findingId "REQ-NEW-001" ;
+  triage:title "PortabilityError exposes anyhow::Error via #[source] — inconsistent with QA-001 fix" ;
+  triage:description "PortabilityError has struct variants with #[source] source:AnyhowError fields, exposing anyhow::Error in the public API. Inconsistent with QA-001 fix applied to RuntimeError. Must use opaque error wrapping." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/REQ-NEW-001/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/REQ-NEW-001/integration-phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/REQ-NEW-001/integration-phase-A/3> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/fff8b88> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/REQ-NEW-001/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/lib.rs" ;
+  triage:line 3 ;
+  triage:snippet "use anyhow::Error as AnyhowError;" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/REQ-NEW-001/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/lib.rs" ;
+  triage:line 67 ;
+  triage:snippet "        source: AnyhowError," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/REQ-NEW-001/integration-phase-A/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/lib.rs" ;
+  triage:line 73 ;
+  triage:snippet "        source: AnyhowError," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:worktree/integration-phase-A/fff8b88>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:orderIndex 99 .
