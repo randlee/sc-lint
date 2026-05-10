@@ -6,8 +6,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+use anyhow as anyhow_crate;
 use anyhow::Context;
-use anyhow::Error as AnyhowError;
 use anyhow::Result;
 use cargo_metadata::MetadataCommand;
 use quote::ToTokens;
@@ -44,25 +44,35 @@ const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 const SC_LINT_BOUNDARY_TOOL: &str = "sc-lint-boundary";
 const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("{0}")]
+pub struct BoundaryErrorSource(Box<str>);
+
+impl From<anyhow_crate::Error> for BoundaryErrorSource {
+    fn from(value: anyhow_crate::Error) -> Self {
+        Self(value.to_string().into_boxed_str())
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum BoundaryError {
     #[error("failed to load boundary inventory for root `{}`: {source:#}", root.display())]
     InventoryLoad {
         root: PathBuf,
         #[source]
-        source: AnyhowError,
+        source: BoundaryErrorSource,
     },
     #[error("failed to analyze manifest policy for root `{}`: {source:#}", root.display())]
     ManifestPolicyAnalysis {
         root: PathBuf,
         #[source]
-        source: AnyhowError,
+        source: BoundaryErrorSource,
     },
     #[error("failed to build workspace graph for root `{}`: {source:#}", root.display())]
     WorkspaceGraphBuild {
         root: PathBuf,
         #[source]
-        source: AnyhowError,
+        source: BoundaryErrorSource,
     },
 }
 
@@ -383,7 +393,7 @@ pub fn analyze_workspace(
             manifest_policy::analyze_manifest_policy(&options.root).map_err(|source| {
                 BoundaryError::ManifestPolicyAnalysis {
                     root: options.root.clone(),
-                    source,
+                    source: source.into(),
                 }
             })?;
         let status = if manifest_report
@@ -408,13 +418,13 @@ pub fn analyze_workspace(
     let inventory = inventory::load_boundary_inventory(&options.root).map_err(|source| {
         BoundaryError::InventoryLoad {
             root: options.root.clone(),
-            source,
+            source: source.into(),
         }
     })?;
     let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
             root: options.root.clone(),
-            source,
+            source: source.into(),
         }
     })?;
     let inventory_summary = inventory.summary();
@@ -440,7 +450,7 @@ pub fn analyze_workspace(
             manifest_policy::analyze_manifest_policy(&options.root)
                 .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
                     root: options.root.clone(),
-                    source,
+                    source: source.into(),
                 })?
                 .findings,
         );
@@ -477,7 +487,7 @@ pub fn export_workspace_graph(
     graph::build_workspace_graph(&options.root).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
             root: options.root.clone(),
-            source,
+            source: source.into(),
         }
     })
 }

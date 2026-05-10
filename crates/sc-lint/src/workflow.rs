@@ -83,6 +83,7 @@ impl StepReport {
     }
 }
 
+/// Seam for injecting step execution in tests and alternate runtimes.
 pub(crate) trait SystemAdapter {
     fn cargo_xwin_available(&self, repo_root: &Path) -> bool;
     #[expect(

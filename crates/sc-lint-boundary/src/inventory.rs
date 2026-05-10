@@ -158,6 +158,167 @@ impl TryFrom<String> for TrackingId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct OwnerPackage(String);
+
+impl OwnerPackage {
+    fn parse(value: String) -> std::result::Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("owner packages must not be empty".to_string());
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for OwnerPackage {
+    type Error = String;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+impl AsRef<str> for OwnerPackage {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for OwnerPackage {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for OwnerPackage {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for OwnerPackage {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct OwnerCratePath(String);
+
+impl OwnerCratePath {
+    fn parse(value: String) -> std::result::Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("owner crate paths must not be empty".to_string());
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for OwnerCratePath {
+    type Error = String;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+impl AsRef<str> for OwnerCratePath {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for OwnerCratePath {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for OwnerCratePath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for OwnerCratePath {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct PlanningKey(String);
+
+impl PlanningKey {
+    fn parse(value: String) -> std::result::Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("planning keys must not be empty".to_string());
+        }
+        if !trimmed.starts_with("BOUNDARY-") || !trimmed.contains('.') {
+            return Err(format!(
+                "planning keys must use <boundary_id>.<section>.<field>[.<subfield>] shape (got `{trimmed}`)"
+            ));
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for PlanningKey {
+    type Error = String;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+impl AsRef<str> for PlanningKey {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for PlanningKey {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for PlanningKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for PlanningKey {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BoundaryInventory {
     pub(crate) records: Vec<BoundaryRecord>,
@@ -191,8 +352,8 @@ impl InventorySummary {
 #[serde(deny_unknown_fields)]
 pub(crate) struct BoundaryRecord {
     pub(crate) boundary_id: BoundaryId,
-    pub(crate) owner_package: String,
-    pub(crate) owner_crate_path: String,
+    pub(crate) owner_package: OwnerPackage,
+    pub(crate) owner_crate_path: OwnerCratePath,
     pub(crate) name: String,
     pub(crate) public: PublicSection,
     pub(crate) implementation: ImplementationSection,
@@ -266,7 +427,7 @@ pub(crate) struct StatusSection {
 pub(crate) struct PlanningMetadata {
     pub(crate) planning: PlanningHeader,
     #[serde(default)]
-    pub(crate) planned_items: BTreeMap<String, PlannedItem>,
+    pub(crate) planned_items: BTreeMap<PlanningKey, PlannedItem>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -412,7 +573,7 @@ fn validate_boundary_path(
         .and_then(Path::file_name)
         .and_then(|name| name.to_str())
         .context("boundary file missing owner-package directory")?;
-    if owner_dir != record.owner_package {
+    if record.owner_package != owner_dir {
         anyhow::bail!(
             "boundary file `{}` is under owner directory `{owner_dir}` but declares owner_package `{}`",
             path.display(),
@@ -421,7 +582,7 @@ fn validate_boundary_path(
     }
 
     let expected_owner_crate_path = record.owner_package.replace('-', "_");
-    if record.owner_crate_path != expected_owner_crate_path {
+    if record.owner_crate_path.as_str() != expected_owner_crate_path {
         anyhow::bail!(
             "boundary `{}` declares owner_crate_path `{}` but expected `{expected_owner_crate_path}` from owner_package `{}`",
             record.boundary_id,

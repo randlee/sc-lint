@@ -4,6 +4,8 @@ use serde::Serialize;
 pub(crate) struct ServiceName(&'static str);
 
 impl ServiceName {
+    // Static command/service identifiers are fixed at compile time, so Cow
+    // would add generality without any real construction-site benefit here.
     pub(crate) const fn new(value: &'static str) -> Self {
         debug_assert!(!value.is_empty(), "service names must not be empty");
         Self(value)
