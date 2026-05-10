@@ -95,29 +95,7 @@ pub enum LintTarget {
     Ci,
 }
 
-impl LintTarget {
-    #[allow(dead_code)]
-    pub const fn command_suffix(self) -> &'static str {
-        match self {
-            Self::ScBoundary => "sc-boundary",
-            Self::ScPortability => "sc-portability",
-            Self::ScRuntime => "sc-runtime",
-            Self::Fast => "fast",
-            Self::Full => "full",
-            Self::Ci => "ci",
-        }
-    }
-
-    #[allow(dead_code)]
-    pub const fn profile(self) -> Option<LintProfile> {
-        match self {
-            Self::Fast => Some(LintProfile::Fast),
-            Self::Full => Some(LintProfile::Full),
-            Self::Ci => Some(LintProfile::Ci),
-            Self::ScBoundary | Self::ScPortability | Self::ScRuntime => None,
-        }
-    }
-}
+impl LintTarget {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ViewTarget {
@@ -127,15 +105,7 @@ pub enum ViewTarget {
     Findings,
 }
 
-impl ViewTarget {
-    #[allow(dead_code)]
-    pub const fn command_suffix(self) -> &'static str {
-        match self {
-            Self::Graph => "graph",
-            Self::Findings => "findings",
-        }
-    }
-}
+impl ViewTarget {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum CheckTarget {

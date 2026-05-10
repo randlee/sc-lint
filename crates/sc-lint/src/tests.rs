@@ -179,11 +179,10 @@ fn output_mode_tracks_json_flag_and_serializes() {
 }
 
 #[test]
-fn lint_targets_map_profile_values_stably() {
-    assert_eq!(LintTarget::Fast.profile(), Some(crate::LintProfile::Fast));
-    assert_eq!(LintTarget::Full.profile(), Some(crate::LintProfile::Full));
-    assert_eq!(LintTarget::Ci.profile(), Some(crate::LintProfile::Ci));
-    assert_eq!(LintTarget::ScBoundary.profile(), None);
+fn lint_profiles_have_stable_suffixes() {
+    assert_eq!(crate::LintProfile::Fast.command_suffix(), "fast");
+    assert_eq!(crate::LintProfile::Full.command_suffix(), "full");
+    assert_eq!(crate::LintProfile::Ci.command_suffix(), "ci");
 }
 
 #[test]

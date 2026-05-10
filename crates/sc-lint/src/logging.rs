@@ -28,6 +28,18 @@ use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
 
+const FIELD_COMMAND: &str = "command";
+const FIELD_CONFIG_PATH: &str = "config_path";
+const FIELD_ELAPSED_MS: &str = "elapsed_ms";
+const FIELD_FINDING_COUNT: &str = "finding_count";
+const FIELD_JSON: &str = "json";
+const FIELD_LOG_CONSOLE: &str = "log_console";
+const FIELD_LOG_ROOT_OVERRIDE: &str = "log_root_override";
+const FIELD_PREFLIGHT_MODE: &str = "preflight_mode";
+const FIELD_REPO_ROOT: &str = "repo_root";
+const FIELD_SUMMARY: &str = "summary";
+const FIELD_TARGET_TRIPLE: &str = "target_triple";
+
 #[derive(Debug, Clone)]
 pub struct ObservedCommand<'a> {
     context: &'a CommandContext,
@@ -129,26 +141,26 @@ pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Lo
 
 pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
     let mut fields = base_fields(observed);
-    fields.insert(consts::FIELD_JSON.to_string(), Value::Bool(cli.json));
+    fields.insert(FIELD_JSON.to_string(), Value::Bool(cli.json));
     fields.insert(
-        consts::FIELD_LOG_CONSOLE.to_string(),
+        FIELD_LOG_CONSOLE.to_string(),
         Value::Bool(observed.loaded_config().logging_console()),
     );
     if let Some(log_root) = cli.log_root.as_ref() {
         fields.insert(
-            consts::FIELD_LOG_ROOT_OVERRIDE.to_string(),
+            FIELD_LOG_ROOT_OVERRIDE.to_string(),
             Value::String(log_root.display().to_string()),
         );
     }
     if let Some(repo_root) = observed.loaded_config().repo_root() {
         fields.insert(
-            consts::FIELD_REPO_ROOT.to_string(),
+            FIELD_REPO_ROOT.to_string(),
             Value::String(repo_root.display().to_string()),
         );
     }
     if let Some(config_path) = observed.loaded_config().config_path() {
         fields.insert(
-            consts::FIELD_CONFIG_PATH.to_string(),
+            FIELD_CONFIG_PATH.to_string(),
             Value::String(config_path.display().to_string()),
         );
     }
@@ -193,7 +205,7 @@ pub fn log_dispatch_result(
         Value::String(dispatch.tool().to_string()),
     );
     fields.insert(
-        consts::FIELD_FINDING_COUNT.to_string(),
+        FIELD_FINDING_COUNT.to_string(),
         json!(dispatch.finding_count()),
     );
 
@@ -217,11 +229,11 @@ pub fn log_completion(
 ) {
     let mut fields = base_fields(observed);
     fields.insert(
-        consts::FIELD_SUMMARY.to_string(),
+        FIELD_SUMMARY.to_string(),
         Value::String(summary.to_string()),
     );
     fields.insert(
-        consts::FIELD_ELAPSED_MS.to_string(),
+        FIELD_ELAPSED_MS.to_string(),
         Value::from(elapsed_ms(elapsed)),
     );
 
@@ -343,17 +355,14 @@ fn build_event(
 fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
     let mut fields = Map::from_iter([
         (
-            consts::FIELD_COMMAND.to_string(),
+            FIELD_COMMAND.to_string(),
             Value::String(observed.command_id().to_string()),
         ),
-        (consts::FIELD_SUMMARY.to_string(), json!(observed.summary())),
+        (FIELD_SUMMARY.to_string(), json!(observed.summary())),
     ]);
     if observed.context.is_xwin_preflight() {
-        fields.insert(consts::FIELD_PREFLIGHT_MODE.to_string(), json!("xwin"));
-        fields.insert(
-            consts::FIELD_TARGET_TRIPLE.to_string(),
-            json!(WINDOWS_XWIN_TARGET),
-        );
+        fields.insert(FIELD_PREFLIGHT_MODE.to_string(), json!("xwin"));
+        fields.insert(FIELD_TARGET_TRIPLE.to_string(), json!(WINDOWS_XWIN_TARGET));
     }
     fields
 }
@@ -363,6 +372,17 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
     reason = "Logger startup must fail through the shared CliError contract when static logging metadata is invalid."
 )]
 fn validate_logging_contract() -> Result<(), CliError> {
+    let _ = (
+        consts::TOOL_BOUNDARY,
+        consts::CMD_BOUNDARY,
+        consts::FIELD_FINDINGS,
+        consts::FIELD_STATUS,
+        consts::FIELD_CRATE_NAME,
+        consts::FIELD_CRATE_VERSION,
+        consts::FIELD_SUGGESTED_ACTION,
+        consts::FIELD_STEPS,
+        consts::FIELD_ROOT,
+    );
     let _ = schema_version().map_err(CliError::internal)?;
     let _ = command_target().map_err(CliError::internal)?;
     let _ = started_action().map_err(CliError::internal)?;

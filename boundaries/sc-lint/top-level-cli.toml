@@ -18,7 +18,7 @@ constructor = "none"
 # The A.1b/A.2 execution model also exposes the command-context seam, preflight
 # target enums, and the canonical Windows xwin target triple as contract-relevant
 # CLI composition items.
-roots = ["Command", "CommandContext", "LintProfile", "LintTarget", "ViewTarget", "OutputMode", "CheckTarget", "ClippyTarget", "CommandEnvelope", "CliError", "DispatchTelemetry", "ParsedInvocation", "ImmediateOutcome", "ExecutionOutcome", "RenderedOutput", "WINDOWS_XWIN_TARGET"]
+roots = ["Command", "CommandContext", "LintProfile", "LintTarget", "ViewTarget", "OutputMode", "CheckTarget", "ClippyTarget", "CommandEnvelope", "CliError", "DispatchTelemetry", "LoadedConfig", "ParsedInvocation", "ImmediateOutcome", "ExecutionOutcome", "RenderedOutput", "WINDOWS_XWIN_TARGET"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the shared support crate and

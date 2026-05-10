@@ -1,4 +1,5 @@
-#[allow(dead_code)]
+// Binary target declares its own consts; library pub(crate) consts are not
+// accessible from a separate binary compilation unit.
 mod consts;
 mod logging;
 

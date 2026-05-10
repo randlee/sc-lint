@@ -1,7 +1,6 @@
 mod cli;
 mod command;
 mod config;
-#[allow(dead_code)]
 mod consts;
 mod contract;
 mod dispatch;

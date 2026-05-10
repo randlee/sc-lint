@@ -60,16 +60,6 @@ impl RepoRoot {
     pub fn as_path(&self) -> &Path {
         &self.0
     }
-
-    #[allow(dead_code)]
-    pub fn to_path_buf(&self) -> PathBuf {
-        self.0.clone()
-    }
-
-    #[allow(dead_code)]
-    pub fn display(&self) -> std::path::Display<'_> {
-        self.0.display()
-    }
 }
 
 impl AsRef<Path> for RepoRoot {
