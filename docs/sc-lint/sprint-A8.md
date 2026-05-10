@@ -112,6 +112,17 @@ permits.
    Required doc or boundary updates:
    - update CLI docs if any guide reveals naming drift
 
+4. Document logging interpretation guidance
+   Development work:
+   - explain how users read command entry, completion, and error events in the
+     per-tool guides
+   - explain how stable error codes and elapsed-time fields relate to the
+     `CommandEnvelope<T>` / `CliError` contract
+   Required tests:
+   - doc review for consistency with `docs/sc-lint/logging.md`
+   Required doc or boundary updates:
+   - add logging cross-links where the guides rely on the shared event schema
+
 ## Split Recommendation
 
 Keep A.8 together if the release-1 tool set stays small. If the guide set
@@ -127,6 +138,8 @@ grows materially, split by tool family rather than by document section.
   disabled
 - the guides use the primary crate-mapped CLI target names consistently
 - the repository-root `README.md` links every per-tool guide directly
+- each guide explains how to read the standard command entry/completion/error
+  log events for that tool
 
 ## Required Validation
 

@@ -65,6 +65,33 @@ Logging is a CLI-layer responsibility.
 This keeps one process-wide logging authority for each `sc-lint` binary
 invocation.
 
+### Initialization Failure Contract
+
+`LoggerBuilder` initialization failures must be surfaced as `CliError`
+results before command dispatch proceeds.
+
+Failure mode inventory:
+
+- invalid or contradictory logging configuration
+  - emit `CliError`
+  - top-level kind/code:
+    - `config`
+    - `CLI.CONFIG_ERROR`
+- resolved log path cannot be created or written in the current environment
+  - emit `CliError`
+  - top-level kind/code:
+    - `capability`
+    - `CLI.CAPABILITY_ERROR`
+- unexpected builder or sink wiring failure inside the CLI process
+  - emit `CliError`
+  - top-level kind/code:
+    - `internal`
+    - `CLI.INTERNAL_ERROR`
+
+The failure envelope should include recovery-oriented guidance because logging
+startup is part of the top-level CLI contract rather than a backend-local
+implementation detail.
+
 ## Service Names
 
 Requirement coverage:
@@ -161,23 +188,25 @@ Every CLI invocation should emit:
    - command
      - uses the same stable dotted command identifier documented for
        `CommandEnvelope.command`
+   - effective settings/config used for the call
    - resolved args
    - timestamp
    - service name
 2. completion event
    - verdict
    - summary
-   - duration
+   - elapsed time in ms
    - service name
 3. one error event per emitted top-level error
-   - stable error code when available
+   - stable error code
+   - `CliError.kind`
    - failure category
    - summary message
 
 For delegated backends, the CLI also logs:
 
 - dispatch start
-- normalized result receipt
+- normalized result receipt after `CommandEnvelope<T>` / `CliError` mapping
 - finding count when the backend returns findings payloads
 
 ## Rollout By Sprint
@@ -198,12 +227,19 @@ Requirement coverage:
   - log backend dispatch calls
   - log normalized delegated results
 - `A.4`
-  - add `sc-boundary` analyzer entry/exit/finding-count logging to the
+  - add `sc-portability` analyzer entry/exit/finding-count logging to the
     delegated backend pattern
 - `A.5`
-  - apply the same analyzer logging pattern to `sc-portability`
-- `A.6`
   - apply the same analyzer logging pattern to `sc-runtime`
+- `A.6`
+  - add boundary-inventory loader entry/exit/error logging to the
+    `sc-boundary` tool path
+- `A.7`
+  - add manifest-policy entry/exit/error logging to the `sc-boundary` tool
+    path during the parity window
+- `A.8`
+  - document how users read command, verdict, elapsed-time, and stable-error
+    log fields in the per-tool guides
 
 ## Ownership Rule
 

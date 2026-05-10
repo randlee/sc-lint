@@ -169,8 +169,11 @@ The product should support both:
   opt-in.
 
 - `REQ-LOG-004`
-  Each CLI invocation must log entry, completion, and per-error events through
-  the structured logging runtime.
+  Each CLI invocation must log through the structured logging runtime:
+  - one entry event carrying the command and effective settings/config used
+    for the call
+  - one completion event carrying the result/verdict and elapsed time in ms
+  - one error event per `CliError`, including the stable error code
 
 - `REQ-LOG-005`
   Backend crates must not initialize the logger; structured logging remains a

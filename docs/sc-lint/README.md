@@ -43,6 +43,8 @@ Current contents:
   the planned top-level `sc-lint` CLI
 - [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
   envelope and backend-to-CLI normalization contract
+- [`logging.md`](./logging.md) — structured logging design, rollout, and event
+  schema for the top-level CLI
 
 Current intended crate split:
 
@@ -237,19 +239,22 @@ Future documents that should also live here:
 - deeper RDF/Oxygraph integration notes
 - release-1 acceptance notes
 
-Related architecture decision:
+Related architecture decisions:
 
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
   — canonical TOML boundary source plus planning-aware inventory-parity
+- [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+  — top-level CLI profile semantics plus capability-driven `xwin` preflight
+- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+  — top-level CLI as the stable machine-contract owner rather than a
+  dispatcher-only wrapper
+- [`./adr/ADR-007-analyzer-crate-partition.md`](./adr/ADR-007-analyzer-crate-partition.md)
+  — analyzer-crate partitioning and primary lint-target mapping
+- [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
+  — `sc-observability` selection plus CLI-owned structured logging policy
 
 Planned A.8 user-guide convention:
 
 - per-tool guides will live under `docs/sc-lint/tools/`
 - each file will be named after the tool it documents
 - the repository-root `README.md` will link every guide directly
-  enforcement
-- [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
-  — top-level CLI profile semantics plus capability-driven `xwin` preflight
-- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
-  — top-level CLI as the stable machine-contract owner rather than a
-  dispatcher-only wrapper

@@ -125,18 +125,20 @@ crate, moves the existing portability implementation out of
    - keep the top-level CLI docs aligned so primary lint targets map to the
      backend crate boundary
 
-5. Plan analyzer logging baseline for `sc-boundary`
+5. Plan analyzer logging baseline for `sc-portability`
    Development work:
    - keep the logging ownership boundary at the `analyze_workspace` seam:
      the top-level CLI initializes the logger and analyzer crates only emit
      structured events through log macros inside the delegated analysis path
-   - define `sc-boundary` analyzer entry logging for delegated analyze calls
+   - define `sc-portability` analyzer entry logging for delegated analyze
+     calls
    - define completion logging with verdict and finding count
-   - keep emission ownership in the top-level CLI logging layer
+   - keep emission ownership in the top-level CLI logging layer and log only
+     after result normalization through `CommandEnvelope<T>` or `CliError`
    Required tests:
    - doc review for backend-service naming and finding-count event consistency
    Required doc or boundary updates:
-   - keep `docs/sc-lint/logging.md` aligned with the `sc-boundary` logging
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-portability`
      pattern
 
 ## Split Recommendation
@@ -150,6 +152,10 @@ portability rules rather than leaving the rule family split across crates.
 - `PORT-001` through `PORT-005` live in `sc-lint-portability`
 - `sc-lint-boundary` no longer owns portability-rule business logic
 - wrapper and CLI docs identify portability as its own backend surface
+- `sc-lint-portability` does not initialize the logger runtime and relies on
+  CLI-owned logging hooks only
+- portability-tool entry/exit/error events are emitted only after top-level
+  normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 

@@ -109,16 +109,17 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
    Required doc or boundary updates:
    - keep `sc-lint-tokio` present as a planned future crate only
 
-5. Plan analyzer logging for `sc-portability`
+5. Plan analyzer logging for `sc-runtime`
    Development work:
-   - define `sc-portability` analyzer entry logging for delegated analyze
+   - define `sc-runtime` analyzer entry logging for delegated analyze
      calls
    - define completion logging with verdict and finding count
-   - keep logging initialization out of the backend crate
+   - keep logging initialization out of the backend crate and log only after
+     result normalization through `CommandEnvelope<T>` or `CliError`
    Required tests:
    - doc review for backend-service naming and finding-count event consistency
    Required doc or boundary updates:
-   - keep `docs/sc-lint/logging.md` aligned with the `sc-portability`
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-runtime`
      logging pattern
 
 ## Split Recommendation
@@ -132,6 +133,10 @@ one contained sprint and should not be split across two crates or two phases.
 - `SCB-RUNTIME-001` and `SCB-RUNTIME-002` live in `sc-lint-runtime`
 - product docs clearly separate generic std runtime rules from future
   Tokio-specific rules
+- `sc-lint-runtime` does not initialize the logger runtime and relies on
+  CLI-owned logging hooks only
+- runtime-tool entry/exit/error events are emitted only after top-level
+  normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 

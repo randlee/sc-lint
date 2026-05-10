@@ -49,6 +49,7 @@ distinguishes:
 - `REQ-CLI-008C`
 - `REQ-CLI-014`
 - `REQ-CLI-015`
+- `REQ-LOG-004`
 
 ## Governing ADRs
 
@@ -133,7 +134,19 @@ distinguishes:
    Required doc or boundary updates:
    - update profile docs if capability behavior narrows further
 
-4. Document rule-disable behavior
+4. Plan `xwin` preflight logging
+   Development work:
+   - log one entry event for `sc-lint check xwin` and `sc-lint clippy xwin`
+     including the effective target/config selection
+   - log one completion event with verdict and elapsed time in ms
+   - log one error event per `CliError` on capability or preflight failure
+   Required tests:
+   - doc review for entry/exit/error event consistency with
+     `docs/sc-lint/logging.md`
+   Required doc or boundary updates:
+   - keep the logging design aligned with the `xwin` command path
+
+5. Document rule-disable behavior
    Development work:
    - define how rules are disabled in the new CLI (source vs config)
    - document the disable policy for the first shipped backends
@@ -142,7 +155,7 @@ distinguishes:
    Required doc or boundary updates:
    - ensure initial per-tool guides (even if draft) reflect this policy
 
-5. Align repo-local wrappers with CLI semantics
+6. Align repo-local wrappers with CLI semantics
    Development work:
    - ensure `just` wrappers call the intended `sc-lint` profile commands
    - keep CI semantics explicit and independent from `xwin`
@@ -165,6 +178,8 @@ and `ci` actually mean.
 - `sc-lint ci` exists and includes tests
 - `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is installed
 - the `full` profile includes `xwin` when present, but `fast` and `ci` remain independent from `xwin`
+- `xwin` preflight command paths log entry, completion, and error events
+  through the standard CLI event pattern
 - real Windows CI remains the authoritative release gate
 - the cross-target preflight strategy document exists and is approved before
   A.2 closes

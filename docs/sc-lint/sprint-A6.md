@@ -103,15 +103,17 @@ item semantics can stabilize independently.
    - keep the boundary-enforcement model aligned with actual duplicate
      behavior
 
-4. Plan analyzer logging for `sc-runtime`
+4. Plan boundary-inventory logging for `sc-boundary`
    Development work:
-   - define `sc-runtime` analyzer entry logging for delegated analyze calls
-   - define completion logging with verdict and finding count
-   - keep logger lifecycle ownership in the top-level CLI
+   - define `sc-boundary` entry logging for boundary-inventory loader calls
+   - define completion logging with verdict plus schema/duplicate summary
+   - keep logger lifecycle ownership in the top-level CLI and log only after
+     result normalization through `CommandEnvelope<T>` or `CliError`
    Required tests:
    - doc review for backend-service naming and finding-count event consistency
    Required doc or boundary updates:
-   - keep `docs/sc-lint/logging.md` aligned with the `sc-runtime` logging
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-boundary`
+     inventory-loader logging
      pattern
 
 ## Split Recommendation
@@ -126,6 +128,10 @@ starts.
 - schema validation is Rust-native
 - duplicate boundary and planning-item handling is Rust-native
 - the Python validator still exists as a parity oracle
+- the boundary-inventory loader path does not initialize the logger runtime in
+  backend code
+- boundary-inventory entry/exit/error events are emitted only after top-level
+  normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 

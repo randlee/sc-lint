@@ -30,6 +30,8 @@ standalone fixture coverage.
 - `REQ-CLI-006`
 - `REQ-CLI-012`
 - `REQ-CLI-013`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -112,6 +114,21 @@ standalone fixture coverage.
    Required doc or boundary updates:
    - update README and roadmap if view command names narrow
 
+5. Plan Python utility logging
+   Development work:
+   - log entry events for Python-backed utility calls including the effective
+     adapter/config settings used by the CLI
+   - log completion events with normalized result/verdict and elapsed time in
+     ms
+   - log one error event per `CliError` after adapter normalization rather
+     than exposing raw traceback text
+   Required tests:
+   - doc review proving Python utility paths follow the same entry/exit/error
+     pattern as Rust-backed tools
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the Python adapter logging
+     path
+
 ## Split Recommendation
 
 If schedule pressure appears, split A.3 by utility family:
@@ -129,6 +146,8 @@ extraction.
 - consumer-specific policy does not leak into the shared defaults
 - top-level CLI dispatch exists for extracted utilities that are ready for
   stable exposure
+- Python-backed utility paths log entry, completion, and error events only
+  after top-level normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 
