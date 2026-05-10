@@ -1,0 +1,43 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A6-SC-001
+# lint_boundaries.py Python parity oracle absent from .just/
+# Source: QA-A6-001 SC-QA-001 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A6-SC-001>
+  a triage:Finding ;
+  triage:findingId "A6-SC-001" ;
+  triage:title "lint_boundaries.py Python parity oracle absent — REQ-PRODUCT-015 and sprint A.6 acceptance criterion not met" ;
+  triage:description ".just/lint_boundaries.py does not exist on feature/sprint-A6 at 8544597. Sprint A.6 acceptance criteria require a Python parity oracle (lint_boundaries.py) that mirrors the Rust sc-lint-boundary logic for CI validation. REQ-PRODUCT-015 governs this requirement. Fix: implement .just/lint_boundaries.py as the Python boundary-linting oracle with the coverage specified in sprint-A6.md." ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "Missing implementation on A6. Not a carry-in. A6 sprint scope." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A6-SC-001/sprint-A6/1> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A6/8544597> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:occurrence/A6-SC-001/sprint-A6/1>
+  a triage:Occurrence ;
+  triage:file ".just/lint_boundaries.py" ;
+  triage:snippet "file absent" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 .
