@@ -19,7 +19,7 @@ path = "src/lib.rs"
 
 [dependencies]
 clap.workspace = true
-sc-observability.workspace = true
+sc-observability = "1.0.0"
 serde.workspace = true
 serde_json.workspace = true
 
