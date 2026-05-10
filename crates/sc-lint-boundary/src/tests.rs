@@ -372,6 +372,7 @@ fn flags_hardcoded_tmp_path_in_test_scope() {
 
                 #[test]
                 fn writes_artifact() {
+                    // Intentionally uses /tmp to exercise PORT-001 detection.
                     let _ = PathBuf::from("/tmp/test-artifact");
                 }
             }
@@ -443,6 +444,7 @@ fn does_not_flag_unix_only_production_code() {
         r#"
             #[cfg(unix)]
             pub fn socket_path() -> std::path::PathBuf {
+                // Intentionally uses /tmp to exercise PORT-001 detection.
                 std::path::PathBuf::from("/tmp/runtime-socket")
             }
         "#,
