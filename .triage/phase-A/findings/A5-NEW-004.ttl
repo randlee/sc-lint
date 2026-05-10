@@ -1,0 +1,52 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A5-NEW-004
+# boundaries/sc-lint/top-level-cli.toml state='planned' — crate is fully implemented
+# Source: QA-A5-001 arch-qa finding SC-QA-004 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A5-NEW-004>
+  a triage:Finding ;
+  triage:findingId "A5-NEW-004" ;
+  triage:title "boundaries/sc-lint/top-level-cli.toml state='planned' while crate is fully implemented" ;
+  triage:description "boundaries/sc-lint/top-level-cli.toml [status] section (line 47) reads state = 'planned'. The sc-lint crate is the top-level CLI and has been fully implemented since phase A.1. The boundary TOML state field must reflect current implementation status. Fix: update state = 'concrete_landed' (or the appropriate concrete state per the boundary TOML schema)." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "Present on integration/phase-A at 1cd8862 (arrived via PR #13 A4 merge). Will propagate to A5-A8 via merge-forward. Fix on A5; propagates downstream." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A5-NEW-004/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/1cd8862> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/A5-NEW-004/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "boundaries/sc-lint/top-level-cli.toml" ;
+  triage:line 47 ;
+  triage:snippet "state = \"planned\"" ;
+  triage:context "[status] section of the sc-lint top-level boundary record" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1cd8862" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1cd8862> .
+
+<urn:atm:triage:worktree/integration-phase-A/1cd8862>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "1cd8862" ;
+  triage:orderIndex 0 .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 .
