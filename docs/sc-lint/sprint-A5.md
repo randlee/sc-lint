@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.5"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: M
@@ -32,6 +32,8 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
 - `REQ-PRODUCT-015B`
 - `REQ-PRODUCT-015C`
 - `REQ-CLI-007F`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -106,6 +108,18 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
    - none beyond doc and boundary review
    Required doc or boundary updates:
    - keep `sc-lint-tokio` present as a planned future crate only
+
+5. Plan analyzer logging for `sc-portability`
+   Development work:
+   - define `sc-portability` analyzer entry logging for delegated analyze
+     calls
+   - define completion logging with verdict and finding count
+   - keep logging initialization out of the backend crate
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-portability`
+     logging pattern
 
 ## Split Recommendation
 

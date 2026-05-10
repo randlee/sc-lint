@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.7"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: M

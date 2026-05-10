@@ -26,7 +26,7 @@ roots = ["Command", "LintProfile", "OutputMode", "CommandEnvelope", "CliError"]
 # backend surfaces unless a later boundary/architecture update approves
 # direct linkage.
 allowed_dependents = []
-allowed_dependencies = ["sc-lint-boundary", "sc-lint-directives"]
+allowed_dependencies = ["sc-lint-boundary", "sc-lint-directives", "sc-observability"]
 forbidden_edges = [
   "sc-lint-directives -> sc-lint",
   "sc-lint-attributes -> sc-lint",

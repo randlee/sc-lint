@@ -6,6 +6,10 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+
+Related design docs:
+- [docs/sc-lint/logging.md](./sc-lint/logging.md)
 
 ## Product Purpose
 
@@ -149,6 +153,28 @@ The product should support both:
   machine contract to backend-specific machine-output flags or adapters, but
   that translation must not leak backend-specific contract drift into the
   stable user-facing surface.
+
+### Logging and observability
+
+- `REQ-LOG-001`
+  The top-level CLI must initialize the `sc-observability` logger at startup
+  before command execution begins.
+
+- `REQ-LOG-002`
+  The default log root must be `~/sc-lint/logs/<service>/`, with a
+  per-lint-system override available through config or CLI flag.
+
+- `REQ-LOG-003`
+  File logging must be enabled by default and console logging must remain
+  opt-in.
+
+- `REQ-LOG-004`
+  Each CLI invocation must log entry, completion, and per-error events through
+  the structured logging runtime.
+
+- `REQ-LOG-005`
+  Backend crates must not initialize the logger; structured logging remains a
+  CLI-layer responsibility even when backend execution is delegated.
 
 ### Boundary definitions
 

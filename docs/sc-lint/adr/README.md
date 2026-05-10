@@ -13,6 +13,8 @@ Phase A planning surface.
   - canonical AI-first top-level CLI machine contract
 - [`ADR-007-analyzer-crate-partition.md`](./ADR-007-analyzer-crate-partition.md)
   - analyzer-crate partitioning and primary lint-target mapping
+- [`ADR-008-sc-observability-logging.md`](./ADR-008-sc-observability-logging.md)
+  - `sc-observability` selection and CLI-owned structured logging policy
 
 ## Index Rules
 

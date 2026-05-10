@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.1b"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: S
@@ -50,11 +50,17 @@ utility extraction work begins.
 - `REQ-CLI-008A`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
+- `REQ-LOG-001`
+- `REQ-LOG-002`
+- `REQ-LOG-003`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
 - `docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md`
 - `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
+- `docs/sc-lint/adr/ADR-008-sc-observability-logging.md`
 
 ## Governing Boundaries
 
@@ -99,6 +105,8 @@ utility extraction work begins.
    Development work:
    - define the repo-root discovery path
    - implement one top-level config loader for CLI-owned commands
+   - keep command-family config resolution in shared helpers rather than
+     per-command parsing branches
    - keep backend-specific config parsing behind the CLI contract seam
    Required tests:
    - repo-root discovery tests
@@ -111,13 +119,29 @@ utility extraction work begins.
    - add one real delegated command path through the CLI, preferably
      `sc-lint lint sc-boundary`
    - normalize backend machine output into the top-level envelope
+   - route delegated results through one shared normalization helper used by
+     every non-interactive command family
    - handle backend protocol and execution failures explicitly
    Required tests:
    - delegated success-path tests
    - malformed backend JSON tests
    - backend execution failure tests
+   - contract-parity tests proving delegated command paths still use the same
+     `command`, success-envelope, and `CliError` pattern as direct CLI-owned
+     commands
    Required doc or boundary updates:
    - update CLI contract docs if the normalization rules need narrower wording
+
+3. Plan dispatch-seam logging
+   Development work:
+   - log delegated backend dispatch start for the active command
+   - log the normalized delegated result summary after completion
+   - keep backend logging as a CLI-owned concern rather than a backend-owned
+     logger initialization path
+   Required tests:
+   - doc review for dispatch/event-shape consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with delegated dispatch behavior
 
 ## Split Recommendation
 
@@ -131,6 +155,10 @@ end-to-end CLI seam.
 - at least one real delegated backend command is normalized through the
   top-level CLI
 - non-interactive delegated CLI paths use the canonical `--json` contract
+- dispatch-seam logging writes delegated dispatch-call and normalized-result
+  entries for the active backend command
+- delegated command paths still use the same documented top-level `command`,
+  response, and error pattern as the rest of the CLI
 - no backend crate gains a direct dependency on another backend crate
 
 ## Required Validation
@@ -144,6 +172,7 @@ end-to-end CLI seam.
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
 - `docs/architecture.md`
 - `docs/project-plan.md`
 

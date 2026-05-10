@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.4"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: M
@@ -33,6 +33,8 @@ crate, moves the existing portability implementation out of
 - `REQ-PRODUCT-015B`
 - `REQ-PRODUCT-015C`
 - `REQ-CLI-007F`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -122,6 +124,20 @@ crate, moves the existing portability implementation out of
    Required doc or boundary updates:
    - keep the top-level CLI docs aligned so primary lint targets map to the
      backend crate boundary
+
+5. Plan analyzer logging baseline for `sc-boundary`
+   Development work:
+   - keep the logging ownership boundary at the `analyze_workspace` seam:
+     the top-level CLI initializes the logger and analyzer crates only emit
+     structured events through log macros inside the delegated analysis path
+   - define `sc-boundary` analyzer entry logging for delegated analyze calls
+   - define completion logging with verdict and finding count
+   - keep emission ownership in the top-level CLI logging layer
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-boundary` logging
+     pattern
 
 ## Split Recommendation
 

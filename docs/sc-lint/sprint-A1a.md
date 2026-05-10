@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.1a"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: S
@@ -52,11 +52,17 @@ must leave the product with a real top-level binary and a vetted
 - `REQ-CLI-008A`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
+- `REQ-LOG-001`
+- `REQ-LOG-002`
+- `REQ-LOG-003`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
 - `docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md`
 - `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
+- `docs/sc-lint/adr/ADR-008-sc-observability-logging.md`
 
 ## Governing Boundaries
 
@@ -91,6 +97,8 @@ must leave the product with a real top-level binary and a vetted
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
+- `docs/requirements.md`
 - `docs/project-plan.md`
 - `boundaries/sc-lint/top-level-cli.toml`
 - `boundaries/planning.toml`
@@ -102,6 +110,9 @@ must leave the product with a real top-level binary and a vetted
    - add the `sc-lint` crate to the workspace
    - implement the top-level `Cli` command root and initial grouped command
      families
+   - split responsibilities early into command-parsing, contract, error,
+     rendering, and logging seams so later command families do not copy/paste
+     their own output behavior
    - reserve the initial surface:
      - `lint`
      - `view`
@@ -120,10 +131,16 @@ must leave the product with a real top-level binary and a vetted
    Development work:
    - define `CommandEnvelope<T>` and `CliError`
    - implement canonical `--json` success and failure rendering
+   - define the stable dotted `command` identifier convention for every
+     initial non-interactive command family
+   - keep envelope serialization and `CliError` mapping in one shared contract
+     path rather than per-command handlers
    - normalize exit-code behavior for top-level CLI-owned failures
    Required tests:
    - success-envelope serialization tests
    - failure-envelope serialization tests
+   - fixture or snapshot tests proving `lint`, `view`, `check`, `clippy`,
+     `ci`, and `version` all use the same top-level envelope and failure keys
    - exit-code tests for usage/config/internal failures
    Required doc or boundary updates:
    - keep `docs/sc-lint/cli-contract.md` aligned with the implemented field
@@ -141,6 +158,19 @@ must leave the product with a real top-level binary and a vetted
    - keep `docs/project-plan.md` and
      `docs/sc-lint/foundation-phase-plan.md` aligned with the A.1a/A.1b gate
 
+4. Plan structured logging bootstrap
+   Development work:
+   - add the `sc-observability` path dependency plan for the `sc-lint` crate
+   - define top-level logger initialization ownership at CLI startup
+   - define invocation entry, completion, and per-error event logging for
+     top-level CLI commands
+   Required tests:
+   - doc review for service-name, log-root, and sink-policy consistency
+   Required doc or boundary updates:
+   - add `docs/sc-lint/logging.md`
+   - update `docs/requirements.md`
+   - update `boundaries/planning.toml`
+
 ## Split Recommendation
 
 Keep A.1a together. The crate bootstrap and machine contract definition should
@@ -155,6 +185,10 @@ normalization begin.
 - top-level machine-readable success uses `CommandEnvelope<T>`
 - top-level machine-readable failure uses `CliError`
 - the contract-review checkpoint for A.1b entry is documented and complete
+- the initial non-interactive command families share one documented `command`,
+  response, and error pattern at the top-level envelope
+- the CLI logger initializes at process startup and writes invocation entry,
+  completion, and per-error events under `~/sc-lint/logs/sc-lint/`
 - no backend crate gains a direct dependency on another backend crate
 
 ## Required Validation
@@ -168,6 +202,8 @@ normalization begin.
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
+- `docs/requirements.md`
 - `docs/project-plan.md`
 - `boundaries/sc-lint/top-level-cli.toml`
 - `boundaries/planning.toml`
