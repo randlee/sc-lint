@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PHAS-A-NEW-003>
+  a triage:Finding ;
+  triage:findingId "PHAS-A-NEW-003" ;
+  triage:title "sc-lint-portability FileContext.package/target are plain String — RBP-F001 newtype fix not applied to portability crate" ;
+  triage:description "crates/sc-lint-portability/src/source_scan.rs lines 16-17: FileContext.package and .target fields use plain String. RBP-F001 fix introduced PackageName/TargetName newtypes in sc-lint-runtime but the portability crate was not updated in parallel. Cross-crate parity gap." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-003/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-003/integration-phase-A/2> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/c1c3133> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-003/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/source_scan.rs" ;
+  triage:line 16 ;
+  triage:snippet "pub(crate) package: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-003/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/source_scan.rs" ;
+  triage:line 17 ;
+  triage:snippet "pub(crate) target: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:worktree/integration-phase-A/c1c3133>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:orderIndex 99 .
