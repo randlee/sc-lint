@@ -11,6 +11,9 @@ Related ADRs:
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
 
+For release `0.1.x`, ADR-005 is the approved cross-target preflight strategy
+artifact and supersedes earlier provisional profile/`xwin` rollout notes.
+
 ## Product Purpose
 
 `sc-lint` is a standalone lint tool family for Rust repositories. It provides:
@@ -137,7 +140,9 @@ The product should support both:
 - `REQ-PRODUCT-006C`
   The product should provide a documented cross-target preflight strategy for
   surfacing likely platform-specific compile failures before CI where that can
-  be done without requiring native execution on every target platform.
+  be done without requiring native execution on every target platform. For
+  release `0.1.x`, that governing strategy artifact is
+  [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md).
 
 - `REQ-PRODUCT-006D`
   The initial cross-target preflight target should be Windows via `cargo xwin`
@@ -225,9 +230,11 @@ The product should support both:
   promotion criteria and expected platform coverage.
 
 - `REQ-PRODUCT-012B`
-  The default promotion candidate for cross-target preflight is `cargo xwin
-  check`, while `cargo xwin clippy` should remain a stronger non-default path
-  until timing and noise are proven acceptable.
+  ADR-005 supersedes earlier provisional sequencing that treated `cargo xwin
+  check` as the only initial profile-promotion candidate. The lighter explicit
+  preflight path remains `cargo xwin check`, but release `0.1.x` profile
+  semantics may include both `cargo xwin check` and `cargo xwin clippy` in
+  `full` when the capability is installed.
 
 - `REQ-PRODUCT-012C`
   `xwin` availability should be capability-detected. When unavailable, the
@@ -244,8 +251,9 @@ The product should support both:
 
 - `REQ-PRODUCT-012E`
   If `cargo xwin` is installed, `xwin`-backed Windows preflight should be
-  eligible for the `full` lint profile, while `fast` remains `xwin`-free to
-  preserve low-latency local feedback and `ci` continues to exclude `xwin`.
+  eligible for the `full` lint profile through both `check` and `clippy`
+  command paths, while `fast` remains `xwin`-free to preserve low-latency
+  local feedback and `ci` continues to exclude `xwin`.
 
 ### Extraction and migration
 
@@ -335,13 +343,16 @@ The current execution phase, Phase `A`, requires:
   checks
 - documented `fast` / `full` / `ci` profile semantics and the distinction
   between `sc-lint lint ci` and top-level `sc-lint ci`
+- repo-local wrappers that map `just lint` and `just ci` onto the CLI-owned
+  profile and CI contracts instead of redefining them separately
 - a staged migration plan for:
   - generic Python utilities
   - boundary inventory and manifest-policy logic moving into Rust
 - a documented partition for newly proven lint families so release `0.1.x`
   does not blur reusable analyzer rules with consumer-local policy
 - a documented position on cross-target preflight checks for developer
-  confidence versus real multi-platform CI validation
+  confidence versus real multi-platform CI validation, with ADR-005 serving as
+  the approved Phase A strategy artifact
 
 ## Requirement Management
 

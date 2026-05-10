@@ -49,18 +49,22 @@ Current contents:
 Current intended crate split:
 
 - `sc-lint`
-  - planned top-level CLI crate
+  - top-level CLI crate
   - command parsing, config loading, output normalization, tool dispatch
   - canonical AI-first machine contract for non-interactive commands
-  - planned profiles:
+  - implemented profiles:
     - `fast`
     - `full`
     - `ci`
-  - planned top-level CI-equivalent command:
+  - implemented top-level CI-equivalent command:
     - `sc-lint ci`
-  - planned Windows preflight commands when `cargo xwin` is installed:
+  - implemented Windows preflight commands when `cargo xwin` is installed:
     - `sc-lint check xwin`
     - `sc-lint clippy xwin`
+  - implemented Python-backed utility commands:
+    - `sc-lint lint line-counts`
+    - `sc-lint lint identity-literals`
+    - `sc-lint view findings`
 - `sc-lint-directives`
   - shared directive parsing/types
 - `sc-lint-boundary`
@@ -115,8 +119,13 @@ Current scaffold status:
       - `SCB-CYCLE-001` multi-owner architectural cycle
       - `SCB-CYCLE-002` type/method self-loop
       - `SCB-CYCLE-003` trait-impl self-loop
-    - built-in default trait-self-loop policy from:
-      - `crates/sc-lint-boundary/config/defaults.toml`
+      - built-in default trait-self-loop policy from:
+        - `crates/sc-lint-boundary/config/defaults.toml`
+  - A.3 extraction surfaces now include:
+    - `.just/lint_line_counts.py`
+    - `.just/lint_identity_literals.py`
+    - `.just/view_findings.py`
+    - `.just/python_adapter.py`
     - boundary enforcement with:
       - `SCB-BOUNDARY-001` internal_only visibility violation
       - `SCB-BOUNDARY-002` internal_only external reference
@@ -189,7 +198,7 @@ Current repo integration status:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
-Current planned profile policy:
+Current implemented profile policy:
 
 - `fast`
   - local low-latency lint profile
@@ -202,6 +211,25 @@ Current planned profile policy:
   - excludes `xwin`
 - top-level `ci`
   - lint plus tests
+
+Current wrapper mapping:
+
+- `just lint`
+  - defaults to `sc-lint lint full`
+- `just lint fast`
+  - maps to `sc-lint lint fast`
+- `just lint full`
+  - maps to `sc-lint lint full`
+- `just lint ci`
+  - maps to `sc-lint lint ci`
+- `just ci`
+  - maps to `sc-lint ci`
+
+Current rule-disable policy:
+
+- A.2 does not add top-level `sc-lint` rule-disable flags
+- profile orchestration does not override backend rule configuration
+- current rule-disable behavior stays with the owning backend or delegated tool
 
 Current repo boundary source status:
 

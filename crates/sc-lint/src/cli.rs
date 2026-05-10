@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Parser)]
 #[command(name = "sc-lint")]
@@ -13,6 +14,8 @@ pub struct Cli {
     pub json: bool,
     #[arg(long, global = true, value_name = "path")]
     pub root: Option<PathBuf>,
+    #[arg(long, global = true, value_name = "path")]
+    pub config: Option<PathBuf>,
     #[arg(long, global = true, value_name = "path")]
     pub log_root: Option<PathBuf>,
     #[arg(long, global = true)]
@@ -43,6 +46,41 @@ pub enum Command {
     Ci,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ValueEnum)]
+#[serde(rename_all = "snake_case")]
+pub enum LintProfile {
+    Fast,
+    Full,
+    Ci,
+}
+
+impl LintProfile {
+    pub const fn command_suffix(self) -> &'static str {
+        match self {
+            Self::Fast => "fast",
+            Self::Full => "full",
+            Self::Ci => "ci",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputMode {
+    Human,
+    Json,
+}
+
+impl OutputMode {
+    pub const fn from_json_flag(json: bool) -> Self {
+        if json { Self::Json } else { Self::Human }
+    }
+
+    pub const fn is_json(self) -> bool {
+        matches!(self, Self::Json)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum LintTarget {
     #[value(name = "sc-boundary")]
@@ -51,6 +89,10 @@ pub enum LintTarget {
     ScPortability,
     #[value(name = "sc-runtime")]
     ScRuntime,
+    #[value(name = "line-counts")]
+    LineCounts,
+    #[value(name = "identity-literals")]
+    IdentityLiterals,
     #[value(name = "fast")]
     Fast,
     #[value(name = "full")]
@@ -65,9 +107,24 @@ impl LintTarget {
             Self::ScBoundary => "sc-boundary",
             Self::ScPortability => "sc-portability",
             Self::ScRuntime => "sc-runtime",
+            Self::LineCounts => "line-counts",
+            Self::IdentityLiterals => "identity-literals",
             Self::Fast => "fast",
             Self::Full => "full",
             Self::Ci => "ci",
+        }
+    }
+
+    pub const fn profile(self) -> Option<LintProfile> {
+        match self {
+            Self::Fast => Some(LintProfile::Fast),
+            Self::Full => Some(LintProfile::Full),
+            Self::Ci => Some(LintProfile::Ci),
+            Self::ScBoundary
+            | Self::ScPortability
+            | Self::ScRuntime
+            | Self::LineCounts
+            | Self::IdentityLiterals => None,
         }
     }
 }

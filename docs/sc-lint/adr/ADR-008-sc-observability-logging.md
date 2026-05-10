@@ -60,6 +60,13 @@ backends, including Python tools still used in Sprint `A.3`, run in separate
 processes and are not governed by the CLI logger runtime. Their stdout/stderr
 handling remains a separate concern defined in the `A.3` dispatch design.
 
+Cargo package scoping also matters here: the current `sc-lint` package mixes a
+library target and a binary target, and Cargo cannot scope a dependency like
+`sc-observability` to only the binary within that package. Boundary and
+architecture review should therefore treat the dependency as a package-level
+constraint of the CLI crate layout, not as permission for backend-facing
+library surfaces to own logger initialization.
+
 ## CLI-Layer Ownership Invariant
 
 Named invariant: `CLI-LAYER-OWNS-LOGGER-INITIALIZATION`

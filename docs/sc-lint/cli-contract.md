@@ -69,10 +69,16 @@ Initial convention:
 
 - `sc-lint lint sc-boundary`
   - `lint.sc-boundary`
+- `sc-lint lint line-counts`
+  - `lint.line-counts`
+- `sc-lint lint identity-literals`
+  - `lint.identity-literals`
 - `sc-lint lint fast`
   - `lint.fast`
-- `sc-lint view <target>`
-  - `view.<target>`
+- `sc-lint view findings`
+  - `view.findings`
+- `sc-lint view graph`
+  - `view.graph`
 - `sc-lint check xwin`
   - `check.xwin`
 - `sc-lint clippy xwin`
@@ -81,6 +87,12 @@ Initial convention:
   - `ci`
 - `sc-lint version`
   - `version`
+
+When parsing fails before a concrete command path is resolved, the CLI uses the
+fallback identifier:
+
+- parser-level usage failure
+  - `cli.parse_error`
 
 The same identifier should also be used in structured logging entry and
 completion events so command telemetry and machine-readable output line up.
@@ -91,9 +103,37 @@ Current implementation status:
   - direct CLI-owned success path
 - `lint.sc-boundary`
   - first real backend-normalized success path
-- all remaining command families
-  - exposed now
-  - remain reserved until their owning sprints land
+- `lint.fast`
+  - implemented profile orchestration path
+- `lint.full`
+  - implemented profile orchestration path with conditional `xwin` preflight
+- `lint.ci`
+  - implemented lint-only CI-parity profile path
+- `check.native`
+  - implemented native preflight path
+- `check.xwin`
+  - implemented capability-gated Windows preflight path
+- `clippy.native`
+  - implemented native clippy path
+- `clippy.xwin`
+  - implemented capability-gated Windows clippy path
+- `ci`
+  - implemented top-level lint-plus-tests path
+- `lint.line-counts`
+  - implemented Python-adapter lint path
+- `lint.identity-literals`
+  - implemented Python-adapter lint path
+- `view.findings`
+  - implemented Python-adapter view path
+- `view.graph`
+  - still reserved pending a stable graph contract
+- `cli.parse_error`
+  - implemented parser-level usage failure envelope path when command parsing
+    fails before a concrete subcommand identity exists
+- `lint.sc-portability`
+  - still reserved until A.4 lands
+- `lint.sc-runtime`
+  - still reserved until A.5 lands
 
 ## Canonical Success Envelope
 
@@ -190,6 +230,10 @@ The initial documented mapping should be:
 
 The string values above are the implemented A.1a code families.
 
+Parser-level usage failures emitted before `CommandContext` can resolve a
+family-specific path still use this same error taxonomy, but their machine
+envelope `command` value is the fallback identifier `cli.parse_error`.
+
 ## Planned Command-Family Contract Matrix
 
 Every non-interactive command family should be implementation-reviewed against
@@ -240,6 +284,22 @@ If the delegated binary:
 - exits zero with malformed machine-readable output
   - emit `CLI.BACKEND_PROTOCOL_ERROR`
 
+### Python adapter backend
+
+For Python-backed utility paths in A.3:
+
+- the CLI invokes the Python tool with `--json`
+- the Python tool emits `sc-lint-python-v1`
+- the CLI validates the adapter schema before exposing any success payload
+- adapter-reported failures map into `CliError` by structured fields:
+  - `kind`
+  - `message`
+  - optional `details`
+  - optional `suggested_action`
+- the public exit code still comes from the normalized top-level `CliError`
+  kind rather than the raw Python subprocess status
+- raw traceback text is not part of the public machine contract
+
 ### Python backend
 
 When the CLI dispatches to a Python utility:
@@ -274,6 +334,19 @@ Recommended initial policy:
   - delegated backend protocol failure
 
 These codes are owned by the CLI and must not drift per backend.
+
+For Python-adapter command paths in A.3:
+
+- the adapter's process exit status is not the public contract surface
+- when the adapter returns a structured failure payload, the CLI maps its
+  normalized `CliError.kind` to the same top-level exit codes above
+- a Python adapter payload with `kind=config` therefore exits `3`, and
+  `kind=capability` exits `4`, even if the Python subprocess chose a different
+  nonzero status
+- adapter startup failures still map to `CLI.BACKEND_EXEC_FAILURE` / exit code
+  `5`
+- missing, malformed, or unknown-schema adapter output still maps to
+  `CLI.BACKEND_PROTOCOL_ERROR` / exit code `6`
 
 ## Relationship To Backend JSON
 

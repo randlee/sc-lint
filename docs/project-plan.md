@@ -99,9 +99,11 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A1b.md`
 - `A.2`
   - profiles and Windows preflight
+  - active implementation branch: `feature/sprint-A2`
   - `docs/sc-lint/sprint-A2.md`
 - `A.3`
   - generic utility extraction
+  - active implementation branch: `feature/sprint-A3`
   - `docs/sc-lint/sprint-A3.md`
 - `A.4`
   - `sc-lint-portability` crate creation and portability-rule moves/imports

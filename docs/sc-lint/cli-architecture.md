@@ -220,6 +220,7 @@ The current crate layout is:
 - `crates/sc-lint/src/contract.rs`
 - `crates/sc-lint/src/dispatch.rs`
 - `crates/sc-lint/src/error.rs`
+- `crates/sc-lint/src/python_adapter.rs`
 - `crates/sc-lint/src/render.rs`
 - `crates/sc-lint/src/logging.rs`
 
@@ -236,13 +237,21 @@ Current command behavior:
   - succeeds through the shared config + dispatch + normalization seam
   - uses direct Rust-library dispatch in A.1b
   - emits dedicated dispatch-start and dispatch-normalized log events
+- `lint line-counts`
+  - succeeds through the Python Adapter Protocol
+  - loads line-count thresholds and exclusions from `.just/lint-config.toml`
+- `lint identity-literals`
+  - succeeds through the Python Adapter Protocol
+  - exposes a configurable framework rather than consumer-specific defaults
+- `view findings`
+  - succeeds through the Python Adapter Protocol
+  - collates generated findings artifacts into a stable findings index
 - `lint`
-  - reserved contract surface
-  - all non-`sc-boundary` targets currently return `CLI.CAPABILITY_ERROR`
-    through `CliError`
+  - implemented for profiles, `sc-boundary`, `line-counts`, and
+    `identity-literals`
 - `view`
-  - reserved contract surface
-  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+  - `findings` is implemented
+  - `graph` remains reserved until the graph contract is stable
 - `check`
   - reserved contract surface
   - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
@@ -364,6 +373,26 @@ For `xwin`-aware commands, capability resolution includes:
 - add `xwin`-aware checks into `full` only when the capability is present
 - keep `ci` profile semantics independent from `xwin`
 - skip or error with a clear capability message depending on command mode
+
+Current A.2 implementation notes:
+
+- `check.native` runs `cargo check --workspace`
+- `check.xwin` runs `cargo xwin check --workspace --target x86_64-pc-windows-msvc`
+  when the capability is present
+- `clippy.native` runs `cargo clippy --workspace --all-targets -- -D warnings`
+- `clippy.xwin` runs `cargo xwin clippy --workspace --all-targets --target x86_64-pc-windows-msvc -- -D warnings`
+- `lint.fast` keeps the low-latency subset
+- `lint.full` adds `xwin` preflight only when available
+- `lint.ci` stays lint-only and excludes `xwin`
+- top-level `ci` reuses `lint.ci` semantics and adds workspace tests
+
+Current A.3 Python-adapter notes:
+
+- the adapter schema is `sc-lint-python-v1`
+- Python-backed commands use dedicated scripts under `.just/`
+- the CLI validates the adapter payload before exposing any result
+- Python tool config remains consumer-neutral and repo-local through
+  `.just/lint-config.toml`
 
 ## Output Model
 
