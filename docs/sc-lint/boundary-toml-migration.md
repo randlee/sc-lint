@@ -261,7 +261,8 @@ Expected low-impact areas:
 - rule ids
 - graph/export schema
 - source analysis
-- manifest/source enforcement logic
+- manifest/source enforcement logic outside the current workspace-inheritance
+  and internal path-version parity window
 
 ## Remaining Open Decisions
 
@@ -285,6 +286,19 @@ The next planned boundary-enforcement feature set depends on this migration:
 
 That means the migration is not just a format cleanup. It creates the correct
 data model for the next enforcement stage.
+
+## Rust-Native Vs Python-Backed After A.7
+
+Rust-native now owns:
+
+- canonical boundary inventory loading and schema validation in `sc-lint-boundary`
+- boundary graph/export analysis and crate-boundary enforcement in Rust
+- manifest ownership and workspace-package inheritance checks in Rust
+
+Python-backed still owns:
+
+- `.just/lint_manifests.py` as the parity oracle for the A.7 manifest-policy migration window
+- repo-level lint workflow orchestration that still runs the Python manifest check alongside Rust validation
 
 ## Recommendation
 

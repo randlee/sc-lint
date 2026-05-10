@@ -15,25 +15,35 @@ from lint_manifests import collect_manifest_violations
 from lint_manifests import relative_manifest_display
 
 
-ROOT_MANIFEST = """\
+CORE_CRATE = "fixture-lib"
+APP_CRATE = "fixture-app"
+CORE_PACKAGE = "synthetic-lib"
+APP_PACKAGE = "synthetic-app"
+DEPENDENCY_KEY = "fixture-lib"
+WINDOWS_REPO_ROOT = PureWindowsPath(r"D:\a\synthetic-repo\synthetic-repo")
+
+
+def root_manifest(*members: str) -> str:
+    rendered_members = ", ".join(f'"crates/{member}"' for member in members)
+    return f"""\
 [workspace]
-members = ["crates/atm-core", "crates/atm"]
+members = [{rendered_members}]
 resolver = "2"
 
 [workspace.package]
 version = "1.1.2"
 edition = "2024"
 rust-version = "1.94.1"
-authors = ["atm-core contributors"]
+authors = ["synthetic contributors"]
 license = "MIT OR Apache-2.0"
 repository = "https://example.invalid/repo"
 homepage = "https://example.invalid/repo"
 """
 
 
-GOOD_MEMBER = """\
+GOOD_MEMBER = f"""\
 [package]
-name = "agent-team-mail-core"
+name = "{CORE_PACKAGE}"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -49,17 +59,20 @@ serde = "1"
 
 class LintManifestsTests(unittest.TestCase):
     def test_relative_manifest_display_uses_posix_separators(self) -> None:
-        repo_root = PureWindowsPath(r"D:\a\atm-core\atm-core")
-        manifest_path = PureWindowsPath(r"D:\a\atm-core\atm-core\crates\atm-core\Cargo.toml")
+        repo_root = WINDOWS_REPO_ROOT
+        manifest_path = WINDOWS_REPO_ROOT / "crates" / CORE_CRATE / "Cargo.toml"
 
         self.assertEqual(
             relative_manifest_display(manifest_path, repo_root),
-            "crates/atm-core/Cargo.toml",
+            f"crates/{CORE_CRATE}/Cargo.toml",
         )
 
     def write_repo(self, repo_root: Path) -> None:
-        (repo_root / "Cargo.toml").write_text(ROOT_MANIFEST, encoding="utf-8")
-        crate_dir = repo_root / "crates/atm-core"
+        (repo_root / "Cargo.toml").write_text(
+            root_manifest(CORE_CRATE, APP_CRATE),
+            encoding="utf-8",
+        )
+        crate_dir = repo_root / "crates" / CORE_CRATE
         crate_dir.mkdir(parents=True)
         (crate_dir / "Cargo.toml").write_text(GOOD_MEMBER, encoding="utf-8")
 
@@ -73,26 +86,32 @@ class LintManifestsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             self.write_repo(repo_root)
-            manifest_path = repo_root / "crates/atm-core/Cargo.toml"
+            manifest_path = repo_root / "crates" / CORE_CRATE / "Cargo.toml"
             manifest_path.write_text(GOOD_MEMBER.replace("homepage.workspace = true\n", ""), encoding="utf-8")
 
             violations = collect_manifest_violations(repo_root)
             rendered = [violation.render() for violation in violations]
-            self.assertIn("crates/atm-core/Cargo.toml: set [package].homepage.workspace = true", rendered)
+            self.assertIn(
+                f"crates/{CORE_CRATE}/Cargo.toml: set [package].homepage.workspace = true",
+                rendered,
+            )
 
     def test_collect_manifest_violations_flags_mismatched_internal_path_version(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
-            (repo_root / "Cargo.toml").write_text(ROOT_MANIFEST.replace('"crates/atm"]', '"crates/atm", "crates/atm-core"]'), encoding="utf-8")
-            atm_core_dir = repo_root / "crates/atm-core"
-            atm_core_dir.mkdir(parents=True)
-            (atm_core_dir / "Cargo.toml").write_text(GOOD_MEMBER, encoding="utf-8")
-            atm_dir = repo_root / "crates/atm"
-            atm_dir.mkdir(parents=True)
-            (atm_dir / "Cargo.toml").write_text(
-                """\
+            (repo_root / "Cargo.toml").write_text(
+                root_manifest(APP_CRATE, CORE_CRATE),
+                encoding="utf-8",
+            )
+            core_dir = repo_root / "crates" / CORE_CRATE
+            core_dir.mkdir(parents=True)
+            (core_dir / "Cargo.toml").write_text(GOOD_MEMBER, encoding="utf-8")
+            app_dir = repo_root / "crates" / APP_CRATE
+            app_dir.mkdir(parents=True)
+            (app_dir / "Cargo.toml").write_text(
+                f"""\
 [package]
-name = "agent-team-mail"
+name = "{APP_PACKAGE}"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -102,7 +121,7 @@ repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
-atm-core = { path = "../atm-core", version = "9.9.9" }
+{DEPENDENCY_KEY} = {{ path = "../{CORE_CRATE}", version = "9.9.9" }}
 """,
                 encoding="utf-8",
             )
@@ -110,7 +129,8 @@ atm-core = { path = "../atm-core", version = "9.9.9" }
             violations = collect_manifest_violations(repo_root)
             rendered = [violation.render() for violation in violations]
             self.assertIn(
-                'crates/atm/Cargo.toml [dependencies.atm-core]: path dependency version must match target crate version "1.1.2"',
+                f'crates/{APP_CRATE}/Cargo.toml [dependencies.{DEPENDENCY_KEY}]: '
+                'path dependency version must match target crate version "1.1.2"',
                 rendered,
             )
 
@@ -118,7 +138,7 @@ atm-core = { path = "../atm-core", version = "9.9.9" }
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             (repo_root / "Cargo.toml").write_text(
-                ROOT_MANIFEST.replace('"crates/atm"]', '"crates/atm", "crates/sc-lint-attributes"]'),
+                root_manifest(CORE_CRATE, APP_CRATE, "sc-lint-attributes"),
                 encoding="utf-8",
             )
             self.write_repo(repo_root)

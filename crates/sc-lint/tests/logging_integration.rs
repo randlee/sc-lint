@@ -189,6 +189,85 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
 
 #[test]
 #[serial]
+fn sc_boundary_logs_manifest_policy_metadata_for_completion_and_error_paths() {
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+
+    let success_fixture = WorkspaceFixture::new();
+    let success_logs = TempDir::new().expect("temp dir");
+    let success_output = sc_lint_command(binary, &workspace_root())
+        .args([
+            "--json",
+            "--root",
+            success_fixture.root().to_str().expect("utf-8 repo root"),
+            "--log-root",
+            success_logs.path().to_str().expect("utf-8 temp path"),
+            "lint",
+            "sc-boundary",
+        ])
+        .output()
+        .expect("boundary success command runs");
+    assert!(
+        success_output.status.success(),
+        "boundary success stderr: {}",
+        String::from_utf8_lossy(&success_output.stderr)
+    );
+
+    let success_log_path = success_logs
+        .path()
+        .join("sc-boundary")
+        .join("sc-boundary.log.jsonl");
+    for action in ["cli.command.started", "cli.command.completed"] {
+        assert_log_file_contains_field(
+            &success_log_path,
+            action,
+            "manifest_policy_mode",
+            "rust-native",
+        );
+        assert_log_file_contains_field(
+            &success_log_path,
+            action,
+            "manifest_policy_parity",
+            "python-oracle",
+        );
+    }
+
+    let failure_fixture = WorkspaceFixture::new();
+    failure_fixture.write("crates/example/src/lib.rs", "pub fn broken( {}\n");
+    let failure_logs = TempDir::new().expect("temp dir");
+    let failure_output = sc_lint_command(binary, &workspace_root())
+        .args([
+            "--json",
+            "--root",
+            failure_fixture.root().to_str().expect("utf-8 repo root"),
+            "--log-root",
+            failure_logs.path().to_str().expect("utf-8 temp path"),
+            "lint",
+            "sc-boundary",
+        ])
+        .output()
+        .expect("boundary failure command runs");
+    assert_eq!(failure_output.status.code(), Some(5));
+
+    let failure_log_path = failure_logs
+        .path()
+        .join("sc-boundary")
+        .join("sc-boundary.log.jsonl");
+    assert_log_file_contains_field(
+        &failure_log_path,
+        "cli.command.error",
+        "manifest_policy_mode",
+        "rust-native",
+    );
+    assert_log_file_contains_field(
+        &failure_log_path,
+        "cli.command.error",
+        "manifest_policy_parity",
+        "python-oracle",
+    );
+}
+
+#[test]
+#[serial]
 fn python_backed_commands_log_adapter_metadata() {
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs-python");
@@ -599,6 +678,15 @@ impl WorkspaceFixture {
                 [workspace]
                 members = ["crates/example"]
                 resolver = "2"
+
+                [workspace.package]
+                version = "0.1.0"
+                edition = "2024"
+                rust-version = "1.94.1"
+                authors = ["sc-lint contributors"]
+                license = "MIT OR Apache-2.0"
+                repository = "https://example.invalid/sc-lint"
+                homepage = "https://example.invalid/sc-lint"
             "#,
         );
         std::fs::create_dir_all(fixture.root().join("boundaries")).expect("create boundaries dir");
@@ -606,7 +694,7 @@ impl WorkspaceFixture {
             "boundaries/planning.toml",
             r#"
                 [planning]
-                current_sprint = "A.6"
+                current_sprint = "A.7"
             "#,
         );
         fixture.write(
@@ -614,8 +702,13 @@ impl WorkspaceFixture {
             r#"
                 [package]
                 name = "example"
-                version = "0.1.0"
-                edition = "2024"
+                version.workspace = true
+                edition.workspace = true
+                rust-version.workspace = true
+                authors.workspace = true
+                license.workspace = true
+                repository.workspace = true
+                homepage.workspace = true
             "#,
         );
         fixture.write(

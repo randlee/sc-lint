@@ -330,8 +330,14 @@ Requirement coverage:
     `sc-boundary` command normalization and therefore reuse the standard
     entry/completion/error event pattern
 - `A.7`
-  - add manifest-policy entry/exit/error logging to the `sc-boundary` tool
-    path during the parity window
+  - manifest-policy checks now execute inside the existing
+    `lint.sc-boundary` command path during the parity window
+  - entry/completion/error logging stays CLI-owned and covers manifest-policy
+    findings through the same `sc-boundary` command envelope used for loader,
+    graph, and inventory failures
+  - those events now carry `manifest_policy_mode = "rust-native"` and
+    `manifest_policy_parity = "python-oracle"` so the CLI log makes the
+    migration state explicit without initializing logging in backend code
 - `A.8`
   - document how users read command, verdict, elapsed-time, and stable-error
     log fields in the per-tool guides

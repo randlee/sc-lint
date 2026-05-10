@@ -12,6 +12,14 @@ Related requirements:
 This document records the planned warn/error enforcement model for
 inventory-parity boundary checks in `sc-lint-boundary`.
 
+Current implementation note:
+
+- A.7 adds Rust-native manifest-policy checks and parity tests against
+  `.just/lint_manifests.py`
+- that work does not replace the inventory-parity model described here
+- planning-aware missing-item enforcement remains a later stage built on the
+  A.6 loader foundation
+
 The goal is:
 
 - hard gate architectural drift
