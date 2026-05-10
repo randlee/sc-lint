@@ -23,6 +23,10 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-003`
   The CLI must load repo config before backend dispatch.
+  The implemented A.1b config-discovery surfaces are:
+  - `sc-lint.toml`
+  - `.just/lint-config.toml`
+  with `--root <path>` as the explicit repo-root override.
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
@@ -258,3 +262,11 @@ specialized backend tools and mixed Rust/Python implementations.
 - the A.1a consistency gate is enforced in `crates/sc-lint/src/tests.rs`
   so later command families must keep using the same top-level envelope and
   `CliError` pattern
+
+## A.1b Implementation Notes
+
+- the A.1b config loader lives in `crates/sc-lint/src/config.rs`
+- the first backend dispatch seam lives in `crates/sc-lint/src/dispatch.rs`
+- `lint.sc-boundary` is the first real backend-normalized command path
+- the remaining command families keep using the reserved-surface pattern until
+  their owning sprints land

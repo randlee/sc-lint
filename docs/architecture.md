@@ -36,8 +36,7 @@ The product is organized into five layers:
 Current primary crates:
 
 - `sc-lint`
-  - planned top-level CLI crate for command parsing, config loading, and tool
-    dispatch
+  - top-level CLI crate for command parsing, config loading, and tool dispatch
 - `sc-lint-directives`
   - shared directive parsing/types
 - `sc-lint-attributes`
@@ -60,7 +59,7 @@ Planned later crate:
 
 ## Top-level CLI Role
 
-The top-level `sc-lint` CLI is the intended stable user-facing entry point.
+The top-level `sc-lint` CLI is the stable user-facing entry point.
 
 It should own:
 
@@ -109,6 +108,15 @@ the product contract.
 
 Backend-specific machine flags may still exist internally during migration, but
 the user-facing product contract should not depend on them.
+
+Current implementation status:
+
+- `version`
+  - direct CLI-owned success path
+- `lint.sc-boundary`
+  - real backend-normalized success path
+  - config loading and logger initialization stay in the top-level CLI
+  - `sc-lint-boundary` stays a backend-owned analyzer without logger setup
 
 ## Backend Crate Isolation
 

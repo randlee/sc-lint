@@ -23,6 +23,7 @@ use serde_json::json;
 use crate::Cli;
 use crate::CliError;
 use crate::command::CommandContext;
+use crate::config::LoadedConfig;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct LogRoot(PathBuf);
@@ -49,20 +50,27 @@ impl LogRoot {
     }
 }
 
-pub fn initialize_logger(context: &CommandContext, cli: &Cli) -> Result<Logger, CliError> {
+pub fn initialize_logger(
+    context: &CommandContext,
+    cli: &Cli,
+    loaded_config: &LoadedConfig,
+) -> Result<Logger, CliError> {
     let service_name = ServiceName::new(context.service_name()).map_err(|error| {
         CliError::internal(format!(
             "invalid service name `{}`: {error}",
             context.service_name()
         ))
     })?;
-    let log_root = LogRoot::resolve(cli.log_root.as_ref(), context.service_name())?;
+    let log_root = LogRoot::resolve(
+        loaded_config.logging_root().or(cli.log_root.as_ref()),
+        context.service_name(),
+    )?;
     let mut config =
         LoggerConfig::default_for(service_name.clone(), log_root.service_root().clone());
     let rotation = config.rotation;
     let retention = config.retention;
     config.enable_file_sink = false;
-    config.enable_console_sink = cli.log_console;
+    config.enable_console_sink = loaded_config.logging_console();
 
     let mut builder = LoggerBuilder::new(config).map_err(|error| {
         CliError::config(format!(
@@ -77,14 +85,34 @@ pub fn initialize_logger(context: &CommandContext, cli: &Cli) -> Result<Logger, 
     Ok(builder.build())
 }
 
-pub fn emit_entry(logger: &Logger, context: &CommandContext, cli: &Cli) {
+pub fn emit_entry(
+    logger: &Logger,
+    context: &CommandContext,
+    cli: &Cli,
+    loaded_config: &LoadedConfig,
+) {
     let mut fields = base_fields(context);
     fields.insert("json".to_string(), Value::Bool(cli.json));
-    fields.insert("log_console".to_string(), Value::Bool(cli.log_console));
+    fields.insert(
+        "log_console".to_string(),
+        Value::Bool(loaded_config.logging_console()),
+    );
     if let Some(log_root) = cli.log_root.as_ref() {
         fields.insert(
             "log_root_override".to_string(),
             Value::String(log_root.display().to_string()),
+        );
+    }
+    if let Some(repo_root) = loaded_config.repo_root() {
+        fields.insert(
+            "repo_root".to_string(),
+            Value::String(repo_root.display().to_string()),
+        );
+    }
+    if let Some(config_path) = loaded_config.config_path() {
+        fields.insert(
+            "config_path".to_string(),
+            Value::String(config_path.display().to_string()),
         );
     }
     emit(
@@ -130,6 +158,40 @@ pub fn emit_error(logger: &Logger, context: &CommandContext, error: &CliError) {
         "cli.command.error",
         Some("failure"),
         Some("top-level cli error emitted"),
+        fields,
+    );
+}
+
+pub fn emit_dispatch_start(logger: &Logger, context: &CommandContext, tool: &str) {
+    let mut fields = base_fields(context);
+    fields.insert("tool".to_string(), Value::String(tool.to_string()));
+    emit(
+        logger,
+        context,
+        Level::Info,
+        "cli.dispatch.started",
+        None,
+        Some("backend dispatch started"),
+        fields,
+    );
+}
+
+pub fn emit_dispatch_result(
+    logger: &Logger,
+    context: &CommandContext,
+    tool: &str,
+    finding_count: usize,
+) {
+    let mut fields = base_fields(context);
+    fields.insert("tool".to_string(), Value::String(tool.to_string()));
+    fields.insert("finding_count".to_string(), json!(finding_count));
+    emit(
+        logger,
+        context,
+        Level::Info,
+        "cli.dispatch.normalized",
+        Some("success"),
+        Some("backend result normalized through top-level contract"),
         fields,
     );
 }

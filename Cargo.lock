@@ -552,11 +552,13 @@ name = "sc-lint"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "sc-lint-boundary",
  "sc-observability",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "toml",
 ]
 
 [[package]]

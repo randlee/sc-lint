@@ -95,6 +95,7 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A1a.md`
 - `A.1b`
   - config loading and first backend integration
+  - first operational path is `sc-lint lint sc-boundary`
   - `docs/sc-lint/sprint-A1b.md`
 - `A.2`
   - profiles and Windows preflight

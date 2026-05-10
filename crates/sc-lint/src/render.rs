@@ -49,6 +49,21 @@ pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope
                 .unwrap_or("unknown");
             format!("sc-lint {version}")
         }
+        "lint.sc-boundary" => {
+            let status = envelope
+                .data
+                .as_ref()
+                .and_then(|value| value.get("status"))
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let finding_count = envelope
+                .data
+                .as_ref()
+                .and_then(|value| value.get("findings"))
+                .and_then(Value::as_array)
+                .map_or(0, std::vec::Vec::len);
+            format!("sc-lint-boundary: {status} ({finding_count} findings)")
+        }
         _ => format!("{}: ok", context.command_id()),
     }
 }

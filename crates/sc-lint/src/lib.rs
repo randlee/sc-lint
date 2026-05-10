@@ -1,6 +1,8 @@
 mod cli;
 mod command;
+mod config;
 mod contract;
+mod dispatch;
 mod error;
 mod logging;
 mod render;
@@ -14,6 +16,7 @@ use std::process::ExitCode;
 use clap::CommandFactory;
 use clap::Parser;
 use command::CommandContext;
+use config::LoadedConfig;
 use render::RenderedOutput;
 use serde_json::Value;
 
@@ -45,7 +48,14 @@ where
 
 fn execute(cli: Cli) -> ExitCode {
     let context = CommandContext::from_cli(&cli);
-    let logger = logging::initialize_logger(&context, &cli);
+    let loaded_config = match LoadedConfig::load(&cli, &context) {
+        Ok(config) => config,
+        Err(error) => {
+            let rendered = render_error(context.command_id(), cli.json, &error);
+            return write_rendered_output(rendered, error.exit_code());
+        }
+    };
+    let logger = logging::initialize_logger(&context, &cli, &loaded_config);
 
     let logger = match logger {
         Ok(logger) => Some(logger),
@@ -56,10 +66,10 @@ fn execute(cli: Cli) -> ExitCode {
     };
 
     if let Some(logger) = logger.as_ref() {
-        logging::emit_entry(logger, &context, &cli);
+        logging::emit_entry(logger, &context, &cli, &loaded_config);
     }
 
-    let result = command::execute(&context);
+    let result = command::execute(&context, &loaded_config, logger.as_ref());
     let exit_code = match result {
         Ok(data) => {
             if let Some(logger) = logger.as_ref() {

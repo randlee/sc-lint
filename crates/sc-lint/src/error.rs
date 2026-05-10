@@ -63,6 +63,14 @@ impl CliError {
         Self::new(CliErrorKind::Capability, message)
     }
 
+    pub fn backend_failure(message: impl Into<String>) -> Self {
+        Self::new(CliErrorKind::BackendFailure, message)
+    }
+
+    pub fn backend_protocol(message: impl Into<String>) -> Self {
+        Self::new(CliErrorKind::BackendProtocol, message)
+    }
+
     pub fn internal(message: impl Into<String>) -> Self {
         Self::new(CliErrorKind::Internal, message)
     }

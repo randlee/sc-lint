@@ -1,6 +1,6 @@
 # `sc-lint` Structured Logging Plan
 
-This document defines the planned structured logging integration for
+This document defines the structured logging integration for
 `sc-lint`.
 
 Related ADRs:
@@ -14,8 +14,8 @@ backend-owned concern. Satisfies `REQ-LOG-001` and `REQ-LOG-005`.
 
 This document defines both the logging design and the sprint-level
 implementation assignments for Phase `A`. The A.1a bootstrap implementation is
-now present in `crates/sc-lint/src/logging.rs`; later sprints extend that same
-CLI-owned runtime rather than replacing it.
+now present in `crates/sc-lint/src/logging.rs`; A.1b extends that same
+CLI-owned runtime with dispatch-seam logging for the first real backend path.
 
 ## Dependency Model
 
@@ -268,6 +268,11 @@ The A.1a bootstrap action names are:
 - `cli.command.completed`
 - `cli.command.error`
 
+The A.1b dispatch action names are:
+
+- `cli.dispatch.started`
+- `cli.dispatch.normalized`
+
 ## Rollout By Sprint
 
 Requirement coverage:
@@ -285,6 +290,8 @@ Requirement coverage:
 - `A.1b`
   - log backend dispatch calls
   - log normalized delegated results
+  - load `logging.root` and `logging.console` through the top-level config
+    loader before initializing the runtime
 - `A.2`
   - add `xwin` preflight entry/exit/error logging through the standard CLI
     event pattern

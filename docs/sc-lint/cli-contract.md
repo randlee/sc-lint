@@ -85,12 +85,15 @@ Initial convention:
 The same identifier should also be used in structured logging entry and
 completion events so command telemetry and machine-readable output line up.
 
-Bootstrap note for A.1a:
+Current implementation status:
 
-- `version` is the implemented direct success path
-- the remaining command families are exposed as reserved contract surfaces and
-  return top-level `CLI.CAPABILITY_ERROR` envelopes until their owning sprints
-  land real execution
+- `version`
+  - direct CLI-owned success path
+- `lint.sc-boundary`
+  - first real backend-normalized success path
+- all remaining command families
+  - exposed now
+  - remain reserved until their owning sprints land
 
 ## Canonical Success Envelope
 
@@ -209,7 +212,8 @@ contract.
 
 ### Rust library backend
 
-When the CLI calls a Rust library directly:
+When the CLI calls a Rust library directly, as A.1b does for
+`sc-lint lint sc-boundary`:
 
 - backend success payloads become `CommandEnvelope<T>.data`
 - typed backend errors are mapped into `CliError`
@@ -305,8 +309,9 @@ Implementation is not considered complete unless tests prove that:
 - `command` values match the documented dotted-identifier convention
 - delegated backends cannot bypass the top-level normalization path
 
-For A.1a, the consistency gate lives in `crates/sc-lint/src/tests.rs` and
-proves:
+The consistency gate lives in `crates/sc-lint/src/tests.rs`.
+
+A.1a proves:
 
 - grouped command parsing for the initial surface
 - help output for the grouped command root
@@ -315,6 +320,14 @@ proves:
   `ci`
 - stable exit-code mapping for CLI-owned failures
 - CLI-owned logging entry/completion/error event emission
+
+A.1b extends that gate with:
+
+- repo-root discovery and malformed-config handling
+- `lint.sc-boundary` success normalization through the same envelope family
+- backend execution failure mapping
+- backend protocol failure mapping
+- dispatch-start and dispatch-normalized log events for the real backend path
 
 ## Graph and Interactive Futures
 

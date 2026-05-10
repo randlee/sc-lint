@@ -6,7 +6,7 @@ phase: A
 sprint: "A.1b"
 worktree: <repo-root>
 branch: develop
-status: planned
+status: implemented
 estimated_scope: S
 ```
 
@@ -185,3 +185,52 @@ end-to-end CLI seam.
 - do not let backend-specific flags become the public top-level contract
 - do not turn config loading into duplicated wrapper behavior
 - do not normalize only the happy path while leaving backend failures raw
+
+## Implemented A.1b Surface
+
+The A.1b branch adds two shared seams to the A.1a CLI crate:
+
+- `crates/sc-lint/src/config.rs`
+  - repo-root discovery
+  - config-file discovery
+  - config loading for CLI-owned commands
+- `crates/sc-lint/src/dispatch.rs`
+  - first real backend path for `lint.sc-boundary`
+  - shared backend-payload normalization helpers
+  - explicit backend failure and protocol-failure mapping
+
+The implemented config flow is:
+
+1. resolve the repo root from:
+   - `--root <path>`, if provided
+   - otherwise the current directory, walking upward
+2. locate repo config in:
+   - `sc-lint.toml`
+   - `.just/lint-config.toml`
+3. load CLI-owned logging settings from the top-level config
+4. dispatch the real `sc-lint lint sc-boundary` path through the shared
+   normalization seam
+
+Current A.1b top-level config/logging flags:
+
+- `--root <path>`
+- `--json`
+- `--log-root <path>`
+- `--log-console`
+
+## A.1b Dispatch Notes
+
+The first real backend command in A.1b is:
+
+- `sc-lint lint sc-boundary`
+
+It currently uses direct Rust-library dispatch to `sc-lint-boundary`, which is
+already an approved direct dependency in `BOUNDARY-ScLintCli`.
+
+The important A.1b invariant is the normalization seam:
+
+- top-level config loading remains in `sc-lint`
+- the backend payload is normalized into `CommandEnvelope<T>.data`
+- backend failures map to `CLI.BACKEND_EXEC_FAILURE`
+- backend protocol-normalization failures map to `CLI.BACKEND_PROTOCOL_ERROR`
+- logger initialization remains in `sc-lint`, not in `sc-lint-boundary`
