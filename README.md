@@ -93,12 +93,23 @@ Current implemented rule families:
   - `boundary.internal_only` external reference violation
 - `SCB-BOUNDARY-003`
   - `boundary.forbid_external_impls` violation
+
+## sc-lint-portability
+
+`sc-lint-portability` owns the shipped portability rule family.
+
+Current implemented rule families:
+
 - `PORT-001`
   - hardcoded Unix-only absolute paths in test code
 - `PORT-002`
   - `dirs::home_dir()` without configured override handling
 - `PORT-003`
   - `std::env::set_var()` in test code
+- `PORT-004`
+  - ungated `std::os::unix` imports in production code
+- `PORT-005`
+  - `#[cfg_attr(not(unix), allow(dead_code))]` portability suppressors
 
 Supported outputs:
 
