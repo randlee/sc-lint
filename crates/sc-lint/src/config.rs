@@ -33,7 +33,7 @@ impl RepoRoot {
                 .parent()
                 .map_or_else(|| start.to_path_buf(), Path::to_path_buf)
         };
-        current = current.canonicalize().map_err(|error| {
+        current = dunce::canonicalize(&current).map_err(|error| {
             CliError::config(format!(
                 "failed to canonicalize repo-root discovery start `{}`",
                 start.display()

@@ -19,6 +19,7 @@ path = "src/lib.rs"
 
 [dependencies]
 clap.workspace = true
+dunce = "1"
 sc-observability.workspace = true
 sc-lint-boundary = { version = "0.1.0", path = "../sc-lint-boundary" }
 serde.workspace = true
