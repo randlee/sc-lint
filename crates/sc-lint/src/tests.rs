@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use serde_json::Value;
+use serde_json::json;
 use serial_test::serial;
 use tempfile::TempDir;
 
@@ -312,7 +313,7 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
 
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "lint.sc-portability");
-    assert_eq!(json["data"]["tool"], "sc-lint-portability");
+    assert_eq!(json["data"]["tool"], crate::consts::TOOL_PORTABILITY);
     assert!(json["data"]["findings"].is_array());
 }
 
@@ -641,6 +642,52 @@ fn native_and_xwin_preflight_commands_use_success_envelopes() {
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "clippy.xwin");
     assert_eq!(json["data"]["xwin"]["target"], crate::WINDOWS_XWIN_TARGET);
+}
+
+#[test]
+fn render_success_human_covers_version_boundary_and_summary_paths() {
+    let version_cli = Cli::parse_from(["sc-lint", "version"]);
+    let version_context = CommandContext::from_cli(&version_cli).expect("version context");
+    let version_output = crate::render::render_success_human(
+        &version_context,
+        &CommandEnvelope::success("version", json!({ "crate_version": "1.2.3" })),
+    );
+    assert_eq!(version_output, "sc-lint 1.2.3");
+
+    let boundary_cli = Cli::parse_from(["sc-lint", "lint", "sc-boundary"]);
+    let boundary_context = CommandContext::from_cli(&boundary_cli).expect("boundary context");
+    let boundary_output = crate::render::render_success_human(
+        &boundary_context,
+        &CommandEnvelope::success(
+            boundary_context.command_id(),
+            json!({
+                "status": "fail",
+                "findings": [{ "rule_id": "SCB-CYCLE-001" }]
+            }),
+        ),
+    );
+    assert_eq!(boundary_output, "sc-lint-boundary: fail (1 findings)");
+
+    let view_cli = Cli::parse_from(["sc-lint", "view", "findings"]);
+    let view_context = CommandContext::from_cli(&view_cli).expect("view findings context");
+    let view_output = crate::render::render_success_human(
+        &view_context,
+        &CommandEnvelope::success(
+            view_context.command_id(),
+            json!({ "summary": "2 findings grouped by rule" }),
+        ),
+    );
+    assert_eq!(view_output, "view.findings: 2 findings grouped by rule");
+}
+
+#[test]
+fn render_error_human_includes_suggested_action_when_present() {
+    let error = CliError::config("bad config")
+        .with_suggested_action("Run `sc-lint lint sc-boundary --json` to inspect the failure.");
+    let rendered = crate::render::render_error_human("lint.sc-boundary", &error);
+
+    assert!(rendered.contains("lint.sc-boundary: bad config (CLI.CONFIG_ERROR)"));
+    assert!(rendered.contains("Run `sc-lint lint sc-boundary --json` to inspect the failure."));
 }
 
 fn project_workspace_root() -> PathBuf {

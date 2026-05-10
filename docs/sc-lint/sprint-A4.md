@@ -4,8 +4,8 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.4"
-worktree: <repo-root>
-branch: develop
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4
+branch: feature/sprint-A4
 status: complete
 estimated_scope: M
 ```

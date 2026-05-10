@@ -30,7 +30,9 @@ use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
 use crate::source_scan::FileContext;
+use crate::source_scan::PackageName;
 use crate::source_scan::ScopeKind;
+use crate::source_scan::TargetName;
 use crate::source_scan::classify_scope;
 use crate::source_scan::count_scanned_crates as count_crates;
 use crate::source_scan::discover_source_files;
@@ -71,8 +73,8 @@ struct PortabilityFinding {
     message: String,
     source_path: PathBuf,
     line: usize,
-    package: String,
-    target: String,
+    package: PackageName,
+    target: TargetName,
     node_label: String,
 }
 
@@ -124,8 +126,8 @@ pub(crate) fn analyze_portability(root: &Path) -> Result<Vec<Finding>> {
                 finding.message
             ),
             owner_ids: vec![OwnerId::new(CrateId::from_parts(
-                &finding.package,
-                &finding.target,
+                finding.package.as_str(),
+                finding.target.as_str(),
             ))],
             node_ids: vec![NodeId::new(finding.node_label)],
         })

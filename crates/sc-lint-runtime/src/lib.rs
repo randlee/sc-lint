@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::Error as AnyhowError;
 use sc_lint_schema::Finding as SchemaFinding;
 use sc_lint_schema::FindingsReport as SchemaFindingsReport;
 use sc_lint_schema::NodeId;
@@ -70,10 +71,18 @@ impl Serialize for RuleId {
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
-    #[error("failed to analyze runtime findings for root `{}`: {detail}", root.display())]
-    AnalyzeFindings { root: PathBuf, detail: String },
-    #[error("failed to count scanned crates for root `{}`: {detail}", root.display())]
-    CountScannedCrates { root: PathBuf, detail: String },
+    #[error("failed to analyze runtime findings for root `{}`: {source:#}", root.display())]
+    AnalyzeFindings {
+        root: PathBuf,
+        #[source]
+        source: AnyhowError,
+    },
+    #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
+    CountScannedCrates {
+        root: PathBuf,
+        #[source]
+        source: AnyhowError,
+    },
 }
 
 pub fn analyze_workspace(
@@ -82,13 +91,13 @@ pub fn analyze_workspace(
     let findings = runtime::analyze_runtime_liveness(&options.root).map_err(|source| {
         RuntimeError::AnalyzeFindings {
             root: options.root.clone(),
-            detail: source.to_string(),
+            source,
         }
     })?;
     let scanned_crates = source_scan::count_scanned_crates(&options.root).map_err(|source| {
         RuntimeError::CountScannedCrates {
             root: options.root.clone(),
-            detail: source.to_string(),
+            source,
         }
     })?;
     let status = if findings.is_empty() {

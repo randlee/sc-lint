@@ -16,7 +16,7 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
 
-    let version = sc_lint_command(binary, &workspace_root())
+    let version = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--log-root",
@@ -31,7 +31,7 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
         String::from_utf8_lossy(&version.stderr)
     );
 
-    let dispatch = sc_lint_command(binary, &workspace_root())
+    let dispatch = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -49,7 +49,7 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
         String::from_utf8_lossy(&dispatch.stderr)
     );
 
-    let failure = sc_lint_command(binary, &workspace_root())
+    let failure = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -79,7 +79,7 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.normalized");
     assert_log_file_contains_elapsed_ms(&dispatch_log_path);
 
-    let runtime = sc_lint_command(binary, &workspace_root())
+    let runtime = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -108,7 +108,8 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
 #[cfg_attr(windows, ignore = "cargo.cmd not resolved by CreateProcessW")]
 fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     let temp_dir = TempDir::new().expect("temp dir");
-    let repo_root = workspace_root();
+    let fixture = WorkspaceFixture::new();
+    let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
     let original_path = std::env::var_os("PATH");
 
@@ -194,7 +195,7 @@ fn sc_boundary_logs_manifest_policy_metadata_for_completion_and_error_paths() {
 
     let success_fixture = WorkspaceFixture::new();
     let success_logs = TempDir::new().expect("temp dir");
-    let success_output = sc_lint_command(binary, &workspace_root())
+    let success_output = sc_lint_command(binary, success_fixture.root())
         .args([
             "--json",
             "--root",
@@ -234,7 +235,7 @@ fn sc_boundary_logs_manifest_policy_metadata_for_completion_and_error_paths() {
     let failure_fixture = WorkspaceFixture::new();
     failure_fixture.write("crates/example/src/lib.rs", "pub fn broken( {}\n");
     let failure_logs = TempDir::new().expect("temp dir");
-    let failure_output = sc_lint_command(binary, &workspace_root())
+    let failure_output = sc_lint_command(binary, failure_fixture.root())
         .args([
             "--json",
             "--root",
@@ -275,7 +276,7 @@ fn python_backed_commands_log_adapter_metadata() {
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
 
-    let output = sc_lint_command(binary, &workspace_root())
+    let output = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -336,7 +337,7 @@ fn line_counts_logs_adapter_metadata_for_error() {
     let fixture = WorkspaceFixture::new();
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
-    let baseline = sc_lint_command(binary, &workspace_root())
+    let baseline = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -356,7 +357,7 @@ fn line_counts_logs_adapter_metadata_for_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs-line-counts-error");
 
-    let output = sc_lint_command(binary, &workspace_root())
+    let output = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -410,7 +411,7 @@ fn identity_literals_logs_adapter_metadata_for_completion() {
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
 
-    let output = sc_lint_command(binary, &workspace_root())
+    let output = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -443,7 +444,7 @@ fn identity_literals_logs_adapter_metadata_for_error() {
     let fixture = WorkspaceFixture::new();
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
-    let baseline = sc_lint_command(binary, &workspace_root())
+    let baseline = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -464,7 +465,7 @@ fn identity_literals_logs_adapter_metadata_for_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs-identity-literals-error");
 
-    let output = sc_lint_command(binary, &workspace_root())
+    let output = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -515,7 +516,7 @@ fn view_findings_logs_adapter_metadata_for_error() {
     let fixture = WorkspaceFixture::new();
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
-    let baseline = sc_lint_command(binary, &workspace_root())
+    let baseline = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -534,7 +535,7 @@ fn view_findings_logs_adapter_metadata_for_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs-view-findings-error");
 
-    let output = sc_lint_command(binary, &workspace_root())
+    let output = sc_lint_command(binary, repo_root)
         .env("PATH", isolated_path(temp_dir.path()))
         .args([
             "--json",
@@ -587,7 +588,7 @@ fn view_findings_logs_adapter_metadata_for_completion() {
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
 
-    let output = sc_lint_command(binary, &workspace_root())
+    let output = sc_lint_command(binary, repo_root)
         .args([
             "--json",
             "--root",
@@ -732,7 +733,7 @@ impl WorkspaceFixture {
             ".just/lint_identity_literals.py",
             ".just/view_findings.py",
         ] {
-            let source = workspace_root().join(relative_path);
+            let source = repo_source_root().join(relative_path);
             let contents = std::fs::read_to_string(&source).expect("read support file");
             fixture.write(relative_path, &contents);
         }
@@ -899,7 +900,7 @@ fn isolated_path(path: &Path) -> std::ffi::OsString {
     std::env::join_paths([path]).expect("join isolated path")
 }
 
-fn workspace_root() -> PathBuf {
+fn repo_source_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)

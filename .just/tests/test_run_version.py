@@ -32,6 +32,8 @@ class RunVersionTests(unittest.TestCase):
             self.assertEqual(workspace_version(repo_root), "0.1.0")
 
     def test_cargo_outdated_command_uses_manifest_path_and_root_deps_only(self) -> None:
+        # Use a fixed absolute path so this command-shape assertion stays hermetic and does not
+        # depend on whichever temp directory the host test runner happens to allocate.
         manifest_path = Path("/tmp/repo/crates/sc-lint-boundary/Cargo.toml")
         self.assertEqual(
             cargo_outdated_command(manifest_path),
