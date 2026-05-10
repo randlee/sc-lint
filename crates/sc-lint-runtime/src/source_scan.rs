@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -9,11 +10,53 @@ use cargo_metadata::MetadataCommand;
 use proc_macro2::Span;
 use syn::Attribute;
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct PackageName(String);
+
+impl PackageName {
+    pub(crate) fn new(value: impl Into<String>) -> Self {
+        let value = value.into();
+        debug_assert!(!value.is_empty(), "package names must not be empty");
+        Self(value)
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for PackageName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct TargetName(String);
+
+impl TargetName {
+    pub(crate) fn new(value: impl Into<String>) -> Self {
+        let value = value.into();
+        debug_assert!(!value.is_empty(), "target names must not be empty");
+        Self(value)
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for TargetName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct FileContext {
     pub(crate) source_path: PathBuf,
-    pub(crate) package: String,
-    pub(crate) target: String,
+    pub(crate) package: PackageName,
+    pub(crate) target: TargetName,
     pub(crate) is_test_file: bool,
 }
 
@@ -37,6 +80,8 @@ pub(crate) fn discover_source_files(root: &Path) -> Result<Vec<FileContext>> {
             if !is_supported_target(target) {
                 continue;
             }
+            let package_name = PackageName::new(package.name.to_string());
+            let target_name = TargetName::new(target.name.clone());
             let manifest_dir = package
                 .manifest_path
                 .as_std_path()
@@ -47,16 +92,16 @@ pub(crate) fn discover_source_files(root: &Path) -> Result<Vec<FileContext>> {
             collect_rust_files(
                 &src_dir,
                 false,
-                &package.name,
-                &target.name,
+                &package_name,
+                &target_name,
                 &mut seen_paths,
                 &mut files,
             )?;
             collect_rust_files(
                 &tests_dir,
                 true,
-                &package.name,
-                &target.name,
+                &package_name,
+                &target_name,
                 &mut seen_paths,
                 &mut files,
             )?;
@@ -79,8 +124,8 @@ pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {
 fn collect_rust_files(
     dir: &Path,
     is_test_file: bool,
-    package: &str,
-    target: &str,
+    package: &PackageName,
+    target: &TargetName,
     seen_paths: &mut BTreeSet<PathBuf>,
     files: &mut Vec<FileContext>,
 ) -> Result<()> {
@@ -105,8 +150,8 @@ fn collect_rust_files(
         }
         files.push(FileContext {
             source_path: path,
-            package: package.to_string(),
-            target: target.to_string(),
+            package: package.clone(),
+            target: target.clone(),
             is_test_file,
         });
     }

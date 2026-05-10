@@ -1,0 +1,81 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/ARCH-005>
+  a triage:Finding ;
+  triage:findingId "ARCH-005" ;
+  triage:title "clear_atm_env does not set ATM_HOME/ATM_CONFIG_HOME to TempDir paths" ;
+  triage:description "clear_atm_env removes ATM env vars but does not set ATM_HOME and ATM_CONFIG_HOME to isolated TempDir paths. Tests that call clear_atm_env may still read from the real user ATM config, causing non-deterministic behavior across environments." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:references "PR #13" ;
+  triage:references "QA-A4-002 FAIL report" ;
+  triage:notes "Fix: update clear_atm_env to also set ATM_HOME and ATM_CONFIG_HOME to TempDir-based paths so tests are fully isolated." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-005/sprint-A4/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-005/sprint-A4/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A4/b60b763> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A4/b60b763> .
+
+<urn:atm:triage:occurrence/ARCH-005/sprint-A4/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 632 ;
+  triage:snippet "clear_atm_env(&mut command);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/b60b763> .
+
+<urn:atm:triage:occurrence/ARCH-005/sprint-A4/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 636 ;
+  triage:snippet "fn clear_atm_env(command: &mut Command) { for (key, _) in std::env::vars_os() { if key.to_string_lossy().starts_with(\"ATM_\") { command.env_remove(key); } } }" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/b60b763> .
+
+<urn:atm:triage:worktree/sprint-A4/b60b763>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:orderIndex 4 .
+
+<urn:atm:triage:worktree/sprint-A5/d4c847a>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "d4c847a" ;
+  triage:orderIndex 5 .
+
+<urn:atm:triage:worktree/sprint-A6/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 6 .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 .

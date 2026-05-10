@@ -6,7 +6,6 @@ mod consts;
 mod contract;
 mod dispatch;
 mod error;
-mod logging;
 pub(crate) mod python_adapter;
 mod render;
 mod workflow;
@@ -14,22 +13,20 @@ mod workflow;
 #[cfg(test)]
 mod tests;
 
-use std::ffi::OsString;
-use std::process::ExitCode;
-use std::time::Instant;
-
 #[cfg(test)]
 use clap::CommandFactory;
 use clap::Parser;
 use serde_json::Value;
+use std::ffi::OsString;
+use std::process::ExitCode;
+
+use crate::cli::OutputMode;
 
 pub use cli::CheckTarget;
 pub use cli::Cli;
 pub use cli::ClippyTarget;
 pub use cli::Command;
-pub use cli::LintProfile;
 pub use cli::LintTarget;
-pub use cli::OutputMode;
 pub use cli::ViewTarget;
 pub use command::CommandContext;
 pub use command::DispatchTelemetry;
@@ -43,6 +40,12 @@ pub use workflow::WINDOWS_XWIN_TARGET;
 pub struct ImmediateOutcome {
     rendered: render::RenderedOutput,
     exit_code: u8,
+}
+
+impl ImmediateOutcome {
+    pub fn write(self) -> ExitCode {
+        write_rendered_output(self.rendered, self.exit_code)
+    }
 }
 
 pub enum ParsedInvocation {
@@ -114,58 +117,10 @@ where
                     return write_rendered_output(rendered, error.exit_code());
                 }
             };
-            let observed = match logging::ObservedCommand::from_context(&context, &loaded_config) {
-                Ok(observed) => observed,
-                Err(error) => {
-                    let rendered = render_error(
-                        context.command_id(),
-                        OutputMode::from_json_flag(cli.json),
-                        &error,
-                    );
-                    return write_rendered_output(rendered, error.exit_code());
-                }
-            };
-            let logger = match logging::initialize_logger(&observed, &cli) {
-                Ok(logger) => Some(logger),
-                Err(error) => {
-                    let rendered = render_error(
-                        context.command_id(),
-                        OutputMode::from_json_flag(cli.json),
-                        &error,
-                    );
-                    return write_rendered_output(rendered, error.exit_code());
-                }
-            };
-            let started_at = Instant::now();
-            if let Some(logger) = logger.as_ref() {
-                logging::log_entry(logger, &observed, &cli);
-                if let Some(tool) = context.dispatch_tool() {
-                    logging::log_dispatch_start(logger, &observed, tool);
-                }
-            }
-            let outcome = execute(context.clone(), &loaded_config, cli.json);
-            if let Some(logger) = logger.as_ref() {
-                if let Some(dispatch) = outcome.dispatch.as_ref() {
-                    logging::log_dispatch_result(logger, &observed, dispatch);
-                }
-                if let Some(error) = outcome.error.as_ref() {
-                    logging::log_error(logger, &observed, error);
-                }
-                logging::log_completion(
-                    logger,
-                    &observed,
-                    outcome.ok,
-                    &outcome.summary,
-                    started_at.elapsed(),
-                );
-                logging::flush(logger);
-                logging::shutdown(logger);
-            }
+            let outcome = execute(context, &loaded_config, cli.json);
             write_rendered_output(outcome.rendered, outcome.exit_code)
         }
-        ParsedInvocation::Immediate(outcome) => {
-            write_rendered_output(outcome.rendered, outcome.exit_code)
-        }
+        ParsedInvocation::Immediate(outcome) => outcome.write(),
     }
 }
 

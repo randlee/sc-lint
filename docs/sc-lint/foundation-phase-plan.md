@@ -184,6 +184,8 @@ Requirements:
 - land portability rules in `sc-lint-portability`
 - preserve their existing rule ids
 - perform parity validation against the source implementation in `atm-core`
+- keep top-level `sc-lint lint sc-portability` delegated rather than adding a
+  direct `sc-lint -> sc-lint-portability` crate dependency
 
 ### Workstream 7: Add `sc-lint-runtime`
 

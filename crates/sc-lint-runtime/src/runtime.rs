@@ -23,7 +23,9 @@ use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
 use crate::source_scan::FileContext;
+use crate::source_scan::PackageName;
 use crate::source_scan::ScopeKind;
+use crate::source_scan::TargetName;
 use crate::source_scan::classify_scope;
 use crate::source_scan::discover_source_files;
 use crate::source_scan::span_start_line;
@@ -35,8 +37,8 @@ struct RuntimeFinding {
     message: String,
     source_path: PathBuf,
     line: usize,
-    package: String,
-    target: String,
+    package: PackageName,
+    target: TargetName,
     node_label: String,
 }
 
@@ -86,8 +88,8 @@ pub(crate) fn analyze_runtime_liveness(root: &Path) -> Result<Vec<Finding>> {
                 finding.message
             ),
             owner_ids: vec![OwnerId::new(CrateId::from_parts(
-                &finding.package,
-                &finding.target,
+                finding.package.as_str(),
+                finding.target.as_str(),
             ))],
             node_ids: vec![NodeId::new(finding.node_label)],
         })
@@ -240,6 +242,8 @@ impl<'a> RuntimeCollector<'a> {
         if method_call.method != "wait" || method_call.args.len() != 1 {
             return;
         }
+        // This is an AST approximation over `.wait(...)` calls and does not
+        // attempt receiver type resolution before flagging the pattern.
         self.findings.push(RuntimeFinding {
             rule_id: RuleId::ScbRuntime001,
             kind: "condvar_wait_without_timeout",

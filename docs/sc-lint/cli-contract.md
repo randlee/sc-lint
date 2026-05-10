@@ -31,8 +31,6 @@ The release-1 contract explicitly names these types:
 
 - `Cli`
 - `Command`
-- `LintProfile`
-- `OutputMode`
 - `CommandEnvelope<T>`
 - `CliError`
 

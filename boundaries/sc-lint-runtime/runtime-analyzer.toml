@@ -15,12 +15,8 @@ constructor = "none"
 [composition]
 roots = [
   "RuntimeError",
-  "OutputFormat",
   "AnalyzeOptions",
-  "NodeId",
-  "OwnerId",
   "FindingsReport",
-  "ReportStatus",
   "Finding",
   "RuleId",
   "analyze_workspace",
@@ -29,7 +25,7 @@ roots = [
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = []
+allowed_dependencies = ["sc-lint-schema"]
 forbidden_edges = [
   "sc-lint-runtime -> sc-lint-attributes",
   "sc-lint-runtime -> sc-lint-boundary",

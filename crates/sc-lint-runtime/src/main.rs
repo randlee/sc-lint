@@ -4,9 +4,9 @@ use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
 use sc_lint_runtime::AnalyzeOptions;
-use sc_lint_runtime::OutputFormat;
 use sc_lint_runtime::analyze_workspace;
 use sc_lint_runtime::render_findings_report;
+use sc_lint_schema::OutputFormat;
 
 #[derive(Debug, Parser)]
 #[command(name = "sc-lint-runtime")]

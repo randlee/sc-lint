@@ -1,6 +1,8 @@
 #![cfg(test)]
 
 use super::*;
+use sc_lint_schema::OutputFormat;
+use sc_lint_schema::ReportStatus;
 use std::path::Path;
 
 use tempfile::TempDir;

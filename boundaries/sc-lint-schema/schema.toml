@@ -1,0 +1,40 @@
+boundary_id = "BOUNDARY-ScLintSchema"
+owner_package = "sc-lint-schema"
+owner_crate_path = "sc_lint_schema"
+name = "ScLintSchema"
+
+[public]
+facade = "FindingsReport"
+
+[implementation]
+type = "FindingsReport"
+module = "sc_lint_schema"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["OutputFormat", "NodeId", "OwnerId", "FindingsReport", "ReportStatus", "Finding"]
+
+[dependencies]
+allowed_dependents = ["sc-lint", "sc-lint-boundary", "sc-lint-portability"]
+allowed_dependencies = []
+forbidden_edges = [
+  "sc-lint-schema -> sc-lint",
+  "sc-lint-schema -> sc-lint-boundary",
+  "sc-lint-schema -> sc-lint-portability",
+]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = ["shared_schema_only"]
+
+[status]
+state = "concrete_landed"
