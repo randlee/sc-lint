@@ -99,6 +99,7 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A1b.md`
 - `A.2`
   - profiles and Windows preflight
+  - active implementation branch: `feature/sprint-A2`
   - `docs/sc-lint/sprint-A2.md`
 - `A.3`
   - generic utility extraction

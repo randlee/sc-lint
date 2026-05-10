@@ -5,6 +5,7 @@ mod contract;
 mod dispatch;
 mod error;
 mod render;
+mod workflow;
 
 #[cfg(test)]
 mod tests;
@@ -20,7 +21,9 @@ pub use cli::CheckTarget;
 pub use cli::Cli;
 pub use cli::ClippyTarget;
 pub use cli::Command;
+pub use cli::LintProfile;
 pub use cli::LintTarget;
+pub use cli::OutputMode;
 pub use cli::ViewTarget;
 pub use command::CommandContext;
 pub use command::DispatchTelemetry;
@@ -30,6 +33,7 @@ pub use contract::CommandEnvelope;
 pub use error::CliError;
 pub use error::CliErrorKind;
 pub use render::RenderedOutput;
+pub use workflow::WINDOWS_XWIN_TARGET;
 
 pub struct ImmediateOutcome {
     pub rendered: RenderedOutput,
@@ -62,7 +66,11 @@ where
             let loaded_config = match LoadedConfig::load(&cli, &context) {
                 Ok(loaded_config) => loaded_config,
                 Err(error) => {
-                    let rendered = render_error(context.command_id(), cli.json, &error);
+                    let rendered = render_error(
+                        context.command_id(),
+                        OutputMode::from_json_flag(cli.json),
+                        &error,
+                    );
                     return write_rendered_output(rendered, error.exit_code());
                 }
             };
@@ -93,10 +101,11 @@ pub fn execute(
     json_mode: bool,
 ) -> ExecutionOutcome {
     let result = command::execute(&context, loaded_config);
+    let output_mode = OutputMode::from_json_flag(json_mode);
     match result {
         Ok(success) => {
             let envelope = CommandEnvelope::success(context.command_id(), success.data);
-            let rendered = render_success(&context, json_mode, &envelope);
+            let rendered = render_success(&context, output_mode, &envelope);
             ExecutionOutcome {
                 context,
                 rendered,
@@ -110,7 +119,7 @@ pub fn execute(
         Err(error) => {
             let exit_code = error.exit_code();
             let summary = error.message.clone();
-            let rendered = render_error(context.command_id(), json_mode, &error);
+            let rendered = render_error(context.command_id(), output_mode, &error);
             ExecutionOutcome {
                 context,
                 rendered,
@@ -138,7 +147,7 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
                 "Run `sc-lint --help` to inspect the supported command surface.",
             );
             ImmediateOutcome {
-                rendered: render_error("cli", json_mode, &cli_error),
+                rendered: render_error("cli", OutputMode::from_json_flag(json_mode), &cli_error),
                 exit_code: cli_error.exit_code(),
             }
         }
@@ -147,18 +156,18 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
 
 fn render_success(
     context: &CommandContext,
-    json_mode: bool,
+    output_mode: OutputMode,
     envelope: &CommandEnvelope<Value>,
 ) -> RenderedOutput {
-    if json_mode {
+    if output_mode.is_json() {
         RenderedOutput::stdout(render::render_success_json(envelope))
     } else {
         RenderedOutput::stdout(render::render_success_human(context, envelope))
     }
 }
 
-fn render_error(command_id: &str, json_mode: bool, error: &CliError) -> RenderedOutput {
-    if json_mode {
+fn render_error(command_id: &str, output_mode: OutputMode, error: &CliError) -> RenderedOutput {
+    if output_mode.is_json() {
         RenderedOutput::stderr(render::render_error_json(command_id, error))
     } else {
         RenderedOutput::stderr(render::render_error_human(command_id, error))
@@ -166,7 +175,7 @@ fn render_error(command_id: &str, json_mode: bool, error: &CliError) -> Rendered
 }
 
 pub fn render_failure(command_id: &str, json_mode: bool, error: &CliError) -> RenderedOutput {
-    render_error(command_id, json_mode, error)
+    render_error(command_id, OutputMode::from_json_flag(json_mode), error)
 }
 
 pub fn write_rendered_output(rendered: RenderedOutput, exit_code: u8) -> ExitCode {

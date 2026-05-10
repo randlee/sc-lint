@@ -189,7 +189,7 @@ Current repo integration status:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
-Current planned profile policy:
+Current implemented profile policy:
 
 - `fast`
   - local low-latency lint profile
@@ -202,6 +202,25 @@ Current planned profile policy:
   - excludes `xwin`
 - top-level `ci`
   - lint plus tests
+
+Current wrapper mapping:
+
+- `just lint`
+  - defaults to `sc-lint lint full`
+- `just lint fast`
+  - maps to `sc-lint lint fast`
+- `just lint full`
+  - maps to `sc-lint lint full`
+- `just lint ci`
+  - maps to `sc-lint lint ci`
+- `just ci`
+  - maps to `sc-lint ci`
+
+Current rule-disable policy:
+
+- A.2 does not add top-level `sc-lint` rule-disable flags
+- profile orchestration does not override backend rule configuration
+- current rule-disable behavior stays with the owning backend or delegated tool
 
 Current repo boundary source status:
 

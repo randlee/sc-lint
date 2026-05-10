@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -13,9 +15,11 @@ use crate::ClippyTarget;
 use crate::Command;
 use crate::CommandEnvelope;
 use crate::LintTarget;
+use crate::OutputMode;
 use crate::ViewTarget;
 use crate::command::CommandContext;
 use crate::config::LoadedConfig;
+use crate::workflow;
 
 #[test]
 fn command_surface_parses_the_initial_grouped_shape() {
@@ -79,19 +83,17 @@ fn version_success_uses_the_canonical_top_level_envelope() {
 }
 
 #[test]
-fn every_initial_command_family_uses_the_same_failure_envelope_shape() {
+fn reserved_view_commands_use_the_same_failure_envelope_shape() {
     let commands = [
         Cli::parse_from(["sc-lint", "--json", "view", "graph"]),
-        Cli::parse_from(["sc-lint", "--json", "check", "xwin"]),
-        Cli::parse_from(["sc-lint", "--json", "clippy", "native"]),
-        Cli::parse_from(["sc-lint", "--json", "ci"]),
+        Cli::parse_from(["sc-lint", "--json", "view", "findings"]),
     ];
 
     for cli in commands {
         let context = CommandContext::from_cli(&cli);
         let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
         let error =
-            crate::command::execute(&context, &loaded).expect_err("command is reserved in A.1b");
+            crate::command::execute(&context, &loaded).expect_err("view commands are reserved");
         let rendered = crate::render::render_error_json(context.command_id(), &error);
         let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
 
@@ -129,14 +131,21 @@ fn cli_error_exit_codes_are_stable_by_kind() {
 }
 
 #[test]
-fn reserved_commands_report_capability_errors() {
-    let cli = Cli::parse_from(["sc-lint", "check", "xwin"]);
-    let context = CommandContext::from_cli(&cli);
-    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let error = crate::command::execute(&context, &loaded).expect_err("reserved command fails");
+fn output_mode_tracks_json_flag_and_serializes() {
+    assert_eq!(OutputMode::from_json_flag(false), OutputMode::Human);
+    assert_eq!(OutputMode::from_json_flag(true), OutputMode::Json);
+    assert_eq!(
+        serde_json::to_string(&OutputMode::Json).expect("serialize output mode"),
+        "\"json\""
+    );
+}
 
-    assert_eq!(error.kind, CliErrorKind::Capability);
-    assert!(error.message.contains("Sprint A.1b"));
+#[test]
+fn lint_targets_map_profile_values_stably() {
+    assert_eq!(LintTarget::Fast.profile(), Some(crate::LintProfile::Fast));
+    assert_eq!(LintTarget::Full.profile(), Some(crate::LintProfile::Full));
+    assert_eq!(LintTarget::Ci.profile(), Some(crate::LintProfile::Ci));
+    assert_eq!(LintTarget::ScBoundary.profile(), None);
 }
 
 #[test]
@@ -281,10 +290,212 @@ fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
     );
 }
 
+#[test]
+fn lint_profiles_have_stable_membership() {
+    let repo_root = workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "fast",
+    ]);
+    let context = CommandContext::from_cli(&cli);
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let adapter = FakeSystemAdapter::new(false);
+
+    let success = workflow::run_lint_profile_with(&loaded, crate::LintProfile::Fast, &adapter)
+        .expect("fast profile succeeds");
+    let steps = success
+        .data
+        .get("steps")
+        .and_then(Value::as_array)
+        .expect("steps array");
+
+    assert_eq!(
+        step_names(steps),
+        vec!["fmt", "version", "manifests", "spell", "pytests"]
+    );
+}
+
+#[test]
+fn full_profile_adds_xwin_only_when_available() {
+    let repo_root = workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "full",
+    ]);
+    let context = CommandContext::from_cli(&cli);
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+
+    let unavailable = workflow::run_lint_profile_with(
+        &loaded,
+        crate::LintProfile::Full,
+        &FakeSystemAdapter::new(false),
+    )
+    .expect("full profile succeeds without xwin");
+    let unavailable_steps = unavailable
+        .data
+        .get("steps")
+        .and_then(Value::as_array)
+        .expect("steps array");
+    assert!(!step_names(unavailable_steps).contains(&"check.xwin".to_string()));
+    assert_eq!(unavailable.data["xwin"]["included"], false);
+
+    let available = workflow::run_lint_profile_with(
+        &loaded,
+        crate::LintProfile::Full,
+        &FakeSystemAdapter::new(true),
+    )
+    .expect("full profile succeeds with xwin");
+    let available_steps = available
+        .data
+        .get("steps")
+        .and_then(Value::as_array)
+        .expect("steps array");
+    assert!(step_names(available_steps).contains(&"check.xwin".to_string()));
+    assert!(step_names(available_steps).contains(&"clippy.xwin".to_string()));
+    assert_eq!(available.data["xwin"]["included"], true);
+}
+
+#[test]
+fn ci_and_lint_ci_differ_only_by_test_execution() {
+    let repo_root = workspace_root();
+    let lint_cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "ci",
+    ]);
+    let lint_context = CommandContext::from_cli(&lint_cli);
+    let loaded = LoadedConfig::load(&lint_cli, &lint_context).expect("config loads");
+    let adapter = FakeSystemAdapter::new(false);
+
+    let lint_ci = workflow::run_lint_profile_with(&loaded, crate::LintProfile::Ci, &adapter)
+        .expect("lint ci succeeds");
+    let top_level_ci = workflow::run_ci_with(&loaded, &adapter).expect("ci succeeds");
+    let lint_steps = lint_ci
+        .data
+        .get("steps")
+        .and_then(Value::as_array)
+        .expect("steps array");
+    let ci_steps = top_level_ci
+        .data
+        .get("steps")
+        .and_then(Value::as_array)
+        .expect("steps array");
+
+    assert_eq!(ci_steps.len(), lint_steps.len() + 1);
+    assert_eq!(
+        step_names(lint_steps),
+        step_names(&ci_steps[..lint_steps.len()])
+    );
+    assert_eq!(ci_steps.last().expect("test step")["name"], "test");
+    assert_eq!(top_level_ci.data["tests_included"], true);
+}
+
+#[test]
+fn explicit_xwin_commands_require_capability() {
+    let repo_root = workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "check",
+        "xwin",
+    ]);
+    let context = CommandContext::from_cli(&cli);
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let error =
+        workflow::run_check_with(&loaded, CheckTarget::Xwin, &FakeSystemAdapter::new(false))
+            .expect_err("xwin command should require capability");
+
+    assert_eq!(error.kind, CliErrorKind::Capability);
+    assert_eq!(error.details["command"], "check.xwin");
+    assert_eq!(error.details["target"], crate::WINDOWS_XWIN_TARGET);
+}
+
+#[test]
+fn native_and_xwin_preflight_commands_use_success_envelopes() {
+    let repo_root = workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "clippy",
+        "xwin",
+    ]);
+    let context = CommandContext::from_cli(&cli);
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let success =
+        workflow::run_clippy_with(&loaded, ClippyTarget::Xwin, &FakeSystemAdapter::new(true))
+            .expect("xwin clippy succeeds");
+    let envelope = CommandEnvelope::success(context.command_id(), success.data);
+    let rendered = crate::render::render_success_json(&envelope);
+    let json: Value = serde_json::from_str(&rendered).expect("json envelope");
+
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["command"], "clippy.xwin");
+    assert_eq!(json["data"]["xwin"]["target"], crate::WINDOWS_XWIN_TARGET);
+}
+
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
         .expect("workspace root")
         .to_path_buf()
+}
+
+fn step_names(steps: &[Value]) -> Vec<String> {
+    steps
+        .iter()
+        .map(|step| {
+            step.get("name")
+                .and_then(Value::as_str)
+                .expect("step name")
+                .to_string()
+        })
+        .collect()
+}
+
+struct FakeSystemAdapter {
+    xwin_available: bool,
+    failures: HashMap<&'static str, &'static str>,
+    invocations: RefCell<Vec<String>>,
+}
+
+impl FakeSystemAdapter {
+    fn new(xwin_available: bool) -> Self {
+        Self {
+            xwin_available,
+            failures: HashMap::new(),
+            invocations: RefCell::new(Vec::new()),
+        }
+    }
+}
+
+impl workflow::SystemAdapter for FakeSystemAdapter {
+    fn cargo_xwin_available(&self, _repo_root: &Path) -> bool {
+        self.xwin_available
+    }
+
+    fn run_step(
+        &self,
+        _repo_root: &Path,
+        step: &workflow::StepPlan,
+    ) -> Result<workflow::StepReport, CliError> {
+        self.invocations.borrow_mut().push(step.name().to_string());
+
+        if let Some(message) = self.failures.get(step.name()) {
+            return Err(CliError::backend_failure(*message));
+        }
+
+        Ok(workflow::StepReport::success(step))
+    }
 }

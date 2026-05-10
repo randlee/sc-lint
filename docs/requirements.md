@@ -335,6 +335,8 @@ The current execution phase, Phase `A`, requires:
   checks
 - documented `fast` / `full` / `ci` profile semantics and the distinction
   between `sc-lint lint ci` and top-level `sc-lint ci`
+- repo-local wrappers that map `just lint` and `just ci` onto the CLI-owned
+  profile and CI contracts instead of redefining them separately
 - a staged migration plan for:
   - generic Python utilities
   - boundary inventory and manifest-policy logic moving into Rust

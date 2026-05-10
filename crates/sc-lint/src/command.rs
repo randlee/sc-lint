@@ -6,6 +6,7 @@ use crate::CliError;
 use crate::Command;
 use crate::config::LoadedConfig;
 use crate::dispatch;
+use crate::workflow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DispatchTelemetry {
@@ -75,11 +76,13 @@ impl CommandContext {
                 },
                 summary: match target {
                     crate::LintTarget::ScBoundary => "boundary analyzer command path",
-                    crate::LintTarget::ScPortability
-                    | crate::LintTarget::ScRuntime
-                    | crate::LintTarget::Fast
-                    | crate::LintTarget::Full
-                    | crate::LintTarget::Ci => "reserved lint contract surface",
+                    crate::LintTarget::ScPortability => {
+                        "reserved portability analyzer contract surface"
+                    }
+                    crate::LintTarget::ScRuntime => "reserved runtime analyzer contract surface",
+                    crate::LintTarget::Fast | crate::LintTarget::Full | crate::LintTarget::Ci => {
+                        "lint profile orchestration path"
+                    }
                 },
                 requires_repo_root: true,
             },
@@ -92,13 +95,13 @@ impl CommandContext {
             Command::Check { target } => Self {
                 command_id: format!("check.{}", target.command_suffix()),
                 service_name: "sc-lint",
-                summary: "reserved preflight contract surface",
+                summary: "preflight execution path",
                 requires_repo_root: true,
             },
             Command::Clippy { target } => Self {
                 command_id: format!("clippy.{}", target.command_suffix()),
                 service_name: "sc-lint",
-                summary: "reserved clippy contract surface",
+                summary: "clippy execution path",
                 requires_repo_root: true,
             },
             Command::Version => Self {
@@ -110,7 +113,7 @@ impl CommandContext {
             Command::Ci => Self {
                 command_id: "ci".to_string(),
                 service_name: "sc-lint",
-                summary: "reserved ci contract surface",
+                summary: "top-level ci orchestration path",
                 requires_repo_root: true,
             },
         }
@@ -163,22 +166,18 @@ pub fn execute(
         "lint.sc-runtime" => {
             reserved_command(context, "A.5 will add the runtime analyzer backend path.")
         }
-        "lint.fast" | "lint.full" | "lint.ci" => reserved_command(
-            context,
-            "A.2 will materialize named lint profiles behind the stable contract.",
-        ),
+        "lint.fast" => workflow::run_lint_profile(loaded_config, crate::LintProfile::Fast),
+        "lint.full" => workflow::run_lint_profile(loaded_config, crate::LintProfile::Full),
+        "lint.ci" => workflow::run_lint_profile(loaded_config, crate::LintProfile::Ci),
         "view.graph" | "view.findings" => reserved_command(
             context,
             "A.3 will connect the reserved view surfaces to extracted utility paths.",
         ),
-        "check.native" | "check.xwin" | "clippy.native" | "clippy.xwin" => reserved_command(
-            context,
-            "A.2 will add the preflight execution strategy and capability-aware dispatch.",
-        ),
-        "ci" => reserved_command(
-            context,
-            "A.2 will compose lint profiles and test execution into the top-level CI flow.",
-        ),
+        "check.native" => workflow::run_check(loaded_config, crate::CheckTarget::Native),
+        "check.xwin" => workflow::run_check(loaded_config, crate::CheckTarget::Xwin),
+        "clippy.native" => workflow::run_clippy(loaded_config, crate::ClippyTarget::Native),
+        "clippy.xwin" => workflow::run_clippy(loaded_config, crate::ClippyTarget::Xwin),
+        "ci" => workflow::run_ci(loaded_config),
         _ => Err(CliError::internal(format!(
             "unknown command identity `{}` reached the execution layer",
             context.command_id()

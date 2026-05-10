@@ -7,6 +7,7 @@ use sc_lint::CliError;
 use sc_lint::CommandContext;
 use sc_lint::DispatchTelemetry;
 use sc_lint::LoadedConfig;
+use sc_lint::WINDOWS_XWIN_TARGET;
 use sc_observability::ActionName;
 use sc_observability::JsonlFileSink;
 use sc_observability::Level;
@@ -304,13 +305,18 @@ fn log_event(
 }
 
 fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
-    Map::from_iter([
+    let mut fields = Map::from_iter([
         (
             "command".to_string(),
             Value::String(observed.command_id().to_string()),
         ),
         ("summary".to_string(), json!(observed.summary())),
-    ])
+    ]);
+    if matches!(observed.command_id(), "check.xwin" | "clippy.xwin") {
+        fields.insert("preflight_mode".to_string(), json!("xwin"));
+        fields.insert("target_triple".to_string(), json!(WINDOWS_XWIN_TARGET));
+    }
+    fields
 }
 
 fn schema_version() -> &'static SchemaVersion {

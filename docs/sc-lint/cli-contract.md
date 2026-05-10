@@ -91,9 +91,28 @@ Current implementation status:
   - direct CLI-owned success path
 - `lint.sc-boundary`
   - first real backend-normalized success path
-- all remaining command families
-  - exposed now
-  - remain reserved until their owning sprints land
+- `lint.fast`
+  - implemented profile orchestration path
+- `lint.full`
+  - implemented profile orchestration path with conditional `xwin` preflight
+- `lint.ci`
+  - implemented lint-only CI-parity profile path
+- `check.native`
+  - implemented native preflight path
+- `check.xwin`
+  - implemented capability-gated Windows preflight path
+- `clippy.native`
+  - implemented native clippy path
+- `clippy.xwin`
+  - implemented capability-gated Windows clippy path
+- `ci`
+  - implemented top-level lint-plus-tests path
+- `view.*`
+  - still reserved until A.3 lands
+- `lint.sc-portability`
+  - still reserved until A.4 lands
+- `lint.sc-runtime`
+  - still reserved until A.5 lands
 
 ## Canonical Success Envelope
 

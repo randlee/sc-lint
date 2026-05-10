@@ -276,7 +276,7 @@ Current integration state:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
-Current planned local/CI profile split:
+Current implemented local/CI profile split:
 
 - `fast`
   - low-latency local developer gate
@@ -291,6 +291,19 @@ Current planned local/CI profile split:
 - top-level `ci`
   - lint plus tests
 
+Current wrapper mapping:
+
+- `just lint`
+  - defaults to `sc-lint lint full`
+- `just lint fast`
+  - maps to `sc-lint lint fast`
+- `just lint full`
+  - maps to `sc-lint lint full`
+- `just lint ci`
+  - maps to `sc-lint lint ci`
+- `just ci`
+  - maps to `sc-lint ci`
+
 ## Default Rule Policy
 
 `sc-lint-boundary` ships with an embedded default rule config at:
@@ -304,6 +317,9 @@ It currently carries the built-in `trait_self_loop` policy through:
 
 This is the default-install extension point for common non-architectural trait
 families such as comparison, hashing, conversion, and serde traits.
+
+The top-level CLI does not add its own rule-disable flags in A.2; profile
+orchestration must preserve backend-owned rule policy rather than replacing it.
 
 ## Next Planning Items
 

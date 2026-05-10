@@ -270,3 +270,38 @@ specialized backend tools and mixed Rust/Python implementations.
 - `lint.sc-boundary` is the first real backend-normalized command path
 - the remaining command families keep using the reserved-surface pattern until
   their owning sprints land
+
+## A.2 Implementation Notes
+
+- `LintProfile::{Fast, Full, Ci}` and `OutputMode::{Human, Json}` now live in
+  `crates/sc-lint/src/cli.rs`
+- the A.2 orchestration layer lives in `crates/sc-lint/src/workflow.rs`
+- `--json` selects `OutputMode::Json` for every non-interactive command family
+  through the same top-level envelope and `CliError` path
+- `lint.fast`, `lint.full`, `lint.ci`, `check.native`, `check.xwin`,
+  `clippy.native`, `clippy.xwin`, and top-level `ci` are now implemented
+- `full` conditionally adds `xwin` preflight only when `cargo xwin` is
+  available; `fast` and `ci` remain `xwin`-free
+- repo-local wrappers now map onto the CLI-owned profiles:
+  - `just lint`
+    defaults to `sc-lint lint full`
+  - `just lint fast`
+    maps to `sc-lint lint fast`
+  - `just lint ci`
+    maps to `sc-lint lint ci`
+  - `just ci`
+    maps to top-level `sc-lint ci`
+
+## A.2 Rule-Disable Policy
+
+- A.2 does not introduce top-level `sc-lint` rule-disable flags
+- rule disable behavior remains backend-owned rather than profile-owned
+- for the current shipped backend path:
+  - `sc-lint-boundary`
+    keeps its default rule tuning in backend configuration such as
+    `crates/sc-lint-boundary/config/defaults.toml`
+- for delegated Python-backed checks used by `lint full` and `lint ci`, the
+  existing per-tool config behavior remains authoritative until those tools
+  migrate behind first-class Rust command paths
+- profile orchestration must not silently suppress or rewrite backend rule
+  selections

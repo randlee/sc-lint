@@ -365,6 +365,18 @@ For `xwin`-aware commands, capability resolution includes:
 - keep `ci` profile semantics independent from `xwin`
 - skip or error with a clear capability message depending on command mode
 
+Current A.2 implementation notes:
+
+- `check.native` runs `cargo check --workspace`
+- `check.xwin` runs `cargo xwin check --workspace --target x86_64-pc-windows-msvc`
+  when the capability is present
+- `clippy.native` runs `cargo clippy --workspace --all-targets -- -D warnings`
+- `clippy.xwin` runs `cargo xwin clippy --workspace --all-targets --target x86_64-pc-windows-msvc -- -D warnings`
+- `lint.fast` keeps the low-latency subset
+- `lint.full` adds `xwin` preflight only when available
+- `lint.ci` stays lint-only and excludes `xwin`
+- top-level `ci` reuses `lint.ci` semantics and adds workspace tests
+
 ## Output Model
 
 The CLI should present:

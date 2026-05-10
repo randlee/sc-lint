@@ -295,8 +295,10 @@ Requirement coverage:
   - load `logging.root` and `logging.console` through the top-level config
     loader before initializing the runtime
 - `A.2`
-  - add `xwin` preflight entry/exit/error logging through the standard CLI
-    event pattern
+  - `xwin` preflight now emits entry/exit/error logging through the standard
+    CLI event pattern
+  - `check.xwin` and `clippy.xwin` log `preflight_mode=xwin` and the effective
+    Windows target triple in the CLI-owned event fields
 - `A.3`
   - add Python utility entry/exit/error logging through the adapter-normalized
     CLI event pattern

@@ -64,6 +64,22 @@ pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope
                 .map_or(0, std::vec::Vec::len);
             format!("sc-lint-boundary: {status} ({finding_count} findings)")
         }
+        "lint.fast" | "lint.full" | "lint.ci" | "ci" | "check.native" | "check.xwin"
+        | "clippy.native" | "clippy.xwin" => {
+            let status = envelope
+                .data
+                .as_ref()
+                .and_then(|value| value.get("status"))
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            let step_count = envelope
+                .data
+                .as_ref()
+                .and_then(|value| value.get("steps"))
+                .and_then(Value::as_array)
+                .map_or(0, std::vec::Vec::len);
+            format!("{}: {status} ({step_count} steps)", context.command_id())
+        }
         _ => format!("{}: ok", context.command_id()),
     }
 }

@@ -17,6 +17,8 @@ class PrintHelpTests(unittest.TestCase):
         output = render_help("sc-lint")
         self.assertIn("version latest", output)
         self.assertIn("lint fast", output)
+        self.assertIn("lint full", output)
+        self.assertIn("lint ci", output)
         self.assertIn("lint modules", output)
         self.assertIn("lint sc-boundary", output)
         self.assertIn("lint sc-portability", output)
