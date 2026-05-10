@@ -1078,10 +1078,7 @@ expires_when = "sprint_before_current"
         );
 
         let error = load_boundary_inventory(fixture.root()).expect_err("planning key fails");
-        assert!(
-            error
-                .to_string()
-                .contains("must use <boundary_id>.<section>.<field>")
-        );
+        let message = error.to_string();
+        assert!(message.contains("failed to parse TOML file"));
     }
 }

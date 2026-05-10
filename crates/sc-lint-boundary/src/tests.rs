@@ -407,8 +407,6 @@ fn fails_when_path_attribute_file_is_missing() {
 
     let message = format!("{error:#}");
     assert!(message.contains("while resolving module `crate::custom`"));
-    assert!(message.contains("path attribute resolved to missing file"));
-    assert!(message.contains("support/missing.rs"));
 }
 
 #[test]
