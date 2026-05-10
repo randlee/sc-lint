@@ -139,6 +139,94 @@ impl PartialEq<String> for OwnerId {
     }
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(transparent)]
+pub struct CrateId(String);
+
+impl CrateId {
+    pub fn new(value: impl Into<String>) -> Self {
+        let value = value.into();
+        debug_assert!(!value.is_empty(), "crate ids must not be empty");
+        Self(value)
+    }
+
+    pub fn from_parts(package_name: &str, target_name: &str) -> Self {
+        Self::new(format!("crate::{package_name}::{target_name}"))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for CrateId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for CrateId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for CrateId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl From<String> for CrateId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<&str> for CrateId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<CrateId> for String {
+    fn from(value: CrateId) -> Self {
+        value.0
+    }
+}
+
+impl From<&CrateId> for String {
+    fn from(value: &CrateId) -> Self {
+        value.0.clone()
+    }
+}
+
+impl From<CrateId> for NodeId {
+    fn from(value: CrateId) -> Self {
+        Self::new(String::from(value))
+    }
+}
+
+impl From<&CrateId> for NodeId {
+    fn from(value: &CrateId) -> Self {
+        Self::new(String::from(value))
+    }
+}
+
+impl PartialEq<&str> for CrateId {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<String> for CrateId {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FindingsReport<R>
 where

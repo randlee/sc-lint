@@ -15,7 +15,7 @@ constructor = "none"
 [composition]
 # `CommandEnvelope` records the generic success-envelope family documented in
 # the CLI contract as `CommandEnvelope<T>`.
-roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "run"]
+roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "logging", "run"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the boundary backend crate, the

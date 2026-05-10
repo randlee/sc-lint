@@ -1,16 +1,16 @@
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ServiceName(String);
+pub(crate) struct ServiceName(&'static str);
 
 impl ServiceName {
-    pub(crate) fn new(value: &'static str) -> Self {
+    pub(crate) const fn new(value: &'static str) -> Self {
         debug_assert!(!value.is_empty(), "service names must not be empty");
-        Self(value.to_string())
+        Self(value)
     }
 
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
+    pub(crate) const fn as_str(&self) -> &str {
+        self.0
     }
 }
 

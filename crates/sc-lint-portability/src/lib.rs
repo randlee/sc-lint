@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Error as AnyhowError;
+use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::OwnerId;
@@ -22,21 +23,6 @@ const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 pub struct AnalyzeOptions {
     pub root: PathBuf,
     pub format: OutputFormat,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CrateId(String);
-
-impl CrateId {
-    pub(crate) fn from_parts(package_name: &str, target_name: &str) -> Self {
-        Self(format!("crate::{package_name}::{target_name}"))
-    }
-}
-
-impl From<CrateId> for String {
-    fn from(value: CrateId) -> Self {
-        value.0
-    }
 }
 
 pub type FindingsReport = sc_lint_schema::FindingsReport<RuleId>;

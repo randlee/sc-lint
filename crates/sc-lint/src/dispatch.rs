@@ -28,28 +28,33 @@ enum BoundaryDispatchError {
 impl BoundaryDispatchError {
     fn into_cli_error(self, tool: &str, repo_root: Option<&Path>) -> CliError {
         match self {
-            Self::Analysis(error) => CliError::backend_failure(format!(
-                "{tool} failed to analyze `{}`",
-                repo_root.map_or_else(
-                    || "<unknown>".to_string(),
-                    |root| root.display().to_string()
-                )
-            ))
-            .with_source(error)
-            .with_detail(consts::FIELD_TOOL, json!(tool))
-            .with_detail(
-                consts::FIELD_ROOT,
-                json!(repo_root.map(|root| root.display().to_string())),
-            ),
+            Self::Analysis(error) => {
+                CliError::backend_failure(format!("{tool} failed to analyze the workspace"))
+                    .with_source(error)
+                    .with_detail(consts::FIELD_TOOL, json!(tool))
+                    .with_detail(
+                        consts::FIELD_ROOT,
+                        json!(repo_root.map(|root| root.display().to_string())),
+                    )
+                    .with_suggested_action(
+                        "Check the boundary inventory and workspace sources, then rerun `sc-lint lint sc-boundary` for a focused failure report.",
+                    )
+            }
             Self::Serialize(error) => CliError::backend_protocol(format!(
                 "{tool} produced a report that could not be encoded as machine JSON"
             ))
             .with_source(error)
-            .with_detail(consts::FIELD_TOOL, json!(tool)),
+            .with_detail(consts::FIELD_TOOL, json!(tool))
+            .with_suggested_action(
+                "Inspect the backend report payload for non-serializable fields and rerun the analyzer.",
+            ),
             Self::Normalize(error) => {
                 CliError::backend_protocol(format!("{tool} returned malformed machine output"))
                     .with_source(error)
                     .with_detail(consts::FIELD_TOOL, json!(tool))
+                    .with_suggested_action(
+                        "Run the backend directly and inspect its JSON output for schema mismatches.",
+                    )
             }
         }
     }

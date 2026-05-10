@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use anyhow::Error as AnyhowError;
+use anyhow as anyhow_crate;
+use sc_lint_schema::CrateId;
 use sc_lint_schema::Finding as SchemaFinding;
 use sc_lint_schema::FindingsReport as SchemaFindingsReport;
 use sc_lint_schema::NodeId;
@@ -25,21 +26,6 @@ const SC_LINT_RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct AnalyzeOptions {
     pub root: PathBuf,
     pub format: OutputFormat,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CrateId(String);
-
-impl CrateId {
-    pub(crate) fn from_parts(package_name: &str, target_name: &str) -> Self {
-        Self(format!("crate::{package_name}::{target_name}"))
-    }
-}
-
-impl From<CrateId> for String {
-    fn from(value: CrateId) -> Self {
-        value.0
-    }
 }
 
 pub type FindingsReport = SchemaFindingsReport<RuleId>;
@@ -69,19 +55,29 @@ impl Serialize for RuleId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("{0}")]
+pub struct RuntimeErrorSource(Box<str>);
+
+impl From<anyhow_crate::Error> for RuntimeErrorSource {
+    fn from(value: anyhow_crate::Error) -> Self {
+        Self(value.to_string().into_boxed_str())
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum RuntimeError {
     #[error("failed to analyze runtime findings for root `{}`: {source:#}", root.display())]
     AnalyzeFindings {
         root: PathBuf,
         #[source]
-        source: AnyhowError,
+        source: RuntimeErrorSource,
     },
     #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
     CountScannedCrates {
         root: PathBuf,
         #[source]
-        source: AnyhowError,
+        source: RuntimeErrorSource,
     },
 }
 
@@ -91,13 +87,13 @@ pub fn analyze_workspace(
     let findings = runtime::analyze_runtime_liveness(&options.root).map_err(|source| {
         RuntimeError::AnalyzeFindings {
             root: options.root.clone(),
-            source,
+            source: source.into(),
         }
     })?;
     let scanned_crates = source_scan::count_scanned_crates(&options.root).map_err(|source| {
         RuntimeError::CountScannedCrates {
             root: options.root.clone(),
-            source,
+            source: source.into(),
         }
     })?;
     let status = if findings.is_empty() {

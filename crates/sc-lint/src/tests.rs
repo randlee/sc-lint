@@ -192,14 +192,15 @@ fn lint_targets_map_profile_values_stably() {
 
 #[test]
 fn repo_root_discovery_walks_up_to_the_workspace_root() {
-    let repo_root = project_workspace_root();
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "nested/module.rs", "pub struct Example;\n");
+    let nested_source = fixture.root().join("crates/example/src/nested/module.rs");
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
-        repo_root
-            .join("crates/sc-lint/src")
-            .to_str()
-            .expect("repo path"),
+        nested_source.to_str().expect("fixture path"),
         "lint",
         "sc-boundary",
     ]);
@@ -207,8 +208,10 @@ fn repo_root_discovery_walks_up_to_the_workspace_root() {
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let root = loaded.require_repo_root().expect("repo root");
 
-    assert!(root.join("boundaries").is_dir());
-    assert!(root.join("Cargo.toml").is_file());
+    assert_eq!(
+        root,
+        dunce::canonicalize(fixture.root()).expect("canonical fixture root")
+    );
 }
 
 #[test]
@@ -418,11 +421,13 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
 
 #[test]
 fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
-    let repo_root = project_workspace_root();
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write("sc-lint.toml", "[logging]\nconsole = true\n");
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
-        repo_root.to_str().expect("repo root"),
+        fixture.root().to_str().expect("fixture root"),
         "lint",
         "sc-boundary",
     ]);
@@ -431,14 +436,20 @@ fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
 
     assert_eq!(
         loaded.require_repo_root().expect("repo root"),
-        repo_root.as_path()
+        dunce::canonicalize(fixture.root())
+            .expect("canonical fixture root")
+            .as_path()
+    );
+    assert_eq!(
+        loaded.config_path().expect("config path"),
+        dunce::canonicalize(fixture.root().join("sc-lint.toml")).expect("canonical config path")
     );
 }
 
 #[test]
 #[serial]
 fn python_backed_lints_and_views_normalize_through_the_top_level_envelope() {
-    let repo_root = project_workspace_root();
+    let repo_root = repo_backed_workspace_root();
     for (args, command_id) in [
         (
             [
@@ -494,7 +505,7 @@ fn python_backed_lints_and_views_normalize_through_the_top_level_envelope() {
 
 #[test]
 fn lint_profiles_have_stable_membership() {
-    let repo_root = project_workspace_root();
+    let repo_root = repo_backed_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -522,7 +533,7 @@ fn lint_profiles_have_stable_membership() {
 
 #[test]
 fn full_profile_adds_xwin_only_when_available() {
-    let repo_root = project_workspace_root();
+    let repo_root = repo_backed_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -565,7 +576,7 @@ fn full_profile_adds_xwin_only_when_available() {
 
 #[test]
 fn ci_and_lint_ci_differ_only_by_test_execution() {
-    let repo_root = project_workspace_root();
+    let repo_root = repo_backed_workspace_root();
     let lint_cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -602,7 +613,7 @@ fn ci_and_lint_ci_differ_only_by_test_execution() {
 
 #[test]
 fn explicit_xwin_commands_require_capability() {
-    let repo_root = project_workspace_root();
+    let repo_root = repo_backed_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -623,7 +634,7 @@ fn explicit_xwin_commands_require_capability() {
 
 #[test]
 fn native_and_xwin_preflight_commands_use_success_envelopes() {
-    let repo_root = project_workspace_root();
+    let repo_root = repo_backed_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--json",
@@ -719,7 +730,7 @@ fn render_success_json_falls_back_to_internal_error_envelope_on_serialize_failur
     );
 }
 
-fn project_workspace_root() -> PathBuf {
+fn repo_backed_workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
@@ -762,7 +773,7 @@ homepage = "https://example.invalid/sc-lint"
         .expect("workspace root");
         std::fs::create_dir_all(self.root().join("boundaries")).expect("boundaries");
         std::fs::write(
-            self.root().join("boundaries/planning.toml"),
+            self.root().join("boundaries").join("planning.toml"),
             "[planning]\ncurrent_sprint = \"A.7\"\n",
         )
         .expect("planning");

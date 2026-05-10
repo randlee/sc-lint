@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -26,6 +27,20 @@ impl PackageName {
     }
 }
 
+impl AsRef<str> for PackageName {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for PackageName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
 impl fmt::Display for PackageName {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.as_str())
@@ -44,6 +59,20 @@ impl TargetName {
 
     pub(crate) fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl AsRef<str> for TargetName {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for TargetName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
     }
 }
 

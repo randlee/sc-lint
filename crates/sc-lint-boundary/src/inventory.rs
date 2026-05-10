@@ -1,12 +1,162 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt;
 use std::fs;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
 use serde::Deserialize;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct BoundaryId(String);
+
+impl BoundaryId {
+    fn parse(value: String) -> std::result::Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("boundary ids must not be empty".to_string());
+        }
+        if !trimmed.starts_with("BOUNDARY-") {
+            return Err(format!(
+                "boundary ids must start with `BOUNDARY-` (got `{trimmed}`)"
+            ));
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for BoundaryId {
+    type Error = String;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+impl AsRef<str> for BoundaryId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for BoundaryId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for BoundaryId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for BoundaryId {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct SprintId(String);
+
+impl SprintId {
+    fn parse(value: String) -> std::result::Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("sprint ids must not be empty".to_string());
+        }
+        let Some((phase, step)) = trimmed.split_once('.') else {
+            return Err(format!(
+                "sprint ids must use <phase>.<step> format (got `{trimmed}`)"
+            ));
+        };
+        if phase.is_empty() || step.is_empty() || trimmed.contains(char::is_whitespace) {
+            return Err(format!("invalid sprint id `{trimmed}`"));
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+
+    fn placeholder_empty_inventory() -> Self {
+        Self("A.0".to_string())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for SprintId {
+    type Error = String;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+impl AsRef<str> for SprintId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for SprintId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for SprintId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for SprintId {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct TrackingId(String);
+
+impl TrackingId {
+    fn parse(value: String) -> std::result::Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("tracking ids must not be empty".to_string());
+        }
+        if trimmed.contains(char::is_whitespace) {
+            return Err(format!(
+                "tracking ids must not contain whitespace (got `{trimmed}`)"
+            ));
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+}
+
+impl TryFrom<String> for TrackingId {
+    type Error = String;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BoundaryInventory {
@@ -40,7 +190,7 @@ impl InventorySummary {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BoundaryRecord {
-    pub(crate) boundary_id: String,
+    pub(crate) boundary_id: BoundaryId,
     pub(crate) owner_package: String,
     pub(crate) owner_crate_path: String,
     pub(crate) name: String,
@@ -122,14 +272,14 @@ pub(crate) struct PlanningMetadata {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PlanningHeader {
-    pub(crate) current_sprint: String,
+    pub(crate) current_sprint: SprintId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PlannedItem {
-    pub(crate) scheduled_sprint: String,
-    pub(crate) tracking_id: String,
+    pub(crate) scheduled_sprint: SprintId,
+    pub(crate) tracking_id: TrackingId,
     pub(crate) expires_when: ExpirationPolicy,
 }
 
@@ -173,7 +323,7 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
             records: Vec::new(),
             planning: PlanningMetadata {
                 planning: PlanningHeader {
-                    current_sprint: String::new(),
+                    current_sprint: SprintId::placeholder_empty_inventory(),
                 },
                 planned_items: BTreeMap::new(),
             },
@@ -181,7 +331,7 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
     }
     let boundary_paths = discover_boundary_files(&boundaries_root)?;
     let mut records = Vec::new();
-    let mut seen_boundary_ids = BTreeMap::<String, PathBuf>::new();
+    let mut seen_boundary_ids = BTreeMap::<BoundaryId, PathBuf>::new();
 
     for path in boundary_paths {
         let record: BoundaryRecord = parse_toml_file(&path)?;
@@ -361,23 +511,10 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
 }
 
 fn validate_planning_metadata(planning: &PlanningMetadata, planning_path: &Path) -> Result<()> {
-    if planning.planning.current_sprint.trim().is_empty() {
-        anyhow::bail!(
-            "planning metadata `{}` must define a non-empty [planning].current_sprint",
-            planning_path.display()
-        );
-    }
-
-    for (key, item) in &planning.planned_items {
+    for (key, _item) in &planning.planned_items {
         if !key.starts_with("BOUNDARY-") || !key.contains('.') {
             anyhow::bail!(
                 "planning item key `{key}` in `{}` must use <boundary_id>.<section>.<field>[.<subfield>] shape",
-                planning_path.display()
-            );
-        }
-        if item.scheduled_sprint.trim().is_empty() || item.tracking_id.trim().is_empty() {
-            anyhow::bail!(
-                "planning item `{key}` in `{}` must define non-empty scheduled_sprint and tracking_id",
                 planning_path.display()
             );
         }

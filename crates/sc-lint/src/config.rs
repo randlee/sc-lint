@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 use serde_json::Value;
+use serde_json::json;
 
 use crate::Cli;
 use crate::CliError;
@@ -45,11 +46,16 @@ impl RepoRoot {
             if current.join("Cargo.toml").is_file() && current.join("boundaries").is_dir() {
                 return Ok(Self(current));
             }
+            let inspected = current.clone();
             if !current.pop() {
                 return Err(CliError::config(format!(
-                    "could not discover the sc-lint repo root from `{}`",
-                    start.display()
+                    "could not discover the sc-lint repo root from `{}`; last inspected `{}` was missing required sentinels `Cargo.toml` and/or `boundaries`",
+                    start.display(),
+                    inspected.display()
                 ))
+                .with_detail("discovery_start", json!(start.display().to_string()))
+                .with_detail("last_inspected", json!(inspected.display().to_string()))
+                .with_detail("required_sentinels", json!(["Cargo.toml", "boundaries"]))
                 .with_suggested_action(
                     "Run the command inside the repo or pass `--root <path>` to the workspace root.",
                 ));

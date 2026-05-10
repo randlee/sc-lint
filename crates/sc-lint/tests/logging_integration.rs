@@ -772,6 +772,9 @@ fn clear_atm_env(command: &mut Command) {
 }
 
 fn isolated_atm_root() -> &'static PathBuf {
+    // The ATM sandbox root is intentionally shared across this module so every
+    // subprocess sees the same isolated ATM_HOME/ATM_CONFIG_HOME. Tests here
+    // must not assume a brand-new ATM root per test case.
     static ROOT: OnceLock<PathBuf> = OnceLock::new();
     ROOT.get_or_init(|| {
         let root = TempDir::new().expect("temp dir").keep();

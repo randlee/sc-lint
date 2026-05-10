@@ -97,12 +97,12 @@ pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
             if is_trait_impl_self_loop {
                 let trait_name = node_map
                     .get(&source_node_id)
-                    .and_then(|node| node.impl_trait.clone())
-                    .unwrap_or_else(|| "unknown_trait".to_string());
-                if is_non_architectural_trait_impl_self_loop(&trait_name) {
+                    .and_then(|node| node.impl_trait.as_deref())
+                    .unwrap_or("unknown_trait");
+                if is_non_architectural_trait_impl_self_loop(trait_name) {
                     continue;
                 }
-                let entry = trait_nodes.entry(trait_name).or_default();
+                let entry = trait_nodes.entry(trait_name.to_string()).or_default();
                 for edge in source_edges {
                     for node_id in &edge.node_ids {
                         entry.insert(node_id.clone());

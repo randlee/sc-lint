@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
-use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -14,6 +13,7 @@ use cargo_metadata::MetadataCommand;
 use quote::ToTokens;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
+pub use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::OwnerId;
@@ -87,65 +87,6 @@ pub struct AnalyzeOptions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportGraphOptions {
     pub root: PathBuf,
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(transparent)]
-pub struct CrateId(String);
-
-impl CrateId {
-    /// Panics in debug builds if the input string is empty.
-    pub fn new(value: impl Into<String>) -> Self {
-        let value = value.into();
-        debug_assert!(!value.is_empty(), "crate ids must not be empty");
-        Self(value)
-    }
-
-    pub fn from_parts(package_name: &str, target_name: &str) -> Self {
-        Self::new(format!("crate::{package_name}::{target_name}"))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for CrateId {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl Deref for CrateId {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl fmt::Display for CrateId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl From<CrateId> for String {
-    fn from(value: CrateId) -> Self {
-        value.0
-    }
-}
-
-impl From<&CrateId> for String {
-    fn from(value: &CrateId) -> Self {
-        value.as_str().to_string()
-    }
-}
-
-impl From<CrateId> for NodeId {
-    fn from(value: CrateId) -> Self {
-        Self::new(value.0)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -400,7 +341,7 @@ impl GraphBuilder {
     ) {
         let crate_id = graph::crate_id(package_name, target_name);
         self.add_node(GraphNode {
-            id: NodeId::from(crate_id),
+            id: NodeId::new(String::from(crate_id)),
             kind: "crate",
             label: target_name.to_string(),
             visibility: None,

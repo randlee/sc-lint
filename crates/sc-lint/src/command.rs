@@ -209,6 +209,9 @@ pub struct CommandContext {
 }
 
 impl CommandContext {
+    /// This constructor is intentionally infallible today.
+    /// The `Result` is reserved so future command-surface validation can fail
+    /// before config loading without changing the public bootstrap seam.
     #[expect(
         clippy::result_large_err,
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."

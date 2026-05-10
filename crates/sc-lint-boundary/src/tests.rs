@@ -54,7 +54,9 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
             visibility: Some("public"),
             package: "example".to_string(),
             target: Some("example".to_string()),
+            // Ephemeral fixture path, not a real workspace root.
             manifest_path: "/tmp/example/Cargo.toml".to_string(),
+            // Ephemeral fixture path, not a real workspace source file.
             source_path: Some("/tmp/example/src/lib.rs".to_string()),
             module_path: Some("crate::example".to_string()),
             impl_kind: Some(ImplKind::Inherent),
@@ -96,6 +98,7 @@ fn render_graph_export_turtle_escapes_special_characters_and_attributes() {
             package: "example".to_string(),
             target: Some("example".to_string()),
             manifest_path: "C:\\repo\\Cargo.toml".to_string(),
+            // Ephemeral fixture path, not a real workspace source file.
             source_path: Some("/tmp/example/src/lib.rs".to_string()),
             module_path: Some("crate::example".to_string()),
             impl_kind: Some(ImplKind::Trait),
