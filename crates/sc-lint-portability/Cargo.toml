@@ -1,33 +1,33 @@
 [package]
-name = "sc-lint-boundary"
+name = "sc-lint-portability"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "AST-sensitive Rust boundary analyzer."
+description = "AST-sensitive Rust portability analyzer."
 repository.workspace = true
 homepage.workspace = true
 
 [[bin]]
-name = "sc-lint-boundary"
+name = "sc-lint-portability"
 path = "src/main.rs"
 
 [lib]
-name = "sc_lint_boundary"
+name = "sc_lint_portability"
 path = "src/lib.rs"
 
 [dependencies]
 anyhow.workspace = true
 cargo_metadata.workspace = true
+clap.workspace = true
+sc-lint-schema = { version = "0.1.0", path = "../sc-lint-schema" }
 serde.workspace = true
 serde_json.workspace = true
-sc-lint-directives = { version = "0.1.0", path = "../sc-lint-directives" }
-sc-lint-schema = { version = "0.1.0", path = "../sc-lint-schema" }
-clap = { version = "4", features = ["derive"] }
+toml.workspace = true
 syn = { version = "2", features = ["full", "parsing", "visit"] }
 quote = "1"
-toml = "0.8"
+proc-macro2 = { version = "1", features = ["span-locations"] }
 thiserror = "1"
 
 [dev-dependencies]

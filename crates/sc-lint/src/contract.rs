@@ -32,6 +32,7 @@ where
     T: Serialize,
 {
     pub ok: bool,
+    /// Commands are normalized to stable dotted identifiers so logs and machine envelopes share the same contract key.
     pub command: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,

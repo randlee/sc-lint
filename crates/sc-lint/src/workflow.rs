@@ -8,7 +8,7 @@ use serde_json::json;
 use crate::CheckTarget;
 use crate::CliError;
 use crate::ClippyTarget;
-use crate::LintProfile;
+use crate::cli::LintProfile;
 use crate::command::CommandSuccess;
 use crate::config::LoadedConfig;
 

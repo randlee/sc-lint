@@ -16,9 +16,9 @@ use crate::ClippyTarget;
 use crate::Command;
 use crate::CommandEnvelope;
 use crate::LintTarget;
-use crate::OutputMode;
 use crate::ParsedInvocation;
 use crate::ViewTarget;
+use crate::cli::OutputMode;
 use crate::command::CommandContext;
 use crate::config::LoadedConfig;
 use crate::workflow;
@@ -122,26 +122,20 @@ fn reserved_view_commands_use_the_same_failure_envelope_shape() {
 }
 
 #[test]
-fn reserved_lint_placeholders_use_the_same_failure_envelope_shape() {
-    let commands = [
-        Cli::parse_from(["sc-lint", "--json", "lint", "sc-portability"]),
-        Cli::parse_from(["sc-lint", "--json", "lint", "sc-runtime"]),
-    ];
+fn reserved_runtime_lint_placeholder_uses_the_failure_envelope_shape() {
+    let cli = Cli::parse_from(["sc-lint", "--json", "lint", "sc-runtime"]);
+    let context = CommandContext::from_cli(&cli).expect("runtime placeholder context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let error =
+        crate::command::execute(&context, &loaded).expect_err("runtime lint stays reserved");
+    let rendered = crate::render::render_error_json(context.command_id(), &error);
+    let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
 
-    for cli in commands {
-        let context = CommandContext::from_cli(&cli).expect("lint placeholder context");
-        let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-        let error = crate::command::execute(&context, &loaded)
-            .expect_err("reserved lint commands should fail consistently");
-        let rendered = crate::render::render_error_json(context.command_id(), &error);
-        let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
-
-        assert_eq!(json["ok"], false);
-        assert_eq!(json["command"], context.command_id());
-        assert_eq!(json["error"]["kind"], "capability");
-        assert_eq!(json["error"]["code"], "CLI.CAPABILITY_ERROR");
-        assert!(json["diagnostics"].as_array().is_some());
-    }
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["command"], context.command_id());
+    assert_eq!(json["error"]["kind"], "capability");
+    assert_eq!(json["error"]["code"], "CLI.CAPABILITY_ERROR");
+    assert!(json["diagnostics"].as_array().is_some());
 }
 
 #[test]
@@ -194,14 +188,20 @@ fn output_mode_tracks_json_flag_and_serializes() {
 
 #[test]
 fn lint_targets_map_profile_values_stably() {
-    assert_eq!(LintTarget::Fast.profile(), Some(crate::LintProfile::Fast));
-    assert_eq!(LintTarget::Full.profile(), Some(crate::LintProfile::Full));
-    assert_eq!(LintTarget::Ci.profile(), Some(crate::LintProfile::Ci));
+    assert_eq!(
+        LintTarget::Fast.profile(),
+        Some(crate::cli::LintProfile::Fast)
+    );
+    assert_eq!(
+        LintTarget::Full.profile(),
+        Some(crate::cli::LintProfile::Full)
+    );
+    assert_eq!(LintTarget::Ci.profile(), Some(crate::cli::LintProfile::Ci));
     assert_eq!(LintTarget::ScBoundary.profile(), None);
     assert_eq!(LintTarget::LineCounts.profile(), None);
-    assert_eq!(crate::LintProfile::Fast.command_suffix(), "fast");
-    assert_eq!(crate::LintProfile::Full.command_suffix(), "full");
-    assert_eq!(crate::LintProfile::Ci.command_suffix(), "ci");
+    assert_eq!(crate::cli::LintProfile::Fast.command_suffix(), "fast");
+    assert_eq!(crate::cli::LintProfile::Full.command_suffix(), "full");
+    assert_eq!(crate::cli::LintProfile::Ci.command_suffix(), "ci");
 }
 
 #[test]
@@ -285,6 +285,43 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "lint.sc-boundary");
     assert_eq!(json["data"]["tool"], crate::consts::TOOL_BOUNDARY);
+    assert!(json["data"]["findings"].is_array());
+}
+
+#[test]
+fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope() {
+    let repo_root = workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "sc-portability",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("portability context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let expected_finding_count = success
+        .data
+        .get("findings")
+        .and_then(Value::as_array)
+        .map_or(0, std::vec::Vec::len);
+    assert_eq!(
+        success
+            .dispatch
+            .as_ref()
+            .expect("dispatch telemetry")
+            .finding_count(),
+        expected_finding_count
+    );
+    let envelope = CommandEnvelope::success(context.command_id(), success.data);
+    let rendered = crate::render::render_success_json(&envelope);
+    let json: Value = serde_json::from_str(&rendered).expect("success json");
+
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["command"], "lint.sc-portability");
+    assert_eq!(json["data"]["tool"], "sc-lint-portability");
     assert!(json["data"]["findings"].is_array());
 }
 
@@ -417,7 +454,7 @@ fn lint_profiles_have_stable_membership() {
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let adapter = FakeSystemAdapter::new(false);
 
-    let success = workflow::run_lint_profile_with(&loaded, crate::LintProfile::Fast, &adapter)
+    let success = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Fast, &adapter)
         .expect("fast profile succeeds");
     let steps = success
         .data
@@ -446,7 +483,7 @@ fn full_profile_adds_xwin_only_when_available() {
 
     let unavailable = workflow::run_lint_profile_with(
         &loaded,
-        crate::LintProfile::Full,
+        crate::cli::LintProfile::Full,
         &FakeSystemAdapter::new(false),
     )
     .expect("full profile succeeds without xwin");
@@ -460,7 +497,7 @@ fn full_profile_adds_xwin_only_when_available() {
 
     let available = workflow::run_lint_profile_with(
         &loaded,
-        crate::LintProfile::Full,
+        crate::cli::LintProfile::Full,
         &FakeSystemAdapter::new(true),
     )
     .expect("full profile succeeds with xwin");
@@ -488,7 +525,7 @@ fn ci_and_lint_ci_differ_only_by_test_execution() {
     let loaded = LoadedConfig::load(&lint_cli, &lint_context).expect("config loads");
     let adapter = FakeSystemAdapter::new(false);
 
-    let lint_ci = workflow::run_lint_profile_with(&loaded, crate::LintProfile::Ci, &adapter)
+    let lint_ci = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Ci, &adapter)
         .expect("lint ci succeeds");
     let top_level_ci = workflow::run_ci_with(&loaded, &adapter).expect("ci succeeds");
     let lint_steps = lint_ci

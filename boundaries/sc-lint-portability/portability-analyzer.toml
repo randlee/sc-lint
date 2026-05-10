@@ -13,11 +13,19 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = []
+roots = [
+  "AnalyzeOptions",
+  "FindingsReport",
+  "Finding",
+  "RuleId",
+  "PortabilityError",
+  "analyze_workspace",
+  "render_findings_report",
+]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-lint-directives"]
+allowed_dependencies = ["sc-lint-schema"]
 forbidden_edges = [
   "sc-lint-portability -> sc-lint-attributes",
   "sc-lint-portability -> sc-lint-boundary",
@@ -38,4 +46,4 @@ lint_rules = ["LINT-SC-PORTABILITY-ISOLATION"]
 review_gates = ["no_cross_analyzer_dependencies"]
 
 [status]
-state = "planned"
+state = "concrete_landed"

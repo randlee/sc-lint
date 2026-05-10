@@ -6,7 +6,7 @@ phase: A
 sprint: "A.4"
 worktree: <repo-root>
 branch: develop
-status: planned
+status: in-progress
 estimated_scope: M
 ```
 

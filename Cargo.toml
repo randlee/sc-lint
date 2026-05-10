@@ -4,6 +4,8 @@ members = [
   "crates/sc-lint-directives",
   "crates/sc-lint-attributes",
   "crates/sc-lint-boundary",
+  "crates/sc-lint-portability",
+  "crates/sc-lint-schema",
 ]
 resolver = "2"
 

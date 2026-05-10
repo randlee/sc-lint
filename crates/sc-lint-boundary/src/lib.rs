@@ -8,11 +8,16 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use anyhow::Context;
+use anyhow::Error as AnyhowError;
 use anyhow::Result;
 use cargo_metadata::MetadataCommand;
 use quote::ToTokens;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
+use sc_lint_schema::NodeId;
+use sc_lint_schema::OutputFormat;
+use sc_lint_schema::OwnerId;
+use sc_lint_schema::ReportStatus;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
@@ -28,7 +33,6 @@ use thiserror::Error;
 
 mod analysis;
 mod graph;
-mod portability;
 mod render;
 #[cfg(test)]
 mod tests;
@@ -40,56 +44,23 @@ const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Error)]
 pub enum BoundaryError {
-    #[error("failed to analyze portability for root `{}`: {source:#}", root.display())]
-    PortabilityAnalysis {
-        root: PathBuf,
-        #[source]
-        source: anyhow::Error,
-    },
-    #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
-    ScannedCrateCount {
-        root: PathBuf,
-        #[source]
-        source: anyhow::Error,
-    },
     #[error("failed to build workspace graph for root `{}`: {source:#}", root.display())]
     WorkspaceGraphBuild {
         root: PathBuf,
         #[source]
-        source: anyhow::Error,
+        source: AnyhowError,
     },
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 struct RuleDefaults {
     trait_self_loop: TraitSelfLoopDefaults,
-    portability: PortabilityDefaults,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 struct TraitSelfLoopDefaults {
     ignored_trait_paths: Vec<String>,
     ignored_trait_names: Vec<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-struct PortabilityDefaults {
-    unix_path_prefixes: Vec<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
-    Text,
-    Json,
-}
-
-impl fmt::Display for OutputFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Text => f.write_str("text"),
-            Self::Json => f.write_str("json"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -157,131 +128,9 @@ impl From<&CrateId> for String {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(transparent)]
-pub struct NodeId(String);
-
-impl NodeId {
-    /// Panics in debug builds if the input string is empty.
-    pub fn new(value: impl Into<String>) -> Self {
-        let value = value.into();
-        debug_assert!(!value.is_empty(), "node ids must not be empty");
-        Self(value)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for NodeId {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl Deref for NodeId {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl fmt::Display for NodeId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl From<String> for NodeId {
-    fn from(value: String) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<&str> for NodeId {
-    fn from(value: &str) -> Self {
-        Self::new(value)
-    }
-}
-
 impl From<CrateId> for NodeId {
     fn from(value: CrateId) -> Self {
         Self::new(value.0)
-    }
-}
-
-impl PartialEq<&str> for NodeId {
-    fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
-    }
-}
-
-impl PartialEq<String> for NodeId {
-    fn eq(&self, other: &String) -> bool {
-        self.as_str() == other
-    }
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(transparent)]
-pub struct OwnerId(String);
-
-impl OwnerId {
-    /// Panics in debug builds if the input string is empty.
-    pub fn new(value: impl Into<String>) -> Self {
-        let value = value.into();
-        debug_assert!(!value.is_empty(), "owner ids must not be empty");
-        Self(value)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for OwnerId {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl Deref for OwnerId {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl fmt::Display for OwnerId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl From<String> for OwnerId {
-    fn from(value: String) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<&str> for OwnerId {
-    fn from(value: &str) -> Self {
-        Self::new(value)
-    }
-}
-
-impl PartialEq<&str> for OwnerId {
-    fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
-    }
-}
-
-impl PartialEq<String> for OwnerId {
-    fn eq(&self, other: &String) -> bool {
-        self.as_str() == other
     }
 }
 
@@ -291,40 +140,8 @@ pub enum GraphOutputFormat {
     Turtle,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct FindingsReport {
-    pub tool: &'static str,
-    pub version: &'static str,
-    pub schema_version: &'static str,
-    pub status: ReportStatus,
-    pub scanned_crates: usize,
-    pub findings: Vec<Finding>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ReportStatus {
-    Pass,
-    Fail,
-}
-
-impl ReportStatus {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Pass => "pass",
-            Self::Fail => "fail",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct Finding {
-    pub rule_id: RuleId,
-    pub kind: String,
-    pub message: String,
-    pub owner_ids: Vec<OwnerId>,
-    pub node_ids: Vec<NodeId>,
-}
+pub type FindingsReport = sc_lint_schema::FindingsReport<RuleId>;
+pub type Finding = sc_lint_schema::Finding<RuleId>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RuleId {
@@ -334,9 +151,6 @@ pub enum RuleId {
     ScbBoundary001,
     ScbBoundary002,
     ScbBoundary003,
-    Port001,
-    Port002,
-    Port003,
 }
 
 impl RuleId {
@@ -348,15 +162,12 @@ impl RuleId {
             Self::ScbBoundary001 => "SCB-BOUNDARY-001",
             Self::ScbBoundary002 => "SCB-BOUNDARY-002",
             Self::ScbBoundary003 => "SCB-BOUNDARY-003",
-            Self::Port001 => "PORT-001",
-            Self::Port002 => "PORT-002",
-            Self::Port003 => "PORT-003",
         }
     }
 }
 
 impl Serialize for RuleId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -370,7 +181,6 @@ pub enum RuleFilter {
     Boundaries,
     InternalOnly,
     ForbidExternalImpls,
-    Portability,
 }
 
 impl RuleFilter {
@@ -380,7 +190,6 @@ impl RuleFilter {
             Self::Boundaries => "boundaries",
             Self::InternalOnly => "internal_only",
             Self::ForbidExternalImpls => "forbid_external_impls",
-            Self::Portability => "portability",
         }
     }
 }
@@ -408,7 +217,7 @@ impl fmt::Display for RuleFilterParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "unsupported rule filter `{}`; supported: cycles, boundaries, internal_only, forbid_external_impls, portability",
+            "unsupported rule filter `{}`; supported: cycles, boundaries, internal_only, forbid_external_impls",
             self.invalid_value
         )
     }
@@ -425,7 +234,6 @@ impl TryFrom<&str> for RuleFilter {
             "boundaries" => Ok(Self::Boundaries),
             "internal_only" => Ok(Self::InternalOnly),
             "forbid_external_impls" => Ok(Self::ForbidExternalImpls),
-            "portability" => Ok(Self::Portability),
             other => Err(RuleFilterParseError::new(other)),
         }
     }
@@ -608,35 +416,6 @@ impl GraphBuilder {
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
-    if options.rule == Some(RuleFilter::Portability) {
-        let findings = portability::analyze_portability(&options.root).map_err(|source| {
-            BoundaryError::PortabilityAnalysis {
-                root: options.root.clone(),
-                source,
-            }
-        })?;
-        let scanned_crates =
-            portability::count_scanned_crates(&options.root).map_err(|source| {
-                BoundaryError::ScannedCrateCount {
-                    root: options.root.clone(),
-                    source,
-                }
-            })?;
-        let status = if findings.iter().any(analysis::finding_is_failure) {
-            ReportStatus::Fail
-        } else {
-            ReportStatus::Pass
-        };
-        return Ok(FindingsReport {
-            tool: SC_LINT_BOUNDARY_TOOL,
-            version: SC_LINT_BOUNDARY_VERSION,
-            schema_version: SC_LINT_SCHEMA_VERSION,
-            status,
-            scanned_crates,
-            findings,
-        });
-    }
-
     let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
             root: options.root.clone(),

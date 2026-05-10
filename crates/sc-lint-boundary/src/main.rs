@@ -6,13 +6,13 @@ use clap::Subcommand;
 use sc_lint_boundary::AnalyzeOptions;
 use sc_lint_boundary::ExportGraphOptions;
 use sc_lint_boundary::GraphOutputFormat;
-use sc_lint_boundary::OutputFormat;
 use sc_lint_boundary::RuleFilter;
 use sc_lint_boundary::analyze_workspace;
 use sc_lint_boundary::export_workspace_graph;
 use sc_lint_boundary::render_findings_report;
 use sc_lint_boundary::render_graph_export_json;
 use sc_lint_boundary::render_graph_export_turtle;
+use sc_lint_schema::OutputFormat;
 
 #[derive(Debug, Parser)]
 #[command(name = "sc-lint-boundary")]
@@ -58,7 +58,6 @@ enum RuleFilterArg {
     Boundaries,
     InternalOnly,
     ForbidExternalImpls,
-    Portability,
 }
 
 impl From<FormatArg> for OutputFormat {
@@ -86,7 +85,6 @@ impl From<RuleFilterArg> for RuleFilter {
             RuleFilterArg::Boundaries => RuleFilter::Boundaries,
             RuleFilterArg::InternalOnly => RuleFilter::InternalOnly,
             RuleFilterArg::ForbidExternalImpls => RuleFilter::ForbidExternalImpls,
-            RuleFilterArg::Portability => RuleFilter::Portability,
         }
     }
 }

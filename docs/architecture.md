@@ -42,12 +42,14 @@ Current primary crates:
   - top-level CLI crate for command parsing, config loading, and tool dispatch
 - `sc-lint-directives`
   - shared directive parsing/types
+- `sc-lint-schema`
+  - shared machine-schema types for analyzer inputs/outputs
 - `sc-lint-attributes`
   - proc-macro attribute surface for `#[sc_lint(...)]`
 - `sc-lint-boundary`
   - analyzer CLI and library for boundary rules
 - `sc-lint-portability`
-  - planned analyzer CLI and library for platform/OS portability rules
+  - analyzer CLI and library for platform/OS portability rules
 - `sc-lint-runtime`
   - planned analyzer CLI and library for std runtime/concurrency correctness
     rules
@@ -120,6 +122,10 @@ Current implementation status:
   - real backend-normalized success path
   - config loading and logger initialization stay in the top-level CLI
   - `sc-lint-boundary` stays a backend-owned analyzer without logger setup
+- `lint.sc-portability`
+  - real delegated backend-normalized success path
+  - top-level `sc-lint` invokes the dedicated `sc-lint-portability` binary
+    without adding a direct crate dependency
 
 ## Backend Crate Isolation
 
@@ -130,12 +136,15 @@ Default backend isolation rule:
 Allowed shared support:
 
 - `sc-lint-directives`
+- `sc-lint-schema`
 - future shared support crates only after explicit design approval
 
 For release `0.1.x`, this means:
 
 - `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-directives` when shared directive parsing/types are needed
+- `sc-lint-boundary`, `sc-lint-portability`, and the top-level `sc-lint` CLI
+  may depend on `sc-lint-schema` for the canonical machine-schema types
 - the top-level `sc-lint` CLI does not directly depend on
   `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
   integration mode
@@ -238,13 +247,6 @@ planned top-level CLI surface should also name these important contract types:
 
 - `Cli`
 - `Command`
-- `LintProfile`
-  - `Fast`
-  - `Full`
-  - `Ci`
-- `OutputMode`
-  - `Human`
-  - `Json`
 - `CommandEnvelope`
   - boundary/planning metadata tracks the generic family root name
     `CommandEnvelope`, while the CLI contract documents the generic form

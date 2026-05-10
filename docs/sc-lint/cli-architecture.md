@@ -160,15 +160,6 @@ types explicitly:
   - top-level command root
 - `Command`
   - grouped command family selector
-- `LintProfile`
-  - enum with:
-    - `Fast`
-    - `Full`
-    - `Ci`
-- `OutputMode`
-  - enum with:
-    - `Human`
-    - `Json`
 - `CommandEnvelope<T>`
   - top-level success/failure result family
 - `CliError`
@@ -179,9 +170,10 @@ types explicitly:
     - optional details
     - optional suggested action
 
-The A.1a implementation exports `Cli`, `Command`, `CommandEnvelope<T>`, and
-`CliError` now. `LintProfile` and `OutputMode` remain explicit contract roots
-that A.2 will formalize behind the same command surface.
+The implemented public contract exports `Cli`, `Command`, `CommandEnvelope<T>`,
+and `CliError`. Profile selection and machine-mode selection remain CLI-owned
+behaviors, but their implementation enums are not part of the public contract
+surface.
 
 For release `0.1.x`, these planned contract types should also be represented as
 `BOUNDARY-ScLintCli` composition-root items in the boundary/planning metadata.

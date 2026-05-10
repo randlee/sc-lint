@@ -13,11 +13,33 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = []
+roots = [
+  "BoundaryError",
+  "AnalyzeOptions",
+  "ExportGraphOptions",
+  "CrateId",
+  "GraphOutputFormat",
+  "FindingsReport",
+  "Finding",
+  "RuleId",
+  "RuleFilter",
+  "RuleFilterParseError",
+  "GraphExport",
+  "GraphNode",
+  "GraphEdge",
+  "ImplKind",
+  "LintAttribute",
+  "analyze_workspace",
+  "export_workspace_graph",
+  "render_findings_report",
+  "render_graph_export",
+  "render_graph_export_json",
+  "render_graph_export_turtle",
+]
 
 [dependencies]
 allowed_dependents = ["sc-lint"]
-allowed_dependencies = ["sc-lint-directives"]
+allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
 forbidden_edges = [
   "sc-lint-boundary -> sc-lint-attributes",
   "sc-lint-boundary -> sc-observability",

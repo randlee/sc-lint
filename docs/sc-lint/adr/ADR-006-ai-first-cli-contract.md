@@ -72,13 +72,6 @@ Important planned contract types:
 
 - `Cli`
 - `Command`
-- `LintProfile`
-  - `Fast`
-  - `Full`
-  - `Ci`
-- `OutputMode`
-  - `Human`
-  - `Json`
 - `CliError`
 
 ## Consequences
