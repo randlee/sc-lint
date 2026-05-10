@@ -84,8 +84,9 @@ clean:
     cargo clean
 
 # Run the repo lint suite.
-lint target='all':
+lint target='full':
     {{python_cmd}} .just/run_lint.py {{target}}
 
 # Run the local CI-equivalent command set.
-ci: lint test
+ci:
+    cargo run --quiet --bin sc-lint -- ci

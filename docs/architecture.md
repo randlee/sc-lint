@@ -8,6 +8,9 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 
+For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
+rollout notes and is the governing cross-target preflight strategy artifact.
+
 ## Architecture Goals
 
 The `sc-lint` architecture should:
@@ -36,8 +39,7 @@ The product is organized into five layers:
 Current primary crates:
 
 - `sc-lint`
-  - planned top-level CLI crate for command parsing, config loading, and tool
-    dispatch
+  - top-level CLI crate for command parsing, config loading, and tool dispatch
 - `sc-lint-directives`
   - shared directive parsing/types
 - `sc-lint-attributes`
@@ -60,7 +62,7 @@ Planned later crate:
 
 ## Top-level CLI Role
 
-The top-level `sc-lint` CLI is the intended stable user-facing entry point.
+The top-level `sc-lint` CLI is the stable user-facing entry point.
 
 It should own:
 
@@ -109,6 +111,15 @@ the product contract.
 
 Backend-specific machine flags may still exist internally during migration, but
 the user-facing product contract should not depend on them.
+
+Current implementation status:
+
+- `version`
+  - direct CLI-owned success path
+- `lint.sc-boundary`
+  - real backend-normalized success path
+  - config loading and logger initialization stay in the top-level CLI
+  - `sc-lint-boundary` stays a backend-owned analyzer without logger setup
 
 ## Backend Crate Isolation
 
@@ -239,9 +250,18 @@ planned top-level CLI surface should also name these important contract types:
     `CommandEnvelope`, while the CLI contract documents the generic form
     `CommandEnvelope<T>`
 - `CliError`
+- `CommandContext`
+- `CheckTarget`
+  - `Native`
+  - `Xwin`
+- `ClippyTarget`
+  - `Native`
+  - `Xwin`
+- `WINDOWS_XWIN_TARGET`
+  - `x86_64-pc-windows-msvc`
 
-These types are part of the intended architectural contract even before the
-full CLI crate is implemented.
+These types are part of the intended architectural contract, and for the
+A.1b/A.2 line they already match the implemented CLI crate surfaces.
 
 For release `0.1.x`, these planned CLI contract types should also be carried in
 machine-readable boundary/planning metadata as `BOUNDARY-ScLintCli`
@@ -323,13 +343,16 @@ surface likely drift such as:
 - platform-specific imports leaking into shared code
 - type or signature mismatches in gated modules
 
-Current likely first implementation:
+ADR-005 is the approved release-1 strategy artifact for this area and
+supersedes earlier provisional rollout notes from planning documents.
+
+Current explicit Windows preflight commands:
 
 - `cargo xwin check --target x86_64-pc-windows-msvc`
-
-Current likely stronger follow-up path:
-
 - `cargo xwin clippy --target x86_64-pc-windows-msvc -- -D warnings`
+
+For direct invocation, `xwin check` remains the lighter first-stop preflight
+path and `xwin clippy` remains the stronger companion path.
 
 True multi-platform validation still belongs to real CI runners on the target
 platforms because cross-target compile checks do not prove:
@@ -350,18 +373,18 @@ The architecture therefore supports:
 - if `cargo xwin` is not installed, the tool family should degrade cleanly and
   leave those checks unavailable rather than breaking unrelated lint paths
 
-The expected rollout order is:
+The expected rollout policy is:
 
-1. adopt `xwin check` as the first Windows preflight candidate
-2. measure timing and usefulness on consumer repos
-3. keep `xwin clippy` as a stronger explicit path until its cost is better
-   understood
+1. keep `xwin` capability-gated rather than making it a CI prerequisite
+2. allow `full` to add both `xwin check` and `xwin clippy` when the capability
+   is present, as defined by ADR-005
+3. keep real Windows CI as the authoritative validation path
 
 Profile policy:
 
 - `xwin` participation belongs in local lint profiles, not CI-parity profiles
 - `fast` excludes `xwin` to preserve low-latency local feedback
-- if installed, `xwin check` and `xwin clippy` may join `full`
+- if installed, `xwin check` and `xwin clippy` join `full`
 - `ci` lint parity should stay aligned to real CI and therefore should not
   depend on `xwin`
 - the top-level `ci` command should run lint plus tests, while `lint ci`

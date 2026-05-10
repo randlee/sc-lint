@@ -148,6 +148,7 @@ Requirements:
 - consumer-neutral naming
 - standalone fixture tests
 - top-level CLI exposure once the CLI exists
+- Python Adapter Protocol normalization rather than traceback scraping
 
 ### Workstream 5: Boundary logic migration to Rust
 
@@ -284,6 +285,8 @@ The scheduled implementation sprints for this phase are:
 1. `A.1a`
    - top-level CLI bootstrap and contract definition
    - ends with the contract-review checkpoint for A.1b entry
+   - the checkpoint records the contract implications for Workstreams 4-7 in
+     `docs/sc-lint/sprint-A1a.md`
    - sprint plan: `docs/sc-lint/sprint-A1a.md`
 2. `A.1b`
    - top-level config loading and first delegated backend integration

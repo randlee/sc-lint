@@ -91,15 +91,19 @@ The currently scheduled foundation sprints are:
 
 - `A.1a`
   - CLI bootstrap and contract definition
+  - includes the A.1a exit-review checkpoint for Workstreams 4-7
   - `docs/sc-lint/sprint-A1a.md`
 - `A.1b`
   - config loading and first backend integration
+  - first operational path is `sc-lint lint sc-boundary`
   - `docs/sc-lint/sprint-A1b.md`
 - `A.2`
   - profiles and Windows preflight
+  - active implementation branch: `feature/sprint-A2`
   - `docs/sc-lint/sprint-A2.md`
 - `A.3`
   - generic utility extraction
+  - active implementation branch: `feature/sprint-A3`
   - `docs/sc-lint/sprint-A3.md`
 - `A.4`
   - `sc-lint-portability` crate creation and portability-rule moves/imports

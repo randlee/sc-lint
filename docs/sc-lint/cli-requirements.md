@@ -8,6 +8,9 @@ Related ADRs:
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
 
+ADR-005 governs release-1 profile and `xwin` policy and supersedes earlier
+provisional rollout notes for cross-target preflight membership.
+
 ## Purpose
 
 The CLI exists to provide one stable user-facing command surface across
@@ -23,6 +26,10 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-003`
   The CLI must load repo config before backend dispatch.
+  The implemented A.1b config-discovery surfaces are:
+  - `sc-lint.toml`
+  - `.just/lint-config.toml`
+  with `--root <path>` as the explicit repo-root override.
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
@@ -81,6 +88,8 @@ specialized backend tools and mixed Rust/Python implementations.
   - the owner of its success payload shape
   - the applicable top-level error kinds
   - the tests that enforce envelope and error-shape consistency
+  Parser-level usage failures that occur before a concrete subcommand path is
+  resolved must document the fallback command identifier they use.
 
 - `REQ-CLI-006`
   The CLI must support both direct Rust-library dispatch and delegated
@@ -123,6 +132,11 @@ specialized backend tools and mixed Rust/Python implementations.
   Release-1 `view` targets must be documented individually before exposure and
   may remain backed by repo-local Python/report plumbing until a later phase
   promotes them into a stronger product contract.
+  The A.1a bootstrap targets are:
+  - `sc-lint view graph`
+  - `sc-lint view findings`
+  The A.3 implemented stable target is:
+  - `sc-lint view findings`
 
 - `REQ-CLI-007F`
   The primary `sc-lint lint <tool>` identifiers must map one-to-one to backend
@@ -229,9 +243,10 @@ specialized backend tools and mixed Rust/Python implementations.
   backend implementation without changing the user-facing command contract.
 
 - `REQ-CLI-014`
-  If `cargo xwin` is installed, `xwin`-backed Windows preflight should join
-  the `full` lint profile, while `fast` remains `xwin`-free to preserve
-  low-latency local feedback.
+  If `cargo xwin` is installed, both `check.xwin` and `clippy.xwin` should
+  join the `full` lint profile, while `fast` remains `xwin`-free to preserve
+  low-latency local feedback. ADR-005 supersedes earlier provisional notes
+  that limited initial profile membership to `xwin check` alone.
 
 - `REQ-CLI-015`
   `xwin`-backed preflight must not be part of the `ci` lint profile because
@@ -246,3 +261,71 @@ specialized backend tools and mixed Rust/Python implementations.
   - stable command-identifier patterns
   - backend-to-CLI normalization rules
   - exit-code mapping guidance
+
+## A.1a Implementation Notes
+
+- the A.1a bootstrap implementation lives under `crates/sc-lint/src/`
+- the grouped command root, contract, error, render, and logging seams are
+  intentionally split before real backend dispatch begins
+- the A.1a consistency gate is enforced in `crates/sc-lint/src/tests.rs`
+  so later command families must keep using the same top-level envelope and
+  `CliError` pattern
+
+## A.1b Implementation Notes
+
+- the A.1b config loader lives in `crates/sc-lint/src/config.rs`
+- the first backend dispatch seam lives in `crates/sc-lint/src/dispatch.rs`
+- `lint.sc-boundary` is the first real backend-normalized command path
+- the remaining command families keep using the reserved-surface pattern until
+  their owning sprints land
+
+## A.2 Implementation Notes
+
+- `LintProfile::{Fast, Full, Ci}` and `OutputMode::{Human, Json}` now live in
+  `crates/sc-lint/src/cli.rs`
+- the A.2 orchestration layer lives in `crates/sc-lint/src/workflow.rs`
+- `--json` selects `OutputMode::Json` for every non-interactive command family
+  through the same top-level envelope and `CliError` path
+- `lint.fast`, `lint.full`, `lint.ci`, `check.native`, `check.xwin`,
+  `clippy.native`, `clippy.xwin`, and top-level `ci` are now implemented
+- `full` conditionally adds `xwin` preflight only when `cargo xwin` is
+  available; `fast` and `ci` remain `xwin`-free
+- parse-time usage failures that occur before command-path resolution render
+  with the fallback machine identifier `cli.parse_error`
+- repo-local wrappers now map onto the CLI-owned profiles:
+  - `just lint`
+    defaults to `sc-lint lint full`
+  - `just lint fast`
+    maps to `sc-lint lint fast`
+  - `just lint ci`
+    maps to `sc-lint lint ci`
+  - `just ci`
+    maps to top-level `sc-lint ci`
+
+## A.2 Rule-Disable Policy
+
+- A.2 does not introduce top-level `sc-lint` rule-disable flags
+- rule disable behavior remains backend-owned rather than profile-owned
+- for the current shipped backend path:
+  - `sc-lint-boundary`
+    keeps its default rule tuning in backend configuration such as
+    `crates/sc-lint-boundary/config/defaults.toml`
+- for delegated Python-backed checks used by `lint full` and `lint ci`, the
+  existing per-tool config behavior remains authoritative until those tools
+  migrate behind first-class Rust command paths
+- profile orchestration must not silently suppress or rewrite backend rule
+  selections
+
+## A.3 Implementation Notes
+
+- the Python Adapter Protocol now lives in `crates/sc-lint/src/python_adapter.rs`
+  on the Rust side and `.just/python_adapter.py` for Python utility payloads
+- the adapter schema is `sc-lint-python-v1`
+- extracted Python-backed utility commands now include:
+  - `sc-lint lint line-counts`
+  - `sc-lint lint identity-literals`
+  - `sc-lint view findings`
+- `view graph` remains reserved because the graph-oriented contract is not yet
+  stable enough for exposure
+- Python adapter failures are mapped by structured `kind`/`message`/`details`
+  fields rather than by scraping raw traceback text
