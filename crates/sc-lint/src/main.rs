@@ -17,7 +17,13 @@ fn main() -> ExitCode {
 }
 
 fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
-    let context = CommandContext::from_cli(&cli);
+    let context = match CommandContext::from_cli(&cli) {
+        Ok(context) => context,
+        Err(error) => {
+            let rendered = sc_lint::render_failure("cli.parse_error", cli.json, &error);
+            return sc_lint::write_rendered_output(rendered, error.exit_code());
+        }
+    };
     let loaded_config = match LoadedConfig::load(&cli, &context) {
         Ok(loaded_config) => loaded_config,
         Err(error) => {

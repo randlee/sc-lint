@@ -11,10 +11,10 @@ use crate::command::CommandSuccess;
 use crate::command::DispatchTelemetry;
 use crate::config::LoadedConfig;
 
-const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
+pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PythonTool {
+pub(crate) enum PythonTool {
     LineCounts,
     IdentityLiterals,
     ViewFindings,
@@ -57,7 +57,7 @@ struct AdapterResult {
     clippy::result_large_err,
     reason = "Python utility failures must remain normalized through the shared top-level CliError contract."
 )]
-pub fn run_python_tool(
+pub(crate) fn run_python_tool(
     loaded_config: &LoadedConfig,
     tool: PythonTool,
 ) -> Result<CommandSuccess, CliError> {
@@ -85,7 +85,7 @@ pub fn run_python_tool(
             if let Some(object) = data.as_object_mut() {
                 object
                     .entry("adapter".to_string())
-                    .or_insert_with(|| json!("python-json-v1"));
+                    .or_insert_with(|| json!(ADAPTER_SCHEMA));
                 object
                     .entry("config_scope".to_string())
                     .or_insert_with(|| json!(tool.config_scope()));
@@ -238,27 +238,23 @@ fn python_command() -> OsString {
     }
 }
 
-pub fn adapter_kind_for_command(command_id: &str) -> Option<&'static str> {
-    match command_id {
-        "lint.line-counts" | "lint.identity-literals" | "view.findings" => Some("python-json-v1"),
-        _ => None,
-    }
+pub(crate) fn adapter_kind_for_command(command_id: &str) -> Option<&'static str> {
+    python_tool_for_command(command_id).map(|_| ADAPTER_SCHEMA)
 }
 
-pub fn adapter_config_scope_for_command(command_id: &str) -> Option<&'static str> {
-    match command_id {
-        "lint.line-counts" => Some("line_counts"),
-        "lint.identity-literals" => Some("identities"),
-        "view.findings" => Some("view.findings"),
-        _ => None,
-    }
+pub(crate) fn adapter_config_scope_for_command(command_id: &str) -> Option<&'static str> {
+    python_tool_for_command(command_id).map(PythonTool::config_scope)
 }
 
-pub fn adapter_script_for_command(command_id: &str) -> Option<&'static str> {
+pub(crate) fn adapter_script_for_command(command_id: &str) -> Option<&'static str> {
+    python_tool_for_command(command_id).map(PythonTool::script_relative_path)
+}
+
+fn python_tool_for_command(command_id: &str) -> Option<PythonTool> {
     match command_id {
-        "lint.line-counts" => Some(PythonTool::LineCounts.script_relative_path()),
-        "lint.identity-literals" => Some(PythonTool::IdentityLiterals.script_relative_path()),
-        "view.findings" => Some(PythonTool::ViewFindings.script_relative_path()),
+        "lint.line-counts" => Some(PythonTool::LineCounts),
+        "lint.identity-literals" => Some(PythonTool::IdentityLiterals),
+        "view.findings" => Some(PythonTool::ViewFindings),
         _ => None,
     }
 }
@@ -269,17 +265,17 @@ mod tests {
 
     #[test]
     fn adapter_success_payload_normalizes_data() {
-        let parsed = parse_adapter_output(
-            PythonTool::LineCounts,
-            br#"{
-              "adapter_schema": "sc-lint-python-v1",
+        let payload = format!(
+            r#"{{
+              "adapter_schema": "{ADAPTER_SCHEMA}",
               "ok": true,
               "summary": "source file size limits satisfied",
-              "data": {"status": "pass", "findings": []},
+              "data": {{"status": "pass", "findings": []}},
               "diagnostics": []
-            }"#,
-        )
-        .expect("payload parses");
+            }}"#
+        );
+        let parsed = parse_adapter_output(PythonTool::LineCounts, payload.as_bytes())
+            .expect("payload parses");
 
         assert_eq!(parsed.summary, "source file size limits satisfied");
         assert_eq!(parsed.data.expect("data")["status"], "pass");
@@ -287,22 +283,22 @@ mod tests {
 
     #[test]
     fn adapter_error_payload_maps_to_cli_error() {
-        let parsed = parse_adapter_output(
-            PythonTool::IdentityLiterals,
-            br#"{
-              "adapter_schema": "sc-lint-python-v1",
+        let payload = format!(
+            r#"{{
+              "adapter_schema": "{ADAPTER_SCHEMA}",
               "ok": false,
               "summary": "config error",
-              "error": {
+              "error": {{
                 "kind": "config",
                 "message": "bad identities config",
-                "details": {"key": "identities"},
+                "details": {{"key": "identities"}},
                 "suggested_action": "fix the config"
-              },
+              }},
               "diagnostics": []
-            }"#,
-        )
-        .expect("payload parses");
+            }}"#
+        );
+        let parsed = parse_adapter_output(PythonTool::IdentityLiterals, payload.as_bytes())
+            .expect("payload parses");
 
         let error = parsed.error.expect("error");
         assert_eq!(error.kind, CliErrorKind::Config);

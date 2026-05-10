@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.3"
-worktree: <repo-root>
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A3
 branch: feature/sprint-A3
 status: completed
 estimated_scope: M
@@ -129,6 +129,23 @@ standalone fixture coverage.
    - keep `docs/sc-lint/logging.md` aligned with the Python adapter logging
      path
 
+## Logging Requirement Traceability
+
+- `REQ-LOG-004`
+  - A.3 Python-backed `lint.line-counts`, `lint.identity-literals`, and
+    `view.findings` paths must emit the standard CLI entry, completion, and
+    error events after top-level adapter normalization.
+  - those events must carry the Python-adapter metadata fields exposed by the
+    CLI logging path:
+    - `adapter`
+    - `config_scope`
+    - `script`
+- `REQ-LOG-005`
+  - logger initialization remains owned by the top-level `sc-lint` CLI even
+    when the command delegates to a Python utility.
+  - Python utilities are adapter payload producers only; they do not become
+    logging-runtime owners.
+
 ## Split Recommendation
 
 If schedule pressure appears, split A.3 by utility family:
@@ -148,6 +165,9 @@ extraction.
   stable exposure
 - Python-backed utility paths log entry, completion, and error events only
   after top-level normalization through `CommandEnvelope<T>` or `CliError`
+- the A.3 logging path proves `REQ-LOG-004` with adapter-aware CLI event
+  fields and proves `REQ-LOG-005` by keeping logger ownership in the top-level
+  CLI
 
 ## Required Validation
 

@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 
 from lint_common import discover_repo_root
+from python_adapter import AdapterError
+from python_adapter import error_payload
 from python_adapter import success_payload
 from python_adapter import write_json as write_adapter_json
 from view_common import findings_root
@@ -75,15 +77,34 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str]) -> int:
-    args = parse_args(argv)
-    repo_root = discover_repo_root(args.root)
-    data = build_index(repo_root)
-    if args.json:
-        write_adapter_json(success_payload(summary=data["summary"], data=data))
+    try:
+        args = parse_args(argv)
+        repo_root = discover_repo_root(args.root)
+        data = build_index(repo_root)
+        if args.json:
+            write_adapter_json(success_payload(summary=data["summary"], data=data))
+            return 0
+        print(data["summary"])
+        print(relative_artifact_path(repo_root, repo_root / data["artifact_dir"]))
         return 0
-    print(data["summary"])
-    print(relative_artifact_path(repo_root, repo_root / data["artifact_dir"]))
-    return 0
+    except AdapterError as error:
+        print(json.dumps(error_payload(error), indent=2, sort_keys=True))
+        return 1
+    except Exception as error:  # pragma: no cover - contract guardrail
+        print(
+            json.dumps(
+                error_payload(
+                    AdapterError(
+                        "backend_protocol",
+                        f"failed to build findings view: {error}",
+                        details={"tool": "sc-lint-view-findings"},
+                    )
+                ),
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 1
 
 
 if __name__ == "__main__":

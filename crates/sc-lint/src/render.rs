@@ -1,8 +1,11 @@
 use crate::CliError;
 use crate::CommandEnvelope;
 use crate::command::CommandContext;
+use crate::command::CommandId;
+use crate::consts;
 use serde::Serialize;
 use serde_json::Value;
+use serde_json::json;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct RenderedOutput {
@@ -30,46 +33,64 @@ pub fn render_success_json<T>(envelope: &CommandEnvelope<T>) -> String
 where
     T: Serialize,
 {
-    serde_json::to_string_pretty(envelope).expect("success envelopes always serialize")
+    match serde_json::to_string_pretty(envelope) {
+        Ok(rendered) => rendered,
+        Err(error) => fallback_render_error(
+            &envelope.command,
+            &CliError::internal("failed to serialize success envelope").with_source(error),
+        ),
+    }
 }
 
 pub fn render_error_json(command_id: &str, error: &CliError) -> String {
     let envelope = CommandEnvelope::<Value>::failure(command_id, error.clone());
-    serde_json::to_string_pretty(&envelope).expect("error envelopes always serialize")
+    match serde_json::to_string_pretty(&envelope) {
+        Ok(rendered) => rendered,
+        Err(_) => fallback_render_error(command_id, error),
+    }
 }
 
 pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope<Value>) -> String {
-    match context.command_id() {
-        "version" => {
+    match context.id() {
+        CommandId::Version => {
             let version = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get("crate_version"))
+                .and_then(|value| value.get(consts::FIELD_CRATE_VERSION))
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
             format!("sc-lint {version}")
         }
-        "lint.sc-boundary" => {
+        CommandId::LintScBoundary => {
             let status = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get("status"))
+                .and_then(|value| value.get(consts::FIELD_STATUS))
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
             let finding_count = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get("findings"))
+                .and_then(|value| value.get(consts::FIELD_FINDINGS))
                 .and_then(Value::as_array)
                 .map_or(0, std::vec::Vec::len);
-            format!("sc-lint-boundary: {status} ({finding_count} findings)")
+            format!(
+                "{}: {status} ({finding_count} findings)",
+                consts::TOOL_BOUNDARY
+            )
         }
-        "lint.fast" | "lint.full" | "lint.ci" | "ci" | "check.native" | "check.xwin"
-        | "clippy.native" | "clippy.xwin" => {
+        CommandId::LintFast
+        | CommandId::LintFull
+        | CommandId::LintCi
+        | CommandId::Ci
+        | CommandId::CheckNative
+        | CommandId::CheckXwin
+        | CommandId::ClippyNative
+        | CommandId::ClippyXwin => {
             let status = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get("status"))
+                .and_then(|value| value.get(consts::FIELD_STATUS))
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
             let step_count = envelope
@@ -80,15 +101,17 @@ pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope
                 .map_or(0, std::vec::Vec::len);
             format!("{}: {status} ({step_count} steps)", context.command_id())
         }
-        "lint.line-counts" | "lint.identity-literals" | "view.findings" => envelope
-            .data
-            .as_ref()
-            .and_then(|value| value.get("summary"))
-            .and_then(Value::as_str)
-            .map_or_else(
-                || format!("{}: ok", context.command_id()),
-                |summary| format!("{}: {summary}", context.command_id()),
-            ),
+        CommandId::LintLineCounts | CommandId::LintIdentityLiterals | CommandId::ViewFindings => {
+            envelope
+                .data
+                .as_ref()
+                .and_then(|value| value.get("summary"))
+                .and_then(Value::as_str)
+                .map_or_else(
+                    || format!("{}: ok", context.command_id()),
+                    |summary| format!("{}: {summary}", context.command_id()),
+                )
+        }
         _ => format!("{}: ok", context.command_id()),
     }
 }
@@ -100,4 +123,17 @@ pub fn render_error_human(command_id: &str, error: &CliError) -> String {
         rendered.push_str(suggested_action);
     }
     rendered
+}
+
+fn fallback_render_error(command_id: &str, error: &CliError) -> String {
+    let fallback = json!({
+        "ok": false,
+        "command": command_id,
+        "error": error,
+        "diagnostics": [],
+    });
+    match serde_json::to_string_pretty(&fallback) {
+        Ok(rendered) => rendered,
+        Err(_) => "{\"ok\":false,\"command\":\"render.failure\",\"error\":{\"kind\":\"internal\",\"code\":\"CLI.INTERNAL_ERROR\",\"message\":\"failed to serialize CLI output\"},\"diagnostics\":[]}".to_string(),
+    }
 }

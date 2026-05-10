@@ -249,6 +249,14 @@ Every CLI invocation should emit:
    - failure category
    - summary message
 
+Event field table:
+
+| Event | Required fields | Python-adapter additions in A.3 |
+| --- | --- | --- |
+| `cli.command.started` | `command`, effective settings/config, resolved args, timestamp, service name | For `lint.line-counts`, `lint.identity-literals`, and `view.findings`, also include `adapter`, `config_scope`, and `script`. |
+| `cli.command.completed` | `command`, `verdict`, `summary`, elapsed time in ms, service name | Carry the same `adapter`, `config_scope`, and `script` fields when the completed command used the Python-adapter path. |
+| `cli.command.error` | `command`, stable error code, `CliError.kind`, failure category, summary message | Carry the same `adapter`, `config_scope`, and `script` fields when the emitted `CliError` came from a Python-adapter command path. |
+
 For delegated backends, the CLI also logs:
 
 - dispatch start
@@ -302,10 +310,10 @@ Requirement coverage:
 - `A.3`
   - add Python utility entry/exit/error logging through the adapter-normalized
     CLI event pattern
-  - include adapter metadata fields such as:
-    - adapter kind
-    - config scope
-    - delegated script path
+  - include the Python-adapter metadata fields:
+    - `adapter`
+    - `config_scope`
+    - `script`
 - `A.4`
   - add `sc-portability` analyzer entry/exit/finding-count logging to the
     delegated backend pattern

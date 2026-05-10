@@ -1,3 +1,4 @@
+use crate::consts;
 use std::error::Error;
 use std::fmt;
 
@@ -72,14 +73,14 @@ impl Serialize for CliError {
             + usize::from(self.cause.is_some())
             + usize::from(self.suggested_action.is_some());
         let mut state = serializer.serialize_struct("CliError", field_count)?;
-        state.serialize_field("kind", &self.kind)?;
-        state.serialize_field("code", self.code())?;
-        state.serialize_field("message", &self.message)?;
+        state.serialize_field(consts::FIELD_KIND, &self.kind)?;
+        state.serialize_field(consts::FIELD_CODE, self.code())?;
+        state.serialize_field(consts::FIELD_MESSAGE, &self.message)?;
         if !self.details.is_empty() {
-            state.serialize_field("details", &self.details)?;
+            state.serialize_field(consts::FIELD_DETAILS, &self.details)?;
         }
         if let Some(cause) = self.cause.as_ref() {
-            state.serialize_field("cause", cause)?;
+            state.serialize_field(consts::FIELD_CAUSE, cause)?;
         }
         if let Some(suggested_action) = self.suggested_action.as_ref() {
             state.serialize_field("suggested_action", suggested_action)?;
