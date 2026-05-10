@@ -135,6 +135,8 @@ specialized backend tools and mixed Rust/Python implementations.
   The A.1a bootstrap targets are:
   - `sc-lint view graph`
   - `sc-lint view findings`
+  The A.3 implemented stable target is:
+  - `sc-lint view findings`
 
 - `REQ-CLI-007F`
   The primary `sc-lint lint <tool>` identifiers must map one-to-one to backend
@@ -313,3 +315,17 @@ specialized backend tools and mixed Rust/Python implementations.
   migrate behind first-class Rust command paths
 - profile orchestration must not silently suppress or rewrite backend rule
   selections
+
+## A.3 Implementation Notes
+
+- the Python Adapter Protocol now lives in `crates/sc-lint/src/python_adapter.rs`
+  on the Rust side and `.just/python_adapter.py` for Python utility payloads
+- the adapter schema is `sc-lint-python-v1`
+- extracted Python-backed utility commands now include:
+  - `sc-lint lint line-counts`
+  - `sc-lint lint identity-literals`
+  - `sc-lint view findings`
+- `view graph` remains reserved because the graph-oriented contract is not yet
+  stable enough for exposure
+- Python adapter failures are mapped by structured `kind`/`message`/`details`
+  fields rather than by scraping raw traceback text

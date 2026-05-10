@@ -15,6 +15,8 @@ pub struct Cli {
     #[arg(long, global = true, value_name = "path")]
     pub root: Option<PathBuf>,
     #[arg(long, global = true, value_name = "path")]
+    pub config: Option<PathBuf>,
+    #[arg(long, global = true, value_name = "path")]
     pub log_root: Option<PathBuf>,
     #[arg(long, global = true)]
     pub log_console: bool,
@@ -87,6 +89,10 @@ pub enum LintTarget {
     ScPortability,
     #[value(name = "sc-runtime")]
     ScRuntime,
+    #[value(name = "line-counts")]
+    LineCounts,
+    #[value(name = "identity-literals")]
+    IdentityLiterals,
     #[value(name = "fast")]
     Fast,
     #[value(name = "full")]
@@ -95,7 +101,33 @@ pub enum LintTarget {
     Ci,
 }
 
-impl LintTarget {}
+impl LintTarget {
+    pub const fn command_suffix(self) -> &'static str {
+        match self {
+            Self::ScBoundary => "sc-boundary",
+            Self::ScPortability => "sc-portability",
+            Self::ScRuntime => "sc-runtime",
+            Self::LineCounts => "line-counts",
+            Self::IdentityLiterals => "identity-literals",
+            Self::Fast => "fast",
+            Self::Full => "full",
+            Self::Ci => "ci",
+        }
+    }
+
+    pub const fn profile(self) -> Option<LintProfile> {
+        match self {
+            Self::Fast => Some(LintProfile::Fast),
+            Self::Full => Some(LintProfile::Full),
+            Self::Ci => Some(LintProfile::Ci),
+            Self::ScBoundary
+            | Self::ScPortability
+            | Self::ScRuntime
+            | Self::LineCounts
+            | Self::IdentityLiterals => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ViewTarget {

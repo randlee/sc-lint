@@ -399,6 +399,18 @@ fn lint_profile_plan(
                 "lint",
                 ".just/lint_sc_portability.py",
             ),
+            python_step(
+                repo_root,
+                "line-counts",
+                "lint",
+                ".just/lint_line_counts.py",
+            ),
+            python_step(
+                repo_root,
+                "identity-literals",
+                "lint",
+                ".just/lint_identity_literals.py",
+            ),
         ],
         LintProfile::Ci => vec![
             cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),

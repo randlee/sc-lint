@@ -40,6 +40,8 @@ SECTIONS = (
             ("lint shear", "Run cargo-shear unused-dependency checks."),
             ("lint sc-boundary", "Run the syn-based boundary analyzer."),
             ("lint sc-portability", "Run the syn-based portability analyzer."),
+            ("lint line-counts", "Run the extracted source-size inventory lint."),
+            ("lint identity-literals", "Run the configurable identity-literal lint."),
             ("lint manifests", "Run the Cargo manifest policy checks."),
             ("lint version", "Run only the version alignment checks."),
             ("lint spell", "Run the spelling/content check."),

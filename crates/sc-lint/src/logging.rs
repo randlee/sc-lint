@@ -2,13 +2,6 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use crate::consts;
-use sc_lint::Cli;
-use sc_lint::CliError;
-use sc_lint::CommandContext;
-use sc_lint::DispatchTelemetry;
-use sc_lint::LoadedConfig;
-use sc_lint::WINDOWS_XWIN_TARGET;
 use sc_observability::ActionName;
 use sc_observability::JsonlFileSink;
 use sc_observability::Level;
@@ -39,19 +32,33 @@ const FIELD_PREFLIGHT_MODE: &str = "preflight_mode";
 const FIELD_REPO_ROOT: &str = "repo_root";
 const FIELD_SUMMARY: &str = "summary";
 const FIELD_TARGET_TRIPLE: &str = "target_triple";
+use crate::Cli;
+use crate::CliError;
+use crate::WINDOWS_XWIN_TARGET;
+use crate::command::CommandContext;
+use crate::command::DispatchTelemetry;
+use crate::config::LoadedConfig;
+use crate::consts;
 
 #[derive(Debug, Clone)]
-pub struct ObservedCommand<'a> {
+pub(crate) struct ObservedCommand<'a> {
     context: &'a CommandContext,
     loaded_config: &'a LoadedConfig,
 }
 
 impl<'a> ObservedCommand<'a> {
-    pub fn from_context(context: &'a CommandContext, loaded_config: &'a LoadedConfig) -> Self {
-        Self {
+    #[expect(
+        clippy::result_large_err,
+        reason = "The binary logging seam preserves the same top-level CliError contract as the library execution path."
+    )]
+    pub(crate) fn from_context(
+        context: &'a CommandContext,
+        loaded_config: &'a LoadedConfig,
+    ) -> Result<Self, CliError> {
+        Ok(Self {
             context,
             loaded_config,
-        }
+        })
     }
 
     fn command_id(&self) -> &str {
@@ -109,7 +116,10 @@ impl LogRoot {
     clippy::result_large_err,
     reason = "Logger initialization failures are part of the stable top-level CliError contract."
 )]
-pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Logger, CliError> {
+pub(crate) fn initialize_logger(
+    observed: &ObservedCommand<'_>,
+    cli: &Cli,
+) -> Result<Logger, CliError> {
     validate_logging_contract()?;
     let log_root = LogRoot::resolve(
         observed
@@ -139,7 +149,7 @@ pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Lo
     Ok(builder.build())
 }
 
-pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
+pub(crate) fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
     let mut fields = base_fields(observed);
     fields.insert(FIELD_JSON.to_string(), Value::Bool(cli.json));
     fields.insert(
@@ -176,7 +186,7 @@ pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
     );
 }
 
-pub fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>, tool: &str) {
+pub(crate) fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>, tool: &str) {
     let mut fields = base_fields(observed);
     fields.insert(
         consts::FIELD_TOOL.to_string(),
@@ -194,7 +204,7 @@ pub fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>, tool:
     );
 }
 
-pub fn log_dispatch_result(
+pub(crate) fn log_dispatch_result(
     logger: &Logger,
     observed: &ObservedCommand<'_>,
     dispatch: &DispatchTelemetry,
@@ -220,7 +230,7 @@ pub fn log_dispatch_result(
     );
 }
 
-pub fn log_completion(
+pub(crate) fn log_completion(
     logger: &Logger,
     observed: &ObservedCommand<'_>,
     ok: bool,
@@ -252,7 +262,7 @@ pub fn log_completion(
     );
 }
 
-pub fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: &CliError) {
+pub(crate) fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: &CliError) {
     let mut fields = base_fields(observed);
     fields.insert(
         consts::FIELD_CODE.to_string(),
@@ -290,11 +300,11 @@ pub fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: &CliErr
     );
 }
 
-pub fn flush(logger: &Logger) {
+pub(crate) fn flush(logger: &Logger) {
     let _ = logger.flush();
 }
 
-pub fn shutdown(logger: &Logger) {
+pub(crate) fn shutdown(logger: &Logger) {
     let _ = logger.shutdown();
 }
 
@@ -363,6 +373,15 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
     if observed.context.is_xwin_preflight() {
         fields.insert(FIELD_PREFLIGHT_MODE.to_string(), json!("xwin"));
         fields.insert(FIELD_TARGET_TRIPLE.to_string(), json!(WINDOWS_XWIN_TARGET));
+    }
+    if let Some(adapter_kind) = observed.context.adapter_kind() {
+        fields.insert("adapter".to_string(), json!(adapter_kind));
+    }
+    if let Some(config_scope) = observed.context.adapter_config_scope() {
+        fields.insert("config_scope".to_string(), json!(config_scope));
+    }
+    if let Some(script) = observed.context.adapter_script() {
+        fields.insert("script".to_string(), json!(script));
     }
     fields
 }

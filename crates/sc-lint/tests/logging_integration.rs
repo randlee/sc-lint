@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use serde_json::Value;
+use serial_test::serial;
 use tempfile::TempDir;
 
 #[test]
@@ -164,6 +165,406 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     );
 }
 
+#[test]
+#[serial]
+fn python_backed_commands_log_adapter_metadata() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-python");
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "line-counts",
+        ])
+        .output()
+        .expect("python-backed command runs");
+    assert!(
+        output.status.success(),
+        "python-backed stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let expected = adapter_metadata_from_output(&output.stdout);
+
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.started",
+        "adapter",
+        &expected.adapter,
+    );
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.started",
+        "config_scope",
+        &expected.config_scope,
+    );
+    assert_log_file_contains_field(&log_path, "cli.command.started", "script", &expected.script);
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.completed",
+        "adapter",
+        &expected.adapter,
+    );
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.completed",
+        "config_scope",
+        &expected.config_scope,
+    );
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.completed",
+        "script",
+        &expected.script,
+    );
+    assert_log_file_contains_action(&log_path, "cli.dispatch.started");
+    assert_log_file_contains_action(&log_path, "cli.dispatch.normalized");
+}
+
+#[test]
+#[serial]
+fn line_counts_logs_adapter_metadata_for_error() {
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+    let baseline = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "lint",
+            "line-counts",
+        ])
+        .output()
+        .expect("baseline line-counts command runs");
+    assert!(
+        baseline.status.success(),
+        "baseline line-counts stderr: {}",
+        String::from_utf8_lossy(&baseline.stderr)
+    );
+    let expected = adapter_metadata_from_output(&baseline.stdout);
+    let config_override = LintConfigOverride::new("[line_counts]\nmax_total_lines = \"invalid\"\n");
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-line-counts-error");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--config",
+            config_override.path().to_str().expect("utf-8 config path"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "line-counts",
+        ])
+        .output()
+        .expect("line-counts error command runs");
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "line-counts stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(
+        output.stdout.is_empty(),
+        "expected json error on stderr, got stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let output_json = parse_command_output(&output.stderr);
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.error",
+        "config_scope",
+        &expected.config_scope,
+    );
+    assert_log_file_contains_field(&log_path, "cli.command.error", "script", &expected.script);
+    assert_eq!(
+        output_json["error"]["kind"].as_str(),
+        Some("config"),
+        "line-counts stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+#[serial]
+fn identity_literals_logs_adapter_metadata_for_completion() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-identity-literals");
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "identity-literals",
+        ])
+        .output()
+        .expect("identity-literals command runs");
+    assert!(
+        output.status.success(),
+        "identity-literals stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let expected = adapter_metadata_from_output(&output.stdout);
+
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    for action in ["cli.command.started", "cli.command.completed"] {
+        assert_log_file_contains_field(&log_path, action, "adapter", &expected.adapter);
+        assert_log_file_contains_field(&log_path, action, "config_scope", &expected.config_scope);
+        assert_log_file_contains_field(&log_path, action, "script", &expected.script);
+    }
+}
+
+#[test]
+#[serial]
+fn identity_literals_logs_adapter_metadata_for_error() {
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+    let baseline = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "lint",
+            "identity-literals",
+        ])
+        .output()
+        .expect("baseline identity-literals command runs");
+    assert!(
+        baseline.status.success(),
+        "baseline identity-literals stderr: {}",
+        String::from_utf8_lossy(&baseline.stderr)
+    );
+    let expected = adapter_metadata_from_output(&baseline.stdout);
+    let config_override =
+        LintConfigOverride::new("[identities]\nforbidden_literals = \"invalid\"\n");
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-identity-literals-error");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--config",
+            config_override.path().to_str().expect("utf-8 config path"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "identity-literals",
+        ])
+        .output()
+        .expect("identity-literals error command runs");
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "identity-literals stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(
+        output.stdout.is_empty(),
+        "expected json error on stderr, got stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let output_json = parse_command_output(&output.stderr);
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.error",
+        "config_scope",
+        &expected.config_scope,
+    );
+    assert_log_file_contains_field(&log_path, "cli.command.error", "script", &expected.script);
+    assert_eq!(
+        output_json["error"]["kind"].as_str(),
+        Some("config"),
+        "identity-literals stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+#[serial]
+fn view_findings_logs_adapter_metadata_for_error() {
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+    let baseline = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "view",
+            "findings",
+        ])
+        .output()
+        .expect("baseline view findings command runs");
+    assert!(
+        baseline.status.success(),
+        "baseline view findings stderr: {}",
+        String::from_utf8_lossy(&baseline.stderr)
+    );
+    let expected = adapter_metadata_from_output(&baseline.stdout);
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-view-findings-error");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .env("PATH", isolated_path(temp_dir.path()))
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "view",
+            "findings",
+        ])
+        .output()
+        .expect("view findings error command runs");
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "view findings stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(
+        output.stdout.is_empty(),
+        "expected json error on stderr, got stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let output_json = parse_command_output(&output.stderr);
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.error",
+        "config_scope",
+        &expected.config_scope,
+    );
+    assert_log_file_contains_field(&log_path, "cli.command.error", "script", &expected.script);
+    assert_eq!(
+        output_json["error"]["kind"].as_str(),
+        Some("backend_failure"),
+        "view findings stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+#[serial]
+fn view_findings_logs_adapter_metadata_for_completion() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-view-findings");
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "view",
+            "findings",
+        ])
+        .output()
+        .expect("view findings command runs");
+    assert!(
+        output.status.success(),
+        "view findings stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let expected = adapter_metadata_from_output(&output.stdout);
+
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    for action in ["cli.command.started", "cli.command.completed"] {
+        assert_log_file_contains_field(&log_path, action, "adapter", &expected.adapter);
+        assert_log_file_contains_field(&log_path, action, "config_scope", &expected.config_scope);
+        assert_log_file_contains_field(&log_path, action, "script", &expected.script);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AdapterMetadata {
+    adapter: String,
+    config_scope: String,
+    script: String,
+}
+
+fn adapter_metadata_from_output(output: &[u8]) -> AdapterMetadata {
+    let payload = parse_command_output(output);
+    let details = payload["data"].as_object().expect("data object");
+    AdapterMetadata {
+        adapter: details["adapter"]
+            .as_str()
+            .expect("adapter field")
+            .to_string(),
+        config_scope: details["config_scope"]
+            .as_str()
+            .expect("config_scope field")
+            .to_string(),
+        script: details["script"]
+            .as_str()
+            .expect("script field")
+            .to_string(),
+    }
+}
+
+fn parse_command_output(output: &[u8]) -> Value {
+    serde_json::from_slice(output).expect("command writes json")
+}
+
+struct LintConfigOverride {
+    dir: TempDir,
+    path: PathBuf,
+}
+
+impl LintConfigOverride {
+    fn new(contents: &str) -> Self {
+        let dir = TempDir::new().expect("temp dir");
+        let path = dir.path().join("lint-config.toml");
+        std::fs::write(&path, contents).expect("write lint config override");
+        Self { dir, path }
+    }
+
+    fn path(&self) -> &Path {
+        let _keepalive = self.dir.path();
+        &self.path
+    }
+}
+
 fn assert_log_file_contains_action(path: &Path, action: &str) {
     let contents = std::fs::read_to_string(path).expect("log file exists");
     assert!(
@@ -277,6 +678,10 @@ fn prepend_path(
         parts.extend(std::env::split_paths(&existing).map(|path| path.into_os_string()));
     }
     std::env::join_paths(parts).expect("join path entries")
+}
+
+fn isolated_path(path: &Path) -> std::ffi::OsString {
+    std::env::join_paths([path]).expect("join isolated path")
 }
 
 fn workspace_root() -> PathBuf {

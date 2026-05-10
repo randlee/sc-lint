@@ -14,14 +14,14 @@ pub struct RenderedOutput {
 }
 
 impl RenderedOutput {
-    pub fn stdout(value: String) -> Self {
+    pub(crate) fn stdout(value: String) -> Self {
         Self {
             stdout: Some(value),
             stderr: None,
         }
     }
 
-    pub fn stderr(value: String) -> Self {
+    pub(crate) fn stderr(value: String) -> Self {
         Self {
             stdout: None,
             stderr: Some(value),
@@ -29,7 +29,7 @@ impl RenderedOutput {
     }
 }
 
-pub fn render_success_json<T>(envelope: &CommandEnvelope<T>) -> String
+pub(crate) fn render_success_json<T>(envelope: &CommandEnvelope<T>) -> String
 where
     T: Serialize,
 {
@@ -42,7 +42,7 @@ where
     }
 }
 
-pub fn render_error_json(command_id: &str, error: &CliError) -> String {
+pub(crate) fn render_error_json(command_id: &str, error: &CliError) -> String {
     let envelope = CommandEnvelope::<Value>::failure(command_id, error.clone());
     match serde_json::to_string_pretty(&envelope) {
         Ok(rendered) => rendered,
@@ -50,7 +50,10 @@ pub fn render_error_json(command_id: &str, error: &CliError) -> String {
     }
 }
 
-pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope<Value>) -> String {
+pub(crate) fn render_success_human(
+    context: &CommandContext,
+    envelope: &CommandEnvelope<Value>,
+) -> String {
     match context.id() {
         CommandId::Version => {
             let version = envelope
@@ -101,11 +104,22 @@ pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope
                 .map_or(0, std::vec::Vec::len);
             format!("{}: {status} ({step_count} steps)", context.command_id())
         }
+        CommandId::LintLineCounts | CommandId::LintIdentityLiterals | CommandId::ViewFindings => {
+            envelope
+                .data
+                .as_ref()
+                .and_then(|value| value.get("summary"))
+                .and_then(Value::as_str)
+                .map_or_else(
+                    || format!("{}: ok", context.command_id()),
+                    |summary| format!("{}: {summary}", context.command_id()),
+                )
+        }
         _ => format!("{}: ok", context.command_id()),
     }
 }
 
-pub fn render_error_human(command_id: &str, error: &CliError) -> String {
+pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
     let mut rendered = format!("{command_id}: {} ({})", error.message, error.code());
     if let Some(suggested_action) = error.suggested_action.as_deref() {
         rendered.push('\n');

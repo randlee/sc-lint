@@ -8,6 +8,7 @@ use crate::config::LoadedConfig;
 use crate::consts;
 use crate::contract::ServiceName;
 use crate::dispatch;
+use crate::python_adapter;
 use crate::workflow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,11 +25,11 @@ impl DispatchTelemetry {
         }
     }
 
-    pub fn tool(&self) -> &'static str {
+    pub const fn tool(&self) -> &'static str {
         self.tool
     }
 
-    pub fn finding_count(&self) -> usize {
+    pub const fn finding_count(&self) -> usize {
         self.finding_count
     }
 }
@@ -65,6 +66,8 @@ pub(crate) enum CommandId {
     LintCi,
     LintFast,
     LintFull,
+    LintIdentityLiterals,
+    LintLineCounts,
     LintScBoundary,
     LintScPortability,
     LintScRuntime,
@@ -80,6 +83,8 @@ impl CommandId {
                 crate::LintTarget::ScBoundary => Self::LintScBoundary,
                 crate::LintTarget::ScPortability => Self::LintScPortability,
                 crate::LintTarget::ScRuntime => Self::LintScRuntime,
+                crate::LintTarget::LineCounts => Self::LintLineCounts,
+                crate::LintTarget::IdentityLiterals => Self::LintIdentityLiterals,
                 crate::LintTarget::Fast => Self::LintFast,
                 crate::LintTarget::Full => Self::LintFull,
                 crate::LintTarget::Ci => Self::LintCi,
@@ -111,6 +116,8 @@ impl CommandId {
             Self::LintCi => "lint.ci",
             Self::LintFast => "lint.fast",
             Self::LintFull => "lint.full",
+            Self::LintIdentityLiterals => "lint.identity-literals",
+            Self::LintLineCounts => "lint.line-counts",
             Self::LintScBoundary => consts::CMD_BOUNDARY,
             Self::LintScPortability => "lint.sc-portability",
             Self::LintScRuntime => "lint.sc-runtime",
@@ -133,6 +140,8 @@ impl CommandId {
             | Self::LintCi
             | Self::LintFast
             | Self::LintFull
+            | Self::LintIdentityLiterals
+            | Self::LintLineCounts
             | Self::Version
             | Self::ViewFindings
             | Self::ViewGraph => consts::SERVICE_NAME,
@@ -145,11 +154,14 @@ impl CommandId {
             Self::CheckNative | Self::CheckXwin => "preflight execution path",
             Self::ClippyNative | Self::ClippyXwin => "clippy execution path",
             Self::LintCi | Self::LintFast | Self::LintFull => "lint profile orchestration path",
+            Self::LintIdentityLiterals => "python-backed identity literal lint path",
+            Self::LintLineCounts => "python-backed line-count lint path",
             Self::LintScBoundary => "boundary analyzer command path",
             Self::LintScPortability => "reserved portability analyzer contract surface",
             Self::LintScRuntime => "reserved runtime analyzer contract surface",
             Self::Version => "sc-lint version information",
-            Self::ViewFindings | Self::ViewGraph => "reserved view contract surface",
+            Self::ViewFindings => "python-backed findings view path",
+            Self::ViewGraph => "reserved view contract surface",
         }
     }
 
@@ -160,8 +172,25 @@ impl CommandId {
     pub const fn dispatch_tool(self) -> Option<&'static str> {
         match self {
             Self::LintScBoundary => Some(consts::TOOL_BOUNDARY),
+            Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts.tool_name()),
+            Self::LintIdentityLiterals => {
+                Some(python_adapter::PythonTool::IdentityLiterals.tool_name())
+            }
+            Self::ViewFindings => Some(python_adapter::PythonTool::ViewFindings.tool_name()),
             _ => None,
         }
+    }
+
+    pub fn adapter_kind(self) -> Option<&'static str> {
+        python_adapter::adapter_kind_for_command(self.as_str())
+    }
+
+    pub fn adapter_config_scope(self) -> Option<&'static str> {
+        python_adapter::adapter_config_scope_for_command(self.as_str())
+    }
+
+    pub fn adapter_script(self) -> Option<&'static str> {
+        python_adapter::adapter_script_for_command(self.as_str())
     }
 
     pub const fn is_xwin_preflight(self) -> bool {
@@ -182,7 +211,7 @@ impl CommandContext {
         clippy::result_large_err,
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
-    pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
+    pub(crate) fn from_cli(cli: &Cli) -> Result<Self, CliError> {
         let command_id = CommandId::from_cli_command(&cli.command);
         let service_name = ServiceName::new(command_id.service_name());
 
@@ -194,7 +223,7 @@ impl CommandContext {
         })
     }
 
-    pub fn command_id(&self) -> &str {
+    pub(crate) fn command_id(&self) -> &str {
         self.command_id.as_str()
     }
 
@@ -206,19 +235,31 @@ impl CommandContext {
         self.command_id
     }
 
-    pub const fn summary(&self) -> &'static str {
+    pub(crate) const fn summary(&self) -> &'static str {
         self.summary
     }
 
-    pub const fn requires_repo_root(&self) -> bool {
+    pub(crate) const fn requires_repo_root(&self) -> bool {
         self.requires_repo_root
     }
 
-    pub fn dispatch_tool(&self) -> Option<&'static str> {
+    pub(crate) fn dispatch_tool(&self) -> Option<&'static str> {
         self.command_id.dispatch_tool()
     }
 
-    pub const fn is_xwin_preflight(&self) -> bool {
+    pub(crate) fn adapter_kind(&self) -> Option<&'static str> {
+        self.command_id.adapter_kind()
+    }
+
+    pub(crate) fn adapter_config_scope(&self) -> Option<&'static str> {
+        self.command_id.adapter_config_scope()
+    }
+
+    pub(crate) fn adapter_script(&self) -> Option<&'static str> {
+        self.command_id.adapter_script()
+    }
+
+    pub(crate) const fn is_xwin_preflight(&self) -> bool {
         self.command_id.is_xwin_preflight()
     }
 }
@@ -227,7 +268,7 @@ impl CommandContext {
     clippy::result_large_err,
     reason = "CliError is the stable top-level contract type for the bootstrap CLI execution seam."
 )]
-pub fn execute(
+pub(crate) fn execute(
     context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
@@ -246,13 +287,23 @@ pub fn execute(
         CommandId::LintScRuntime => {
             reserved_command(context, "A.5 will add the runtime analyzer backend path.")
         }
+        CommandId::LintLineCounts => {
+            python_adapter::run_python_tool(loaded_config, python_adapter::PythonTool::LineCounts)
+        }
+        CommandId::LintIdentityLiterals => python_adapter::run_python_tool(
+            loaded_config,
+            python_adapter::PythonTool::IdentityLiterals,
+        ),
         CommandId::LintFast => workflow::run_lint_profile(loaded_config, crate::LintProfile::Fast),
         CommandId::LintFull => workflow::run_lint_profile(loaded_config, crate::LintProfile::Full),
         CommandId::LintCi => workflow::run_lint_profile(loaded_config, crate::LintProfile::Ci),
-        CommandId::ViewGraph | CommandId::ViewFindings => reserved_command(
+        CommandId::ViewGraph => reserved_command(
             context,
-            "A.3 will connect the reserved view surfaces to extracted utility paths.",
+            "A later sprint will connect graph-oriented view surfaces once the contract is stable.",
         ),
+        CommandId::ViewFindings => {
+            python_adapter::run_python_tool(loaded_config, python_adapter::PythonTool::ViewFindings)
+        }
         CommandId::CheckNative => workflow::run_check(loaded_config, crate::CheckTarget::Native),
         CommandId::CheckXwin => workflow::run_check(loaded_config, crate::CheckTarget::Xwin),
         CommandId::ClippyNative => workflow::run_clippy(loaded_config, crate::ClippyTarget::Native),

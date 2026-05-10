@@ -57,14 +57,8 @@ impl RepoRoot {
         }
     }
 
-    pub fn as_path(&self) -> &Path {
+    pub(crate) fn as_path(&self) -> &Path {
         &self.0
-    }
-}
-
-impl AsRef<Path> for RepoRoot {
-    fn as_ref(&self) -> &Path {
-        self.as_path()
     }
 }
 
@@ -73,7 +67,7 @@ impl LoadedConfig {
         clippy::result_large_err,
         reason = "Config loading failures are part of the stable top-level CliError contract."
     )]
-    pub fn load(cli: &Cli, context: &CommandContext) -> Result<Self, CliError> {
+    pub(crate) fn load(cli: &Cli, context: &CommandContext) -> Result<Self, CliError> {
         if !context.requires_repo_root() {
             return Ok(Self {
                 repo_root: None,
@@ -91,7 +85,7 @@ impl LoadedConfig {
             })?
         };
         let repo_root = RepoRoot::discover(&discovery_base)?;
-        let config_path = find_repo_config(repo_root.as_path());
+        let config_path = find_repo_config(repo_root.as_path(), cli.config.as_deref());
         let file_config = if let Some(path) = config_path.as_ref() {
             parse_repo_config(path)?
         } else {
@@ -123,7 +117,7 @@ impl LoadedConfig {
         })
     }
 
-    pub fn repo_root(&self) -> Option<&Path> {
+    pub(crate) fn repo_root(&self) -> Option<&Path> {
         self.repo_root.as_ref().map(RepoRoot::as_path)
     }
 
@@ -131,7 +125,7 @@ impl LoadedConfig {
         clippy::result_large_err,
         reason = "Commands that require a repo root must surface failures through the shared CliError contract."
     )]
-    pub fn require_repo_root(&self) -> Result<&Path, CliError> {
+    pub(crate) fn require_repo_root(&self) -> Result<&Path, CliError> {
         self.repo_root
             .as_ref()
             .map(RepoRoot::as_path)
@@ -140,15 +134,15 @@ impl LoadedConfig {
             })
     }
 
-    pub fn config_path(&self) -> Option<&Path> {
+    pub(crate) fn config_path(&self) -> Option<&Path> {
         self.config_path.as_deref()
     }
 
-    pub fn logging_root(&self) -> Option<&PathBuf> {
+    pub(crate) fn logging_root(&self) -> Option<&PathBuf> {
         self.logging_root.as_ref()
     }
 
-    pub const fn logging_console(&self) -> bool {
+    pub(crate) const fn logging_console(&self) -> bool {
         self.logging_console
     }
 }
@@ -164,7 +158,10 @@ struct LoggingConfigFile {
     console: Option<bool>,
 }
 
-fn find_repo_config(repo_root: &Path) -> Option<PathBuf> {
+fn find_repo_config(repo_root: &Path, override_path: Option<&Path>) -> Option<PathBuf> {
+    if let Some(path) = override_path {
+        return Some(resolve_repo_relative_path(repo_root, path));
+    }
     ["sc-lint.toml", ".just/lint-config.toml"]
         .into_iter()
         .map(|relative| repo_root.join(relative))

@@ -9,7 +9,7 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum CliErrorKind {
+pub enum CliErrorKind {
     Usage,
     Config,
     Capability,

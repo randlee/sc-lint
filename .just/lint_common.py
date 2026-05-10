@@ -19,6 +19,9 @@ DIRECTIVE_RE = re.compile(
     r"(?P<action>allow-next-line|allow-start|allow-end)\b",
     re.IGNORECASE,
 )
+STRING_LITERAL_RE = re.compile(
+    r'r(?P<hashes>#+)?"(?P<raw>.*?)"(?P=hashes)|"(?P<quoted>(?:[^"\\]|\\.)*)"'
+)
 
 
 @dataclass(frozen=True)
@@ -58,8 +61,9 @@ def discover_repo_root(explicit_root: str | None = None) -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def load_lint_config(repo_root: Path) -> dict:
-    config_path = repo_root / CONFIG_PATH
+def load_lint_config(repo_root: Path, config_path: str | None = None) -> dict:
+    candidate = Path(config_path) if config_path is not None else CONFIG_PATH
+    config_path = candidate if candidate.is_absolute() else repo_root / candidate
     if not config_path.exists():
         return {}
     return tomllib.loads(config_path.read_text(encoding="utf-8"))
@@ -123,6 +127,17 @@ def workspace_crates(repo_root: Path) -> list[WorkspaceCrate]:
             )
         )
     return crates
+
+
+def iter_workspace_rust_files(repo_root: Path) -> list[Path]:
+    paths: list[Path] = []
+    for manifest_path in workspace_manifest_paths(repo_root):
+        crate_root = manifest_path.parent
+        for directory_name in ("src", "tests"):
+            directory = crate_root / directory_name
+            if directory.exists():
+                paths.extend(sorted(directory.rglob("*.rs")))
+    return sorted(set(paths))
 
 
 def workspace_target_args(manifest_path: Path) -> list[str]:
@@ -444,3 +459,25 @@ def classify_rust_test_scope(
             cfg_test_attribute_active = False
 
     return scope
+
+
+def rust_file_test_scope(path: Path, lines: list[str]) -> list[bool]:
+    rel_posix = path.as_posix()
+    if "/tests/" in rel_posix:
+        return [True] * len(lines)
+    if "/src/" in rel_posix:
+        return classify_rust_test_scope(lines)
+    return [False] * len(lines)
+
+
+def iter_string_literal_contents(line: str) -> list[str]:
+    literals: list[str] = []
+    for match in STRING_LITERAL_RE.finditer(line):
+        raw_value = match.group("raw")
+        if raw_value is not None:
+            literals.append(raw_value)
+            continue
+        quoted_value = match.group("quoted")
+        if quoted_value is not None:
+            literals.append(bytes(quoted_value, "utf-8").decode("unicode_escape"))
+    return literals
