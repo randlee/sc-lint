@@ -23,13 +23,13 @@ use clap::CommandFactory;
 use clap::Parser;
 use serde_json::Value;
 
+use crate::cli::OutputMode;
+
 pub use cli::CheckTarget;
 pub use cli::Cli;
 pub use cli::ClippyTarget;
 pub use cli::Command;
-pub use cli::LintProfile;
 pub use cli::LintTarget;
-pub use cli::OutputMode;
 pub use cli::ViewTarget;
 pub use command::CommandContext;
 pub use command::DispatchTelemetry;

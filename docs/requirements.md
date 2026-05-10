@@ -105,6 +105,8 @@ The product should support both:
 - `REQ-PRODUCT-004A`
   `sc-lint-portability` must be the home for shared AST-sensitive
   platform/OS portability rules.
+  Current A.4 implementation status:
+  `PORT-001` through `PORT-005` are assigned to `sc-lint-portability`.
 
 - `REQ-PRODUCT-004B`
   `sc-lint-runtime` must be the home for shared AST-sensitive std

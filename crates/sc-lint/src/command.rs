@@ -157,7 +157,7 @@ impl CommandId {
             Self::LintIdentityLiterals => "python-backed identity literal lint path",
             Self::LintLineCounts => "python-backed line-count lint path",
             Self::LintScBoundary => "boundary analyzer command path",
-            Self::LintScPortability => "reserved portability analyzer contract surface",
+            Self::LintScPortability => "portability analyzer command path",
             Self::LintScRuntime => "reserved runtime analyzer contract surface",
             Self::Version => "sc-lint version information",
             Self::ViewFindings => "python-backed findings view path",
@@ -172,6 +172,7 @@ impl CommandId {
     pub const fn dispatch_tool(self) -> Option<&'static str> {
         match self {
             Self::LintScBoundary => Some(consts::TOOL_BOUNDARY),
+            Self::LintScPortability => Some("sc-lint-portability"),
             Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts.tool_name()),
             Self::LintIdentityLiterals => {
                 Some(python_adapter::PythonTool::IdentityLiterals.tool_name())
@@ -280,10 +281,7 @@ pub(crate) fn execute(
             consts::FIELD_STATUS: "dispatch_ready",
         }))),
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
-        CommandId::LintScPortability => reserved_command(
-            context,
-            "A.4 will add the portability analyzer backend path.",
-        ),
+        CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => {
             reserved_command(context, "A.5 will add the runtime analyzer backend path.")
         }
@@ -294,9 +292,13 @@ pub(crate) fn execute(
             loaded_config,
             python_adapter::PythonTool::IdentityLiterals,
         ),
-        CommandId::LintFast => workflow::run_lint_profile(loaded_config, crate::LintProfile::Fast),
-        CommandId::LintFull => workflow::run_lint_profile(loaded_config, crate::LintProfile::Full),
-        CommandId::LintCi => workflow::run_lint_profile(loaded_config, crate::LintProfile::Ci),
+        CommandId::LintFast => {
+            workflow::run_lint_profile(loaded_config, crate::cli::LintProfile::Fast)
+        }
+        CommandId::LintFull => {
+            workflow::run_lint_profile(loaded_config, crate::cli::LintProfile::Full)
+        }
+        CommandId::LintCi => workflow::run_lint_profile(loaded_config, crate::cli::LintProfile::Ci),
         CommandId::ViewGraph => reserved_command(
             context,
             "A later sprint will connect graph-oriented view surfaces once the contract is stable.",

@@ -35,7 +35,7 @@ Planned next crates:
     - `sc-lint clippy xwin`
 - `sc-lint-portability`
   - platform/OS portability analyzer crate
-  - planned first moves/imports:
+  - current owned rules:
     - `PORT-001`
     - `PORT-002`
     - `PORT-003`
@@ -79,8 +79,8 @@ Current scaffold state:
   - first owner-graph cycle rules in place now
   - first boundary enforcement rules in place now
 - `sc-lint-portability`
-  - planned
-  - implementation not started yet
+  - created
+  - owns the shared portability rule family now
 - `sc-lint-runtime`
   - planned
   - implementation not started yet
@@ -94,10 +94,10 @@ Current scaffold state:
 
 ### Current code moves required
 
-The current implementation still contains portability rules inside
-`sc-lint-boundary`.
+The current implementation now places the shared portability rule family in
+`sc-lint-portability`.
 
-Planned moves:
+Current completed move:
 
 - from `crates/sc-lint-boundary/src/portability.rs`
   - `PORT-001`
@@ -106,16 +106,18 @@ Planned moves:
   - `PORT-004`
   - `PORT-005`
   - target crate: `sc-lint-portability`
-- from the current `atm-core` proving implementation
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
-  - target crate: `sc-lint-runtime`
 
 Wrapper retargets required after those moves:
 
 - `.just/lint_sc_portability.py`
 - `.just/run_lint.py`
 - help text and README references for `sc-portability`
+
+Wrapper retarget state after A.4:
+
+- `sc-portability` wrappers now delegate to `sc-lint-portability`
+- runtime wrapper retargets remain A.5 work alongside the `SCB-RUNTIME-001`
+  and `SCB-RUNTIME-002` migration
 
 Planned primary CLI target mapping:
 
@@ -225,6 +227,8 @@ Current implementation status:
 - deferred:
   - additional boundary declarations beyond current attribute set
   - postmortem portability/runtime imports until their dedicated crates exist
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
 
 ## What Is Explicitly Deferred
 
@@ -327,8 +331,8 @@ The next planned tool-distribution work after the current implementation
 branch merges is:
 
 1. create `sc-lint-portability`
-2. move existing `PORT-001/002/003` into `sc-lint-portability`
-3. import `PORT-004/005` into `sc-lint-portability`
+2. `sc-lint-portability` now owns `PORT-001..005`
+3. keep portability wrapper and top-level CLI delegation aligned to that crate
 4. create `sc-lint-runtime`
 5. move `SCB-RUNTIME-001/002` into `sc-lint-runtime`
 6. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify

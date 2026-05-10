@@ -107,6 +107,7 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A3.md`
 - `A.4`
   - `sc-lint-portability` crate creation and portability-rule moves/imports
+  - current status: in progress
   - `docs/sc-lint/sprint-A4.md`
 - `A.5`
   - `sc-lint-runtime` crate creation and runtime-rule imports
