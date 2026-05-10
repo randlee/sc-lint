@@ -116,7 +116,7 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     let success_logs = temp_dir.path().join("logs-success");
     let success_path =
         cargo_wrapper_path(temp_dir.path().join("bin-success"), CargoMode::XwinSuccess);
-    let success = sc_lint_command(binary, &repo_root)
+    let success = sc_lint_command(binary, repo_root)
         .env(
             "PATH",
             prepend_path(&success_path, original_path.as_deref()),
@@ -155,7 +155,7 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     let failure_logs = temp_dir.path().join("logs-failure");
     let failure_path =
         cargo_wrapper_path(temp_dir.path().join("bin-failure"), CargoMode::XwinMissing);
-    let failure = sc_lint_command(binary, &repo_root)
+    let failure = sc_lint_command(binary, repo_root)
         .env(
             "PATH",
             prepend_path(&failure_path, original_path.as_deref()),
