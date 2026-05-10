@@ -60,6 +60,41 @@ backends, including Python tools still used in Sprint `A.3`, run in separate
 processes and are not governed by the CLI logger runtime. Their stdout/stderr
 handling remains a separate concern defined in the `A.3` dispatch design.
 
+## CLI-Layer Ownership Invariant
+
+Named invariant: `CLI-LAYER-OWNS-LOGGER-INITIALIZATION`
+
+`REQ-LOG-005` is a hard architectural rule:
+
+- only the top-level `sc-lint` CLI may initialize the structured logging
+  runtime
+- backend crates must not construct, install, or reinitialize
+  `sc-observability`
+- backend crates may emit structured log events only through the CLI-owned
+  runtime after top-level normalization through `CommandEnvelope<T>` or
+  `CliError`
+
+This invariant exists so the product keeps one citable logging authority per
+`sc-lint` process and so boundary enforcement can reject backend-local runtime
+construction.
+
+## Delegation Models Governed By This ADR
+
+This ADR governs both supported backend-integration models:
+
+- subprocess/external-process delegation
+  - the CLI process owns its logger runtime
+  - subprocess backends run outside that process and are not participants in
+    the CLI logger runtime
+  - subprocess stdout/stderr handling is an adapter concern, not a shared
+    logger-runtime concern
+- in-process direct-linked backend delegation
+  - the backend library runs inside the `sc-lint` process
+  - the backend must reuse the CLI-owned logger runtime rather than creating a
+    second subscriber/runtime
+  - service-name selection, sink wiring, and failure normalization remain
+    owned by the CLI layer even when backend code is directly linked
+
 ## Consequences
 
 ### Positive
@@ -70,6 +105,8 @@ handling remains a separate concern defined in the `A.3` dispatch design.
 - JSONL output aligns with the machine-readable logging requirement
 - service-name scoping aligns with the planned `sc-lint` and analyzer command
   surfaces
+- one invariant governs both subprocess and in-process backend delegation
+  paths
 
 ### Negative
 
@@ -79,6 +116,8 @@ handling remains a separate concern defined in the `A.3` dispatch design.
   `~/sc-lint/logs/<service>/` directory shape
 - subprocess backend logging remains outside this runtime and still needs a
   separate stdout/stderr handling design
+- direct-linked backend libraries must treat logger access as an injected
+  CLI-owned facility rather than a backend-owned setup concern
 
 ## Alternatives Rejected
 
@@ -101,5 +140,6 @@ itself with no product benefit for Phase `A`.
 | Keep `docs/sc-lint/logging.md` aligned with the `sc-observability` runtime surface and ownership model. | sc-lint implementation owner | Before A.1a implementation starts |
 | Keep logger initialization in the top-level CLI and out of backend crates. | sc-lint implementation owner | Ongoing through A.6 |
 | Define separate subprocess stdout/stderr handling in the A.3 backend-dispatch work. | sc-lint implementation owner | Before A.3 closes |
+| Confirm the concrete `LoggerBuilder::build()` return-type and error-contract surface before implementation starts. | sc-lint implementation owner | Before A.1a implementation starts |
 
 *ADR-008 | sc-lint | 2026-05-09*

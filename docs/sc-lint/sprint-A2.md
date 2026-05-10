@@ -50,6 +50,7 @@ distinguishes:
 - `REQ-CLI-014`
 - `REQ-CLI-015`
 - `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 

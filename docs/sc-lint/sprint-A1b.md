@@ -159,8 +159,8 @@ end-to-end CLI seam.
   entries for the active backend command
 - delegated command paths still use the same documented top-level `command`,
   response, and error pattern as the rest of the CLI
-- the delegated backend path proves REQ-LOG-005 by keeping logger
-  initialization in the CLI and out of backend crates
+- the delegated `sc-lint-boundary` path proves REQ-LOG-005 by keeping logger
+  initialization in the CLI and out of `sc-lint-boundary`
 - delegated entry/exit/error events are emitted only after top-level
   normalization through `CommandEnvelope<T>` or `CliError`
 - no backend crate gains a direct dependency on another backend crate

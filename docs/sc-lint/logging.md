@@ -43,6 +43,13 @@ The design depends on the following public surface:
 - `ConsoleSink`
 - `ServiceName`
 
+Planned implementation note:
+
+- construct `ServiceName` once in the top-level CLI command-resolution layer
+  from the stable dotted `command` identifier
+- pass that validated service identity into logger setup and event emission
+  helpers rather than rebuilding raw strings at each call site
+
 ## Initialization Model
 
 Requirement coverage:
@@ -133,6 +140,12 @@ Planned override surfaces:
 The override is per lint system because the service name is part of the
 resolved root selection.
 
+Planned implementation note:
+
+- represent the validated effective log root as a dedicated `LogRoot`
+  wrapper/newtype at the CLI config boundary rather than passing a raw
+  `String` through multiple modules
+
 ## Sink Model
 
 Requirement coverage:
@@ -176,6 +189,21 @@ Planned controls:
 
 When enabled, the CLI registers `ConsoleSink` through `LoggerBuilder`.
 
+## Concurrency Model
+
+The logging runtime is process-wide for one `sc-lint` invocation and must be
+safe to share across all command-dispatch code that runs inside that process.
+
+Planned constraints:
+
+- the CLI owns construction of the runtime and sink set once at startup
+- the constructed runtime handle must be shareable across in-process command
+  execution without backend-local reinitialization
+- backend crates must treat logging as an already-installed facility rather
+  than a mutable global they control
+- sink-thread-safety and cross-thread emission behavior must match the
+  concrete `sc-observability` runtime surface chosen during implementation
+
 ## Event Model
 
 Requirement coverage:
@@ -197,6 +225,8 @@ Every CLI invocation should emit:
    - summary
    - elapsed time in ms
    - service name
+   - emitted for both success and failure verdicts so the command always has a
+     closed lifecycle record
 3. one error event per emitted top-level error
    - stable error code
    - `CliError.kind`
@@ -208,6 +238,15 @@ For delegated backends, the CLI also logs:
 - dispatch start
 - normalized result receipt after `CommandEnvelope<T>` / `CliError` mapping
 - finding count when the backend returns findings payloads
+
+Dispatch failure contract:
+
+- if dispatch fails after the entry event but before a successful backend
+  payload is normalized, the CLI must emit:
+  - one `CliError`-backed error event
+  - one completion event with a failure verdict and elapsed time in ms
+- the CLI must not leave a started command path without either a completion
+  event or a top-level failure envelope
 
 ## Rollout By Sprint
 
@@ -226,6 +265,12 @@ Requirement coverage:
 - `A.1b`
   - log backend dispatch calls
   - log normalized delegated results
+- `A.2`
+  - add `xwin` preflight entry/exit/error logging through the standard CLI
+    event pattern
+- `A.3`
+  - add Python utility entry/exit/error logging through the adapter-normalized
+    CLI event pattern
 - `A.4`
   - add `sc-portability` analyzer entry/exit/finding-count logging to the
     delegated backend pattern

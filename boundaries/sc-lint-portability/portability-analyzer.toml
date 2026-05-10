@@ -22,6 +22,7 @@ forbidden_edges = [
   "sc-lint-portability -> sc-lint-attributes",
   "sc-lint-portability -> sc-lint-boundary",
   "sc-lint-portability -> sc-lint-runtime",
+  "sc-lint-portability -> sc-observability",
 ]
 
 [references]
