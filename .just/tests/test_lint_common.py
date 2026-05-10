@@ -25,6 +25,7 @@ from lint_common import render_workspace_crate_table
 from lint_common import rust_file_test_scope
 from lint_common import workspace_crate_section_lines
 from lint_common import workspace_crates
+from fixture_constants import TEAM_LEAD_IDENTITY
 
 
 ROOT_MANIFEST = """\
@@ -217,8 +218,11 @@ version = "0.1.0"
         self.assertEqual(scope, [False, True, True, True, True, True])
 
     def test_iter_string_literal_contents_supports_raw_and_escaped_literals(self) -> None:
-        line = 'let a = "team\\nlead"; let b = r#"team-lead"#;'
-        self.assertEqual(iter_string_literal_contents(line), ["team\nlead", "team-lead"])
+        line = f'let a = "team\\nlead"; let b = r#"{TEAM_LEAD_IDENTITY}"#;'
+        self.assertEqual(
+            iter_string_literal_contents(line),
+            ["team\nlead", TEAM_LEAD_IDENTITY],
+        )
 
     def test_iter_workspace_rust_files_includes_src_and_tests(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

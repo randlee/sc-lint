@@ -315,6 +315,7 @@ The scheduled implementation sprints for this phase are:
   - sprint plan: `docs/sc-lint/sprint-A6.md`
 8. `A.7`
    - Rust manifest-policy migration and Python parity window
+   - active implementation branch: `feature/sprint-A7`
    - sprint plan: `docs/sc-lint/sprint-A7.md`
 9. `A.8`
    - per-tool user guides and rule-disable documentation

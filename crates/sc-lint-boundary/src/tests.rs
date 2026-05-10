@@ -5,6 +5,8 @@ use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command;
 
 use tempfile::TempDir;
 
@@ -349,8 +351,173 @@ fn rejects_unknown_rule_filter() {
     let error = RuleFilter::try_from("unknown").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "unsupported rule filter `unknown`; supported: cycles, boundaries, internal_only, forbid_external_impls"
+        "unsupported rule filter `unknown`; supported: cycles, boundaries, internal_only, forbid_external_impls, manifests"
     );
+}
+
+#[test]
+fn manifest_policy_accepts_workspace_inheritance() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest("example", &good_member_manifest("example", ""));
+    fixture.write_member_source("example", "pub struct Example;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Manifests),
+    })
+    .expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert_eq!(report.scanned_crates, 1);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn manifest_policy_flags_missing_workspace_field() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Manifests),
+    })
+    .expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        finding_messages(&report),
+        vec!["crates/example/Cargo.toml: set [package].homepage.workspace = true".to_string()]
+    );
+}
+
+#[test]
+fn manifest_policy_flags_mismatched_internal_path_version() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example", "crates/helper"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &path_dependency_manifest("example", "helper", "../helper", "9.9.9"),
+    );
+    fixture.write_member_manifest("helper", &good_member_manifest("helper", ""));
+    fixture.write_member_source("example", "pub struct Example;");
+    fixture.write_member_source("helper", "pub struct Helper;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Manifests),
+    })
+    .expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        finding_messages(&report),
+        vec![
+            "crates/example/Cargo.toml [dependencies.helper]: path dependency version must match target crate version \"1.1.2\""
+                .to_string()
+        ]
+    );
+}
+
+#[test]
+fn manifest_policy_accepts_explicit_tool_crate_version() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example", "crates/sc-lint-attributes"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest("example", &good_member_manifest("example", ""));
+    fixture.write_member_manifest(
+        "sc-lint-attributes",
+        r#"
+            [package]
+            name = "sc-lint-attributes"
+            version = "0.1.0"
+            edition.workspace = true
+            rust-version.workspace = true
+            authors.workspace = true
+            license.workspace = true
+            repository.workspace = true
+            homepage.workspace = true
+        "#,
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+    fixture.write_member_source("sc-lint-attributes", "pub struct Attr;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Manifests),
+    })
+    .expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn manifest_policy_matches_python_oracle_on_representative_fixtures() {
+    let valid = ManifestPolicyFixture::new(&["crates/example"]);
+    valid.write_workspace_package_defaults("1.1.2");
+    valid.write_member_manifest("example", &good_member_manifest("example", ""));
+    valid.write_member_source("example", "pub struct Example;");
+
+    let missing_field = ManifestPolicyFixture::new(&["crates/example"]);
+    missing_field.write_workspace_package_defaults("1.1.2");
+    missing_field.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    missing_field.write_member_source("example", "pub struct Example;");
+
+    let mismatched_version = ManifestPolicyFixture::new(&["crates/example", "crates/helper"]);
+    mismatched_version.write_workspace_package_defaults("1.1.2");
+    mismatched_version.write_member_manifest(
+        "example",
+        &path_dependency_manifest("example", "helper", "../helper", "9.9.9"),
+    );
+    mismatched_version.write_member_manifest("helper", &good_member_manifest("helper", ""));
+    mismatched_version.write_member_source("example", "pub struct Example;");
+    mismatched_version.write_member_source("helper", "pub struct Helper;");
+
+    let explicit_tool =
+        ManifestPolicyFixture::new(&["crates/example", "crates/sc-lint-attributes"]);
+    explicit_tool.write_workspace_package_defaults("1.1.2");
+    explicit_tool.write_member_manifest("example", &good_member_manifest("example", ""));
+    explicit_tool.write_member_manifest(
+        "sc-lint-attributes",
+        r#"
+            [package]
+            name = "sc-lint-attributes"
+            version = "0.1.0"
+            edition.workspace = true
+            rust-version.workspace = true
+            authors.workspace = true
+            license.workspace = true
+            repository.workspace = true
+            homepage.workspace = true
+        "#,
+    );
+    explicit_tool.write_member_source("example", "pub struct Example;");
+    explicit_tool.write_member_source("sc-lint-attributes", "pub struct Attr;");
+
+    for fixture in [valid, missing_field, mismatched_version, explicit_tool] {
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Manifests),
+        })
+        .expect("manifest analysis succeeds");
+        assert_eq!(
+            finding_messages(&report),
+            python_manifest_findings(fixture.root())
+        );
+    }
 }
 
 #[test]
@@ -1480,7 +1647,43 @@ impl WorkspaceFixture {
                     [workspace]
                     members = ["crates/example"]
                     resolver = "2"
+
+                    [workspace.package]
+                    version = "0.1.0"
+                    edition = "2024"
+                    rust-version = "1.94.1"
+                    authors = ["sc-lint contributors"]
+                    license = "MIT OR Apache-2.0"
+                    repository = "https://example.invalid/sc-lint"
+                    homepage = "https://example.invalid/sc-lint"
                 "#,
+        );
+    }
+
+    fn write_workspace_root_with_members(&self, members: &[&str]) {
+        let members = members
+            .iter()
+            .map(|member| format!("\"{member}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.write(
+            "Cargo.toml",
+            &format!(
+                r#"
+                    [workspace]
+                    members = [{members}]
+                    resolver = "2"
+
+                    [workspace.package]
+                    version = "0.1.0"
+                    edition = "2024"
+                    rust-version = "1.94.1"
+                    authors = ["sc-lint contributors"]
+                    license = "MIT OR Apache-2.0"
+                    repository = "https://example.invalid/sc-lint"
+                    homepage = "https://example.invalid/sc-lint"
+                "#
+            ),
         );
     }
 
@@ -1491,8 +1694,13 @@ impl WorkspaceFixture {
                 r#"
                         [package]
                         name = "{package_name}"
-                        version = "0.1.0"
-                        edition = "2024"
+                        version.workspace = true
+                        edition.workspace = true
+                        rust-version.workspace = true
+                        authors.workspace = true
+                        license.workspace = true
+                        repository.workspace = true
+                        homepage.workspace = true
                     "#
             ),
         );
@@ -1512,6 +1720,151 @@ impl WorkspaceFixture {
         }
         fs::write(path, trim_indentation(contents)).unwrap();
     }
+}
+
+struct ManifestPolicyFixture {
+    workspace: WorkspaceFixture,
+    members: Vec<String>,
+}
+
+impl ManifestPolicyFixture {
+    fn new(members: &[&str]) -> Self {
+        let workspace = WorkspaceFixture::new();
+        workspace.write_workspace_root_with_members(members);
+        Self {
+            workspace,
+            members: members.iter().map(|member| (*member).to_string()).collect(),
+        }
+    }
+
+    fn root(&self) -> &Path {
+        self.workspace.root()
+    }
+
+    fn write_workspace_package_defaults(&self, version: &str) {
+        self.workspace.write(
+            "Cargo.toml",
+            &format!(
+                r#"
+                    [workspace]
+                    members = [{}]
+                    resolver = "2"
+
+                    [workspace.package]
+                    version = "{version}"
+                    edition = "2024"
+                    rust-version = "1.94.1"
+                    authors = ["sc-lint contributors"]
+                    license = "MIT OR Apache-2.0"
+                    repository = "https://example.invalid/sc-lint"
+                    homepage = "https://example.invalid/sc-lint"
+                "#,
+                self.members
+                    .iter()
+                    .map(|member| format!("\"{member}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        );
+    }
+
+    fn write_member_manifest(&self, package_name: &str, contents: &str) {
+        self.workspace
+            .write(&format!("crates/{package_name}/Cargo.toml"), contents);
+    }
+
+    fn write_member_source(&self, package_name: &str, contents: &str) {
+        self.workspace
+            .write_source(package_name, "lib.rs", contents);
+    }
+}
+
+fn finding_messages(report: &FindingsReport) -> Vec<String> {
+    report
+        .findings
+        .iter()
+        .map(|finding| finding.message.clone())
+        .collect()
+}
+
+fn python_manifest_findings(repo_root: &Path) -> Vec<String> {
+    let repo_root_path = repo_root_from_manifest_dir();
+    let script = r#"
+import json
+import sys
+from pathlib import Path
+
+repo_root = Path(sys.argv[1])
+fixture_root = Path(sys.argv[2])
+sys.path.insert(0, str(repo_root / ".just"))
+from lint_manifests import collect_manifest_violations
+
+print(json.dumps([violation.render() for violation in collect_manifest_violations(fixture_root)]))
+"#;
+    let output = Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(&repo_root_path)
+        .arg(repo_root)
+        .output()
+        .expect("python parity command runs");
+    assert!(
+        output.status.success(),
+        "python parity command failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice::<Vec<String>>(&output.stdout).expect("python parity json")
+}
+
+fn repo_root_from_manifest_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("repo root")
+        .to_path_buf()
+}
+
+fn good_member_manifest(package_name: &str, extra: &str) -> String {
+    trim_indentation(&format!(
+        r#"
+            [package]
+            name = "{package_name}"
+            version.workspace = true
+            edition.workspace = true
+            rust-version.workspace = true
+            authors.workspace = true
+            license.workspace = true
+            repository.workspace = true
+            homepage.workspace = true
+
+            {extra}
+        "#
+    ))
+}
+
+fn path_dependency_manifest(
+    package_name: &str,
+    dependency_name: &str,
+    dependency_path: &str,
+    version: &str,
+) -> String {
+    trim_indentation(&format!(
+        r#"
+            [package]
+            name = "{package_name}"
+            version.workspace = true
+            edition.workspace = true
+            rust-version.workspace = true
+            authors.workspace = true
+            license.workspace = true
+            repository.workspace = true
+            homepage.workspace = true
+
+            [dependencies]
+            {dependency_name} = {{ path = "{dependency_path}", version = "{version}" }}
+        "#
+    ))
 }
 
 fn trim_indentation(input: &str) -> String {

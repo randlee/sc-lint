@@ -669,13 +669,25 @@ impl AnalysisFixture {
     fn write_workspace_root(&self) {
         std::fs::write(
             self.root().join("Cargo.toml"),
-            "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
+            r#"[workspace]
+members = ["crates/example"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.1"
+authors = ["sc-lint contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/sc-lint"
+homepage = "https://example.invalid/sc-lint"
+"#,
         )
         .expect("workspace root");
         std::fs::create_dir_all(self.root().join("boundaries")).expect("boundaries");
         std::fs::write(
             self.root().join("boundaries/planning.toml"),
-            "[planning]\ncurrent_sprint = \"A.6\"\n",
+            "[planning]\ncurrent_sprint = \"A.7\"\n",
         )
         .expect("planning");
     }
