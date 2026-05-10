@@ -20,7 +20,7 @@ Generic, repo-defined reviewers remain language-independent and continue to run 
 
 For Rust work, add:
 - `rust-best-practices-agent` in `doc_review` mode when requirements or architecture documents imply best-practices concerns from `rust-best-practices/patterns/enforcement-strategy.md`
-- `rust-service-hardening-agent` in `doc_review` mode when service/runtime architecture is in scope
+- `rust-service-hardening-agent` in `doc_review` mode only on an explicit override or when service/runtime architecture is genuinely in scope
 
 Do not launch `rust-qa-agent` for docs-only plan review.
 
@@ -28,8 +28,9 @@ Do not launch `rust-qa-agent` for docs-only plan review.
 
 For Rust implementation work:
 - always launch `rust-qa-agent`
-- launch `rust-best-practices-agent` in `sprint_review` mode when changed Rust code is in scope
-- launch `rust-service-hardening-agent` in `sprint_review` mode when the changed scope is service-like or when service indicators are already known
+- launch `rust-best-practices-agent` in `sprint_review` mode for QA-1 only when changed Rust code is in scope
+- do not launch `rust-best-practices-agent` in QA-2 and later rounds on the same sprint branch
+- launch `rust-service-hardening-agent` in `sprint_review` mode only on an explicit override or when the changed scope is actually service-like; it is not part of the standing `sc-lint` QA set
 
 Default sprint best-practices scope should follow the cadence matrix in `rust-best-practices/patterns/enforcement-strategy.md`. The usual sprint set is:
 - `RBP-001`
@@ -42,7 +43,7 @@ Default sprint best-practices scope should follow the cadence matrix in `rust-be
 For Rust phase-end review:
 - always launch `rust-qa-agent`
 - launch `rust-best-practices-agent` in `phase_end` mode
-- launch `rust-service-hardening-agent` in `phase_end` mode when the repo or crate is service-like
+- launch `rust-service-hardening-agent` in `phase_end` mode only on an explicit override or when the repo or crate is actually service-like
 
 ## Rendering Assignments
 
