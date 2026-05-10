@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A7-ARCH-002
+# RULE-010: "team-lead" raw string literal in test files — no named constant
+# Source: QA-A7-001 ARCH-005/006 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A7-ARCH-002>
+  a triage:Finding ;
+  triage:findingId "A7-ARCH-002" ;
+  triage:title "RULE-010: 'team-lead' raw string literal repeated in test files without named constant" ;
+  triage:description "test_lint_identity_literals.py has 6+ occurrences of the bare string 'team-lead' and test_lint_common.py also contains it, without a centralized named constant. RULE-010 requires well-known identifier strings to be defined as named constants, not repeated as literals. Fix: add a constant (e.g. TEAM_LEAD_IDENTITY = 'team-lead') in a shared fixture module or consts.py and replace all raw literals." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable true ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "A7-sprint Python test files. Sweep all .just/tests/ files for the same pattern before reporting fix complete." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-ARCH-002/sprint-A7/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-ARCH-002/sprint-A7/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/32f233e> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-ARCH-002/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file ".just/tests/test_lint_identity_literals.py" ;
+  triage:snippet "\"team-lead\" (6+ occurrences)" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-ARCH-002/sprint-A7/2>
+  a triage:Occurrence ;
+  triage:file ".just/tests/test_lint_common.py" ;
+  triage:snippet "\"team-lead\"" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:worktree/sprint-A7/32f233e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "32f233e" ;
+  triage:orderIndex 7 .
