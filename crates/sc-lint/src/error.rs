@@ -83,7 +83,7 @@ impl Serialize for CliError {
             state.serialize_field(consts::FIELD_CAUSE, cause)?;
         }
         if let Some(suggested_action) = self.suggested_action.as_ref() {
-            state.serialize_field("suggested_action", suggested_action)?;
+            state.serialize_field(consts::FIELD_SUGGESTED_ACTION, suggested_action)?;
         }
         state.end()
     }

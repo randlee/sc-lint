@@ -1,5 +1,32 @@
 use serde::Serialize;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ServiceName(String);
+
+impl ServiceName {
+    pub(crate) fn new(value: &'static str) -> Result<Self, ServiceNameError> {
+        if value.is_empty() {
+            return Err(ServiceNameError);
+        }
+        Ok(Self(value.to_string()))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ServiceNameError;
+
+impl std::fmt::Display for ServiceNameError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("service names must not be empty")
+    }
+}
+
+impl std::error::Error for ServiceNameError {}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CommandEnvelope<T>
 where

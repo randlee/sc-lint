@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::path::Path;
 
 use sc_lint_boundary::AnalyzeOptions;
@@ -16,7 +17,7 @@ use crate::consts;
 
 #[derive(Debug)]
 enum BoundaryDispatchError {
-    Analysis(String),
+    Analysis(Box<dyn Error + Send + Sync>),
     Serialize(JsonError),
     Normalize(JsonError),
 }
@@ -31,10 +32,10 @@ impl BoundaryDispatchError {
                     |root| root.display().to_string()
                 )
             ))
-            .with_cause(error)
+            .with_source(error)
             .with_detail(consts::FIELD_TOOL, json!(tool))
             .with_detail(
-                "root",
+                consts::FIELD_ROOT,
                 json!(repo_root.map(|root| root.display().to_string())),
             ),
             Self::Serialize(error) => CliError::backend_protocol(format!(
@@ -66,7 +67,7 @@ pub fn run_sc_boundary(
         format: OutputFormat::Json,
         rule: None,
     })
-    .map_err(|error| BoundaryDispatchError::Analysis(error.to_string()))
+    .map_err(|error| BoundaryDispatchError::Analysis(Box::new(error)))
     .map_err(|error| error.into_cli_error(tool, Some(repo_root)))?;
 
     let raw = serde_json::to_string(&report)

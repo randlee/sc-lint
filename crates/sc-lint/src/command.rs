@@ -1,4 +1,3 @@
-use sc_observability::ServiceName;
 use serde_json::Value;
 use serde_json::json;
 
@@ -7,6 +6,7 @@ use crate::CliError;
 use crate::Command;
 use crate::config::LoadedConfig;
 use crate::consts;
+use crate::contract::ServiceName;
 use crate::dispatch;
 use crate::workflow;
 
@@ -205,8 +205,8 @@ impl CommandContext {
         self.command_id.as_str()
     }
 
-    pub fn service_name(&self) -> &ServiceName {
-        &self.service_name
+    pub fn service_name(&self) -> &str {
+        self.service_name.as_str()
     }
 
     pub(crate) const fn id(&self) -> CommandId {

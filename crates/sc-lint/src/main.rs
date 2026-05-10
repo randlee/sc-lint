@@ -32,13 +32,7 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
         }
     };
 
-    let observed = match logging::ObservedCommand::from_context(&context, &loaded_config) {
-        Ok(observed) => observed,
-        Err(error) => {
-            let rendered = sc_lint::render_failure(context.command_id(), cli.json, &error);
-            return sc_lint::write_rendered_output(rendered, error.exit_code());
-        }
-    };
+    let observed = logging::ObservedCommand::from_context(&context, &loaded_config);
 
     let logger = match logging::initialize_logger(&observed, &cli) {
         Ok(logger) => Some(logger),

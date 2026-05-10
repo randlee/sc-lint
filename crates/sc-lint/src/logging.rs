@@ -38,26 +38,24 @@ pub struct ObservedCommand<'a> {
 }
 
 impl<'a> ObservedCommand<'a> {
-    #[expect(
-        clippy::result_large_err,
-        reason = "The binary logging seam preserves the same top-level CliError contract as the library execution path."
-    )]
-    pub fn from_context(
-        context: &'a CommandContext,
-        loaded_config: &'a LoadedConfig,
-    ) -> Result<Self, CliError> {
-        Ok(Self {
+    pub fn from_context(context: &'a CommandContext, loaded_config: &'a LoadedConfig) -> Self {
+        Self {
             context,
             loaded_config,
-        })
+        }
     }
 
     fn command_id(&self) -> &str {
         self.context.command_id()
     }
 
-    fn service_name(&self) -> &ServiceName {
+    fn service_name(&self) -> &str {
         self.context.service_name()
+    }
+
+    fn observability_service_name(&self) -> ServiceName {
+        ServiceName::new(self.service_name())
+            .expect("command contexts validate static service names before logging starts")
     }
 
     fn summary(&self) -> &'static str {
@@ -93,8 +91,8 @@ impl LogRoot {
         &self.0
     }
 
-    fn active_log_path(&self, service_name: &ServiceName) -> PathBuf {
-        self.0.join(format!("{}.log.jsonl", service_name.as_str()))
+    fn active_log_path(&self, service_name: &str) -> PathBuf {
+        self.0.join(format!("{service_name}.log.jsonl"))
     }
 }
 
@@ -109,10 +107,10 @@ pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Lo
             .loaded_config()
             .logging_root()
             .or(cli.log_root.as_ref()),
-        observed.service_name().as_str(),
+        observed.service_name(),
     )?;
     let mut config = LoggerConfig::default_for(
-        observed.service_name().clone(),
+        observed.observability_service_name(),
         log_root.service_root().clone(),
     );
     let rotation = config.rotation;
@@ -134,20 +132,20 @@ pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Lo
 
 pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
     let mut fields = base_fields(observed);
-    fields.insert("json".to_string(), Value::Bool(cli.json));
+    fields.insert(consts::FIELD_JSON.to_string(), Value::Bool(cli.json));
     fields.insert(
-        "log_console".to_string(),
+        consts::FIELD_LOG_CONSOLE.to_string(),
         Value::Bool(observed.loaded_config().logging_console()),
     );
     if let Some(log_root) = cli.log_root.as_ref() {
         fields.insert(
-            "log_root_override".to_string(),
+            consts::FIELD_LOG_ROOT_OVERRIDE.to_string(),
             Value::String(log_root.display().to_string()),
         );
     }
     if let Some(repo_root) = observed.loaded_config().repo_root() {
         fields.insert(
-            "repo_root".to_string(),
+            consts::FIELD_REPO_ROOT.to_string(),
             Value::String(repo_root.display().to_string()),
         );
     }
@@ -158,7 +156,7 @@ pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
         );
     }
 
-    emit_event(
+    dispatch_event(
         logger,
         observed,
         Level::Info,
@@ -176,7 +174,7 @@ pub fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>, tool:
         Value::String(tool.to_string()),
     );
 
-    emit_event(
+    dispatch_event(
         logger,
         observed,
         Level::Info,
@@ -197,9 +195,12 @@ pub fn log_dispatch_result(
         consts::FIELD_TOOL.to_string(),
         Value::String(dispatch.tool().to_string()),
     );
-    fields.insert("finding_count".to_string(), json!(dispatch.finding_count()));
+    fields.insert(
+        consts::FIELD_FINDING_COUNT.to_string(),
+        json!(dispatch.finding_count()),
+    );
 
-    emit_event(
+    dispatch_event(
         logger,
         observed,
         Level::Info,
@@ -218,10 +219,16 @@ pub fn log_completion(
     elapsed: Duration,
 ) {
     let mut fields = base_fields(observed);
-    fields.insert("summary".to_string(), Value::String(summary.to_string()));
-    fields.insert("elapsed_ms".to_string(), Value::from(elapsed_ms(elapsed)));
+    fields.insert(
+        consts::FIELD_SUMMARY.to_string(),
+        Value::String(summary.to_string()),
+    );
+    fields.insert(
+        consts::FIELD_ELAPSED_MS.to_string(),
+        Value::from(elapsed_ms(elapsed)),
+    );
 
-    emit_event(
+    dispatch_event(
         logger,
         observed,
         Level::Info,
@@ -263,7 +270,7 @@ pub fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: &CliErr
         );
     }
 
-    emit_event(
+    dispatch_event(
         logger,
         observed,
         Level::Error,
@@ -282,7 +289,7 @@ pub fn shutdown(logger: &Logger) {
     let _ = logger.shutdown();
 }
 
-fn emit_event(
+fn dispatch_event(
     logger: &Logger,
     observed: &ObservedCommand<'_>,
     level: Level,
@@ -291,8 +298,12 @@ fn emit_event(
     message: Option<&str>,
     fields: Map<String, Value>,
 ) {
-    let Ok(event) = build_event(observed, level, action, outcome, message, fields) else {
-        return;
+    let event = match build_event(observed, level, action, outcome, message, fields) {
+        Ok(event) => event,
+        Err(error) => {
+            debug_assert!(false, "failed to build log event: {error}");
+            return;
+        }
     };
     let _ = logger.emit(event);
 }
@@ -313,7 +324,7 @@ fn build_event(
         version: schema_version().map_err(CliError::internal)?.clone(),
         timestamp: Timestamp::now_utc(),
         level,
-        service: observed.service_name().clone(),
+        service: observed.observability_service_name(),
         target: command_target().map_err(CliError::internal)?.clone(),
         action: action.map_err(CliError::internal)?,
         message: message.map(ToString::to_string),
@@ -332,14 +343,17 @@ fn build_event(
 fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
     let mut fields = Map::from_iter([
         (
-            "command".to_string(),
+            consts::FIELD_COMMAND.to_string(),
             Value::String(observed.command_id().to_string()),
         ),
-        ("summary".to_string(), json!(observed.summary())),
+        (consts::FIELD_SUMMARY.to_string(), json!(observed.summary())),
     ]);
     if observed.context.is_xwin_preflight() {
-        fields.insert("preflight_mode".to_string(), json!("xwin"));
-        fields.insert("target_triple".to_string(), json!(WINDOWS_XWIN_TARGET));
+        fields.insert(consts::FIELD_PREFLIGHT_MODE.to_string(), json!("xwin"));
+        fields.insert(
+            consts::FIELD_TARGET_TRIPLE.to_string(),
+            json!(WINDOWS_XWIN_TARGET),
+        );
     }
     fields
 }

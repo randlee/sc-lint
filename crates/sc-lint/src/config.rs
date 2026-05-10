@@ -70,6 +70,12 @@ impl RepoRoot {
     }
 }
 
+impl AsRef<Path> for RepoRoot {
+    fn as_ref(&self) -> &Path {
+        self.as_path()
+    }
+}
+
 impl LoadedConfig {
     #[expect(
         clippy::result_large_err,

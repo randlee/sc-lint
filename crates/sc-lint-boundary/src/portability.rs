@@ -24,6 +24,7 @@ use syn::Stmt;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
+use crate::CrateId;
 use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
@@ -117,9 +118,9 @@ pub(crate) fn analyze_portability(root: &Path) -> Result<Vec<Finding>> {
                 finding.line,
                 finding.message
             ),
-            owner_ids: vec![OwnerId::new(format!(
-                "crate::{}::{}",
-                finding.package, finding.target
+            owner_ids: vec![OwnerId::new(CrateId::from_parts(
+                &finding.package,
+                &finding.target,
             ))],
             node_ids: vec![NodeId::new(finding.node_label)],
         })
