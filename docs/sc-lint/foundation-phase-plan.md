@@ -257,7 +257,7 @@ Required outputs for the current release line:
 
 - one guide for `sc-lint-boundary`
 - one guide for `sc-lint-portability`
-- one guide for each remaining shipped lint surface in the repo-local gate
+- one guide for `sc-lint-runtime`
   that is treated as productized behavior
 - all guide files live under `docs/sc-lint/tools/`
 - all guide files are named after the tool they document
@@ -319,6 +319,7 @@ The scheduled implementation sprints for this phase are:
    - sprint plan: `docs/sc-lint/sprint-A7.md`
 9. `A.8`
    - per-tool user guides and rule-disable documentation
+   - active implementation branch: `feature/sprint-A8`
    - sprint plan: `docs/sc-lint/sprint-A8.md`
 
 These sprint plans are the authoritative implementation breakdown of the

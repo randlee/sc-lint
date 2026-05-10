@@ -45,6 +45,12 @@ Current contents:
   envelope and backend-to-CLI normalization contract
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
+- [`tools/sc-boundary.md`](./tools/sc-boundary.md) — user guide for
+  `sc-lint lint sc-boundary`
+- [`tools/sc-portability.md`](./tools/sc-portability.md) — user guide for
+  `sc-lint lint sc-portability`
+- [`tools/sc-runtime.md`](./tools/sc-runtime.md) — user guide for
+  `sc-lint lint sc-runtime`
 
 Current intended crate split:
 
