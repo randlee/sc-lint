@@ -17,18 +17,18 @@ pub struct DispatchTelemetry {
 }
 
 impl DispatchTelemetry {
-    pub const fn new(tool: &'static str, finding_count: usize) -> Self {
+    pub(crate) const fn new(tool: &'static str, finding_count: usize) -> Self {
         Self {
             tool,
             finding_count,
         }
     }
 
-    pub const fn tool(&self) -> &'static str {
+    pub fn tool(&self) -> &'static str {
         self.tool
     }
 
-    pub const fn finding_count(&self) -> usize {
+    pub fn finding_count(&self) -> usize {
         self.finding_count
     }
 }
@@ -184,14 +184,7 @@ impl CommandContext {
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
         let command_id = CommandId::from_cli_command(&cli.command);
-        let service_name = ServiceName::new(command_id.service_name()).map_err(|error| {
-            CliError::internal(format!(
-                "invalid service name `{}` for command `{}`",
-                command_id.service_name(),
-                command_id.as_str()
-            ))
-            .with_source(error)
-        })?;
+        let service_name = ServiceName::new(command_id.service_name());
 
         Ok(Self {
             command_id,

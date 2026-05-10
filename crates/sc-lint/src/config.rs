@@ -18,7 +18,7 @@ pub struct LoadedConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RepoRoot(PathBuf);
+pub(crate) struct RepoRoot(PathBuf);
 
 impl RepoRoot {
     #[expect(
@@ -61,10 +61,12 @@ impl RepoRoot {
         &self.0
     }
 
+    #[allow(dead_code)]
     pub fn to_path_buf(&self) -> PathBuf {
         self.0.clone()
     }
 
+    #[allow(dead_code)]
     pub fn display(&self) -> std::path::Display<'_> {
         self.0.display()
     }

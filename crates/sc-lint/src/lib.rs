@@ -22,19 +22,21 @@ use serde_json::Value;
 pub use cli::CheckTarget;
 pub use cli::Cli;
 pub use cli::ClippyTarget;
-pub use cli::Command;
+pub(crate) use cli::Command;
 pub use cli::LintProfile;
-pub use cli::LintTarget;
+pub(crate) use cli::LintTarget;
 pub use cli::OutputMode;
-pub use cli::ViewTarget;
+pub(crate) use cli::ViewTarget;
 pub use command::CommandContext;
 pub use command::DispatchTelemetry;
 pub use config::LoadedConfig;
-pub use config::RepoRoot;
+#[allow(unused_imports)]
+pub(crate) use config::RepoRoot;
 pub use contract::CommandEnvelope;
 pub use error::CliError;
-pub use error::CliErrorKind;
-pub use render::RenderedOutput;
+#[allow(unused_imports)]
+pub(crate) use error::CliErrorKind;
+pub(crate) use render::RenderedOutput;
 pub use workflow::WINDOWS_XWIN_TARGET;
 
 pub struct ImmediateOutcome {
@@ -57,7 +59,8 @@ pub struct ExecutionOutcome {
     pub dispatch: Option<DispatchTelemetry>,
 }
 
-pub fn run<I, T>(args: I) -> ExitCode
+#[allow(dead_code)]
+pub(crate) fn run<I, T>(args: I) -> ExitCode
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
@@ -204,7 +207,8 @@ pub fn write_rendered_output(rendered: RenderedOutput, exit_code: u8) -> ExitCod
     ExitCode::from(exit_code)
 }
 
-pub fn help_text() -> String {
+#[allow(dead_code)]
+pub(crate) fn help_text() -> String {
     let mut command = Cli::command();
     let mut bytes = Vec::new();
     command

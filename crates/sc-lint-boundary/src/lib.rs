@@ -40,19 +40,19 @@ const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Error)]
 pub enum BoundaryError {
-    #[error("failed to analyze portability for root `{}`", root.display())]
+    #[error("failed to analyze portability for root `{}`: {source:#}", root.display())]
     PortabilityAnalysis {
         root: PathBuf,
         #[source]
         source: anyhow::Error,
     },
-    #[error("failed to count scanned crates for root `{}`", root.display())]
+    #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
     ScannedCrateCount {
         root: PathBuf,
         #[source]
         source: anyhow::Error,
     },
-    #[error("failed to build workspace graph for root `{}`", root.display())]
+    #[error("failed to build workspace graph for root `{}`: {source:#}", root.display())]
     WorkspaceGraphBuild {
         root: PathBuf,
         #[source]
@@ -109,6 +109,7 @@ pub struct ExportGraphOptions {
 pub struct CrateId(String);
 
 impl CrateId {
+    /// Panics in debug builds if the input string is empty.
     pub fn new(value: impl Into<String>) -> Self {
         let value = value.into();
         debug_assert!(!value.is_empty(), "crate ids must not be empty");
@@ -161,6 +162,7 @@ impl From<&CrateId> for String {
 pub struct NodeId(String);
 
 impl NodeId {
+    /// Panics in debug builds if the input string is empty.
     pub fn new(value: impl Into<String>) -> Self {
         let value = value.into();
         debug_assert!(!value.is_empty(), "node ids must not be empty");
@@ -227,6 +229,7 @@ impl PartialEq<String> for NodeId {
 pub struct OwnerId(String);
 
 impl OwnerId {
+    /// Panics in debug builds if the input string is empty.
     pub fn new(value: impl Into<String>) -> Self {
         let value = value.into();
         debug_assert!(!value.is_empty(), "owner ids must not be empty");
@@ -679,12 +682,14 @@ pub fn analyze_workspace(
     })
 }
 
-pub fn export_workspace_graph(options: &ExportGraphOptions) -> Result<GraphExport> {
-    graph::build_workspace_graph(&options.root).with_context(|| {
-        format!(
-            "failed to build workspace graph for root: {}",
-            options.root.display()
-        )
+pub fn export_workspace_graph(
+    options: &ExportGraphOptions,
+) -> std::result::Result<GraphExport, BoundaryError> {
+    graph::build_workspace_graph(&options.root).map_err(|source| {
+        BoundaryError::WorkspaceGraphBuild {
+            root: options.root.clone(),
+            source,
+        }
     })
 }
 

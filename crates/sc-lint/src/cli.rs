@@ -19,11 +19,11 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub log_console: bool,
     #[command(subcommand)]
-    pub command: Command,
+    pub(crate) command: Command,
 }
 
 #[derive(Debug, Clone, Subcommand)]
-pub enum Command {
+pub(crate) enum Command {
     Lint {
         #[arg(value_enum)]
         target: LintTarget,
@@ -80,7 +80,7 @@ impl OutputMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum LintTarget {
+pub(crate) enum LintTarget {
     #[value(name = "sc-boundary")]
     ScBoundary,
     #[value(name = "sc-portability")]
@@ -96,6 +96,7 @@ pub enum LintTarget {
 }
 
 impl LintTarget {
+    #[allow(dead_code)]
     pub const fn command_suffix(self) -> &'static str {
         match self {
             Self::ScBoundary => "sc-boundary",
@@ -107,6 +108,7 @@ impl LintTarget {
         }
     }
 
+    #[allow(dead_code)]
     pub const fn profile(self) -> Option<LintProfile> {
         match self {
             Self::Fast => Some(LintProfile::Fast),
@@ -118,7 +120,7 @@ impl LintTarget {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum ViewTarget {
+pub(crate) enum ViewTarget {
     #[value(name = "graph")]
     Graph,
     #[value(name = "findings")]
@@ -126,6 +128,7 @@ pub enum ViewTarget {
 }
 
 impl ViewTarget {
+    #[allow(dead_code)]
     pub const fn command_suffix(self) -> &'static str {
         match self {
             Self::Graph => "graph",

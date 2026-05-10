@@ -55,7 +55,7 @@ impl<'a> ObservedCommand<'a> {
 
     fn observability_service_name(&self) -> ServiceName {
         ServiceName::new(self.service_name())
-            .expect("command contexts validate static service names before logging starts")
+            .expect("command contexts only produce valid static observability service names")
     }
 
     fn summary(&self) -> &'static str {
@@ -251,7 +251,7 @@ pub fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: &CliErr
     );
     fields.insert(
         consts::FIELD_KIND.to_string(),
-        Value::String(format!("{:?}", error.kind).to_lowercase()),
+        Value::String(error.kind_label().to_string()),
     );
     fields.insert(
         consts::FIELD_MESSAGE.to_string(),
