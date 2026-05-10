@@ -11,7 +11,7 @@ use crate::command::CommandSuccess;
 use crate::command::DispatchTelemetry;
 use crate::config::LoadedConfig;
 
-pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
+pub const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PythonTool {

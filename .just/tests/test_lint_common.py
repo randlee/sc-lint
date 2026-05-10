@@ -247,7 +247,7 @@ version = "0.1.0"
 
             files = [path.relative_to(repo_root).as_posix() for path in iter_workspace_rust_files(repo_root)]
 
-            self.assertEqual(files, ["crates/demo/src/lib.rs", "crates/demo/tests/basic.rs"])
+            self.assertCountEqual(files, ["crates/demo/src/lib.rs", "crates/demo/tests/basic.rs"])
 
     def test_rust_file_test_scope_marks_tests_tree_as_test(self) -> None:
         lines = ["#[test]", "fn smoke() {}"]

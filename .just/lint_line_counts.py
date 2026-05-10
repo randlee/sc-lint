@@ -243,8 +243,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str]) -> int:
-    args = parse_args(argv)
     try:
+        args = parse_args(argv)
         repo_root = discover_repo_root(args.root)
         config = load_config(repo_root)
         started = monotonic_now()
@@ -268,6 +268,19 @@ def main(argv: list[str]) -> int:
             return 3 if error.kind == "config" else 1
         print(error.message, file=sys.stderr)
         return 3 if error.kind == "config" else 1
+    except Exception as error:  # pragma: no cover - contract guardrail
+        payload = error_payload(
+            AdapterError(
+                "backend_protocol",
+                f"failed to evaluate line counts: {error}",
+                details={"tool": f"sc-lint-{TOOL_NAME}"},
+            )
+        )
+        if "args" in locals() and args.json:
+            write_adapter_json(payload)
+            return 1
+        print(payload["error"]["message"], file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
