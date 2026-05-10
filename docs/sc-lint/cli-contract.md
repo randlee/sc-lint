@@ -69,10 +69,16 @@ Initial convention:
 
 - `sc-lint lint sc-boundary`
   - `lint.sc-boundary`
+- `sc-lint lint line-counts`
+  - `lint.line-counts`
+- `sc-lint lint identity-literals`
+  - `lint.identity-literals`
 - `sc-lint lint fast`
   - `lint.fast`
-- `sc-lint view <target>`
-  - `view.<target>`
+- `sc-lint view findings`
+  - `view.findings`
+- `sc-lint view graph`
+  - `view.graph`
 - `sc-lint check xwin`
   - `check.xwin`
 - `sc-lint clippy xwin`
@@ -107,8 +113,14 @@ Current implementation status:
   - implemented capability-gated Windows clippy path
 - `ci`
   - implemented top-level lint-plus-tests path
-- `view.*`
-  - still reserved until A.3 lands
+- `lint.line-counts`
+  - implemented Python-adapter lint path
+- `lint.identity-literals`
+  - implemented Python-adapter lint path
+- `view.findings`
+  - implemented Python-adapter view path
+- `view.graph`
+  - still reserved pending a stable graph contract
 - `lint.sc-portability`
   - still reserved until A.4 lands
 - `lint.sc-runtime`
@@ -258,6 +270,20 @@ If the delegated binary:
   - emit `CLI.BACKEND_EXEC_FAILURE`
 - exits zero with malformed machine-readable output
   - emit `CLI.BACKEND_PROTOCOL_ERROR`
+
+### Python adapter backend
+
+For Python-backed utility paths in A.3:
+
+- the CLI invokes the Python tool with `--json`
+- the Python tool emits `sc-lint-python-v1`
+- the CLI validates the adapter schema before exposing any success payload
+- adapter-reported failures map into `CliError` by structured fields:
+  - `kind`
+  - `message`
+  - optional `details`
+  - optional `suggested_action`
+- raw traceback text is not part of the public machine contract
 
 ### Python backend
 

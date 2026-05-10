@@ -302,6 +302,10 @@ Requirement coverage:
 - `A.3`
   - add Python utility entry/exit/error logging through the adapter-normalized
     CLI event pattern
+  - include adapter metadata fields such as:
+    - adapter kind
+    - config scope
+    - delegated script path
 - `A.4`
   - add `sc-portability` analyzer entry/exit/finding-count logging to the
     delegated backend pattern

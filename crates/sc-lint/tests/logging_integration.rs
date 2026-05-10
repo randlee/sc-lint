@@ -150,6 +150,55 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     );
 }
 
+#[test]
+fn python_backed_commands_log_adapter_metadata() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-python");
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "line-counts",
+        ])
+        .output()
+        .expect("python-backed command runs");
+    assert!(
+        output.status.success(),
+        "python-backed stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.started",
+        "adapter",
+        "python-json-v1",
+    );
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.started",
+        "config_scope",
+        "line_counts",
+    );
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.started",
+        "script",
+        ".just/lint_line_counts.py",
+    );
+    assert_log_file_contains_action(&log_path, "cli.dispatch.started");
+    assert_log_file_contains_action(&log_path, "cli.dispatch.normalized");
+}
+
 fn assert_log_file_contains_action(path: &Path, action: &str) {
     let contents = std::fs::read_to_string(path).expect("log file exists");
     assert!(

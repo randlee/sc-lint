@@ -5,8 +5,8 @@ plan_type: sprint_plan
 phase: A
 sprint: "A.3"
 worktree: <repo-root>
-branch: develop
-status: planned
+branch: feature/sprint-A3
+status: completed
 estimated_scope: M
 ```
 

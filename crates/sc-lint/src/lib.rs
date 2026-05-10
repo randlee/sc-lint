@@ -4,6 +4,7 @@ mod config;
 mod contract;
 mod dispatch;
 mod error;
+pub mod python_adapter;
 mod render;
 mod workflow;
 
@@ -106,12 +107,19 @@ pub fn execute(
         Ok(success) => {
             let envelope = CommandEnvelope::success(context.command_id(), success.data);
             let rendered = render_success(&context, output_mode, &envelope);
+            let summary = envelope
+                .data
+                .as_ref()
+                .and_then(|value| value.get("summary"))
+                .and_then(Value::as_str)
+                .unwrap_or("command completed")
+                .to_string();
             ExecutionOutcome {
                 context,
                 rendered,
                 exit_code: 0,
                 ok: true,
-                summary: "command completed".to_string(),
+                summary,
                 error: None,
                 dispatch: success.dispatch,
             }

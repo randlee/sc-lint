@@ -277,12 +277,19 @@ Required work:
 - add standalone fixture tests
 - keep repo wrappers thin in the consumer repo
 - expose extracted utilities through the top-level `sc-lint` CLI
+- normalize Python utility machine output through one adapter schema
+  (`sc-lint-python-v1`) before the top-level CLI wraps results into
+  `CommandEnvelope<T>` or `CliError`
 
 Deliverable:
 
 - `sc-lint` owns the generic Python utilities
 - consumer repos call them through local wrappers or direct `sc-lint`
   invocation
+- the initial extracted command surfaces are:
+  - `sc-lint lint line-counts`
+  - `sc-lint lint identity-literals`
+  - `sc-lint view findings`
 
 Phase 1 note on identity literals:
 

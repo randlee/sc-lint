@@ -8,6 +8,7 @@ use sc_lint::CommandContext;
 use sc_lint::DispatchTelemetry;
 use sc_lint::LoadedConfig;
 use sc_lint::WINDOWS_XWIN_TARGET;
+use sc_lint::python_adapter;
 use sc_observability::ActionName;
 use sc_observability::JsonlFileSink;
 use sc_observability::Level;
@@ -315,6 +316,17 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
     if matches!(observed.command_id(), "check.xwin" | "clippy.xwin") {
         fields.insert("preflight_mode".to_string(), json!("xwin"));
         fields.insert("target_triple".to_string(), json!(WINDOWS_XWIN_TARGET));
+    }
+    if let Some(adapter_kind) = python_adapter::adapter_kind_for_command(observed.command_id()) {
+        fields.insert("adapter".to_string(), json!(adapter_kind));
+    }
+    if let Some(config_scope) =
+        python_adapter::adapter_config_scope_for_command(observed.command_id())
+    {
+        fields.insert("config_scope".to_string(), json!(config_scope));
+    }
+    if let Some(script) = python_adapter::adapter_script_for_command(observed.command_id()) {
+        fields.insert("script".to_string(), json!(script));
     }
     fields
 }

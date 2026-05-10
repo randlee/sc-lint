@@ -80,6 +80,15 @@ pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope
                 .map_or(0, std::vec::Vec::len);
             format!("{}: {status} ({step_count} steps)", context.command_id())
         }
+        "lint.line-counts" | "lint.identity-literals" | "view.findings" => envelope
+            .data
+            .as_ref()
+            .and_then(|value| value.get("summary"))
+            .and_then(Value::as_str)
+            .map_or_else(
+                || format!("{}: ok", context.command_id()),
+                |summary| format!("{}: {summary}", context.command_id()),
+            ),
         _ => format!("{}: ok", context.command_id()),
     }
 }

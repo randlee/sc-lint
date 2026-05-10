@@ -39,6 +39,22 @@ fn command_surface_parses_the_initial_grouped_shape() {
         }
     ));
 
+    let cli = Cli::parse_from(["sc-lint", "lint", "line-counts"]);
+    assert!(matches!(
+        cli.command,
+        Command::Lint {
+            target: LintTarget::LineCounts
+        }
+    ));
+
+    let cli = Cli::parse_from(["sc-lint", "view", "findings"]);
+    assert!(matches!(
+        cli.command,
+        Command::View {
+            target: ViewTarget::Findings
+        }
+    ));
+
     let cli = Cli::parse_from(["sc-lint", "check", "xwin"]);
     assert!(matches!(
         cli.command,
@@ -84,10 +100,7 @@ fn version_success_uses_the_canonical_top_level_envelope() {
 
 #[test]
 fn reserved_view_commands_use_the_same_failure_envelope_shape() {
-    let commands = [
-        Cli::parse_from(["sc-lint", "--json", "view", "graph"]),
-        Cli::parse_from(["sc-lint", "--json", "view", "findings"]),
-    ];
+    let commands = [Cli::parse_from(["sc-lint", "--json", "view", "graph"])];
 
     for cli in commands {
         let context = CommandContext::from_cli(&cli);
@@ -146,6 +159,7 @@ fn lint_targets_map_profile_values_stably() {
     assert_eq!(LintTarget::Full.profile(), Some(crate::LintProfile::Full));
     assert_eq!(LintTarget::Ci.profile(), Some(crate::LintProfile::Ci));
     assert_eq!(LintTarget::ScBoundary.profile(), None);
+    assert_eq!(LintTarget::LineCounts.profile(), None);
 }
 
 #[test]
@@ -288,6 +302,59 @@ fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
         loaded.require_repo_root().expect("repo root"),
         repo_root.as_path()
     );
+}
+
+#[test]
+fn python_backed_lints_and_views_normalize_through_the_top_level_envelope() {
+    let repo_root = workspace_root();
+    for (args, command_id) in [
+        (
+            [
+                "sc-lint",
+                "--json",
+                "--root",
+                repo_root.to_str().expect("repo root"),
+                "lint",
+                "line-counts",
+            ],
+            "lint.line-counts",
+        ),
+        (
+            [
+                "sc-lint",
+                "--json",
+                "--root",
+                repo_root.to_str().expect("repo root"),
+                "lint",
+                "identity-literals",
+            ],
+            "lint.identity-literals",
+        ),
+        (
+            [
+                "sc-lint",
+                "--json",
+                "--root",
+                repo_root.to_str().expect("repo root"),
+                "view",
+                "findings",
+            ],
+            "view.findings",
+        ),
+    ] {
+        let cli = Cli::parse_from(args);
+        let context = CommandContext::from_cli(&cli);
+        let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+        let success =
+            crate::command::execute(&context, &loaded).expect("python-backed command succeeds");
+        let envelope = CommandEnvelope::success(context.command_id(), success.data);
+        let rendered = crate::render::render_success_json(&envelope);
+        let json: Value = serde_json::from_str(&rendered).expect("success json");
+
+        assert_eq!(json["ok"], true);
+        assert_eq!(json["command"], command_id);
+        assert_eq!(json["data"]["adapter"], "python-json-v1");
+    }
 }
 
 #[test]

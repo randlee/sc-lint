@@ -6,6 +6,7 @@ use crate::CliError;
 use crate::Command;
 use crate::config::LoadedConfig;
 use crate::dispatch;
+use crate::python_adapter;
 use crate::workflow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,6 +71,9 @@ impl CommandContext {
                     crate::LintTarget::ScBoundary => "sc-boundary",
                     crate::LintTarget::ScPortability => "sc-portability",
                     crate::LintTarget::ScRuntime => "sc-runtime",
+                    crate::LintTarget::LineCounts | crate::LintTarget::IdentityLiterals => {
+                        "sc-lint"
+                    }
                     crate::LintTarget::Fast | crate::LintTarget::Full | crate::LintTarget::Ci => {
                         "sc-lint"
                     }
@@ -80,6 +84,10 @@ impl CommandContext {
                         "reserved portability analyzer contract surface"
                     }
                     crate::LintTarget::ScRuntime => "reserved runtime analyzer contract surface",
+                    crate::LintTarget::LineCounts => "python-backed line-count lint path",
+                    crate::LintTarget::IdentityLiterals => {
+                        "python-backed identity literal lint path"
+                    }
                     crate::LintTarget::Fast | crate::LintTarget::Full | crate::LintTarget::Ci => {
                         "lint profile orchestration path"
                     }
@@ -89,7 +97,10 @@ impl CommandContext {
             Command::View { target } => Self {
                 command_id: format!("view.{}", target.command_suffix()),
                 service_name: "sc-lint",
-                summary: "reserved view contract surface",
+                summary: match target {
+                    crate::ViewTarget::Graph => "reserved view contract surface",
+                    crate::ViewTarget::Findings => "python-backed findings view path",
+                },
                 requires_repo_root: true,
             },
             Command::Check { target } => Self {
@@ -138,6 +149,9 @@ impl CommandContext {
     pub fn dispatch_tool(&self) -> Option<&'static str> {
         match self.command_id.as_str() {
             "lint.sc-boundary" => Some("sc-lint-boundary"),
+            "lint.line-counts" => Some("sc-lint-line-counts"),
+            "lint.identity-literals" => Some("sc-lint-identity-literals"),
+            "view.findings" => Some("sc-lint-view-findings"),
             _ => None,
         }
     }
@@ -166,13 +180,23 @@ pub fn execute(
         "lint.sc-runtime" => {
             reserved_command(context, "A.5 will add the runtime analyzer backend path.")
         }
+        "lint.line-counts" => {
+            python_adapter::run_python_tool(loaded_config, python_adapter::PythonTool::LineCounts)
+        }
+        "lint.identity-literals" => python_adapter::run_python_tool(
+            loaded_config,
+            python_adapter::PythonTool::IdentityLiterals,
+        ),
         "lint.fast" => workflow::run_lint_profile(loaded_config, crate::LintProfile::Fast),
         "lint.full" => workflow::run_lint_profile(loaded_config, crate::LintProfile::Full),
         "lint.ci" => workflow::run_lint_profile(loaded_config, crate::LintProfile::Ci),
-        "view.graph" | "view.findings" => reserved_command(
+        "view.graph" => reserved_command(
             context,
-            "A.3 will connect the reserved view surfaces to extracted utility paths.",
+            "A later sprint will connect graph-oriented view surfaces once the contract is stable.",
         ),
+        "view.findings" => {
+            python_adapter::run_python_tool(loaded_config, python_adapter::PythonTool::ViewFindings)
+        }
         "check.native" => workflow::run_check(loaded_config, crate::CheckTarget::Native),
         "check.xwin" => workflow::run_check(loaded_config, crate::CheckTarget::Xwin),
         "clippy.native" => workflow::run_clippy(loaded_config, crate::ClippyTarget::Native),
@@ -191,7 +215,7 @@ pub fn execute(
 )]
 fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<CommandSuccess, CliError> {
     Err(CliError::capability(format!(
-        "{} is a reserved contract surface in Sprint A.1b. {follow_up}",
+        "{} is a reserved contract surface. {follow_up}",
         context.command_id()
     )))
 }

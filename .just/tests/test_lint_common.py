@@ -13,6 +13,8 @@ if str(JUST_DIR) not in sys.path:
 
 from lint_common import build_report
 from lint_common import classify_rust_test_scope
+from lint_common import iter_string_literal_contents
+from lint_common import iter_workspace_rust_files
 from lint_common import LintDirectivePolicy
 from lint_common import lint_slug
 from lint_common import line_is_suppressed
@@ -20,6 +22,7 @@ from lint_common import load_lint_config
 from lint_common import make_log_path
 from lint_common import relative_log_path
 from lint_common import render_workspace_crate_table
+from lint_common import rust_file_test_scope
 from lint_common import workspace_crate_section_lines
 from lint_common import workspace_crates
 
@@ -212,6 +215,44 @@ version = "0.1.0"
         scope = classify_rust_test_scope(lines)
 
         self.assertEqual(scope, [False, True, True, True, True, True])
+
+    def test_iter_string_literal_contents_supports_raw_and_escaped_literals(self) -> None:
+        line = 'let a = "team\\nlead"; let b = r#"team-lead"#;'
+        self.assertEqual(iter_string_literal_contents(line), ["team\nlead", "team-lead"])
+
+    def test_iter_workspace_rust_files_includes_src_and_tests(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                """\
+[workspace]
+members = ["crates/demo"]
+resolver = "2"
+""",
+                encoding="utf-8",
+            )
+            crate_root = repo_root / "crates/demo"
+            (crate_root / "src").mkdir(parents=True)
+            (crate_root / "tests").mkdir(parents=True)
+            (crate_root / "Cargo.toml").write_text(
+                """\
+[package]
+name = "demo"
+version = "0.1.0"
+""",
+                encoding="utf-8",
+            )
+            (crate_root / "src/lib.rs").write_text("pub fn run() {}\n", encoding="utf-8")
+            (crate_root / "tests/basic.rs").write_text("#[test]\nfn smoke() {}\n", encoding="utf-8")
+
+            files = [path.relative_to(repo_root).as_posix() for path in iter_workspace_rust_files(repo_root)]
+
+            self.assertEqual(files, ["crates/demo/src/lib.rs", "crates/demo/tests/basic.rs"])
+
+    def test_rust_file_test_scope_marks_tests_tree_as_test(self) -> None:
+        lines = ["#[test]", "fn smoke() {}"]
+        scope = rust_file_test_scope(Path("crates/demo/tests/basic.rs"), lines)
+        self.assertEqual(scope, [True, True])
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 [planning]
 # current_sprint denotes the active, in-progress sprint. Planned items
 # scheduled for this sprint remain warning-eligible until the sprint advances.
-current_sprint = "A.2"
+current_sprint = "A.3"
 
 [planned_items."BOUNDARY-ScLintCli.implementation.module"]
 scheduled_sprint = "A.1a"

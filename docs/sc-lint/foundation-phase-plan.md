@@ -148,6 +148,7 @@ Requirements:
 - consumer-neutral naming
 - standalone fixture tests
 - top-level CLI exposure once the CLI exists
+- Python Adapter Protocol normalization rather than traceback scraping
 
 ### Workstream 5: Boundary logic migration to Rust
 
