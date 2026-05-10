@@ -3,6 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use serde_json::Value;
 
 use crate::Cli;
 use crate::CliError;
@@ -10,13 +11,70 @@ use crate::command::CommandContext;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedConfig {
-    repo_root: Option<PathBuf>,
+    repo_root: Option<RepoRoot>,
     config_path: Option<PathBuf>,
     logging_root: Option<PathBuf>,
     logging_console: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepoRoot(PathBuf);
+
+impl RepoRoot {
+    #[expect(
+        clippy::result_large_err,
+        reason = "Repo-root discovery failures are part of the stable top-level CliError contract."
+    )]
+    fn discover(start: &Path) -> Result<Self, CliError> {
+        let mut current = if start.is_dir() {
+            start.to_path_buf()
+        } else {
+            start
+                .parent()
+                .map_or_else(|| start.to_path_buf(), Path::to_path_buf)
+        };
+        current = current.canonicalize().map_err(|error| {
+            CliError::config(format!(
+                "failed to canonicalize repo-root discovery start `{}`",
+                start.display()
+            ))
+            .with_source(error)
+        })?;
+
+        loop {
+            if current.join("Cargo.toml").is_file() && current.join("boundaries").is_dir() {
+                return Ok(Self(current));
+            }
+            if !current.pop() {
+                return Err(CliError::config(format!(
+                    "could not discover the sc-lint repo root from `{}`",
+                    start.display()
+                ))
+                .with_suggested_action(
+                    "Run the command inside the repo or pass `--root <path>` to the workspace root.",
+                ));
+            }
+        }
+    }
+
+    pub fn as_path(&self) -> &Path {
+        &self.0
+    }
+
+    pub fn to_path_buf(&self) -> PathBuf {
+        self.0.clone()
+    }
+
+    pub fn display(&self) -> std::path::Display<'_> {
+        self.0.display()
+    }
+}
+
 impl LoadedConfig {
+    #[expect(
+        clippy::result_large_err,
+        reason = "Config loading failures are part of the stable top-level CliError contract."
+    )]
     pub fn load(cli: &Cli, context: &CommandContext) -> Result<Self, CliError> {
         if !context.requires_repo_root() {
             return Ok(Self {
@@ -31,11 +89,11 @@ impl LoadedConfig {
             root.clone()
         } else {
             std::env::current_dir().map_err(|error| {
-                CliError::config(format!("failed to read current directory: {error}"))
+                CliError::config("failed to read current directory").with_source(error)
             })?
         };
-        let repo_root = discover_repo_root(&discovery_base)?;
-        let config_path = find_repo_config(&repo_root);
+        let repo_root = RepoRoot::discover(&discovery_base)?;
+        let config_path = find_repo_config(repo_root.as_path());
         let file_config = if let Some(path) = config_path.as_ref() {
             parse_repo_config(path)?
         } else {
@@ -47,7 +105,7 @@ impl LoadedConfig {
                 .logging
                 .as_ref()
                 .and_then(|logging| logging.root.as_ref())
-                .map(|path| resolve_repo_relative_path(&repo_root, path))
+                .map(|path| resolve_repo_relative_path(repo_root.as_path(), path))
         });
         let logging_console = if cli.log_console {
             true
@@ -68,13 +126,20 @@ impl LoadedConfig {
     }
 
     pub fn repo_root(&self) -> Option<&Path> {
-        self.repo_root.as_deref()
+        self.repo_root.as_ref().map(RepoRoot::as_path)
     }
 
+    #[expect(
+        clippy::result_large_err,
+        reason = "Commands that require a repo root must surface failures through the shared CliError contract."
+    )]
     pub fn require_repo_root(&self) -> Result<&Path, CliError> {
-        self.repo_root.as_deref().ok_or_else(|| {
-            CliError::internal("repo root required but configuration did not resolve one")
-        })
+        self.repo_root
+            .as_ref()
+            .map(RepoRoot::as_path)
+            .ok_or_else(|| {
+                CliError::internal("repo root required but configuration did not resolve one")
+            })
     }
 
     pub fn config_path(&self) -> Option<&Path> {
@@ -101,37 +166,6 @@ struct LoggingConfigFile {
     console: Option<bool>,
 }
 
-fn discover_repo_root(start: &Path) -> Result<PathBuf, CliError> {
-    let mut current = if start.is_dir() {
-        start.to_path_buf()
-    } else {
-        start
-            .parent()
-            .map_or_else(|| start.to_path_buf(), Path::to_path_buf)
-    };
-    current = current.canonicalize().map_err(|error| {
-        CliError::config(format!(
-            "failed to canonicalize repo-root discovery start `{}`: {error}",
-            start.display()
-        ))
-    })?;
-
-    loop {
-        if current.join("Cargo.toml").is_file() && current.join("boundaries").is_dir() {
-            return Ok(current);
-        }
-        if !current.pop() {
-            return Err(CliError::config(format!(
-                "could not discover the sc-lint repo root from `{}`",
-                start.display()
-            ))
-            .with_suggested_action(
-                "Run the command inside the repo or pass `--root <path>` to the workspace root.",
-            ));
-        }
-    }
-}
-
 fn find_repo_config(repo_root: &Path) -> Option<PathBuf> {
     ["sc-lint.toml", ".just/lint-config.toml"]
         .into_iter()
@@ -139,22 +173,19 @@ fn find_repo_config(repo_root: &Path) -> Option<PathBuf> {
         .find(|path| path.exists())
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Repo config parse failures are part of the stable top-level CliError contract."
+)]
 fn parse_repo_config(path: &Path) -> Result<RepoConfigFile, CliError> {
     let text = fs::read_to_string(path).map_err(|error| {
-        CliError::config(format!(
-            "failed to read repo config `{}`: {error}",
-            path.display()
-        ))
+        CliError::config(format!("failed to read repo config `{}`", path.display()))
+            .with_source(error)
     })?;
     toml::from_str(&text).map_err(|error| {
-        CliError::config(format!(
-            "failed to parse repo config `{}`: {error}",
-            path.display()
-        ))
-        .with_detail(
-            "config_path",
-            serde_json::Value::String(path.display().to_string()),
-        )
+        CliError::config(format!("failed to parse repo config `{}`", path.display()))
+            .with_source(error)
+            .with_detail("config_path", Value::String(path.display().to_string()))
     })
 }
 

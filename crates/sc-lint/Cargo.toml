@@ -19,11 +19,10 @@ path = "src/lib.rs"
 
 [dependencies]
 clap.workspace = true
-sc-observability = { version = "1.0.0", path = "../../../../../sc-observability/crates/sc-observability" }
+sc-observability.workspace = true
 sc-lint-boundary = { version = "0.1.0", path = "../sc-lint-boundary" }
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
 toml.workspace = true
 
 [dev-dependencies]

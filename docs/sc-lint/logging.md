@@ -29,11 +29,10 @@ The planned dependency is:
 - crate:
   - `sc-observability`
 - source:
-  - repo-adjacent workspace checkout declared through a path dependency in
-    `Cargo.toml`
+  - published Cargo dependency resolved through crates.io
 - integration mode:
-  - path dependency from the `sc-lint` crate during local workspace
-    development
+  - regular workspace dependency from the `sc-lint` crate so CI runners and
+    local development use the same source of truth
 
 The design depends on the following public surface:
 
@@ -201,7 +200,10 @@ Planned controls:
 - config key:
   - `logging.console`
 
-When enabled, the CLI registers `ConsoleSink` through `LoggerBuilder`.
+When enabled, the A.1a bootstrap turns on
+`LoggerConfig.enable_console_sink` before `LoggerBuilder::new(...)`. Later
+sprints should preserve the same CLI surface unless explicit per-sink
+filtering becomes necessary.
 
 ## Concurrency Model
 

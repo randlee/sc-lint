@@ -69,7 +69,7 @@ pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope
 }
 
 pub fn render_error_human(command_id: &str, error: &CliError) -> String {
-    let mut rendered = format!("{command_id}: {} ({})", error.message, error.code);
+    let mut rendered = format!("{command_id}: {} ({})", error.message, error.code());
     if let Some(suggested_action) = error.suggested_action.as_deref() {
         rendered.push('\n');
         rendered.push_str(suggested_action);

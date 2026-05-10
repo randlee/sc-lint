@@ -1,4 +1,3 @@
-use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -67,8 +66,8 @@ fn version_success_uses_the_canonical_top_level_envelope() {
     let cli = Cli::parse_from(["sc-lint", "--json", "version"]);
     let context = CommandContext::from_cli(&cli);
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let data = crate::command::execute(&context, &loaded, None).expect("version command succeeds");
-    let envelope = CommandEnvelope::success(context.command_id(), data);
+    let success = crate::command::execute(&context, &loaded).expect("version command succeeds");
+    let envelope = CommandEnvelope::success(context.command_id(), success.data);
     let rendered = crate::render::render_success_json(&envelope);
     let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
 
@@ -91,8 +90,8 @@ fn every_initial_command_family_uses_the_same_failure_envelope_shape() {
     for cli in commands {
         let context = CommandContext::from_cli(&cli);
         let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-        let error = crate::command::execute(&context, &loaded, None)
-            .expect_err("command is reserved in A.1b");
+        let error =
+            crate::command::execute(&context, &loaded).expect_err("command is reserved in A.1b");
         let rendered = crate::render::render_error_json(context.command_id(), &error);
         let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
 
@@ -106,47 +105,27 @@ fn every_initial_command_family_uses_the_same_failure_envelope_shape() {
 }
 
 #[test]
+fn version_failure_uses_the_canonical_top_level_envelope() {
+    let error = CliError::internal("version rendering failure");
+    let rendered = crate::render::render_error_json("version", &error);
+    let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
+
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["command"], "version");
+    assert_eq!(json["error"]["code"], "CLI.INTERNAL_ERROR");
+}
+
+#[test]
 fn cli_error_exit_codes_are_stable_by_kind() {
     assert_eq!(CliError::usage("bad args").exit_code(), 2);
     assert_eq!(CliError::config("bad config").exit_code(), 3);
     assert_eq!(CliError::capability("missing capability").exit_code(), 4);
+    assert_eq!(CliError::backend_failure("backend failed").exit_code(), 5);
+    assert_eq!(
+        CliError::backend_protocol("backend malformed").exit_code(),
+        6
+    );
     assert_eq!(CliError::internal("bug").exit_code(), 1);
-}
-
-#[test]
-fn logger_bootstrap_writes_entry_completion_and_error_records() {
-    let repo_root = workspace_root();
-    let temp_dir = TempDir::new().expect("temp dir");
-    let temp_root = temp_dir.path().join("logs");
-
-    let success_exit = crate::run([
-        OsString::from("sc-lint"),
-        OsString::from("--json"),
-        OsString::from("--log-root"),
-        OsString::from(temp_root.display().to_string()),
-        OsString::from("version"),
-    ]);
-    assert_eq!(success_exit, std::process::ExitCode::from(0));
-
-    let failure_exit = crate::run([
-        OsString::from("sc-lint"),
-        OsString::from("--json"),
-        OsString::from("--root"),
-        OsString::from(repo_root.display().to_string()),
-        OsString::from("--log-root"),
-        OsString::from(temp_root.display().to_string()),
-        OsString::from("lint"),
-        OsString::from("sc-boundary"),
-    ]);
-    assert_eq!(failure_exit, std::process::ExitCode::from(0));
-
-    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
-    assert_log_file_contains_action(&log_path, "cli.command.started");
-    assert_log_file_contains_action(&log_path, "cli.command.completed");
-
-    let error_log_path = temp_root.join("sc-boundary").join("sc-boundary.log.jsonl");
-    assert_log_file_contains_action(&error_log_path, "cli.dispatch.started");
-    assert_log_file_contains_action(&error_log_path, "cli.dispatch.normalized");
 }
 
 #[test]
@@ -154,8 +133,7 @@ fn reserved_commands_report_capability_errors() {
     let cli = Cli::parse_from(["sc-lint", "check", "xwin"]);
     let context = CommandContext::from_cli(&cli);
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let error =
-        crate::command::execute(&context, &loaded, None).expect_err("reserved command fails");
+    let error = crate::command::execute(&context, &loaded).expect_err("reserved command fails");
 
     assert_eq!(error.kind, CliErrorKind::Capability);
     assert!(error.message.contains("Sprint A.1b"));
@@ -205,6 +183,7 @@ fn malformed_repo_config_returns_cli_config_error() {
 
     assert_eq!(error.kind, CliErrorKind::Config);
     assert!(error.message.contains("failed to parse repo config"));
+    assert!(error.cause.is_some());
 }
 
 #[test]
@@ -220,8 +199,21 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
     ]);
     let context = CommandContext::from_cli(&cli);
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let data = crate::command::execute(&context, &loaded, None).expect("dispatch succeeds");
-    let envelope = CommandEnvelope::success(context.command_id(), data);
+    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let expected_finding_count = success
+        .data
+        .get("findings")
+        .and_then(Value::as_array)
+        .map_or(0, std::vec::Vec::len);
+    assert_eq!(
+        success
+            .dispatch
+            .as_ref()
+            .expect("dispatch telemetry")
+            .finding_count(),
+        expected_finding_count
+    );
+    let envelope = CommandEnvelope::success(context.command_id(), success.data);
     let rendered = crate::render::render_success_json(&envelope);
     let json: Value = serde_json::from_str(&rendered).expect("success json");
 
@@ -237,7 +229,9 @@ fn malformed_backend_json_maps_to_backend_protocol_error() {
         .expect_err("normalization should fail");
 
     assert_eq!(error.kind, CliErrorKind::BackendProtocol);
-    assert_eq!(error.code, "CLI.BACKEND_PROTOCOL_ERROR");
+    assert_eq!(error.code(), "CLI.BACKEND_PROTOCOL_ERROR");
+    assert!(error.cause.is_some());
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[test]
@@ -260,20 +254,30 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
     ]);
     let context = CommandContext::from_cli(&cli);
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let error = crate::command::execute(&context, &loaded, None).expect_err("dispatch should fail");
+    let error = crate::command::execute(&context, &loaded).expect_err("dispatch should fail");
 
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_eq!(error.code, "CLI.BACKEND_EXEC_FAILURE");
+    assert_eq!(error.code(), "CLI.BACKEND_EXEC_FAILURE");
+    assert!(error.cause.is_some());
+    assert!(std::error::Error::source(&error).is_some());
 }
 
-fn assert_log_file_contains_action(path: &Path, action: &str) {
-    let contents = std::fs::read_to_string(path).expect("log file exists");
-    assert!(
-        contents
-            .lines()
-            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-            .any(|line| line["action"] == action),
-        "expected `{action}` in {path:?}"
+#[test]
+fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
+    let repo_root = workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli);
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+
+    assert_eq!(
+        loaded.require_repo_root().expect("repo root"),
+        repo_root.as_path()
     );
 }
 

@@ -139,6 +139,7 @@ Illustrative shape:
     "kind": "backend_protocol",
     "code": "CLI.BACKEND_PROTOCOL_ERROR",
     "message": "sc-lint-boundary returned unexpected JSON",
+    "cause": "expected top-level `findings` array",
     "details": {
       "tool": "sc-lint-boundary"
     },
@@ -153,11 +154,12 @@ Illustrative shape:
 - `kind`
 - `code`
 - `message`
+- `cause`
 - `details`
 - `suggested_action`
 
-`details` and `suggested_action` may be omitted when they do not apply, but
-the machine-readable failure family must remain stable.
+`cause`, `details`, and `suggested_action` may be omitted when they do not
+apply, but the machine-readable failure family must remain stable.
 
 ## Error Kinds
 

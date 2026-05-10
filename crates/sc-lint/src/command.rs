@@ -1,4 +1,3 @@
-use sc_observability::Logger;
 use serde_json::Value;
 use serde_json::json;
 
@@ -7,6 +6,51 @@ use crate::CliError;
 use crate::Command;
 use crate::config::LoadedConfig;
 use crate::dispatch;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DispatchTelemetry {
+    tool: &'static str,
+    finding_count: usize,
+}
+
+impl DispatchTelemetry {
+    pub const fn new(tool: &'static str, finding_count: usize) -> Self {
+        Self {
+            tool,
+            finding_count,
+        }
+    }
+
+    pub const fn tool(&self) -> &'static str {
+        self.tool
+    }
+
+    pub const fn finding_count(&self) -> usize {
+        self.finding_count
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommandSuccess {
+    pub data: Value,
+    pub dispatch: Option<DispatchTelemetry>,
+}
+
+impl CommandSuccess {
+    pub fn direct(data: Value) -> Self {
+        Self {
+            data,
+            dispatch: None,
+        }
+    }
+
+    pub fn with_dispatch(data: Value, dispatch: DispatchTelemetry) -> Self {
+        Self {
+            data,
+            dispatch: Some(dispatch),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandContext {
@@ -87,21 +131,31 @@ impl CommandContext {
     pub const fn requires_repo_root(&self) -> bool {
         self.requires_repo_root
     }
+
+    pub fn dispatch_tool(&self) -> Option<&'static str> {
+        match self.command_id.as_str() {
+            "lint.sc-boundary" => Some("sc-lint-boundary"),
+            _ => None,
+        }
+    }
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "CliError is the stable top-level contract type for the bootstrap CLI execution seam."
+)]
 pub fn execute(
     context: &CommandContext,
     loaded_config: &LoadedConfig,
-    logger: Option<&Logger>,
-) -> Result<Value, CliError> {
+) -> Result<CommandSuccess, CliError> {
     match context.command_id() {
-        "version" => Ok(json!({
+        "version" => Ok(CommandSuccess::direct(json!({
             "crate_name": "sc-lint",
             "crate_version": env!("CARGO_PKG_VERSION"),
             "contract_schema": "v1",
             "status": "dispatch_ready",
-        })),
-        "lint.sc-boundary" => dispatch::run_sc_boundary(context, loaded_config, logger),
+        }))),
+        "lint.sc-boundary" => dispatch::run_sc_boundary(context, loaded_config),
         "lint.sc-portability" => reserved_command(
             context,
             "A.4 will add the portability analyzer backend path.",
@@ -132,7 +186,11 @@ pub fn execute(
     }
 }
 
-fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<Value, CliError> {
+#[expect(
+    clippy::result_large_err,
+    reason = "Reserved bootstrap commands must return the same top-level CliError contract as real command paths."
+)]
+fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<CommandSuccess, CliError> {
     Err(CliError::capability(format!(
         "{} is a reserved contract surface in Sprint A.1b. {follow_up}",
         context.command_id()

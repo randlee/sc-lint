@@ -5,7 +5,7 @@ plan_type: sprint_plan
 phase: A
 sprint: "A.1b"
 worktree: <repo-root>
-branch: develop
+branch: feature/sprint-A1b
 status: implemented
 estimated_scope: S
 ```
@@ -21,6 +21,12 @@ This sprint completes the first operational `sc-lint` command path. It keeps
 config loading at the top level, normalizes one backend through the canonical
 envelope, and leaves the repo with a real delegated CLI flow before profile and
 utility extraction work begins.
+
+The broader `REQ-CLI-008A` contract inventory remains only partially satisfied
+in A.1b. The implemented line now defines `Cli`, `Command`, `CommandEnvelope<T>`,
+`CliError`, and the first delegated dispatch seam; `LintProfile` and
+`OutputMode` remain assigned to Sprint `A.2` because they depend on the
+profile/preflight strategy gate.
 
 ## Governing Requirements
 
@@ -47,7 +53,6 @@ utility extraction work begins.
 - `REQ-CLI-007C`
 - `REQ-CLI-007D`
 - `REQ-CLI-007E`
-- `REQ-CLI-008A`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
 - `REQ-LOG-001`

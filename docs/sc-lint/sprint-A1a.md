@@ -23,6 +23,11 @@ contract seam. It does not finish config loading or backend delegation, but it
 must leave the product with a real top-level binary and a vetted
 `CommandEnvelope<T>` / `CliError` contract.
 
+The broader `REQ-CLI-008A` contract inventory is only partially satisfied in
+A.1a by design. A.1a defines `Cli`, `Command`, `CommandEnvelope<T>`, and
+`CliError`; `LintProfile` and `OutputMode` remain assigned to Sprint `A.2`
+because they depend on the profile/preflight strategy gate.
+
 ## Governing Requirements
 
 - `REQ-PRODUCT-001`
@@ -49,7 +54,6 @@ must leave the product with a real top-level binary and a vetted
 - `REQ-CLI-007C`
 - `REQ-CLI-007D`
 - `REQ-CLI-007E`
-- `REQ-CLI-008A`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
 - `REQ-LOG-001`
