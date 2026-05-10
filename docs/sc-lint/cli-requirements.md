@@ -123,6 +123,9 @@ specialized backend tools and mixed Rust/Python implementations.
   Release-1 `view` targets must be documented individually before exposure and
   may remain backed by repo-local Python/report plumbing until a later phase
   promotes them into a stronger product contract.
+  The A.1a bootstrap targets are:
+  - `sc-lint view graph`
+  - `sc-lint view findings`
 
 - `REQ-CLI-007F`
   The primary `sc-lint lint <tool>` identifiers must map one-to-one to backend
@@ -246,3 +249,12 @@ specialized backend tools and mixed Rust/Python implementations.
   - stable command-identifier patterns
   - backend-to-CLI normalization rules
   - exit-code mapping guidance
+
+## A.1a Implementation Notes
+
+- the A.1a bootstrap implementation lives under `crates/sc-lint/src/`
+- the grouped command root, contract, error, render, and logging seams are
+  intentionally split before real backend dispatch begins
+- the A.1a consistency gate is enforced in `crates/sc-lint/src/tests.rs`
+  so later command families must keep using the same top-level envelope and
+  `CliError` pattern

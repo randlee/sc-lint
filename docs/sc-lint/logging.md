@@ -13,8 +13,9 @@ its delegated backend calls without turning logging initialization into a
 backend-owned concern. Satisfies `REQ-LOG-001` and `REQ-LOG-005`.
 
 This document defines both the logging design and the sprint-level
-implementation assignments for Phase `A`. The current task is documentation
-only; the Rust implementation lands in the owning Phase `A` sprints.
+implementation assignments for Phase `A`. The A.1a bootstrap implementation is
+now present in `crates/sc-lint/src/logging.rs`; later sprints extend that same
+CLI-owned runtime rather than replacing it.
 
 ## Dependency Model
 
@@ -28,9 +29,8 @@ The planned dependency is:
 - crate:
   - `sc-observability`
 - source:
-  - local workspace path dependency declared in `Cargo.toml`
-  - expected local checkout layout:
-    - `../sc-observability/crates/sc-observability`
+  - repo-adjacent workspace checkout declared through a path dependency in
+    `Cargo.toml`
 - integration mode:
   - path dependency from the `sc-lint` crate during local workspace
     development
@@ -49,6 +49,17 @@ Planned implementation note:
   from the stable dotted `command` identifier
 - pass that validated service identity into logger setup and event emission
   helpers rather than rebuilding raw strings at each call site
+- the A.1a bootstrap currently maps:
+  - `version`
+    - `sc-lint`
+  - `lint.sc-boundary`
+    - `sc-boundary`
+  - `lint.sc-portability`
+    - `sc-portability`
+  - `lint.sc-runtime`
+    - `sc-runtime`
+  - remaining bootstrap-only command paths
+    - `sc-lint`
 
 ## Initialization Model
 
@@ -145,6 +156,9 @@ Planned implementation note:
 - represent the validated effective log root as a dedicated `LogRoot`
   wrapper/newtype at the CLI config boundary rather than passing a raw
   `String` through multiple modules
+- the A.1a implementation applies the service name to the resolved root so
+  `--log-root <path>` becomes:
+  - `<path>/<service-name>/`
 
 ## Sink Model
 
@@ -187,7 +201,10 @@ Planned controls:
 - config key:
   - `logging.console`
 
-When enabled, the CLI registers `ConsoleSink` through `LoggerBuilder`.
+When enabled, the A.1a bootstrap turns on
+`LoggerConfig.enable_console_sink` before `LoggerBuilder::new(...)`. Later
+sprints should preserve the same CLI surface unless explicit per-sink
+filtering becomes necessary.
 
 ## Concurrency Model
 
@@ -247,6 +264,12 @@ Dispatch failure contract:
   - one completion event with a failure verdict and elapsed time in ms
 - the CLI must not leave a started command path without either a completion
   event or a top-level failure envelope
+
+The A.1a bootstrap action names are:
+
+- `cli.command.started`
+- `cli.command.completed`
+- `cli.command.error`
 
 ## Rollout By Sprint
 
