@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F008>
+  a triage:Finding ;
+  triage:findingId "RBP-F008" ;
+  triage:title "CommandContext::from_cli returns infallible Result" ;
+  triage:description "CommandContext::from_cli returns Result<Self, CliError> but has no actual failure path in its implementation. The Result wrapper adds noise with no benefit; consider returning Self directly or documenting the reserved failure path." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F008/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F008/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/command.rs" ;
+  triage:line 216 ;
+  triage:snippet "pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .

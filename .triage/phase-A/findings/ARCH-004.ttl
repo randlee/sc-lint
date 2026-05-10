@@ -1,11 +1,11 @@
 @prefix triage: <urn:atm:triage:> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<urn:atm:triage:finding/ARCH-005>
+<urn:atm:triage:finding/ARCH-004>
   a triage:Finding ;
-  triage:findingId "ARCH-005" ;
-  triage:title "RULE-006: /tmp/example/src/lib.rs fixture string — no intent comment at tests.rs:99" ;
-  triage:description "crates/sc-lint-boundary/src/tests.rs:99 contains '/tmp/example/src/lib.rs' with no intent comment. RULE-006 requires explicit intent comments for hardcoded /tmp/ paths." ;
+  triage:findingId "ARCH-004" ;
+  triage:title "RULE-006: /tmp/example/src/lib.rs fixture string — no intent comment at tests.rs:58" ;
+  triage:description "crates/sc-lint-boundary/src/tests.rs:58 contains '/tmp/example/src/lib.rs' with no intent comment. RULE-006 requires explicit intent comments for hardcoded /tmp/ paths." ;
   triage:phaseId "phase-A" ;
   triage:triageMode "initial_pass" ;
   triage:category "ARCH" ;
@@ -16,16 +16,16 @@
   triage:dispatchReady true ;
   triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
   triage:references "PR #19 QA-PHASE-A-FINAL comment" ;
-  triage:references "crates/sc-lint-boundary/src/tests.rs:99" ;
-  triage:notes "Same file as ARCH-003/004. Non-repeatable, targeted to line 99. Overwrites a prior unrelated ARCH-005 record per team-lead reassignment." ;
-  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-005/integration-phase-A/1> ;
+  triage:references "crates/sc-lint-boundary/src/tests.rs:58" ;
+  triage:notes "Same file as ARCH-003. Non-repeatable, targeted to line 58." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-004/integration-phase-A/1> ;
   triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
   triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
 
-<urn:atm:triage:occurrence/ARCH-005/integration-phase-A/1>
+<urn:atm:triage:occurrence/ARCH-004/integration-phase-A/1>
   a triage:Occurrence ;
   triage:file "crates/sc-lint-boundary/src/tests.rs" ;
-  triage:line 99 ;
+  triage:line 58 ;
   triage:snippet "source_path: Some(\"/tmp/example/src/lib.rs\".to_string())," ;
   triage:status "open" ;
   triage:closed false ;

@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F006>
+  a triage:Finding ;
+  triage:findingId "RBP-F006" ;
+  triage:title "ServiceName allocates String from &'static str unnecessarily" ;
+  triage:description "ServiceName wraps a String but is always constructed from &'static str literals. Should use &'static str or Cow<'static, str> to avoid heap allocation." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F006/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F006/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/contract.rs" ;
+  triage:line 4 ;
+  triage:snippet "pub(crate) struct ServiceName(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .

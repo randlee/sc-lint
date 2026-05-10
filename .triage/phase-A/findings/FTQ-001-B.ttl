@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/FTQ-001-B>
+  a triage:Finding ;
+  triage:findingId "FTQ-001-B" ;
+  triage:title "loaded_config_preserves_repo_root_as_a_validated_newtype reads live sc-lint.toml" ;
+  triage:description "Test reads live sc-lint.toml from working directory rather than using a hermetic fixture. May fail outside repo context." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "FTQ" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001-B/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/FTQ-001-B/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 420 ;
+  triage:snippet "fn loaded_config_preserves_repo_root_as_a_validated_newtype()" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .

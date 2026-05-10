@@ -4,62 +4,55 @@
 <urn:atm:triage:finding/QA-001>
   a triage:Finding ;
   triage:findingId "QA-001" ;
-  triage:title "anyhow::Error leaks into public RuntimeError API via struct variant source fields" ;
-  triage:description "crates/sc-lint-runtime/src/lib.rs defines pub enum RuntimeError with two struct variants (AnalyzeFindings, CountScannedCrates) each containing `source: AnyhowError` where AnyhowError = anyhow::Error. Enum struct-variant fields inherit the enum's pub visibility, making anyhow part of the public API surface. Library crates must not expose anyhow at public API boundaries. Fix: replace source: AnyhowError with a concrete typed error (e.g. BoxedError or per-variant typed sub-errors), or mark fields pub(crate)." ;
+  triage:title "anyhow::Error exposed in public RuntimeError API via struct variant field" ;
+  triage:description "crates/sc-lint-runtime/src/lib.rs:72-86 pub enum RuntimeError has struct variant fields `source: AnyhowError` (where AnyhowError = anyhow::Error) that inherit the enum's pub visibility. PHAS-A-NEW-005 fix changed detail:String to #[source] source:AnyhowError but did not address the public visibility of anyhow::Error in the public API surface." ;
   triage:phaseId "phase-A" ;
-  triage:triageMode "initial_pass" ;
-  triage:category "ARCH" ;
+  triage:triageMode "followup_pass" ;
+  triage:category "SC" ;
   triage:severity "important" ;
   triage:repeatable false ;
   triage:sweepScope "crate" ;
   triage:status "open" ;
   triage:dispatchReady true ;
   triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
-  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/sprint-A5/1> ;
-  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/sprint-A5/2> ;
-  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/sprint-A5/3> ;
-  triage:openOn <urn:atm:triage:worktree/sprint-A5/a392088> ;
-  triage:promoteTo <urn:atm:triage:worktree/sprint-A5/a392088> .
+  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/phase-A/3> ;
+  triage:openOn <urn:atm:triage:worktree/phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-A/2bb6d32> .
 
-<urn:atm:triage:occurrence/QA-001/sprint-A5/1>
+<urn:atm:triage:occurrence/QA-001/phase-A/1>
   a triage:Occurrence ;
   triage:file "crates/sc-lint-runtime/src/lib.rs" ;
-  triage:line 5 ;
+  triage:line 3 ;
   triage:snippet "use anyhow::Error as AnyhowError;" ;
   triage:status "open" ;
   triage:closed false ;
-  triage:branch "feature/sprint-A5" ;
-  triage:headSha "a392088" ;
-  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-A/2bb6d32> .
 
-<urn:atm:triage:occurrence/QA-001/sprint-A5/2>
+<urn:atm:triage:occurrence/QA-001/phase-A/2>
   a triage:Occurrence ;
   triage:file "crates/sc-lint-runtime/src/lib.rs" ;
-  triage:line 193 ;
+  triage:line 78 ;
   triage:snippet "        source: AnyhowError," ;
   triage:status "open" ;
   triage:closed false ;
-  triage:branch "feature/sprint-A5" ;
-  triage:headSha "a392088" ;
-  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-A/2bb6d32> .
 
-<urn:atm:triage:occurrence/QA-001/sprint-A5/3>
+<urn:atm:triage:occurrence/QA-001/phase-A/3>
   a triage:Occurrence ;
   triage:file "crates/sc-lint-runtime/src/lib.rs" ;
-  triage:line 199 ;
+  triage:line 84 ;
   triage:snippet "        source: AnyhowError," ;
   triage:status "open" ;
   triage:closed false ;
-  triage:branch "feature/sprint-A5" ;
-  triage:headSha "a392088" ;
-  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
-
-<urn:atm:triage:worktree/sprint-A4/aac4dea>
-  a triage:WorktreeSnapshot ;
-  triage:branch "feature/sprint-A4" ;
-  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
-  triage:headSha "aac4dea" ;
-  triage:orderIndex 4 .
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-A/2bb6d32> .
 
 <urn:atm:triage:worktree/sprint-A5/a392088>
   a triage:WorktreeSnapshot ;
@@ -68,23 +61,9 @@
   triage:headSha "a392088" ;
   triage:orderIndex 5 .
 
-<urn:atm:triage:worktree/sprint-A6/8544597>
+<urn:atm:triage:worktree/phase-A/2bb6d32>
   a triage:WorktreeSnapshot ;
-  triage:branch "feature/sprint-A6" ;
-  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
-  triage:headSha "8544597" ;
-  triage:orderIndex 6 .
-
-<urn:atm:triage:worktree/sprint-A7/8eee490>
-  a triage:WorktreeSnapshot ;
-  triage:branch "feature/sprint-A7" ;
-  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
-  triage:headSha "8eee490" ;
-  triage:orderIndex 7 .
-
-<urn:atm:triage:worktree/sprint-A8/8eee490>
-  a triage:WorktreeSnapshot ;
-  triage:branch "feature/sprint-A8" ;
-  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
-  triage:headSha "8eee490" ;
-  triage:orderIndex 8 .
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .
