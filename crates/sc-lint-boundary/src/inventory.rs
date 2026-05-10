@@ -511,7 +511,7 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
 }
 
 fn validate_planning_metadata(planning: &PlanningMetadata, planning_path: &Path) -> Result<()> {
-    for (key, _item) in &planning.planned_items {
+    for key in planning.planned_items.keys() {
         if !key.starts_with("BOUNDARY-") || !key.contains('.') {
             anyhow::bail!(
                 "planning item key `{key}` in `{}` must use <boundary_id>.<section>.<field>[.<subfield>] shape",
