@@ -1,0 +1,68 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A7-ARCH-001
+# RULE-008: 4 Python test files hardcode production consumer-repo names
+# Source: QA-A7-001 ARCH-001/002/003/004 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A7-ARCH-001>
+  a triage:Finding ;
+  triage:findingId "A7-ARCH-001" ;
+  triage:title "RULE-008: 4 Python test files hardcode production consumer-repo names" ;
+  triage:description "test_lint_manifests.py, test_lint_external_tools.py, test_lint_cargo_modules.py, and test_check_version_sync.py on feature/sprint-A7 contain hardcoded production consumer-repo names (atm-core, atm, agent-team-mail, agent-team-mail-core, agent-team-mail-daemon, atm-rusqlite, etc.). RULE-008 forbids hardcoding production consumer repository names in test fixtures — tests must use synthetic repo names or a centralized fixture constant so the sc-lint tool remains repo-agnostic. Fix: replace all hardcoded consumer names with synthetic fixture names (e.g. 'test-crate-a', 'fixture-app') or a centralized constant." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable true ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "All 4 files are A7-sprint additions (.just/tests/). Fix on A7. Sweep all test files for the same pattern." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/4> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/32f233e> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file ".just/tests/test_lint_manifests.py" ;
+  triage:snippet "hardcoded consumer repo names (atm-core, atm, etc.)" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/2>
+  a triage:Occurrence ;
+  triage:file ".just/tests/test_lint_external_tools.py" ;
+  triage:snippet "hardcoded consumer repo names" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/3>
+  a triage:Occurrence ;
+  triage:file ".just/tests/test_lint_cargo_modules.py" ;
+  triage:snippet "hardcoded consumer repo names" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-ARCH-001/sprint-A7/4>
+  a triage:Occurrence ;
+  triage:file ".just/tests/test_check_version_sync.py" ;
+  triage:snippet "hardcoded consumer repo names" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:worktree/sprint-A7/32f233e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "32f233e" ;
+  triage:orderIndex 7 .
