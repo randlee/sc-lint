@@ -20,9 +20,6 @@ rust-version = "1.94.1"
 anyhow = "1"
 cargo_metadata = "0.20"
 clap = { version = "4", features = ["derive"] }
+sc-observability = "1.0.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
-[patch.crates-io]
-sc-observability = { git = "https://github.com/randlee/sc-observability.git", rev = "bd14de799ab707f650a0e30475334c9dc1968e8a" }
-sc-observability-types = { git = "https://github.com/randlee/sc-observability.git", rev = "bd14de799ab707f650a0e30475334c9dc1968e8a" }
