@@ -4,6 +4,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use clap::Parser;
+use serde::Serialize;
+use serde::Serializer;
 use serde_json::Value;
 use serde_json::json;
 use serial_test::serial;
@@ -688,6 +690,33 @@ fn render_error_human_includes_suggested_action_when_present() {
 
     assert!(rendered.contains("lint.sc-boundary: bad config (CLI.CONFIG_ERROR)"));
     assert!(rendered.contains("Run `sc-lint lint sc-boundary --json` to inspect the failure."));
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BrokenSerialize;
+
+impl Serialize for BrokenSerialize {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Err(serde::ser::Error::custom("boom"))
+    }
+}
+
+#[test]
+fn render_success_json_falls_back_to_internal_error_envelope_on_serialize_failure() {
+    let envelope = CommandEnvelope::success("version", BrokenSerialize);
+    let rendered = crate::render::render_success_json(&envelope);
+    let json: Value = serde_json::from_str(&rendered).expect("fallback envelope json");
+
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["command"], "version");
+    assert_eq!(json["error"]["code"], "CLI.INTERNAL_ERROR");
+    assert_eq!(
+        json["error"]["message"],
+        "failed to serialize success envelope"
+    );
 }
 
 fn project_workspace_root() -> PathBuf {

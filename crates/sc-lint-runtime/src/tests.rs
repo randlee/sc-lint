@@ -1,7 +1,9 @@
 #![cfg(test)]
 
 use super::*;
+use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
+use sc_lint_schema::OwnerId;
 use sc_lint_schema::ReportStatus;
 use std::path::Path;
 
@@ -20,6 +22,29 @@ fn findings_report_text_is_stable() {
     assert_eq!(
         render_findings_report(&report),
         "sc-lint-runtime 0.1.0 status=pass scanned_crates=2 findings=0"
+    );
+}
+
+#[test]
+fn findings_report_text_renders_failure_status_and_count() {
+    let report = FindingsReport {
+        tool: "sc-lint-runtime",
+        version: "0.1.0",
+        schema_version: "0.1.0",
+        status: ReportStatus::Fail,
+        scanned_crates: 3,
+        findings: vec![Finding {
+            rule_id: RuleId::ScbRuntime001,
+            kind: "condvar_wait".to_string(),
+            message: "wait used".to_string(),
+            owner_ids: vec![OwnerId::new("crate::example::example")],
+            node_ids: vec![NodeId::new("crate::example::example::block")],
+        }],
+    };
+
+    assert_eq!(
+        render_findings_report(&report),
+        "sc-lint-runtime 0.1.0 status=fail scanned_crates=3 findings=1"
     );
 }
 

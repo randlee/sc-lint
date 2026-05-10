@@ -42,6 +42,87 @@ fn graph_export_serializes_tool_metadata() {
 }
 
 #[test]
+fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
+    let graph = GraphExport {
+        tool: "sc-lint-boundary",
+        version: "0.1.0",
+        schema_version: "0.1.0",
+        nodes: vec![GraphNode {
+            id: NodeId::new("crate::example::example"),
+            kind: "type",
+            label: "Example".to_string(),
+            visibility: Some("public"),
+            package: "example".to_string(),
+            target: Some("example".to_string()),
+            manifest_path: "/tmp/example/Cargo.toml".to_string(),
+            source_path: Some("/tmp/example/src/lib.rs".to_string()),
+            module_path: Some("crate::example".to_string()),
+            impl_kind: Some(ImplKind::Inherent),
+            impl_trait: Some("crate::Api".to_string()),
+            attributes: vec![LintAttribute {
+                scope: "boundary",
+                name: "internal_only",
+                values: Vec::new(),
+            }],
+        }],
+        edges: vec![GraphEdge {
+            kind: "contains",
+            from: NodeId::new("crate::example"),
+            to: NodeId::new("crate::example::example"),
+        }],
+    };
+
+    let rendered =
+        render_graph_export(&graph, GraphOutputFormat::Json).expect("json graph render succeeds");
+    let json: serde_json::Value = serde_json::from_str(&rendered).expect("graph json");
+
+    assert_eq!(json["tool"], "sc-lint-boundary");
+    assert_eq!(json["nodes"][0]["label"], "Example");
+    assert_eq!(json["nodes"][0]["impl_kind"], "inherent");
+    assert_eq!(json["edges"][0]["kind"], "contains");
+}
+
+#[test]
+fn render_graph_export_turtle_escapes_special_characters_and_attributes() {
+    let graph = GraphExport {
+        tool: "sc-lint-boundary",
+        version: "0.1.0",
+        schema_version: "0.1.0",
+        nodes: vec![GraphNode {
+            id: NodeId::new("crate::example::example"),
+            kind: "type",
+            label: "Example \"quoted\"\nline".to_string(),
+            visibility: Some("public"),
+            package: "example".to_string(),
+            target: Some("example".to_string()),
+            manifest_path: "C:\\repo\\Cargo.toml".to_string(),
+            source_path: Some("/tmp/example/src/lib.rs".to_string()),
+            module_path: Some("crate::example".to_string()),
+            impl_kind: Some(ImplKind::Trait),
+            impl_trait: Some("crate::Api".to_string()),
+            attributes: vec![LintAttribute {
+                scope: "boundary",
+                name: "allow",
+                values: vec!["cycle.type_method_self_loop".to_string()],
+            }],
+        }],
+        edges: vec![GraphEdge {
+            kind: "contains",
+            from: NodeId::new("crate::example"),
+            to: NodeId::new("crate::example::example"),
+        }],
+    };
+
+    let rendered = render_graph_export_turtle(&graph);
+
+    assert!(rendered.contains("sc:label \"Example \\\"quoted\\\"\\nline\" ."));
+    assert!(rendered.contains("sc:manifestPath \"C:\\\\repo\\\\Cargo.toml\" ."));
+    assert!(rendered.contains("sc:implKind \"trait\" ."));
+    assert!(rendered.contains("sc:attribute \"boundary.allow(cycle.type_method_self_loop)\" ."));
+    assert!(rendered.contains(" sc:contains "));
+}
+
+#[test]
 fn exports_graph_for_inline_and_file_modules_and_attributes() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

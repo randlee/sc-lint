@@ -8,6 +8,8 @@ use sc_lint_schema::ReportStatus;
 use tempfile::TempDir;
 
 use super::*;
+use sc_lint_schema::NodeId;
+use sc_lint_schema::OwnerId;
 
 #[test]
 fn findings_report_text_is_stable() {
@@ -22,6 +24,29 @@ fn findings_report_text_is_stable() {
     assert_eq!(
         render_findings_report(&report),
         "sc-lint-portability 0.1.0 status=pass scanned_crates=2 findings=0"
+    );
+}
+
+#[test]
+fn findings_report_text_renders_failure_status_and_count() {
+    let report = FindingsReport {
+        tool: "sc-lint-portability",
+        version: "0.1.0",
+        schema_version: "0.1.0",
+        status: ReportStatus::Fail,
+        scanned_crates: 4,
+        findings: vec![Finding {
+            rule_id: RuleId::Port004,
+            kind: "ungated_std_os_unix_import".to_string(),
+            message: "ungated import".to_string(),
+            owner_ids: vec![OwnerId::new("crate::example::example")],
+            node_ids: vec![NodeId::new("crate::example::example::portability")],
+        }],
+    };
+
+    assert_eq!(
+        render_findings_report(&report),
+        "sc-lint-portability 0.1.0 status=fail scanned_crates=4 findings=1"
     );
 }
 
