@@ -4,7 +4,7 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.1a"
-worktree: /Users/randlee/Documents/github/sc-lint
+worktree: <repo-root>
 branch: develop
 status: planned
 estimated_scope: S
@@ -145,6 +145,8 @@ normalization begin.
 - non-interactive CLI-owned paths support canonical `--json`
 - top-level machine-readable success uses `CommandEnvelope<T>`
 - top-level machine-readable failure uses `CliError`
+- the CLI logger initializes at process startup and writes invocation entry,
+  completion, and per-error events under `~/sc-lint/logs/sc-lint/`
 - no backend crate gains a direct dependency on another backend crate
 
 ## Required Validation
@@ -158,6 +160,8 @@ normalization begin.
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
+- `docs/requirements.md`
 - `docs/project-plan.md`
 - `boundaries/sc-lint/top-level-cli.toml`
 - `boundaries/planning.toml`

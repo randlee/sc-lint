@@ -9,7 +9,9 @@ Use `sc-observability` as the logging-only runtime for the top-level CLI and
 its delegated backend calls without turning logging initialization into a
 backend-owned concern.
 
-Phase `A` scope is planning only. No Rust implementation lands in this task.
+This document defines both the logging design and the sprint-level
+implementation assignments for Phase `A`. The current task is documentation
+only; the Rust implementation lands in the owning Phase `A` sprints.
 
 ## Dependency Model
 
@@ -18,7 +20,9 @@ The planned dependency is:
 - crate:
   - `sc-observability`
 - source:
-  - `/Users/randlee/Documents/github/sc-observability/crates/sc-observability`
+  - local workspace path dependency declared in `Cargo.toml`
+  - expected local checkout layout:
+    - `../sc-observability/crates/sc-observability`
 - integration mode:
   - path dependency from the `sc-lint` crate during local workspace
     development
