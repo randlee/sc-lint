@@ -229,6 +229,78 @@ fn python_backed_commands_log_adapter_metadata() {
 
 #[test]
 #[serial]
+fn line_counts_logs_adapter_metadata_for_error() {
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+    let baseline = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "lint",
+            "line-counts",
+        ])
+        .output()
+        .expect("baseline line-counts command runs");
+    assert!(
+        baseline.status.success(),
+        "baseline line-counts stderr: {}",
+        String::from_utf8_lossy(&baseline.stderr)
+    );
+    let expected = adapter_metadata_from_output(&baseline.stdout);
+    let config_override = LintConfigOverride::new("[line_counts]\nmax_total_lines = \"invalid\"\n");
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-line-counts-error");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--config",
+            config_override.path().to_str().expect("utf-8 config path"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "line-counts",
+        ])
+        .output()
+        .expect("line-counts error command runs");
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "line-counts stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(
+        output.stdout.is_empty(),
+        "expected json error on stderr, got stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let output_json = parse_command_output(&output.stderr);
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.error",
+        "config_scope",
+        &expected.config_scope,
+    );
+    assert_log_file_contains_field(&log_path, "cli.command.error", "script", &expected.script);
+    assert_eq!(
+        output_json["error"]["kind"].as_str(),
+        Some("config"),
+        "line-counts stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+#[serial]
 fn identity_literals_logs_adapter_metadata_for_completion() {
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs-identity-literals");
@@ -285,10 +357,8 @@ fn identity_literals_logs_adapter_metadata_for_error() {
         String::from_utf8_lossy(&baseline.stderr)
     );
     let expected = adapter_metadata_from_output(&baseline.stdout);
-    let _config_override = LintConfigOverride::replace(
-        &repo_root,
-        "[identities]\nforbidden_literals = \"invalid\"\n",
-    );
+    let config_override =
+        LintConfigOverride::new("[identities]\nforbidden_literals = \"invalid\"\n");
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs-identity-literals-error");
 
@@ -298,6 +368,8 @@ fn identity_literals_logs_adapter_metadata_for_error() {
             "--json",
             "--root",
             repo_root.to_str().expect("utf-8 repo root"),
+            "--config",
+            config_override.path().to_str().expect("utf-8 config path"),
             "--log-root",
             temp_root.to_str().expect("utf-8 temp path"),
             "lint",
@@ -332,6 +404,76 @@ fn identity_literals_logs_adapter_metadata_for_error() {
         output_json["error"]["kind"].as_str(),
         Some("config"),
         "identity-literals stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[test]
+#[serial]
+fn view_findings_logs_adapter_metadata_for_error() {
+    let repo_root = workspace_root();
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+    let baseline = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "view",
+            "findings",
+        ])
+        .output()
+        .expect("baseline view findings command runs");
+    assert!(
+        baseline.status.success(),
+        "baseline view findings stderr: {}",
+        String::from_utf8_lossy(&baseline.stderr)
+    );
+    let expected = adapter_metadata_from_output(&baseline.stdout);
+    let temp_dir = TempDir::new().expect("temp dir");
+    let temp_root = temp_dir.path().join("logs-view-findings-error");
+
+    let output = Command::new(binary)
+        .current_dir(&repo_root)
+        .env("PATH", isolated_path(temp_dir.path()))
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "view",
+            "findings",
+        ])
+        .output()
+        .expect("view findings error command runs");
+    assert_eq!(
+        output.status.code(),
+        Some(5),
+        "view findings stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(
+        output.stdout.is_empty(),
+        "expected json error on stderr, got stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let output_json = parse_command_output(&output.stderr);
+    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
+    assert_log_file_contains_field(
+        &log_path,
+        "cli.command.error",
+        "config_scope",
+        &expected.config_scope,
+    );
+    assert_log_file_contains_field(&log_path, "cli.command.error", "script", &expected.script);
+    assert_eq!(
+        output_json["error"]["kind"].as_str(),
+        Some("backend_failure"),
+        "view findings stdout: {}",
         String::from_utf8_lossy(&output.stdout)
     );
 }
@@ -403,22 +545,21 @@ fn parse_command_output(output: &[u8]) -> Value {
 }
 
 struct LintConfigOverride {
+    dir: TempDir,
     path: PathBuf,
-    original: String,
 }
 
 impl LintConfigOverride {
-    fn replace(repo_root: &Path, contents: &str) -> Self {
-        let path = repo_root.join(".just/lint-config.toml");
-        let original = std::fs::read_to_string(&path).expect("read lint config");
+    fn new(contents: &str) -> Self {
+        let dir = TempDir::new().expect("temp dir");
+        let path = dir.path().join("lint-config.toml");
         std::fs::write(&path, contents).expect("write lint config override");
-        Self { path, original }
+        Self { dir, path }
     }
-}
 
-impl Drop for LintConfigOverride {
-    fn drop(&mut self) {
-        std::fs::write(&self.path, &self.original).expect("restore lint config");
+    fn path(&self) -> &Path {
+        let _keepalive = self.dir.path();
+        &self.path
     }
 }
 
@@ -534,6 +675,10 @@ fn prepend_path(wrapper_path: &Path) -> std::ffi::OsString {
         parts.extend(std::env::split_paths(&existing).map(|path| path.into_os_string()));
     }
     std::env::join_paths(parts).expect("join path entries")
+}
+
+fn isolated_path(path: &Path) -> std::ffi::OsString {
+    std::env::join_paths([path]).expect("join isolated path")
 }
 
 fn read_log_file_with_retry(path: &Path) -> String {

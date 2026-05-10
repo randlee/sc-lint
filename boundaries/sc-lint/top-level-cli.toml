@@ -20,7 +20,7 @@ constructor = "none"
 # CLI composition items. A.3 extends the stable target surface through the
 # extracted Python-backed lint/view commands, so `LintTarget` and `ViewTarget`
 # become explicit composition roots in this sprint.
-roots = ["Command", "CommandContext", "LintProfile", "LintTarget", "ViewTarget", "OutputMode", "CheckTarget", "ClippyTarget", "CommandEnvelope", "CliError", "WINDOWS_XWIN_TARGET"]
+roots = ["Cli", "Command", "LintProfile", "LintTarget", "ViewTarget", "OutputMode", "CheckTarget", "ClippyTarget", "CommandEnvelope", "CliError", "CliErrorKind", "WINDOWS_XWIN_TARGET", "run", "help_text"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the shared support crate and

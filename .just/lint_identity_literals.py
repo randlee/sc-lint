@@ -43,8 +43,8 @@ class IdentityViolation:
         return f"{self.path}:{self.line_number}: {self.line}"
 
 
-def load_forbidden_literals(repo_root: Path) -> tuple[str, ...]:
-    config = load_lint_config(repo_root).get("identities", {})
+def load_forbidden_literals(repo_root: Path, config_path: str | None = None) -> tuple[str, ...]:
+    config = load_lint_config(repo_root, config_path).get("identities", {})
     if not isinstance(config, dict):
         raise AdapterError("config", "[identities] must be a TOML table")
     literals = config.get("forbidden_literals", [])
@@ -53,8 +53,11 @@ def load_forbidden_literals(repo_root: Path) -> tuple[str, ...]:
     return tuple(literals)
 
 
-def load_production_canonical_literals(repo_root: Path) -> dict[str, tuple[str, ...]]:
-    config = load_lint_config(repo_root).get("identities", {})
+def load_production_canonical_literals(
+    repo_root: Path,
+    config_path: str | None = None,
+) -> dict[str, tuple[str, ...]]:
+    config = load_lint_config(repo_root, config_path).get("identities", {})
     if not isinstance(config, dict):
         raise AdapterError("config", "[identities] must be a TOML table")
     literal_map = config.get("production_canonical_literals", {})
@@ -163,6 +166,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         description="Reject forbidden test literals and duplicated canonical production literals in Rust code."
     )
     parser.add_argument("--root", help="Repo root to inspect.")
+    parser.add_argument("--config", help="Repo config file override.")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv[1:])
 
@@ -171,8 +175,8 @@ def main(argv: list[str]) -> int:
     try:
         args = parse_args(argv)
         repo_root = discover_repo_root(args.root)
-        forbidden_literals = load_forbidden_literals(repo_root)
-        production_canonical_literals = load_production_canonical_literals(repo_root)
+        forbidden_literals = load_forbidden_literals(repo_root, args.config)
+        production_canonical_literals = load_production_canonical_literals(repo_root, args.config)
         started = monotonic_now()
         violations = collect_identity_violations(
             repo_root,

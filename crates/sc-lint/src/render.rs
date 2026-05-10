@@ -8,20 +8,20 @@ use serde_json::Value;
 use serde_json::json;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct RenderedOutput {
+pub(crate) struct RenderedOutput {
     pub stdout: Option<String>,
     pub stderr: Option<String>,
 }
 
 impl RenderedOutput {
-    pub fn stdout(value: String) -> Self {
+    pub(crate) fn stdout(value: String) -> Self {
         Self {
             stdout: Some(value),
             stderr: None,
         }
     }
 
-    pub fn stderr(value: String) -> Self {
+    pub(crate) fn stderr(value: String) -> Self {
         Self {
             stdout: None,
             stderr: Some(value),
@@ -29,7 +29,7 @@ impl RenderedOutput {
     }
 }
 
-pub fn render_success_json<T>(envelope: &CommandEnvelope<T>) -> String
+pub(crate) fn render_success_json<T>(envelope: &CommandEnvelope<T>) -> String
 where
     T: Serialize,
 {
@@ -42,7 +42,7 @@ where
     }
 }
 
-pub fn render_error_json(command_id: &str, error: &CliError) -> String {
+pub(crate) fn render_error_json(command_id: &str, error: &CliError) -> String {
     let envelope = CommandEnvelope::<Value>::failure(command_id, error.clone());
     match serde_json::to_string_pretty(&envelope) {
         Ok(rendered) => rendered,
@@ -50,7 +50,10 @@ pub fn render_error_json(command_id: &str, error: &CliError) -> String {
     }
 }
 
-pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope<Value>) -> String {
+pub(crate) fn render_success_human(
+    context: &CommandContext,
+    envelope: &CommandEnvelope<Value>,
+) -> String {
     match context.id() {
         CommandId::Version => {
             let version = envelope
@@ -116,7 +119,7 @@ pub fn render_success_human(context: &CommandContext, envelope: &CommandEnvelope
     }
 }
 
-pub fn render_error_human(command_id: &str, error: &CliError) -> String {
+pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
     let mut rendered = format!("{command_id}: {} ({})", error.message, error.code());
     if let Some(suggested_action) = error.suggested_action.as_deref() {
         rendered.push('\n');

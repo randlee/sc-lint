@@ -61,8 +61,9 @@ def discover_repo_root(explicit_root: str | None = None) -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def load_lint_config(repo_root: Path) -> dict:
-    config_path = repo_root / CONFIG_PATH
+def load_lint_config(repo_root: Path, config_path: str | None = None) -> dict:
+    candidate = Path(config_path) if config_path is not None else CONFIG_PATH
+    config_path = candidate if candidate.is_absolute() else repo_root / candidate
     if not config_path.exists():
         return {}
     return tomllib.loads(config_path.read_text(encoding="utf-8"))

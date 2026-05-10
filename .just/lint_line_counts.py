@@ -73,8 +73,8 @@ def classify_lines(lines: list[str]) -> tuple[int, int]:
     return production_lines, test_lines
 
 
-def load_config(repo_root: Path) -> LineLimitConfig:
-    config = load_lint_config(repo_root).get("line_counts", {})
+def load_config(repo_root: Path, config_path: str | None = None) -> LineLimitConfig:
+    config = load_lint_config(repo_root, config_path).get("line_counts", {})
     if not isinstance(config, dict):
         raise AdapterError("config", "[line_counts] must be a TOML table")
 
@@ -238,6 +238,7 @@ def build_data(repo_root: Path, counts: list[FileCounts], config: LineLimitConfi
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Check Rust file size limits by crate.")
     parser.add_argument("--root", help="Repo root to inspect.")
+    parser.add_argument("--config", help="Repo config file override.")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv[1:])
 
@@ -246,7 +247,7 @@ def main(argv: list[str]) -> int:
     try:
         args = parse_args(argv)
         repo_root = discover_repo_root(args.root)
-        config = load_config(repo_root)
+        config = load_config(repo_root, args.config)
         started = monotonic_now()
         counts = collect_file_counts(repo_root, config)
         failures = evaluate_limits(counts, config)

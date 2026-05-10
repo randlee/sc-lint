@@ -72,6 +72,7 @@ def build_index(repo_root: Path) -> dict:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collate findings artifacts into a stable view index.")
     parser.add_argument("--root", help="Repo root to inspect.")
+    parser.add_argument("--config", help="Repo config file override.")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv[1:])
 

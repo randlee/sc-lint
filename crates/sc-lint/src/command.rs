@@ -12,24 +12,24 @@ use crate::python_adapter;
 use crate::workflow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DispatchTelemetry {
+pub(crate) struct DispatchTelemetry {
     tool: &'static str,
     finding_count: usize,
 }
 
 impl DispatchTelemetry {
-    pub const fn new(tool: &'static str, finding_count: usize) -> Self {
+    pub(crate) const fn new(tool: &'static str, finding_count: usize) -> Self {
         Self {
             tool,
             finding_count,
         }
     }
 
-    pub const fn tool(&self) -> &'static str {
+    pub(crate) const fn tool(&self) -> &'static str {
         self.tool
     }
 
-    pub const fn finding_count(&self) -> usize {
+    pub(crate) const fn finding_count(&self) -> usize {
         self.finding_count
     }
 }
@@ -199,7 +199,7 @@ impl CommandId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommandContext {
+pub(crate) struct CommandContext {
     command_id: CommandId,
     service_name: ServiceName,
     summary: &'static str,
@@ -211,7 +211,7 @@ impl CommandContext {
         clippy::result_large_err,
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
-    pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
+    pub(crate) fn from_cli(cli: &Cli) -> Result<Self, CliError> {
         let command_id = CommandId::from_cli_command(&cli.command);
         let service_name = ServiceName::new(command_id.service_name()).map_err(|error| {
             CliError::internal(format!(
@@ -230,11 +230,11 @@ impl CommandContext {
         })
     }
 
-    pub fn command_id(&self) -> &str {
+    pub(crate) fn command_id(&self) -> &str {
         self.command_id.as_str()
     }
 
-    pub fn service_name(&self) -> &ServiceName {
+    pub(crate) fn service_name(&self) -> &ServiceName {
         &self.service_name
     }
 
@@ -242,31 +242,31 @@ impl CommandContext {
         self.command_id
     }
 
-    pub const fn summary(&self) -> &'static str {
+    pub(crate) const fn summary(&self) -> &'static str {
         self.summary
     }
 
-    pub const fn requires_repo_root(&self) -> bool {
+    pub(crate) const fn requires_repo_root(&self) -> bool {
         self.requires_repo_root
     }
 
-    pub fn dispatch_tool(&self) -> Option<&'static str> {
+    pub(crate) fn dispatch_tool(&self) -> Option<&'static str> {
         self.command_id.dispatch_tool()
     }
 
-    pub fn adapter_kind(&self) -> Option<&'static str> {
+    pub(crate) fn adapter_kind(&self) -> Option<&'static str> {
         self.command_id.adapter_kind()
     }
 
-    pub fn adapter_config_scope(&self) -> Option<&'static str> {
+    pub(crate) fn adapter_config_scope(&self) -> Option<&'static str> {
         self.command_id.adapter_config_scope()
     }
 
-    pub fn adapter_script(&self) -> Option<&'static str> {
+    pub(crate) fn adapter_script(&self) -> Option<&'static str> {
         self.command_id.adapter_script()
     }
 
-    pub const fn is_xwin_preflight(&self) -> bool {
+    pub(crate) const fn is_xwin_preflight(&self) -> bool {
         self.command_id.is_xwin_preflight()
     }
 }
@@ -275,7 +275,7 @@ impl CommandContext {
     clippy::result_large_err,
     reason = "CliError is the stable top-level contract type for the bootstrap CLI execution seam."
 )]
-pub fn execute(
+pub(crate) fn execute(
     context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {

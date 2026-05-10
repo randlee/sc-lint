@@ -11,7 +11,7 @@ use crate::command::CommandSuccess;
 use crate::command::DispatchTelemetry;
 use crate::config::LoadedConfig;
 
-pub const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
+pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PythonTool {
@@ -68,6 +68,12 @@ pub(crate) fn run_python_tool(
         .arg(&script_path)
         .arg("--root")
         .arg(repo_root)
+        .args(
+            loaded_config
+                .config_path()
+                .into_iter()
+                .flat_map(|path| [OsString::from("--config"), path.as_os_str().to_os_string()]),
+        )
         .arg("--json")
         .output()
         .map_err(|error| {
