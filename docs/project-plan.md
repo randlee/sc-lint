@@ -38,6 +38,8 @@ The current project focus is:
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
+  - see [docs/sc-lint/logging.md](./sc-lint/logging.md)
+  - see [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
   - see [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
@@ -140,6 +142,7 @@ Release `0.1.x` should establish:
 - a documented and approved top-level `sc-lint` CLI contract
 - explicit machine-contract decisions for:
   - canonical `--json` mode
+  - one envelope and error pattern for every non-interactive command family
   - stable machine-readable failures
   - reusable request/response seams
   - secondary interactive graph surfaces only

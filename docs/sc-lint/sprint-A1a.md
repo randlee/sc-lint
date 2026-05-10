@@ -58,6 +58,7 @@ must leave the product with a real top-level binary and a vetted
 
 - `docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md`
 - `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
+- `docs/sc-lint/adr/ADR-008-sc-observability-logging.md`
 
 ## Governing Boundaries
 
@@ -92,6 +93,9 @@ must leave the product with a real top-level binary and a vetted
    - add the `sc-lint` crate to the workspace
    - implement the top-level `Cli` command root and initial grouped command
      families
+   - split responsibilities early into command-parsing, contract, error,
+     rendering, and logging seams so later command families do not copy/paste
+     their own output behavior
    - reserve the initial surface:
      - `lint`
      - `view`
@@ -110,10 +114,16 @@ must leave the product with a real top-level binary and a vetted
    Development work:
    - define `CommandEnvelope<T>` and `CliError`
    - implement canonical `--json` success and failure rendering
+   - define the stable dotted `command` identifier convention for every
+     initial non-interactive command family
+   - keep envelope serialization and `CliError` mapping in one shared contract
+     path rather than per-command handlers
    - normalize exit-code behavior for top-level CLI-owned failures
    Required tests:
    - success-envelope serialization tests
    - failure-envelope serialization tests
+   - fixture or snapshot tests proving `lint`, `view`, `check`, `clippy`,
+     `ci`, and `version` all use the same top-level envelope and failure keys
    - exit-code tests for usage/config/internal failures
    Required doc or boundary updates:
    - keep `docs/sc-lint/cli-contract.md` aligned with the implemented field
@@ -145,6 +155,8 @@ normalization begin.
 - non-interactive CLI-owned paths support canonical `--json`
 - top-level machine-readable success uses `CommandEnvelope<T>`
 - top-level machine-readable failure uses `CliError`
+- the initial non-interactive command families share one documented `command`,
+  response, and error pattern at the top-level envelope
 - the CLI logger initializes at process startup and writes invocation entry,
   completion, and per-error events under `~/sc-lint/logs/sc-lint/`
 - no backend crate gains a direct dependency on another backend crate

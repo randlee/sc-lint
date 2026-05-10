@@ -159,6 +159,8 @@ Every CLI invocation should emit:
 
 1. invocation entry event
    - command
+     - uses the same stable dotted command identifier documented for
+       `CommandEnvelope.command`
    - resolved args
    - timestamp
    - service name

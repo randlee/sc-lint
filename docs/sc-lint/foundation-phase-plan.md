@@ -126,6 +126,8 @@ Required contract decisions:
 
 - top-level machine mode is `--json`
 - non-interactive commands remain machine-readable on both success and failure
+- every non-interactive command family reuses one top-level command/result/error
+  pattern rather than inventing family-specific envelopes
 - request/response seams stay reusable outside the CLI entrypoint
 - human-readable output remains a presentation layer, not the only tested
   interface

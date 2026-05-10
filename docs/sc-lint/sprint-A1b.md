@@ -57,6 +57,7 @@ utility extraction work begins.
 
 - `docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md`
 - `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
+- `docs/sc-lint/adr/ADR-008-sc-observability-logging.md`
 
 ## Governing Boundaries
 
@@ -91,6 +92,8 @@ utility extraction work begins.
    Development work:
    - define the repo-root discovery path
    - implement one top-level config loader for CLI-owned commands
+   - keep command-family config resolution in shared helpers rather than
+     per-command parsing branches
    - keep backend-specific config parsing behind the CLI contract seam
    Required tests:
    - repo-root discovery tests
@@ -103,11 +106,16 @@ utility extraction work begins.
    - add one real delegated command path through the CLI, preferably
      `sc-lint lint sc-boundary`
    - normalize backend machine output into the top-level envelope
+   - route delegated results through one shared normalization helper used by
+     every non-interactive command family
    - handle backend protocol and execution failures explicitly
    Required tests:
    - delegated success-path tests
    - malformed backend JSON tests
    - backend execution failure tests
+   - contract-parity tests proving delegated command paths still use the same
+     `command`, success-envelope, and `CliError` pattern as direct CLI-owned
+     commands
    Required doc or boundary updates:
    - update CLI contract docs if the normalization rules need narrower wording
 
@@ -136,6 +144,8 @@ end-to-end CLI seam.
 - non-interactive delegated CLI paths use the canonical `--json` contract
 - dispatch-seam logging writes delegated dispatch-call and normalized-result
   entries for the active backend command
+- delegated command paths still use the same documented top-level `command`,
+  response, and error pattern as the rest of the CLI
 - no backend crate gains a direct dependency on another backend crate
 
 ## Required Validation

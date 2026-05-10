@@ -6,6 +6,7 @@ This document defines the detailed requirements for the planned top-level
 Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+- [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
 
 ## Purpose
 
@@ -64,6 +65,22 @@ specialized backend tools and mixed Rust/Python implementations.
   - direct library failures
   - delegated backend execution failures
   - delegated backend protocol/parse failures
+
+- `REQ-CLI-005H`
+  Every non-interactive top-level command family must use the same envelope
+  pattern:
+  - stable `command` identifier
+  - family-owned payload under `data` on success
+  - `CliError` under `error` on failure
+  - additive diagnostics only, never family-specific top-level envelope keys
+
+- `REQ-CLI-005I`
+  Before a command family is considered implementation-ready, the contract docs
+  must record:
+  - its stable command-identifier pattern
+  - the owner of its success payload shape
+  - the applicable top-level error kinds
+  - the tests that enforce envelope and error-shape consistency
 
 - `REQ-CLI-006`
   The CLI must support both direct Rust-library dispatch and delegated
@@ -225,5 +242,7 @@ specialized backend tools and mixed Rust/Python implementations.
 - See [cli-contract.md](./cli-contract.md) for:
   - top-level success envelope
   - `CliError` failure envelope
+  - per-command-family contract invariants
+  - stable command-identifier patterns
   - backend-to-CLI normalization rules
   - exit-code mapping guidance
