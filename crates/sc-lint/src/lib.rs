@@ -1,6 +1,8 @@
 mod cli;
 mod command;
 mod config;
+#[allow(dead_code)]
+mod consts;
 mod contract;
 mod dispatch;
 mod error;
@@ -62,7 +64,17 @@ where
 {
     match parse_args(args) {
         ParsedInvocation::Ready(cli) => {
-            let context = CommandContext::from_cli(&cli);
+            let context = match CommandContext::from_cli(&cli) {
+                Ok(context) => context,
+                Err(error) => {
+                    let rendered = render_error(
+                        "cli.parse_error",
+                        OutputMode::from_json_flag(cli.json),
+                        &error,
+                    );
+                    return write_rendered_output(rendered, error.exit_code());
+                }
+            };
             let loaded_config = match LoadedConfig::load(&cli, &context) {
                 Ok(loaded_config) => loaded_config,
                 Err(error) => {
@@ -147,7 +159,11 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
                 "Run `sc-lint --help` to inspect the supported command surface.",
             );
             ImmediateOutcome {
-                rendered: render_error("cli", OutputMode::from_json_flag(json_mode), &cli_error),
+                rendered: render_error(
+                    "cli.parse_error",
+                    OutputMode::from_json_flag(json_mode),
+                    &cli_error,
+                ),
                 exit_code: cli_error.exit_code(),
             }
         }

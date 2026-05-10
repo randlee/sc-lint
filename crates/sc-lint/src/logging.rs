@@ -1,3 +1,7 @@
+#[allow(dead_code)]
+#[path = "consts.rs"]
+mod consts;
+
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -31,7 +35,6 @@ use serde_json::json;
 pub struct ObservedCommand<'a> {
     context: &'a CommandContext,
     loaded_config: &'a LoadedConfig,
-    service_name: ServiceName,
 }
 
 impl<'a> ObservedCommand<'a> {
@@ -43,15 +46,9 @@ impl<'a> ObservedCommand<'a> {
         context: &'a CommandContext,
         loaded_config: &'a LoadedConfig,
     ) -> Result<Self, CliError> {
-        let service_name = ServiceName::new(context.service_name()).map_err(|error| {
-            CliError::internal(format!("invalid service name `{}`", context.service_name()))
-                .with_source(error)
-        })?;
-
         Ok(Self {
             context,
             loaded_config,
-            service_name,
         })
     }
 
@@ -60,7 +57,7 @@ impl<'a> ObservedCommand<'a> {
     }
 
     fn service_name(&self) -> &ServiceName {
-        &self.service_name
+        self.context.service_name()
     }
 
     fn summary(&self) -> &'static str {
@@ -106,6 +103,7 @@ impl LogRoot {
     reason = "Logger initialization failures are part of the stable top-level CliError contract."
 )]
 pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Logger, CliError> {
+    validate_logging_contract()?;
     let log_root = LogRoot::resolve(
         observed
             .loaded_config()
@@ -122,13 +120,7 @@ pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Lo
     config.enable_file_sink = false;
     config.enable_console_sink = observed.loaded_config().logging_console();
 
-    let mut builder = LoggerBuilder::new(config).map_err(|error| {
-        CliError::config("failed to initialize the structured logger")
-            .with_source(error)
-            .with_suggested_action(
-                "Verify the configured log root is writable for the current user.",
-            )
-    })?;
+    let mut builder = LoggerBuilder::new(config).map_err(classify_logger_init_error)?;
     builder.register_sink(SinkRegistration::new(std::sync::Arc::new(
         JsonlFileSink::new(
             log_root.active_log_path(observed.service_name()),
@@ -161,16 +153,16 @@ pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
     }
     if let Some(config_path) = observed.loaded_config().config_path() {
         fields.insert(
-            "config_path".to_string(),
+            consts::FIELD_CONFIG_PATH.to_string(),
             Value::String(config_path.display().to_string()),
         );
     }
 
-    log_event(
+    emit_event(
         logger,
         observed,
         Level::Info,
-        started_action().clone(),
+        started_action().cloned(),
         None,
         Some("command invocation started"),
         fields,
@@ -179,13 +171,16 @@ pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
 
 pub fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>, tool: &str) {
     let mut fields = base_fields(observed);
-    fields.insert("tool".to_string(), Value::String(tool.to_string()));
+    fields.insert(
+        consts::FIELD_TOOL.to_string(),
+        Value::String(tool.to_string()),
+    );
 
-    log_event(
+    emit_event(
         logger,
         observed,
         Level::Info,
-        dispatch_started_action().clone(),
+        dispatch_started_action().cloned(),
         None,
         Some("backend dispatch started"),
         fields,
@@ -199,17 +194,17 @@ pub fn log_dispatch_result(
 ) {
     let mut fields = base_fields(observed);
     fields.insert(
-        "tool".to_string(),
+        consts::FIELD_TOOL.to_string(),
         Value::String(dispatch.tool().to_string()),
     );
     fields.insert("finding_count".to_string(), json!(dispatch.finding_count()));
 
-    log_event(
+    emit_event(
         logger,
         observed,
         Level::Info,
-        dispatch_normalized_action().clone(),
-        Some(success_outcome().clone()),
+        dispatch_normalized_action().cloned(),
+        success_outcome().cloned().ok(),
         Some("backend result normalized through top-level contract"),
         fields,
     );
@@ -226,16 +221,16 @@ pub fn log_completion(
     fields.insert("summary".to_string(), Value::String(summary.to_string()));
     fields.insert("elapsed_ms".to_string(), Value::from(elapsed_ms(elapsed)));
 
-    log_event(
+    emit_event(
         logger,
         observed,
         Level::Info,
-        completed_action().clone(),
-        Some(if ok {
-            success_outcome().clone()
+        completed_action().cloned(),
+        if ok {
+            success_outcome().cloned().ok()
         } else {
-            failure_outcome().clone()
-        }),
+            failure_outcome().cloned().ok()
+        },
         Some("command invocation completed"),
         fields,
     );
@@ -243,25 +238,37 @@ pub fn log_completion(
 
 pub fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: &CliError) {
     let mut fields = base_fields(observed);
-    fields.insert("code".to_string(), Value::String(error.code().to_string()));
     fields.insert(
-        "kind".to_string(),
+        consts::FIELD_CODE.to_string(),
+        Value::String(error.code().to_string()),
+    );
+    fields.insert(
+        consts::FIELD_KIND.to_string(),
         Value::String(format!("{:?}", error.kind).to_lowercase()),
     );
-    fields.insert("message".to_string(), Value::String(error.message.clone()));
+    fields.insert(
+        consts::FIELD_MESSAGE.to_string(),
+        Value::String(error.message.clone()),
+    );
     if let Some(cause) = error.cause.as_ref() {
-        fields.insert("cause".to_string(), Value::String(cause.clone()));
+        fields.insert(
+            consts::FIELD_CAUSE.to_string(),
+            Value::String(cause.clone()),
+        );
     }
     if !error.details.is_empty() {
-        fields.insert("details".to_string(), Value::Object(error.details.clone()));
+        fields.insert(
+            consts::FIELD_DETAILS.to_string(),
+            Value::Object(error.details.clone()),
+        );
     }
 
-    log_event(
+    emit_event(
         logger,
         observed,
         Level::Error,
-        error_action().clone(),
-        Some(failure_outcome().clone()),
+        error_action().cloned(),
+        failure_outcome().cloned().ok(),
         Some("top-level cli error emitted"),
         fields,
     );
@@ -275,22 +282,40 @@ pub fn shutdown(logger: &Logger) {
     let _ = logger.shutdown();
 }
 
-fn log_event(
+fn emit_event(
     logger: &Logger,
     observed: &ObservedCommand<'_>,
     level: Level,
-    action: ActionName,
+    action: Result<ActionName, &'static str>,
     outcome: Option<OutcomeLabel>,
     message: Option<&str>,
     fields: Map<String, Value>,
 ) {
+    let Ok(event) = build_event(observed, level, action, outcome, message, fields) else {
+        return;
+    };
+    let _ = logger.emit(event);
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Only the top-level logging/event seam needs to lift static-contract failures into the shared CliError contract."
+)]
+fn build_event(
+    observed: &ObservedCommand<'_>,
+    level: Level,
+    action: Result<ActionName, &'static str>,
+    outcome: Option<OutcomeLabel>,
+    message: Option<&str>,
+    fields: Map<String, Value>,
+) -> Result<LogEvent, CliError> {
     let event = LogEvent {
-        version: schema_version().clone(),
+        version: schema_version().map_err(CliError::internal)?.clone(),
         timestamp: Timestamp::now_utc(),
         level,
         service: observed.service_name().clone(),
-        target: command_target().clone(),
-        action,
+        target: command_target().map_err(CliError::internal)?.clone(),
+        action: action.map_err(CliError::internal)?,
         message: message.map(ToString::to_string),
         identity: ProcessIdentity::default(),
         trace: None,
@@ -301,7 +326,7 @@ fn log_event(
         state_transition: None,
         fields,
     };
-    let _ = logger.emit(event);
+    Ok(event)
 }
 
 fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
@@ -312,72 +337,122 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
         ),
         ("summary".to_string(), json!(observed.summary())),
     ]);
-    if matches!(observed.command_id(), "check.xwin" | "clippy.xwin") {
+    if observed.context.is_xwin_preflight() {
         fields.insert("preflight_mode".to_string(), json!("xwin"));
         fields.insert("target_triple".to_string(), json!(WINDOWS_XWIN_TARGET));
     }
     fields
 }
 
-fn schema_version() -> &'static SchemaVersion {
-    static SCHEMA_VERSION: OnceLock<SchemaVersion> = OnceLock::new();
-    SCHEMA_VERSION.get_or_init(|| {
-        SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION).expect("static schema version is valid")
-    })
+#[expect(
+    clippy::result_large_err,
+    reason = "Logger startup must fail through the shared CliError contract when static logging metadata is invalid."
+)]
+fn validate_logging_contract() -> Result<(), CliError> {
+    let _ = schema_version().map_err(CliError::internal)?;
+    let _ = command_target().map_err(CliError::internal)?;
+    let _ = started_action().map_err(CliError::internal)?;
+    let _ = completed_action().map_err(CliError::internal)?;
+    let _ = error_action().map_err(CliError::internal)?;
+    let _ = dispatch_started_action().map_err(CliError::internal)?;
+    let _ = dispatch_normalized_action().map_err(CliError::internal)?;
+    let _ = success_outcome().map_err(CliError::internal)?;
+    let _ = failure_outcome().map_err(CliError::internal)?;
+    Ok(())
 }
 
-fn command_target() -> &'static TargetCategory {
-    static COMMAND_TARGET: OnceLock<TargetCategory> = OnceLock::new();
-    COMMAND_TARGET.get_or_init(|| {
-        TargetCategory::new("cli.command").expect("static target category is valid")
-    })
+fn schema_version() -> Result<&'static SchemaVersion, &'static str> {
+    static SCHEMA_VERSION: OnceLock<Result<SchemaVersion, &'static str>> = OnceLock::new();
+    match SCHEMA_VERSION.get_or_init(|| {
+        SchemaVersion::new(OBSERVATION_ENVELOPE_VERSION)
+            .map_err(|_| "invalid static logging schema version")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
-fn started_action() -> &'static ActionName {
-    static STARTED_ACTION: OnceLock<ActionName> = OnceLock::new();
-    STARTED_ACTION.get_or_init(|| {
-        ActionName::new("cli.command.started").expect("static started action is valid")
-    })
+fn command_target() -> Result<&'static TargetCategory, &'static str> {
+    static COMMAND_TARGET: OnceLock<Result<TargetCategory, &'static str>> = OnceLock::new();
+    match COMMAND_TARGET.get_or_init(|| {
+        TargetCategory::new("cli.command").map_err(|_| "invalid static logging target category")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
-fn completed_action() -> &'static ActionName {
-    static COMPLETED_ACTION: OnceLock<ActionName> = OnceLock::new();
-    COMPLETED_ACTION.get_or_init(|| {
-        ActionName::new("cli.command.completed").expect("static completed action is valid")
-    })
+fn started_action() -> Result<&'static ActionName, &'static str> {
+    static STARTED_ACTION: OnceLock<Result<ActionName, &'static str>> = OnceLock::new();
+    match STARTED_ACTION.get_or_init(|| {
+        ActionName::new("cli.command.started").map_err(|_| "invalid static logging started action")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
-fn error_action() -> &'static ActionName {
-    static ERROR_ACTION: OnceLock<ActionName> = OnceLock::new();
-    ERROR_ACTION
-        .get_or_init(|| ActionName::new("cli.command.error").expect("static error action is valid"))
+fn completed_action() -> Result<&'static ActionName, &'static str> {
+    static COMPLETED_ACTION: OnceLock<Result<ActionName, &'static str>> = OnceLock::new();
+    match COMPLETED_ACTION.get_or_init(|| {
+        ActionName::new("cli.command.completed")
+            .map_err(|_| "invalid static logging completed action")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
-fn dispatch_started_action() -> &'static ActionName {
-    static DISPATCH_STARTED_ACTION: OnceLock<ActionName> = OnceLock::new();
-    DISPATCH_STARTED_ACTION.get_or_init(|| {
-        ActionName::new("cli.dispatch.started").expect("static dispatch started action is valid")
-    })
+fn error_action() -> Result<&'static ActionName, &'static str> {
+    static ERROR_ACTION: OnceLock<Result<ActionName, &'static str>> = OnceLock::new();
+    match ERROR_ACTION.get_or_init(|| {
+        ActionName::new("cli.command.error").map_err(|_| "invalid static logging error action")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
-fn dispatch_normalized_action() -> &'static ActionName {
-    static DISPATCH_NORMALIZED_ACTION: OnceLock<ActionName> = OnceLock::new();
-    DISPATCH_NORMALIZED_ACTION.get_or_init(|| {
+fn dispatch_started_action() -> Result<&'static ActionName, &'static str> {
+    static DISPATCH_STARTED_ACTION: OnceLock<Result<ActionName, &'static str>> = OnceLock::new();
+    match DISPATCH_STARTED_ACTION.get_or_init(|| {
+        ActionName::new("cli.dispatch.started")
+            .map_err(|_| "invalid static dispatch started action")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
+}
+
+fn dispatch_normalized_action() -> Result<&'static ActionName, &'static str> {
+    static DISPATCH_NORMALIZED_ACTION: OnceLock<Result<ActionName, &'static str>> = OnceLock::new();
+    match DISPATCH_NORMALIZED_ACTION.get_or_init(|| {
         ActionName::new("cli.dispatch.normalized")
-            .expect("static dispatch normalized action is valid")
-    })
+            .map_err(|_| "invalid static dispatch normalized action")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
-fn success_outcome() -> &'static OutcomeLabel {
-    static SUCCESS_OUTCOME: OnceLock<OutcomeLabel> = OnceLock::new();
-    SUCCESS_OUTCOME
-        .get_or_init(|| OutcomeLabel::new("success").expect("static success outcome is valid"))
+fn success_outcome() -> Result<&'static OutcomeLabel, &'static str> {
+    static SUCCESS_OUTCOME: OnceLock<Result<OutcomeLabel, &'static str>> = OnceLock::new();
+    match SUCCESS_OUTCOME.get_or_init(|| {
+        OutcomeLabel::new("success").map_err(|_| "invalid static success outcome label")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
-fn failure_outcome() -> &'static OutcomeLabel {
-    static FAILURE_OUTCOME: OnceLock<OutcomeLabel> = OnceLock::new();
-    FAILURE_OUTCOME
-        .get_or_init(|| OutcomeLabel::new("failure").expect("static failure outcome is valid"))
+fn failure_outcome() -> Result<&'static OutcomeLabel, &'static str> {
+    static FAILURE_OUTCOME: OnceLock<Result<OutcomeLabel, &'static str>> = OnceLock::new();
+    match FAILURE_OUTCOME.get_or_init(|| {
+        OutcomeLabel::new("failure").map_err(|_| "invalid static failure outcome label")
+    }) {
+        Ok(value) => Ok(value),
+        Err(error) => Err(*error),
+    }
 }
 
 fn elapsed_ms(elapsed: Duration) -> u64 {
@@ -390,7 +465,7 @@ fn elapsed_ms(elapsed: Duration) -> u64 {
 )]
 fn default_log_base() -> Result<PathBuf, CliError> {
     home_directory()
-        .map(|home| home.join("sc-lint").join("logs"))
+        .map(|home| home.join(consts::SERVICE_NAME).join("logs"))
         .ok_or_else(|| {
             CliError::capability("could not resolve the current user's home directory for logging")
                 .with_suggested_action(
@@ -418,4 +493,46 @@ fn home_directory() -> Option<PathBuf> {
     {
         std::env::var_os("HOME").map(PathBuf::from)
     }
+}
+
+fn classify_logger_init_error<E>(error: E) -> CliError
+where
+    E: std::fmt::Display,
+{
+    let message = error.to_string().to_ascii_lowercase();
+    if contains_config_signal(&message) {
+        return CliError::config("failed to initialize the structured logger")
+            .with_source(error)
+            .with_suggested_action(
+                "Check the logging configuration values and retry the command.",
+            );
+    }
+    if contains_capability_signal(&message) {
+        return CliError::capability("failed to initialize the structured logger")
+            .with_source(error)
+            .with_suggested_action(
+                "Verify the configured log root is writable for the current user.",
+            );
+    }
+    CliError::internal("failed to initialize the structured logger")
+        .with_source(error)
+        .with_suggested_action(
+            "Re-run the command; if the failure persists, inspect the logger wiring.",
+        )
+}
+
+fn contains_config_signal(message: &str) -> bool {
+    message.contains("config")
+        || message.contains("invalid")
+        || message.contains("contradict")
+        || message.contains("schema")
+}
+
+fn contains_capability_signal(message: &str) -> bool {
+    message.contains("permission")
+        || message.contains("writable")
+        || message.contains("write")
+        || message.contains("create")
+        || message.contains("path")
+        || message.contains("directory")
 }

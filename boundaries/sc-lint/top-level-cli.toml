@@ -15,7 +15,10 @@ constructor = "none"
 [composition]
 # `CommandEnvelope` records the generic success-envelope family documented in
 # the CLI contract as `CommandEnvelope<T>`.
-roots = ["Command", "LintProfile", "OutputMode", "CommandEnvelope", "CliError"]
+# The A.1b/A.2 execution model also exposes the command-context seam, preflight
+# target enums, and the canonical Windows xwin target triple as contract-relevant
+# CLI composition items.
+roots = ["Command", "CommandContext", "LintProfile", "OutputMode", "CheckTarget", "ClippyTarget", "CommandEnvelope", "CliError", "WINDOWS_XWIN_TARGET"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the shared support crate and
@@ -24,7 +27,8 @@ roots = ["Command", "LintProfile", "OutputMode", "CommandEnvelope", "CliError"]
 # direct crate dependency edge here. In particular, the planned primary
 # `sc-portability` and `sc-runtime` lint targets are release-1 delegated
 # backend surfaces unless a later boundary/architecture update approves
-# direct linkage.
+# direct linkage. The package currently mixes library and binary targets, so
+# Cargo cannot scope `sc-observability` to the binary alone.
 allowed_dependents = []
 allowed_dependencies = ["sc-lint-boundary", "sc-lint-directives", "sc-observability"]
 forbidden_edges = [

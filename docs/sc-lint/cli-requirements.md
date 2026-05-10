@@ -8,6 +8,9 @@ Related ADRs:
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
 
+ADR-005 governs release-1 profile and `xwin` policy and supersedes earlier
+provisional rollout notes for cross-target preflight membership.
+
 ## Purpose
 
 The CLI exists to provide one stable user-facing command surface across
@@ -85,6 +88,8 @@ specialized backend tools and mixed Rust/Python implementations.
   - the owner of its success payload shape
   - the applicable top-level error kinds
   - the tests that enforce envelope and error-shape consistency
+  Parser-level usage failures that occur before a concrete subcommand path is
+  resolved must document the fallback command identifier they use.
 
 - `REQ-CLI-006`
   The CLI must support both direct Rust-library dispatch and delegated
@@ -236,9 +241,10 @@ specialized backend tools and mixed Rust/Python implementations.
   backend implementation without changing the user-facing command contract.
 
 - `REQ-CLI-014`
-  If `cargo xwin` is installed, `xwin`-backed Windows preflight should join
-  the `full` lint profile, while `fast` remains `xwin`-free to preserve
-  low-latency local feedback.
+  If `cargo xwin` is installed, both `check.xwin` and `clippy.xwin` should
+  join the `full` lint profile, while `fast` remains `xwin`-free to preserve
+  low-latency local feedback. ADR-005 supersedes earlier provisional notes
+  that limited initial profile membership to `xwin check` alone.
 
 - `REQ-CLI-015`
   `xwin`-backed preflight must not be part of the `ci` lint profile because
@@ -282,6 +288,8 @@ specialized backend tools and mixed Rust/Python implementations.
   `clippy.native`, `clippy.xwin`, and top-level `ci` are now implemented
 - `full` conditionally adds `xwin` preflight only when `cargo xwin` is
   available; `fast` and `ci` remain `xwin`-free
+- parse-time usage failures that occur before command-path resolution render
+  with the fallback machine identifier `cli.parse_error`
 - repo-local wrappers now map onto the CLI-owned profiles:
   - `just lint`
     defaults to `sc-lint lint full`

@@ -28,9 +28,24 @@ scheduled_sprint = "A.2"
 tracking_id = "SC-LINT-CLI-005"
 expires_when = "sprint_before_current"
 
+[planned_items."BOUNDARY-ScLintCli.composition.root.CommandContext"]
+scheduled_sprint = "A.1b"
+tracking_id = "SC-LINT-CLI-010"
+expires_when = "sprint_before_current"
+
 [planned_items."BOUNDARY-ScLintCli.composition.root.OutputMode"]
 scheduled_sprint = "A.2"
 tracking_id = "SC-LINT-CLI-006"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.CheckTarget"]
+scheduled_sprint = "A.2"
+tracking_id = "SC-LINT-CLI-011"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.ClippyTarget"]
+scheduled_sprint = "A.2"
+tracking_id = "SC-LINT-CLI-012"
 expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.composition.root.CommandEnvelope"]
@@ -41,6 +56,11 @@ expires_when = "sprint_before_current"
 [planned_items."BOUNDARY-ScLintCli.composition.root.CliError"]
 scheduled_sprint = "A.1a"
 tracking_id = "SC-LINT-CLI-008"
+expires_when = "sprint_before_current"
+
+[planned_items."BOUNDARY-ScLintCli.composition.root.WINDOWS_XWIN_TARGET"]
+scheduled_sprint = "A.2"
+tracking_id = "SC-LINT-CLI-013"
 expires_when = "sprint_before_current"
 
 [planned_items."BOUNDARY-ScLintCli.dependencies.external.sc-observability"]

@@ -16,6 +16,7 @@ use crate::Command;
 use crate::CommandEnvelope;
 use crate::LintTarget;
 use crate::OutputMode;
+use crate::ParsedInvocation;
 use crate::ViewTarget;
 use crate::command::CommandContext;
 use crate::config::LoadedConfig;
@@ -68,7 +69,7 @@ fn help_text_exposes_the_initial_grouped_surface() {
 #[test]
 fn version_success_uses_the_canonical_top_level_envelope() {
     let cli = Cli::parse_from(["sc-lint", "--json", "version"]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("version context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let success = crate::command::execute(&context, &loaded).expect("version command succeeds");
     let envelope = CommandEnvelope::success(context.command_id(), success.data);
@@ -90,7 +91,7 @@ fn reserved_view_commands_use_the_same_failure_envelope_shape() {
     ];
 
     for cli in commands {
-        let context = CommandContext::from_cli(&cli);
+        let context = CommandContext::from_cli(&cli).expect("view context");
         let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
         let error =
             crate::command::execute(&context, &loaded).expect_err("view commands are reserved");
@@ -104,6 +105,43 @@ fn reserved_view_commands_use_the_same_failure_envelope_shape() {
         assert_eq!(json["error"]["code"], "CLI.CAPABILITY_ERROR");
         assert!(json["diagnostics"].as_array().is_some());
     }
+}
+
+#[test]
+fn reserved_lint_placeholders_use_the_same_failure_envelope_shape() {
+    let commands = [
+        Cli::parse_from(["sc-lint", "--json", "lint", "sc-portability"]),
+        Cli::parse_from(["sc-lint", "--json", "lint", "sc-runtime"]),
+    ];
+
+    for cli in commands {
+        let context = CommandContext::from_cli(&cli).expect("lint placeholder context");
+        let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+        let error = crate::command::execute(&context, &loaded)
+            .expect_err("reserved lint commands should fail consistently");
+        let rendered = crate::render::render_error_json(context.command_id(), &error);
+        let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
+
+        assert_eq!(json["ok"], false);
+        assert_eq!(json["command"], context.command_id());
+        assert_eq!(json["error"]["kind"], "capability");
+        assert_eq!(json["error"]["code"], "CLI.CAPABILITY_ERROR");
+        assert!(json["diagnostics"].as_array().is_some());
+    }
+}
+
+#[test]
+fn parse_errors_use_the_documented_command_identifier() {
+    let ParsedInvocation::Immediate(outcome) =
+        crate::parse_args(["sc-lint", "--json", "unknown-command"])
+    else {
+        panic!("invalid command should stop at parse time");
+    };
+    let rendered = outcome.rendered.stderr.expect("parse error emits stderr");
+    let json: Value = serde_json::from_str(&rendered).expect("rendered parse error is json");
+
+    assert_eq!(json["command"], "cli.parse_error");
+    assert_eq!(json["error"]["code"], "CLI.USAGE_ERROR");
 }
 
 #[test]
@@ -161,7 +199,7 @@ fn repo_root_discovery_walks_up_to_the_workspace_root() {
         "lint",
         "sc-boundary",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("repo-root context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let root = loaded.require_repo_root().expect("repo root");
 
@@ -187,7 +225,7 @@ fn malformed_repo_config_returns_cli_config_error() {
         "lint",
         "sc-boundary",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("config-error context");
     let error = LoadedConfig::load(&cli, &context).expect_err("config should fail");
 
     assert_eq!(error.kind, CliErrorKind::Config);
@@ -206,7 +244,7 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
         "lint",
         "sc-boundary",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
     let expected_finding_count = success
@@ -261,7 +299,7 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
         "lint",
         "sc-boundary",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("dispatch failure context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let error = crate::command::execute(&context, &loaded).expect_err("dispatch should fail");
 
@@ -281,7 +319,7 @@ fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
         "lint",
         "sc-boundary",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("loaded-config context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
 
     assert_eq!(
@@ -300,7 +338,7 @@ fn lint_profiles_have_stable_membership() {
         "lint",
         "fast",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("lint fast context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let adapter = FakeSystemAdapter::new(false);
 
@@ -328,7 +366,7 @@ fn full_profile_adds_xwin_only_when_available() {
         "lint",
         "full",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("lint full context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
 
     let unavailable = workflow::run_lint_profile_with(
@@ -371,7 +409,7 @@ fn ci_and_lint_ci_differ_only_by_test_execution() {
         "lint",
         "ci",
     ]);
-    let lint_context = CommandContext::from_cli(&lint_cli);
+    let lint_context = CommandContext::from_cli(&lint_cli).expect("lint ci context");
     let loaded = LoadedConfig::load(&lint_cli, &lint_context).expect("config loads");
     let adapter = FakeSystemAdapter::new(false);
 
@@ -408,7 +446,7 @@ fn explicit_xwin_commands_require_capability() {
         "check",
         "xwin",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("xwin check context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let error =
         workflow::run_check_with(&loaded, CheckTarget::Xwin, &FakeSystemAdapter::new(false))
@@ -430,7 +468,7 @@ fn native_and_xwin_preflight_commands_use_success_envelopes() {
         "clippy",
         "xwin",
     ]);
-    let context = CommandContext::from_cli(&cli);
+    let context = CommandContext::from_cli(&cli).expect("xwin clippy context");
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let success =
         workflow::run_clippy_with(&loaded, ClippyTarget::Xwin, &FakeSystemAdapter::new(true))
@@ -467,6 +505,8 @@ fn step_names(steps: &[Value]) -> Vec<String> {
 struct FakeSystemAdapter {
     xwin_available: bool,
     failures: HashMap<&'static str, &'static str>,
+    // Tests need to observe step order without requiring Sync, so RefCell is
+    // sufficient for this single-threaded fake.
     invocations: RefCell<Vec<String>>,
 }
 

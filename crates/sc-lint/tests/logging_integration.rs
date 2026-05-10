@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Duration;
+use std::time::Instant;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -65,6 +67,12 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     let cli_log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
     assert_log_file_contains_action(&cli_log_path, "cli.command.started");
     assert_log_file_contains_error_action(&cli_log_path, "cli.command.error");
+    assert_log_file_contains_field(
+        &cli_log_path,
+        "cli.command.started",
+        "command",
+        "view.graph",
+    );
     assert_log_file_contains_elapsed_ms(&cli_log_path);
 
     let dispatch_log_path = temp_root.join("sc-boundary").join("sc-boundary.log.jsonl");
@@ -74,9 +82,13 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
 }
 
 #[test]
+#[cfg_attr(windows, ignore = "cargo.cmd not resolved by CreateProcessW")]
 fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     let temp_dir = TempDir::new().expect("temp dir");
     let repo_root = workspace_root();
+    if !host_cargo_xwin_available(&repo_root) {
+        return;
+    }
     let binary = env!("CARGO_BIN_EXE_sc-lint");
 
     let success_logs = temp_dir.path().join("logs-success");
@@ -151,7 +163,7 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
 }
 
 fn assert_log_file_contains_action(path: &Path, action: &str) {
-    let contents = std::fs::read_to_string(path).expect("log file exists");
+    let contents = read_log_file_with_retry(path);
     assert!(
         contents
             .lines()
@@ -162,7 +174,7 @@ fn assert_log_file_contains_action(path: &Path, action: &str) {
 }
 
 fn assert_log_file_contains_error_action(path: &Path, action: &str) {
-    let contents = std::fs::read_to_string(path).expect("log file exists");
+    let contents = read_log_file_with_retry(path);
     assert!(
         contents
             .lines()
@@ -173,12 +185,14 @@ fn assert_log_file_contains_error_action(path: &Path, action: &str) {
 }
 
 fn assert_log_file_contains_elapsed_ms(path: &Path) {
-    let contents = std::fs::read_to_string(path).expect("log file exists");
+    let contents = read_log_file_with_retry(path);
     assert!(
         contents
             .lines()
             .filter_map(|line| serde_json::from_str::<Value>(line).ok())
             .any(|line| {
+                // Do not add a minimum elapsed-ms assertion here. Fast hosts
+                // can legitimately record 0ms for short commands.
                 line["action"] == "cli.command.completed"
                     && line["fields"]["elapsed_ms"].as_u64().is_some()
             }),
@@ -187,7 +201,7 @@ fn assert_log_file_contains_elapsed_ms(path: &Path) {
 }
 
 fn assert_log_file_contains_field(path: &Path, action: &str, field: &str, expected: &str) {
-    let contents = std::fs::read_to_string(path).expect("log file exists");
+    let contents = read_log_file_with_retry(path);
     assert!(
         contents
             .lines()
@@ -255,9 +269,34 @@ fn prepend_path(wrapper_path: &Path) -> std::ffi::OsString {
     let bin_dir = wrapper_path.parent().expect("wrapper parent");
     let mut parts = vec![bin_dir.as_os_str().to_os_string()];
     if let Some(existing) = std::env::var_os("PATH") {
+        // These tests assume no concurrent PATH mutation inside the same
+        // process while the child-command environment is being assembled.
         parts.extend(std::env::split_paths(&existing).map(|path| path.into_os_string()));
     }
     std::env::join_paths(parts).expect("join path entries")
+}
+
+fn read_log_file_with_retry(path: &Path) -> String {
+    let deadline = Instant::now() + Duration::from_millis(500);
+    loop {
+        match std::fs::read_to_string(path) {
+            Ok(contents) if !contents.is_empty() => return contents,
+            Ok(_) | Err(_) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(25))
+            }
+            Ok(contents) => return contents,
+            Err(error) => panic!("log file {path:?} was not readable before timeout: {error}"),
+        }
+    }
+}
+
+fn host_cargo_xwin_available(repo_root: &Path) -> bool {
+    Command::new("cargo")
+        .current_dir(repo_root)
+        .arg("xwin")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
 }
 
 fn workspace_root() -> PathBuf {

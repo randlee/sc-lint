@@ -82,6 +82,12 @@ Initial convention:
 - `sc-lint version`
   - `version`
 
+When parsing fails before a concrete command path is resolved, the CLI uses the
+fallback identifier:
+
+- parser-level usage failure
+  - `cli.parse_error`
+
 The same identifier should also be used in structured logging entry and
 completion events so command telemetry and machine-readable output line up.
 
@@ -107,6 +113,9 @@ Current implementation status:
   - implemented capability-gated Windows clippy path
 - `ci`
   - implemented top-level lint-plus-tests path
+- `cli.parse_error`
+  - implemented parser-level usage failure envelope path when command parsing
+    fails before a concrete subcommand identity exists
 - `view.*`
   - still reserved until A.3 lands
 - `lint.sc-portability`
@@ -208,6 +217,10 @@ The initial documented mapping should be:
 | `internal` | `CLI.INTERNAL_ERROR` | top-level CLI bug or invariant violation |
 
 The string values above are the implemented A.1a code families.
+
+Parser-level usage failures emitted before `CommandContext` can resolve a
+family-specific path still use this same error taxonomy, but their machine
+envelope `command` value is the fallback identifier `cli.parse_error`.
 
 ## Planned Command-Family Contract Matrix
 
