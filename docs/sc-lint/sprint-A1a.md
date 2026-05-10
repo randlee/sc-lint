@@ -6,7 +6,7 @@ phase: A
 sprint: "A.1a"
 worktree: <repo-root>
 branch: develop
-status: planned
+status: implemented
 estimated_scope: S
 ```
 
@@ -214,3 +214,92 @@ normalization begin.
   contract
 - do not make `--format json` part of the top-level CLI surface
 - do not overfit the envelope to only the first delegated backend
+
+## Implemented A.1a Surface
+
+The implemented `sc-lint` crate lands the following bootstrap seams:
+
+- `crates/sc-lint/src/cli.rs`
+  - top-level `Cli` plus grouped command parsing for:
+    - `lint`
+    - `view`
+    - `check`
+    - `clippy`
+    - `version`
+    - `ci`
+- `crates/sc-lint/src/command.rs`
+  - canonical dotted `command` identifiers
+  - service-name selection for structured logging
+  - reserved command handling for not-yet-integrated command families
+- `crates/sc-lint/src/contract.rs`
+  - `CommandEnvelope<T>`
+- `crates/sc-lint/src/error.rs`
+  - `CliError`
+  - stable top-level error-code mapping
+- `crates/sc-lint/src/render.rs`
+  - canonical `--json` rendering
+  - human-readable rendering derived from the same normalized result
+- `crates/sc-lint/src/logging.rs`
+  - CLI-owned logger bootstrap
+  - entry/completion/error event emission
+
+The A.1a reserved command inventory is:
+
+- `sc-lint lint sc-boundary`
+- `sc-lint lint sc-portability`
+- `sc-lint lint sc-runtime`
+- `sc-lint lint fast`
+- `sc-lint lint full`
+- `sc-lint lint ci`
+- `sc-lint view graph`
+- `sc-lint view findings`
+- `sc-lint check native`
+- `sc-lint check xwin`
+- `sc-lint clippy native`
+- `sc-lint clippy xwin`
+- `sc-lint ci`
+
+In A.1a those reserved surfaces intentionally return top-level
+`CLI.CAPABILITY_ERROR` envelopes rather than ad hoc prose so later sprints can
+add real execution paths without changing the contract family. The direct
+success-path bootstrap command in A.1a is `sc-lint version`.
+
+## A.1a Contract-Review Checkpoint
+
+The A.1a exit review against Workstreams 4-7 is complete and is the gate for
+A.1b entry.
+
+### Workstream 4: Generic Python utility extraction
+
+- `view` stays a reserved top-level grouping in A.1a.
+- the documented bootstrap targets are:
+  - `view.graph`
+  - `view.findings`
+- A.3 must normalize Python-backed utility output through the same
+  `CommandEnvelope<T>` / `CliError` path rather than exposing raw Python
+  stderr or per-tool JSON.
+
+### Workstream 5: Boundary logic migration to Rust
+
+- A.1b is approved to make `sc-lint lint sc-boundary` the first real backend
+  path.
+- A.1b must keep repo-root discovery and config loading in the top-level CLI
+  before calling `sc-lint-boundary`.
+- backend-native machine output must still normalize through one shared
+  top-level envelope path.
+
+### Workstream 6: `sc-lint-portability`
+
+- the stable top-level target name is fixed as `lint.sc-portability`.
+- A.4 may use delegated backend execution first; direct top-level crate
+  linkage is not assumed by A.1a.
+- the CLI-owned logger must continue to choose `sc-portability` as the
+  service identity when that backend path becomes real.
+
+### Workstream 7: `sc-lint-runtime`
+
+- the stable top-level target name is fixed as `lint.sc-runtime`.
+- A.5 must reuse the same contract and logging path rather than introducing a
+  runtime-specific response envelope.
+- any future direct-linked runtime backend remains subject to the CLI-owned
+  logger invariant from ADR-008.

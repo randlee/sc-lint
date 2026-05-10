@@ -91,6 +91,7 @@ The currently scheduled foundation sprints are:
 
 - `A.1a`
   - CLI bootstrap and contract definition
+  - includes the A.1a exit-review checkpoint for Workstreams 4-7
   - `docs/sc-lint/sprint-A1a.md`
 - `A.1b`
   - config loading and first backend integration

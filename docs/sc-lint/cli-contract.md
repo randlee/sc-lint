@@ -1,6 +1,6 @@
 # sc-lint CLI Contract
 
-This document defines the planned end-to-end contract for the top-level
+This document defines the end-to-end contract for the top-level
 `sc-lint` CLI.
 
 Related ADRs:
@@ -25,9 +25,9 @@ That means:
 - success and failure are both machine-readable in machine mode
 - backend-specific flags and result shapes stay behind the CLI boundary
 
-## Planned Contract Types
+## Contract Types
 
-The release-1 contract should explicitly define these types:
+The release-1 contract explicitly names these types:
 
 - `Cli`
 - `Command`
@@ -85,6 +85,13 @@ Initial convention:
 The same identifier should also be used in structured logging entry and
 completion events so command telemetry and machine-readable output line up.
 
+Bootstrap note for A.1a:
+
+- `version` is the implemented direct success path
+- the remaining command families are exposed as reserved contract surfaces and
+  return top-level `CLI.CAPABILITY_ERROR` envelopes until their owning sprints
+  land real execution
+
 ## Canonical Success Envelope
 
 Machine-readable success results should use one stable top-level envelope
@@ -112,8 +119,7 @@ Required properties:
   JSON shape per backend
 - diagnostics are additive and do not replace the business payload
 
-The exact field names may still be tuned, but the envelope family must remain
-stable once implemented.
+The implemented field names are stable for the Phase A bootstrap line.
 
 ## Canonical Error Envelope
 
@@ -177,9 +183,7 @@ The initial documented mapping should be:
 | `backend_protocol` | `CLI.BACKEND_PROTOCOL_ERROR` | delegated backend returned malformed or unexpected machine output |
 | `internal` | `CLI.INTERNAL_ERROR` | top-level CLI bug or invariant violation |
 
-The exact string values may still be tuned before implementation, but the
-release-1 contract must define one stable mapping from top-level error kind to
-top-level stable code.
+The string values above are the implemented A.1a code families.
 
 ## Planned Command-Family Contract Matrix
 
@@ -189,7 +193,7 @@ the same matrix before code lands:
 | Command family | Stable `command` pattern | Success payload owner | Applicable top-level error kinds |
 | --- | --- | --- | --- |
 | `lint` | `lint.<tool-or-profile>` | analyzer backend or lint-profile orchestrator | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
-| `view` | `view.<target>` | view/report backend or adapter layer | `usage`, `config`, `backend_failure`, `backend_protocol`, `internal` |
+| `view` | `view.<target>` | view/report backend or adapter layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `check` | `check.<target>` | compile/preflight runner | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `clippy` | `clippy.<target>` | lint-runner backend | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
@@ -250,12 +254,20 @@ Recommended initial policy:
 
 - `0`
   - command succeeded
-- nonzero
-  - command failed
+- `1`
+  - top-level internal failure
+- `2`
+  - top-level usage failure
+- `3`
+  - top-level config failure
+- `4`
+  - top-level capability failure
+- `5`
+  - delegated backend execution failure
+- `6`
+  - delegated backend protocol failure
 
-The CLI may use finer-grained exit-code families later, but those codes must be
-documented alongside the machine-readable contract and must not drift per
-backend.
+These codes are owned by the CLI and must not drift per backend.
 
 ## Relationship To Backend JSON
 
@@ -292,6 +304,17 @@ Implementation is not considered complete unless tests prove that:
 - every failure path uses `CliError` rather than family-specific JSON
 - `command` values match the documented dotted-identifier convention
 - delegated backends cannot bypass the top-level normalization path
+
+For A.1a, the consistency gate lives in `crates/sc-lint/src/tests.rs` and
+proves:
+
+- grouped command parsing for the initial surface
+- help output for the grouped command root
+- success-envelope serialization for `version`
+- failure-envelope serialization for `lint`, `view`, `check`, `clippy`, and
+  `ci`
+- stable exit-code mapping for CLI-owned failures
+- CLI-owned logging entry/completion/error event emission
 
 ## Graph and Interactive Futures
 

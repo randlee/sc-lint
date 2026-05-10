@@ -1,6 +1,6 @@
 # sc-lint CLI Architecture
 
-This document records the intended architecture of the top-level `sc-lint` CLI
+This document records the architecture of the top-level `sc-lint` CLI
 crate.
 
 Related ADRs:
@@ -100,7 +100,9 @@ For release `0.1.x`, the `view` family remains narrower than `lint`:
   - primary targets are crate-mapped and ownership-bearing
 - `view`
   - reserved top-level grouping for report and visualization surfaces
-  - target names are documented individually as they become stable
+  - the A.1a bootstrap targets are:
+    - `graph`
+    - `findings`
   - release-1 view targets may remain backed by repo-local Python/report
     plumbing instead of one target per backend crate
 
@@ -149,7 +151,7 @@ Profile semantics:
   - lint plus tests
   - mirrors real CI intent rather than `xwin` preflight
 
-## Planned Contract Types
+## Contract Types
 
 The release-1 CLI design should name and preserve the following important
 types explicitly:
@@ -177,8 +179,9 @@ types explicitly:
     - optional details
     - optional suggested action
 
-These names define the intended architectural seam even before all of them are
-fully implemented.
+The A.1a implementation exports `Cli`, `Command`, `CommandEnvelope<T>`, and
+`CliError` now. `LintProfile` and `OutputMode` remain explicit contract roots
+that A.2 will formalize behind the same command surface.
 
 For release `0.1.x`, these planned contract types should also be represented as
 `BOUNDARY-ScLintCli` composition-root items in the boundary/planning metadata.
@@ -209,6 +212,43 @@ own local pattern:
 This split is meant to improve development success by preventing duplicated
 JSON rendering, ad hoc error mapping, and command-family-specific dispatch
 wrappers.
+
+The current A.1a crate layout is:
+
+- `crates/sc-lint/src/cli.rs`
+- `crates/sc-lint/src/command.rs`
+- `crates/sc-lint/src/contract.rs`
+- `crates/sc-lint/src/error.rs`
+- `crates/sc-lint/src/render.rs`
+- `crates/sc-lint/src/logging.rs`
+
+## A.1a Bootstrap Behavior
+
+Sprint A.1a intentionally stops before real backend dispatch.
+
+Current command behavior:
+
+- `version`
+  - succeeds directly from the top-level CLI
+- `lint`
+  - reserved contract surface
+  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+- `view`
+  - reserved contract surface
+  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+- `check`
+  - reserved contract surface
+  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+- `clippy`
+  - reserved contract surface
+  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+- `ci`
+  - reserved contract surface
+  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+
+This is intentional. The goal of A.1a is to freeze the top-level envelope,
+error family, command identifiers, and logger ownership before A.1b adds the
+first real backend path.
 
 ## Machine Contract Model
 
