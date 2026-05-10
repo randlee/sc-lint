@@ -58,6 +58,16 @@ standalone fixture coverage.
 - migrating ATM-specific policy lints unchanged
 - migrating boundary inventory logic into Rust in this sprint
 
+## Primary Targets
+
+- `crates/sc-lint/`
+- `.just/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/README.md`
+- `docs/project-plan.md`
+
 ## Sub-Tasks
 
 1. Extract line-count lint

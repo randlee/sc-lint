@@ -214,9 +214,9 @@ The product should support both:
   `Justfile` conventions.
 
 - `REQ-PRODUCT-012E`
-  If `cargo xwin` is installed, `xwin check` should be eligible for `fast`
-  and `full`, and `xwin clippy` should be eligible for `full`, but `xwin`
-  steps must stay out of the `ci` lint profile.
+  If `cargo xwin` is installed, `xwin`-backed Windows preflight should be
+  eligible for the `full` lint profile, while `fast` remains `xwin`-free to
+  preserve low-latency local feedback and `ci` continues to exclude `xwin`.
 
 ### Extraction and migration
 

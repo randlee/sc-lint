@@ -213,8 +213,8 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-014`
   If `cargo xwin` is installed, `xwin`-backed Windows preflight should join
-  the `fast` and `full` lint profiles where the specific command remains fast
-  enough for that profile.
+  the `full` lint profile, while `fast` remains `xwin`-free to preserve
+  low-latency local feedback.
 
 - `REQ-CLI-015`
   `xwin`-backed preflight must not be part of the `ci` lint profile because

@@ -137,10 +137,10 @@ Profile semantics:
 
 - `fast`
   - low-latency local developer gate
-  - includes `xwin` checks only when the individual command is fast enough
+  - excludes `xwin` to preserve low-latency local feedback
 - `full`
   - stronger local pre-push gate
-  - may include slower `xwin` checks such as `clippy xwin`
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only profile aligned to what the project considers CI lint parity
   - does not include `xwin`
@@ -263,8 +263,7 @@ For `xwin`-aware commands, capability resolution includes:
 
 - detect whether `cargo xwin` is installed
 - select the supported Windows target set
-- add `xwin`-aware checks into `fast` or `full` only when the capability is
-  present
+- add `xwin`-aware checks into `full` only when the capability is present
 - keep `ci` profile semantics independent from `xwin`
 - skip or error with a clear capability message depending on command mode
 

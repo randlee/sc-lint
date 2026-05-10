@@ -45,6 +45,8 @@ distinguishes:
 - `REQ-CLI-007C`
 - `REQ-CLI-007D`
 - `REQ-CLI-007E`
+- `REQ-CLI-008B`
+- `REQ-CLI-008C`
 - `REQ-CLI-014`
 - `REQ-CLI-015`
 
@@ -75,18 +77,35 @@ distinguishes:
 - adding `xwin` to the `ci` lint profile
 - porting Python utilities to Rust
 
+## Primary Targets
+
+- `crates/sc-lint/`
+- `Justfile`
+- `.just/run_lint.py`
+- `docs/sc-lint/cli-requirements.md`
+- `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/requirements.md`
+- `boundaries/planning.toml`
+
 ## Sub-Tasks
 
-1. Implement `LintProfile`
+1. Implement `LintProfile` and `OutputMode`
    Development work:
    - add `LintProfile::{Fast, Full, Ci}`
+   - add `OutputMode::{Human, Json}`
    - define stable membership and dispatch rules for each profile
+   - define stable output-mode selection rules for human and `--json` paths
    - expose `sc-lint lint fast|full|ci`
    Required tests:
    - profile parsing tests
    - profile membership tests
+   - output-mode parsing and serialization tests
    Required doc or boundary updates:
    - update CLI/profile docs if the implemented subcommand shape differs
+   - keep `boundaries/planning.toml` and `docs/sc-lint/cli-contract.md`
+     aligned with the implemented `OutputMode`
 
 2. Implement top-level `sc-lint ci`
    Development work:
@@ -139,6 +158,8 @@ and `ci` actually mean.
 ## Acceptance Criteria
 
 - `sc-lint lint fast`, `full`, and `ci` exist and are documented
+- `OutputMode::{Human, Json}` is implemented and documented for the top-level
+  CLI
 - `sc-lint ci` exists and includes tests
 - `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is installed
 - the `full` profile includes `xwin` when present, but `fast` and `ci` remain independent from `xwin`
@@ -154,6 +175,8 @@ and `ci` actually mean.
 
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/README.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/project-plan.md`
 - `docs/requirements.md`

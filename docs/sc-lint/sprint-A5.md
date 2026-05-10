@@ -57,6 +57,17 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
 - boundary inventory loader migration
 - manifest-policy migration
 
+## Primary Targets
+
+- `Cargo.toml`
+- `crates/sc-lint-runtime/`
+- `boundaries/sc-lint-runtime/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/sc-lint/README.md`
+- `docs/requirements.md`
+- `docs/architecture.md`
+
 ## Sub-Tasks
 
 1. Create `sc-lint-runtime`

@@ -61,6 +61,20 @@ crate, moves the existing portability implementation out of
 - manifest-policy migration
 - Tokio-specific rule work
 
+## Primary Targets
+
+- `Cargo.toml`
+- `crates/sc-lint-portability/`
+- `crates/sc-lint-boundary/`
+- `.just/lint_sc_portability.py`
+- `.just/run_lint.py`
+- `boundaries/sc-lint-portability/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/sc-lint/README.md`
+- `docs/requirements.md`
+- `docs/architecture.md`
+
 ## Sub-Tasks
 
 1. Create `sc-lint-portability`

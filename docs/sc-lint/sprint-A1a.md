@@ -44,8 +44,6 @@ must leave the product with a real top-level binary and a vetted
 - `REQ-CLI-005F`
 - `REQ-CLI-005G`
 - `REQ-CLI-008A`
-- `REQ-CLI-008B`
-- `REQ-CLI-008C`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
 
@@ -79,6 +77,17 @@ must leave the product with a real top-level binary and a vetted
 - adding `xwin` support
 - migrating Python boundary logic into Rust
 - changing backend crate ownership or introducing backend cross-dependencies
+
+## Primary Targets
+
+- `Cargo.toml`
+- `crates/sc-lint/`
+- `docs/sc-lint/cli-requirements.md`
+- `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/cli-contract.md`
+- `docs/project-plan.md`
+- `boundaries/sc-lint/top-level-cli.toml`
+- `boundaries/planning.toml`
 
 ## Sub-Tasks
 
@@ -114,6 +123,18 @@ must leave the product with a real top-level binary and a vetted
    - keep `docs/sc-lint/cli-contract.md` aligned with the implemented field
      names and error-code families
 
+3. Complete the A.1a contract-review checkpoint
+   Development work:
+   - review the planned CLI envelope against the needs of Workstreams 4-7
+   - record any required pre-A.1b scope adjustments in the phase and sprint
+     plan docs
+   Required tests:
+   - cross-doc review proving the contract checkpoint is assigned and
+     sequenced before delegated backend work
+   Required doc or boundary updates:
+   - keep `docs/project-plan.md` and
+     `docs/sc-lint/foundation-phase-plan.md` aligned with the A.1a/A.1b gate
+
 ## Split Recommendation
 
 Keep A.1a together. The crate bootstrap and machine contract definition should
@@ -127,6 +148,7 @@ normalization begin.
 - non-interactive CLI-owned paths support canonical `--json`
 - top-level machine-readable success uses `CommandEnvelope<T>`
 - top-level machine-readable failure uses `CliError`
+- the contract-review checkpoint for A.1b entry is documented and complete
 - no backend crate gains a direct dependency on another backend crate
 
 ## Required Validation

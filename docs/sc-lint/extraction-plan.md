@@ -249,8 +249,8 @@ Required work:
   - `xwin check` as the likely first promotion candidate
   - `xwin clippy` as a stronger follow-up path that may stay non-default
 - record the profile policy:
-  - `fast` may include `xwin check`
-  - `full` may include `xwin check` and `xwin clippy`
+  - `fast` excludes `xwin` to preserve low-latency local feedback
+  - `full` includes `xwin check` and `xwin clippy` when available
   - `ci` excludes `xwin` because real Windows CI already exists
 
 Deliverable:

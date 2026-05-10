@@ -43,8 +43,6 @@ utility extraction work begins.
 - `REQ-CLI-005F`
 - `REQ-CLI-005G`
 - `REQ-CLI-008A`
-- `REQ-CLI-008B`
-- `REQ-CLI-008C`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
 
@@ -63,7 +61,7 @@ utility extraction work begins.
 
 - Sprint A.1a complete with a real `sc-lint` crate
 - `CommandEnvelope<T>` and `CliError` agreed and testable
-- CLI contract docs reviewed against the requirements of Workstreams 4-7
+- the A.1a contract-review checkpoint completed against Workstreams 4-7
 
 ## Hard Dependencies
 
@@ -79,6 +77,16 @@ utility extraction work begins.
 - adding `xwin` support
 - migrating Python boundary logic into Rust
 - changing backend crate ownership or introducing backend cross-dependencies
+
+## Primary Targets
+
+- `crates/sc-lint/`
+- `crates/sc-lint-boundary/`
+- `docs/sc-lint/cli-requirements.md`
+- `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/cli-contract.md`
+- `docs/architecture.md`
+- `docs/project-plan.md`
 
 ## Sub-Tasks
 

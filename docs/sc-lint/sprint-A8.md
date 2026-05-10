@@ -62,6 +62,14 @@ permits.
 - changing release-1 ownership boundaries
 - adding disable paths where none are approved
 
+## Primary Targets
+
+- `docs/sc-lint/tools/`
+- `docs/sc-lint/README.md`
+- `README.md`
+- `docs/project-plan.md`
+- `docs/sc-lint/foundation-phase-plan.md`
+
 ## Sub-Tasks
 
 1. Define the guide set

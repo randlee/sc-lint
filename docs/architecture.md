@@ -352,8 +352,8 @@ The expected rollout order is:
 Profile policy:
 
 - `xwin` participation belongs in local lint profiles, not CI-parity profiles
-- if installed, `xwin check` may join `fast` and `full`
-- if installed, `xwin clippy` may join `full`
+- `fast` excludes `xwin` to preserve low-latency local feedback
+- if installed, `xwin check` and `xwin clippy` may join `full`
 - `ci` lint parity should stay aligned to real CI and therefore should not
   depend on `xwin`
 - the top-level `ci` command should run lint plus tests, while `lint ci`

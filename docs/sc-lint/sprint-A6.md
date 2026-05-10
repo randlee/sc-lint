@@ -58,6 +58,17 @@ item semantics can stabilize independently.
 - manifest section rules
 - parity retirement
 
+## Primary Targets
+
+- `crates/sc-lint-boundary/`
+- `boundaries/`
+- `.just/tests/`
+- `docs/sc-lint/boundary-toml-migration.md`
+- `docs/sc-lint/boundary-enforcement-model.md`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/project-plan.md`
+
 ## Sub-Tasks
 
 1. Implement TOML boundary loading

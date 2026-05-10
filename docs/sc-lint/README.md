@@ -22,6 +22,10 @@ Current contents:
 - [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
   execution plan for repo self-hosting, boundaries, CLI introduction, and
   extraction order
+- [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
+  ownership, and Phase A touchpoint guide
+- [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
+  decisions
 - [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract
   definition sprint
 - [`sprint-A1b.md`](./sprint-A1b.md) — top-level config loading and first
@@ -187,10 +191,10 @@ Current planned profile policy:
 
 - `fast`
   - local low-latency lint profile
-  - may include `xwin check` when available
+  - excludes `xwin` to preserve low-latency local feedback
 - `full`
   - stronger local pre-push lint profile
-  - may include `xwin check` and `xwin clippy` when available
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only CI-parity profile
   - excludes `xwin`

@@ -52,6 +52,17 @@ ownership rules, manifest-section rules, and parity comparison.
 - new analyzer-family imports
 - graph-db integration
 
+## Primary Targets
+
+- `crates/sc-lint-boundary/`
+- `.just/tests/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/boundary-toml-migration.md`
+- `docs/sc-lint/boundary-enforcement-model.md`
+- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/project-plan.md`
+
 ## Sub-Tasks
 
 1. Implement manifest ownership rules

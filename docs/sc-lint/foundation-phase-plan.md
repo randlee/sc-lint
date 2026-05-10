@@ -263,8 +263,8 @@ The current phase should execute in this order:
 2. tighten `just lint` for self-hosting
 3. bootstrap the top-level `sc-lint` CLI and define its canonical machine
    contract
-4. perform a critical review of the implemented CLI contract against
-   Workstreams 4-7
+4. complete the A.1a exit review of the implemented CLI contract against
+   Workstreams 4-7 before A.1b begins
 5. add top-level config loading and the first delegated backend path
 6. define the cross-target preflight strategy
 7. extract generic Python utilities
@@ -281,6 +281,7 @@ The scheduled implementation sprints for this phase are:
 
 1. `A.1a`
    - top-level CLI bootstrap and contract definition
+   - ends with the contract-review checkpoint for A.1b entry
    - sprint plan: `docs/sc-lint/sprint-A1a.md`
 2. `A.1b`
    - top-level config loading and first delegated backend integration
