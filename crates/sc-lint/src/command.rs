@@ -212,7 +212,7 @@ impl CommandContext {
         clippy::result_large_err,
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
-    pub(crate) fn from_cli(cli: &Cli) -> Result<Self, CliError> {
+    pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
         let command_id = CommandId::from_cli_command(&cli.command);
         let service_name = ServiceName::new(command_id.service_name());
 
@@ -224,7 +224,7 @@ impl CommandContext {
         })
     }
 
-    pub(crate) fn command_id(&self) -> &str {
+    pub fn command_id(&self) -> &str {
         self.command_id.as_str()
     }
 
@@ -236,7 +236,7 @@ impl CommandContext {
         self.command_id
     }
 
-    pub(crate) const fn summary(&self) -> &'static str {
+    pub const fn summary(&self) -> &'static str {
         self.summary
     }
 
@@ -244,23 +244,23 @@ impl CommandContext {
         self.requires_repo_root
     }
 
-    pub(crate) fn dispatch_tool(&self) -> Option<&'static str> {
+    pub fn dispatch_tool(&self) -> Option<&'static str> {
         self.command_id.dispatch_tool()
     }
 
-    pub(crate) fn adapter_kind(&self) -> Option<&'static str> {
+    pub fn adapter_kind(&self) -> Option<&'static str> {
         self.command_id.adapter_kind()
     }
 
-    pub(crate) fn adapter_config_scope(&self) -> Option<&'static str> {
+    pub fn adapter_config_scope(&self) -> Option<&'static str> {
         self.command_id.adapter_config_scope()
     }
 
-    pub(crate) fn adapter_script(&self) -> Option<&'static str> {
+    pub fn adapter_script(&self) -> Option<&'static str> {
         self.command_id.adapter_script()
     }
 
-    pub(crate) const fn is_xwin_preflight(&self) -> bool {
+    pub const fn is_xwin_preflight(&self) -> bool {
         self.command_id.is_xwin_preflight()
     }
 }

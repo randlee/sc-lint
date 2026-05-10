@@ -64,6 +64,7 @@ fn flags_hardcoded_tmp_path_in_test_scope() {
 
                 #[test]
                 fn writes_artifact() {
+                    // Intentional PORT-001 fixture: hardcoded /tmp/ path should be flagged.
                     let _ = PathBuf::from("/tmp/test-artifact");
                 }
             }
@@ -133,6 +134,7 @@ fn does_not_flag_unix_only_production_code() {
         r#"
             #[cfg(unix)]
             pub fn socket_path() -> std::path::PathBuf {
+                // Intentional PORT-001 fixture: hardcoded /tmp/ path should be flagged.
                 std::path::PathBuf::from("/tmp/runtime-socket")
             }
         "#,
@@ -348,6 +350,7 @@ fn flags_cfg_attr_not_unix_allow_dead_code_in_production_code() {
         r#"
             #[cfg_attr(not(unix), allow(dead_code))]
             pub fn unix_socket_path() -> &'static str {
+                // Intentional PORT-001 fixture: hardcoded /tmp/ path should be flagged.
                 "/tmp/runtime.sock"
             }
         "#,

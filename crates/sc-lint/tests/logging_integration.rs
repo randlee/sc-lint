@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 
 use serde_json::Value;
 use serial_test::serial;
@@ -639,6 +640,19 @@ fn clear_atm_env(command: &mut Command) {
             command.env_remove(key);
         }
     }
+    let atm_root = isolated_atm_root();
+    command.env("ATM_HOME", atm_root.join("home"));
+    command.env("ATM_CONFIG_HOME", atm_root.join("config-home"));
+}
+
+fn isolated_atm_root() -> &'static PathBuf {
+    static ROOT: OnceLock<PathBuf> = OnceLock::new();
+    ROOT.get_or_init(|| {
+        let root = TempDir::new().expect("temp dir").keep();
+        std::fs::create_dir_all(root.join("home")).expect("create ATM_HOME");
+        std::fs::create_dir_all(root.join("config-home")).expect("create ATM_CONFIG_HOME");
+        root
+    })
 }
 
 fn assert_log_file_contains_action(path: &Path, action: &str) {
