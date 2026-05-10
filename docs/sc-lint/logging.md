@@ -318,7 +318,11 @@ Requirement coverage:
   - add `sc-portability` analyzer entry/exit/finding-count logging to the
     delegated backend pattern
 - `A.5`
-  - apply the same analyzer logging pattern to `sc-runtime`
+  - `sc-runtime` now uses the same delegated analyzer logging pattern as
+    `sc-portability`
+  - `cli.dispatch.started` and `cli.dispatch.normalized` carry the
+    `lint.sc-runtime` command identity and `sc-runtime` service name after
+    top-level normalization
 - `A.6`
   - add boundary-inventory loader entry/exit/error logging to the
     `sc-boundary` tool path

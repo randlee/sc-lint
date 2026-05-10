@@ -51,8 +51,7 @@ Current primary crates:
 - `sc-lint-portability`
   - analyzer CLI and library for platform/OS portability rules
 - `sc-lint-runtime`
-  - planned analyzer CLI and library for std runtime/concurrency correctness
-    rules
+  - analyzer CLI and library for std runtime/concurrency correctness rules
 
 Planned later crate:
 
@@ -126,6 +125,10 @@ Current implementation status:
   - real delegated backend-normalized success path
   - top-level `sc-lint` invokes the dedicated `sc-lint-portability` binary
     without adding a direct crate dependency
+- `lint.sc-runtime`
+  - real delegated backend-normalized success path
+  - top-level `sc-lint` invokes the dedicated `sc-lint-runtime` binary
+    without adding a direct crate dependency
 
 ## Backend Crate Isolation
 
@@ -176,7 +179,7 @@ Current intended distribution is:
     - `PORT-005`
 - `sc-lint-runtime`
   - std runtime/concurrency correctness rules
-  - current planned imports:
+  - current owned rules:
     - `SCB-RUNTIME-001`
     - `SCB-RUNTIME-002`
 - `sc-lint-tokio`

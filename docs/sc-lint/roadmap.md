@@ -6,7 +6,7 @@ These points are considered settled for the initial spike.
 
 ### Crate split
 
-Current implemented crates:
+Current implemented foundation crates:
 
 - `sc-lint-directives`
   - shared directive parsing/types
@@ -17,20 +17,20 @@ Current implemented crates:
   - proc-macro attribute crate
   - currently shares the workspace `0.1.0` version line
 
-Planned next crates:
+Current implemented CLI and analyzer crates:
 
 - `sc-lint`
   - top-level CLI crate
   - stable user-facing command surface
   - command parsing, config loading, output normalization, tool dispatch
   - canonical AI-first machine contract for non-interactive commands
-  - planned lint profiles:
+  - implemented lint profiles:
     - `fast`
     - `full`
     - `ci`
-  - planned top-level CI-equivalent command:
+  - implemented top-level CI-equivalent command:
     - `sc-lint ci`
-  - planned Windows preflight commands when `cargo xwin` is installed:
+  - implemented Windows preflight commands when `cargo xwin` is installed:
     - `sc-lint check xwin`
     - `sc-lint clippy xwin`
 - `sc-lint-portability`
@@ -43,7 +43,7 @@ Planned next crates:
     - `PORT-005`
 - `sc-lint-runtime`
   - std runtime/concurrency analyzer crate
-  - planned first imports:
+  - current owned rules:
     - `SCB-RUNTIME-001`
     - `SCB-RUNTIME-002`
 
@@ -81,13 +81,12 @@ Current scaffold state:
 - `sc-lint-portability`
   - created
   - owns the shared portability rule family now
-- `sc-lint-runtime`
-  - planned
-  - implementation not started yet
 - `sc-lint`
-  - planned
-  - detailed CLI requirements/architecture defined
-  - implementation not started yet
+  - created
+  - delegated backend contract paths implemented
+- `sc-lint-runtime`
+  - created
+  - runtime rule imports implemented
 - `sc-lint-tokio`
   - reserved
   - no implementation scope yet
@@ -113,11 +112,10 @@ Wrapper retargets required after those moves:
 - `.just/run_lint.py`
 - help text and README references for `sc-portability`
 
-Wrapper retarget state after A.4:
+Wrapper retarget state after A.5:
 
 - `sc-portability` wrappers now delegate to `sc-lint-portability`
-- runtime wrapper retargets remain A.5 work alongside the `SCB-RUNTIME-001`
-  and `SCB-RUNTIME-002` migration
+- `lint sc-runtime` now delegates to `sc-lint-runtime`
 
 Planned primary CLI target mapping:
 
@@ -226,9 +224,6 @@ Current implementation status:
   - `forbid_external_impls` enforcement
 - deferred:
   - additional boundary declarations beyond current attribute set
-  - postmortem portability/runtime imports until their dedicated crates exist
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
 
 ## What Is Explicitly Deferred
 
@@ -330,12 +325,9 @@ orchestration must preserve backend-owned rule policy rather than replacing it.
 The next planned tool-distribution work after the current implementation
 branch merges is:
 
-1. create `sc-lint-portability`
-2. `sc-lint-portability` now owns `PORT-001..005`
-3. keep portability wrapper and top-level CLI delegation aligned to that crate
-4. create `sc-lint-runtime`
-5. move `SCB-RUNTIME-001/002` into `sc-lint-runtime`
-6. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
+1. keep portability and runtime wrapper delegation aligned to their dedicated
+   crates
+2. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
    implementation
 
 The next planned boundary-enforcement work after that is:

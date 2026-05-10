@@ -8,6 +8,7 @@ use serial_test::serial;
 use tempfile::TempDir;
 
 #[test]
+#[serial]
 fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs");
@@ -77,9 +78,33 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.started");
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.normalized");
     assert_log_file_contains_elapsed_ms(&dispatch_log_path);
+
+    let runtime = sc_lint_command(binary, &workspace_root())
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "sc-runtime",
+        ])
+        .output()
+        .expect("runtime command runs");
+    assert!(
+        runtime.status.success(),
+        "runtime stderr: {}",
+        String::from_utf8_lossy(&runtime.stderr)
+    );
+
+    let runtime_log_path = temp_root.join("sc-runtime").join("sc-runtime.log.jsonl");
+    assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.started");
+    assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.normalized");
+    assert_log_file_contains_elapsed_ms(&runtime_log_path);
 }
 
 #[test]
+#[serial]
 #[cfg_attr(windows, ignore = "cargo.cmd not resolved by CreateProcessW")]
 fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     let temp_dir = TempDir::new().expect("temp dir");

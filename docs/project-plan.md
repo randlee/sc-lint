@@ -107,10 +107,11 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A3.md`
 - `A.4`
   - `sc-lint-portability` crate creation and portability-rule moves/imports
-  - current status: in progress
+  - current status: complete
   - `docs/sc-lint/sprint-A4.md`
 - `A.5`
   - `sc-lint-runtime` crate creation and runtime-rule imports
+  - active implementation branch: `feature/sprint-A5`
   - `docs/sc-lint/sprint-A5.md`
 - `A.6`
   - Rust boundary inventory loading, schema validation, and duplicate handling

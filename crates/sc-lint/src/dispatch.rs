@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::sync::OnceLock;
 
 use sc_lint_boundary::AnalyzeOptions;
 use sc_lint_boundary::analyze_workspace;
@@ -94,19 +96,42 @@ pub fn run_sc_portability(
     _context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
+    run_delegated_backend(loaded_config, consts::TOOL_PORTABILITY)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Delegated backend failures must remain in the shared top-level CliError contract."
+)]
+pub fn run_sc_runtime(
+    _context: &CommandContext,
+    loaded_config: &LoadedConfig,
+) -> Result<CommandSuccess, CliError> {
+    run_delegated_backend(loaded_config, consts::TOOL_RUNTIME)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Backend protocol violations must remain in the shared top-level CliError contract."
+)]
+pub fn normalize_backend_json(tool: &str, raw: &str) -> Result<Value, CliError> {
+    serde_json::from_str(raw)
+        .map_err(BoundaryDispatchError::Normalize)
+        .map_err(|error| error.into_cli_error(tool, None))
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Delegated backend failures must remain in the shared top-level CliError contract."
+)]
+fn run_delegated_backend(
+    loaded_config: &LoadedConfig,
+    tool: &'static str,
+) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
-    let tool = "sc-lint-portability";
     let output = ProcessCommand::new("cargo")
-        .current_dir(repo_root)
-        .args([
-            "run",
-            "-q",
-            "-p",
-            "sc-lint-portability",
-            "--",
-            "analyze",
-            "--root",
-        ])
+        .current_dir(backend_workspace_root())
+        .args(["run", "-q", "-p", tool, "--", "analyze", "--root"])
         .arg(repo_root)
         .args(["--format", "json"])
         .output()
@@ -124,11 +149,11 @@ pub fn run_sc_portability(
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let cause = if !stderr.is_empty() {
-            stderr.clone()
+            stderr
         } else if !stdout.is_empty() {
-            stdout.clone()
+            stdout
         } else {
-            "delegated portability backend exited non-zero".to_string()
+            format!("delegated backend `{tool}` exited non-zero")
         };
         return Err(CliError::backend_failure(format!(
             "{tool} failed to analyze `{}`",
@@ -157,12 +182,14 @@ pub fn run_sc_portability(
     ))
 }
 
-#[expect(
-    clippy::result_large_err,
-    reason = "Backend protocol violations must remain in the shared top-level CliError contract."
-)]
-pub fn normalize_backend_json(tool: &str, raw: &str) -> Result<Value, CliError> {
-    serde_json::from_str(raw)
-        .map_err(BoundaryDispatchError::Normalize)
-        .map_err(|error| error.into_cli_error(tool, None))
+fn backend_workspace_root() -> &'static Path {
+    static ROOT: OnceLock<PathBuf> = OnceLock::new();
+    ROOT.get_or_init(|| {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("workspace root")
+            .to_path_buf()
+    })
+    .as_path()
 }
