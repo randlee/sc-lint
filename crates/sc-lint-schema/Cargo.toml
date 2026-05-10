@@ -1,0 +1,17 @@
+[package]
+name = "sc-lint-schema"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Shared machine schema types for sc-lint analyzer outputs."
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "sc_lint_schema"
+path = "src/lib.rs"
+
+[dependencies]
+serde.workspace = true

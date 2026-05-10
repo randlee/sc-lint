@@ -138,7 +138,7 @@ The following logic should migrate into `sc-lint-boundary`:
 - inventory-parity checks
 - future boundary metadata checks that depend on the canonical boundary model
 
-The following reusable analyzer families should migrate into dedicated crates:
+The following reusable analyzer families migrate into dedicated crates:
 
 - `sc-lint-portability`
   - `PORT-001` hardcoded Unix-only absolute paths in test code
@@ -312,8 +312,7 @@ Required work:
   `crates/sc-lint-boundary/src/portability.rs`
 - keep `PORT-001/002/003` with the same rule ids under `sc-lint-portability`
 - port `PORT-004` and `PORT-005` into `sc-lint-portability`
-- retarget the current portability wrapper surface to the new crate once it
-  exists
+- retarget the current portability wrapper surface to the new crate
 - add rule documentation and tests in `sc-lint`
 - keep the consumer repo (`atm-core`) as the first validation target after
   the backport

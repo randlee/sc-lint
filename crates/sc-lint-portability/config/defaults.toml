@@ -1,0 +1,2 @@
+[portability]
+unix_path_prefixes = ["/tmp/", "/var/tmp/", "/private/tmp/"]

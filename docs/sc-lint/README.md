@@ -71,7 +71,7 @@ Current intended crate split:
   - analyzer CLI + library
   - AST parsing, graph construction, semantic boundary rule evaluation
 - `sc-lint-portability`
-  - planned analyzer crate for shared OS/platform portability rules
+  - analyzer crate for shared OS/platform portability rules
 - `sc-lint-runtime`
   - planned analyzer crate for shared std runtime/concurrency rules
 - `sc-lint-tokio`
@@ -130,14 +130,20 @@ Current scaffold status:
       - `SCB-BOUNDARY-001` internal_only visibility violation
       - `SCB-BOUNDARY-002` internal_only external reference
       - `SCB-BOUNDARY-003` forbid_external_impls violation
-    - temporary portability enforcement inside `sc-lint-boundary` with:
-      - `PORT-001` hardcoded Unix-only absolute paths in test code
-      - `PORT-002` direct `dirs::home_dir()` without configured override check
-      - `PORT-003` `std::env::set_var()` in test code
     - stable text/JSON findings output
     - graph export in:
       - JSON
       - Turtle
+- `sc-lint-portability`
+  - exists now
+  - currently shares the workspace `0.1.0` version line
+  - currently provides:
+    - `PORT-001` hardcoded Unix-only absolute paths in test code
+    - `PORT-002` direct `dirs::home_dir()` without configured override check
+    - `PORT-003` `std::env::set_var()` in test code
+    - `PORT-004` ungated `std::os::unix` imports in production code
+    - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
+    - stable text/JSON findings output
 - `sc-lint`
   - planned now
   - not implemented yet
@@ -147,18 +153,11 @@ Current scaffold status:
 
 Current code moves required for the planned partition:
 
-- move portability rules out of `crates/sc-lint-boundary/src/portability.rs`
-  into the future `sc-lint-portability` crate:
-  - `PORT-001`
-  - `PORT-002`
-  - `PORT-003`
-  - `PORT-004`
-  - `PORT-005`
 - import std runtime/concurrency rules from the current `atm-core` proving
   surface into the future `sc-lint-runtime` crate:
   - `SCB-RUNTIME-001`
   - `SCB-RUNTIME-002`
-- retarget the current portability wrapper surface when that crate exists:
+- keep the portability wrapper surface pointed at `sc-lint-portability`:
   - `.just/lint_sc_portability.py`
   - `.just/run_lint.py`
 
@@ -176,9 +175,6 @@ primary ownership-preserving command surface.
 
 Planned next shared rule imports from `atm-core`:
 
-- `sc-lint-portability`
-  - `PORT-004`
-  - `PORT-005`
 - `sc-lint-runtime`
   - `SCB-RUNTIME-001`
   - `SCB-RUNTIME-002`

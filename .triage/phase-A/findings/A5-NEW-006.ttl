@@ -1,0 +1,51 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A5-NEW-006
+# sprint-A4.md status field still reads 'in-progress' after sprint completed
+# Source: QA-A5-001 minor finding SC-QA-006 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A5-NEW-006>
+  a triage:Finding ;
+  triage:findingId "A5-NEW-006" ;
+  triage:title "sprint-A4.md status: in-progress — sprint is complete and merged" ;
+  triage:description "docs/sc-lint/sprint-A4.md YAML frontmatter line 9 reads 'status: in-progress'. Sprint A.4 (sc-lint-portability extraction) is complete — PR #13 merged to integration/phase-A at 1cd8862. Fix: update status to 'complete' (or the appropriate closed-sprint value per the sprint doc schema)." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "Present on integration/phase-A at 1cd8862. Will propagate to A5-A8 via merge-forward. Minor finding — no blocking impact. Fix on A5; propagates downstream." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A5-NEW-006/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/1cd8862> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/A5-NEW-006/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A4.md" ;
+  triage:line 9 ;
+  triage:snippet "status: in-progress" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1cd8862" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1cd8862> .
+
+<urn:atm:triage:worktree/integration-phase-A/1cd8862>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "1cd8862" ;
+  triage:orderIndex 0 .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 .

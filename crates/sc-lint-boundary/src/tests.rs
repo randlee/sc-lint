@@ -1,6 +1,8 @@
 #![cfg(test)]
 
 use super::*;
+use sc_lint_schema::OutputFormat;
+use sc_lint_schema::ReportStatus;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -349,233 +351,173 @@ fn rejects_unknown_rule_filter() {
     let error = RuleFilter::try_from("unknown").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "unsupported rule filter `unknown`; supported: cycles, boundaries, internal_only, forbid_external_impls, manifests, portability"
+        "unsupported rule filter `unknown`; supported: cycles, boundaries, internal_only, forbid_external_impls, manifests"
     );
 }
 
 #[test]
-fn flags_hardcoded_tmp_path_in_test_scope() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root();
-    fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"
-        [portability]
-        config_home_env = "ATM_CONFIG_HOME"
-        "#,
-    );
-    fixture.write_source(
-        "example",
-        "lib.rs",
-        r#"
-            #[cfg(test)]
-            mod tests {
-                use std::path::PathBuf;
-
-                #[test]
-                fn writes_artifact() {
-                    let _ = PathBuf::from("/tmp/test-artifact");
-                }
-            }
-        "#,
-    );
+fn manifest_policy_accepts_workspace_inheritance() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest("example", &good_member_manifest("example", ""));
+    fixture.write_member_source("example", "pub struct Example;");
 
     let report = analyze_workspace(&AnalyzeOptions {
         root: fixture.root().to_path_buf(),
         format: OutputFormat::Json,
-        rule: Some(RuleFilter::Portability),
+        rule: Some(RuleFilter::Manifests),
     })
-    .unwrap();
+    .expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert_eq!(report.scanned_crates, 1);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn manifest_policy_flags_missing_workspace_field() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Manifests),
+    })
+    .expect("manifest analysis succeeds");
 
     assert_eq!(report.status, ReportStatus::Fail);
-    assert_eq!(report.findings.len(), 1);
-    assert_eq!(report.findings[0].rule_id, RuleId::Port001);
+    assert_eq!(
+        finding_messages(&report),
+        vec!["crates/example/Cargo.toml: set [package].homepage.workspace = true".to_string()]
+    );
 }
 
 #[test]
-fn passes_temp_dir_usage_in_test_scope() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root();
-    fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"
-        [portability]
-        config_home_env = "ATM_CONFIG_HOME"
-        "#,
-    );
-    fixture.write_source(
+fn manifest_policy_flags_mismatched_internal_path_version() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example", "crates/helper"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
         "example",
-        "lib.rs",
-        r#"
-            #[cfg(test)]
-            mod tests {
-                #[test]
-                fn writes_artifact() {
-                    let _ = std::env::temp_dir().join("test-artifact");
-                }
-            }
-        "#,
+        &path_dependency_manifest("example", "helper", "../helper", "9.9.9"),
     );
+    fixture.write_member_manifest("helper", &good_member_manifest("helper", ""));
+    fixture.write_member_source("example", "pub struct Example;");
+    fixture.write_member_source("helper", "pub struct Helper;");
 
     let report = analyze_workspace(&AnalyzeOptions {
         root: fixture.root().to_path_buf(),
         format: OutputFormat::Json,
-        rule: Some(RuleFilter::Portability),
+        rule: Some(RuleFilter::Manifests),
     })
-    .unwrap();
+    .expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        finding_messages(&report),
+        vec![
+            "crates/example/Cargo.toml [dependencies.helper]: path dependency version must match target crate version \"1.1.2\""
+                .to_string()
+        ]
+    );
+}
+
+#[test]
+fn manifest_policy_accepts_explicit_tool_crate_version() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example", "crates/sc-lint-attributes"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest("example", &good_member_manifest("example", ""));
+    fixture.write_member_manifest(
+        "sc-lint-attributes",
+        r#"
+            [package]
+            name = "sc-lint-attributes"
+            version = "0.1.0"
+            edition.workspace = true
+            rust-version.workspace = true
+            authors.workspace = true
+            license.workspace = true
+            repository.workspace = true
+            homepage.workspace = true
+        "#,
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+    fixture.write_member_source("sc-lint-attributes", "pub struct Attr;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Manifests),
+    })
+    .expect("manifest analysis succeeds");
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
 }
 
 #[test]
-fn does_not_flag_unix_only_production_code() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root();
-    fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"
-        [portability]
-        config_home_env = "ATM_CONFIG_HOME"
-        "#,
-    );
-    fixture.write_source(
+fn manifest_policy_matches_python_oracle_on_representative_fixtures() {
+    let valid = ManifestPolicyFixture::new(&["crates/example"]);
+    valid.write_workspace_package_defaults("1.1.2");
+    valid.write_member_manifest("example", &good_member_manifest("example", ""));
+    valid.write_member_source("example", "pub struct Example;");
+
+    let missing_field = ManifestPolicyFixture::new(&["crates/example"]);
+    missing_field.write_workspace_package_defaults("1.1.2");
+    missing_field.write_member_manifest(
         "example",
-        "lib.rs",
-        r#"
-            #[cfg(unix)]
-            pub fn socket_path() -> std::path::PathBuf {
-                std::path::PathBuf::from("/tmp/runtime-socket")
-            }
-        "#,
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
     );
+    missing_field.write_member_source("example", "pub struct Example;");
 
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Portability),
-    })
-    .unwrap();
-
-    assert_eq!(report.status, ReportStatus::Pass);
-    assert!(report.findings.is_empty());
-}
-
-#[test]
-fn flags_dirs_home_dir_without_override_check() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root();
-    fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"
-        [portability]
-        config_home_env = "ATM_CONFIG_HOME"
-        "#,
-    );
-    fixture.write_source(
+    let mismatched_version = ManifestPolicyFixture::new(&["crates/example", "crates/helper"]);
+    mismatched_version.write_workspace_package_defaults("1.1.2");
+    mismatched_version.write_member_manifest(
         "example",
-        "lib.rs",
+        &path_dependency_manifest("example", "helper", "../helper", "9.9.9"),
+    );
+    mismatched_version.write_member_manifest("helper", &good_member_manifest("helper", ""));
+    mismatched_version.write_member_source("example", "pub struct Example;");
+    mismatched_version.write_member_source("helper", "pub struct Helper;");
+
+    let explicit_tool =
+        ManifestPolicyFixture::new(&["crates/example", "crates/sc-lint-attributes"]);
+    explicit_tool.write_workspace_package_defaults("1.1.2");
+    explicit_tool.write_member_manifest("example", &good_member_manifest("example", ""));
+    explicit_tool.write_member_manifest(
+        "sc-lint-attributes",
         r#"
-            #[cfg(test)]
-            mod tests {
-                fn config_root() -> std::path::PathBuf {
-                    dirs::home_dir().expect("home")
-                }
-            }
+            [package]
+            name = "sc-lint-attributes"
+            version = "0.1.0"
+            edition.workspace = true
+            rust-version.workspace = true
+            authors.workspace = true
+            license.workspace = true
+            repository.workspace = true
+            homepage.workspace = true
         "#,
     );
+    explicit_tool.write_member_source("example", "pub struct Example;");
+    explicit_tool.write_member_source("sc-lint-attributes", "pub struct Attr;");
 
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Portability),
-    })
-    .unwrap();
-
-    assert_eq!(report.status, ReportStatus::Fail);
-    assert_eq!(report.findings.len(), 1);
-    assert_eq!(report.findings[0].rule_id, RuleId::Port002);
-    assert!(report.findings[0].message.contains("ATM_CONFIG_HOME"));
-}
-
-#[test]
-fn passes_dirs_home_dir_after_override_check() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root();
-    fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"
-        [portability]
-        config_home_env = "ATM_CONFIG_HOME"
-        "#,
-    );
-    fixture.write_source(
-        "example",
-        "lib.rs",
-        r#"
-            #[cfg(test)]
-            mod tests {
-                fn get_os_home_dir() -> std::path::PathBuf {
-                    if let Ok(home) = std::env::var("ATM_CONFIG_HOME") {
-                        return std::path::PathBuf::from(home);
-                    }
-                    dirs::home_dir().expect("home")
-                }
-            }
-        "#,
-    );
-
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Portability),
-    })
-    .unwrap();
-
-    assert_eq!(report.status, ReportStatus::Pass);
-    assert!(report.findings.is_empty());
-}
-
-#[test]
-fn flags_set_var_in_test_scope() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root();
-    fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"
-        [portability]
-        config_home_env = "ATM_CONFIG_HOME"
-        "#,
-    );
-    fixture.write_source(
-        "example",
-        "lib.rs",
-        r#"
-            #[cfg(test)]
-            mod tests {
-                #[test]
-                fn mutates_env() {
-                    unsafe { std::env::set_var("HOME", "test-home") };
-                }
-            }
-        "#,
-    );
-
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Portability),
-    })
-    .unwrap();
-
-    assert_eq!(report.status, ReportStatus::Fail);
-    assert_eq!(report.findings.len(), 1);
-    assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == RuleId::Port003)
-    );
+    for fixture in [valid, missing_field, mismatched_version, explicit_tool] {
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Manifests),
+        })
+        .expect("manifest analysis succeeds");
+        assert_eq!(
+            finding_messages(&report),
+            python_manifest_findings(fixture.root())
+        );
+    }
 }
 
 #[test]
@@ -1683,171 +1625,6 @@ fn fails_when_sc_lint_attribute_has_mixed_valid_and_invalid_directives() {
     assert!(format!("{error:#}").contains("unsupported boundary directive"));
 }
 
-#[test]
-fn manifest_policy_accepts_workspace_inheritance() {
-    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
-    fixture.write_workspace_package_defaults("1.1.2");
-    fixture.write_member_manifest("example", &good_member_manifest("example", ""));
-    fixture.write_member_source("example", "pub struct Example;");
-
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Manifests),
-    })
-    .expect("manifest analysis succeeds");
-
-    assert_eq!(report.status, ReportStatus::Pass);
-    assert_eq!(report.scanned_crates, 1);
-    assert!(report.findings.is_empty());
-}
-
-#[test]
-fn manifest_policy_flags_missing_workspace_field() {
-    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
-    fixture.write_workspace_package_defaults("1.1.2");
-    fixture.write_member_manifest(
-        "example",
-        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
-    );
-    fixture.write_member_source("example", "pub struct Example;");
-
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Manifests),
-    })
-    .expect("manifest analysis succeeds");
-
-    assert_eq!(report.status, ReportStatus::Fail);
-    assert_eq!(
-        finding_messages(&report),
-        vec!["crates/example/Cargo.toml: set [package].homepage.workspace = true".to_string()]
-    );
-}
-
-#[test]
-fn manifest_policy_flags_mismatched_internal_path_version() {
-    let fixture = ManifestPolicyFixture::new(&["crates/example", "crates/helper"]);
-    fixture.write_workspace_package_defaults("1.1.2");
-    fixture.write_member_manifest(
-        "example",
-        &path_dependency_manifest("example", "helper", "../helper", "9.9.9"),
-    );
-    fixture.write_member_manifest("helper", &good_member_manifest("helper", ""));
-    fixture.write_member_source("example", "pub struct Example;");
-    fixture.write_member_source("helper", "pub struct Helper;");
-
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Manifests),
-    })
-    .expect("manifest analysis succeeds");
-
-    assert_eq!(report.status, ReportStatus::Fail);
-    assert_eq!(
-        finding_messages(&report),
-        vec![
-            "crates/example/Cargo.toml [dependencies.helper]: path dependency version must match target crate version \"1.1.2\""
-                .to_string()
-        ]
-    );
-}
-
-#[test]
-fn manifest_policy_accepts_explicit_tool_crate_version() {
-    let fixture = ManifestPolicyFixture::new(&["crates/example", "crates/sc-lint-attributes"]);
-    fixture.write_workspace_package_defaults("1.1.2");
-    fixture.write_member_manifest("example", &good_member_manifest("example", ""));
-    fixture.write_member_manifest(
-        "sc-lint-attributes",
-        r#"
-            [package]
-            name = "sc-lint-attributes"
-            version = "0.1.0"
-            edition.workspace = true
-            rust-version.workspace = true
-            authors.workspace = true
-            license.workspace = true
-            repository.workspace = true
-            homepage.workspace = true
-        "#,
-    );
-    fixture.write_member_source("example", "pub struct Example;");
-    fixture.write_member_source("sc-lint-attributes", "pub struct Attr;");
-
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Manifests),
-    })
-    .expect("manifest analysis succeeds");
-
-    assert_eq!(report.status, ReportStatus::Pass);
-    assert!(report.findings.is_empty());
-}
-
-#[test]
-fn manifest_policy_matches_python_oracle_on_representative_fixtures() {
-    let valid = ManifestPolicyFixture::new(&["crates/example"]);
-    valid.write_workspace_package_defaults("1.1.2");
-    valid.write_member_manifest("example", &good_member_manifest("example", ""));
-    valid.write_member_source("example", "pub struct Example;");
-
-    let missing_field = ManifestPolicyFixture::new(&["crates/example"]);
-    missing_field.write_workspace_package_defaults("1.1.2");
-    missing_field.write_member_manifest(
-        "example",
-        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
-    );
-    missing_field.write_member_source("example", "pub struct Example;");
-
-    let mismatched_version = ManifestPolicyFixture::new(&["crates/example", "crates/helper"]);
-    mismatched_version.write_workspace_package_defaults("1.1.2");
-    mismatched_version.write_member_manifest(
-        "example",
-        &path_dependency_manifest("example", "helper", "../helper", "9.9.9"),
-    );
-    mismatched_version.write_member_manifest("helper", &good_member_manifest("helper", ""));
-    mismatched_version.write_member_source("example", "pub struct Example;");
-    mismatched_version.write_member_source("helper", "pub struct Helper;");
-
-    let explicit_tool =
-        ManifestPolicyFixture::new(&["crates/example", "crates/sc-lint-attributes"]);
-    explicit_tool.write_workspace_package_defaults("1.1.2");
-    explicit_tool.write_member_manifest("example", &good_member_manifest("example", ""));
-    explicit_tool.write_member_manifest(
-        "sc-lint-attributes",
-        r#"
-            [package]
-            name = "sc-lint-attributes"
-            version = "0.1.0"
-            edition.workspace = true
-            rust-version.workspace = true
-            authors.workspace = true
-            license.workspace = true
-            repository.workspace = true
-            homepage.workspace = true
-        "#,
-    );
-    explicit_tool.write_member_source("example", "pub struct Example;");
-    explicit_tool.write_member_source("sc-lint-attributes", "pub struct Attr;");
-
-    for fixture in [valid, missing_field, mismatched_version, explicit_tool] {
-        let report = analyze_workspace(&AnalyzeOptions {
-            root: fixture.root().to_path_buf(),
-            format: OutputFormat::Json,
-            rule: Some(RuleFilter::Manifests),
-        })
-        .expect("manifest analysis succeeds");
-        assert_eq!(
-            finding_messages(&report),
-            python_manifest_findings(fixture.root())
-        );
-    }
-}
-
 struct WorkspaceFixture {
     tempdir: TempDir,
 }
@@ -1934,10 +1711,6 @@ impl WorkspaceFixture {
             &format!("crates/{package_name}/src/{relative_path}"),
             contents,
         );
-    }
-
-    fn write_lint_config(&self, contents: &str) {
-        self.write("sc-lint.toml", contents);
     }
 
     fn write(&self, relative_path: &str, contents: &str) {
