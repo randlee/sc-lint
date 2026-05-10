@@ -58,10 +58,10 @@ Profile policy:
 
 - `fast`
   - local low-latency profile
-  - may include `xwin check` when available and fast enough
+  - excludes `xwin` to preserve sub-second response times
 - `full`
   - stronger local pre-push profile
-  - may include `xwin check` and `xwin clippy` when available
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only CI-parity profile
   - excludes `xwin`

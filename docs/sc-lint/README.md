@@ -22,7 +22,10 @@ Current contents:
 - [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
   execution plan for repo self-hosting, boundaries, CLI introduction, and
   extraction order
-- [`sprint-A1.md`](./sprint-A1.md) — top-level CLI bootstrap sprint
+- [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract
+  definition sprint
+- [`sprint-A1b.md`](./sprint-A1b.md) — top-level config loading and first
+  backend integration sprint
 - [`sprint-A2.md`](./sprint-A2.md) — profiles and `xwin` sprint
 - [`sprint-A3.md`](./sprint-A3.md) — generic utility extraction sprint
 - [`sprint-A4.md`](./sprint-A4.md) — portability crate extraction sprint

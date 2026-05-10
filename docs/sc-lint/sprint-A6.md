@@ -43,7 +43,7 @@ item semantics can stabilize independently.
 
 ## Prerequisites
 
-- A.1 through A.5 complete
+- A.1a through A.5 complete
 - TOML boundary records remain the canonical source of planning truth
 - Python boundary validator remains available
 

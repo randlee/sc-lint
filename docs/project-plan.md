@@ -43,7 +43,8 @@ The current project focus is:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - current phase execution plan
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
-  - see [docs/sc-lint/sprint-A1.md](./sc-lint/sprint-A1.md)
+  - see [docs/sc-lint/sprint-A1a.md](./sc-lint/sprint-A1a.md)
+  - see [docs/sc-lint/sprint-A1b.md](./sc-lint/sprint-A1b.md)
   - see [docs/sc-lint/sprint-A2.md](./sc-lint/sprint-A2.md)
   - see [docs/sc-lint/sprint-A3.md](./sc-lint/sprint-A3.md)
   - see [docs/sc-lint/sprint-A4.md](./sc-lint/sprint-A4.md)
@@ -62,26 +63,32 @@ This phase should execute in the following order:
 2. make `just lint` self-host the repo's own analyzer checks by default
 3. add the top-level `sc-lint` CLI crate and define its canonical machine
    contract
-4. define the cross-target preflight strategy for local and CI lint flows
-5. extract generic Python utilities
-6. add the next analyzer crate needed for portability rule-family ownership
-7. move portability rules into `sc-lint-portability`
-8. add the next analyzer crate needed for std runtime rule-family ownership
-9. import runtime rules into `sc-lint-runtime`
-10. migrate boundary inventory loading/schema/duplicate handling from Python
+4. review the implemented CLI contract against the needs of extracted Python
+   utilities and later analyzer backends
+5. add top-level config loading and the first delegated backend path
+6. define the cross-target preflight strategy for local and CI lint flows
+7. extract generic Python utilities
+8. add the next analyzer crate needed for portability rule-family ownership
+9. move portability rules into `sc-lint-portability`
+10. add the next analyzer crate needed for std runtime rule-family ownership
+11. import runtime rules into `sc-lint-runtime`
+12. migrate boundary inventory loading/schema/duplicate handling from Python
     into `sc-lint-boundary`
-11. migrate manifest policy into `sc-lint-boundary`
-12. run parity validation before deprecating Python boundary logic
-13. publish comprehensive per-tool user guides and rule-disable guidance for
+13. migrate manifest policy into `sc-lint-boundary`
+14. run parity validation before deprecating Python boundary logic
+15. publish comprehensive per-tool user guides and rule-disable guidance for
     the release-1 lint surface
 
 ## Scheduled Sprint Plans
 
 The currently scheduled foundation sprints are:
 
-- `A.1`
-  - CLI bootstrap
-  - `docs/sc-lint/sprint-A1.md`
+- `A.1a`
+  - CLI bootstrap and contract definition
+  - `docs/sc-lint/sprint-A1a.md`
+- `A.1b`
+  - config loading and first backend integration
+  - `docs/sc-lint/sprint-A1b.md`
 - `A.2`
   - profiles and Windows preflight
   - `docs/sc-lint/sprint-A2.md`

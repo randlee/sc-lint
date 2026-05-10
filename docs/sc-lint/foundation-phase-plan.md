@@ -180,6 +180,7 @@ Requirements:
 - move the existing portability implementation out of `sc-lint-boundary`
 - land portability rules in `sc-lint-portability`
 - preserve their existing rule ids
+- perform parity validation against the source implementation in `atm-core`
 
 ### Workstream 7: Add `sc-lint-runtime`
 
@@ -196,6 +197,7 @@ Requirements:
 - create `sc-lint-runtime`
 - land runtime rules in `sc-lint-runtime`
 - preserve their existing rule ids
+- perform parity validation against the source implementation in `atm-core`
 - keep ATM-local policy lints out of `sc-lint` unless extracted only as
   configurable framework
 
@@ -210,8 +212,8 @@ Required work:
 - document the supported cross-target preflight mode
 - document `cargo xwin` as the first Windows preflight candidate
 - determine the profile policy:
-  - `fast` may include `xwin check`
-  - `full` may include `xwin check` and `xwin clippy`
+  - `fast` excludes `xwin` to preserve low-latency local feedback
+  - `full` includes `xwin check` and `xwin clippy` when available
   - `ci` excludes `xwin`
 - determine whether `cargo xwin clippy` remains an explicit stronger path
   rather than part of the default gate
@@ -259,42 +261,49 @@ The current phase should execute in this order:
 
 1. define repo boundaries
 2. tighten `just lint` for self-hosting
-3. add the top-level `sc-lint` CLI
-4. define the cross-target preflight strategy
-5. extract generic Python utilities
-6. add `sc-lint-portability` and move shared portability rules into it
-7. add `sc-lint-runtime` and import shared std runtime rules into it
-8. migrate boundary inventory loading/schema/duplicate handling into Rust
-9. migrate manifest-policy logic into Rust
-10. keep Python parity validation during the migration window
-11. publish per-tool user guides for the release-1 lint surface
+3. bootstrap the top-level `sc-lint` CLI and define its canonical machine
+   contract
+4. perform a critical review of the implemented CLI contract against
+   Workstreams 4-7
+5. add top-level config loading and the first delegated backend path
+6. define the cross-target preflight strategy
+7. extract generic Python utilities
+8. add `sc-lint-portability` and move shared portability rules into it
+9. add `sc-lint-runtime` and import shared std runtime rules into it
+10. migrate boundary inventory loading/schema/duplicate handling into Rust
+11. migrate manifest-policy logic into Rust
+12. keep Python parity validation during the migration window
+13. publish per-tool user guides for the release-1 lint surface
 
 ## Planned Sprint Sequence
 
 The scheduled implementation sprints for this phase are:
 
-1. `A.1`
-   - top-level CLI bootstrap
-   - sprint plan: `docs/sc-lint/sprint-A1.md`
-2. `A.2`
+1. `A.1a`
+   - top-level CLI bootstrap and contract definition
+   - sprint plan: `docs/sc-lint/sprint-A1a.md`
+2. `A.1b`
+   - top-level config loading and first delegated backend integration
+   - sprint plan: `docs/sc-lint/sprint-A1b.md`
+3. `A.2`
    - profile semantics and `xwin` capability support
    - sprint plan: `docs/sc-lint/sprint-A2.md`
-3. `A.3`
+4. `A.3`
    - generic utility extraction
    - sprint plan: `docs/sc-lint/sprint-A3.md`
-4. `A.4`
+5. `A.4`
    - `sc-lint-portability` creation and portability-rule migration
    - sprint plan: `docs/sc-lint/sprint-A4.md`
-5. `A.5`
+6. `A.5`
    - `sc-lint-runtime` creation and runtime-rule migration
    - sprint plan: `docs/sc-lint/sprint-A5.md`
-6. `A.6`
+7. `A.6`
    - Rust boundary inventory loader/schema/duplicate handling
    - sprint plan: `docs/sc-lint/sprint-A6.md`
-7. `A.7`
+8. `A.7`
    - Rust manifest-policy migration and Python parity window
    - sprint plan: `docs/sc-lint/sprint-A7.md`
-8. `A.8`
+9. `A.8`
    - per-tool user guides and rule-disable documentation
    - sprint plan: `docs/sc-lint/sprint-A8.md`
 

@@ -42,7 +42,7 @@ standalone fixture coverage.
 
 ## Prerequisites
 
-- Sprint A.1 complete with top-level CLI dispatch
+- Sprint A.1b complete with top-level CLI dispatch
 - Sprint A.2 complete with stable profile semantics
 
 ## Hard Dependencies
@@ -82,7 +82,17 @@ standalone fixture coverage.
    Required doc or boundary updates:
    - update product docs if the framework name differs from the current plan
 
-3. Extract generic view plumbing
+3. Define Python Adapter Protocol
+   Development work:
+   - define a standard JSON adapter for Python utilities
+   - ensure Python failures are reliably mapped into `CliError` without
+     scraping tracebacks
+   Required tests:
+   - adapter normalization tests
+   Required doc or boundary updates:
+   - update CLI architecture docs to include the adapter pattern
+
+4. Extract generic view plumbing
    Development work:
    - move the generic report/site plumbing that is not ATM-specific
    - expose it behind the top-level CLI only when the command contract is

@@ -59,7 +59,7 @@ distinguishes:
 
 ## Prerequisites
 
-- Sprint A.1 complete with a functioning top-level CLI crate
+- Sprint A.1b complete with a functioning top-level CLI crate
 - one top-level delegated command already normalized through the CLI
 
 ## Hard Dependencies
@@ -103,7 +103,8 @@ distinguishes:
    - detect `cargo xwin`
    - expose `sc-lint check xwin`
    - expose `sc-lint clippy xwin`
-   - ensure `fast` and `full` include `xwin` only when installed
+   - ensure `full` includes `xwin` only when installed
+   - ensure `fast` remains strictly zero-network/low-latency without `xwin`
    Required tests:
    - capability-present tests
    - capability-absent tests
@@ -111,7 +112,16 @@ distinguishes:
    Required doc or boundary updates:
    - update profile docs if capability behavior narrows further
 
-4. Align repo-local wrappers with CLI semantics
+4. Document rule-disable behavior
+   Development work:
+   - define how rules are disabled in the new CLI (source vs config)
+   - document the disable policy for the first shipped backends
+   Required tests:
+   - doc review for consistency
+   Required doc or boundary updates:
+   - ensure initial per-tool guides (even if draft) reflect this policy
+
+5. Align repo-local wrappers with CLI semantics
    Development work:
    - ensure `just` wrappers call the intended `sc-lint` profile commands
    - keep CI semantics explicit and independent from `xwin`
@@ -130,10 +140,8 @@ and `ci` actually mean.
 
 - `sc-lint lint fast`, `full`, and `ci` exist and are documented
 - `sc-lint ci` exists and includes tests
-- `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is
-  installed
-- local profile behavior changes when `xwin` is present, but `ci` remains
-  independent from `xwin`
+- `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is installed
+- the `full` profile includes `xwin` when present, but `fast` and `ci` remain independent from `xwin`
 - real Windows CI remains the authoritative release gate
 
 ## Required Validation

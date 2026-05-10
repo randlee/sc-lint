@@ -43,7 +43,7 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
 
 ## Prerequisites
 
-- A.1 through A.4 complete
+- A.1a through A.4 complete
 - `sc-lint-portability` already owns the shared portability family
 
 ## Hard Dependencies
@@ -81,6 +81,7 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
    - port the discarded `wait_timeout*` result rule
    Required tests:
    - regression tests from the consumer-proven cases
+   - parity validation against the source implementation in `atm-core`
    Required doc or boundary updates:
    - keep runtime documentation aligned with the proven semantics
 

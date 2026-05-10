@@ -46,7 +46,7 @@ permits.
 
 ## Prerequisites
 
-- A.1 through A.7 complete or at least stable enough that the release-1 tool
+- A.1a through A.7 complete or at least stable enough that the release-1 tool
   surfaces are not changing underneath the docs
 - the primary crate-mapped lint target names are settled
 
@@ -92,18 +92,7 @@ permits.
    - add cross-links from the repository-root `README.md` and roadmap where
      useful
 
-3. Document rule-disable behavior
-   Each guide must say explicitly:
-   - whether source-level allowances exist
-   - whether config-driven suppression exists
-   - whether the tool intentionally has no disable path
-   - where policy requires fixing the code rather than suppressing the finding
-   Required tests:
-   - doc review for unsupported or ambiguous disable guidance
-   Required doc or boundary updates:
-   - update rule-model docs if disable guidance exposes missing policy wording
-
-4. Align CLI and wrapper references
+3. Align CLI and wrapper references
    Development work:
    - make sure guides use the primary crate-mapped lint target names
    - distinguish:

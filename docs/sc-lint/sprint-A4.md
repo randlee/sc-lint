@@ -45,7 +45,7 @@ crate, moves the existing portability implementation out of
 
 ## Prerequisites
 
-- A.1 through A.3 complete
+- A.1a through A.3 complete
 - current `PORT-001/002/003` behavior remains green in the repo gate
 
 ## Hard Dependencies
@@ -92,6 +92,7 @@ crate, moves the existing portability implementation out of
    into `sc-lint-portability`
    Required tests:
    - consumer-proven fixture or regression coverage for both imported rules
+   - parity validation against the source implementation in `atm-core`
    Required doc or boundary updates:
    - update rule inventory references
 
