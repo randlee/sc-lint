@@ -1,6 +1,8 @@
 mod cli;
 mod command;
+mod config;
 mod contract;
+mod dispatch;
 mod error;
 mod render;
 
@@ -21,6 +23,9 @@ pub use cli::Command;
 pub use cli::LintTarget;
 pub use cli::ViewTarget;
 pub use command::CommandContext;
+pub use command::DispatchTelemetry;
+pub use config::LoadedConfig;
+pub use config::RepoRoot;
 pub use contract::CommandEnvelope;
 pub use error::CliError;
 pub use error::CliErrorKind;
@@ -43,6 +48,7 @@ pub struct ExecutionOutcome {
     pub ok: bool,
     pub summary: String,
     pub error: Option<CliError>,
+    pub dispatch: Option<DispatchTelemetry>,
 }
 
 pub fn run<I, T>(args: I) -> ExitCode
@@ -53,7 +59,14 @@ where
     match parse_args(args) {
         ParsedInvocation::Ready(cli) => {
             let context = CommandContext::from_cli(&cli);
-            let outcome = execute(context, cli.json);
+            let loaded_config = match LoadedConfig::load(&cli, &context) {
+                Ok(loaded_config) => loaded_config,
+                Err(error) => {
+                    let rendered = render_error(context.command_id(), cli.json, &error);
+                    return write_rendered_output(rendered, error.exit_code());
+                }
+            };
+            let outcome = execute(context, &loaded_config, cli.json);
             write_rendered_output(outcome.rendered, outcome.exit_code)
         }
         ParsedInvocation::Immediate(outcome) => {
@@ -74,11 +87,15 @@ where
     }
 }
 
-pub fn execute(context: CommandContext, json_mode: bool) -> ExecutionOutcome {
-    let result = command::execute(&context);
+pub fn execute(
+    context: CommandContext,
+    loaded_config: &LoadedConfig,
+    json_mode: bool,
+) -> ExecutionOutcome {
+    let result = command::execute(&context, loaded_config);
     match result {
-        Ok(data) => {
-            let envelope = CommandEnvelope::success(context.command_id(), data);
+        Ok(success) => {
+            let envelope = CommandEnvelope::success(context.command_id(), success.data);
             let rendered = render_success(&context, json_mode, &envelope);
             ExecutionOutcome {
                 context,
@@ -87,6 +104,7 @@ pub fn execute(context: CommandContext, json_mode: bool) -> ExecutionOutcome {
                 ok: true,
                 summary: "command completed".to_string(),
                 error: None,
+                dispatch: success.dispatch,
             }
         }
         Err(error) => {
@@ -100,6 +118,7 @@ pub fn execute(context: CommandContext, json_mode: bool) -> ExecutionOutcome {
                 ok: false,
                 summary,
                 error: Some(error),
+                dispatch: None,
             }
         }
     }

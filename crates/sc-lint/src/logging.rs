@@ -5,6 +5,8 @@ use std::time::Duration;
 use sc_lint::Cli;
 use sc_lint::CliError;
 use sc_lint::CommandContext;
+use sc_lint::DispatchTelemetry;
+use sc_lint::LoadedConfig;
 use sc_observability::ActionName;
 use sc_observability::JsonlFileSink;
 use sc_observability::Level;
@@ -27,6 +29,7 @@ use serde_json::json;
 #[derive(Debug, Clone)]
 pub struct ObservedCommand<'a> {
     context: &'a CommandContext,
+    loaded_config: &'a LoadedConfig,
     service_name: ServiceName,
 }
 
@@ -35,7 +38,10 @@ impl<'a> ObservedCommand<'a> {
         clippy::result_large_err,
         reason = "The binary logging seam preserves the same top-level CliError contract as the library execution path."
     )]
-    pub fn from_context(context: &'a CommandContext) -> Result<Self, CliError> {
+    pub fn from_context(
+        context: &'a CommandContext,
+        loaded_config: &'a LoadedConfig,
+    ) -> Result<Self, CliError> {
         let service_name = ServiceName::new(context.service_name()).map_err(|error| {
             CliError::internal(format!("invalid service name `{}`", context.service_name()))
                 .with_source(error)
@@ -43,6 +49,7 @@ impl<'a> ObservedCommand<'a> {
 
         Ok(Self {
             context,
+            loaded_config,
             service_name,
         })
     }
@@ -57,6 +64,10 @@ impl<'a> ObservedCommand<'a> {
 
     fn summary(&self) -> &'static str {
         self.context.summary()
+    }
+
+    fn loaded_config(&self) -> &LoadedConfig {
+        self.loaded_config
     }
 }
 
@@ -94,7 +105,13 @@ impl LogRoot {
     reason = "Logger initialization failures are part of the stable top-level CliError contract."
 )]
 pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Logger, CliError> {
-    let log_root = LogRoot::resolve(cli.log_root.as_ref(), observed.service_name().as_str())?;
+    let log_root = LogRoot::resolve(
+        observed
+            .loaded_config()
+            .logging_root()
+            .or(cli.log_root.as_ref()),
+        observed.service_name().as_str(),
+    )?;
     let mut config = LoggerConfig::default_for(
         observed.service_name().clone(),
         log_root.service_root().clone(),
@@ -102,7 +119,7 @@ pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Lo
     let rotation = config.rotation;
     let retention = config.retention;
     config.enable_file_sink = false;
-    config.enable_console_sink = cli.log_console;
+    config.enable_console_sink = observed.loaded_config().logging_console();
 
     let mut builder = LoggerBuilder::new(config).map_err(|error| {
         CliError::config("failed to initialize the structured logger")
@@ -125,11 +142,26 @@ pub fn initialize_logger(observed: &ObservedCommand<'_>, cli: &Cli) -> Result<Lo
 pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
     let mut fields = base_fields(observed);
     fields.insert("json".to_string(), Value::Bool(cli.json));
-    fields.insert("log_console".to_string(), Value::Bool(cli.log_console));
+    fields.insert(
+        "log_console".to_string(),
+        Value::Bool(observed.loaded_config().logging_console()),
+    );
     if let Some(log_root) = cli.log_root.as_ref() {
         fields.insert(
             "log_root_override".to_string(),
             Value::String(log_root.display().to_string()),
+        );
+    }
+    if let Some(repo_root) = observed.loaded_config().repo_root() {
+        fields.insert(
+            "repo_root".to_string(),
+            Value::String(repo_root.display().to_string()),
+        );
+    }
+    if let Some(config_path) = observed.loaded_config().config_path() {
+        fields.insert(
+            "config_path".to_string(),
+            Value::String(config_path.display().to_string()),
         );
     }
 
@@ -140,6 +172,44 @@ pub fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
         started_action().clone(),
         None,
         Some("command invocation started"),
+        fields,
+    );
+}
+
+pub fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>, tool: &str) {
+    let mut fields = base_fields(observed);
+    fields.insert("tool".to_string(), Value::String(tool.to_string()));
+
+    log_event(
+        logger,
+        observed,
+        Level::Info,
+        dispatch_started_action().clone(),
+        None,
+        Some("backend dispatch started"),
+        fields,
+    );
+}
+
+pub fn log_dispatch_result(
+    logger: &Logger,
+    observed: &ObservedCommand<'_>,
+    dispatch: &DispatchTelemetry,
+) {
+    let mut fields = base_fields(observed);
+    fields.insert(
+        "tool".to_string(),
+        Value::String(dispatch.tool().to_string()),
+    );
+    fields.insert("finding_count".to_string(), json!(dispatch.finding_count()));
+
+    log_event(
+        logger,
+        observed,
+        Level::Info,
+        dispatch_normalized_action().clone(),
+        Some(success_outcome().clone()),
+        Some("backend result normalized through top-level contract"),
         fields,
     );
 }
@@ -275,6 +345,21 @@ fn error_action() -> &'static ActionName {
     static ERROR_ACTION: OnceLock<ActionName> = OnceLock::new();
     ERROR_ACTION
         .get_or_init(|| ActionName::new("cli.command.error").expect("static error action is valid"))
+}
+
+fn dispatch_started_action() -> &'static ActionName {
+    static DISPATCH_STARTED_ACTION: OnceLock<ActionName> = OnceLock::new();
+    DISPATCH_STARTED_ACTION.get_or_init(|| {
+        ActionName::new("cli.dispatch.started").expect("static dispatch started action is valid")
+    })
+}
+
+fn dispatch_normalized_action() -> &'static ActionName {
+    static DISPATCH_NORMALIZED_ACTION: OnceLock<ActionName> = OnceLock::new();
+    DISPATCH_NORMALIZED_ACTION.get_or_init(|| {
+        ActionName::new("cli.dispatch.normalized")
+            .expect("static dispatch normalized action is valid")
+    })
 }
 
 fn success_outcome() -> &'static OutcomeLabel {

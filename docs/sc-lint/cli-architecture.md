@@ -188,9 +188,8 @@ For release `0.1.x`, these planned contract types should also be represented as
 
 ## Suggested Implementation Seams
 
-The exact filenames may change, but the implementation should keep these
-responsibilities centralized rather than letting each command family invent its
-own local pattern:
+The implementation should keep these responsibilities centralized rather than
+letting each command family invent its own local pattern:
 
 - `cli`
   - clap-facing command definitions and grouped command parsing
@@ -213,26 +212,34 @@ This split is meant to improve development success by preventing duplicated
 JSON rendering, ad hoc error mapping, and command-family-specific dispatch
 wrappers.
 
-The current A.1a crate layout is:
+The current crate layout is:
 
 - `crates/sc-lint/src/cli.rs`
 - `crates/sc-lint/src/command.rs`
+- `crates/sc-lint/src/config.rs`
 - `crates/sc-lint/src/contract.rs`
+- `crates/sc-lint/src/dispatch.rs`
 - `crates/sc-lint/src/error.rs`
 - `crates/sc-lint/src/render.rs`
 - `crates/sc-lint/src/logging.rs`
 
-## A.1a Bootstrap Behavior
+## Current Bootstrap Behavior
 
-Sprint A.1a intentionally stops before real backend dispatch.
+Sprint A.1a intentionally stopped before real backend dispatch. A.1b adds the
+first operational backend path.
 
 Current command behavior:
 
 - `version`
   - succeeds directly from the top-level CLI
+- `lint sc-boundary`
+  - succeeds through the shared config + dispatch + normalization seam
+  - uses direct Rust-library dispatch in A.1b
+  - emits dedicated dispatch-start and dispatch-normalized log events
 - `lint`
   - reserved contract surface
-  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+  - all non-`sc-boundary` targets currently return `CLI.CAPABILITY_ERROR`
+    through `CliError`
 - `view`
   - reserved contract surface
   - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
@@ -246,8 +253,8 @@ Current command behavior:
   - reserved contract surface
   - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
 
-This is intentional. The goal of A.1a is to freeze the top-level envelope,
-error family, command identifiers, and logger ownership before A.1b adds the
+This is intentional. The goal of A.1a was to freeze the top-level envelope,
+error family, command identifiers, and logger ownership before A.1b added the
 first real backend path.
 
 ## Machine Contract Model
@@ -339,10 +346,16 @@ all emit the same envelope and error shapes at the top level.
 Expected flow:
 
 1. discover repo root
-2. load shared config
+2. load shared config from `sc-lint.toml` or `.just/lint-config.toml`
 3. resolve subcommand/tool target and capability requirements
 4. dispatch to backend
 5. normalize output and exit code
+
+Current A.1b repo-root resolution order is:
+
+- explicit `--root <path>`
+- otherwise current working directory walked upward until the repo root is
+  found
 
 For `xwin`-aware commands, capability resolution includes:
 

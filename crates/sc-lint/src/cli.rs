@@ -12,6 +12,8 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
     #[arg(long, global = true, value_name = "path")]
+    pub root: Option<PathBuf>,
+    #[arg(long, global = true, value_name = "path")]
     pub log_root: Option<PathBuf>,
     #[arg(long, global = true)]
     pub log_console: bool,
