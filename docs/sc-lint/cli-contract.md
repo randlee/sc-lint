@@ -129,7 +129,7 @@ Current implementation status:
   - implemented parser-level usage failure envelope path when command parsing
     fails before a concrete subcommand identity exists
 - `lint.sc-portability`
-  - still reserved until A.4 lands
+  - implemented delegated backend path
 - `lint.sc-runtime`
   - implemented delegated backend path
 

@@ -16,7 +16,7 @@ constructor = "none"
 roots = ["OutputFormat", "NodeId", "OwnerId", "FindingsReport", "ReportStatus", "Finding"]
 
 [dependencies]
-allowed_dependents = ["sc-lint", "sc-lint-boundary", "sc-lint-portability"]
+allowed_dependents = ["sc-lint", "sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]
 allowed_dependencies = []
 forbidden_edges = [
   "sc-lint-schema -> sc-lint",

@@ -235,24 +235,25 @@ Current command behavior:
 - `lint identity-literals`
   - succeeds through the Python Adapter Protocol
   - exposes a configurable framework rather than consumer-specific defaults
+- `lint sc-portability`
+  - succeeds through delegated backend dispatch to `sc-lint-portability`
+- `lint sc-runtime`
+  - succeeds through delegated backend dispatch to `sc-lint-runtime`
 - `view findings`
   - succeeds through the Python Adapter Protocol
   - collates generated findings artifacts into a stable findings index
 - `lint`
-  - implemented for profiles, `sc-boundary`, `line-counts`, and
-    `identity-literals`
+  - implemented for profiles, `sc-boundary`, `sc-portability`, `sc-runtime`,
+    `line-counts`, and `identity-literals`
 - `view`
   - `findings` is implemented
   - `graph` remains reserved until the graph contract is stable
 - `check`
-  - reserved contract surface
-  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+  - implemented native and capability-gated `xwin` preflight surface
 - `clippy`
-  - reserved contract surface
-  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+  - implemented native and capability-gated `xwin` clippy surface
 - `ci`
-  - reserved contract surface
-  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`
+  - implemented top-level lint-plus-tests orchestration surface
 
 This is intentional. The goal of A.1a was to freeze the top-level envelope,
 error family, command identifiers, and logger ownership before A.1b added the

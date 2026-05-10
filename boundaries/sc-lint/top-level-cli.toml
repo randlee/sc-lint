@@ -15,10 +15,7 @@ constructor = "none"
 [composition]
 # `CommandEnvelope` records the generic success-envelope family documented in
 # the CLI contract as `CommandEnvelope<T>`.
-#
-# ADR-008 approves crates/sc-lint/src/logging.rs as the binary-only
-# sc-observability entry module through `logging::dispatch_event`.
-roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "logging::dispatch_event", "run"]
+roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "run"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the boundary backend crate, the
