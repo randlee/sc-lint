@@ -222,6 +222,8 @@ Current implementation status:
     `boundary.allow("cycle.recursive_value_container")`
   - `internal_only` visibility/reference enforcement
   - `forbid_external_impls` enforcement
+  - manifest-policy parity for workspace-package inheritance and internal path
+    dependency version checks on `feature/sprint-A7`
 - deferred:
   - additional boundary declarations beyond current attribute set
   - postmortem portability/runtime imports until their dedicated crates exist

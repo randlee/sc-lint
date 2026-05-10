@@ -58,6 +58,7 @@ enum RuleFilterArg {
     Boundaries,
     InternalOnly,
     ForbidExternalImpls,
+    Manifests,
     Portability,
 }
 
@@ -86,6 +87,7 @@ impl From<RuleFilterArg> for RuleFilter {
             RuleFilterArg::Boundaries => RuleFilter::Boundaries,
             RuleFilterArg::InternalOnly => RuleFilter::InternalOnly,
             RuleFilterArg::ForbidExternalImpls => RuleFilter::ForbidExternalImpls,
+            RuleFilterArg::Manifests => RuleFilter::Manifests,
             RuleFilterArg::Portability => RuleFilter::Portability,
         }
     }

@@ -117,6 +117,7 @@ The currently scheduled foundation sprints are:
   - `docs/sc-lint/sprint-A6.md`
 - `A.7`
   - Rust manifest-policy enforcement and Python parity window
+  - active implementation branch: `feature/sprint-A7`
   - `docs/sc-lint/sprint-A7.md`
 - `A.8`
   - per-tool user guides and rule-disable documentation

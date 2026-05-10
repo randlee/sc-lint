@@ -261,7 +261,8 @@ Expected low-impact areas:
 - rule ids
 - graph/export schema
 - source analysis
-- manifest/source enforcement logic
+- manifest/source enforcement logic outside the current workspace-inheritance
+  and internal path-version parity window
 
 ## Remaining Open Decisions
 

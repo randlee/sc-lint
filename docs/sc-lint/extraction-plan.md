@@ -18,7 +18,9 @@ This plan covers six current tooling areas and one proof-to-product migration
 track:
 
 1. boundary inventory and manifest-policy enforcement
-   - current implementation: Python `lint_boundaries.py`
+   - current implementation:
+     - Python `.just/lint_manifests.py` for manifest policy
+     - Rust `sc-lint-boundary` for boundary inventory loading/schema
    - target: Rust `sc-lint-boundary`
 2. line-count lint
    - current implementation: Python `check_line_counts.py`
@@ -363,14 +365,15 @@ Deliverable:
 
 ### Phase 3: Add manifest-policy enforcement to Rust
 
-Port the generic manifest-policy portion of `lint_boundaries.py` into
+Port the current manifest-policy checks from `.just/lint_manifests.py` into
 `sc-lint-boundary`.
 
 Required work:
 
-- model dependency ownership rules
-- model manifest section rules
-- validate `Cargo.toml` edges against boundary/config policy
+- model dependency ownership rules for internal path dependencies
+- model workspace-package inheritance rules inside `[package]`
+- validate `Cargo.toml` path dependency edges and required workspace package
+  fields
 - preserve stable finding categories across the migration
 - route execution through the top-level `sc-lint` CLI without adding direct
   dependencies on unrelated backend crates
@@ -381,17 +384,17 @@ Deliverable:
 
 ### Phase 4: Parity validation window
 
-Keep the Python boundary implementation and run it as a parity validator
-against the Rust implementation.
+Keep the Python manifest-policy implementation and run it as a parity
+validator against the Rust implementation.
 
 Required work:
 
 - define parity fixtures
 - compare Python vs Rust findings on:
-  - valid boundary inventory
-  - invalid boundary inventory
+  - valid manifest-policy fixtures
+  - invalid manifest-policy fixtures
   - manifest-policy failures
-  - mixed-source migration repos where still relevant
+  - mixed explicit-version and workspace-version package sets
 - fail parity tests on mismatch
 - ensure parity runs can be triggered from the top-level CLI or equivalent test
   harness without violating backend crate isolation

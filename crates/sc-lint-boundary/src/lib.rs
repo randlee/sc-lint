@@ -29,6 +29,7 @@ use thiserror::Error;
 mod analysis;
 mod graph;
 mod inventory;
+mod manifest_policy;
 mod portability;
 mod render;
 #[cfg(test)]
@@ -43,6 +44,12 @@ const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub enum BoundaryError {
     #[error("failed to load boundary inventory for root `{}`: {source:#}", root.display())]
     InventoryLoad {
+        root: PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
+    #[error("failed to analyze manifest policy for root `{}`: {source:#}", root.display())]
+    ManifestPolicyAnalysis {
         root: PathBuf,
         #[source]
         source: anyhow::Error,
@@ -341,6 +348,8 @@ pub enum RuleId {
     ScbBoundary001,
     ScbBoundary002,
     ScbBoundary003,
+    ScbManifest001,
+    ScbManifest002,
     Port001,
     Port002,
     Port003,
@@ -355,6 +364,8 @@ impl RuleId {
             Self::ScbBoundary001 => "SCB-BOUNDARY-001",
             Self::ScbBoundary002 => "SCB-BOUNDARY-002",
             Self::ScbBoundary003 => "SCB-BOUNDARY-003",
+            Self::ScbManifest001 => "SCB-MANIFEST-001",
+            Self::ScbManifest002 => "SCB-MANIFEST-002",
             Self::Port001 => "PORT-001",
             Self::Port002 => "PORT-002",
             Self::Port003 => "PORT-003",
@@ -377,6 +388,7 @@ pub enum RuleFilter {
     Boundaries,
     InternalOnly,
     ForbidExternalImpls,
+    Manifests,
     Portability,
 }
 
@@ -387,6 +399,7 @@ impl RuleFilter {
             Self::Boundaries => "boundaries",
             Self::InternalOnly => "internal_only",
             Self::ForbidExternalImpls => "forbid_external_impls",
+            Self::Manifests => "manifests",
             Self::Portability => "portability",
         }
     }
@@ -415,7 +428,7 @@ impl fmt::Display for RuleFilterParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "unsupported rule filter `{}`; supported: cycles, boundaries, internal_only, forbid_external_impls, portability",
+            "unsupported rule filter `{}`; supported: cycles, boundaries, internal_only, forbid_external_impls, manifests, portability",
             self.invalid_value
         )
     }
@@ -432,6 +445,7 @@ impl TryFrom<&str> for RuleFilter {
             "boundaries" => Ok(Self::Boundaries),
             "internal_only" => Ok(Self::InternalOnly),
             "forbid_external_impls" => Ok(Self::ForbidExternalImpls),
+            "manifests" => Ok(Self::Manifests),
             "portability" => Ok(Self::Portability),
             other => Err(RuleFilterParseError::new(other)),
         }
@@ -615,6 +629,33 @@ impl GraphBuilder {
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
+    if options.rule == Some(RuleFilter::Manifests) {
+        let manifest_report =
+            manifest_policy::analyze_manifest_policy(&options.root).map_err(|source| {
+                BoundaryError::ManifestPolicyAnalysis {
+                    root: options.root.clone(),
+                    source,
+                }
+            })?;
+        let status = if manifest_report
+            .findings
+            .iter()
+            .any(analysis::finding_is_failure)
+        {
+            ReportStatus::Fail
+        } else {
+            ReportStatus::Pass
+        };
+        return Ok(FindingsReport {
+            tool: SC_LINT_BOUNDARY_TOOL,
+            version: SC_LINT_BOUNDARY_VERSION,
+            schema_version: SC_LINT_SCHEMA_VERSION,
+            status,
+            scanned_crates: manifest_report.scanned_crates,
+            findings: manifest_report.findings,
+        });
+    }
+
     if options.rule == Some(RuleFilter::Portability) {
         let findings = portability::analyze_portability(&options.root).map_err(|source| {
             BoundaryError::PortabilityAnalysis {
@@ -672,6 +713,16 @@ pub fn analyze_workspace(
         || filter == Some(RuleFilter::ForbidExternalImpls)
     {
         findings.extend(analysis::analyze_forbid_external_impls(&graph));
+    }
+    if filter.is_none() {
+        findings.extend(
+            manifest_policy::analyze_manifest_policy(&options.root)
+                .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
+                    root: options.root.clone(),
+                    source,
+                })?
+                .findings,
+        );
     }
     findings.sort_by(|left, right| {
         analysis::finding_sort_key(left)
