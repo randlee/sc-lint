@@ -6,6 +6,7 @@ This document defines the planned end-to-end contract for the top-level
 Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+- [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
 
 It exists to close the gap between:
 
@@ -34,6 +35,55 @@ The release-1 contract should explicitly define these types:
 - `OutputMode`
 - `CommandEnvelope<T>`
 - `CliError`
+
+## Contract Invariants For Every Non-Interactive Command
+
+Every non-interactive top-level command must preserve the same contract shape:
+
+- success:
+  - `ok: true`
+  - stable `command`
+  - family-specific payload under `data`
+  - optional additive `diagnostics`
+- failure:
+  - `ok: false`
+  - stable `command`
+  - `CliError` under `error`
+  - optional additive `diagnostics`
+
+Commands must not introduce family-specific top-level envelope keys such as:
+
+- `findings` at the top level for lint only
+- `report` at the top level for view only
+- `steps` at the top level for CI only
+
+Those values belong under `data` so the top-level machine contract remains
+consistent.
+
+## Command Identity Convention
+
+The `command` field is a stable dotted identifier derived from the final CLI
+path selected by the caller.
+
+Initial convention:
+
+- `sc-lint lint sc-boundary`
+  - `lint.sc-boundary`
+- `sc-lint lint fast`
+  - `lint.fast`
+- `sc-lint view <target>`
+  - `view.<target>`
+- `sc-lint check xwin`
+  - `check.xwin`
+- `sc-lint clippy xwin`
+  - `clippy.xwin`
+- `sc-lint ci`
+  - `ci`
+- `sc-lint version`
+  - `version`
+
+The same identifier should also be used in structured logging entry and
+completion events so command telemetry and machine-readable output line up.
 
 ## Canonical Success Envelope
 
@@ -131,6 +181,23 @@ The exact string values may still be tuned before implementation, but the
 release-1 contract must define one stable mapping from top-level error kind to
 top-level stable code.
 
+## Planned Command-Family Contract Matrix
+
+Every non-interactive command family should be implementation-reviewed against
+the same matrix before code lands:
+
+| Command family | Stable `command` pattern | Success payload owner | Applicable top-level error kinds |
+| --- | --- | --- | --- |
+| `lint` | `lint.<tool-or-profile>` | analyzer backend or lint-profile orchestrator | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
+| `view` | `view.<target>` | view/report backend or adapter layer | `usage`, `config`, `backend_failure`, `backend_protocol`, `internal` |
+| `check` | `check.<target>` | compile/preflight runner | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
+| `clippy` | `clippy.<target>` | lint-runner backend | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
+| `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
+| `version` | `version` | top-level CLI crate | `usage`, `internal` |
+
+This matrix exists to prevent each command family from inventing its own
+response or error pattern at implementation time.
+
 ## Backend-to-CLI Normalization
 
 The top-level CLI must normalize backend-native results into the canonical
@@ -216,6 +283,15 @@ It must not:
 - contain machine-significant information missing from `--json`
 - silently hide failure categories that exist in `CliError`
 - become the only supported path for debugging backend dispatch failures
+
+## Consistency Gates
+
+Implementation is not considered complete unless tests prove that:
+
+- every non-interactive command family uses the same top-level envelope keys
+- every failure path uses `CliError` rather than family-specific JSON
+- `command` values match the documented dotted-identifier convention
+- delegated backends cannot bypass the top-level normalization path
 
 ## Graph and Interactive Futures
 

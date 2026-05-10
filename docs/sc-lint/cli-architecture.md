@@ -6,6 +6,7 @@ crate.
 Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+- [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
 
 ## Role
 
@@ -137,10 +138,10 @@ Profile semantics:
 
 - `fast`
   - low-latency local developer gate
-  - includes `xwin` checks only when the individual command is fast enough
+  - excludes `xwin` to preserve low-latency local feedback
 - `full`
   - stronger local pre-push gate
-  - may include slower `xwin` checks such as `clippy xwin`
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only profile aligned to what the project considers CI lint parity
   - does not include `xwin`
@@ -181,6 +182,33 @@ fully implemented.
 
 For release `0.1.x`, these planned contract types should also be represented as
 `BOUNDARY-ScLintCli` composition-root items in the boundary/planning metadata.
+
+## Suggested Implementation Seams
+
+The exact filenames may change, but the implementation should keep these
+responsibilities centralized rather than letting each command family invent its
+own local pattern:
+
+- `cli`
+  - clap-facing command definitions and grouped command parsing
+- `command`
+  - canonical command-path resolution and dotted `command` identifiers
+- `config`
+  - repo-root discovery and shared config loading
+- `contract`
+  - `CommandEnvelope<T>` serialization and success helpers
+- `error`
+  - `CliError`, stable code mapping, and recovery-oriented constructors
+- `dispatch`
+  - backend selection and execution
+- `render`
+  - human-readable rendering derived from the normalized command result
+- `logging`
+  - CLI-owned logger setup and command-lifecycle event emission
+
+This split is meant to improve development success by preventing duplicated
+JSON rendering, ad hoc error mapping, and command-family-specific dispatch
+wrappers.
 
 ## Machine Contract Model
 
@@ -224,6 +252,12 @@ Backend tools own:
 Future MCP wrappers should reuse the same request and response models rather
 than introducing a second business-payload schema.
 
+The top-level CLI also owns the stable command-identifier convention used by:
+
+- `CommandEnvelope.command`
+- `CliError` attribution context
+- structured logging entry/completion/error events
+
 ## Backend Normalization Path
 
 The end-to-end result path should be:
@@ -249,6 +283,17 @@ Required normalization cases:
   - normalized into `CliError` rather than exposing raw traceback text as the
     public machine contract
 
+The normalization helper should be shared across command families so:
+
+- `lint`
+- `view`
+- `check`
+- `clippy`
+- `ci`
+- `version`
+
+all emit the same envelope and error shapes at the top level.
+
 ## Config Flow
 
 Expected flow:
@@ -263,8 +308,7 @@ For `xwin`-aware commands, capability resolution includes:
 
 - detect whether `cargo xwin` is installed
 - select the supported Windows target set
-- add `xwin`-aware checks into `fast` or `full` only when the capability is
-  present
+- add `xwin`-aware checks into `full` only when the capability is present
 - keep `ci` profile semantics independent from `xwin`
 - skip or error with a clear capability message depending on command mode
 
@@ -279,6 +323,17 @@ The CLI should present:
 
 See [cli-contract.md](./cli-contract.md) for the detailed envelope and
 normalization contract, including the planned exit-code mapping.
+
+## Consistency Test Strategy
+
+The implementation plan should include:
+
+- parse tests for every top-level command family
+- JSON fixture or snapshot tests proving top-level envelope-key parity across
+  `lint`, `view`, `check`, `clippy`, `ci`, and `version`
+- failure-shape tests proving every family uses `CliError`
+- delegated-backend tests proving malformed backend payloads cannot bypass the
+  top-level normalization path
 
 ## Interactive Constraint
 

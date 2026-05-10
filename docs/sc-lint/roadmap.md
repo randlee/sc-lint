@@ -280,10 +280,10 @@ Current planned local/CI profile split:
 
 - `fast`
   - low-latency local developer gate
-  - may include `xwin check` when available
+  - excludes `xwin` to preserve low-latency local feedback
 - `full`
   - stronger local pre-push gate
-  - may include `xwin check` and `xwin clippy` when available
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only CI-parity profile
   - intentionally excludes `xwin` because real Windows CI remains

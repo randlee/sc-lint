@@ -43,6 +43,11 @@ scheduled_sprint = "A.1a"
 tracking_id = "SC-LINT-CLI-008"
 expires_when = "sprint_before_current"
 
+[planned_items."BOUNDARY-ScLintCli.dependencies.external.sc-observability"]
+scheduled_sprint = "A.1a"
+tracking_id = "SC-LINT-CLI-009"
+expires_when = "sprint_before_current"
+
 [planned_items."BOUNDARY-ScLintPortabilityAnalyzer.public.facade"]
 scheduled_sprint = "A.4"
 tracking_id = "SC-LINT-PORT-001"

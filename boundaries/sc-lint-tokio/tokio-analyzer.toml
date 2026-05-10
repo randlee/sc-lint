@@ -23,6 +23,7 @@ forbidden_edges = [
   "sc-lint-tokio -> sc-lint-boundary",
   "sc-lint-tokio -> sc-lint-portability",
   "sc-lint-tokio -> sc-lint-runtime",
+  "sc-lint-tokio -> sc-observability",
 ]
 
 [references]

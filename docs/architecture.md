@@ -121,6 +121,14 @@ Allowed shared support:
 - `sc-lint-directives`
 - future shared support crates only after explicit design approval
 
+For release `0.1.x`, this means:
+
+- `sc-lint-portability` and `sc-lint-runtime` may depend on
+  `sc-lint-directives` when shared directive parsing/types are needed
+- the top-level `sc-lint` CLI does not directly depend on
+  `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
+  integration mode
+
 This means coordination belongs in:
 
 - the top-level `sc-lint` CLI
@@ -352,8 +360,8 @@ The expected rollout order is:
 Profile policy:
 
 - `xwin` participation belongs in local lint profiles, not CI-parity profiles
-- if installed, `xwin check` may join `fast` and `full`
-- if installed, `xwin clippy` may join `full`
+- `fast` excludes `xwin` to preserve low-latency local feedback
+- if installed, `xwin check` and `xwin clippy` may join `full`
 - `ci` lint parity should stay aligned to real CI and therefore should not
   depend on `xwin`
 - the top-level `ci` command should run lint plus tests, while `lint ci`
