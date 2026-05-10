@@ -30,6 +30,7 @@ the `atm-core` proving surface, and keeps Tokio-specific work out of scope.
 - `REQ-PRODUCT-006AA`
 - `REQ-PRODUCT-015A`
 - `REQ-PRODUCT-015B`
+- `REQ-PRODUCT-015C`
 - `REQ-CLI-007F`
 
 ## Governing ADRs

@@ -42,6 +42,11 @@ utility extraction work begins.
 - `REQ-CLI-005E`
 - `REQ-CLI-005F`
 - `REQ-CLI-005G`
+- `REQ-CLI-007`
+- `REQ-CLI-007B`
+- `REQ-CLI-007C`
+- `REQ-CLI-007D`
+- `REQ-CLI-007E`
 - `REQ-CLI-008A`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`

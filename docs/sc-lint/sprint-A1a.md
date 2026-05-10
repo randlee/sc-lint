@@ -33,6 +33,7 @@ must leave the product with a real top-level binary and a vetted
 - `REQ-PRODUCT-002D`
 - `REQ-PRODUCT-002DA`
 - `REQ-PRODUCT-002E`
+- `REQ-PRODUCT-012D`
 - `REQ-CLI-001`
 - `REQ-CLI-002`
 - `REQ-CLI-003`
@@ -43,6 +44,11 @@ must leave the product with a real top-level binary and a vetted
 - `REQ-CLI-005E`
 - `REQ-CLI-005F`
 - `REQ-CLI-005G`
+- `REQ-CLI-007`
+- `REQ-CLI-007B`
+- `REQ-CLI-007C`
+- `REQ-CLI-007D`
+- `REQ-CLI-007E`
 - `REQ-CLI-008A`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`

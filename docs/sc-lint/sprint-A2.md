@@ -124,6 +124,8 @@ distinguishes:
    - expose `sc-lint clippy xwin`
    - ensure `full` includes `xwin` only when installed
    - ensure `fast` remains strictly zero-network/low-latency without `xwin`
+   - keep `xwin check` as an explicit command rather than default `fast`
+     membership until a later policy change is approved
    Required tests:
    - capability-present tests
    - capability-absent tests
@@ -164,6 +166,8 @@ and `ci` actually mean.
 - `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is installed
 - the `full` profile includes `xwin` when present, but `fast` and `ci` remain independent from `xwin`
 - real Windows CI remains the authoritative release gate
+- the cross-target preflight strategy document exists and is approved before
+  A.2 closes
 
 ## Required Validation
 

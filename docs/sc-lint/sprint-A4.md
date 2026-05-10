@@ -31,6 +31,7 @@ crate, moves the existing portability implementation out of
 - `REQ-PRODUCT-006B`
 - `REQ-PRODUCT-015A`
 - `REQ-PRODUCT-015B`
+- `REQ-PRODUCT-015C`
 - `REQ-CLI-007F`
 
 ## Governing ADRs

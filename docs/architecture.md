@@ -121,6 +121,14 @@ Allowed shared support:
 - `sc-lint-directives`
 - future shared support crates only after explicit design approval
 
+For release `0.1.x`, this means:
+
+- `sc-lint-portability` and `sc-lint-runtime` may depend on
+  `sc-lint-directives` when shared directive parsing/types are needed
+- the top-level `sc-lint` CLI does not directly depend on
+  `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
+  integration mode
+
 This means coordination belongs in:
 
 - the top-level `sc-lint` CLI
