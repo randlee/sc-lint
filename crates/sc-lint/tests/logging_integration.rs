@@ -78,6 +78,30 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.started");
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.normalized");
     assert_log_file_contains_elapsed_ms(&dispatch_log_path);
+
+    let runtime = Command::new(binary)
+        .current_dir(&repo_root)
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "sc-runtime",
+        ])
+        .output()
+        .expect("runtime command runs");
+    assert!(
+        runtime.status.success(),
+        "runtime stderr: {}",
+        String::from_utf8_lossy(&runtime.stderr)
+    );
+
+    let runtime_log_path = temp_root.join("sc-runtime").join("sc-runtime.log.jsonl");
+    assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.started");
+    assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.normalized");
+    assert_log_file_contains_elapsed_ms(&runtime_log_path);
 }
 
 #[test]

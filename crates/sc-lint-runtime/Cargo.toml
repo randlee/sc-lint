@@ -1,0 +1,31 @@
+[package]
+name = "sc-lint-runtime"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "AST-sensitive Rust runtime analyzer."
+repository.workspace = true
+homepage.workspace = true
+
+[[bin]]
+name = "sc-lint-runtime"
+path = "src/main.rs"
+
+[lib]
+name = "sc_lint_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+cargo_metadata.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+syn = { version = "2", features = ["full", "parsing", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+thiserror = "1"
+
+[dev-dependencies]
+tempfile = "3"

@@ -133,7 +133,7 @@ Current implementation status:
 - `lint.sc-portability`
   - still reserved until A.4 lands
 - `lint.sc-runtime`
-  - still reserved until A.5 lands
+  - implemented delegated backend path
 
 ## Canonical Success Envelope
 

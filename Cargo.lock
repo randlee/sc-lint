@@ -687,6 +687,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-lint-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "clap",
+ "proc-macro2",
+ "serde",
+ "serde_json",
+ "syn",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "sc-observability"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

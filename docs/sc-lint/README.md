@@ -73,7 +73,9 @@ Current intended crate split:
 - `sc-lint-portability`
   - planned analyzer crate for shared OS/platform portability rules
 - `sc-lint-runtime`
-  - planned analyzer crate for shared std runtime/concurrency rules
+  - analyzer crate for shared std runtime/concurrency rules
+  - implemented delegated CLI target:
+    - `sc-lint lint sc-runtime`
 - `sc-lint-tokio`
   - planned future analyzer crate for Tokio-specific rules
   - represented now as a reserved future boundary surface only
@@ -139,11 +141,17 @@ Current scaffold status:
       - JSON
       - Turtle
 - `sc-lint`
-  - planned now
-  - not implemented yet
+  - exists now
   - detailed CLI requirements and architecture are defined in:
     - [`cli-requirements.md`](./cli-requirements.md)
     - [`cli-architecture.md`](./cli-architecture.md)
+  - current implemented command families include:
+    - `version`
+    - `lint`
+    - `view`
+    - `check`
+    - `clippy`
+    - `ci`
 
 Current code moves required for the planned partition:
 
@@ -155,7 +163,7 @@ Current code moves required for the planned partition:
   - `PORT-004`
   - `PORT-005`
 - import std runtime/concurrency rules from the current `atm-core` proving
-  surface into the future `sc-lint-runtime` crate:
+  surface into `sc-lint-runtime`:
   - `SCB-RUNTIME-001`
   - `SCB-RUNTIME-002`
 - retarget the current portability wrapper surface when that crate exists:
@@ -179,9 +187,6 @@ Planned next shared rule imports from `atm-core`:
 - `sc-lint-portability`
   - `PORT-004`
   - `PORT-005`
-- `sc-lint-runtime`
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
 
 Kept local to consumer repos for now:
 

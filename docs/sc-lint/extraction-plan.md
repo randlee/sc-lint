@@ -342,6 +342,8 @@ Deliverable:
 - the imported runtime families land in a dedicated analyzer crate rather than
   widening `sc-lint-boundary`
 - consumer repos can consume those rules without copying ATM-local policy
+- release-1 CLI exposure remains `sc-lint lint sc-runtime` through delegated
+  backend execution and top-level output normalization
 
 ### Phase 2: Introduce Rust boundary inventory loader
 

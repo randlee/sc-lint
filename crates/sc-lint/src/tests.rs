@@ -123,10 +123,12 @@ fn reserved_view_commands_use_the_same_failure_envelope_shape() {
 
 #[test]
 fn reserved_lint_placeholders_use_the_same_failure_envelope_shape() {
-    let commands = [
-        Cli::parse_from(["sc-lint", "--json", "lint", "sc-portability"]),
-        Cli::parse_from(["sc-lint", "--json", "lint", "sc-runtime"]),
-    ];
+    let commands = [Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "lint",
+        "sc-portability",
+    ])];
 
     for cli in commands {
         let context = CommandContext::from_cli(&cli).expect("lint placeholder context");
@@ -285,6 +287,43 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "lint.sc-boundary");
     assert_eq!(json["data"]["tool"], crate::consts::TOOL_BOUNDARY);
+    assert!(json["data"]["findings"].is_array());
+}
+
+#[test]
+fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
+    let repo_root = workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "sc-runtime",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("runtime context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let success = crate::command::execute(&context, &loaded).expect("runtime dispatch succeeds");
+    let expected_finding_count = success
+        .data
+        .get("findings")
+        .and_then(Value::as_array)
+        .map_or(0, std::vec::Vec::len);
+    assert_eq!(
+        success
+            .dispatch
+            .as_ref()
+            .expect("dispatch telemetry")
+            .finding_count(),
+        expected_finding_count
+    );
+    let envelope = CommandEnvelope::success(context.command_id(), success.data);
+    let rendered = crate::render::render_success_json(&envelope);
+    let json: Value = serde_json::from_str(&rendered).expect("success json");
+
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["command"], "lint.sc-runtime");
+    assert_eq!(json["data"]["tool"], "sc-lint-runtime");
     assert!(json["data"]["findings"].is_array());
 }
 

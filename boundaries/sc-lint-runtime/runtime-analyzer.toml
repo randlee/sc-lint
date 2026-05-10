@@ -13,11 +13,23 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = []
+roots = [
+  "RuntimeError",
+  "OutputFormat",
+  "AnalyzeOptions",
+  "NodeId",
+  "OwnerId",
+  "FindingsReport",
+  "ReportStatus",
+  "Finding",
+  "RuleId",
+  "analyze_workspace",
+  "render_findings_report",
+]
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-lint-directives"]
+allowed_dependencies = []
 forbidden_edges = [
   "sc-lint-runtime -> sc-lint-attributes",
   "sc-lint-runtime -> sc-lint-boundary",
@@ -38,4 +50,4 @@ lint_rules = ["LINT-SC-RUNTIME-ISOLATION"]
 review_gates = ["no_cross_analyzer_dependencies"]
 
 [status]
-state = "planned"
+state = "concrete_landed"

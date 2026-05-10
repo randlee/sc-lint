@@ -8,6 +8,20 @@ These points are considered settled for the initial spike.
 
 Current implemented crates:
 
+- `sc-lint`
+  - top-level CLI crate
+  - stable user-facing command surface
+  - command parsing, config loading, output normalization, tool dispatch
+  - canonical AI-first machine contract for non-interactive commands
+  - implemented lint profiles:
+    - `fast`
+    - `full`
+    - `ci`
+  - implemented top-level CI-equivalent command:
+    - `sc-lint ci`
+  - implemented Windows preflight commands when `cargo xwin` is installed:
+    - `sc-lint check xwin`
+    - `sc-lint clippy xwin`
 - `sc-lint-directives`
   - shared directive parsing/types
 - `sc-lint-boundary`
@@ -16,23 +30,14 @@ Current implemented crates:
 - `sc-lint-attributes`
   - proc-macro attribute crate
   - currently shares the workspace `0.1.0` version line
+- `sc-lint-runtime`
+  - std runtime/concurrency analyzer crate
+  - implemented first imports:
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
 
 Planned next crates:
 
-- `sc-lint`
-  - top-level CLI crate
-  - stable user-facing command surface
-  - command parsing, config loading, output normalization, tool dispatch
-  - canonical AI-first machine contract for non-interactive commands
-  - planned lint profiles:
-    - `fast`
-    - `full`
-    - `ci`
-  - planned top-level CI-equivalent command:
-    - `sc-lint ci`
-  - planned Windows preflight commands when `cargo xwin` is installed:
-    - `sc-lint check xwin`
-    - `sc-lint clippy xwin`
 - `sc-lint-portability`
   - platform/OS portability analyzer crate
   - planned first moves/imports:
@@ -41,11 +46,6 @@ Planned next crates:
     - `PORT-003`
     - `PORT-004`
     - `PORT-005`
-- `sc-lint-runtime`
-  - std runtime/concurrency analyzer crate
-  - planned first imports:
-    - `SCB-RUNTIME-001`
-    - `SCB-RUNTIME-002`
 
 Planned later crate:
 
@@ -82,12 +82,12 @@ Current scaffold state:
   - planned
   - implementation not started yet
 - `sc-lint-runtime`
-  - planned
-  - implementation not started yet
+  - created
+  - delegated backend command path in place now
+  - first runtime-rule imports in place now
 - `sc-lint`
-  - planned
-  - detailed CLI requirements/architecture defined
-  - implementation not started yet
+  - created
+  - command parsing, config loading, normalization, and dispatch in place now
 - `sc-lint-tokio`
   - reserved
   - no implementation scope yet
@@ -329,9 +329,7 @@ branch merges is:
 1. create `sc-lint-portability`
 2. move existing `PORT-001/002/003` into `sc-lint-portability`
 3. import `PORT-004/005` into `sc-lint-portability`
-4. create `sc-lint-runtime`
-5. move `SCB-RUNTIME-001/002` into `sc-lint-runtime`
-6. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
+4. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
    implementation
 
 The next planned boundary-enforcement work after that is:

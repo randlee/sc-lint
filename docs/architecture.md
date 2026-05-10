@@ -120,6 +120,11 @@ Current implementation status:
   - real backend-normalized success path
   - config loading and logger initialization stay in the top-level CLI
   - `sc-lint-boundary` stays a backend-owned analyzer without logger setup
+- `lint.sc-runtime`
+  - delegated backend-normalized success path
+  - config loading, logger initialization, dispatch telemetry, and output
+    normalization stay in the top-level CLI
+  - `sc-lint-runtime` stays a backend-owned analyzer without logger setup
 
 ## Backend Crate Isolation
 
@@ -314,9 +319,6 @@ Current planned promotion path from `atm-core`:
   - `sc-lint-portability`
     - `PORT-004`
     - `PORT-005`
-  - `sc-lint-runtime`
-    - `SCB-RUNTIME-001`
-    - `SCB-RUNTIME-002`
 - consumer-local policy families that stay outside `sc-lint` unless extracted
   as a configurable framework:
   - duplicate semantic string-literal policy
