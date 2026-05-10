@@ -58,19 +58,24 @@ Use fenced JSON for machine-readable status payloads:
 ## QA Lifecycle (Multi-Pass)
 
 1. Initial pass: usually `FAIL` with findings.
+   - If Rust best-practices review is in scope, run it in QA-1 only.
 2. Fix passes: `IN-FLIGHT` or `FAIL` while fixes are in progress.
+   - QA-2 and later rounds must not re-run Rust best-practices review on the
+     same sprint branch.
+   - Unresolved QA-1 RBP findings that are not fixed in the first fix round
+     carry to the next phase backlog instead of being re-raised in later rounds.
 3. Final pass: `PASS` with final quality report and merge recommendation.
 
 Do not treat QA as single-shot.
 
 ## CI Monitoring
 
-Preferred flow:
-- use `gh pr checks <PR> --watch` to follow PR check progression
-- use `gh pr view <PR> --json mergeStateStatus,reviewDecision,statusCheckRollup` for one-shot structured status
-- use `gh run view <run-id>` when a specific workflow run needs deeper inspection
+Preferred repo-specific flow:
+- use `atm gh monitor status` to verify monitor health when available
+- use `atm gh monitor pr <PR> --start-timeout 120` to start or attach a PR monitor when available
+- use `atm gh pr report <PR> --json` for one-shot structured status when available
 
-Fallback when GitHub CLI access is unavailable or not yet wired:
+Fallback when repo-specific `atm gh` tooling is unavailable or not yet wired:
 - `gh pr checks <PR> --watch`
 - `gh pr view <PR> --json mergeStateStatus,reviewDecision`
 
@@ -97,6 +102,11 @@ Fallback when render fails:
 - post plain markdown preserving the same machine-status fields
 
 `<vars.json>` must be a flat JSON map of strings for `sc-compose`.
+Use raw JSON strings for array-valued machine-status fields, for example:
+- `blocking_ids_json: "[\"QA-001\"]"`
+
+Use numeric strings for count fields so the templates can render them as JSON
+numbers without quotes.
 
 ## Final Quality Report to PR (Closeout)
 
