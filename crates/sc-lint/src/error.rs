@@ -44,7 +44,7 @@ impl CliErrorKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliError {
-    pub kind: CliErrorKind,
+    pub(crate) kind: CliErrorKind,
     pub message: String,
     pub details: Map<String, Value>,
     pub cause: Option<String>,
@@ -83,7 +83,7 @@ impl Serialize for CliError {
             state.serialize_field(consts::FIELD_CAUSE, cause)?;
         }
         if let Some(suggested_action) = self.suggested_action.as_ref() {
-            state.serialize_field("suggested_action", suggested_action)?;
+            state.serialize_field(consts::FIELD_SUGGESTED_ACTION, suggested_action)?;
         }
         state.end()
     }
@@ -128,7 +128,7 @@ impl CliError {
         Self::new(CliErrorKind::Internal, message)
     }
 
-    pub fn new(kind: CliErrorKind, message: impl Into<String>) -> Self {
+    pub(crate) fn new(kind: CliErrorKind, message: impl Into<String>) -> Self {
         Self {
             kind,
             message: message.into(),
@@ -160,10 +160,22 @@ impl CliError {
     where
         E: fmt::Display,
     {
+        // source erased to String — CliError is a display type, not a re-throw carrier
         let cause = source.to_string();
         self.cause = Some(cause.clone());
         self.source = Some(CliErrorSource(cause));
         self
+    }
+
+    pub fn kind_label(&self) -> &'static str {
+        match self.kind {
+            CliErrorKind::Usage => "usage",
+            CliErrorKind::Config => "config",
+            CliErrorKind::Capability => "capability",
+            CliErrorKind::BackendFailure => "backend_failure",
+            CliErrorKind::BackendProtocol => "backend_protocol",
+            CliErrorKind::Internal => "internal",
+        }
     }
 
     pub const fn exit_code(&self) -> u8 {

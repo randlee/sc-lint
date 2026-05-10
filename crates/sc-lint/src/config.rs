@@ -10,7 +10,7 @@ use crate::CliError;
 use crate::command::CommandContext;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LoadedConfig {
+pub struct LoadedConfig {
     repo_root: Option<RepoRoot>,
     config_path: Option<PathBuf>,
     logging_root: Option<PathBuf>,

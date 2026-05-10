@@ -18,9 +18,9 @@ constructor = "none"
 # The A.1b/A.2 execution model also exposes the command-context seam, preflight
 # target enums, and the canonical Windows xwin target triple as contract-relevant
 # CLI composition items. A.3 extends the stable target surface through the
-# extracted Python-backed lint/view commands, so `LintTarget` and `ViewTarget`
-# become explicit composition roots in this sprint.
-roots = ["Cli", "Command", "LintProfile", "LintTarget", "ViewTarget", "OutputMode", "CheckTarget", "ClippyTarget", "CommandEnvelope", "CliError", "CliErrorKind", "WINDOWS_XWIN_TARGET", "run", "help_text"]
+# extracted Python-backed lint/view commands, while A.2 keeps the bootstrap
+# contract types and execution outcomes as explicit review roots.
+roots = ["Cli", "Command", "CommandContext", "LintProfile", "LintTarget", "ViewTarget", "OutputMode", "CheckTarget", "ClippyTarget", "CommandEnvelope", "CliError", "CliErrorKind", "DispatchTelemetry", "LoadedConfig", "ParsedInvocation", "ImmediateOutcome", "ExecutionOutcome", "RenderedOutput", "WINDOWS_XWIN_TARGET", "run"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the shared support crate and

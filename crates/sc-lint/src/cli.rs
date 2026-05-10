@@ -21,7 +21,7 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub log_console: bool,
     #[command(subcommand)]
-    pub command: Command,
+    pub(crate) command: Command,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -137,14 +137,7 @@ pub enum ViewTarget {
     Findings,
 }
 
-impl ViewTarget {
-    pub const fn command_suffix(self) -> &'static str {
-        match self {
-            Self::Graph => "graph",
-            Self::Findings => "findings",
-        }
-    }
-}
+impl ViewTarget {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum CheckTarget {

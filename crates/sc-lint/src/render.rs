@@ -8,7 +8,7 @@ use serde_json::Value;
 use serde_json::json;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub(crate) struct RenderedOutput {
+pub struct RenderedOutput {
     pub stdout: Option<String>,
     pub stderr: Option<String>,
 }
@@ -99,7 +99,7 @@ pub(crate) fn render_success_human(
             let step_count = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get("steps"))
+                .and_then(|value| value.get(consts::FIELD_STEPS))
                 .and_then(Value::as_array)
                 .map_or(0, std::vec::Vec::len);
             format!("{}: {status} ({step_count} steps)", context.command_id())
@@ -137,6 +137,8 @@ fn fallback_render_error(command_id: &str, error: &CliError) -> String {
     });
     match serde_json::to_string_pretty(&fallback) {
         Ok(rendered) => rendered,
-        Err(_) => "{\"ok\":false,\"command\":\"render.failure\",\"error\":{\"kind\":\"internal\",\"code\":\"CLI.INTERNAL_ERROR\",\"message\":\"failed to serialize CLI output\"},\"diagnostics\":[]}".to_string(),
+        Err(_) => format!(
+            "{{\"ok\":false,\"command\":\"{command_id}\",\"error\":{{\"kind\":\"internal\",\"code\":\"CLI.INTERNAL_ERROR\",\"message\":\"failed to serialize CLI output\"}},\"diagnostics\":[]}}"
+        ),
     }
 }

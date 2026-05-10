@@ -1,4 +1,3 @@
-use sc_observability::ServiceName;
 use serde_json::Value;
 use serde_json::json;
 
@@ -7,12 +6,13 @@ use crate::CliError;
 use crate::Command;
 use crate::config::LoadedConfig;
 use crate::consts;
+use crate::contract::ServiceName;
 use crate::dispatch;
 use crate::python_adapter;
 use crate::workflow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DispatchTelemetry {
+pub struct DispatchTelemetry {
     tool: &'static str,
     finding_count: usize,
 }
@@ -25,11 +25,11 @@ impl DispatchTelemetry {
         }
     }
 
-    pub(crate) const fn tool(&self) -> &'static str {
+    pub const fn tool(&self) -> &'static str {
         self.tool
     }
 
-    pub(crate) const fn finding_count(&self) -> usize {
+    pub const fn finding_count(&self) -> usize {
         self.finding_count
     }
 }
@@ -199,7 +199,7 @@ impl CommandId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CommandContext {
+pub struct CommandContext {
     command_id: CommandId,
     service_name: ServiceName,
     summary: &'static str,
@@ -213,14 +213,7 @@ impl CommandContext {
     )]
     pub(crate) fn from_cli(cli: &Cli) -> Result<Self, CliError> {
         let command_id = CommandId::from_cli_command(&cli.command);
-        let service_name = ServiceName::new(command_id.service_name()).map_err(|error| {
-            CliError::internal(format!(
-                "invalid service name `{}` for command `{}`",
-                command_id.service_name(),
-                command_id.as_str()
-            ))
-            .with_source(error)
-        })?;
+        let service_name = ServiceName::new(command_id.service_name());
 
         Ok(Self {
             command_id,
@@ -234,8 +227,8 @@ impl CommandContext {
         self.command_id.as_str()
     }
 
-    pub(crate) fn service_name(&self) -> &ServiceName {
-        &self.service_name
+    pub fn service_name(&self) -> &str {
+        self.service_name.as_str()
     }
 
     pub(crate) const fn id(&self) -> CommandId {

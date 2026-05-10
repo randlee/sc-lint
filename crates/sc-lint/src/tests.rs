@@ -199,6 +199,9 @@ fn lint_targets_map_profile_values_stably() {
     assert_eq!(LintTarget::Ci.profile(), Some(crate::LintProfile::Ci));
     assert_eq!(LintTarget::ScBoundary.profile(), None);
     assert_eq!(LintTarget::LineCounts.profile(), None);
+    assert_eq!(crate::LintProfile::Fast.command_suffix(), "fast");
+    assert_eq!(crate::LintProfile::Full.command_suffix(), "full");
+    assert_eq!(crate::LintProfile::Ci.command_suffix(), "ci");
 }
 
 #[test]
@@ -281,13 +284,13 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
 
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "lint.sc-boundary");
-    assert_eq!(json["data"]["tool"], "sc-lint-boundary");
+    assert_eq!(json["data"]["tool"], crate::consts::TOOL_BOUNDARY);
     assert!(json["data"]["findings"].is_array());
 }
 
 #[test]
 fn malformed_backend_json_maps_to_backend_protocol_error() {
-    let error = crate::dispatch::normalize_backend_json("sc-lint-boundary", "{not-json")
+    let error = crate::dispatch::normalize_backend_json(crate::consts::TOOL_BOUNDARY, "{not-json")
         .expect_err("normalization should fail");
 
     assert_eq!(error.kind, CliErrorKind::BackendProtocol);
@@ -577,8 +580,6 @@ fn step_names(steps: &[Value]) -> Vec<String> {
 struct FakeSystemAdapter {
     xwin_available: bool,
     failures: HashMap<&'static str, &'static str>,
-    // Tests need to observe step order without requiring Sync, so RefCell is
-    // sufficient for this single-threaded fake.
     invocations: RefCell<Vec<String>>,
 }
 
@@ -587,6 +588,8 @@ impl FakeSystemAdapter {
         Self {
             xwin_available,
             failures: HashMap::new(),
+            // Tests need to observe step order without requiring Sync, so
+            // RefCell is sufficient for this single-threaded fake.
             invocations: RefCell::new(Vec::new()),
         }
     }

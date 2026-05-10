@@ -28,6 +28,7 @@ syn = { version = "2", features = ["full", "parsing", "visit"] }
 quote = "1"
 toml = "0.8"
 proc-macro2 = { version = "1", features = ["span-locations"] }
+thiserror = "1"
 
 [dev-dependencies]
 tempfile = "3"

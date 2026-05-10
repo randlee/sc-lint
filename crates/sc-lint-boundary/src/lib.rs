@@ -24,6 +24,7 @@ use syn::Item;
 use syn::Receiver;
 use syn::Type;
 use syn::visit::Visit;
+use thiserror::Error;
 
 mod analysis;
 mod graph;
@@ -34,6 +35,30 @@ mod tests;
 
 const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
+const SC_LINT_BOUNDARY_TOOL: &str = "sc-lint-boundary";
+const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Debug, Error)]
+pub enum BoundaryError {
+    #[error("failed to analyze portability for root `{}`: {source:#}", root.display())]
+    PortabilityAnalysis {
+        root: PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
+    #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
+    ScannedCrateCount {
+        root: PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
+    #[error("failed to build workspace graph for root `{}`: {source:#}", root.display())]
+    WorkspaceGraphBuild {
+        root: PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
+}
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 struct RuleDefaults {
@@ -81,11 +106,67 @@ pub struct ExportGraphOptions {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]
+pub struct CrateId(String);
+
+impl CrateId {
+    /// Panics in debug builds if the input string is empty.
+    pub fn new(value: impl Into<String>) -> Self {
+        let value = value.into();
+        debug_assert!(!value.is_empty(), "crate ids must not be empty");
+        Self(value)
+    }
+
+    pub fn from_parts(package_name: &str, target_name: &str) -> Self {
+        Self::new(format!("crate::{package_name}::{target_name}"))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for CrateId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Deref for CrateId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for CrateId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<CrateId> for String {
+    fn from(value: CrateId) -> Self {
+        value.0
+    }
+}
+
+impl From<&CrateId> for String {
+    fn from(value: &CrateId) -> Self {
+        value.as_str().to_string()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(transparent)]
 pub struct NodeId(String);
 
 impl NodeId {
+    /// Panics in debug builds if the input string is empty.
     pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        let value = value.into();
+        debug_assert!(!value.is_empty(), "node ids must not be empty");
+        Self(value)
     }
 
     pub fn as_str(&self) -> &str {
@@ -115,13 +196,19 @@ impl fmt::Display for NodeId {
 
 impl From<String> for NodeId {
     fn from(value: String) -> Self {
-        Self(value)
+        Self::new(value)
     }
 }
 
 impl From<&str> for NodeId {
     fn from(value: &str) -> Self {
-        Self(value.to_string())
+        Self::new(value)
+    }
+}
+
+impl From<CrateId> for NodeId {
+    fn from(value: CrateId) -> Self {
+        Self::new(value.0)
     }
 }
 
@@ -142,8 +229,11 @@ impl PartialEq<String> for NodeId {
 pub struct OwnerId(String);
 
 impl OwnerId {
+    /// Panics in debug builds if the input string is empty.
     pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+        let value = value.into();
+        debug_assert!(!value.is_empty(), "owner ids must not be empty");
+        Self(value)
     }
 
     pub fn as_str(&self) -> &str {
@@ -173,13 +263,13 @@ impl fmt::Display for OwnerId {
 
 impl From<String> for OwnerId {
     fn from(value: String) -> Self {
-        Self(value)
+        Self::new(value)
     }
 }
 
 impl From<&str> for OwnerId {
     fn from(value: &str) -> Self {
-        Self(value.to_string())
+        Self::new(value)
     }
 }
 
@@ -422,7 +512,7 @@ struct TargetContext {
     package_name: String,
     target_name: String,
     manifest_path: String,
-    crate_id: String,
+    crate_id: CrateId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -452,6 +542,10 @@ struct GraphBuilder {
 
 impl GraphBuilder {
     fn add_node(&mut self, node: GraphNode) {
+        debug_assert!(
+            !node.package.is_empty(),
+            "graph nodes must carry a non-empty package name"
+        );
         if !self.nodes.iter().any(|existing| existing.id == node.id) {
             self.nodes.push(node);
         }
@@ -477,7 +571,7 @@ impl GraphBuilder {
     ) {
         let crate_id = graph::crate_id(package_name, target_name);
         self.add_node(GraphNode {
-            id: NodeId::new(crate_id),
+            id: NodeId::from(crate_id),
             kind: "crate",
             label: target_name.to_string(),
             visibility: None,
@@ -502,8 +596,8 @@ impl GraphBuilder {
         });
 
         GraphExport {
-            tool: "sc-lint-boundary",
-            version: env!("CARGO_PKG_VERSION"),
+            tool: SC_LINT_BOUNDARY_TOOL,
+            version: SC_LINT_BOUNDARY_VERSION,
             schema_version: SC_LINT_SCHEMA_VERSION,
             nodes: self.nodes,
             edges: self.edges,
@@ -511,20 +605,22 @@ impl GraphBuilder {
     }
 }
 
-pub fn analyze_workspace(options: &AnalyzeOptions) -> Result<FindingsReport> {
+pub fn analyze_workspace(
+    options: &AnalyzeOptions,
+) -> std::result::Result<FindingsReport, BoundaryError> {
     if options.rule == Some(RuleFilter::Portability) {
-        let findings = portability::analyze_portability(&options.root).with_context(|| {
-            format!(
-                "failed to analyze portability for root: {}",
-                options.root.display()
-            )
+        let findings = portability::analyze_portability(&options.root).map_err(|source| {
+            BoundaryError::PortabilityAnalysis {
+                root: options.root.clone(),
+                source,
+            }
         })?;
         let scanned_crates =
-            portability::count_scanned_crates(&options.root).with_context(|| {
-                format!(
-                    "failed to count scanned crates for root: {}",
-                    options.root.display()
-                )
+            portability::count_scanned_crates(&options.root).map_err(|source| {
+                BoundaryError::ScannedCrateCount {
+                    root: options.root.clone(),
+                    source,
+                }
             })?;
         let status = if findings.iter().any(analysis::finding_is_failure) {
             ReportStatus::Fail
@@ -532,8 +628,8 @@ pub fn analyze_workspace(options: &AnalyzeOptions) -> Result<FindingsReport> {
             ReportStatus::Pass
         };
         return Ok(FindingsReport {
-            tool: "sc-lint-boundary",
-            version: env!("CARGO_PKG_VERSION"),
+            tool: SC_LINT_BOUNDARY_TOOL,
+            version: SC_LINT_BOUNDARY_VERSION,
             schema_version: SC_LINT_SCHEMA_VERSION,
             status,
             scanned_crates,
@@ -541,11 +637,11 @@ pub fn analyze_workspace(options: &AnalyzeOptions) -> Result<FindingsReport> {
         });
     }
 
-    let graph = graph::build_workspace_graph(&options.root).with_context(|| {
-        format!(
-            "failed to build workspace graph for root: {}",
-            options.root.display()
-        )
+    let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
+        BoundaryError::WorkspaceGraphBuild {
+            root: options.root.clone(),
+            source,
+        }
     })?;
     let mut findings = Vec::new();
     let filter = options.rule;
@@ -581,8 +677,8 @@ pub fn analyze_workspace(options: &AnalyzeOptions) -> Result<FindingsReport> {
     };
 
     Ok(FindingsReport {
-        tool: "sc-lint-boundary",
-        version: env!("CARGO_PKG_VERSION"),
+        tool: SC_LINT_BOUNDARY_TOOL,
+        version: SC_LINT_BOUNDARY_VERSION,
         schema_version: SC_LINT_SCHEMA_VERSION,
         status,
         scanned_crates,
@@ -590,12 +686,14 @@ pub fn analyze_workspace(options: &AnalyzeOptions) -> Result<FindingsReport> {
     })
 }
 
-pub fn export_workspace_graph(options: &ExportGraphOptions) -> Result<GraphExport> {
-    graph::build_workspace_graph(&options.root).with_context(|| {
-        format!(
-            "failed to build workspace graph for root: {}",
-            options.root.display()
-        )
+pub fn export_workspace_graph(
+    options: &ExportGraphOptions,
+) -> std::result::Result<GraphExport, BoundaryError> {
+    graph::build_workspace_graph(&options.root).map_err(|source| {
+        BoundaryError::WorkspaceGraphBuild {
+            root: options.root.clone(),
+            source,
+        }
     })
 }
 
