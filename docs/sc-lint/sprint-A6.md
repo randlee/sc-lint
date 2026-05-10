@@ -30,6 +30,8 @@ item semantics can stabilize independently.
 - `REQ-PRODUCT-014`
 - `REQ-PRODUCT-015`
 - `REQ-PRODUCT-017`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -89,6 +91,17 @@ item semantics can stabilize independently.
    Required doc or boundary updates:
    - keep the boundary-enforcement model aligned with actual duplicate
      behavior
+
+4. Plan analyzer logging for `sc-runtime`
+   Development work:
+   - define `sc-runtime` analyzer entry logging for delegated analyze calls
+   - define completion logging with verdict and finding count
+   - keep logger lifecycle ownership in the top-level CLI
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-runtime` logging
+     pattern
 
 ## Split Recommendation
 

@@ -48,6 +48,11 @@ must leave the product with a real top-level binary and a vetted
 - `REQ-CLI-008C`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
+- `REQ-LOG-001`
+- `REQ-LOG-002`
+- `REQ-LOG-003`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -113,6 +118,19 @@ must leave the product with a real top-level binary and a vetted
    Required doc or boundary updates:
    - keep `docs/sc-lint/cli-contract.md` aligned with the implemented field
      names and error-code families
+
+3. Plan structured logging bootstrap
+   Development work:
+   - add the `sc-observability` path dependency plan for the `sc-lint` crate
+   - define top-level logger initialization ownership at CLI startup
+   - define invocation entry, completion, and per-error event logging for
+     top-level CLI commands
+   Required tests:
+   - doc review for service-name, log-root, and sink-policy consistency
+   Required doc or boundary updates:
+   - add `docs/sc-lint/logging.md`
+   - update `docs/requirements.md`
+   - update `boundaries/planning.toml`
 
 ## Split Recommendation
 

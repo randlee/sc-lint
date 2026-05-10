@@ -47,6 +47,9 @@ utility extraction work begins.
 - `REQ-CLI-008C`
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
+- `REQ-LOG-001`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -105,6 +108,17 @@ utility extraction work begins.
    - backend execution failure tests
    Required doc or boundary updates:
    - update CLI contract docs if the normalization rules need narrower wording
+
+3. Plan dispatch-seam logging
+   Development work:
+   - log delegated backend dispatch start for the active command
+   - log the normalized delegated result summary after completion
+   - keep backend logging as a CLI-owned concern rather than a backend-owned
+     logger initialization path
+   Required tests:
+   - doc review for dispatch/event-shape consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with delegated dispatch behavior
 
 ## Split Recommendation
 

@@ -32,6 +32,8 @@ crate, moves the existing portability implementation out of
 - `REQ-PRODUCT-015A`
 - `REQ-PRODUCT-015B`
 - `REQ-CLI-007F`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -107,6 +109,17 @@ crate, moves the existing portability implementation out of
    Required doc or boundary updates:
    - keep the top-level CLI docs aligned so primary lint targets map to the
      backend crate boundary
+
+5. Plan analyzer logging baseline for `sc-boundary`
+   Development work:
+   - define `sc-boundary` analyzer entry logging for delegated analyze calls
+   - define completion logging with verdict and finding count
+   - keep emission ownership in the top-level CLI logging layer
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-boundary` logging
+     pattern
 
 ## Split Recommendation
 
