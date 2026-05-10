@@ -23,7 +23,7 @@ pub struct Cli {
 }
 
 #[derive(Debug, Clone, Subcommand)]
-pub(crate) enum Command {
+pub enum Command {
     Lint {
         #[arg(value_enum)]
         target: LintTarget,
@@ -80,7 +80,7 @@ impl OutputMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(crate) enum LintTarget {
+pub enum LintTarget {
     #[value(name = "sc-boundary")]
     ScBoundary,
     #[value(name = "sc-portability")]
@@ -120,7 +120,7 @@ impl LintTarget {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(crate) enum ViewTarget {
+pub enum ViewTarget {
     #[value(name = "graph")]
     Graph,
     #[value(name = "findings")]

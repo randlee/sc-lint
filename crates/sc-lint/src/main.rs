@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+mod consts;
 mod logging;
 
 use std::process::ExitCode;
@@ -8,11 +10,9 @@ use sc_lint::LoadedConfig;
 use sc_lint::ParsedInvocation;
 
 fn main() -> ExitCode {
-    match sc_lint::parse_args(std::env::args_os()) {
+    match sc_lint::ParsedInvocation::parse(std::env::args_os()) {
         ParsedInvocation::Ready(cli) => run_with_logging(cli),
-        ParsedInvocation::Immediate(outcome) => {
-            sc_lint::write_rendered_output(outcome.rendered, outcome.exit_code)
-        }
+        ParsedInvocation::Immediate(outcome) => outcome.rendered.write(outcome.exit_code),
     }
 }
 
@@ -20,15 +20,17 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
     let context = match CommandContext::from_cli(&cli) {
         Ok(context) => context,
         Err(error) => {
-            let rendered = sc_lint::render_failure("cli.parse_error", cli.json, &error);
-            return sc_lint::write_rendered_output(rendered, error.exit_code());
+            let rendered =
+                sc_lint::RenderedOutput::render_failure("cli.parse_error", cli.json, &error);
+            return rendered.write(error.exit_code());
         }
     };
     let loaded_config = match LoadedConfig::load(&cli, &context) {
         Ok(loaded_config) => loaded_config,
         Err(error) => {
-            let rendered = sc_lint::render_failure(context.command_id(), cli.json, &error);
-            return sc_lint::write_rendered_output(rendered, error.exit_code());
+            let rendered =
+                sc_lint::RenderedOutput::render_failure(context.command_id(), cli.json, &error);
+            return rendered.write(error.exit_code());
         }
     };
 
@@ -37,8 +39,9 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
     let logger = match logging::initialize_logger(&observed, &cli) {
         Ok(logger) => Some(logger),
         Err(error) => {
-            let rendered = sc_lint::render_failure(context.command_id(), cli.json, &error);
-            return sc_lint::write_rendered_output(rendered, error.exit_code());
+            let rendered =
+                sc_lint::RenderedOutput::render_failure(context.command_id(), cli.json, &error);
+            return rendered.write(error.exit_code());
         }
     };
 
@@ -50,7 +53,7 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
         }
     }
 
-    let outcome = sc_lint::execute(context.clone(), &loaded_config, cli.json);
+    let outcome = sc_lint::ExecutionOutcome::run(context.clone(), &loaded_config, cli.json);
 
     if let Some(logger) = logger.as_ref() {
         if let Some(dispatch) = outcome.dispatch.as_ref() {
@@ -70,5 +73,5 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
         logging::shutdown(logger);
     }
 
-    sc_lint::write_rendered_output(outcome.rendered, outcome.exit_code)
+    outcome.rendered.write(outcome.exit_code)
 }

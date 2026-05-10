@@ -1,11 +1,8 @@
-#[allow(dead_code)]
-#[path = "consts.rs"]
-mod consts;
-
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use crate::consts;
 use sc_lint::Cli;
 use sc_lint::CliError;
 use sc_lint::CommandContext;
@@ -302,6 +299,9 @@ fn dispatch_event(
         Ok(event) => event,
         Err(error) => {
             debug_assert!(false, "failed to build log event: {error}");
+            #[cfg(debug_assertions)]
+            eprintln!("[sc-lint] dispatch_event: build_event error: {:?}", error);
+            // telemetry failures are intentionally discarded in release — this is a display-layer tool
             return;
         }
     };

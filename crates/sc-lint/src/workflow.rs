@@ -367,7 +367,7 @@ fn lint_profile_plan(
             python_step(repo_root, "spell", "lint", ".just/lint_codespell.py"),
             python_step(repo_root, "pytests", "lint", ".just/run_pytests.py"),
         ],
-        LintProfile::Full | LintProfile::Ci => vec![
+        LintProfile::Full => vec![
             cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
             cargo_step(
                 "clippy",
@@ -399,6 +399,40 @@ fn lint_profile_plan(
                 "lint",
                 ".just/lint_sc_portability.py",
             ),
+        ],
+        LintProfile::Ci => vec![
+            cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
+            cargo_step(
+                "clippy",
+                "lint",
+                [
+                    "clippy",
+                    "--workspace",
+                    "--all-targets",
+                    "--",
+                    "-D",
+                    "warnings",
+                ],
+            ),
+            python_step(repo_root, "deny", "lint", ".just/lint_cargo_deny.py"),
+            python_step(repo_root, "shear", "lint", ".just/lint_cargo_shear.py"),
+            python_step(repo_root, "version", "lint", ".just/check_version_sync.py"),
+            python_step(repo_root, "manifests", "lint", ".just/lint_manifests.py"),
+            python_step(repo_root, "spell", "lint", ".just/lint_codespell.py"),
+            python_step(repo_root, "pytests", "lint", ".just/run_pytests.py"),
+            python_step(
+                repo_root,
+                "sc-boundary",
+                "lint",
+                ".just/lint_sc_boundary.py",
+            ),
+            python_step(
+                repo_root,
+                "sc-portability",
+                "lint",
+                ".just/lint_sc_portability.py",
+            ),
+            // REQ-CLI-015: the CI profile never includes xwin-only steps.
         ],
     };
 

@@ -15,6 +15,7 @@ mod tests;
 use std::ffi::OsString;
 use std::process::ExitCode;
 
+#[cfg(test)]
 use clap::CommandFactory;
 use clap::Parser;
 use serde_json::Value;
@@ -22,21 +23,19 @@ use serde_json::Value;
 pub use cli::CheckTarget;
 pub use cli::Cli;
 pub use cli::ClippyTarget;
-pub(crate) use cli::Command;
+pub use cli::Command;
 pub use cli::LintProfile;
-pub(crate) use cli::LintTarget;
+pub use cli::LintTarget;
 pub use cli::OutputMode;
-pub(crate) use cli::ViewTarget;
+pub use cli::ViewTarget;
 pub use command::CommandContext;
 pub use command::DispatchTelemetry;
 pub use config::LoadedConfig;
-#[allow(unused_imports)]
-pub(crate) use config::RepoRoot;
 pub use contract::CommandEnvelope;
 pub use error::CliError;
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use error::CliErrorKind;
-pub(crate) use render::RenderedOutput;
+pub use render::RenderedOutput;
 pub use workflow::WINDOWS_XWIN_TARGET;
 
 pub struct ImmediateOutcome {
@@ -49,6 +48,26 @@ pub enum ParsedInvocation {
     Immediate(ImmediateOutcome),
 }
 
+impl ParsedInvocation {
+    pub fn parse<I, T>(args: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<OsString> + Clone,
+    {
+        parse_args(args)
+    }
+}
+
+impl RenderedOutput {
+    pub fn render_failure(command_id: &str, json_mode: bool, error: &CliError) -> Self {
+        render_failure(command_id, json_mode, error)
+    }
+
+    pub fn write(self, exit_code: u8) -> ExitCode {
+        write_rendered_output(self, exit_code)
+    }
+}
+
 pub struct ExecutionOutcome {
     pub context: CommandContext,
     pub rendered: RenderedOutput,
@@ -59,46 +78,13 @@ pub struct ExecutionOutcome {
     pub dispatch: Option<DispatchTelemetry>,
 }
 
-#[allow(dead_code)]
-pub(crate) fn run<I, T>(args: I) -> ExitCode
-where
-    I: IntoIterator<Item = T>,
-    T: Into<OsString> + Clone,
-{
-    match parse_args(args) {
-        ParsedInvocation::Ready(cli) => {
-            let context = match CommandContext::from_cli(&cli) {
-                Ok(context) => context,
-                Err(error) => {
-                    let rendered = render_error(
-                        "cli.parse_error",
-                        OutputMode::from_json_flag(cli.json),
-                        &error,
-                    );
-                    return write_rendered_output(rendered, error.exit_code());
-                }
-            };
-            let loaded_config = match LoadedConfig::load(&cli, &context) {
-                Ok(loaded_config) => loaded_config,
-                Err(error) => {
-                    let rendered = render_error(
-                        context.command_id(),
-                        OutputMode::from_json_flag(cli.json),
-                        &error,
-                    );
-                    return write_rendered_output(rendered, error.exit_code());
-                }
-            };
-            let outcome = execute(context, &loaded_config, cli.json);
-            write_rendered_output(outcome.rendered, outcome.exit_code)
-        }
-        ParsedInvocation::Immediate(outcome) => {
-            write_rendered_output(outcome.rendered, outcome.exit_code)
-        }
+impl ExecutionOutcome {
+    pub fn run(context: CommandContext, loaded_config: &LoadedConfig, json_mode: bool) -> Self {
+        execute(context, loaded_config, json_mode)
     }
 }
 
-pub fn parse_args<I, T>(args: I) -> ParsedInvocation
+pub(crate) fn parse_args<I, T>(args: I) -> ParsedInvocation
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
@@ -110,7 +96,7 @@ where
     }
 }
 
-pub fn execute(
+pub(crate) fn execute(
     context: CommandContext,
     loaded_config: &LoadedConfig,
     json_mode: bool,
@@ -193,11 +179,15 @@ fn render_error(command_id: &str, output_mode: OutputMode, error: &CliError) -> 
     }
 }
 
-pub fn render_failure(command_id: &str, json_mode: bool, error: &CliError) -> RenderedOutput {
+pub(crate) fn render_failure(
+    command_id: &str,
+    json_mode: bool,
+    error: &CliError,
+) -> RenderedOutput {
     render_error(command_id, OutputMode::from_json_flag(json_mode), error)
 }
 
-pub fn write_rendered_output(rendered: RenderedOutput, exit_code: u8) -> ExitCode {
+pub(crate) fn write_rendered_output(rendered: RenderedOutput, exit_code: u8) -> ExitCode {
     if let Some(stdout) = rendered.stdout {
         println!("{stdout}");
     }
@@ -207,7 +197,7 @@ pub fn write_rendered_output(rendered: RenderedOutput, exit_code: u8) -> ExitCod
     ExitCode::from(exit_code)
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn help_text() -> String {
     let mut command = Cli::command();
     let mut bytes = Vec::new();

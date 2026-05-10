@@ -542,6 +542,10 @@ struct GraphBuilder {
 
 impl GraphBuilder {
     fn add_node(&mut self, node: GraphNode) {
+        debug_assert!(
+            !node.package.is_empty(),
+            "graph nodes must carry a non-empty package name"
+        );
         if !self.nodes.iter().any(|existing| existing.id == node.id) {
             self.nodes.push(node);
         }
