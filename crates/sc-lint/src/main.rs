@@ -6,6 +6,7 @@ use std::time::Instant;
 pub use sc_lint::Cli;
 pub use sc_lint::CliError;
 pub use sc_lint::WINDOWS_XWIN_TARGET;
+use sc_lint::consts;
 
 mod command {
     pub use sc_lint::CommandContext;
