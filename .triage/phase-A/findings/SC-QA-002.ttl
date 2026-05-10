@@ -1,0 +1,109 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-002>
+  a triage:Finding ;
+  triage:findingId "SC-QA-002" ;
+  triage:title "docs/sc-lint/README.md still lists SCB-RUNTIME-001/002 as pending future work" ;
+  triage:description "docs/sc-lint/README.md section 'Current code moves required for the planned partition' at lines 165-168 lists SCB-RUNTIME-001 and SCB-RUNTIME-002 as pending future work. These rules were implemented in sprint A5 and are no longer pending. Sprint-A5.md requires README.md as a Required Document Update." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/4> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/1fa98cf> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/1fa98cf> .
+
+<urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/README.md" ;
+  triage:line 159 ;
+  triage:snippet "  - `SCB-RUNTIME-001`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1fa98cf" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1fa98cf> .
+
+<urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/README.md" ;
+  triage:line 160 ;
+  triage:snippet "  - `SCB-RUNTIME-002`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1fa98cf" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1fa98cf> .
+
+<urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/3>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/README.md" ;
+  triage:line 183 ;
+  triage:snippet "  - `SCB-RUNTIME-001`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1fa98cf" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1fa98cf> .
+
+<urn:atm:triage:occurrence/SC-QA-002/integration-phase-A/4>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/README.md" ;
+  triage:line 184 ;
+  triage:snippet "  - `SCB-RUNTIME-002`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1fa98cf" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1fa98cf> .
+
+<urn:atm:triage:worktree/sprint-A4/aac4dea>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:orderIndex 4 .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 .
+
+<urn:atm:triage:worktree/integration-phase-A/1fa98cf>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "1fa98cf" ;
+  triage:orderIndex 0 .

@@ -14,6 +14,29 @@ pub(crate) struct BoundaryInventory {
     pub(crate) planning: PlanningMetadata,
 }
 
+impl BoundaryInventory {
+    pub(crate) fn summary(&self) -> InventorySummary {
+        InventorySummary {
+            boundary_count: self.records.len(),
+            planned_item_count: self.planning.planned_items.len(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct InventorySummary {
+    pub(crate) boundary_count: usize,
+    pub(crate) planned_item_count: usize,
+}
+
+impl InventorySummary {
+    pub(crate) fn recommended_finding_capacity(self) -> usize {
+        self.boundary_count
+            .saturating_add(self.planned_item_count)
+            .max(8)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct BoundaryRecord {
@@ -41,10 +64,10 @@ pub(crate) struct PublicSection {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ImplementationSection {
     #[serde(rename = "type")]
-    pub(crate) implementation_type: String,
-    pub(crate) module: String,
+    pub(crate) implementation_type: Option<String>,
+    pub(crate) module: Option<String>,
     pub(crate) visibility: Visibility,
-    pub(crate) constructor: Constructor,
+    pub(crate) constructor: Option<Constructor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -114,6 +137,7 @@ pub(crate) struct PlannedItem {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Visibility {
     Public,
+    TraitOnly,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -161,6 +185,7 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
 
     for path in boundary_paths {
         let record: BoundaryRecord = parse_toml_file(&path)?;
+        validate_boundary_schema(&record, &path)?;
         validate_boundary_path(&record, &path, &boundaries_root)?;
         if let Some(previous_path) =
             seen_boundary_ids.insert(record.boundary_id.clone(), path.clone())
@@ -266,6 +291,70 @@ fn validate_boundary_path(
             "boundary file `{}` must use boundaries/<owner-package>/<boundary>.toml layout",
             path.display()
         );
+    }
+
+    Ok(())
+}
+
+fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> {
+    if record.public.facade.trim().is_empty() {
+        anyhow::bail!(
+            "boundary `{}` in `{}` must define a non-empty public.facade",
+            record.boundary_id,
+            path.display()
+        );
+    }
+
+    match record.implementation.visibility {
+        Visibility::Public => {
+            if record
+                .implementation
+                .implementation_type
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                anyhow::bail!(
+                    "boundary `{}` in `{}` must define implementation.type for public visibility",
+                    record.boundary_id,
+                    path.display()
+                );
+            }
+            if record
+                .implementation
+                .module
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty())
+            {
+                anyhow::bail!(
+                    "boundary `{}` in `{}` must define implementation.module for public visibility",
+                    record.boundary_id,
+                    path.display()
+                );
+            }
+            if record.implementation.constructor.is_none() {
+                anyhow::bail!(
+                    "boundary `{}` in `{}` must define implementation.constructor for public visibility",
+                    record.boundary_id,
+                    path.display()
+                );
+            }
+        }
+        Visibility::TraitOnly => {
+            if record.implementation.implementation_type.is_some() {
+                anyhow::bail!(
+                    "boundary `{}` in `{}` must omit implementation.type when visibility is trait_only",
+                    record.boundary_id,
+                    path.display()
+                );
+            }
+            if record.implementation.module.is_some() {
+                anyhow::bail!(
+                    "boundary `{}` in `{}` must omit implementation.module when visibility is trait_only",
+                    record.boundary_id,
+                    path.display()
+                );
+            }
+        }
     }
 
     Ok(())
@@ -401,6 +490,54 @@ expires_when = "sprint_before_current"
     }
 
     #[test]
+    fn allows_trait_only_records_to_omit_type_and_module() {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.write(
+            "boundaries/sc-lint-directives/trait-only.toml",
+            r#"
+boundary_id = "BOUNDARY-DirectiveTraitSurface"
+owner_package = "sc-lint-directives"
+owner_crate_path = "sc_lint_directives"
+name = "DirectiveTraitSurface"
+
+[public]
+facade = "Directive"
+
+[implementation]
+visibility = "trait_only"
+
+[composition]
+roots = ["Directive"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "concrete_landed"
+"#,
+        );
+
+        let inventory =
+            load_boundary_inventory(fixture.root()).expect("trait-only inventory loads");
+        assert_eq!(inventory.records.len(), 2);
+    }
+
+    #[test]
     fn rejects_unknown_boundary_fields() {
         let fixture = InventoryFixture::new();
         fixture.write_valid_inventory();
@@ -449,6 +586,54 @@ state = "concrete_landed"
 
         let error = load_boundary_inventory(fixture.root()).expect_err("schema fails");
         assert!(error.to_string().contains("failed to parse TOML file"));
+    }
+
+    #[test]
+    fn rejects_public_visibility_without_type_and_module() {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.write(
+            "boundaries/sc-lint-directives/missing-impl-shape.toml",
+            r#"
+boundary_id = "BOUNDARY-DirectiveModel"
+owner_package = "sc-lint-directives"
+owner_crate_path = "sc_lint_directives"
+name = "DirectiveModel"
+
+[public]
+facade = "Directive"
+
+[implementation]
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["Directive"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "concrete_landed"
+"#,
+        );
+
+        let error = load_boundary_inventory(fixture.root()).expect_err("public impl shape fails");
+        assert!(error.to_string().contains("implementation.type"));
     }
 
     #[test]

@@ -184,21 +184,18 @@ specialized backend tools and mixed Rust/Python implementations.
   The planned CLI contract must explicitly define:
   - `Cli`
   - `Command`
-  - `LintProfile`
-  - `OutputMode`
   - `CommandEnvelope<T>`
   - `CliError`
 
 - `REQ-CLI-008B`
-  `LintProfile` must define the product-level profile values:
+  The CLI implementation must define the product-level profile values:
   - `Fast`
   - `Full`
   - `Ci`
 
 - `REQ-CLI-008C`
-  `OutputMode` must define:
-  - `Human`
-  - `Json`
+  The CLI implementation must define both human and JSON output modes for the
+  top-level command surface.
 
 - `REQ-CLI-008D`
   `CliError` must be documented as a structured machine-readable contract with

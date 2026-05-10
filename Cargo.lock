@@ -642,6 +642,7 @@ dependencies = [
  "clap",
  "dunce",
  "sc-lint-boundary",
+ "sc-lint-schema",
  "sc-observability",
  "serde",
  "serde_json",
@@ -667,9 +668,9 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "clap",
- "proc-macro2",
  "quote",
  "sc-lint-directives",
+ "sc-lint-schema",
  "serde",
  "serde_json",
  "syn",
@@ -684,6 +685,47 @@ version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
+]
+
+[[package]]
+name = "sc-lint-portability"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "clap",
+ "proc-macro2",
+ "quote",
+ "sc-lint-schema",
+ "serde",
+ "serde_json",
+ "syn",
+ "tempfile",
+ "thiserror 1.0.69",
+ "toml",
+]
+
+[[package]]
+name = "sc-lint-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "clap",
+ "proc-macro2",
+ "sc-lint-schema",
+ "serde",
+ "serde_json",
+ "syn",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "sc-lint-schema"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

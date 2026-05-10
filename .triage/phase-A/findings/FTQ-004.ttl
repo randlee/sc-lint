@@ -1,0 +1,105 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/FTQ-004>
+  a triage:Finding ;
+  triage:findingId "FTQ-004" ;
+  triage:title "xwin_logging test not #[serial] creates PATH TOCTOU race" ;
+  triage:description "crates/sc-lint/tests/logging_integration.rs: xwin_logging_records_target_metadata_for_success_and_error_paths reads std::env::var_os(\"PATH\") without holding a serial lock, creating a TOCTOU race with #[serial]-marked tests that may modify the process environment. Fix: mark this test #[serial]." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "FTQ" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-004/sprint-A4/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-004/sprint-A5/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-004/sprint-A6/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-004/sprint-A7/1> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A4/aac4dea> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A5/a392088> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A6/8544597> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/8eee490> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+<urn:atm:triage:occurrence/FTQ-004/sprint-A4/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 82 ;
+  triage:snippet "#[test]\\n#[cfg_attr(windows, ignore = ...)]\\nfn xwin_logging_records_target_metadata_for_success_and_error_paths() { // missing #[serial]; reads PATH at line 88" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/aac4dea> .
+
+<urn:atm:triage:occurrence/FTQ-004/sprint-A5/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 107 ;
+  triage:snippet "#[test]\\n#[cfg_attr(windows, ignore = ...)]\\nfn xwin_logging_records_target_metadata_for_success_and_error_paths() { // missing #[serial]; reads PATH at line 113" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/FTQ-004/sprint-A6/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 83 ;
+  triage:snippet "#[test]\\n#[cfg_attr(windows, ignore = ...)]\\nfn xwin_logging_records_target_metadata_for_success_and_error_paths() { // missing #[serial]; reads PATH at line 89" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:occurrence/FTQ-004/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 83 ;
+  triage:snippet "#[test]\\n#[cfg_attr(windows, ignore = ...)]\\nfn xwin_logging_records_target_metadata_for_success_and_error_paths() { // missing #[serial]; reads PATH at line 89" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+<urn:atm:triage:worktree/sprint-A4/aac4dea>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:orderIndex 4 .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 .

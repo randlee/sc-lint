@@ -105,10 +105,14 @@ The product should support both:
 - `REQ-PRODUCT-004A`
   `sc-lint-portability` must be the home for shared AST-sensitive
   platform/OS portability rules.
+  Current A.4 implementation status:
+  `PORT-001` through `PORT-005` are assigned to `sc-lint-portability`.
 
 - `REQ-PRODUCT-004B`
   `sc-lint-runtime` must be the home for shared AST-sensitive std
   runtime/concurrency correctness rules.
+  The release-1 primary top-level target for this family is
+  `sc-lint lint sc-runtime`.
 
 - `REQ-PRODUCT-004C`
   Tokio-specific runtime rules must not land in `sc-lint-runtime` by default;

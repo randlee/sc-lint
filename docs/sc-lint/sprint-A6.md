@@ -122,6 +122,14 @@ Keep A.6 together. Loader, schema validation, and duplicate handling form one
 coherent contract surface and should stabilize before manifest-policy work
 starts.
 
+## Sub-Task 4 Review Note
+
+The approved A.6 logging seam keeps boundary-inventory loading logger-free
+inside `sc-lint-boundary`. `crates/sc-lint/src/logging.rs` remains the only
+binary-side `sc-observability` integration module for the CLI, and inventory
+loader entry/exit/error events stay top-level concerns emitted only after
+normalization through `CommandEnvelope<T>` or `CliError`.
+
 ## Acceptance Criteria
 
 - `sc-lint-boundary` loads TOML boundary inventories directly

@@ -6,7 +6,7 @@ These points are considered settled for the initial spike.
 
 ### Crate split
 
-Current implemented crates:
+Current implemented foundation crates:
 
 - `sc-lint-directives`
   - shared directive parsing/types
@@ -17,25 +17,25 @@ Current implemented crates:
   - proc-macro attribute crate
   - currently shares the workspace `0.1.0` version line
 
-Planned next crates:
+Current implemented CLI and analyzer crates:
 
 - `sc-lint`
   - top-level CLI crate
   - stable user-facing command surface
   - command parsing, config loading, output normalization, tool dispatch
   - canonical AI-first machine contract for non-interactive commands
-  - planned lint profiles:
+  - implemented lint profiles:
     - `fast`
     - `full`
     - `ci`
-  - planned top-level CI-equivalent command:
+  - implemented top-level CI-equivalent command:
     - `sc-lint ci`
-  - planned Windows preflight commands when `cargo xwin` is installed:
+  - implemented Windows preflight commands when `cargo xwin` is installed:
     - `sc-lint check xwin`
     - `sc-lint clippy xwin`
 - `sc-lint-portability`
   - platform/OS portability analyzer crate
-  - planned first moves/imports:
+  - current owned rules:
     - `PORT-001`
     - `PORT-002`
     - `PORT-003`
@@ -43,7 +43,7 @@ Planned next crates:
     - `PORT-005`
 - `sc-lint-runtime`
   - std runtime/concurrency analyzer crate
-  - planned first imports:
+  - current owned rules:
     - `SCB-RUNTIME-001`
     - `SCB-RUNTIME-002`
 
@@ -79,25 +79,24 @@ Current scaffold state:
   - first owner-graph cycle rules in place now
   - first boundary enforcement rules in place now
 - `sc-lint-portability`
-  - planned
-  - implementation not started yet
-- `sc-lint-runtime`
-  - planned
-  - implementation not started yet
+  - created
+  - owns the shared portability rule family now
 - `sc-lint`
-  - planned
-  - detailed CLI requirements/architecture defined
-  - implementation not started yet
+  - created
+  - delegated backend contract paths implemented
+- `sc-lint-runtime`
+  - created
+  - runtime rule imports implemented
 - `sc-lint-tokio`
   - reserved
   - no implementation scope yet
 
 ### Current code moves required
 
-The current implementation still contains portability rules inside
-`sc-lint-boundary`.
+The current implementation now places the shared portability rule family in
+`sc-lint-portability`.
 
-Planned moves:
+Current completed move:
 
 - from `crates/sc-lint-boundary/src/portability.rs`
   - `PORT-001`
@@ -106,16 +105,17 @@ Planned moves:
   - `PORT-004`
   - `PORT-005`
   - target crate: `sc-lint-portability`
-- from the current `atm-core` proving implementation
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
-  - target crate: `sc-lint-runtime`
 
 Wrapper retargets required after those moves:
 
 - `.just/lint_sc_portability.py`
 - `.just/run_lint.py`
 - help text and README references for `sc-portability`
+
+Wrapper retarget state after A.5:
+
+- `sc-portability` wrappers now delegate to `sc-lint-portability`
+- `lint sc-runtime` now delegates to `sc-lint-runtime`
 
 Planned primary CLI target mapping:
 
@@ -224,7 +224,6 @@ Current implementation status:
   - `forbid_external_impls` enforcement
 - deferred:
   - additional boundary declarations beyond current attribute set
-  - postmortem portability/runtime imports until their dedicated crates exist
 
 ## What Is Explicitly Deferred
 
@@ -326,12 +325,9 @@ orchestration must preserve backend-owned rule policy rather than replacing it.
 The next planned tool-distribution work after the current implementation
 branch merges is:
 
-1. create `sc-lint-portability`
-2. move existing `PORT-001/002/003` into `sc-lint-portability`
-3. import `PORT-004/005` into `sc-lint-portability`
-4. create `sc-lint-runtime`
-5. move `SCB-RUNTIME-001/002` into `sc-lint-runtime`
-6. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
+1. keep portability and runtime wrapper delegation aligned to their dedicated
+   crates
+2. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
    implementation
 
 The next planned boundary-enforcement work after that is:

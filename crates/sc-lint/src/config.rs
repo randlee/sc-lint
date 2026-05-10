@@ -67,7 +67,7 @@ impl LoadedConfig {
         clippy::result_large_err,
         reason = "Config loading failures are part of the stable top-level CliError contract."
     )]
-    pub(crate) fn load(cli: &Cli, context: &CommandContext) -> Result<Self, CliError> {
+    pub fn load(cli: &Cli, context: &CommandContext) -> Result<Self, CliError> {
         if !context.requires_repo_root() {
             return Ok(Self {
                 repo_root: None,
@@ -117,7 +117,7 @@ impl LoadedConfig {
         })
     }
 
-    pub(crate) fn repo_root(&self) -> Option<&Path> {
+    pub fn repo_root(&self) -> Option<&Path> {
         self.repo_root.as_ref().map(RepoRoot::as_path)
     }
 
@@ -125,7 +125,7 @@ impl LoadedConfig {
         clippy::result_large_err,
         reason = "Commands that require a repo root must surface failures through the shared CliError contract."
     )]
-    pub(crate) fn require_repo_root(&self) -> Result<&Path, CliError> {
+    pub fn require_repo_root(&self) -> Result<&Path, CliError> {
         self.repo_root
             .as_ref()
             .map(RepoRoot::as_path)
@@ -134,15 +134,15 @@ impl LoadedConfig {
             })
     }
 
-    pub(crate) fn config_path(&self) -> Option<&Path> {
+    pub fn config_path(&self) -> Option<&Path> {
         self.config_path.as_deref()
     }
 
-    pub(crate) fn logging_root(&self) -> Option<&PathBuf> {
+    pub fn logging_root(&self) -> Option<&PathBuf> {
         self.logging_root.as_ref()
     }
 
-    pub(crate) const fn logging_console(&self) -> bool {
+    pub const fn logging_console(&self) -> bool {
         self.logging_console
     }
 }

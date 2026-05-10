@@ -1,0 +1,115 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: RBP-F001
+# FileContext.package and .target use plain String instead of PackageName/TargetName newtypes
+# Phase: phase-A | Mode: initial_pass | Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/RBP-F001>
+  a triage:Finding ;
+  triage:findingId "RBP-F001" ;
+  triage:title "FileContext.package and .target use plain String instead of PackageName/TargetName newtypes" ;
+  triage:description "crates/sc-lint-runtime/src/source_scan.rs: FileContext has pub(crate) package: String and target: String. Both represent semantically distinct Cargo identifiers (package name vs target name) but share the same String type, allowing silent mixing at call sites. RuntimeFinding repeats the same pair. Node-id assembly in runtime.rs (lines 88-93, 251-252, 270-271) interleaves them manually with no type enforcement. Fix: introduce PackageName and TargetName newtypes with validated constructors." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/sprint-A5/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/sprint-A5/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/sprint-A5/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/sprint-A5/4> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A5/a392088> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+# Occurrences on sprint-A5 (sc-lint-runtime crate only)
+
+<urn:atm:triage:occurrence/RBP-F001/sprint-A5/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/source_scan.rs" ;
+  triage:line 15 ;
+  triage:snippet "pub(crate) package: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/RBP-F001/sprint-A5/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/source_scan.rs" ;
+  triage:line 16 ;
+  triage:snippet "pub(crate) target: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/RBP-F001/sprint-A5/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/runtime.rs" ;
+  triage:line 38 ;
+  triage:snippet "package: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/RBP-F001/sprint-A5/4>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/runtime.rs" ;
+  triage:line 39 ;
+  triage:snippet "target: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+# WorktreeSnapshots
+
+<urn:atm:triage:worktree/sprint-A4/aac4dea>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:orderIndex 4 ;
+  triage:branchStatus "absent" .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 ;
+  triage:branchStatus "open" .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 ;
+  triage:branchStatus "absent" .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 ;
+  triage:branchStatus "absent" .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 ;
+  triage:branchStatus "absent" .
