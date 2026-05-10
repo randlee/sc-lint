@@ -3,17 +3,25 @@
 This document defines the planned structured logging integration for
 `sc-lint`.
 
+Related ADRs:
+- [ADR-008 — `sc-observability` For `sc-lint` Structured Logging](./adr/ADR-008-sc-observability-logging.md)
+
 ## Goal
 
 Use `sc-observability` as the logging-only runtime for the top-level CLI and
 its delegated backend calls without turning logging initialization into a
-backend-owned concern.
+backend-owned concern. Satisfies `REQ-LOG-001` and `REQ-LOG-005`.
 
 This document defines both the logging design and the sprint-level
 implementation assignments for Phase `A`. The current task is documentation
 only; the Rust implementation lands in the owning Phase `A` sprints.
 
 ## Dependency Model
+
+Requirement coverage:
+
+- `REQ-LOG-001`
+- `REQ-LOG-003`
 
 The planned dependency is:
 
@@ -37,6 +45,11 @@ The design depends on the following public surface:
 
 ## Initialization Model
 
+Requirement coverage:
+
+- `REQ-LOG-001`
+- `REQ-LOG-005`
+
 Logging is a CLI-layer responsibility.
 
 - the top-level `sc-lint` CLI initializes the logger at process startup
@@ -45,10 +58,19 @@ Logging is a CLI-layer responsibility.
   normalization
 - direct library backends, when later added, receive logging through the same
   CLI-owned runtime rather than constructing a second logger
+- subprocess backends, including Python tools still routed through Sprint
+  `A.3`, run in separate processes and are not governed by the CLI logger
+  runtime; their stdout/stderr handling is a separate dispatch concern
 
-This keeps one process-wide logging authority for each CLI invocation.
+This keeps one process-wide logging authority for each `sc-lint` binary
+invocation.
 
 ## Service Names
+
+Requirement coverage:
+
+- `REQ-LOG-002`
+- `REQ-LOG-004`
 
 The planned service names are:
 
@@ -66,6 +88,10 @@ initializing the runtime for that invocation.
 
 ## Log Root Model
 
+Requirement coverage:
+
+- `REQ-LOG-002`
+
 Default service-scoped log root:
 
 - `~/sc-lint/logs/<service-name>/`
@@ -81,6 +107,10 @@ The override is per lint system because the service name is part of the
 resolved root selection.
 
 ## Sink Model
+
+Requirement coverage:
+
+- `REQ-LOG-003`
 
 ### File Sink
 
@@ -121,6 +151,10 @@ When enabled, the CLI registers `ConsoleSink` through `LoggerBuilder`.
 
 ## Event Model
 
+Requirement coverage:
+
+- `REQ-LOG-004`
+
 Every CLI invocation should emit:
 
 1. invocation entry event
@@ -146,6 +180,14 @@ For delegated backends, the CLI also logs:
 
 ## Rollout By Sprint
 
+Requirement coverage:
+
+- `REQ-LOG-001`
+- `REQ-LOG-002`
+- `REQ-LOG-003`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
+
 - `A.1a`
   - add the `sc-observability` dependency planning record
   - initialize the CLI-owned logger
@@ -162,6 +204,10 @@ For delegated backends, the CLI also logs:
   - apply the same analyzer logging pattern to `sc-runtime`
 
 ## Ownership Rule
+
+Requirement coverage:
+
+- `REQ-LOG-005`
 
 - the CLI owns logger initialization
 - backend crates may emit through CLI-owned logging hooks later, but must not

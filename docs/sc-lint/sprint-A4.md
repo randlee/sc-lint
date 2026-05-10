@@ -112,6 +112,9 @@ crate, moves the existing portability implementation out of
 
 5. Plan analyzer logging baseline for `sc-boundary`
    Development work:
+   - keep the logging ownership boundary at the `analyze_workspace` seam:
+     the top-level CLI initializes the logger and analyzer crates only emit
+     structured events through log macros inside the delegated analysis path
    - define `sc-boundary` analyzer entry logging for delegated analyze calls
    - define completion logging with verdict and finding count
    - keep emission ownership in the top-level CLI logging layer

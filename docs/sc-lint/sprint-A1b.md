@@ -48,6 +48,8 @@ utility extraction work begins.
 - `REQ-CLI-008D`
 - `REQ-CLI-008F`
 - `REQ-LOG-001`
+- `REQ-LOG-002`
+- `REQ-LOG-003`
 - `REQ-LOG-004`
 - `REQ-LOG-005`
 
@@ -132,6 +134,8 @@ end-to-end CLI seam.
 - at least one real delegated backend command is normalized through the
   top-level CLI
 - non-interactive delegated CLI paths use the canonical `--json` contract
+- dispatch-seam logging writes delegated dispatch-call and normalized-result
+  entries for the active backend command
 - no backend crate gains a direct dependency on another backend crate
 
 ## Required Validation
@@ -145,6 +149,7 @@ end-to-end CLI seam.
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
 - `docs/architecture.md`
 - `docs/project-plan.md`
 
