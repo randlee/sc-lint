@@ -8,6 +8,7 @@ use serial_test::serial;
 use tempfile::TempDir;
 
 #[test]
+#[serial]
 fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     let temp_dir = TempDir::new().expect("temp dir");
     let temp_root = temp_dir.path().join("logs");
@@ -77,9 +78,33 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.started");
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.normalized");
     assert_log_file_contains_elapsed_ms(&dispatch_log_path);
+
+    let runtime = sc_lint_command(binary, &workspace_root())
+        .args([
+            "--json",
+            "--root",
+            repo_root.to_str().expect("utf-8 repo root"),
+            "--log-root",
+            temp_root.to_str().expect("utf-8 temp path"),
+            "lint",
+            "sc-runtime",
+        ])
+        .output()
+        .expect("runtime command runs");
+    assert!(
+        runtime.status.success(),
+        "runtime stderr: {}",
+        String::from_utf8_lossy(&runtime.stderr)
+    );
+
+    let runtime_log_path = temp_root.join("sc-runtime").join("sc-runtime.log.jsonl");
+    assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.started");
+    assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.normalized");
+    assert_log_file_contains_elapsed_ms(&runtime_log_path);
 }
 
 #[test]
+#[serial]
 #[cfg_attr(windows, ignore = "cargo.cmd not resolved by CreateProcessW")]
 fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
     let temp_dir = TempDir::new().expect("temp dir");
@@ -159,6 +184,85 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
         "cli.command.error",
         "preflight_mode",
         "xwin",
+    );
+}
+
+#[test]
+#[serial]
+fn sc_boundary_logs_manifest_policy_metadata_for_completion_and_error_paths() {
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+
+    let success_fixture = WorkspaceFixture::new();
+    let success_logs = TempDir::new().expect("temp dir");
+    let success_output = sc_lint_command(binary, &workspace_root())
+        .args([
+            "--json",
+            "--root",
+            success_fixture.root().to_str().expect("utf-8 repo root"),
+            "--log-root",
+            success_logs.path().to_str().expect("utf-8 temp path"),
+            "lint",
+            "sc-boundary",
+        ])
+        .output()
+        .expect("boundary success command runs");
+    assert!(
+        success_output.status.success(),
+        "boundary success stderr: {}",
+        String::from_utf8_lossy(&success_output.stderr)
+    );
+
+    let success_log_path = success_logs
+        .path()
+        .join("sc-boundary")
+        .join("sc-boundary.log.jsonl");
+    for action in ["cli.command.started", "cli.command.completed"] {
+        assert_log_file_contains_field(
+            &success_log_path,
+            action,
+            "manifest_policy_mode",
+            "rust-native",
+        );
+        assert_log_file_contains_field(
+            &success_log_path,
+            action,
+            "manifest_policy_parity",
+            "python-oracle",
+        );
+    }
+
+    let failure_fixture = WorkspaceFixture::new();
+    failure_fixture.write("crates/example/src/lib.rs", "pub fn broken( {}\n");
+    let failure_logs = TempDir::new().expect("temp dir");
+    let failure_output = sc_lint_command(binary, &workspace_root())
+        .args([
+            "--json",
+            "--root",
+            failure_fixture.root().to_str().expect("utf-8 repo root"),
+            "--log-root",
+            failure_logs.path().to_str().expect("utf-8 temp path"),
+            "lint",
+            "sc-boundary",
+        ])
+        .output()
+        .expect("boundary failure command runs");
+    assert_eq!(failure_output.status.code(), Some(5));
+
+    let failure_log_path = failure_logs
+        .path()
+        .join("sc-boundary")
+        .join("sc-boundary.log.jsonl");
+    assert_log_file_contains_field(
+        &failure_log_path,
+        "cli.command.error",
+        "manifest_policy_mode",
+        "rust-native",
+    );
+    assert_log_file_contains_field(
+        &failure_log_path,
+        "cli.command.error",
+        "manifest_policy_parity",
+        "python-oracle",
     );
 }
 

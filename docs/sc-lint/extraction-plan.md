@@ -343,6 +343,8 @@ Deliverable:
 - the imported runtime families land in a dedicated analyzer crate rather than
   widening `sc-lint-boundary`
 - consumer repos can consume those rules without copying ATM-local policy
+- release-1 CLI exposure remains `sc-lint lint sc-runtime` through delegated
+  backend execution and top-level output normalization
 
 ### Phase 2: Introduce Rust boundary inventory loader
 
@@ -380,6 +382,16 @@ Required work:
 Deliverable:
 
 - Rust owns boundary inventory plus manifest-policy enforcement
+
+Rust-native vs Python-backed after A.7:
+
+- Rust-native:
+  - boundary inventory loading and schema validation in `sc-lint-boundary`
+  - boundary graph analysis and enforcement in `sc-lint-boundary`
+  - manifest ownership and workspace-package inheritance checks in `sc-lint-boundary`
+- Python-backed:
+  - `.just/lint_manifests.py` remains the parity oracle during the A.7 validation window
+  - `.just/run_lint.py` still executes the Python manifest lint in the repo-level lint workflow
 
 ### Phase 4: Parity validation window
 

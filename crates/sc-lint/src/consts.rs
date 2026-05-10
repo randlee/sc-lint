@@ -1,6 +1,10 @@
 pub(crate) const SERVICE_NAME: &str = "sc-lint";
 pub(crate) const TOOL_BOUNDARY: &str = "sc-lint-boundary";
+pub(crate) const TOOL_PORTABILITY: &str = "sc-lint-portability";
+pub(crate) const TOOL_RUNTIME: &str = "sc-lint-runtime";
 pub(crate) const CMD_BOUNDARY: &str = "lint.sc-boundary";
+pub(crate) const CMD_PORTABILITY: &str = "lint.sc-portability";
+pub(crate) const CMD_RUNTIME: &str = "lint.sc-runtime";
 
 pub(crate) const FIELD_TOOL: &str = "tool";
 pub(crate) const FIELD_FINDINGS: &str = "findings";

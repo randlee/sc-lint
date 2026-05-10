@@ -318,7 +318,11 @@ Requirement coverage:
   - add `sc-portability` analyzer entry/exit/finding-count logging to the
     delegated backend pattern
 - `A.5`
-  - apply the same analyzer logging pattern to `sc-runtime`
+  - `sc-runtime` now uses the same delegated analyzer logging pattern as
+    `sc-portability`
+  - `cli.dispatch.started` and `cli.dispatch.normalized` carry the
+    `lint.sc-runtime` command identity and `sc-runtime` service name after
+    top-level normalization
 - `A.6`
   - the `sc-boundary` tool path now covers boundary-inventory loader
     validation before graph analysis
@@ -331,6 +335,9 @@ Requirement coverage:
   - entry/completion/error logging stays CLI-owned and covers manifest-policy
     findings through the same `sc-boundary` command envelope used for loader,
     graph, and inventory failures
+  - those events now carry `manifest_policy_mode = "rust-native"` and
+    `manifest_policy_parity = "python-oracle"` so the CLI log makes the
+    migration state explicit without initializing logging in backend code
 - `A.8`
   - document how users read command, verdict, elapsed-time, and stable-error
     log fields in the per-tool guides

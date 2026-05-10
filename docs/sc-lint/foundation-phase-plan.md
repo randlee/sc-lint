@@ -205,6 +205,9 @@ Requirements:
 - perform parity validation against the source implementation in `atm-core`
 - keep ATM-local policy lints out of `sc-lint` unless extracted only as
   configurable framework
+- keep release-1 CLI ownership in the top-level `sc-lint` crate by using the
+  delegated `lint sc-runtime` command path rather than backend-local logging
+  or envelope shaping
 
 ### Workstream 8: Cross-target preflight strategy
 
@@ -303,8 +306,9 @@ The scheduled implementation sprints for this phase are:
    - `sc-lint-portability` creation and portability-rule migration
    - sprint plan: `docs/sc-lint/sprint-A4.md`
 6. `A.5`
-   - `sc-lint-runtime` creation and runtime-rule migration
-   - sprint plan: `docs/sc-lint/sprint-A5.md`
+  - `sc-lint-runtime` creation and runtime-rule migration
+  - active implementation branch: `feature/sprint-A5`
+  - sprint plan: `docs/sc-lint/sprint-A5.md`
 7. `A.6`
   - Rust boundary inventory loader/schema/duplicate handling
   - active implementation branch: `feature/sprint-A6`

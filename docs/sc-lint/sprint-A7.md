@@ -151,3 +151,17 @@ leave the product in an ambiguous transition state.
 - do not let consumer-repo edge cases vanish during fixture reduction
 - do not treat Python parity as a permanent architecture instead of a
   migration window
+
+## Sub-Task 4 Review Artifact
+
+Manifest-policy logging review for A.7:
+
+- `crates/sc-lint/src/main.rs` remains the only logger initialization point
+- `crates/sc-lint/src/logging.rs` emits the standard CLI
+  `cli.command.started`, `cli.command.completed`, and `cli.command.error`
+  events for `lint.sc-boundary`
+- those `sc-boundary` events now carry the manifest-policy migration metadata
+  fields `manifest_policy_mode = "rust-native"` and
+  `manifest_policy_parity = "python-oracle"`
+- `docs/sc-lint/logging.md` is aligned with the same command path and field
+  names

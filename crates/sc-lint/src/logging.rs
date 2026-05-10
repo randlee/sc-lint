@@ -28,6 +28,8 @@ const FIELD_FINDING_COUNT: &str = "finding_count";
 const FIELD_JSON: &str = "json";
 const FIELD_LOG_CONSOLE: &str = "log_console";
 const FIELD_LOG_ROOT_OVERRIDE: &str = "log_root_override";
+const FIELD_MANIFEST_POLICY_MODE: &str = "manifest_policy_mode";
+const FIELD_MANIFEST_POLICY_PARITY: &str = "manifest_policy_parity";
 const FIELD_PREFLIGHT_MODE: &str = "preflight_mode";
 const FIELD_REPO_ROOT: &str = "repo_root";
 const FIELD_SUMMARY: &str = "summary";
@@ -382,6 +384,13 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
     }
     if let Some(script) = observed.context.adapter_script() {
         fields.insert("script".to_string(), json!(script));
+    }
+    if observed.command_id() == consts::CMD_BOUNDARY {
+        fields.insert(FIELD_MANIFEST_POLICY_MODE.to_string(), json!("rust-native"));
+        fields.insert(
+            FIELD_MANIFEST_POLICY_PARITY.to_string(),
+            json!("python-oracle"),
+        );
     }
     fields
 }

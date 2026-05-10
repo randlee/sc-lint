@@ -706,6 +706,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-lint-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "clap",
+ "proc-macro2",
+ "sc-lint-schema",
+ "serde",
+ "serde_json",
+ "syn",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "sc-lint-schema"
 version = "0.1.0"
 dependencies = [

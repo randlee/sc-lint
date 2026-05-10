@@ -15,6 +15,7 @@ from lint_identity_literals import collect_identity_violations
 from lint_identity_literals import load_forbidden_literals
 from lint_identity_literals import load_production_canonical_literals
 from lint_identity_literals import main
+from fixture_constants import TEAM_LEAD_IDENTITY
 
 
 class IdentityLiteralTests(unittest.TestCase):
@@ -22,12 +23,12 @@ class IdentityLiteralTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = seed_workspace(Path(tempdir))
             (repo_root / ".just/lint-config.toml").write_text(
-                """\
+                f"""\
 [identities]
-forbidden_literals = ["team-lead"]
+forbidden_literals = ["{TEAM_LEAD_IDENTITY}"]
 
 [identities.production_canonical_literals]
-"team-lead" = ["crates/demo/src/constants.rs"]
+"{TEAM_LEAD_IDENTITY}" = ["crates/demo/src/constants.rs"]
 """,
                 encoding="utf-8",
             )
@@ -82,22 +83,25 @@ edition = "2024"
 """,
         encoding="utf-8",
     )
-    (crate_root / "src/constants.rs").write_text('pub const OWNER: &str = "team-lead";\n', encoding="utf-8")
+    (crate_root / "src/constants.rs").write_text(
+        f'pub const OWNER: &str = "{TEAM_LEAD_IDENTITY}";\n',
+        encoding="utf-8",
+    )
     (crate_root / "src/lib.rs").write_text(
-        """\
-pub fn owner() -> &'static str {
-    "team-lead"
-}
+        f"""\
+pub fn owner() -> &'static str {{
+    "{TEAM_LEAD_IDENTITY}"
+}}
 """,
         encoding="utf-8",
     )
     (crate_root / "tests/tests.rs").write_text(
-        """\
+        f"""\
 #[test]
-fn uses_identity_literal() {
-    let owner = "team-lead";
-    assert_eq!(owner, "team-lead");
-}
+fn uses_identity_literal() {{
+    let owner = "{TEAM_LEAD_IDENTITY}";
+    assert_eq!(owner, "{TEAM_LEAD_IDENTITY}");
+}}
 """,
         encoding="utf-8",
     )

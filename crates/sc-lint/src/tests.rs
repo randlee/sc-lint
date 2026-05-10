@@ -122,23 +122,6 @@ fn reserved_view_commands_use_the_same_failure_envelope_shape() {
 }
 
 #[test]
-fn reserved_runtime_lint_placeholder_uses_the_failure_envelope_shape() {
-    let cli = Cli::parse_from(["sc-lint", "--json", "lint", "sc-runtime"]);
-    let context = CommandContext::from_cli(&cli).expect("runtime placeholder context");
-    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let error =
-        crate::command::execute(&context, &loaded).expect_err("runtime lint stays reserved");
-    let rendered = crate::render::render_error_json(context.command_id(), &error);
-    let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
-
-    assert_eq!(json["ok"], false);
-    assert_eq!(json["command"], context.command_id());
-    assert_eq!(json["error"]["kind"], "capability");
-    assert_eq!(json["error"]["code"], "CLI.CAPABILITY_ERROR");
-    assert!(json["diagnostics"].as_array().is_some());
-}
-
-#[test]
 fn parse_errors_use_the_documented_command_identifier() {
     let ParsedInvocation::Immediate(outcome) =
         crate::parse_args(["sc-lint", "--json", "unknown-command"])
@@ -206,7 +189,7 @@ fn lint_targets_map_profile_values_stably() {
 
 #[test]
 fn repo_root_discovery_walks_up_to_the_workspace_root() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -253,7 +236,11 @@ fn malformed_repo_config_returns_cli_config_error() {
 
 #[test]
 fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() {
-    let repo_root = workspace_root();
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;\n");
+    let repo_root = fixture.root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--json",
@@ -290,7 +277,11 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
 
 #[test]
 fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope() {
-    let repo_root = workspace_root();
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub fn portable() {}\n");
+    let repo_root = fixture.root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--json",
@@ -322,6 +313,64 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "lint.sc-portability");
     assert_eq!(json["data"]["tool"], "sc-lint-portability");
+    assert!(json["data"]["findings"].is_array());
+}
+
+#[test]
+fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            use std::sync::{Condvar, Mutex};
+            use std::time::Duration;
+
+            pub fn inspected(condvar: &Condvar, state: &Mutex<bool>) {
+                let state = state.lock().expect("lock");
+                let (_guard, wait) = condvar
+                    .wait_timeout(state, Duration::from_secs(1))
+                    .expect("wait");
+                if wait.timed_out() {
+                    return;
+                }
+            }
+        "#,
+    );
+    let repo_root = fixture.root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "sc-runtime",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("runtime context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let expected_finding_count = success
+        .data
+        .get("findings")
+        .and_then(Value::as_array)
+        .map_or(0, std::vec::Vec::len);
+    assert_eq!(
+        success
+            .dispatch
+            .as_ref()
+            .expect("dispatch telemetry")
+            .finding_count(),
+        expected_finding_count
+    );
+    let envelope = CommandEnvelope::success(context.command_id(), success.data);
+    let rendered = crate::render::render_success_json(&envelope);
+    let json: Value = serde_json::from_str(&rendered).expect("success json");
+
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["command"], "lint.sc-runtime");
+    assert_eq!(json["data"]["tool"], crate::consts::TOOL_RUNTIME);
     assert!(json["data"]["findings"].is_array());
 }
 
@@ -366,7 +415,7 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
 
 #[test]
 fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -386,7 +435,7 @@ fn loaded_config_preserves_repo_root_as_a_validated_newtype() {
 #[test]
 #[serial]
 fn python_backed_lints_and_views_normalize_through_the_top_level_envelope() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     for (args, command_id) in [
         (
             [
@@ -442,7 +491,7 @@ fn python_backed_lints_and_views_normalize_through_the_top_level_envelope() {
 
 #[test]
 fn lint_profiles_have_stable_membership() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -470,7 +519,7 @@ fn lint_profiles_have_stable_membership() {
 
 #[test]
 fn full_profile_adds_xwin_only_when_available() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -513,7 +562,7 @@ fn full_profile_adds_xwin_only_when_available() {
 
 #[test]
 fn ci_and_lint_ci_differ_only_by_test_execution() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     let lint_cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -550,7 +599,7 @@ fn ci_and_lint_ci_differ_only_by_test_execution() {
 
 #[test]
 fn explicit_xwin_commands_require_capability() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--root",
@@ -571,7 +620,7 @@ fn explicit_xwin_commands_require_capability() {
 
 #[test]
 fn native_and_xwin_preflight_commands_use_success_envelopes() {
-    let repo_root = workspace_root();
+    let repo_root = project_workspace_root();
     let cli = Cli::parse_from([
         "sc-lint",
         "--json",
@@ -594,12 +643,78 @@ fn native_and_xwin_preflight_commands_use_success_envelopes() {
     assert_eq!(json["data"]["xwin"]["target"], crate::WINDOWS_XWIN_TARGET);
 }
 
-fn workspace_root() -> PathBuf {
+fn project_workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
         .expect("workspace root")
         .to_path_buf()
+}
+
+struct AnalysisFixture {
+    tempdir: TempDir,
+}
+
+impl AnalysisFixture {
+    fn new() -> Self {
+        Self {
+            tempdir: TempDir::new().expect("temp dir"),
+        }
+    }
+
+    fn root(&self) -> &Path {
+        self.tempdir.path()
+    }
+
+    fn write_workspace_root(&self) {
+        std::fs::write(
+            self.root().join("Cargo.toml"),
+            r#"[workspace]
+members = ["crates/example"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.1"
+authors = ["sc-lint contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/sc-lint"
+homepage = "https://example.invalid/sc-lint"
+"#,
+        )
+        .expect("workspace root");
+        std::fs::create_dir_all(self.root().join("boundaries")).expect("boundaries");
+        std::fs::write(
+            self.root().join("boundaries/planning.toml"),
+            "[planning]\ncurrent_sprint = \"A.7\"\n",
+        )
+        .expect("planning");
+    }
+
+    fn write_package_manifest(&self, package_name: &str) {
+        self.write(
+            &format!("crates/{package_name}/Cargo.toml"),
+            &format!(
+                "[package]\nname = \"{package_name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n"
+            ),
+        );
+    }
+
+    fn write_source(&self, package_name: &str, relative_path: &str, contents: &str) {
+        self.write(
+            &format!("crates/{package_name}/src/{relative_path}"),
+            contents,
+        );
+    }
+
+    fn write(&self, relative_path: &str, contents: &str) {
+        let path = self.root().join(relative_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("parent dirs");
+        }
+        std::fs::write(path, contents).expect("write fixture file");
+    }
 }
 
 fn step_names(steps: &[Value]) -> Vec<String> {

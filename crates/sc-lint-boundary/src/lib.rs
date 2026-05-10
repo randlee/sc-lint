@@ -464,19 +464,20 @@ pub fn analyze_workspace(
         });
     }
 
+    let inventory = inventory::load_boundary_inventory(&options.root).map_err(|source| {
+        BoundaryError::InventoryLoad {
+            root: options.root.clone(),
+            source,
+        }
+    })?;
     let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
             root: options.root.clone(),
             source,
         }
     })?;
-    inventory::load_boundary_inventory(&options.root).map_err(|source| {
-        BoundaryError::InventoryLoad {
-            root: options.root.clone(),
-            source,
-        }
-    })?;
-    let mut findings = Vec::new();
+    let inventory_summary = inventory.summary();
+    let mut findings = Vec::with_capacity(inventory_summary.recommended_finding_capacity());
     let filter = options.rule;
     if filter.is_none() || filter == Some(RuleFilter::Cycles) {
         findings.extend(analysis::analyze_cycles(&graph));

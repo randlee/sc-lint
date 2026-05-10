@@ -119,8 +119,8 @@ impl CommandId {
             Self::LintIdentityLiterals => "lint.identity-literals",
             Self::LintLineCounts => "lint.line-counts",
             Self::LintScBoundary => consts::CMD_BOUNDARY,
-            Self::LintScPortability => "lint.sc-portability",
-            Self::LintScRuntime => "lint.sc-runtime",
+            Self::LintScPortability => consts::CMD_PORTABILITY,
+            Self::LintScRuntime => consts::CMD_RUNTIME,
             Self::Version => "version",
             Self::ViewFindings => "view.findings",
             Self::ViewGraph => "view.graph",
@@ -158,7 +158,7 @@ impl CommandId {
             Self::LintLineCounts => "python-backed line-count lint path",
             Self::LintScBoundary => "boundary analyzer command path",
             Self::LintScPortability => "portability analyzer command path",
-            Self::LintScRuntime => "reserved runtime analyzer contract surface",
+            Self::LintScRuntime => "runtime analyzer command path",
             Self::Version => "sc-lint version information",
             Self::ViewFindings => "python-backed findings view path",
             Self::ViewGraph => "reserved view contract surface",
@@ -172,7 +172,8 @@ impl CommandId {
     pub const fn dispatch_tool(self) -> Option<&'static str> {
         match self {
             Self::LintScBoundary => Some(consts::TOOL_BOUNDARY),
-            Self::LintScPortability => Some("sc-lint-portability"),
+            Self::LintScPortability => Some(consts::TOOL_PORTABILITY),
+            Self::LintScRuntime => Some(consts::TOOL_RUNTIME),
             Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts.tool_name()),
             Self::LintIdentityLiterals => {
                 Some(python_adapter::PythonTool::IdentityLiterals.tool_name())
@@ -282,9 +283,7 @@ pub(crate) fn execute(
         }))),
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
-        CommandId::LintScRuntime => {
-            reserved_command(context, "A.5 will add the runtime analyzer backend path.")
-        }
+        CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),
         CommandId::LintLineCounts => {
             python_adapter::run_python_tool(loaded_config, python_adapter::PythonTool::LineCounts)
         }

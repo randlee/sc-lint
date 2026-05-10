@@ -73,7 +73,7 @@ Current intended crate split:
 - `sc-lint-portability`
   - analyzer crate for shared OS/platform portability rules
 - `sc-lint-runtime`
-  - planned analyzer crate for shared std runtime/concurrency rules
+  - analyzer crate for shared std runtime/concurrency rules
 - `sc-lint-tokio`
   - planned future analyzer crate for Tokio-specific rules
   - represented now as a reserved future boundary surface only
@@ -145,16 +145,20 @@ Current scaffold status:
     - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
     - stable text/JSON findings output
 - `sc-lint`
-  - planned now
-  - not implemented yet
-  - detailed CLI requirements and architecture are defined in:
+  - exists now
+  - currently provides the stable top-level CLI contract and delegated backend
+    dispatch for:
+    - `sc-boundary`
+    - `sc-portability`
+    - `sc-runtime`
+  - detailed CLI requirements and architecture remain defined in:
     - [`cli-requirements.md`](./cli-requirements.md)
     - [`cli-architecture.md`](./cli-architecture.md)
 
-Current code moves required for the planned partition:
+Current code moves completed for the current partition:
 
-- import std runtime/concurrency rules from the current `atm-core` proving
-  surface into the future `sc-lint-runtime` crate:
+- imported std runtime/concurrency rules from the current `atm-core` proving
+  surface into `sc-lint-runtime`:
   - `SCB-RUNTIME-001`
   - `SCB-RUNTIME-002`
 - keep the portability wrapper surface pointed at `sc-lint-portability`:
@@ -172,12 +176,6 @@ Planned primary lint-target mapping for the top-level CLI:
 
 Grouped subset aliases may exist later, but these crate-mapped targets are the
 primary ownership-preserving command surface.
-
-Planned next shared rule imports from `atm-core`:
-
-- `sc-lint-runtime`
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
 
 Kept local to consumer repos for now:
 
