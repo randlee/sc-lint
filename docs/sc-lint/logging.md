@@ -201,7 +201,10 @@ Planned controls:
 - config key:
   - `logging.console`
 
-When enabled, the CLI registers `ConsoleSink` through `LoggerBuilder`.
+When enabled, the A.1a bootstrap turns on
+`LoggerConfig.enable_console_sink` before `LoggerBuilder::new(...)`. Later
+sprints should preserve the same CLI surface unless explicit per-sink
+filtering becomes necessary.
 
 ## Concurrency Model
 

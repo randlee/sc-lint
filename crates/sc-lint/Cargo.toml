@@ -19,10 +19,9 @@ path = "src/lib.rs"
 
 [dependencies]
 clap.workspace = true
-sc-observability = { version = "1.0.0", path = "../../../../../sc-observability/crates/sc-observability" }
+sc-observability.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

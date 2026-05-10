@@ -68,6 +68,10 @@ impl CommandContext {
     }
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "CliError is the stable top-level contract type for the bootstrap CLI execution seam."
+)]
 pub fn execute(context: &CommandContext) -> Result<Value, CliError> {
     match context.command_id() {
         "version" => Ok(json!({
@@ -110,6 +114,10 @@ pub fn execute(context: &CommandContext) -> Result<Value, CliError> {
     }
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Reserved bootstrap commands must return the same top-level CliError contract as real command paths."
+)]
 fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<Value, CliError> {
     Err(CliError::capability(format!(
         "{} is a reserved contract surface in Sprint A.1a. {follow_up}",
