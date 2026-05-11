@@ -21,7 +21,7 @@ jobs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_version: ${{ steps.meta.outputs.release_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -66,7 +66,7 @@ jobs:
     needs: gate-and-tag
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -158,7 +158,7 @@ jobs:
           PY
 
       - name: Upload release inventory artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-inventory
           path: release/release-inventory.json
@@ -167,7 +167,7 @@ jobs:
     needs: [gate-and-tag, prepare-release-inventory]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -203,7 +203,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: crates-io
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -265,7 +265,7 @@ jobs:
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -306,7 +306,7 @@ jobs:
           echo "ARCHIVE=$ARCHIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
@@ -315,12 +315,12 @@ jobs:
     needs: [gate-and-tag, build, publish-crates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
 
