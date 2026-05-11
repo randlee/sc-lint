@@ -25,11 +25,23 @@ PYTHON_LINT_ORDER = (
     "spell",
     "pytests",
 )
-EXTRA_LINTS = ("modules", "sc-boundary", "sc-portability")
-DEFAULT_EXTRA_LINTS = ("sc-boundary", "sc-portability")
+EXTRA_LINTS = (
+    "modules",
+    "sc-boundary",
+    "sc-portability",
+    "line-counts",
+    "identity-literals",
+)
+DEFAULT_EXTRA_LINTS = ("sc-boundary", "sc-portability", "line-counts", "identity-literals")
 CARGO_LINT_ORDER = ("fmt", "clippy", "deny", "shear")
 FAST_LINT_ORDER = ("fmt", "version", "manifests", "spell", "pytests")
 CRATE_INVENTORY_LINTS = {"fmt", "clippy", "modules", "sc-boundary", "sc-portability", "manifests"}
+CLI_PROFILE_TARGETS = {
+    "all": "full",
+    "fast": "fast",
+    "full": "full",
+    "ci": "ci",
+}
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 ERROR_MARKER_RE = re.compile(r"(?<![A-Za-z0-9_])(error|failed|traceback|exception)(?![A-Za-z0-9_])")
 
@@ -67,6 +79,14 @@ def build_tasks(repo_root: Path) -> dict[str, LintTask]:
             "sc-portability",
             [python_executable, str(repo_root / ".just/lint_sc_portability.py")],
         ),
+        "line-counts": LintTask(
+            "line-counts",
+            [python_executable, str(repo_root / ".just/lint_line_counts.py")],
+        ),
+        "identity-literals": LintTask(
+            "identity-literals",
+            [python_executable, str(repo_root / ".just/lint_identity_literals.py")],
+        ),
         "manifests": LintTask("manifests", [python_executable, str(repo_root / ".just/lint_manifests.py")]),
         "spell": LintTask("spell", [python_executable, str(repo_root / ".just/lint_codespell.py")]),
         "pytests": LintTask("pytests", [python_executable, str(repo_root / ".just/run_pytests.py")]),
@@ -78,7 +98,7 @@ def resolve_task_names(target: str) -> list[str]:
         return [*CARGO_LINT_ORDER, *PYTHON_LINT_ORDER, *DEFAULT_EXTRA_LINTS]
     if target == "fast":
         return list(FAST_LINT_ORDER)
-    valid = {"all", "fast", *CARGO_LINT_ORDER, *PYTHON_LINT_ORDER, *EXTRA_LINTS}
+    valid = {"all", "fast", "full", "ci", *CARGO_LINT_ORDER, *PYTHON_LINT_ORDER, *EXTRA_LINTS}
     if target not in valid:
         valid_display = ", ".join(sorted(valid))
         raise ValueError(f"unknown lint target: {target}; expected one of: {valid_display}")
@@ -182,6 +202,16 @@ def run_parallel(tasks: list[LintTask], repo_root: Path) -> list[LintResult]:
         return [future.result() for future in futures]
 
 
+def run_cli_profile(repo_root: Path, target: str) -> int:
+    completed = subprocess.run(
+        ["cargo", "run", "--quiet", "--bin", "sc-lint", "--", "lint", CLI_PROFILE_TARGETS[target]],
+        cwd=repo_root,
+        text=True,
+        encoding="utf-8",
+    )
+    return completed.returncode
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Run repo lint targets.")
     parser.add_argument("target", nargs="?", default="all")
@@ -189,6 +219,8 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv[1:])
     repo_root = discover_repo_root(args.root)
     target = args.target
+    if target in CLI_PROFILE_TARGETS:
+        return run_cli_profile(repo_root, target)
     try:
         task_names = resolve_task_names(target)
     except ValueError as error:

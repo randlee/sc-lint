@@ -1,0 +1,183 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# ── Finding ──────────────────────────────────────────────────────────────────
+
+<urn:atm:triage:finding/FTQ-001>
+  a triage:Finding ;
+  triage:findingId "FTQ-001" ;
+  triage:title "lint_sc_boundary and lint_sc_runtime tests use live workspace_root() instead of hermetic fixture" ;
+  triage:description "crates/sc-lint/src/tests.rs contains lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope and lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope which call workspace_root() — the live feature worktree — and assert json['ok'] == true. If the real codebase has boundary or runtime findings at test time, assertions flip to failure. Fix: replace live workspace_root() with a hermetic WorkspaceFixture containing known-clean synthetic source." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "FTQ" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "crate" ;
+  triage:pattern "workspace_root\\(\\)" ;
+  triage:fileFilter "tests\\.rs" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:references "PR #15" , "QA-A5-001 FAIL" , "flaky-test-qa findings FTQ-001/002" ;
+  triage:notes "Both FTQ-001 and FTQ-002 have the same root cause (workspace_root() in sc-lint/src/tests.rs) so they share this triage record. Sweep confirmed open on sprint-A4, sprint-A5, sprint-A6, sprint-A7. sprint-A8 has no sc-lint crate (absent). write_workspace_root() calls in sc-lint-boundary and sc-lint-portability tests are hermetic fixture methods and are NOT occurrences of this finding." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A4/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A4/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A5/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A5/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A6/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A6/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A7/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001/sprint-A7/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A4/aac4dea> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A5/a392088> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A6/8544597> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/8eee490> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A8/8eee490> .
+
+# ── Occurrences on sprint-A4 ─────────────────────────────────────────────────
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A4/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 256 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/aac4dea> .
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A4/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 293 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/aac4dea> .
+
+# ── Occurrences on sprint-A5 ─────────────────────────────────────────────────
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A5/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 258 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A5/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 295 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+# ── Occurrences on sprint-A6 ─────────────────────────────────────────────────
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A6/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 256 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A6/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 332 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope (line offset due to A6 additions)" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+# ── Occurrences on sprint-A7 ─────────────────────────────────────────────────
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 256 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+<urn:atm:triage:occurrence/FTQ-001/sprint-A7/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 332 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:context "fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope (line offset due to A6/A7 additions)" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+# ── WorktreeSnapshots ────────────────────────────────────────────────────────
+
+<urn:atm:triage:worktree/sprint-A4/aac4dea>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:orderIndex 4 ;
+  triage:branchStatus "open" .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 ;
+  triage:branchStatus "open" .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 ;
+  triage:branchStatus "open" .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 ;
+  triage:branchStatus "open" .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 ;
+  triage:branchStatus "absent" ;
+  triage:absentReason "crates/sc-lint does not exist in this worktree; no sc-lint/src/tests.rs present" .

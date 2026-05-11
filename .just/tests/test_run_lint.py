@@ -36,6 +36,8 @@ resolver = "2"
         self.assertIn("pytests", names)
         self.assertIn("sc-boundary", names)
         self.assertIn("sc-portability", names)
+        self.assertIn("line-counts", names)
+        self.assertIn("identity-literals", names)
         self.assertNotIn("modules", names)
 
     def test_resolve_task_names_rejects_unknown_target(self) -> None:
@@ -46,6 +48,8 @@ resolver = "2"
         self.assertEqual(resolve_task_names("modules"), ["modules"])
         self.assertEqual(resolve_task_names("sc-boundary"), ["sc-boundary"])
         self.assertEqual(resolve_task_names("sc-portability"), ["sc-portability"])
+        self.assertEqual(resolve_task_names("line-counts"), ["line-counts"])
+        self.assertEqual(resolve_task_names("identity-literals"), ["identity-literals"])
 
     def test_prioritize_error_lines_prefers_actual_failures(self) -> None:
         lines = [
@@ -85,6 +89,8 @@ resolver = "2"
             self.assertEqual(tasks["modules"].command[-1], str(repo_root / ".just/lint_cargo_modules.py"))
             self.assertEqual(tasks["sc-boundary"].command[-1], str(repo_root / ".just/lint_sc_boundary.py"))
             self.assertEqual(tasks["sc-portability"].command[-1], str(repo_root / ".just/lint_sc_portability.py"))
+            self.assertEqual(tasks["line-counts"].command[-1], str(repo_root / ".just/lint_line_counts.py"))
+            self.assertEqual(tasks["identity-literals"].command[-1], str(repo_root / ".just/lint_identity_literals.py"))
             self.assertEqual(tasks["manifests"].command[-1], str(repo_root / ".just/lint_manifests.py"))
             self.assertEqual(tasks["deny"].command[-1], str(repo_root / ".just/lint_cargo_deny.py"))
             self.assertEqual(tasks["shear"].command[-1], str(repo_root / ".just/lint_cargo_shear.py"))

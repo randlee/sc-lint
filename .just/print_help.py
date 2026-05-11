@@ -29,8 +29,10 @@ SECTIONS = (
     (
         "Lint",
         (
-            ("lint", "Run the full repo lint suite."),
+            ("lint", "Run the default full lint profile."),
             ("lint fast", "Run the low-latency lint subset."),
+            ("lint full", "Run the stronger local full lint profile."),
+            ("lint ci", "Run the lint-only CI-parity profile."),
             ("lint fmt", "Run only the format check."),
             ("lint clippy", "Run only Clippy with warnings denied."),
             ("lint modules", "Run cargo-modules internal acyclic checks (advisory/manual)."),
@@ -38,6 +40,8 @@ SECTIONS = (
             ("lint shear", "Run cargo-shear unused-dependency checks."),
             ("lint sc-boundary", "Run the syn-based boundary analyzer."),
             ("lint sc-portability", "Run the syn-based portability analyzer."),
+            ("lint line-counts", "Run the extracted source-size inventory lint."),
+            ("lint identity-literals", "Run the configurable identity-literal lint."),
             ("lint manifests", "Run the Cargo manifest policy checks."),
             ("lint version", "Run only the version alignment checks."),
             ("lint spell", "Run the spelling/content check."),

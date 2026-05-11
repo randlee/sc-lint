@@ -19,6 +19,11 @@ from lint_cargo_shear import load_policy_config
 from lint_cargo_shear import parse_sections
 from lint_codespell import build_command as build_codespell_command
 
+APP_CRATE = "fixture-app"
+CORE_CRATE = "fixture-lib"
+APP_PACKAGE = "synthetic-app"
+CORE_PACKAGE = "synthetic-lib"
+
 
 class ExternalLintToolTests(unittest.TestCase):
     def test_build_cargo_deny_command_targets_workspace_manifest(self) -> None:
@@ -72,16 +77,16 @@ allow = ["MIT"]
             )
 
     def test_parse_sections_extracts_warning_files(self) -> None:
-        stdout = """\
+        stdout = f"""\
 shear/unlinked_files
 
-  ⚠ 1 unlinked file in `agent-team-mail`
+  ⚠ 1 unlinked file in `{APP_PACKAGE}`
   │ tests/support/mod.rs
   help: delete this file
 
 shear/empty_files
 
-  ⚠ 2 empty files in `agent-team-mail-core`
+  ⚠ 2 empty files in `{CORE_PACKAGE}`
   │ src/model_registry.rs
   │ src/schema/settings.rs
 """
@@ -94,10 +99,10 @@ shear/empty_files
         )
 
     def test_evaluate_policy_promotes_unapproved_warning_files_to_errors(self) -> None:
-        stdout = """\
+        stdout = f"""\
 shear/unlinked_files
 
-  ⚠ 1 unlinked file in `agent-team-mail`
+  ⚠ 1 unlinked file in `{APP_PACKAGE}`
   │ tests/support/mod.rs
 """
         sections = parse_sections(stdout)
@@ -111,10 +116,10 @@ shear/unlinked_files
         self.assertEqual(findings[0].file_path, "tests/support/mod.rs")
 
     def test_evaluate_policy_downgrades_allowlisted_files(self) -> None:
-        stdout = """\
+        stdout = f"""\
 shear/empty_files
 
-  ⚠ 1 empty file in `agent-team-mail-core`
+  ⚠ 1 empty file in `{CORE_PACKAGE}`
   │ src/model_registry.rs
 """
         sections = parse_sections(stdout)
@@ -161,16 +166,16 @@ shear/empty_files
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             (repo_root / "Cargo.toml").write_text(
-                """\
+                f"""\
 [workspace]
-members = ["crates/atm", "crates/atm-core"]
+members = ["crates/{APP_CRATE}", "crates/{CORE_CRATE}"]
 resolver = "2"
 """,
                 encoding="utf-8",
             )
             for crate_name, package_name in (
-                ("atm", "agent-team-mail"),
-                ("atm-core", "agent-team-mail-core"),
+                (APP_CRATE, APP_PACKAGE),
+                (CORE_CRATE, CORE_PACKAGE),
             ):
                 crate_dir = repo_root / "crates" / crate_name
                 crate_dir.mkdir(parents=True)
@@ -184,16 +189,16 @@ version = "1.1.2"
                 )
 
             sections = parse_sections(
-                """\
+                f"""\
 shear/unlinked_files
 
-  ⚠ 1 unlinked file in `agent-team-mail`
+  ⚠ 1 unlinked file in `{APP_PACKAGE}`
   │ tests/support/mod.rs
 """
             )
             self.assertEqual(
                 annotate_sections(sections, repo_root),
-                ["shear note: crates/atm/tests/support/mod.rs [unlinked_files]"],
+                [f"shear note: crates/{APP_CRATE}/tests/support/mod.rs [unlinked_files]"],
             )
 
     def test_build_codespell_command_uses_repo_config(self) -> None:

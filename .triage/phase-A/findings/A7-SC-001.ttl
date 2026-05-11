@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A7-SC-001
+# Manifest-policy logging criterion unmet + sub-task 4 doc review artifact absent
+# Source: QA-A7-001 SC-QA-A7-001 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A7-SC-001>
+  a triage:Finding ;
+  triage:findingId "A7-SC-001" ;
+  triage:title "Manifest-policy logging criterion unmet; Sub-Task 4 doc review artifact absent" ;
+  triage:description "Two sub-issues: (1) Sprint A.7 acceptance criterion requires CLI-layer entry/completion/error events for manifest-policy execution. These structured log events are absent — the manifest-policy checker runs without dispatch_event calls for entry/completion/error lifecycle. (2) The Sub-Task 4 doc review artifact required by sprint-A7.md is absent. Fix: (a) add entry/completion/error dispatch_event calls around the manifest-policy execution path in crates/sc-lint/src/dispatch.rs or the manifest backend; (b) create the Sub-Task 4 doc review artifact per sprint-A7.md spec." ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "A7-scope. Read sprint-A7.md for Sub-Task 4 deliverable spec and manifest-policy logging acceptance criterion." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-SC-001/sprint-A7/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-SC-001/sprint-A7/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/32f233e> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-SC-001/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/dispatch.rs (or manifest backend)" ;
+  triage:snippet "manifest-policy execution path missing entry/completion/error dispatch_event calls" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-SC-001/sprint-A7/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A7.md (or designated artifact location)" ;
+  triage:snippet "Sub-Task 4 doc review artifact absent" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:worktree/sprint-A7/32f233e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "32f233e" ;
+  triage:orderIndex 7 .

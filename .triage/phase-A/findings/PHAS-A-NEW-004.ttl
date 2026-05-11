@@ -1,0 +1,230 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PHAS-A-NEW-004>
+  a triage:Finding ;
+  triage:findingId "PHAS-A-NEW-004" ;
+  triage:title "workspace_root() used as current_dir for subprocess invocations in logging_integration.rs" ;
+  triage:description "crates/sc-lint/tests/logging_integration.rs uses workspace_root() as current_dir for all sc_lint_command subprocess invocations. This is a residual live-worktree isolation risk beyond the FTQ-001 fix scope. Tests may fail or produce different results depending on which worktree they run from." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/4> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/5> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/6> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/7> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/8> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/9> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/10> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/11> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/12> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/13> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/14> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/15> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/16> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/17> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/c1c3133> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 19 ;
+  triage:snippet "let version = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 34 ;
+  triage:snippet "let dispatch = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 52 ;
+  triage:snippet "let failure = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/4>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 82 ;
+  triage:snippet "let runtime = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/5>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 111 ;
+  triage:snippet "let repo_root = workspace_root();" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/6>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 197 ;
+  triage:snippet "let success_output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/7>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 237 ;
+  triage:snippet "let failure_output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/8>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 278 ;
+  triage:snippet "let output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/9>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 339 ;
+  triage:snippet "let baseline = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/10>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 359 ;
+  triage:snippet "let output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/11>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 413 ;
+  triage:snippet "let output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/12>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 446 ;
+  triage:snippet "let baseline = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/13>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 467 ;
+  triage:snippet "let output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/14>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 518 ;
+  triage:snippet "let baseline = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/15>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 537 ;
+  triage:snippet "let output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/16>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 590 ;
+  triage:snippet "let output = sc_lint_command(binary, &workspace_root())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-004/integration-phase-A/17>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/tests/logging_integration.rs" ;
+  triage:line 735 ;
+  triage:snippet "let source = workspace_root().join(relative_path);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:worktree/integration-phase-A/c1c3133>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:orderIndex 99 .

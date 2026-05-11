@@ -15,20 +15,15 @@ constructor = "none"
 [composition]
 # `CommandEnvelope` records the generic success-envelope family documented in
 # the CLI contract as `CommandEnvelope<T>`.
-roots = ["Command", "LintProfile", "OutputMode", "CommandEnvelope", "CliError"]
+roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "logging", "run"]
 
 [dependencies]
-# Release 0.1.x permits direct linkage only to the shared support crate and
-# the boundary backend crate. Other backend execution may happen through
-# subprocess dispatch behind the CLI contract and therefore does not require a
-# direct crate dependency edge here. In particular, the planned primary
-# `sc-portability` and `sc-runtime` lint targets are release-1 delegated
-# backend surfaces unless a later boundary/architecture update approves
-# direct linkage.
+# Release 0.1.x permits direct linkage only to the boundary backend crate, the
+# shared machine-schema crate, and binary-only support. Other backend execution
+# happens through delegated subprocess dispatch behind the CLI contract.
 allowed_dependents = []
-allowed_dependencies = ["sc-lint-boundary", "sc-lint-directives", "sc-observability"]
+allowed_dependencies = ["sc-lint-boundary", "sc-lint-schema", "sc-observability"]
 forbidden_edges = [
-  "sc-lint-directives -> sc-lint",
   "sc-lint-attributes -> sc-lint",
   "sc-lint-boundary -> sc-lint",
 ]
@@ -49,4 +44,4 @@ lint_rules = ["LINT-SC-CLI-DISPATCH"]
 review_gates = ["no_backend_cross_dependencies"]
 
 [status]
-state = "planned"
+state = "concrete_landed"

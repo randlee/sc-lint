@@ -1,0 +1,63 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# ── Finding ──────────────────────────────────────────────────────────────────
+
+<urn:atm:triage:finding/FTQ-001-PARTIAL>
+  a triage:Finding ;
+  triage:findingId "FTQ-001-PARTIAL" ;
+  triage:title "repo_root_discovery_walks_up_to_the_workspace_root — live boundaries/ assertion at tests.rs:194" ;
+  triage:description "crates/sc-lint/src/tests.rs:194-211 test repo_root_discovery_walks_up_to_the_workspace_root uses project_workspace_root() and contains a live boundaries/ directory assertion. This is a flaky test pattern — the test depends on the live repo structure rather than a hermetic fixture. Original FTQ-001 occurrences were closed; this one remains." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "FTQ" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "crate" ;
+  triage:pattern "project_workspace_root|workspace_root|boundaries/" ;
+  triage:fileFilter "tests\\.rs" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:references "PR #19 QA-PHASE-A-FINAL comment" , "crates/sc-lint/src/tests.rs:194-211" ;
+  triage:notes "Distinct from FTQ-001 (which covered workspace_root() in lint_sc_boundary_normalizes_* and lint_sc_runtime_normalizes_* tests, now closed). This is a new initial_pass finding for the project_workspace_root() use in the repo_root_discovery_walks_up_to_the_workspace_root test plus its live boundaries/ directory assertion at line 210. Only the integration/phase-A worktree was supplied; that single branch was swept. repeatable=false, so no full crate-scope sweep was performed beyond the cited file. Other project_workspace_root() uses in tests.rs (lines 421, 441, 497, 525, 568, 605, 626) drive hermetic fixtures via TempDir and are NOT in scope of this finding." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001-PARTIAL/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/FTQ-001-PARTIAL/integration-phase-A/2> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+# ── Occurrences on integration/phase-A ───────────────────────────────────────
+
+<urn:atm:triage:occurrence/FTQ-001-PARTIAL/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 195 ;
+  triage:snippet "let repo_root = project_workspace_root();" ;
+  triage:context "fn repo_root_discovery_walks_up_to_the_workspace_root — anchors the test in the live feature worktree instead of a hermetic fixture" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/FTQ-001-PARTIAL/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 210 ;
+  triage:snippet "assert!(root.join(\"boundaries\").is_dir());" ;
+  triage:context "fn repo_root_discovery_walks_up_to_the_workspace_root — asserts the live repo's boundaries/ directory exists; will flip if the directory is renamed, removed, or absent from a synthetic fixture" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+# ── WorktreeSnapshots ────────────────────────────────────────────────────────
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 ;
+  triage:branchStatus "open" .

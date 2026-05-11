@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-NEW-003>
+  a triage:Finding ;
+  triage:findingId "RBP-NEW-003" ;
+  triage:title "runtime PackageName/TargetName missing AsRef/Deref vs portability counterparts" ;
+  triage:description "sc-lint-runtime defines PackageName/TargetName newtypes in source_scan.rs without AsRef<str>/Deref implementations, inconsistent with the RBP-F009 fix applied to sc-lint-portability counterparts which have both AsRef<str> and Deref<Target=str>." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-NEW-003/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-NEW-003/integration-phase-A/2> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/fff8b88> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/RBP-NEW-003/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/source_scan.rs" ;
+  triage:line 14 ;
+  triage:snippet "pub(crate) struct PackageName(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/RBP-NEW-003/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/source_scan.rs" ;
+  triage:line 35 ;
+  triage:snippet "pub(crate) struct TargetName(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:worktree/integration-phase-A/fff8b88>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:orderIndex 99 .

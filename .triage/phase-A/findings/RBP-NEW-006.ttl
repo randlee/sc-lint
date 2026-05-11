@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-NEW-006>
+  a triage:Finding ;
+  triage:findingId "RBP-NEW-006" ;
+  triage:title "reserved-Result seam in CommandContext::from_cli undocumented" ;
+  triage:description "Informational: RBP-F008 fix added a doc comment marking the Result as reserved for future failure modes, but the reservation comment is minimal — does not describe under what conditions a failure might occur. The doc comment mentions future command-surface validation but omits concrete examples." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-NEW-006/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/fff8b88> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:occurrence/RBP-NEW-006/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/command.rs" ;
+  triage:line 219 ;
+  triage:snippet "    pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/fff8b88> .
+
+<urn:atm:triage:worktree/integration-phase-A/fff8b88>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "fff8b88" ;
+  triage:orderIndex 99 .

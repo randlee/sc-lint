@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PHAS-A-NEW-009>
+  a triage:Finding ;
+  triage:findingId "PHAS-A-NEW-009" ;
+  triage:title "sprint-A4.md stale placeholder frontmatter (worktree/branch only)" ;
+  triage:description "docs/sc-lint/sprint-A4.md has stale worktree and branch placeholder values in frontmatter. The worktree field is set to the literal '<repo-root>' and the branch field is set to 'develop' rather than reflecting the actual completed sprint branch. Status is already correctly set to 'complete'." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-009/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/c1c3133> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-009/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A4.md" ;
+  triage:line 1 ;
+  triage:snippet "worktree: <repo-root>\\nbranch: develop" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:worktree/integration-phase-A/c1c3133>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:orderIndex 99 .

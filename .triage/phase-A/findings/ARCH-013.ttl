@@ -1,0 +1,222 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# ============================================================
+# Finding: ARCH-013
+# Six shared types duplicated verbatim in sc-lint-runtime — RULE-005
+# Triaged: 2026-05-10T00:00:00Z
+# ============================================================
+
+<urn:atm:triage:finding/ARCH-013>
+  a triage:Finding ;
+  triage:findingId "ARCH-013" ;
+  triage:title "Six shared types duplicated verbatim in sc-lint-runtime — RULE-005" ;
+  triage:description "sc-lint-runtime/src/lib.rs defines OutputFormat (line 21), NodeId (line 58), OwnerId (line 94), FindingsReport (line 129), ReportStatus (line 140), Finding (line 155) — identical to the same-named types in sc-lint-boundary/src/lib.rs. RULE-005 forbids duplicate struct/enum definitions across crates." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable true ;
+  triage:sweepScope "workspace" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-4> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-5> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-6> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-4> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-5> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-6> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A5/a392088> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+# ============================================================
+# WorktreeSnapshots
+# ============================================================
+
+<urn:atm:triage:worktree/sprint-A4/aac4dea>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:orderIndex 4 ;
+  triage:branchState "absent" .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 ;
+  triage:branchState "open" .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 ;
+  triage:branchState "absent" .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 ;
+  triage:branchState "absent" .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 ;
+  triage:branchState "absent" .
+
+# ============================================================
+# Occurrences — sc-lint-runtime/src/lib.rs (A5)
+# ============================================================
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 21 ;
+  triage:snippet "pub enum OutputFormat {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 58 ;
+  triage:snippet "pub struct NodeId(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 94 ;
+  triage:snippet "pub struct OwnerId(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-4>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 129 ;
+  triage:snippet "pub struct FindingsReport {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-5>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 140 ;
+  triage:snippet "pub enum ReportStatus {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/runtime-6>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 155 ;
+  triage:snippet "pub struct Finding {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+# ============================================================
+# Occurrences — sc-lint-boundary/src/lib.rs (A5)
+# These are the canonical-side duplicates (counterparts in runtime)
+# ============================================================
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:line 81 ;
+  triage:snippet "pub enum OutputFormat {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:line 162 ;
+  triage:snippet "pub struct NodeId(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:line 229 ;
+  triage:snippet "pub struct OwnerId(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-4>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:line 295 ;
+  triage:snippet "pub struct FindingsReport {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-5>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:line 306 ;
+  triage:snippet "pub enum ReportStatus {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/ARCH-013/sprint-A5/boundary-6>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:line 321 ;
+  triage:snippet "pub struct Finding {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .

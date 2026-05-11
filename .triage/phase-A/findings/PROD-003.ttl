@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PROD-003>
+  a triage:Finding ;
+  triage:findingId "PROD-003" ;
+  triage:title "top-level-cli.toml does not model sc_lint::consts public surface" ;
+  triage:description "boundaries/sc-lint/top-level-cli.toml lines 15-21 does not model the now-public sc_lint::consts surface exported at crates/sc-lint/src/lib.rs:4 and defined in crates/sc-lint/src/consts.rs:1-22. Either re-hide sc_lint::consts or record it explicitly as part of the CLI public boundary." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PROD-003/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/51e36af> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:occurrence/PROD-003/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "boundaries/sc-lint/top-level-cli.toml" ;
+  triage:line 15 ;
+  triage:snippet "roots = [\"CheckTarget\", \"Cli\", \"ClippyTarget\", \"Command\", \"LintTarget\", \"ViewTarget\", \"CommandContext\", \"DispatchTelemetry\", \"LoadedConfig\", \"CommandEnvelope\", \"CliError\", \"CliErrorKind\", \"RenderedOutput\", \"WINDOWS_XWIN_TARGET\", \"ImmediateOutcome\", \"ParsedInvocation\", \"ExecutionOutcome\", \"logging::dispatch_event\", \"run\"]" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:worktree/integration-phase-A/51e36af>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:orderIndex 99 .

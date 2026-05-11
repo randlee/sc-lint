@@ -1,0 +1,42 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: CI-CLIPPY-001
+# clippy::for_kv_map at inventory.rs:514 — CI-blocking
+# Source: QA-PHASE-A-FINAL-002 rust-qa-agent + CI
+# Triaged: 2026-05-10T23:00:00Z
+
+<urn:atm:triage:finding/CI-CLIPPY-001>
+  a triage:Finding ;
+  triage:findingId "CI-CLIPPY-001" ;
+  triage:title "clippy::for_kv_map at crates/sc-lint-boundary/src/inventory.rs:514" ;
+  triage:description "for (key, _item) in &planning.planned_items should be for key in planning.planned_items.keys(). Confirmed by CI Clippy job and rust-qa-agent. Blocks CI merge gate on PR #19." ;
+  triage:category "CI" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T23:00:00Z"^^xsd:dateTime ;
+  triage:notes "One-line mechanical fix. CI-confirmed. Only occurrence in workspace per rust-qa-agent sweep." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/CI-CLIPPY-001/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/58767cf> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/58767cf> .
+
+<urn:atm:triage:occurrence/CI-CLIPPY-001/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/inventory.rs" ;
+  triage:line 514 ;
+  triage:snippet "for (key, _item) in &planning.planned_items" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "integration/phase-A" ; triage:headSha "58767cf" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/58767cf> .
+
+<urn:atm:triage:worktree/integration-phase-A/58767cf>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "58767cf" ;
+  triage:orderIndex 99 .
