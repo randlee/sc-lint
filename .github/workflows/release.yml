@@ -56,7 +56,11 @@ jobs:
               echo "Tag ${tag} already exists and points to origin/main (${main_sha}), skipping creation"
               exit 0
             fi
-            echo "Tag ${tag} exists but points to ${remote_tag_sha}, not origin/main (${main_sha})" >&2
+            if git merge-base --is-ancestor "$remote_tag_sha" "$main_sha"; then
+              echo "Tag ${tag} already exists at ${remote_tag_sha}, which is an ancestor of main (${main_sha}); skipping creation"
+              exit 0
+            fi
+            echo "Tag exists but points to ${remote_tag_sha}, which is not an ancestor of origin/main (${main_sha})" >&2
             exit 1
           fi
           git tag "$tag" origin/main
