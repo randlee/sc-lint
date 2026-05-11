@@ -24,8 +24,10 @@ deliverables instead of ad hoc cleanup.
    - `pub` visibility exceeding the documented contract surface
    - raw `String` fields used for structured identifiers such as
      `boundary_id`, sprint ids, owner ids, and planning keys
-2. ADR draft stub for observability boundary policy beyond the current
-   structured-logging rollout.
+2. ADR draft stub
+   ([`ADR-009 — Observability Boundary Policy`](./adr/ADR-009-observability-boundary-policy.md))
+   for observability boundary policy beyond the current structured-logging
+   rollout.
 3. QA-process carry-forward: require `rust-best-practices` in
    `practice_mode:all` on every sprint.
 
@@ -44,6 +46,33 @@ most common systemic regressions before they escape to late QA:
 - visibility-contract gate for `pub` vs `pub(crate)` drift
 - structured-identifier gate for typed `boundary_id`/owner/sprint/planning
   fields
+
+The planned gate contracts for this sprint are:
+
+- API-error gate
+  - ban public API error types from exposing `anyhow::Error` or `AnyhowError`
+    directly in public signatures, fields, or enum variants
+  - require an opaque wrapper or `Box<dyn Error + Send + Sync>`-style
+    abstraction when dynamic error transport is necessary
+  - sprint success criteria:
+    - no public API type exposes `anyhow` in its public error contract
+- shared-newtype gate
+  - declare `sc-lint-schema` as the canonical owner of workspace-shared
+    identifier types such as `CrateId`
+  - sprint work must consolidate duplicate `CrateId` definitions into that
+    canonical crate instead of tolerating parallel local copies
+  - sprint success criteria:
+    - all shared `CrateId` usage resolves to the canonical definition in
+      `sc-lint-schema`
+- structured-identifier gate
+  - treat raw `String` fields for structured identifiers such as
+    `boundary_id`, sprint ids, owner ids, and planning keys as a required-fix
+    design issue rather than something to suppress
+  - sprint work must introduce the missing identifier newtypes instead of
+    adding waivers or documentation-only exceptions
+  - sprint success criteria:
+    - structured identifier fields use the newtype surface introduced by the
+      sprint rather than raw `String`
 
 ### Observability ADR
 
@@ -67,4 +96,3 @@ Record the new standing QA expectation:
 3. The QA-process change calls for `rust-best-practices` in
    `practice_mode:all` on every sprint.
 4. The sprint is linked from the Phase-B plan and the project planning index.
-
