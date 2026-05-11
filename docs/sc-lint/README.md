@@ -45,8 +45,7 @@ Current contents:
   envelope and backend-to-CLI normalization contract
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
-- [`../../crates/sc-lint/README.md`](../../crates/sc-lint/README.md) —
-  top-level CLI crate guide
+- [`../../README.md`](../../README.md) — top-level CLI crate and workspace guide
 - [`../../crates/sc-lint-boundary/README.md`](../../crates/sc-lint-boundary/README.md) —
   user guide for `sc-lint lint sc-boundary`
 - [`../../crates/sc-lint-portability/README.md`](../../crates/sc-lint-portability/README.md) —
