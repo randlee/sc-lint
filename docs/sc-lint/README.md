@@ -45,12 +45,20 @@ Current contents:
   envelope and backend-to-CLI normalization contract
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
-- [`tools/sc-boundary.md`](./tools/sc-boundary.md) — user guide for
-  `sc-lint lint sc-boundary`
-- [`tools/sc-portability.md`](./tools/sc-portability.md) — user guide for
-  `sc-lint lint sc-portability`
-- [`tools/sc-runtime.md`](./tools/sc-runtime.md) — user guide for
-  `sc-lint lint sc-runtime`
+- [`../../crates/sc-lint/README.md`](../../crates/sc-lint/README.md) —
+  top-level CLI crate guide
+- [`../../crates/sc-lint-boundary/README.md`](../../crates/sc-lint-boundary/README.md) —
+  user guide for `sc-lint lint sc-boundary`
+- [`../../crates/sc-lint-portability/README.md`](../../crates/sc-lint-portability/README.md) —
+  user guide for `sc-lint lint sc-portability`
+- [`../../crates/sc-lint-runtime/README.md`](../../crates/sc-lint-runtime/README.md) —
+  user guide for `sc-lint lint sc-runtime`
+- [`../../crates/sc-lint-schema/README.md`](../../crates/sc-lint-schema/README.md) —
+  shared schema crate guide
+- [`../../crates/sc-lint-directives/README.md`](../../crates/sc-lint-directives/README.md) —
+  shared directives crate guide
+- [`../../crates/sc-lint-attributes/README.md`](../../crates/sc-lint-attributes/README.md) —
+  proc-macro attribute crate guide
 
 Current intended crate split:
 

@@ -146,7 +146,7 @@ sc-lint --json lint sc-boundary
 ```
 
 That command returns the standard top-level envelope from
-[`cli-contract.md`](../cli-contract.md):
+[`cli-contract.md`](../../docs/sc-lint/cli-contract.md):
 
 - success:
   - `ok: true`
@@ -185,6 +185,5 @@ For A.7 manifest-policy coverage, the same command path also carries:
 
 See:
 
-- [logging.md](../logging.md)
-- [ADR-006](../adr/ADR-006-ai-first-cli-contract.md)
-
+- [logging.md](../../docs/sc-lint/logging.md)
+- [ADR-006](../../docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md)

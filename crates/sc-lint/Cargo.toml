@@ -8,6 +8,7 @@ license.workspace = true
 description = "Top-level CLI composition root for the sc-lint tool family."
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 
 [[bin]]
 name = "sc-lint"
