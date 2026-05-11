@@ -15,6 +15,9 @@ Phase A planning surface.
   - analyzer-crate partitioning and primary lint-target mapping
 - [`ADR-008-sc-observability-logging.md`](./ADR-008-sc-observability-logging.md)
   - `sc-observability` selection and CLI-owned structured logging policy
+- [`ADR-009-observability-boundary-policy.md`](./ADR-009-observability-boundary-policy.md)
+  - draft stub for the broader observability boundary-policy follow-up in
+    Sprint B.1
 
 ## Index Rules
 

@@ -49,6 +49,7 @@ The current project focus is:
   - see [docs/issues-inventory.md](./issues-inventory.md)
 - current phase execution plan
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
+  - see [docs/sc-lint/phase-B-plan.md](./sc-lint/phase-B-plan.md)
   - see [docs/sc-lint/sprint-A1a.md](./sc-lint/sprint-A1a.md)
   - see [docs/sc-lint/sprint-A1b.md](./sc-lint/sprint-A1b.md)
   - see [docs/sc-lint/sprint-A2.md](./sc-lint/sprint-A2.md)
@@ -116,6 +117,9 @@ The currently scheduled foundation sprints are:
 - `A.8`
   - per-tool user guides and rule-disable documentation
   - `docs/sc-lint/sprint-A8.md`
+- `B.1`
+  - phase-A post-mortem carry-forwards and systemic lint-gate planning
+  - `docs/sc-lint/sprint-B1.md`
 
 ## Next Analyzer-Crate Additions
 
