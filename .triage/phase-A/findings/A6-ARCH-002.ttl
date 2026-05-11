@@ -1,0 +1,45 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A6-ARCH-002
+# ADR-008 RULE-001 boundary record gap: top-level-cli.toml missing logging.rs as
+# approved sc-observability entry point.
+# Source: QA-A6-001 ARCH-002 (initial), QA-PHASE-A-FINAL on PR #19 (followup).
+# Followup-triaged: 2026-05-10T23:22:46Z
+
+<urn:atm:triage:finding/A6-ARCH-002>
+  a triage:Finding ;
+  triage:findingId "A6-ARCH-002" ;
+  triage:title "RULE-001: logging.rs not documented as approved sc-observability entry point in boundary TOML" ;
+  triage:description "ADR-008 RULE-001 requires that crates/sc-lint/src/logging.rs (the sc-observability entry point) be explicitly modeled as an approved entry point in boundaries/sc-lint/top-level-cli.toml. The PROD-001 fix removed `dispatch_event` from composition roots but did not add a replacement `logging` boundary entry. logging.rs imports sc_observability::{Logger, LoggerBuilder, LogEvent, JsonlFileSink, ...} and is therefore the canonical sc-observability entry point that RULE-001 mandates be documented. On integration/phase-A at 2bb6d32, the [composition] roots list still omits `logging`." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "followup_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T23:22:46Z"^^xsd:dateTime ;
+  triage:notes "Followup pass on integration/phase-A at 2bb6d32: prior initial_pass recorded this finding open on feature/sprint-A6 at 8544597. After sprint-A6 merged forward to integration/phase-A and the PROD-001 fix landed (removing dispatch_event from roots), the finding remains open because no replacement logging entry was added. Not a regression and not merge_forward_needed — the gap was carried through unchanged. Fix path: amend boundaries/sc-lint/top-level-cli.toml [composition].roots (or add a dedicated approved-entry-points section) to model logging.rs per ADR-008 RULE-001." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A6-ARCH-002/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/A6-ARCH-002/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "boundaries/sc-lint/top-level-cli.toml" ;
+  triage:line 18 ;
+  triage:snippet "roots = [\"CheckTarget\", \"Cli\", \"ClippyTarget\", \"Command\", \"LintTarget\", \"ViewTarget\", \"CommandContext\", \"DispatchTelemetry\", \"LoadedConfig\", \"CommandEnvelope\", \"CliError\", \"CliErrorKind\", \"RenderedOutput\", \"WINDOWS_XWIN_TARGET\", \"ImmediateOutcome\", \"ParsedInvocation\", \"ExecutionOutcome\", \"consts\", \"run\"]  # `logging` absent" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .

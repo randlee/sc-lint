@@ -1,0 +1,62 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F004>
+  a triage:Finding ;
+  triage:findingId "RBP-F004" ;
+  triage:title "RBP-001: BoundaryDispatchError::into_cli_error missing suggested_action on all 3 error arms" ;
+  triage:description "crates/sc-lint/src/dispatch.rs:29 BoundaryDispatchError::into_cli_error has no suggested_action field on any of its 3 error arms. Root path in error message is an unstructured string rather than structured detail. RBP-001 requires actionable error context including suggested_action." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F004/phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F004/phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F004/phase-A/3> ;
+  triage:openOn <urn:atm:triage:worktree/phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F004/phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/dispatch.rs" ;
+  triage:line 31 ;
+  triage:snippet "Self::Analysis(error) => CliError::backend_failure(format!(...)).with_source(error).with_detail(consts::FIELD_TOOL, json!(tool)).with_detail(consts::FIELD_ROOT, json!(repo_root.map(|root| root.display().to_string())))" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:headSha "2bb6d32" ;
+  triage:branch "integration/phase-A" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F004/phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/dispatch.rs" ;
+  triage:line 44 ;
+  triage:snippet "Self::Serialize(error) => CliError::backend_protocol(format!(\"{tool} produced a report that could not be encoded as machine JSON\")).with_source(error).with_detail(consts::FIELD_TOOL, json!(tool))" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:headSha "2bb6d32" ;
+  triage:branch "integration/phase-A" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F004/phase-A/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/dispatch.rs" ;
+  triage:line 49 ;
+  triage:snippet "Self::Normalize(error) => CliError::backend_protocol(format!(\"{tool} returned malformed machine output\")).with_source(error).with_detail(consts::FIELD_TOOL, json!(tool))" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:headSha "2bb6d32" ;
+  triage:branch "integration/phase-A" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-A/2bb6d32> .
+
+<urn:atm:triage:worktree/phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .

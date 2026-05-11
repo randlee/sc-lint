@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F007>
+  a triage:Finding ;
+  triage:findingId "RBP-F007" ;
+  triage:title ".unwrap_or_else allocates String on every cycle-check pass" ;
+  triage:description ".unwrap_or_else(|| \"unknown_trait\".to_string()) allocates a new String on every call in a hot cycle-check loop. Should use a static str fallback." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F007/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F007/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/analysis.rs" ;
+  triage:line 101 ;
+  triage:snippet ".unwrap_or_else(|| \"unknown_trait\".to_string());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .

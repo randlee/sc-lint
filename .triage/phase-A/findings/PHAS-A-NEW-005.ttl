@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PHAS-A-NEW-005>
+  a triage:Finding ;
+  triage:findingId "PHAS-A-NEW-005" ;
+  triage:title "RuntimeError.detail: String erases anyhow chain — inconsistent with BoundaryError/PortabilityError" ;
+  triage:description "crates/sc-lint-runtime/src/lib.rs lines 74 and 76: RuntimeError variants AnalyzeFindings and CountScannedCrates carry a plain String detail field. The anyhow error chain is flattened via source.to_string() at call sites (lines 85, 91), erasing intermediate causes. BoundaryError and PortabilityError preserve the chain. This creates inconsistent error reporting across crates." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-005/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-005/integration-phase-A/2> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/c1c3133> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-005/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 74 ;
+  triage:snippet "AnalyzeFindings { root: PathBuf, detail: String }," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-005/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 76 ;
+  triage:snippet "CountScannedCrates { root: PathBuf, detail: String }," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:worktree/integration-phase-A/c1c3133>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:orderIndex 99 .

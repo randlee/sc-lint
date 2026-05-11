@@ -5,14 +5,22 @@ analysis, and portability checks.
 
 ## Workspace
 
-This repository currently ships three crates:
+This repository currently ships these primary crates:
 
+- `sc-lint`
+  - top-level CLI crate and canonical machine-contract surface
 - `sc-lint-directives`
   - shared parsing/types for `#[sc_lint(...)]` directives
 - `sc-lint-attributes`
   - proc-macro crate that provides the `#[sc_lint(...)]` attribute namespace
+- `sc-lint-schema`
+  - shared findings/report schema used across analyzer crates
 - `sc-lint-boundary`
   - CLI and library for `syn`-based analysis, findings output, and graph export
+- `sc-lint-portability`
+  - portability analyzer crate
+- `sc-lint-runtime`
+  - runtime/concurrency analyzer crate
 
 The workspace version is managed from the root `Cargo.toml` and currently
 starts at `0.1.0`.
@@ -49,11 +57,14 @@ Available but intentionally manual/advisory:
   - `cargo modules dependencies --acyclic`
   - internal module dependency cycle detection per workspace crate
 - `sc-boundary`
-  - `sc-lint-boundary analyze`
+  - `sc-lint lint sc-boundary`
   - preliminary `syn`-based architectural linting and boundary analysis
 - `sc-portability`
-  - `sc-lint-boundary analyze --rule portability`
+  - `sc-lint lint sc-portability`
   - preliminary portability analysis
+- `sc-runtime`
+  - `sc-lint lint sc-runtime`
+  - std runtime/concurrency analysis
 
 Fast local subset:
 
@@ -82,12 +93,23 @@ Current implemented rule families:
   - `boundary.internal_only` external reference violation
 - `SCB-BOUNDARY-003`
   - `boundary.forbid_external_impls` violation
+
+## sc-lint-portability
+
+`sc-lint-portability` owns the shipped portability rule family.
+
+Current implemented rule families:
+
 - `PORT-001`
   - hardcoded Unix-only absolute paths in test code
 - `PORT-002`
   - `dirs::home_dir()` without configured override handling
 - `PORT-003`
   - `std::env::set_var()` in test code
+- `PORT-004`
+  - ungated `std::os::unix` imports in production code
+- `PORT-005`
+  - `#[cfg_attr(not(unix), allow(dead_code))]` portability suppressors
 
 Supported outputs:
 
@@ -106,6 +128,8 @@ just lint fast
 just lint sc-boundary
 just lint sc-portability
 cargo run -p sc-lint-boundary -- analyze --root . --format text
+cargo run -p sc-lint-portability -- analyze --root . --format text
+cargo run -p sc-lint-runtime -- analyze --root . --format text
 cargo run -p sc-lint-boundary -- export-graph --root . --format turtle
 ```
 
@@ -148,6 +172,9 @@ The current GitHub Actions sequence mirrors the local workflow:
 Detailed design and planning material lives under:
 
 - [`docs/sc-lint/README.md`](docs/sc-lint/README.md)
+- [`docs/sc-lint/tools/sc-boundary.md`](docs/sc-lint/tools/sc-boundary.md)
+- [`docs/sc-lint/tools/sc-portability.md`](docs/sc-lint/tools/sc-portability.md)
+- [`docs/sc-lint/tools/sc-runtime.md`](docs/sc-lint/tools/sc-runtime.md)
 - [`docs/sc-lint/requirements.md`](docs/sc-lint/requirements.md)
 - [`docs/sc-lint/graph-schema.md`](docs/sc-lint/graph-schema.md)
 - [`docs/sc-lint/boundary-enforcement-model.md`](docs/sc-lint/boundary-enforcement-model.md)

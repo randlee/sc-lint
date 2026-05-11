@@ -1,154 +1,181 @@
-# Sprint A.4 — Rust Boundary Inventory Migration
+# Sprint A.4 — Portability Crate Extraction
 
 ```yaml
 plan_type: sprint_plan
 phase: A
 sprint: "A.4"
-worktree: /Users/randlee/Documents/github/sc-lint
-branch: develop
-status: planned
-estimated_scope: L
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4
+branch: feature/sprint-A4
+status: complete
+estimated_scope: M
 ```
 
 ## Goal
 
-Move boundary inventory and manifest-policy enforcement into
-`sc-lint-boundary`, while preserving Python parity validation and folding in
-the reusable postmortem analyzer families that are already proven in
-`atm-core`.
+Create `sc-lint-portability` and move the shared portability rule family into
+its dedicated analyzer crate.
 
 ## Scope Summary
 
-This sprint is the largest release-1 foundation sprint. It moves the canonical
-boundary loading and manifest-policy logic into Rust, keeps the Python path as
-an oracle during the migration window, and brings the consumer-proven reusable
-analyzer families into the shared boundary analyzer.
+This sprint is intentionally crate-scoped. It creates the portability tool
+crate, moves the existing portability implementation out of
+`sc-lint-boundary`, and imports the additional proven portability rules from
+`atm-core`.
 
 ## Governing Requirements
 
-- `REQ-PRODUCT-004`
+- `REQ-PRODUCT-004A`
+- `REQ-PRODUCT-006`
 - `REQ-PRODUCT-006A`
-- `REQ-PRODUCT-007`
-- `REQ-PRODUCT-008`
-- `REQ-PRODUCT-009`
-- `REQ-PRODUCT-009A`
-- `REQ-PRODUCT-014`
-- `REQ-PRODUCT-015`
+- `REQ-PRODUCT-006AA`
+- `REQ-PRODUCT-006B`
 - `REQ-PRODUCT-015A`
+- `REQ-PRODUCT-015B`
+- `REQ-PRODUCT-015C`
+- `REQ-CLI-007F`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
-- `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`
 - `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
 
 ## Governing Boundaries
 
-- `BOUNDARY-ScLintBoundaryAnalyzer`
 - `BOUNDARY-ScLintCli`
-- `BOUNDARY-DirectiveModel`
+- `BOUNDARY-ScLintBoundaryAnalyzer`
+- `BOUNDARY-ScLintPortabilityAnalyzer`
 
 ## Prerequisites
 
-- A.1 through A.3 complete
-- TOML boundary records remain the canonical source of planning truth
-- Python boundary validator still available as a parity oracle
+- A.1a through A.3 complete
+- current `PORT-001/002/003` behavior remains green in the repo gate
 
 ## Hard Dependencies
 
-- do not retire the Python boundary path before parity validation is stable
-- do not move consumer-local policy lints into `sc-lint` unchanged
+- do not grow `sc-lint-boundary` with new portability rules once this sprint
+  starts
+- do not change rule ids during the crate move
 
 ## Non-Goals
 
-- full graph-database integration
-- replacing every Python utility
-- migrating ATM-local fixed-sleep, duplicate semantic string, or TTL triage
-  policy directly into `sc-lint`
+- runtime/concurrency rule migration
+- boundary inventory loader migration
+- manifest-policy migration
+- Tokio-specific rule work
+
+## Primary Targets
+
+- `Cargo.toml`
+- `crates/sc-lint-portability/`
+- `crates/sc-lint-boundary/`
+- `.just/lint_sc_portability.py`
+- `.just/run_lint.py`
+- `boundaries/sc-lint-portability/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/sc-lint/README.md`
+- `docs/requirements.md`
+- `docs/architecture.md`
 
 ## Sub-Tasks
 
-1. Implement TOML boundary inventory loading in Rust
+1. Create `sc-lint-portability`
    Development work:
-   - load boundary records and planning metadata in `sc-lint-boundary`
-   - validate schema and duplicate-source/id handling
+   - add the new crate to the workspace
+   - define its CLI/library entry points
+   - define its current direct dependencies
    Required tests:
-   - fixture tests for valid and invalid TOML inventories
-   - duplicate-id and duplicate-item-key tests
+   - workspace compile/tests for the new crate
    Required doc or boundary updates:
-   - keep migration docs aligned with the implemented loader behavior
+   - add or update portability crate references in requirements, architecture,
+     and roadmap docs
 
-2. Implement manifest ownership and manifest-section rules in Rust
+2. Move existing portability rules
    Development work:
-   - port dependency ownership rules
-   - port manifest-section placement rules
-   - emit stable Rust-native findings
+   - move `PORT-001`
+   - move `PORT-002`
+   - move `PORT-003`
+   from the current boundary analyzer path into `sc-lint-portability`
    Required tests:
-   - fixture workspaces with manifest-policy pass/fail cases
+   - rule regression tests for all moved rules
    Required doc or boundary updates:
-   - update rule documentation if rule ids or scopes narrow
+   - update docs that still describe these rules as temporary
 
-3. Keep Python parity validation during migration
+3. Import proven portability rules
    Development work:
-   - preserve the Python validator as a reference path
-   - add parity harnesses comparing Rust and Python outputs
+   - port `PORT-004`
+   - port `PORT-005`
+   into `sc-lint-portability`
    Required tests:
-   - parity tests on representative fixture inventories
+   - consumer-proven fixture or regression coverage for both imported rules
+   - parity validation against the source implementation in `atm-core`
    Required doc or boundary updates:
-   - document any intentional divergence explicitly
+   - update rule inventory references
 
-4. Backport reusable consumer-proven analyzer families
+4. Retarget wrapper and CLI ownership references
    Development work:
-   - migrate:
-     - `PORT-004`
-     - `PORT-005`
-     - `SCB-RUNTIME-001`
-     - `SCB-RUNTIME-002`
-   - keep rule ids stable
+   - retarget `sc-portability` wrappers to the new crate
+   - keep `sc-boundary` focused on boundary ownership only
+   - keep release-1 top-level CLI integration delegated unless a later design
+     update approves direct `sc-lint` crate linkage
    Required tests:
-   - analyzer tests for each migrated rule family
-   - regression tests copied from consumer-proven cases
+   - local lint target coverage for `sc-portability`
    Required doc or boundary updates:
-   - update requirements, roadmap, and rule docs with the migrated families
+   - keep the top-level CLI docs aligned so primary lint targets map to the
+     backend crate boundary
+
+5. Plan analyzer logging baseline for `sc-portability`
+   Development work:
+   - keep the logging ownership boundary at the `analyze_workspace` seam:
+     the top-level CLI initializes the logger and analyzer crates only emit
+     structured events through log macros inside the delegated analysis path
+   - define `sc-portability` analyzer entry logging for delegated analyze
+     calls
+   - define completion logging with verdict and finding count
+   - keep emission ownership in the top-level CLI logging layer and log only
+     after result normalization through `CommandEnvelope<T>` or `CliError`
+   Required tests:
+   - doc review for backend-service naming and finding-count event consistency
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the `sc-portability`
+     pattern
 
 ## Split Recommendation
 
-A.4 may split if needed:
-
-- A.4a boundary inventory + manifest-policy migration
-- A.4b reusable analyzer-family backports
-
-If split, A.4a must land first so the Rust boundary loader exists before more
-rules rely on it.
+Keep A.4 together. The portability crate should land with all five shared
+portability rules rather than leaving the rule family split across crates.
 
 ## Acceptance Criteria
 
-- `sc-lint-boundary` loads TOML boundary inventories directly
-- manifest-policy enforcement exists in Rust
-- Python parity validation still exists during the migration window
-- reusable `PORT-004/005` and `SCB-RUNTIME-001/002` live in `sc-lint-boundary`
-- docs explicitly state what remains Python-only and what is now Rust-native
+- `sc-lint-portability` exists in the workspace
+- `PORT-001` through `PORT-005` live in `sc-lint-portability`
+- `sc-lint-boundary` no longer owns portability-rule business logic
+- wrapper and CLI docs identify portability as its own backend surface
+- `sc-lint-portability` does not initialize the logger runtime and relies on
+  CLI-owned logging hooks only
+- portability-tool entry/exit/error events are emitted only after top-level
+  normalization through `CommandEnvelope<T>` or `CliError`
 
 ## Required Validation
 
 - `cargo test --workspace`
 - `cargo clippy --workspace --all-targets -- -D warnings`
-- `python3 -m unittest discover -s .just/tests -p 'test_*.py'`
 - `just lint`
 
 ## Required Document Updates
 
 - `docs/sc-lint/extraction-plan.md`
 - `docs/sc-lint/foundation-phase-plan.md`
-- `docs/sc-lint/boundary-toml-migration.md`
-- `docs/sc-lint/boundary-enforcement-model.md`
 - `docs/sc-lint/roadmap.md`
+- `docs/sc-lint/README.md`
 - `docs/project-plan.md`
 - `docs/requirements.md`
 - `docs/architecture.md`
 
 ## Risks And Watchouts
 
-- do not weaken boundary semantics during the Python-to-Rust transition
-- do not lose item-level planning/enforcement granularity
-- do not backport consumer-local governance rules as if they were shared
-  analyzer logic
+- do not leave the same portability rule family partially owned by two crates
+- do not invent Tokio-specific abstractions in the generic portability crate
+- do not let convenience wrapper names replace clear crate ownership in the
+  primary command surface

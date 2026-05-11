@@ -1,0 +1,65 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A5-NEW-002
+# roadmap.md contradicts itself: "planned" labels at lines 85,88 vs "owns...now" at line 83
+# Source: QA-A5-001 req-qa finding SC-QA-002 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A5-NEW-002>
+  a triage:Finding ;
+  triage:findingId "A5-NEW-002" ;
+  triage:title "roadmap.md contradicts itself — 'planned' labels present alongside 'owns...now' text" ;
+  triage:description "docs/sc-lint/roadmap.md lines 85 and 88 say 'planned' for items that the same document acknowledges as implemented (line 83: 'owns the shared portability rule family now'; line 97: 'The current implementation now places the shared portability rule family in sc-lint-portability.'). sprint-A5.md required doc updates list roadmap.md. Fix: remove or update the 'planned' labels at lines 85 and 88 to reflect current implementation state." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "Contradiction arrived in integration/phase-A via PR #13 (sprint-A4) merge at 1cd8862. Will propagate to A5-A8 via merge-forward. Sprint A5 is responsible for roadmap.md update per sprint-A5.md Required Document Updates. Fix on A5." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A5-NEW-002/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A5-NEW-002/integration-phase-A/2> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/1cd8862> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+<urn:atm:triage:occurrence/A5-NEW-002/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/roadmap.md" ;
+  triage:line 85 ;
+  triage:snippet "  - planned" ;
+  triage:context "Under sc-lint-portability section that already states 'owns the shared portability rule family now' at line 83" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1cd8862" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1cd8862> .
+
+<urn:atm:triage:occurrence/A5-NEW-002/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/roadmap.md" ;
+  triage:line 88 ;
+  triage:snippet "  - planned" ;
+  triage:context "Second 'planned' label in same sc-lint-portability section" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "1cd8862" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/1cd8862> .
+
+<urn:atm:triage:worktree/integration-phase-A/1cd8862>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "1cd8862" ;
+  triage:orderIndex 0 .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 .

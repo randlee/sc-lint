@@ -18,6 +18,8 @@ The current project focus is:
 - moving boundary inventory and manifest-policy enforcement from Python into
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`
+- splitting imported lint families into narrowly-scoped analyzer crates rather
+  than growing catch-all backends
 - keeping consumer-specific policy lints local unless only their framework is
   worth extracting
 - improving pre-CI developer confidence with cross-target compile checks where
@@ -36,14 +38,26 @@ The current project focus is:
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
+  - see [docs/sc-lint/crate-architecture.md](./sc-lint/crate-architecture.md)
+  - see [docs/sc-lint/adr/README.md](./sc-lint/adr/README.md)
+  - see [docs/sc-lint/logging.md](./sc-lint/logging.md)
+  - see [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+  - see [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
+- known issues inventory
+  - see [docs/issues-inventory.md](./issues-inventory.md)
 - current phase execution plan
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
-  - see [docs/sc-lint/sprint-A1.md](./sc-lint/sprint-A1.md)
+  - see [docs/sc-lint/sprint-A1a.md](./sc-lint/sprint-A1a.md)
+  - see [docs/sc-lint/sprint-A1b.md](./sc-lint/sprint-A1b.md)
   - see [docs/sc-lint/sprint-A2.md](./sc-lint/sprint-A2.md)
   - see [docs/sc-lint/sprint-A3.md](./sc-lint/sprint-A3.md)
   - see [docs/sc-lint/sprint-A4.md](./sc-lint/sprint-A4.md)
+  - see [docs/sc-lint/sprint-A5.md](./sc-lint/sprint-A5.md)
+  - see [docs/sc-lint/sprint-A6.md](./sc-lint/sprint-A6.md)
+  - see [docs/sc-lint/sprint-A7.md](./sc-lint/sprint-A7.md)
+  - see [docs/sc-lint/sprint-A8.md](./sc-lint/sprint-A8.md)
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
@@ -55,29 +69,94 @@ This phase should execute in the following order:
 2. make `just lint` self-host the repo's own analyzer checks by default
 3. add the top-level `sc-lint` CLI crate and define its canonical machine
    contract
-4. extract generic Python utilities
-5. backport reusable `atm-core`-proven analyzer families into `sc-lint`
+4. complete the A.1a exit review of the CLI contract against the needs of
+   extracted Python utilities and later analyzer backends before A.1b starts
+5. add top-level config loading and the first delegated backend path
 6. define the cross-target preflight strategy for local and CI lint flows
-7. migrate boundary inventory + manifest policy from Python into
-   `sc-lint-boundary`
-8. run parity validation before deprecating Python boundary logic
+7. extract generic Python utilities
+8. add the next analyzer crate needed for portability rule-family ownership
+9. move portability rules into `sc-lint-portability`
+10. add the next analyzer crate needed for std runtime rule-family ownership
+11. import runtime rules into `sc-lint-runtime`
+12. migrate boundary inventory loading/schema/duplicate handling from Python
+    into `sc-lint-boundary`
+13. migrate manifest policy into `sc-lint-boundary`
+14. run parity validation before deprecating Python boundary logic
+15. publish comprehensive per-tool user guides and rule-disable guidance for
+    the release-1 lint surface
 
 ## Scheduled Sprint Plans
 
 The currently scheduled foundation sprints are:
 
-- `A.1`
-  - CLI bootstrap
-  - `docs/sc-lint/sprint-A1.md`
+- `A.1a`
+  - CLI bootstrap and contract definition
+  - includes the A.1a exit-review checkpoint for Workstreams 4-7
+  - `docs/sc-lint/sprint-A1a.md`
+- `A.1b`
+  - config loading and first backend integration
+  - first operational path is `sc-lint lint sc-boundary`
+  - `docs/sc-lint/sprint-A1b.md`
 - `A.2`
   - profiles and Windows preflight
+  - active implementation branch: `feature/sprint-A2`
   - `docs/sc-lint/sprint-A2.md`
 - `A.3`
   - generic utility extraction
+  - active implementation branch: `feature/sprint-A3`
   - `docs/sc-lint/sprint-A3.md`
 - `A.4`
-  - Rust boundary inventory migration and reusable analyzer backports
+  - `sc-lint-portability` crate creation and portability-rule moves/imports
+  - current status: complete
   - `docs/sc-lint/sprint-A4.md`
+- `A.5`
+  - `sc-lint-runtime` crate creation and runtime-rule imports
+  - active implementation branch: `feature/sprint-A5`
+  - `docs/sc-lint/sprint-A5.md`
+- `A.6`
+  - Rust boundary inventory loading, schema validation, and duplicate handling
+  - active implementation branch: `feature/sprint-A6`
+  - `docs/sc-lint/sprint-A6.md`
+- `A.7`
+  - Rust manifest-policy enforcement and Python parity window
+  - active implementation branch: `feature/sprint-A7`
+  - `docs/sc-lint/sprint-A7.md`
+- `A.8`
+  - per-tool user guides and rule-disable documentation
+  - active implementation branch: `feature/sprint-A8`
+  - `docs/sc-lint/sprint-A8.md`
+
+## Recent Sprint Deltas
+
+- `A.6`
+  - Rust-native TOML boundary inventory loading, schema validation, and
+    duplicate handling now live in `sc-lint-boundary`
+  - the Python parity oracle now exists at `.just/lint_boundaries.py`
+  - fixture coverage now includes valid, invalid-schema, and duplicate
+    inventory cases in `.just/tests/test_lint_boundaries.py`
+- `A.8`
+  - per-tool user guides now live under `docs/sc-lint/tools/`
+  - direct guide links are now published from both `README.md` and
+    `docs/sc-lint/README.md`
+
+## Next Analyzer-Crate Additions
+
+The next planned tool crates after the current line are:
+
+- `sc-lint-portability`
+  - first moves/imports:
+    - `PORT-001`
+    - `PORT-002`
+    - `PORT-003`
+    - `PORT-004`
+    - `PORT-005`
+- `sc-lint-runtime`
+  - first moves/imports:
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
+- `sc-lint-tokio`
+  - planned crate reservation only for now
+  - no initial implementation scope until Tokio-specific rules justify it
 
 ## Release 1 Target
 
@@ -89,6 +168,7 @@ Release `0.1.x` should establish:
 - a documented and approved top-level `sc-lint` CLI contract
 - explicit machine-contract decisions for:
   - canonical `--json` mode
+  - one envelope and error pattern for every non-interactive command family
   - stable machine-readable failures
   - reusable request/response seams
   - secondary interactive graph surfaces only
@@ -108,6 +188,12 @@ Release `0.1.x` should establish:
   - `sc-lint ci`
 - an implementation path for moving boundary inventory and manifest-policy
   logic into Rust with Python parity validation retained during migration
+- comprehensive user guides for each shipped linter tool, including:
+  - how the tool is invoked
+  - representative examples
+  - how rules are disabled or scoped out when policy permits
+  - one document per tool named after the lint tool and linked from the
+    repository-root `README.md`
 
 The current phase, Phase `A`, is the release-1 foundation phase. It does not imply that
 every release-1 implementation item is already complete.

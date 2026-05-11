@@ -16,9 +16,21 @@ from check_version_sync import validate_winget_manifests
 from check_version_sync import success_message
 
 
-ROOT_MANIFEST = """\
+APP_CRATE = "fixture-app"
+CORE_CRATE = "fixture-lib"
+DAEMON_CRATE = "fixture-daemon"
+STORAGE_CRATE = "fixture-storage"
+APP_PACKAGE = "synthetic-app"
+CORE_PACKAGE = "synthetic-lib"
+DAEMON_PACKAGE = "synthetic-daemon"
+STORAGE_PACKAGE = "synthetic-storage"
+DEPENDENCY_KEY = "fixture-lib"
+WINGET_PACKAGE_ID = "example.synthetic-app"
+
+
+ROOT_MANIFEST = f"""\
 [workspace]
-members = ["crates/atm", "crates/atm-core", "crates/atm-daemon", "crates/atm-rusqlite"]
+members = ["crates/{APP_CRATE}", "crates/{CORE_CRATE}", "crates/{DAEMON_CRATE}", "crates/{STORAGE_CRATE}"]
 resolver = "2"
 
 [workspace.package]
@@ -46,23 +58,26 @@ class CheckVersionSyncTests(unittest.TestCase):
         (repo_root / "Cargo.toml").write_text(ROOT_MANIFEST, encoding="utf-8")
         crates_dir = repo_root / "crates"
         for crate_name, package_name in (
-            ("atm", "agent-team-mail"),
-            ("atm-core", "agent-team-mail-core"),
-            ("atm-daemon", "agent-team-mail-daemon"),
-            ("atm-rusqlite", "agent-team-mail-rusqlite"),
+            (APP_CRATE, APP_PACKAGE),
+            (CORE_CRATE, CORE_PACKAGE),
+            (DAEMON_CRATE, DAEMON_PACKAGE),
+            (STORAGE_CRATE, STORAGE_PACKAGE),
         ):
             crate_dir = crates_dir / crate_name
             crate_dir.mkdir(parents=True)
             extra = ""
-            if crate_name == "atm":
-                extra = '\n[dependencies]\natm-core = { package = "agent-team-mail-core", path = "../atm-core", version = "1.1.2" }\n'
+            if crate_name == APP_CRATE:
+                extra = (
+                    f'\n[dependencies]\n{DEPENDENCY_KEY} = '
+                    f'{{ package = "{CORE_PACKAGE}", path = "../{CORE_CRATE}", version = "1.1.2" }}\n'
+                )
             (crate_dir / "Cargo.toml").write_text(crate_manifest(package_name, extra=extra), encoding="utf-8")
 
     def test_validate_crate_versions_checks_all_member_manifests(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             self.write_repo(repo_root)
-            manifest = repo_root / "crates/atm-rusqlite/Cargo.toml"
+            manifest = repo_root / "crates" / STORAGE_CRATE / "Cargo.toml"
             manifest.write_text(
                 manifest.read_text(encoding="utf-8").replace("version.workspace = true\n", ""),
                 encoding="utf-8",
@@ -73,7 +88,7 @@ class CheckVersionSyncTests(unittest.TestCase):
 
             message = str(error.exception).replace("\\", "/")
             self.assertIn(
-                "crates/atm-rusqlite/Cargo.toml must define [package].version either as a non-empty string or version.workspace = true",
+                f"crates/{STORAGE_CRATE}/Cargo.toml must define [package].version either as a non-empty string or version.workspace = true",
                 message,
             )
 
@@ -86,15 +101,15 @@ class CheckVersionSyncTests(unittest.TestCase):
 version = 3
 
 [[package]]
-name = "agent-team-mail"
+name = "synthetic-app"
 version = "1.1.2"
 
 [[package]]
-name = "agent-team-mail-core"
+name = "synthetic-lib"
 version = "1.1.2"
 
 [[package]]
-name = "agent-team-mail-daemon"
+name = "synthetic-daemon"
 version = "1.1.2"
 """,
                 encoding="utf-8",
@@ -103,13 +118,13 @@ version = "1.1.2"
             with self.assertRaises(SystemExit) as error:
                 validate_lockfile(repo_root, "1.1.2")
 
-            self.assertIn("agent-team-mail-rusqlite missing from Cargo.lock", str(error.exception))
+            self.assertIn(f"{STORAGE_PACKAGE} missing from Cargo.lock", str(error.exception))
 
     def test_validate_crate_versions_requires_internal_path_dep_pin(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             self.write_repo(repo_root)
-            manifest = repo_root / "crates/atm/Cargo.toml"
+            manifest = repo_root / "crates" / APP_CRATE / "Cargo.toml"
             manifest.write_text(
                 manifest.read_text(encoding="utf-8").replace(', version = "1.1.2"', ""),
                 encoding="utf-8",
@@ -119,7 +134,8 @@ version = "1.1.2"
                 validate_crate_versions(repo_root, "1.1.2")
 
             self.assertIn(
-                'crates/atm/Cargo.toml [dependencies.atm-core]: internal path dependency version must match target crate version "1.1.2"',
+                f'crates/{APP_CRATE}/Cargo.toml [dependencies.{DEPENDENCY_KEY}]: '
+                'internal path dependency version must match target crate version "1.1.2"',
                 str(error.exception),
             )
 
@@ -127,9 +143,9 @@ version = "1.1.2"
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             (repo_root / "Cargo.toml").write_text(
-                """\
+                f"""\
 [workspace]
-members = ["crates/atm-core", "crates/sc-lint-attributes"]
+members = ["crates/{CORE_CRATE}", "crates/sc-lint-attributes"]
 resolver = "2"
 
 [workspace.package]
@@ -137,11 +153,11 @@ version = "1.1.2"
 """,
                 encoding="utf-8",
             )
-            atm_core_dir = repo_root / "crates/atm-core"
-            atm_core_dir.mkdir(parents=True)
-            (atm_core_dir / "Cargo.toml").write_text(
+            core_dir = repo_root / "crates" / CORE_CRATE
+            core_dir.mkdir(parents=True)
+            (core_dir / "Cargo.toml").write_text(
                 crate_manifest(
-                    "agent-team-mail-core",
+                    CORE_PACKAGE,
                     extra='\n[dependencies]\nsc-lint-attributes = { path = "../sc-lint-attributes", version = "0.1.0" }\n',
                 ),
                 encoding="utf-8",
@@ -175,14 +191,14 @@ homepage.workspace = true
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             (repo_root / ".winget").mkdir(parents=True)
-            (repo_root / ".winget/randlee.agent-team-mail.yaml").write_text(
-                """\
-PackageIdentifier: randlee.agent-team-mail
+            (repo_root / f".winget/{WINGET_PACKAGE_ID}.yaml").write_text(
+                f"""\
+PackageIdentifier: {WINGET_PACKAGE_ID}
 PackageVersion: 1.1.2
 Installers:
   - Architecture: x64
     InstallerType: zip
-    InstallerUrl: https://github.com/randlee/atm-core/releases/download/v1.1.2/atm_1.1.2_x86_64-pc-windows-msvc.zip
+    InstallerUrl: https://example.invalid/downloads/synthetic-app_1.1.2_x86_64-pc-windows-msvc.zip
 ManifestType: installer
 ManifestVersion: 1.1.2
 """,

@@ -22,38 +22,67 @@ Current contents:
 - [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
   execution plan for repo self-hosting, boundaries, CLI introduction, and
   extraction order
-- [`sprint-A1.md`](./sprint-A1.md) — top-level CLI bootstrap sprint
+- [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
+  ownership, and Phase A touchpoint guide
+- [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
+  decisions
+- [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract
+  definition sprint
+- [`sprint-A1b.md`](./sprint-A1b.md) — top-level config loading and first
+  backend integration sprint
 - [`sprint-A2.md`](./sprint-A2.md) — profiles and `xwin` sprint
 - [`sprint-A3.md`](./sprint-A3.md) — generic utility extraction sprint
-- [`sprint-A4.md`](./sprint-A4.md) — Rust boundary migration and analyzer
-  backport sprint
+- [`sprint-A4.md`](./sprint-A4.md) — portability crate extraction sprint
+- [`sprint-A5.md`](./sprint-A5.md) — runtime crate extraction sprint
+- [`sprint-A6.md`](./sprint-A6.md) — Rust boundary inventory loader sprint
+- [`sprint-A7.md`](./sprint-A7.md) — manifest-policy and parity sprint
+- [`sprint-A8.md`](./sprint-A8.md) — per-tool user-guide sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
   the planned top-level `sc-lint` CLI
 - [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
   envelope and backend-to-CLI normalization contract
+- [`logging.md`](./logging.md) — structured logging design, rollout, and event
+  schema for the top-level CLI
+- [`tools/sc-boundary.md`](./tools/sc-boundary.md) — user guide for
+  `sc-lint lint sc-boundary`
+- [`tools/sc-portability.md`](./tools/sc-portability.md) — user guide for
+  `sc-lint lint sc-portability`
+- [`tools/sc-runtime.md`](./tools/sc-runtime.md) — user guide for
+  `sc-lint lint sc-runtime`
 
 Current intended crate split:
 
 - `sc-lint`
-  - planned top-level CLI crate
+  - top-level CLI crate
   - command parsing, config loading, output normalization, tool dispatch
   - canonical AI-first machine contract for non-interactive commands
-  - planned profiles:
+  - implemented profiles:
     - `fast`
     - `full`
     - `ci`
-  - planned top-level CI-equivalent command:
+  - implemented top-level CI-equivalent command:
     - `sc-lint ci`
-  - planned Windows preflight commands when `cargo xwin` is installed:
+  - implemented Windows preflight commands when `cargo xwin` is installed:
     - `sc-lint check xwin`
     - `sc-lint clippy xwin`
+  - implemented Python-backed utility commands:
+    - `sc-lint lint line-counts`
+    - `sc-lint lint identity-literals`
+    - `sc-lint view findings`
 - `sc-lint-directives`
   - shared directive parsing/types
 - `sc-lint-boundary`
   - analyzer CLI + library
-  - AST parsing, graph construction, semantic rule evaluation
+  - AST parsing, graph construction, semantic boundary rule evaluation
+- `sc-lint-portability`
+  - analyzer crate for shared OS/platform portability rules
+- `sc-lint-runtime`
+  - analyzer crate for shared std runtime/concurrency rules
+- `sc-lint-tokio`
+  - planned future analyzer crate for Tokio-specific rules
+  - represented now as a reserved future boundary surface only
 - `sc-lint-attributes`
   - proc-macro attribute crate
   - intentionally minimal at first
@@ -96,26 +125,69 @@ Current scaffold status:
       - `SCB-CYCLE-001` multi-owner architectural cycle
       - `SCB-CYCLE-002` type/method self-loop
       - `SCB-CYCLE-003` trait-impl self-loop
-    - built-in default trait-self-loop policy from:
-      - `crates/sc-lint-boundary/config/defaults.toml`
+      - built-in default trait-self-loop policy from:
+        - `crates/sc-lint-boundary/config/defaults.toml`
+  - A.3 extraction surfaces now include:
+    - `.just/lint_line_counts.py`
+    - `.just/lint_identity_literals.py`
+    - `.just/view_findings.py`
+    - `.just/python_adapter.py`
     - boundary enforcement with:
       - `SCB-BOUNDARY-001` internal_only visibility violation
       - `SCB-BOUNDARY-002` internal_only external reference
       - `SCB-BOUNDARY-003` forbid_external_impls violation
-    - portability enforcement with:
-      - `PORT-001` hardcoded Unix-only absolute paths in test code
-      - `PORT-002` direct `dirs::home_dir()` without configured override check
-      - `PORT-003` `std::env::set_var()` in test code
     - stable text/JSON findings output
     - graph export in:
       - JSON
       - Turtle
+- `sc-lint-portability`
+  - exists now
+  - currently shares the workspace `0.1.0` version line
+  - currently provides:
+    - `PORT-001` hardcoded Unix-only absolute paths in test code
+    - `PORT-002` direct `dirs::home_dir()` without configured override check
+    - `PORT-003` `std::env::set_var()` in test code
+    - `PORT-004` ungated `std::os::unix` imports in production code
+    - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
+    - stable text/JSON findings output
 - `sc-lint`
-  - planned now
-  - not implemented yet
-  - detailed CLI requirements and architecture are defined in:
+  - exists now
+  - currently provides the stable top-level CLI contract and delegated backend
+    dispatch for:
+    - `sc-boundary`
+    - `sc-portability`
+    - `sc-runtime`
+  - detailed CLI requirements and architecture remain defined in:
     - [`cli-requirements.md`](./cli-requirements.md)
     - [`cli-architecture.md`](./cli-architecture.md)
+
+Current code moves completed for the current partition:
+
+- imported std runtime/concurrency rules from the current `atm-core` proving
+  surface into `sc-lint-runtime`:
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
+- keep the portability wrapper surface pointed at `sc-lint-portability`:
+  - `.just/lint_sc_portability.py`
+  - `.just/run_lint.py`
+
+Planned primary lint-target mapping for the top-level CLI:
+
+- `sc-lint lint sc-boundary`
+  - backend owner: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - backend owner: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - backend owner: `sc-lint-runtime`
+
+Grouped subset aliases may exist later, but these crate-mapped targets are the
+primary ownership-preserving command surface.
+
+Kept local to consumer repos for now:
+
+- duplicate semantic string-literal policy
+- fixed-sleep test-hygiene policy
+- TTL triage consistency policy
 
 Current repo integration status:
 
@@ -126,19 +198,38 @@ Current repo integration status:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
-Current planned profile policy:
+Current implemented profile policy:
 
 - `fast`
   - local low-latency lint profile
-  - may include `xwin check` when available
+  - excludes `xwin` to preserve low-latency local feedback
 - `full`
   - stronger local pre-push lint profile
-  - may include `xwin check` and `xwin clippy` when available
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only CI-parity profile
   - excludes `xwin`
 - top-level `ci`
   - lint plus tests
+
+Current wrapper mapping:
+
+- `just lint`
+  - defaults to `sc-lint lint full`
+- `just lint fast`
+  - maps to `sc-lint lint fast`
+- `just lint full`
+  - maps to `sc-lint lint full`
+- `just lint ci`
+  - maps to `sc-lint lint ci`
+- `just ci`
+  - maps to `sc-lint ci`
+
+Current rule-disable policy:
+
+- A.2 does not add top-level `sc-lint` rule-disable flags
+- profile orchestration does not override backend rule configuration
+- current rule-disable behavior stays with the owning backend or delegated tool
 
 Current repo boundary source status:
 
@@ -176,13 +267,22 @@ Future documents that should also live here:
 - deeper RDF/Oxygraph integration notes
 - release-1 acceptance notes
 
-Related architecture decision:
+Related architecture decisions:
 
 - [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
   — canonical TOML boundary source plus planning-aware inventory-parity
-  enforcement
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
   — top-level CLI profile semantics plus capability-driven `xwin` preflight
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
   — top-level CLI as the stable machine-contract owner rather than a
   dispatcher-only wrapper
+- [`./adr/ADR-007-analyzer-crate-partition.md`](./adr/ADR-007-analyzer-crate-partition.md)
+  — analyzer-crate partitioning and primary lint-target mapping
+- [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
+  — `sc-observability` selection plus CLI-owned structured logging policy
+
+Planned A.8 user-guide convention:
+
+- per-tool guides will live under `docs/sc-lint/tools/`
+- each file will be named after the tool it documents
+- the repository-root `README.md` will link every guide directly

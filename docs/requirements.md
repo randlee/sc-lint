@@ -2,6 +2,18 @@
 
 This document defines the high-level product requirements for `sc-lint`.
 
+Related ADRs:
+- [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
+- [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+
+Related design docs:
+- [docs/sc-lint/logging.md](./sc-lint/logging.md)
+
+For release `0.1.x`, ADR-005 is the approved cross-target preflight strategy
+artifact and supersedes earlier provisional profile/`xwin` rollout notes.
+
 ## Product Purpose
 
 `sc-lint` is a standalone lint tool family for Rust repositories. It provides:
@@ -76,11 +88,36 @@ The product should support both:
   each other directly unless a later design review explicitly approves a shared
   support crate.
 
+- `REQ-PRODUCT-003A`
+  The top-level CLI should expose one primary lint target per backend analyzer
+  crate so the user-facing lint surface preserves crate ownership boundaries.
+
+- `REQ-PRODUCT-003B`
+  Narrower grouped aliases such as rule-subset or profile-oriented names may
+  exist, but they must remain secondary surfaces layered on top of the primary
+  backend-crate mapping rather than replacing it.
+
 ### Backend analyzers and tools
 
 - `REQ-PRODUCT-004`
-  `sc-lint-boundary` must remain the home for AST-sensitive boundary and
-  portability analysis.
+  `sc-lint-boundary` must remain the home for AST-sensitive boundary analysis.
+
+- `REQ-PRODUCT-004A`
+  `sc-lint-portability` must be the home for shared AST-sensitive
+  platform/OS portability rules.
+  Current A.4 implementation status:
+  `PORT-001` through `PORT-005` are assigned to `sc-lint-portability`.
+
+- `REQ-PRODUCT-004B`
+  `sc-lint-runtime` must be the home for shared AST-sensitive std
+  runtime/concurrency correctness rules.
+  The release-1 primary top-level target for this family is
+  `sc-lint lint sc-runtime`.
+
+- `REQ-PRODUCT-004C`
+  Tokio-specific runtime rules must not land in `sc-lint-runtime` by default;
+  they should move into `sc-lint-tokio` when Tokio-specific dependencies or
+  semantics justify a dedicated crate.
 
 - `REQ-PRODUCT-005`
   Generic, non-AST-sensitive utilities may remain Python-based when Rust does
@@ -95,6 +132,11 @@ The product should support both:
   explicit migration path into `sc-lint` when their semantics are
   consumer-neutral.
 
+- `REQ-PRODUCT-006AA`
+  Reusable lint families imported from a consumer repo must be assigned to the
+  narrowest fitting analyzer crate rather than appended to an unrelated
+  catch-all crate.
+
 - `REQ-PRODUCT-006B`
   Consumer-specific policy lints must not migrate into `sc-lint` unchanged;
   only the reusable rule family or a configurable framework may be extracted.
@@ -102,7 +144,9 @@ The product should support both:
 - `REQ-PRODUCT-006C`
   The product should provide a documented cross-target preflight strategy for
   surfacing likely platform-specific compile failures before CI where that can
-  be done without requiring native execution on every target platform.
+  be done without requiring native execution on every target platform. For
+  release `0.1.x`, that governing strategy artifact is
+  [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md).
 
 - `REQ-PRODUCT-006D`
   The initial cross-target preflight target should be Windows via `cargo xwin`
@@ -118,6 +162,31 @@ The product should support both:
   machine contract to backend-specific machine-output flags or adapters, but
   that translation must not leak backend-specific contract drift into the
   stable user-facing surface.
+
+### Logging and observability
+
+- `REQ-LOG-001`
+  The top-level CLI must initialize the `sc-observability` logger at startup
+  before command execution begins.
+
+- `REQ-LOG-002`
+  The default log root must be `~/sc-lint/logs/<service>/`, with a
+  per-lint-system override available through config or CLI flag.
+
+- `REQ-LOG-003`
+  File logging must be enabled by default and console logging must remain
+  opt-in.
+
+- `REQ-LOG-004`
+  Each CLI invocation must log through the structured logging runtime:
+  - one entry event carrying the command and effective settings/config used
+    for the call
+  - one completion event carrying the result/verdict and elapsed time in ms
+  - one error event per `CliError`, including the stable error code
+
+- `REQ-LOG-005`
+  Backend crates must not initialize the logger; structured logging remains a
+  CLI-layer responsibility even when backend execution is delegated.
 
 ### Boundary definitions
 
@@ -140,6 +209,11 @@ The product should support both:
   and must exclude repo-local automation/profile orchestration surfaces unless
   a later phase models them explicitly in structured boundary records.
 
+- `REQ-PRODUCT-009B`
+  Reserved future analyzer crates may be represented in structured boundary
+  records before they are scheduled, but they remain out of inventory-parity
+  scope until a scheduled sprint and planned-item mapping are assigned.
+
 ### Development gate
 
 - `REQ-PRODUCT-010`
@@ -160,9 +234,11 @@ The product should support both:
   promotion criteria and expected platform coverage.
 
 - `REQ-PRODUCT-012B`
-  The default promotion candidate for cross-target preflight is `cargo xwin
-  check`, while `cargo xwin clippy` should remain a stronger non-default path
-  until timing and noise are proven acceptable.
+  ADR-005 supersedes earlier provisional sequencing that treated `cargo xwin
+  check` as the only initial profile-promotion candidate. The lighter explicit
+  preflight path remains `cargo xwin check`, but release `0.1.x` profile
+  semantics may include both `cargo xwin check` and `cargo xwin clippy` in
+  `full` when the capability is installed.
 
 - `REQ-PRODUCT-012C`
   `xwin` availability should be capability-detected. When unavailable, the
@@ -178,9 +254,10 @@ The product should support both:
   `Justfile` conventions.
 
 - `REQ-PRODUCT-012E`
-  If `cargo xwin` is installed, `xwin check` should be eligible for `fast`
-  and `full`, and `xwin clippy` should be eligible for `full`, but `xwin`
-  steps must stay out of the `ci` lint profile.
+  If `cargo xwin` is installed, `xwin`-backed Windows preflight should be
+  eligible for the `full` lint profile through both `check` and `clippy`
+  command paths, while `fast` remains `xwin`-free to preserve low-latency
+  local feedback and `ci` continues to exclude `xwin`.
 
 ### Extraction and migration
 
@@ -202,6 +279,23 @@ The product should support both:
   - migrate to `sc-lint`
   - keep local to the consumer repo
   - extract only as a configurable framework
+
+- `REQ-PRODUCT-015B`
+  The current postmortem imports must distribute as:
+  - `PORT-004` and `PORT-005` -> `sc-lint-portability`
+  - `SCB-RUNTIME-001` and `SCB-RUNTIME-002` -> `sc-lint-runtime`
+
+- `REQ-PRODUCT-015C`
+  The current shared rule-family moves required for release `0.1.x` are:
+  - `PORT-001`
+  - `PORT-002`
+  - `PORT-003`
+  - `PORT-004`
+  - `PORT-005`
+  from `sc-lint-boundary` into `sc-lint-portability`, and:
+  - `SCB-RUNTIME-001`
+  - `SCB-RUNTIME-002`
+  into `sc-lint-runtime`.
 
 ### Release 1 objective
 
@@ -253,13 +347,16 @@ The current execution phase, Phase `A`, requires:
   checks
 - documented `fast` / `full` / `ci` profile semantics and the distinction
   between `sc-lint lint ci` and top-level `sc-lint ci`
+- repo-local wrappers that map `just lint` and `just ci` onto the CLI-owned
+  profile and CI contracts instead of redefining them separately
 - a staged migration plan for:
   - generic Python utilities
   - boundary inventory and manifest-policy logic moving into Rust
 - a documented partition for newly proven lint families so release `0.1.x`
   does not blur reusable analyzer rules with consumer-local policy
 - a documented position on cross-target preflight checks for developer
-  confidence versus real multi-platform CI validation
+  confidence versus real multi-platform CI validation, with ADR-005 serving as
+  the approved Phase A strategy artifact
 
 ## Requirement Management
 

@@ -7,7 +7,7 @@ use syn::parse::Parse;
 use syn::parse::ParseStream;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Scope {
+pub(crate) enum Scope {
     Boundary,
 }
 
@@ -37,7 +37,7 @@ impl Parse for AttributeInput {
     }
 }
 
-pub fn parse_directive(input: ParseStream<'_>) -> Result<Directive> {
+pub(crate) fn parse_directive(input: ParseStream<'_>) -> Result<Directive> {
     let scope = parse_scope(input)?;
     input.parse::<Token![.]>()?;
     let action = input.parse::<Ident>()?;

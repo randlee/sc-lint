@@ -1,11 +1,12 @@
 # sc-lint CLI Architecture
 
-This document records the intended architecture of the top-level `sc-lint` CLI
+This document records the architecture of the top-level `sc-lint` CLI
 crate.
 
 Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+- [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
 
 ## Role
 
@@ -93,14 +94,56 @@ Planned top-level CI-equivalent command:
 
 - `sc-lint ci`
 
+For release `0.1.x`, the `view` family remains narrower than `lint`:
+
+- `lint`
+  - primary targets are crate-mapped and ownership-bearing
+- `view`
+  - reserved top-level grouping for report and visualization surfaces
+  - the A.1a bootstrap targets are:
+    - `graph`
+    - `findings`
+  - release-1 view targets may remain backed by repo-local Python/report
+    plumbing instead of one target per backend crate
+
+Primary lint-target mapping should follow backend-crate ownership:
+
+- `sc-lint lint sc-boundary`
+  - primary backend: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - primary backend: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - primary backend: `sc-lint-runtime`
+
+Future crate-backed additions should follow the same pattern, for example:
+
+- `sc-lint lint sc-tokio`
+  - primary backend: `sc-lint-tokio`
+
+Subset aliases such as `unix-gating` or `runtime-waits` may exist, but they
+must remain secondary convenience surfaces rather than replacing the
+crate-mapped primary command set.
+
+Release-1 integration mode for those targets is:
+
+- `sc-lint lint sc-boundary`
+  - direct linkage or delegated execution are both acceptable
+- `sc-lint lint sc-portability`
+  - initially expected to use delegated backend execution
+- `sc-lint lint sc-runtime`
+  - initially expected to use delegated backend execution
+
+Direct top-level crate dependencies on `sc-lint-portability` or
+`sc-lint-runtime` are a later design choice, not a release-1 assumption.
+
 Profile semantics:
 
 - `fast`
   - low-latency local developer gate
-  - includes `xwin` checks only when the individual command is fast enough
+  - excludes `xwin` to preserve low-latency local feedback
 - `full`
   - stronger local pre-push gate
-  - may include slower `xwin` checks such as `clippy xwin`
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only profile aligned to what the project considers CI lint parity
   - does not include `xwin`
@@ -108,7 +151,7 @@ Profile semantics:
   - lint plus tests
   - mirrors real CI intent rather than `xwin` preflight
 
-## Planned Contract Types
+## Contract Types
 
 The release-1 CLI design should name and preserve the following important
 types explicitly:
@@ -117,15 +160,6 @@ types explicitly:
   - top-level command root
 - `Command`
   - grouped command family selector
-- `LintProfile`
-  - enum with:
-    - `Fast`
-    - `Full`
-    - `Ci`
-- `OutputMode`
-  - enum with:
-    - `Human`
-    - `Json`
 - `CommandEnvelope<T>`
   - top-level success/failure result family
 - `CliError`
@@ -136,11 +170,94 @@ types explicitly:
     - optional details
     - optional suggested action
 
-These names define the intended architectural seam even before all of them are
-fully implemented.
+The implemented public contract exports `Cli`, `Command`, `CommandEnvelope<T>`,
+and `CliError`. Profile selection and machine-mode selection remain CLI-owned
+behaviors, but their implementation enums are not part of the public contract
+surface.
 
 For release `0.1.x`, these planned contract types should also be represented as
 `BOUNDARY-ScLintCli` composition-root items in the boundary/planning metadata.
+
+## Suggested Implementation Seams
+
+The implementation should keep these responsibilities centralized rather than
+letting each command family invent its own local pattern:
+
+- `cli`
+  - clap-facing command definitions and grouped command parsing
+- `command`
+  - canonical command-path resolution and dotted `command` identifiers
+- `config`
+  - repo-root discovery and shared config loading
+- `contract`
+  - `CommandEnvelope<T>` serialization and success helpers
+- `error`
+  - `CliError`, stable code mapping, and recovery-oriented constructors
+- `dispatch`
+  - backend selection and execution
+- `render`
+  - human-readable rendering derived from the normalized command result
+- `logging`
+  - CLI-owned logger setup and command-lifecycle event emission
+
+This split is meant to improve development success by preventing duplicated
+JSON rendering, ad hoc error mapping, and command-family-specific dispatch
+wrappers.
+
+The current crate layout is:
+
+- `crates/sc-lint/src/cli.rs`
+- `crates/sc-lint/src/command.rs`
+- `crates/sc-lint/src/config.rs`
+- `crates/sc-lint/src/contract.rs`
+- `crates/sc-lint/src/dispatch.rs`
+- `crates/sc-lint/src/error.rs`
+- `crates/sc-lint/src/python_adapter.rs`
+- `crates/sc-lint/src/render.rs`
+- `crates/sc-lint/src/logging.rs`
+
+## Current Bootstrap Behavior
+
+Sprint A.1a intentionally stopped before real backend dispatch. A.1b adds the
+first operational backend path.
+
+Current command behavior:
+
+- `version`
+  - succeeds directly from the top-level CLI
+- `lint sc-boundary`
+  - succeeds through the shared config + dispatch + normalization seam
+  - uses direct Rust-library dispatch in A.1b
+  - emits dedicated dispatch-start and dispatch-normalized log events
+- `lint line-counts`
+  - succeeds through the Python Adapter Protocol
+  - loads line-count thresholds and exclusions from `.just/lint-config.toml`
+- `lint identity-literals`
+  - succeeds through the Python Adapter Protocol
+  - exposes a configurable framework rather than consumer-specific defaults
+- `lint sc-portability`
+  - succeeds through delegated backend dispatch to `sc-lint-portability`
+- `lint sc-runtime`
+  - succeeds through delegated backend dispatch to `sc-lint-runtime`
+- `view findings`
+  - succeeds through the Python Adapter Protocol
+  - collates generated findings artifacts into a stable findings index
+- `lint`
+  - implemented for profiles, `sc-boundary`, `sc-portability`, `sc-runtime`,
+    `line-counts`, and `identity-literals`
+- `view`
+  - `findings` is implemented
+  - `graph` remains reserved until the graph contract is stable
+- `check`
+  - implemented native and capability-gated `xwin` preflight surface
+- `clippy`
+  - implemented native and capability-gated `xwin` clippy surface
+- `ci`
+  - implemented top-level lint-plus-tests orchestration surface
+
+This is intentional. The goal of A.1a was to freeze the top-level envelope,
+error family, command identifiers, and logger ownership before A.1b added the
+first real backend path.
 
 ## Machine Contract Model
 
@@ -184,6 +301,12 @@ Backend tools own:
 Future MCP wrappers should reuse the same request and response models rather
 than introducing a second business-payload schema.
 
+The top-level CLI also owns the stable command-identifier convention used by:
+
+- `CommandEnvelope.command`
+- `CliError` attribution context
+- structured logging entry/completion/error events
+
 ## Backend Normalization Path
 
 The end-to-end result path should be:
@@ -209,24 +332,60 @@ Required normalization cases:
   - normalized into `CliError` rather than exposing raw traceback text as the
     public machine contract
 
+The normalization helper should be shared across command families so:
+
+- `lint`
+- `view`
+- `check`
+- `clippy`
+- `ci`
+- `version`
+
+all emit the same envelope and error shapes at the top level.
+
 ## Config Flow
 
 Expected flow:
 
 1. discover repo root
-2. load shared config
+2. load shared config from `sc-lint.toml` or `.just/lint-config.toml`
 3. resolve subcommand/tool target and capability requirements
 4. dispatch to backend
 5. normalize output and exit code
+
+Current A.1b repo-root resolution order is:
+
+- explicit `--root <path>`
+- otherwise current working directory walked upward until the repo root is
+  found
 
 For `xwin`-aware commands, capability resolution includes:
 
 - detect whether `cargo xwin` is installed
 - select the supported Windows target set
-- add `xwin`-aware checks into `fast` or `full` only when the capability is
-  present
+- add `xwin`-aware checks into `full` only when the capability is present
 - keep `ci` profile semantics independent from `xwin`
 - skip or error with a clear capability message depending on command mode
+
+Current A.2 implementation notes:
+
+- `check.native` runs `cargo check --workspace`
+- `check.xwin` runs `cargo xwin check --workspace --target x86_64-pc-windows-msvc`
+  when the capability is present
+- `clippy.native` runs `cargo clippy --workspace --all-targets -- -D warnings`
+- `clippy.xwin` runs `cargo xwin clippy --workspace --all-targets --target x86_64-pc-windows-msvc -- -D warnings`
+- `lint.fast` keeps the low-latency subset
+- `lint.full` adds `xwin` preflight only when available
+- `lint.ci` stays lint-only and excludes `xwin`
+- top-level `ci` reuses `lint.ci` semantics and adds workspace tests
+
+Current A.3 Python-adapter notes:
+
+- the adapter schema is `sc-lint-python-v1`
+- Python-backed commands use dedicated scripts under `.just/`
+- the CLI validates the adapter payload before exposing any result
+- Python tool config remains consumer-neutral and repo-local through
+  `.just/lint-config.toml`
 
 ## Output Model
 
@@ -239,6 +398,17 @@ The CLI should present:
 
 See [cli-contract.md](./cli-contract.md) for the detailed envelope and
 normalization contract, including the planned exit-code mapping.
+
+## Consistency Test Strategy
+
+The implementation plan should include:
+
+- parse tests for every top-level command family
+- JSON fixture or snapshot tests proving top-level envelope-key parity across
+  `lint`, `view`, `check`, `clippy`, `ci`, and `version`
+- failure-shape tests proving every family uses `CliError`
+- delegated-backend tests proving malformed backend payloads cannot bypass the
+  top-level normalization path
 
 ## Interactive Constraint
 

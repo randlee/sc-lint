@@ -1,0 +1,49 @@
+boundary_id = "BOUNDARY-ScLintRuntimeAnalyzer"
+owner_package = "sc-lint-runtime"
+owner_crate_path = "sc_lint_runtime"
+name = "ScLintRuntimeAnalyzer"
+
+[public]
+facade = "analyze_workspace"
+
+[implementation]
+type = "analyze_workspace"
+module = "sc_lint_runtime"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = [
+  "RuntimeError",
+  "AnalyzeOptions",
+  "FindingsReport",
+  "Finding",
+  "RuleId",
+  "analyze_workspace",
+  "render_findings_report",
+]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["sc-lint-schema"]
+forbidden_edges = [
+  "sc-lint-runtime -> sc-lint-attributes",
+  "sc-lint-runtime -> sc-lint-boundary",
+  "sc-lint-runtime -> sc-lint-portability",
+  "sc-lint-runtime -> sc-observability",
+]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-RUNTIME-ISOLATION"]
+review_gates = ["no_cross_analyzer_dependencies"]
+
+[status]
+state = "concrete_landed"

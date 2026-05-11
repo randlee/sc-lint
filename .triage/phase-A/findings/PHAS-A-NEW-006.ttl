@@ -1,0 +1,74 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PHAS-A-NEW-006>
+  a triage:Finding ;
+  triage:findingId "PHAS-A-NEW-006" ;
+  triage:title "render.rs line coverage at 17.21% — below threshold" ;
+  triage:description "render.rs files across crates have 17.21% line coverage, significantly below the acceptable threshold. Key render paths are untested. Affected files include crates/sc-lint/src/render.rs, crates/sc-lint-boundary/src/render.rs, crates/sc-lint-runtime/src/render.rs, and crates/sc-lint-portability/src/render.rs." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/4> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/c1c3133> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/render.rs" ;
+  triage:line 1 ;
+  triage:snippet "render.rs — 17.21% line coverage" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/render.rs" ;
+  triage:line 1 ;
+  triage:snippet "render.rs — 17.21% line coverage" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/render.rs" ;
+  triage:line 1 ;
+  triage:snippet "render.rs — 17.21% line coverage" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-006/integration-phase-A/4>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/render.rs" ;
+  triage:line 1 ;
+  triage:snippet "render.rs — 17.21% line coverage" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:worktree/integration-phase-A/c1c3133>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:orderIndex 99 .

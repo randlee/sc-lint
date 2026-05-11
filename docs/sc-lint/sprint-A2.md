@@ -4,9 +4,9 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.2"
-worktree: /Users/randlee/Documents/github/sc-lint
-branch: develop
-status: planned
+worktree: <repo-root>
+branch: feature/sprint-A2
+status: completed
 estimated_scope: M
 ```
 
@@ -45,13 +45,20 @@ distinguishes:
 - `REQ-CLI-007C`
 - `REQ-CLI-007D`
 - `REQ-CLI-007E`
+- `REQ-CLI-008B`
+- `REQ-CLI-008C`
 - `REQ-CLI-014`
 - `REQ-CLI-015`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
 - `docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md`
 - `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
+
+ADR-005 is the approved cross-target preflight strategy artifact for this
+sprint and supersedes earlier provisional profile/`xwin` rollout notes.
 
 ## Governing Boundaries
 
@@ -59,7 +66,7 @@ distinguishes:
 
 ## Prerequisites
 
-- Sprint A.1 complete with a functioning top-level CLI crate
+- Sprint A.1b complete with a functioning top-level CLI crate
 - one top-level delegated command already normalized through the CLI
 
 ## Hard Dependencies
@@ -75,18 +82,37 @@ distinguishes:
 - adding `xwin` to the `ci` lint profile
 - porting Python utilities to Rust
 
+## Primary Targets
+
+- `crates/sc-lint/`
+- `Justfile`
+- `.just/run_lint.py`
+- `docs/sc-lint/cli-requirements.md`
+- `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/requirements.md`
+- `boundaries/sc-lint/top-level-cli.toml`
+- `boundaries/planning.toml`
+
 ## Sub-Tasks
 
-1. Implement `LintProfile`
+1. Implement `LintProfile` and `OutputMode`
    Development work:
    - add `LintProfile::{Fast, Full, Ci}`
+   - add `OutputMode::{Human, Json}`
    - define stable membership and dispatch rules for each profile
+   - define stable output-mode selection rules for human and `--json` paths
    - expose `sc-lint lint fast|full|ci`
    Required tests:
    - profile parsing tests
    - profile membership tests
+   - output-mode parsing and serialization tests
    Required doc or boundary updates:
    - update CLI/profile docs if the implemented subcommand shape differs
+   - keep `boundaries/planning.toml` and `docs/sc-lint/cli-contract.md`
+     aligned with the implemented `OutputMode`
 
 2. Implement top-level `sc-lint ci`
    Development work:
@@ -103,7 +129,11 @@ distinguishes:
    - detect `cargo xwin`
    - expose `sc-lint check xwin`
    - expose `sc-lint clippy xwin`
-   - ensure `fast` and `full` include `xwin` only when installed
+   - ensure `full` includes `xwin` only when installed
+   - ensure `fast` remains low-latency and does not depend on `cargo xwin` or
+     cross-target bootstrap work
+   - keep `xwin check` as an explicit command rather than default `fast`
+     membership until a later policy change is approved
    Required tests:
    - capability-present tests
    - capability-absent tests
@@ -111,7 +141,28 @@ distinguishes:
    Required doc or boundary updates:
    - update profile docs if capability behavior narrows further
 
-4. Align repo-local wrappers with CLI semantics
+4. Plan `xwin` preflight logging
+   Development work:
+   - log one entry event for `sc-lint check xwin` and `sc-lint clippy xwin`
+     including the effective target/config selection
+   - log one completion event with verdict and elapsed time in ms
+   - log one error event per `CliError` on capability or preflight failure
+   Required tests:
+   - doc review for entry/exit/error event consistency with
+     `docs/sc-lint/logging.md`
+   Required doc or boundary updates:
+   - keep the logging design aligned with the `xwin` command path
+
+5. Document rule-disable behavior
+   Development work:
+   - define how rules are disabled in the new CLI (source vs config)
+   - document the disable policy for the first shipped backends
+   Required tests:
+   - doc review for consistency
+   Required doc or boundary updates:
+   - ensure initial per-tool guides (even if draft) reflect this policy
+
+6. Align repo-local wrappers with CLI semantics
    Development work:
    - ensure `just` wrappers call the intended `sc-lint` profile commands
    - keep CI semantics explicit and independent from `xwin`
@@ -129,12 +180,20 @@ and `ci` actually mean.
 ## Acceptance Criteria
 
 - `sc-lint lint fast`, `full`, and `ci` exist and are documented
+- `OutputMode::{Human, Json}` is implemented and documented for the top-level
+  CLI
 - `sc-lint ci` exists and includes tests
 - `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is
   installed
-- local profile behavior changes when `xwin` is present, but `ci` remains
-  independent from `xwin`
+- ADR-005 is recorded as the approved cross-target preflight strategy artifact
+  for the sprint
+- the `full` profile conditionally includes both `xwin` command paths when the
+  capability is present, while `fast` and `ci` remain `xwin`-free
+- `xwin` preflight command paths log entry, completion, and error events
+  through the standard CLI event pattern
 - real Windows CI remains the authoritative release gate
+- the approved preflight-strategy artifact remains ADR-005 rather than a
+  separate sprint-local profile-policy document
 
 ## Required Validation
 
@@ -146,6 +205,9 @@ and `ci` actually mean.
 
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
+- `docs/sc-lint/README.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/project-plan.md`
 - `docs/requirements.md`

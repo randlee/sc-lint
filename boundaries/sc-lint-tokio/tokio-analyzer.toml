@@ -1,0 +1,42 @@
+boundary_id = "BOUNDARY-ScLintTokioAnalyzer"
+owner_package = "sc-lint-tokio"
+owner_crate_path = "sc_lint_tokio"
+name = "ScLintTokioAnalyzer"
+
+[public]
+facade = "analyze_workspace"
+
+[implementation]
+type = "analyze_workspace"
+module = "sc_lint_tokio"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = []
+forbidden_edges = [
+  "sc-lint-tokio -> sc-lint-attributes",
+  "sc-lint-tokio -> sc-lint-boundary",
+  "sc-lint-tokio -> sc-lint-portability",
+  "sc-lint-tokio -> sc-lint-runtime",
+  "sc-lint-tokio -> sc-observability",
+]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-TOKIO-ISOLATION"]
+review_gates = ["no_cross_analyzer_dependencies"]
+
+[status]
+state = "reserved_future"

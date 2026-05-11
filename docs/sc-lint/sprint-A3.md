@@ -4,9 +4,9 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.3"
-worktree: /Users/randlee/Documents/github/sc-lint
-branch: develop
-status: planned
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A3
+branch: feature/sprint-A3
+status: completed
 estimated_scope: M
 ```
 
@@ -30,6 +30,8 @@ standalone fixture coverage.
 - `REQ-CLI-006`
 - `REQ-CLI-012`
 - `REQ-CLI-013`
+- `REQ-LOG-004`
+- `REQ-LOG-005`
 
 ## Governing ADRs
 
@@ -42,7 +44,7 @@ standalone fixture coverage.
 
 ## Prerequisites
 
-- Sprint A.1 complete with top-level CLI dispatch
+- Sprint A.1b complete with top-level CLI dispatch
 - Sprint A.2 complete with stable profile semantics
 
 ## Hard Dependencies
@@ -57,6 +59,16 @@ standalone fixture coverage.
 - forcing simple utilities into Rust
 - migrating ATM-specific policy lints unchanged
 - migrating boundary inventory logic into Rust in this sprint
+
+## Primary Targets
+
+- `crates/sc-lint/`
+- `.just/`
+- `docs/sc-lint/extraction-plan.md`
+- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/README.md`
+- `docs/project-plan.md`
 
 ## Sub-Tasks
 
@@ -82,7 +94,17 @@ standalone fixture coverage.
    Required doc or boundary updates:
    - update product docs if the framework name differs from the current plan
 
-3. Extract generic view plumbing
+3. Define Python Adapter Protocol
+   Development work:
+   - define a standard JSON adapter for Python utilities
+   - ensure Python failures are reliably mapped into `CliError` without
+     scraping tracebacks
+   Required tests:
+   - adapter normalization tests
+   Required doc or boundary updates:
+   - update CLI architecture docs to include the adapter pattern
+
+4. Extract generic view plumbing
    Development work:
    - move the generic report/site plumbing that is not ATM-specific
    - expose it behind the top-level CLI only when the command contract is
@@ -91,6 +113,38 @@ standalone fixture coverage.
    - fixture tests for output generation
    Required doc or boundary updates:
    - update README and roadmap if view command names narrow
+
+5. Plan Python utility logging
+   Development work:
+   - log entry events for Python-backed utility calls including the effective
+     adapter/config settings used by the CLI
+   - log completion events with normalized result/verdict and elapsed time in
+     ms
+   - log one error event per `CliError` after adapter normalization rather
+     than exposing raw traceback text
+   Required tests:
+   - doc review proving Python utility paths follow the same entry/exit/error
+     pattern as Rust-backed tools
+   Required doc or boundary updates:
+   - keep `docs/sc-lint/logging.md` aligned with the Python adapter logging
+     path
+
+## Logging Requirement Traceability
+
+- `REQ-LOG-004`
+  - A.3 Python-backed `lint.line-counts`, `lint.identity-literals`, and
+    `view.findings` paths must emit the standard CLI entry, completion, and
+    error events after top-level adapter normalization.
+  - those events must carry the Python-adapter metadata fields exposed by the
+    CLI logging path:
+    - `adapter`
+    - `config_scope`
+    - `script`
+- `REQ-LOG-005`
+  - logger initialization remains owned by the top-level `sc-lint` CLI even
+    when the command delegates to a Python utility.
+  - Python utilities are adapter payload producers only; they do not become
+    logging-runtime owners.
 
 ## Split Recommendation
 
@@ -109,6 +163,11 @@ extraction.
 - consumer-specific policy does not leak into the shared defaults
 - top-level CLI dispatch exists for extracted utilities that are ready for
   stable exposure
+- Python-backed utility paths log entry, completion, and error events only
+  after top-level normalization through `CommandEnvelope<T>` or `CliError`
+- the A.3 logging path proves `REQ-LOG-004` with adapter-aware CLI event
+  fields and proves `REQ-LOG-005` by keeping logger ownership in the top-level
+  CLI
 
 ## Required Validation
 

@@ -14,18 +14,22 @@ if str(JUST_DIR) not in sys.path:
 from lint_cargo_modules import module_cycle_command
 from lint_cargo_modules import run
 
+CORE_CRATE = "fixture-lib"
+CORE_PACKAGE = "synthetic-lib"
+CORE_LIB = "fixture_lib"
+
 
 class LintCargoModulesTests(unittest.TestCase):
     def test_module_cycle_command_includes_acyclic(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
-            manifest_path = repo_root / "crates" / "atm-core" / "Cargo.toml"
+            manifest_path = repo_root / "crates" / CORE_CRATE / "Cargo.toml"
             manifest_path.parent.mkdir(parents=True)
             manifest_path.write_text(
-                '[package]\nname = "agent-team-mail-core"\nversion = "1.1.2"\n[lib]\nname = "atm_core"\n',
+                f'[package]\nname = "{CORE_PACKAGE}"\nversion = "1.1.2"\n[lib]\nname = "{CORE_LIB}"\n',
                 encoding="utf-8",
             )
-            command = module_cycle_command(repo_root, manifest_path, "agent-team-mail-core")
+            command = module_cycle_command(repo_root, manifest_path, CORE_PACKAGE)
             self.assertIn("--acyclic", command)
             self.assertIn("--layout", command)
 
@@ -38,10 +42,16 @@ class LintCargoModulesTests(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
-            (repo_root / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/atm-core"]\nresolver = "2"\n', encoding="utf-8")
-            crate_dir = repo_root / "crates" / "atm-core"
+            (repo_root / "Cargo.toml").write_text(
+                f'[workspace]\nmembers = ["crates/{CORE_CRATE}"]\nresolver = "2"\n',
+                encoding="utf-8",
+            )
+            crate_dir = repo_root / "crates" / CORE_CRATE
             crate_dir.mkdir(parents=True)
-            (crate_dir / "Cargo.toml").write_text('[package]\nname = "agent-team-mail-core"\nversion = "1.1.2"\n[lib]\nname = "atm_core"\n', encoding="utf-8")
+            (crate_dir / "Cargo.toml").write_text(
+                f'[package]\nname = "{CORE_PACKAGE}"\nversion = "1.1.2"\n[lib]\nname = "{CORE_LIB}"\n',
+                encoding="utf-8",
+            )
             subprocess_run_mock.return_value = mock.Mock(returncode=0, stdout="ok\n", stderr="")
             self.assertEqual(run(repo_root), 0)
             self.assertTrue(build_report_mock.called)

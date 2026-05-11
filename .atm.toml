@@ -1,2 +1,33 @@
+[core]
+identity = "team-lead"
+default_team = "sc-lint"
+
+[[atm.post_send_hooks]]
+recipient = "clint"
+command = ["/Users/randlee/.atm/scripts/atm-nudge-xml-1.py", "clint"]
+
+[rmux]
+session = "sc-lint"
+
+[[rmux.windows]]
+name = "agents"
+layout = "even-horizontal"
+
+[[rmux.windows.panes]]
+name = "team-lead"
+model = "sonnet"
+env = { ATM_IDENTITY = "team-lead", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
+
+[[rmux.windows.panes]]
+name = "clint"
+tmux_pane_id = "%46"
+command = "codex -c features.codex_hooks=true --yolo"
+env = { ATM_IDENTITY = "clint", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
+
+[[rmux.windows.panes]]
+name = "quality-mgr"
+model = "sonnet"
+env = { ATM_IDENTITY = "quality-mgr", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
+
 [startup.team-lead]
 all = ["Read /codex-orchestration SKILL.md"]

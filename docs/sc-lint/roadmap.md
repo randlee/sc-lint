@@ -6,7 +6,7 @@ These points are considered settled for the initial spike.
 
 ### Crate split
 
-Current implemented crates:
+Current implemented foundation crates:
 
 - `sc-lint-directives`
   - shared directive parsing/types
@@ -17,28 +17,47 @@ Current implemented crates:
   - proc-macro attribute crate
   - currently shares the workspace `0.1.0` version line
 
-Planned next crate:
+Current implemented CLI and analyzer crates:
 
 - `sc-lint`
   - top-level CLI crate
   - stable user-facing command surface
   - command parsing, config loading, output normalization, tool dispatch
   - canonical AI-first machine contract for non-interactive commands
-  - planned lint profiles:
+  - implemented lint profiles:
     - `fast`
     - `full`
     - `ci`
-  - planned top-level CI-equivalent command:
+  - implemented top-level CI-equivalent command:
     - `sc-lint ci`
-  - planned Windows preflight commands when `cargo xwin` is installed:
+  - implemented Windows preflight commands when `cargo xwin` is installed:
     - `sc-lint check xwin`
     - `sc-lint clippy xwin`
+- `sc-lint-portability`
+  - platform/OS portability analyzer crate
+  - current owned rules:
+    - `PORT-001`
+    - `PORT-002`
+    - `PORT-003`
+    - `PORT-004`
+    - `PORT-005`
+- `sc-lint-runtime`
+  - std runtime/concurrency analyzer crate
+  - current owned rules:
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
+
+Planned later crate:
+
+- `sc-lint-tokio`
+  - Tokio-specific analyzer crate reserved for async-runtime-specific rules
 
 Reason:
 
 - real Rust attributes need a proc-macro crate anyway
 - creating it early avoids late packaging churn
-- the analyzer crate should not carry proc-macro concerns
+- the boundary analyzer crate should not carry unrelated portability or
+  runtime-rule growth forever
 - the top-level CLI should coordinate backends rather than forcing backend
   crate cross-dependencies
 - the top-level CLI should own the stable machine contract instead of exposing
@@ -59,10 +78,56 @@ Current scaffold state:
   - initial `sc_lint` attribute ingestion in place now
   - first owner-graph cycle rules in place now
   - first boundary enforcement rules in place now
+- `sc-lint-portability`
+  - created
+  - owns the shared portability rule family now
 - `sc-lint`
-  - planned
-  - detailed CLI requirements/architecture defined
-  - implementation not started yet
+  - created
+  - delegated backend contract paths implemented
+- `sc-lint-runtime`
+  - created
+  - runtime rule imports implemented
+- `sc-lint-tokio`
+  - reserved
+  - no implementation scope yet
+
+### Current code moves required
+
+The current implementation now places the shared portability rule family in
+`sc-lint-portability`.
+
+Current completed move:
+
+- from `crates/sc-lint-boundary/src/portability.rs`
+  - `PORT-001`
+  - `PORT-002`
+  - `PORT-003`
+  - `PORT-004`
+  - `PORT-005`
+  - target crate: `sc-lint-portability`
+
+Wrapper retargets required after those moves:
+
+- `.just/lint_sc_portability.py`
+- `.just/run_lint.py`
+- help text and README references for `sc-portability`
+
+Wrapper retarget state after A.5:
+
+- `sc-portability` wrappers now delegate to `sc-lint-portability`
+- `lint sc-runtime` now delegates to `sc-lint-runtime`
+
+Planned primary CLI target mapping:
+
+- `sc-lint lint sc-boundary`
+  - backend owner: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - backend owner: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - backend owner: `sc-lint-runtime`
+
+Subset aliases may exist later, but they should remain secondary to the
+crate-mapped primary lint targets.
 
 ### Analyzer strategy
 
@@ -157,6 +222,8 @@ Current implementation status:
     `boundary.allow("cycle.recursive_value_container")`
   - `internal_only` visibility/reference enforcement
   - `forbid_external_impls` enforcement
+  - manifest-policy parity for workspace-package inheritance and internal path
+    dependency version checks on `feature/sprint-A7`
 - deferred:
   - additional boundary declarations beyond current attribute set
 
@@ -210,20 +277,33 @@ Current integration state:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
-Current planned local/CI profile split:
+Current implemented local/CI profile split:
 
 - `fast`
   - low-latency local developer gate
-  - may include `xwin check` when available
+  - excludes `xwin` to preserve low-latency local feedback
 - `full`
   - stronger local pre-push gate
-  - may include `xwin check` and `xwin clippy` when available
+  - includes `xwin check` and `xwin clippy` when available
 - `ci`
   - lint-only CI-parity profile
   - intentionally excludes `xwin` because real Windows CI remains
     authoritative
 - top-level `ci`
   - lint plus tests
+
+Current wrapper mapping:
+
+- `just lint`
+  - defaults to `sc-lint lint full`
+- `just lint fast`
+  - maps to `sc-lint lint fast`
+- `just lint full`
+  - maps to `sc-lint lint full`
+- `just lint ci`
+  - maps to `sc-lint lint ci`
+- `just ci`
+  - maps to `sc-lint ci`
 
 ## Default Rule Policy
 
@@ -239,10 +319,20 @@ It currently carries the built-in `trait_self_loop` policy through:
 This is the default-install extension point for common non-architectural trait
 families such as comparison, hashing, conversion, and serde traits.
 
+The top-level CLI does not add its own rule-disable flags in A.2; profile
+orchestration must preserve backend-owned rule policy rather than replacing it.
+
 ## Next Planning Items
 
-The next planned boundary-enforcement work after the current implementation
+The next planned tool-distribution work after the current implementation
 branch merges is:
+
+1. keep portability and runtime wrapper delegation aligned to their dedicated
+   crates
+2. reserve `sc-lint-tokio` in planning docs until Tokio-specific rules justify
+   implementation
+
+The next planned boundary-enforcement work after that is:
 
 1. boundary definition migration from Markdown parsing to TOML
 2. inventory-parity warn/error enforcement on top of the TOML-backed boundary

@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PROD-002>
+  a triage:Finding ;
+  triage:findingId "PROD-002" ;
+  triage:title "sc-lint-schema allowed_dependents omits sc-lint-runtime despite direct dependency" ;
+  triage:description "boundaries/sc-lint-schema/schema.toml lines 18-19 omits sc-lint-runtime from allowed_dependents even though crates/sc-lint-runtime/Cargo.toml lines 20-29 directly depends on sc-lint-schema. Boundary metadata does not match the delivered dependency graph." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PROD-002/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/51e36af> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:occurrence/PROD-002/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "boundaries/sc-lint-schema/schema.toml" ;
+  triage:line 19 ;
+  triage:snippet "allowed_dependents = [\"sc-lint\", \"sc-lint-boundary\", \"sc-lint-portability\"]" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:worktree/integration-phase-A/51e36af>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:orderIndex 99 .

@@ -1,0 +1,178 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-003>
+  a triage:Finding ;
+  triage:findingId "SC-QA-003" ;
+  triage:title "sprint-A5.md YAML frontmatter has placeholder worktree and wrong branch" ;
+  triage:description "docs/sc-lint/sprint-A5.md YAML frontmatter sets worktree to '<repo-root>' (a placeholder) and branch to 'develop' instead of the actual values (feature/sprint-A5). Sprint doc metadata should accurately reflect where the sprint was implemented." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A4/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A4/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A5/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A6/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A6/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A7/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A7/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A8/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/sprint-A8/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A4/aac4dea> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A5/a392088> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A6/8544597> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/8eee490> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A8/8eee490> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A8/8eee490> .
+
+# --- Occurrences: feature/sprint-A4 ---
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A4/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 7 ;
+  triage:snippet "worktree: <repo-root>" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/aac4dea> .
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A4/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 8 ;
+  triage:snippet "branch: develop" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/aac4dea> .
+
+# --- Occurrences: feature/sprint-A5 (worktree placeholder only; branch is correct) ---
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A5/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 7 ;
+  triage:snippet "worktree: <repo-root>" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/a392088> .
+
+# --- Occurrences: feature/sprint-A6 ---
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A6/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 7 ;
+  triage:snippet "worktree: <repo-root>" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A6/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 8 ;
+  triage:snippet "branch: develop" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+# --- Occurrences: feature/sprint-A7 ---
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 7 ;
+  triage:snippet "worktree: <repo-root>" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A7/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 8 ;
+  triage:snippet "branch: develop" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+# --- Occurrences: feature/sprint-A8 ---
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A8/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 7 ;
+  triage:snippet "worktree: <repo-root>" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A8/8eee490> .
+
+<urn:atm:triage:occurrence/SC-QA-003/sprint-A8/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A5.md" ;
+  triage:line 8 ;
+  triage:snippet "branch: develop" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A8/8eee490> .
+
+# --- WorktreeSnapshots ---
+
+<urn:atm:triage:worktree/sprint-A4/aac4dea>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "aac4dea" ;
+  triage:orderIndex 4 .
+
+<urn:atm:triage:worktree/sprint-A5/a392088>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "a392088" ;
+  triage:orderIndex 5 .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 .

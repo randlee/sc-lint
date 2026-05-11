@@ -12,6 +12,14 @@ Related requirements:
 This document records the planned warn/error enforcement model for
 inventory-parity boundary checks in `sc-lint-boundary`.
 
+Current implementation note:
+
+- A.7 adds Rust-native manifest-policy checks and parity tests against
+  `.just/lint_manifests.py`
+- that work does not replace the inventory-parity model described here
+- planning-aware missing-item enforcement remains a later stage built on the
+  A.6 loader foundation
+
 The goal is:
 
 - hard gate architectural drift
@@ -63,6 +71,10 @@ For release `0.1.x`, repo-local automation/profile orchestration surfaces are
 out of parity scope unless they are first promoted into explicit structured
 boundary records. CLI contract types recorded under
 `BOUNDARY-ScLintCli.composition.root.*` are in scope.
+
+Reserved future analyzer crates may also exist in structured boundary records
+before they are scheduled. They remain out of parity scope until a future
+sprint assigns planned items for their implementation/public contract fields.
 
 ## Required Planning Inputs
 
@@ -198,6 +210,14 @@ The important point is that:
 - the item key is stable
 - the scheduling metadata is structured
 - the linter can evaluate it without parsing prose
+
+Current implementation boundary:
+
+- A.6 now provides the Rust-native TOML loader, schema validation, and
+  duplicate handling foundation for this model
+- planning-aware missing-item rule emission (`SCB-INVENTORY-001` through
+  `SCB-INVENTORY-003`) remains the next enforcement stage on top of that
+  loader foundation
 
 ## Sprint Evaluation Rule
 

@@ -2,6 +2,15 @@
 
 This document defines the high-level product architecture for `sc-lint`.
 
+Related ADRs:
+- [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](./sc-lint/adr/ADR-004-structured-boundary-definitions.md)
+- [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
+- [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
+- [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+
+For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
+rollout notes and is the governing cross-target preflight strategy artifact.
+
 ## Architecture Goals
 
 The `sc-lint` architecture should:
@@ -30,18 +39,31 @@ The product is organized into five layers:
 Current primary crates:
 
 - `sc-lint`
-  - planned top-level CLI crate for command parsing, config loading, and tool
-    dispatch
+  - top-level CLI crate for command parsing, config loading, and tool dispatch
 - `sc-lint-directives`
   - shared directive parsing/types
+- `sc-lint-schema`
+  - shared machine-schema types for analyzer inputs/outputs
 - `sc-lint-attributes`
   - proc-macro attribute surface for `#[sc_lint(...)]`
 - `sc-lint-boundary`
-  - analyzer CLI and library for boundary and portability rules
+  - analyzer CLI and library for boundary rules
+- `sc-lint-portability`
+  - analyzer CLI and library for platform/OS portability rules
+- `sc-lint-runtime`
+  - analyzer CLI and library for std runtime/concurrency correctness rules
+
+Planned later crate:
+
+- `sc-lint-tokio`
+  - reserved home for Tokio-specific async/runtime lint rules when Tokio-specific
+    dependencies or semantics justify a dedicated crate
+  - represented in structured boundary metadata as a reserved future crate
+  - out of current parity scope until a future sprint assigns planned items
 
 ## Top-level CLI Role
 
-The top-level `sc-lint` CLI is the intended stable user-facing entry point.
+The top-level `sc-lint` CLI is the stable user-facing entry point.
 
 It should own:
 
@@ -69,8 +91,44 @@ The top-level CLI should standardize on:
   - `full`
   - `ci`
 
+The primary `lint` target surface should preserve backend-crate ownership
+explicitly. Planned primary mappings are:
+
+- `sc-lint lint sc-boundary`
+  - backend owner: `sc-lint-boundary`
+- `sc-lint lint sc-portability`
+  - backend owner: `sc-lint-portability`
+- `sc-lint lint sc-runtime`
+  - backend owner: `sc-lint-runtime`
+
+Future crate-backed additions should follow the same rule, for example:
+
+- `sc-lint lint sc-tokio`
+  - backend owner: `sc-lint-tokio`
+
+Subset aliases such as `unix-gating` or `runtime-waits` may exist as secondary
+surfaces, but they must not replace the primary crate-mapped identifiers in
+the product contract.
+
 Backend-specific machine flags may still exist internally during migration, but
 the user-facing product contract should not depend on them.
+
+Current implementation status:
+
+- `version`
+  - direct CLI-owned success path
+- `lint.sc-boundary`
+  - real backend-normalized success path
+  - config loading and logger initialization stay in the top-level CLI
+  - `sc-lint-boundary` stays a backend-owned analyzer without logger setup
+- `lint.sc-portability`
+  - real delegated backend-normalized success path
+  - top-level `sc-lint` invokes the dedicated `sc-lint-portability` binary
+    without adding a direct crate dependency
+- `lint.sc-runtime`
+  - real delegated backend-normalized success path
+  - top-level `sc-lint` invokes the dedicated `sc-lint-runtime` binary
+    without adding a direct crate dependency
 
 ## Backend Crate Isolation
 
@@ -81,7 +139,18 @@ Default backend isolation rule:
 Allowed shared support:
 
 - `sc-lint-directives`
+- `sc-lint-schema`
 - future shared support crates only after explicit design approval
+
+For release `0.1.x`, this means:
+
+- `sc-lint-portability` and `sc-lint-runtime` may depend on
+  `sc-lint-directives` when shared directive parsing/types are needed
+- `sc-lint-boundary`, `sc-lint-portability`, and the top-level `sc-lint` CLI
+  may depend on `sc-lint-schema` for the canonical machine-schema types
+- the top-level `sc-lint` CLI does not directly depend on
+  `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
+  integration mode
 
 This means coordination belongs in:
 
@@ -90,6 +159,32 @@ This means coordination belongs in:
 and not in:
 
 - direct backend crate cross-calls
+
+### Rule-family distribution
+
+The release line should avoid growing large catch-all analyzer crates.
+
+Current intended distribution is:
+
+- `sc-lint-boundary`
+  - boundary inventory and ownership rules
+  - boundary declarations and attribute-driven boundary policy
+- `sc-lint-portability`
+  - OS/platform portability rules
+  - current planned moves/imports:
+    - `PORT-001`
+    - `PORT-002`
+    - `PORT-003`
+    - `PORT-004`
+    - `PORT-005`
+- `sc-lint-runtime`
+  - std runtime/concurrency correctness rules
+  - current owned rules:
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
+- `sc-lint-tokio`
+  - future Tokio-specific runtime rules
+  - must remain distinct from generic runtime rules
 
 ## Boundary and Planning Data
 
@@ -132,6 +227,15 @@ important public facades and implementation types for the release-1 line:
 - `BOUNDARY-ScLintBoundaryAnalyzer`
   - facade: `analyze_workspace`
   - implementation type: `analyze_workspace`
+- `BOUNDARY-ScLintPortabilityAnalyzer`
+  - facade: `analyze_workspace`
+  - implementation type: `analyze_workspace`
+- `BOUNDARY-ScLintRuntimeAnalyzer`
+  - facade: `analyze_workspace`
+  - implementation type: `analyze_workspace`
+- `BOUNDARY-ScLintTokioAnalyzer`
+  - facade: `analyze_workspace`
+  - implementation type: `analyze_workspace`
 - `BOUNDARY-ScLintCli`
   - facade: `Cli`
   - implementation type: `Cli`
@@ -146,21 +250,23 @@ planned top-level CLI surface should also name these important contract types:
 
 - `Cli`
 - `Command`
-- `LintProfile`
-  - `Fast`
-  - `Full`
-  - `Ci`
-- `OutputMode`
-  - `Human`
-  - `Json`
 - `CommandEnvelope`
   - boundary/planning metadata tracks the generic family root name
     `CommandEnvelope`, while the CLI contract documents the generic form
     `CommandEnvelope<T>`
 - `CliError`
+- `CommandContext`
+- `CheckTarget`
+  - `Native`
+  - `Xwin`
+- `ClippyTarget`
+  - `Native`
+  - `Xwin`
+- `WINDOWS_XWIN_TARGET`
+  - `x86_64-pc-windows-msvc`
 
-These types are part of the intended architectural contract even before the
-full CLI crate is implemented.
+These types are part of the intended architectural contract, and for the
+A.1b/A.2 line they already match the implemented CLI crate surfaces.
 
 For release `0.1.x`, these planned CLI contract types should also be carried in
 machine-readable boundary/planning metadata as `BOUNDARY-ScLintCli`
@@ -209,11 +315,13 @@ productized second.
 
 Current planned promotion path from `atm-core`:
 
-- reusable analyzer families to backport into `sc-lint-boundary`:
-  - `PORT-004`
-  - `PORT-005`
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
+- reusable analyzer families to backport into dedicated tool crates:
+  - `sc-lint-portability`
+    - `PORT-004`
+    - `PORT-005`
+  - `sc-lint-runtime`
+    - `SCB-RUNTIME-001`
+    - `SCB-RUNTIME-002`
 - consumer-local policy families that stay outside `sc-lint` unless extracted
   as a configurable framework:
   - duplicate semantic string-literal policy
@@ -240,13 +348,16 @@ surface likely drift such as:
 - platform-specific imports leaking into shared code
 - type or signature mismatches in gated modules
 
-Current likely first implementation:
+ADR-005 is the approved release-1 strategy artifact for this area and
+supersedes earlier provisional rollout notes from planning documents.
+
+Current explicit Windows preflight commands:
 
 - `cargo xwin check --target x86_64-pc-windows-msvc`
-
-Current likely stronger follow-up path:
-
 - `cargo xwin clippy --target x86_64-pc-windows-msvc -- -D warnings`
+
+For direct invocation, `xwin check` remains the lighter first-stop preflight
+path and `xwin clippy` remains the stronger companion path.
 
 True multi-platform validation still belongs to real CI runners on the target
 platforms because cross-target compile checks do not prove:
@@ -267,18 +378,18 @@ The architecture therefore supports:
 - if `cargo xwin` is not installed, the tool family should degrade cleanly and
   leave those checks unavailable rather than breaking unrelated lint paths
 
-The expected rollout order is:
+The expected rollout policy is:
 
-1. adopt `xwin check` as the first Windows preflight candidate
-2. measure timing and usefulness on consumer repos
-3. keep `xwin clippy` as a stronger explicit path until its cost is better
-   understood
+1. keep `xwin` capability-gated rather than making it a CI prerequisite
+2. allow `full` to add both `xwin check` and `xwin clippy` when the capability
+   is present, as defined by ADR-005
+3. keep real Windows CI as the authoritative validation path
 
 Profile policy:
 
 - `xwin` participation belongs in local lint profiles, not CI-parity profiles
-- if installed, `xwin check` may join `fast` and `full`
-- if installed, `xwin clippy` may join `full`
+- `fast` excludes `xwin` to preserve low-latency local feedback
+- if installed, `xwin check` and `xwin clippy` join `full`
 - `ci` lint parity should stay aligned to real CI and therefore should not
   depend on `xwin`
 - the top-level `ci` command should run lint plus tests, while `lint ci`

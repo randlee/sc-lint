@@ -1,0 +1,59 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: RBP-F001
+# RBP-003: parse_directive pub but undocumented stable surface; Scope enum pub despite internal use
+# Phase: phase-A | Mode: initial_pass | Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/RBP-F001>
+  a triage:Finding ;
+  triage:findingId "RBP-F001" ;
+  triage:title "RBP-003: parse_directive pub but undocumented stable surface; Scope enum pub despite internal use" ;
+  triage:description "crates/sc-lint-directives/src/lib.rs:40 — parse_directive is pub but is not part of any documented stable public API surface. The Scope enum is also pub despite being used only internally. RBP-003 requires visibility to match actual public contract." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/integration-phase-A/2> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+# Occurrences on integration/phase-A
+
+<urn:atm:triage:occurrence/RBP-F001/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-directives/src/lib.rs" ;
+  triage:line 10 ;
+  triage:snippet "pub enum Scope {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F001/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-directives/src/lib.rs" ;
+  triage:line 40 ;
+  triage:snippet "pub fn parse_directive(input: ParseStream<'_>) -> Result<Directive> {" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+# WorktreeSnapshots
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 ;
+  triage:branchStatus "open" .

@@ -9,7 +9,8 @@ tooling into `sc-lint`, with special focus on:
 
 It also records the planned introduction of a top-level `sc-lint` command-line
 entry point that provides one stable surface across mixed Rust/Python tool
-implementations.
+implementations, plus the planned distribution of imported analyzer families
+into narrow dedicated crates.
 
 ## Scope
 
@@ -17,7 +18,9 @@ This plan covers six current tooling areas and one proof-to-product migration
 track:
 
 1. boundary inventory and manifest-policy enforcement
-   - current implementation: Python `lint_boundaries.py`
+   - current implementation:
+     - Python `.just/lint_manifests.py` for manifest policy
+     - Rust `sc-lint-boundary` for boundary inventory loading/schema
    - target: Rust `sc-lint-boundary`
 2. line-count lint
    - current implementation: Python `check_line_counts.py`
@@ -122,7 +125,7 @@ This means, for example:
 - coordination belongs in the top-level `sc-lint` CLI, not in backend crate
   cross-calls
 
-### Move to Rust
+### Move to Rust / dedicated analyzer crates
 
 The following logic should migrate into `sc-lint-boundary`:
 
@@ -134,11 +137,24 @@ The following logic should migrate into `sc-lint-boundary`:
 - manifest section rules
 - inventory-parity checks
 - future boundary metadata checks that depend on the canonical boundary model
-- reusable postmortem analyzer families already proven on `atm-core`:
+
+The following reusable analyzer families migrate into dedicated crates:
+
+- `sc-lint-portability`
+  - `PORT-001` hardcoded Unix-only absolute paths in test code
+  - `PORT-002` direct `dirs::home_dir()` without configured override check
+  - `PORT-003` `std::env::set_var()` in test code
   - `PORT-004` ungated `std::os::unix` imports in production code
   - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
+- `sc-lint-runtime`
   - `SCB-RUNTIME-001` bare production `Condvar::wait(...)`
   - `SCB-RUNTIME-002` discarded `wait_timeout*` results in production code
+
+Planned later crate:
+
+- `sc-lint-tokio`
+  - Tokio-specific runtime rules only
+  - not part of the current import scope
 
 ### Stay in Python
 
@@ -194,6 +210,12 @@ Initial expected shape:
 - `sc-lint version`
 - `sc-lint ci`
 
+Release-1 note:
+
+- `lint` owns the primary crate-mapped backend targets
+- `view` remains a narrower grouped surface whose targets are documented
+  individually as they become stable
+
 Initial expected profile shape:
 
 - `sc-lint lint fast`
@@ -211,57 +233,7 @@ Deliverable:
 - one explicit machine-readable contract for non-interactive command families
 - backend implementations remain self-contained behind the dispatcher
 
-### Phase 1: Extract generic Python utilities
-
-Move the non-boundary generic Python tools into `sc-lint`:
-
-- line-count lint
-- identity literal lint
-- generic view plumbing
-
-Required work:
-
-- rename ATM-specific file/function terminology to consumer-neutral names
-- define repo config inputs in `sc-lint`
-- add standalone fixture tests
-- keep repo wrappers thin in the consumer repo
-- expose extracted utilities through the top-level `sc-lint` CLI
-
-Deliverable:
-
-- `sc-lint` owns the generic Python utilities
-- consumer repos call them through local wrappers or direct `sc-lint`
-  invocation
-
-Phase 1 note on identity literals:
-
-- the current `atm-core` role-name gate is a consumer policy, not a shared
-  default
-- if extracted later, `sc-lint` should expose a configurable literal-policy
-  framework rather than hardcoding ATM role names
-
-### Phase 1.5: Backport proven reusable postmortem analyzer rules
-
-Move the reusable R.19 analyzer families from the embedded `atm-core`
-proving surface into standalone `sc-lint`.
-
-Required work:
-
-- port `PORT-004` and `PORT-005` into the standalone `sc-lint-boundary`
-  codebase
-- port `SCB-RUNTIME-001` and `SCB-RUNTIME-002` into the standalone
-  `sc-lint-boundary` codebase
-- add rule documentation and tests in `sc-lint`
-- keep the consumer repo (`atm-core`) as the first validation target after
-  the backport
-
-Deliverable:
-
-- `sc-lint` owns the reusable postmortem analyzer families that were proven on
-  `atm-core`
-- consumer repos can consume those families without copying ATM-local policy
-
-### Phase 1.6: Define cross-target preflight support
+### Phase 0.5: Define cross-target preflight support
 
 Decide how `sc-lint` should orchestrate cross-target compile checks that can
 surface likely platform drift before CI.
@@ -279,8 +251,8 @@ Required work:
   - `xwin check` as the likely first promotion candidate
   - `xwin clippy` as a stronger follow-up path that may stay non-default
 - record the profile policy:
-  - `fast` may include `xwin check`
-  - `full` may include `xwin check` and `xwin clippy`
+  - `fast` excludes `xwin` to preserve low-latency local feedback
+  - `full` includes `xwin check` and `xwin clippy` when available
   - `ci` excludes `xwin` because real Windows CI already exists
 
 Deliverable:
@@ -291,6 +263,88 @@ Deliverable:
 - no ambiguity about the difference between:
   - `sc-lint lint ci`
   - `sc-lint ci`
+
+### Phase 1: Extract generic Python utilities
+
+Move the non-boundary generic Python tools into `sc-lint`:
+
+- line-count lint
+- identity literal lint
+- generic view plumbing
+
+Required work:
+
+- rename ATM-specific file/function terminology to consumer-neutral names
+- define repo config inputs in `sc-lint`
+- add standalone fixture tests
+- keep repo wrappers thin in the consumer repo
+- expose extracted utilities through the top-level `sc-lint` CLI
+- normalize Python utility machine output through one adapter schema
+  (`sc-lint-python-v1`) before the top-level CLI wraps results into
+  `CommandEnvelope<T>` or `CliError`
+
+Deliverable:
+
+- `sc-lint` owns the generic Python utilities
+- consumer repos call them through local wrappers or direct `sc-lint`
+  invocation
+- the initial extracted command surfaces are:
+  - `sc-lint lint line-counts`
+  - `sc-lint lint identity-literals`
+  - `sc-lint view findings`
+
+Phase 1 note on identity literals:
+
+- the current `atm-core` role-name gate is a consumer policy, not a shared
+  default
+- if extracted later, `sc-lint` should expose a configurable literal-policy
+  framework rather than hardcoding ATM role names
+
+### Phase 1.5: Add `sc-lint-portability`
+
+Create the dedicated portability analyzer crate and move all shared
+portability rules into it.
+
+Required work:
+
+- create `sc-lint-portability`
+- move the existing portability implementation out of
+  `crates/sc-lint-boundary/src/portability.rs`
+- keep `PORT-001/002/003` with the same rule ids under `sc-lint-portability`
+- port `PORT-004` and `PORT-005` into `sc-lint-portability`
+- retarget the current portability wrapper surface to the new crate
+- add rule documentation and tests in `sc-lint`
+- keep the consumer repo (`atm-core`) as the first validation target after
+  the backport
+
+Deliverable:
+
+- `sc-lint-portability` owns the shared portability rule family
+- the existing portability code path has moved out of `sc-lint-boundary`
+- consumer repos can consume the shared portability family without copying
+  ATM-local policy
+
+### Phase 1.6: Add `sc-lint-runtime`
+
+Create the dedicated std runtime/concurrency analyzer crate and move the
+shared runtime rules into it.
+
+Required work:
+
+- create `sc-lint-runtime`
+- port `SCB-RUNTIME-001` and `SCB-RUNTIME-002` into `sc-lint-runtime`
+- add rule documentation and tests in `sc-lint`
+- keep the consumer repo (`atm-core`) as the first validation target after
+  the backport
+
+Deliverable:
+
+- `sc-lint-runtime` owns the shared std runtime rule family
+- the imported runtime families land in a dedicated analyzer crate rather than
+  widening `sc-lint-boundary`
+- consumer repos can consume those rules without copying ATM-local policy
+- release-1 CLI exposure remains `sc-lint lint sc-runtime` through delegated
+  backend execution and top-level output normalization
 
 ### Phase 2: Introduce Rust boundary inventory loader
 
@@ -307,17 +361,20 @@ Required work:
 Deliverable:
 
 - Rust can load and validate boundary inventory without Python assistance
+- the canonical `boundaries/` TOML layout and `boundaries/planning.toml`
+  planning registry are validated in the Rust loader before graph analysis
 
 ### Phase 3: Add manifest-policy enforcement to Rust
 
-Port the generic manifest-policy portion of `lint_boundaries.py` into
+Port the current manifest-policy checks from `.just/lint_manifests.py` into
 `sc-lint-boundary`.
 
 Required work:
 
-- model dependency ownership rules
-- model manifest section rules
-- validate `Cargo.toml` edges against boundary/config policy
+- model dependency ownership rules for internal path dependencies
+- model workspace-package inheritance rules inside `[package]`
+- validate `Cargo.toml` path dependency edges and required workspace package
+  fields
 - preserve stable finding categories across the migration
 - route execution through the top-level `sc-lint` CLI without adding direct
   dependencies on unrelated backend crates
@@ -326,19 +383,29 @@ Deliverable:
 
 - Rust owns boundary inventory plus manifest-policy enforcement
 
+Rust-native vs Python-backed after A.7:
+
+- Rust-native:
+  - boundary inventory loading and schema validation in `sc-lint-boundary`
+  - boundary graph analysis and enforcement in `sc-lint-boundary`
+  - manifest ownership and workspace-package inheritance checks in `sc-lint-boundary`
+- Python-backed:
+  - `.just/lint_manifests.py` remains the parity oracle during the A.7 validation window
+  - `.just/run_lint.py` still executes the Python manifest lint in the repo-level lint workflow
+
 ### Phase 4: Parity validation window
 
-Keep the Python boundary implementation and run it as a parity validator
-against the Rust implementation.
+Keep the Python manifest-policy implementation and run it as a parity
+validator against the Rust implementation.
 
 Required work:
 
 - define parity fixtures
 - compare Python vs Rust findings on:
-  - valid boundary inventory
-  - invalid boundary inventory
+  - valid manifest-policy fixtures
+  - invalid manifest-policy fixtures
   - manifest-policy failures
-  - mixed-source migration repos where still relevant
+  - mixed explicit-version and workspace-version package sets
 - fail parity tests on mismatch
 - ensure parity runs can be triggered from the top-level CLI or equivalent test
   harness without violating backend crate isolation

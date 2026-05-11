@@ -1,0 +1,71 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: RBP-F002
+# RBP-004: CrateId newtype triplicated across portability/runtime/boundary without validation
+# Phase: phase-A | Mode: initial_pass | Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/RBP-F002>
+  a triage:Finding ;
+  triage:findingId "RBP-F002" ;
+  triage:title "RBP-004: CrateId newtype triplicated across portability/runtime/boundary without validation" ;
+  triage:description "CrateId newtype is defined independently in crates/sc-lint-portability/src/lib.rs:28, crates/sc-lint-runtime/src/lib.rs:31, and crates/sc-lint-boundary/src/lib.rs:94 without validation in the portability/runtime versions. RBP-004 requires shared types to be defined once. The portability and runtime versions lack the format invariant validation (debug_assert non-empty) and the Display/AsRef/Deref impls present in the canonical boundary definition." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "workspace" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/integration-phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/integration-phase-A/3> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+# Occurrences on integration/phase-A (workspace sweep)
+
+<urn:atm:triage:occurrence/RBP-F002/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/lib.rs" ;
+  triage:line 28 ;
+  triage:snippet "pub(crate) struct CrateId(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F002/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-runtime/src/lib.rs" ;
+  triage:line 31 ;
+  triage:snippet "pub(crate) struct CrateId(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/RBP-F002/integration-phase-A/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:line 94 ;
+  triage:snippet "pub struct CrateId(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+# WorktreeSnapshots
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 ;
+  triage:branchStatus "open" .
