@@ -91,6 +91,33 @@ Current scaffold state:
   - reserved
   - no implementation scope yet
 
+## Phase Status
+
+### Phase A
+
+Phase `A` is complete. The Phase-A implementation line established the
+release-foundation work for:
+
+- the top-level `sc-lint` CLI
+- dedicated `sc-lint-portability` and `sc-lint-runtime` analyzer crates
+- Rust-native boundary inventory and manifest-policy loading
+- structured CLI logging and user-guide publication
+
+### Phase B
+
+Phase `B` is now the next planned line of work.
+
+Initial Phase-B scope is post-mortem carry-forwards from Phase `A`, starting
+with Sprint `B.1`:
+
+- systemic lint-gate planning for recurring Phase-A finding patterns
+- observability boundary-policy ADR work
+- QA-process tightening so `rust-best-practices` runs in
+  `practice_mode:all` on every sprint
+
+See [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md) and
+[docs/sc-lint/sprint-B1.md](./sprint-B1.md).
+
 ### Current code moves required
 
 The current implementation now places the shared portability rule family in

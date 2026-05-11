@@ -22,6 +22,8 @@ Current contents:
 - [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
   execution plan for repo self-hosting, boundaries, CLI introduction, and
   extraction order
+- [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution stub and
+  post-mortem carry-forward planning line
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and Phase A touchpoint guide
 - [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
@@ -37,6 +39,8 @@ Current contents:
 - [`sprint-A6.md`](./sprint-A6.md) — Rust boundary inventory loader sprint
 - [`sprint-A7.md`](./sprint-A7.md) — manifest-policy and parity sprint
 - [`sprint-A8.md`](./sprint-A8.md) — per-tool user-guide sprint
+- [`sprint-B1.md`](./sprint-B1.md) — post-mortem carry-forward and systemic
+  lint-gate planning sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
