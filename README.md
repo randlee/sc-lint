@@ -172,9 +172,12 @@ The current GitHub Actions sequence mirrors the local workflow:
 Detailed design and planning material lives under:
 
 - [`docs/sc-lint/README.md`](docs/sc-lint/README.md)
-- [`docs/sc-lint/tools/sc-boundary.md`](docs/sc-lint/tools/sc-boundary.md)
-- [`docs/sc-lint/tools/sc-portability.md`](docs/sc-lint/tools/sc-portability.md)
-- [`docs/sc-lint/tools/sc-runtime.md`](docs/sc-lint/tools/sc-runtime.md)
+- [`crates/sc-lint-boundary/README.md`](crates/sc-lint-boundary/README.md)
+- [`crates/sc-lint-portability/README.md`](crates/sc-lint-portability/README.md)
+- [`crates/sc-lint-runtime/README.md`](crates/sc-lint-runtime/README.md)
+- [`crates/sc-lint-schema/README.md`](crates/sc-lint-schema/README.md)
+- [`crates/sc-lint-directives/README.md`](crates/sc-lint-directives/README.md)
+- [`crates/sc-lint-attributes/README.md`](crates/sc-lint-attributes/README.md)
 - [`docs/sc-lint/requirements.md`](docs/sc-lint/requirements.md)
 - [`docs/sc-lint/graph-schema.md`](docs/sc-lint/graph-schema.md)
 - [`docs/sc-lint/boundary-enforcement-model.md`](docs/sc-lint/boundary-enforcement-model.md)

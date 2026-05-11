@@ -8,6 +8,7 @@ license.workspace = true
 description = "AST-sensitive Rust portability analyzer."
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 
 [[bin]]
 name = "sc-lint-portability"

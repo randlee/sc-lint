@@ -8,6 +8,7 @@ license.workspace = true
 description = "Shared machine schema types for sc-lint analyzer outputs."
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 
 [lib]
 name = "sc_lint_schema"

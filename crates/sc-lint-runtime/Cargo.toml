@@ -8,6 +8,7 @@ license.workspace = true
 description = "AST-sensitive Rust runtime analyzer."
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 
 [[bin]]
 name = "sc-lint-runtime"

@@ -141,6 +141,5 @@ Delegated/backend normalization records also appear:
 
 See:
 
-- [logging.md](../logging.md)
-- [cli-contract.md](../cli-contract.md)
-
+- [logging.md](../../docs/sc-lint/logging.md)
+- [cli-contract.md](../../docs/sc-lint/cli-contract.md)
