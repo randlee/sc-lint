@@ -52,10 +52,16 @@ The planned gate contracts for this sprint are:
 - API-error gate
   - ban public API error types from exposing `anyhow::Error` or `AnyhowError`
     directly in public signatures, fields, or enum variants
-  - require an opaque wrapper or `Box<dyn Error + Send + Sync>`-style
-    abstraction when dynamic error transport is necessary
+  - require the Phase-A replacement contract already established by
+    `RuntimeError`, `BoundaryError`, and `PortabilityError`:
+    use an opaque wrapper type where the error surface is crate-owned, or
+    `Box<dyn std::error::Error + Send + Sync>` at the public boundary when a
+    dynamic source must cross that boundary
+  - treat the Phase-A wrapper pattern as the canonical precedent so
+    implementers do not invent per-crate ad hoc replacements
   - sprint success criteria:
-    - no public API type exposes `anyhow` in its public error contract
+    - no public API error type exposes `anyhow` in its public signature
+    - all public error sources are concrete types or boxed trait objects
 - shared-newtype gate
   - declare `sc-lint-schema` as the canonical owner of workspace-shared
     identifier types such as `CrateId`
