@@ -1,0 +1,54 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A6-SC-002
+# TraitOnly visibility variant and nullable BoundaryRecord fields unimplemented
+# Source: QA-A6-001 SC-QA-002 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A6-SC-002>
+  a triage:Finding ;
+  triage:findingId "A6-SC-002" ;
+  triage:title "TraitOnly visibility variant and nullable BoundaryRecord fields missing from schema contract" ;
+  triage:description "The schema contract for boundary loading on feature/sprint-A6 is partially implemented. Specifically: (1) the TraitOnly visibility variant is absent from the VisibilityKind enum or equivalent type, and (2) BoundaryRecord fields that the contract specifies as nullable (Option<T>) are not nullable in the implementation. Sprint A.6 acceptance criteria require the complete schema contract. Fix: add TraitOnly to the visibility enum and make the appropriate BoundaryRecord fields Option<T> per the sprint-A6.md schema spec." ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "A6-scope incomplete implementation. Locate in crates/sc-lint-boundary/ schema types. Read sprint-A6.md schema spec before implementing." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A6-SC-002/sprint-A6/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A6-SC-002/sprint-A6/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A6/8544597> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:occurrence/A6-SC-002/sprint-A6/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:snippet "TraitOnly visibility variant absent from VisibilityKind" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:occurrence/A6-SC-002/sprint-A6/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/lib.rs" ;
+  triage:snippet "BoundaryRecord nullable fields not Option<T>" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 .

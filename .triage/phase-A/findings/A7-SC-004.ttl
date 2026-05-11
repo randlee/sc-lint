@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A7-SC-004
+# extraction-plan.md and boundary-toml-migration.md missing Rust-native vs Python-backed statement
+# Source: QA-A7-001 SC-QA-A7-004 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A7-SC-004>
+  a triage:Finding ;
+  triage:findingId "A7-SC-004" ;
+  triage:title "extraction-plan.md and boundary-toml-migration.md missing Rust-native vs Python-backed statement" ;
+  triage:description "Sprint A.7 acceptance criterion 4 requires an explicit statement in docs/sc-lint/extraction-plan.md and docs/sc-lint/boundary-toml-migration.md (or equivalent) identifying which checks are now Rust-native and which remain Python-backed after the manifest-policy addition. Both documents lack this statement. Fix: add a section or table to each document clearly distinguishing Rust-native checks (sc-lint-boundary Rust analyzer) from Python-backed checks (.just/ parity oracle layer)." ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "Doc-only additions. A7-scope. Read sprint-A7.md acceptance criterion 4 for the exact required statement format." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-SC-004/sprint-A7/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A7-SC-004/sprint-A7/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/32f233e> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-SC-004/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/extraction-plan.md" ;
+  triage:snippet "Rust-native vs Python-backed statement absent" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:occurrence/A7-SC-004/sprint-A7/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/boundary-toml-migration.md (or equivalent)" ;
+  triage:snippet "Rust-native vs Python-backed statement absent" ;
+  triage:status "open" ; triage:closed false ;
+  triage:branch "feature/sprint-A7" ; triage:headSha "32f233e" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/32f233e> .
+
+<urn:atm:triage:worktree/sprint-A7/32f233e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "32f233e" ;
+  triage:orderIndex 7 .

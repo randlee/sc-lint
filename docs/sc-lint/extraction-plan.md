@@ -18,7 +18,9 @@ This plan covers six current tooling areas and one proof-to-product migration
 track:
 
 1. boundary inventory and manifest-policy enforcement
-   - current implementation: Python `lint_boundaries.py`
+   - current implementation:
+     - Python `.just/lint_manifests.py` for manifest policy
+     - Rust `sc-lint-boundary` for boundary inventory loading/schema
    - target: Rust `sc-lint-boundary`
 2. line-count lint
    - current implementation: Python `check_line_counts.py`
@@ -136,7 +138,7 @@ The following logic should migrate into `sc-lint-boundary`:
 - inventory-parity checks
 - future boundary metadata checks that depend on the canonical boundary model
 
-The following reusable analyzer families should migrate into dedicated crates:
+The following reusable analyzer families migrate into dedicated crates:
 
 - `sc-lint-portability`
   - `PORT-001` hardcoded Unix-only absolute paths in test code
@@ -277,12 +279,19 @@ Required work:
 - add standalone fixture tests
 - keep repo wrappers thin in the consumer repo
 - expose extracted utilities through the top-level `sc-lint` CLI
+- normalize Python utility machine output through one adapter schema
+  (`sc-lint-python-v1`) before the top-level CLI wraps results into
+  `CommandEnvelope<T>` or `CliError`
 
 Deliverable:
 
 - `sc-lint` owns the generic Python utilities
 - consumer repos call them through local wrappers or direct `sc-lint`
   invocation
+- the initial extracted command surfaces are:
+  - `sc-lint lint line-counts`
+  - `sc-lint lint identity-literals`
+  - `sc-lint view findings`
 
 Phase 1 note on identity literals:
 
@@ -303,8 +312,7 @@ Required work:
   `crates/sc-lint-boundary/src/portability.rs`
 - keep `PORT-001/002/003` with the same rule ids under `sc-lint-portability`
 - port `PORT-004` and `PORT-005` into `sc-lint-portability`
-- retarget the current portability wrapper surface to the new crate once it
-  exists
+- retarget the current portability wrapper surface to the new crate
 - add rule documentation and tests in `sc-lint`
 - keep the consumer repo (`atm-core`) as the first validation target after
   the backport
@@ -335,6 +343,8 @@ Deliverable:
 - the imported runtime families land in a dedicated analyzer crate rather than
   widening `sc-lint-boundary`
 - consumer repos can consume those rules without copying ATM-local policy
+- release-1 CLI exposure remains `sc-lint lint sc-runtime` through delegated
+  backend execution and top-level output normalization
 
 ### Phase 2: Introduce Rust boundary inventory loader
 
@@ -351,17 +361,20 @@ Required work:
 Deliverable:
 
 - Rust can load and validate boundary inventory without Python assistance
+- the canonical `boundaries/` TOML layout and `boundaries/planning.toml`
+  planning registry are validated in the Rust loader before graph analysis
 
 ### Phase 3: Add manifest-policy enforcement to Rust
 
-Port the generic manifest-policy portion of `lint_boundaries.py` into
+Port the current manifest-policy checks from `.just/lint_manifests.py` into
 `sc-lint-boundary`.
 
 Required work:
 
-- model dependency ownership rules
-- model manifest section rules
-- validate `Cargo.toml` edges against boundary/config policy
+- model dependency ownership rules for internal path dependencies
+- model workspace-package inheritance rules inside `[package]`
+- validate `Cargo.toml` path dependency edges and required workspace package
+  fields
 - preserve stable finding categories across the migration
 - route execution through the top-level `sc-lint` CLI without adding direct
   dependencies on unrelated backend crates
@@ -370,19 +383,29 @@ Deliverable:
 
 - Rust owns boundary inventory plus manifest-policy enforcement
 
+Rust-native vs Python-backed after A.7:
+
+- Rust-native:
+  - boundary inventory loading and schema validation in `sc-lint-boundary`
+  - boundary graph analysis and enforcement in `sc-lint-boundary`
+  - manifest ownership and workspace-package inheritance checks in `sc-lint-boundary`
+- Python-backed:
+  - `.just/lint_manifests.py` remains the parity oracle during the A.7 validation window
+  - `.just/run_lint.py` still executes the Python manifest lint in the repo-level lint workflow
+
 ### Phase 4: Parity validation window
 
-Keep the Python boundary implementation and run it as a parity validator
-against the Rust implementation.
+Keep the Python manifest-policy implementation and run it as a parity
+validator against the Rust implementation.
 
 Required work:
 
 - define parity fixtures
 - compare Python vs Rust findings on:
-  - valid boundary inventory
-  - invalid boundary inventory
+  - valid manifest-policy fixtures
+  - invalid manifest-policy fixtures
   - manifest-policy failures
-  - mixed-source migration repos where still relevant
+  - mixed explicit-version and workspace-version package sets
 - fail parity tests on mismatch
 - ensure parity runs can be triggered from the top-level CLI or equivalent test
   harness without violating backend crate isolation

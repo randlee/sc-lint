@@ -1,0 +1,52 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: A6-ARCH-001
+# Carry-in: mod logging still in lib.rs on A6 (ARCH-NEW-001 carry-in from pre-A4 state)
+# Source: QA-A6-001 ARCH-001 (quality-mgr naming)
+# Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/A6-ARCH-001>
+  a triage:Finding ;
+  triage:findingId "A6-ARCH-001" ;
+  triage:title "ARCH-NEW-001 carry-in: mod logging declared from lib.rs on feature/sprint-A6" ;
+  triage:description "crates/sc-lint/src/lib.rs still declares 'mod logging;' on feature/sprint-A6 at 8544597. This was fixed on feature/sprint-A4 (aac4dea) and is now on integration/phase-A (merged at 1cd8862). Fix: merge-forward from integration/phase-A into feature/sprint-A6. No explicit code change needed — the fix arrives via merge." ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:notes "Resolves via merge-forward from integration/phase-A (1cd8862). Clint is performing merge-forward for A6 per TASK-FIX-A5-003. After merge-forward this finding is closed with no additional action." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A6-ARCH-001/sprint-A6/1> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A6/8544597> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:occurrence/A6-ARCH-001/sprint-A6/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/lib.rs" ;
+  triage:snippet "mod logging;" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8544597> .
+
+<urn:atm:triage:worktree/sprint-A6/8544597>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8544597" ;
+  triage:orderIndex 6 .
+
+<urn:atm:triage:worktree/integration-phase-A/2fd6dce>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2fd6dce" ;
+  triage:orderIndex 0 ;
+  triage:branchStatus "fixed" ;
+  triage:note "Fix for ARCH-NEW-001 arrived via PR #13 (A4) merge at 1cd8862; present on integration/phase-A" .

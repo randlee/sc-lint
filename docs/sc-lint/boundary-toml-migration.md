@@ -130,6 +130,14 @@ Deliverable:
 - no behavior regression in existing boundary checks
 - duplicate authoritative records across formats fail loudly
 
+Current implementation note:
+
+- the A.6 branch now loads canonical TOML boundary records directly from
+  `boundaries/<owner-package>/*.toml`
+- planning metadata is loaded from `boundaries/planning.toml`
+- strict TOML schema validation, owner/path validation, and duplicate-id/item
+  rejection are implemented in Rust
+
 ### Phase 2: Canonical TOML Rollout
 
 Start migrating the existing boundary inventory into TOML.
@@ -253,7 +261,8 @@ Expected low-impact areas:
 - rule ids
 - graph/export schema
 - source analysis
-- manifest/source enforcement logic
+- manifest/source enforcement logic outside the current workspace-inheritance
+  and internal path-version parity window
 
 ## Remaining Open Decisions
 
@@ -277,6 +286,19 @@ The next planned boundary-enforcement feature set depends on this migration:
 
 That means the migration is not just a format cleanup. It creates the correct
 data model for the next enforcement stage.
+
+## Rust-Native Vs Python-Backed After A.7
+
+Rust-native now owns:
+
+- canonical boundary inventory loading and schema validation in `sc-lint-boundary`
+- boundary graph/export analysis and crate-boundary enforcement in Rust
+- manifest ownership and workspace-package inheritance checks in Rust
+
+Python-backed still owns:
+
+- `.just/lint_manifests.py` as the parity oracle for the A.7 manifest-policy migration window
+- repo-level lint workflow orchestration that still runs the Python manifest check alongside Rust validation
 
 ## Recommendation
 

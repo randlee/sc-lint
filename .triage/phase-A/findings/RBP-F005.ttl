@@ -1,0 +1,47 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Finding: RBP-F005
+# RBP-001: RepoRoot::discover 'root not found' path missing cause detail
+# Phase: phase-A | Mode: initial_pass | Triaged: 2026-05-10T00:00:00Z
+
+<urn:atm:triage:finding/RBP-F005>
+  a triage:Finding ;
+  triage:findingId "RBP-F005" ;
+  triage:title "RBP-001: RepoRoot::discover 'root not found' path missing cause detail" ;
+  triage:description "crates/sc-lint/src/config.rs:49 RepoRoot::discover 'root not found' error path is missing cause context - no detail about the last directory inspected or which sentinel file was missing. RBP-001 requires error paths to carry actionable context so users can diagnose root discovery failures." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F005/phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-A/2bb6d32> .
+
+# Occurrences on integration/phase-A (file_only sweep scope)
+
+<urn:atm:triage:occurrence/RBP-F005/phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/config.rs" ;
+  triage:line 49 ;
+  triage:snippet "return Err(CliError::config(format!(\"could not discover the sc-lint repo root from `{}`\", start.display()))" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-A/2bb6d32> .
+
+# WorktreeSnapshots
+
+<urn:atm:triage:worktree/phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 ;
+  triage:branchStatus "open" .

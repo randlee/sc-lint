@@ -1,0 +1,74 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PROD-004>
+  a triage:Finding ;
+  triage:findingId "PROD-004" ;
+  triage:title "cli-architecture.md and cli-contract.md still describe implemented commands as reserved/future" ;
+  triage:description "docs/sc-lint/cli-architecture.md lines 247-255 still says check/clippy/ci are reserved capability surfaces. docs/sc-lint/cli-contract.md lines 131-134 still says lint.sc-portability is reserved until A.4. Both commands are fully implemented and working on integration/phase-A at 51e36af." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PROD-004/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PROD-004/integration-phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PROD-004/integration-phase-A/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PROD-004/integration-phase-A/4> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/51e36af> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:occurrence/PROD-004/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/cli-architecture.md" ;
+  triage:line 247 ;
+  triage:snippet "- `check`\\n  - reserved contract surface\\n  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:occurrence/PROD-004/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/cli-architecture.md" ;
+  triage:line 250 ;
+  triage:snippet "- `clippy`\\n  - reserved contract surface\\n  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:occurrence/PROD-004/integration-phase-A/3>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/cli-architecture.md" ;
+  triage:line 253 ;
+  triage:snippet "- `ci`\\n  - reserved contract surface\\n  - currently returns `CLI.CAPABILITY_ERROR` through `CliError`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:occurrence/PROD-004/integration-phase-A/4>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/cli-contract.md" ;
+  triage:line 131 ;
+  triage:snippet "- `lint.sc-portability`\\n  - still reserved until A.4 lands" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:worktree/integration-phase-A/51e36af>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:orderIndex 99 .

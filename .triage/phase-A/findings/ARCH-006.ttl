@@ -1,0 +1,202 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/ARCH-006>
+  a triage:Finding ;
+  triage:findingId "ARCH-006" ;
+  triage:title "Hardcoded /tmp/ fixture strings lack PORT-001 detection intent comments" ;
+  triage:description "tests.rs lines 67, 136, and 351 contain hardcoded /tmp/ path strings used as fixtures. PORT-001 (portability rule) flags hardcoded /tmp/ paths. These occurrences are intentional test fixtures but lack a comment explaining the PORT-001 detection intent, making it unclear whether they are intentional exemptions or oversight." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A4/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A4/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A4/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A5/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A5/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A6/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A6/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A7/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A7/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A8/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-006/sprint-A8/2> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A4/b60b763> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A5/d4c847a> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A6/8eee490> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A7/8eee490> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A8/8eee490> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A8/8eee490> .
+
+# --- Occurrences: sprint-A4 ---
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A4/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/tests.rs" ;
+  triage:line 67 ;
+  triage:snippet "let _ = PathBuf::from(\"/tmp/test-artifact\");" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/b60b763> .
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A4/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/tests.rs" ;
+  triage:line 136 ;
+  triage:snippet "std::path::PathBuf::from(\"/tmp/runtime-socket\")" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/b60b763> .
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A4/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-portability/src/tests.rs" ;
+  triage:line 351 ;
+  triage:snippet "\"/tmp/runtime.sock\"" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/b60b763> .
+
+# --- Occurrences: sprint-A5 ---
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A5/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 375 ;
+  triage:snippet "let _ = PathBuf::from(\"/tmp/test-artifact\");" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "d4c847a" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/d4c847a> .
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A5/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 446 ;
+  triage:snippet "std::path::PathBuf::from(\"/tmp/runtime-socket\")" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A5" ;
+  triage:headSha "d4c847a" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/d4c847a> .
+
+# --- Occurrences: sprint-A6 ---
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A6/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 375 ;
+  triage:snippet "let _ = PathBuf::from(\"/tmp/test-artifact\");" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8eee490> .
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A6/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 446 ;
+  triage:snippet "std::path::PathBuf::from(\"/tmp/runtime-socket\")" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A6" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A6/8eee490> .
+
+# --- Occurrences: sprint-A7 ---
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A7/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 375 ;
+  triage:snippet "let _ = PathBuf::from(\"/tmp/test-artifact\");" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A7/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 446 ;
+  triage:snippet "std::path::PathBuf::from(\"/tmp/runtime-socket\")" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A7/8eee490> .
+
+# --- Occurrences: sprint-A8 (promote_to_branch, repeatable sweep) ---
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A8/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 375 ;
+  triage:snippet "let _ = PathBuf::from(\"/tmp/test-artifact\");" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A8/8eee490> .
+
+<urn:atm:triage:occurrence/ARCH-006/sprint-A8/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 446 ;
+  triage:snippet "std::path::PathBuf::from(\"/tmp/runtime-socket\")" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A8/8eee490> .
+
+# --- WorktreeSnapshots ---
+
+<urn:atm:triage:worktree/sprint-A4/b60b763>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:orderIndex 4 .
+
+<urn:atm:triage:worktree/sprint-A5/d4c847a>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "d4c847a" ;
+  triage:orderIndex 5 .
+
+<urn:atm:triage:worktree/sprint-A6/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 6 .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 .

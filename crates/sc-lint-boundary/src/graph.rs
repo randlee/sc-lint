@@ -104,7 +104,7 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
                 &source_path,
             );
 
-            let root_module_id = format!("{}::module::crate", context.crate_id);
+            let root_module_id = format!("{}::module::crate", context.crate_id.as_str());
             let root_attributes = Vec::new();
             builder.add_node(GraphNode {
                 id: NodeId::new(root_module_id.clone()),
@@ -157,7 +157,8 @@ fn ingest_module_items(
             Item::Mod(item_mod) => {
                 let name = item_mod.ident.to_string();
                 let child_module_path = format!("{module_path}::{name}");
-                let child_module_id = format!("{}::module::{child_module_path}", context.crate_id);
+                let child_module_id =
+                    format!("{}::module::{child_module_path}", context.crate_id.as_str());
                 let attributes = parse_lint_attributes(&item_mod.attrs)?;
 
                 builder.add_node(GraphNode {
@@ -935,8 +936,8 @@ pub(crate) fn is_supported_target(target: &cargo_metadata::Target) -> bool {
     })
 }
 
-pub(crate) fn crate_id(package_name: &str, target_name: &str) -> String {
-    format!("crate::{package_name}::{target_name}")
+pub(crate) fn crate_id(package_name: &str, target_name: &str) -> CrateId {
+    CrateId::from_parts(package_name, target_name)
 }
 
 pub(crate) fn load_metadata(root: &Path) -> Result<cargo_metadata::Metadata> {

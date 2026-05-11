@@ -45,31 +45,41 @@ Current contents:
   envelope and backend-to-CLI normalization contract
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
+- [`tools/sc-boundary.md`](./tools/sc-boundary.md) — user guide for
+  `sc-lint lint sc-boundary`
+- [`tools/sc-portability.md`](./tools/sc-portability.md) — user guide for
+  `sc-lint lint sc-portability`
+- [`tools/sc-runtime.md`](./tools/sc-runtime.md) — user guide for
+  `sc-lint lint sc-runtime`
 
 Current intended crate split:
 
 - `sc-lint`
-  - planned top-level CLI crate
+  - top-level CLI crate
   - command parsing, config loading, output normalization, tool dispatch
   - canonical AI-first machine contract for non-interactive commands
-  - planned profiles:
+  - implemented profiles:
     - `fast`
     - `full`
     - `ci`
-  - planned top-level CI-equivalent command:
+  - implemented top-level CI-equivalent command:
     - `sc-lint ci`
-  - planned Windows preflight commands when `cargo xwin` is installed:
+  - implemented Windows preflight commands when `cargo xwin` is installed:
     - `sc-lint check xwin`
     - `sc-lint clippy xwin`
+  - implemented Python-backed utility commands:
+    - `sc-lint lint line-counts`
+    - `sc-lint lint identity-literals`
+    - `sc-lint view findings`
 - `sc-lint-directives`
   - shared directive parsing/types
 - `sc-lint-boundary`
   - analyzer CLI + library
   - AST parsing, graph construction, semantic boundary rule evaluation
 - `sc-lint-portability`
-  - planned analyzer crate for shared OS/platform portability rules
+  - analyzer crate for shared OS/platform portability rules
 - `sc-lint-runtime`
-  - planned analyzer crate for shared std runtime/concurrency rules
+  - analyzer crate for shared std runtime/concurrency rules
 - `sc-lint-tokio`
   - planned future analyzer crate for Tokio-specific rules
   - represented now as a reserved future boundary surface only
@@ -115,41 +125,49 @@ Current scaffold status:
       - `SCB-CYCLE-001` multi-owner architectural cycle
       - `SCB-CYCLE-002` type/method self-loop
       - `SCB-CYCLE-003` trait-impl self-loop
-    - built-in default trait-self-loop policy from:
-      - `crates/sc-lint-boundary/config/defaults.toml`
+      - built-in default trait-self-loop policy from:
+        - `crates/sc-lint-boundary/config/defaults.toml`
+  - A.3 extraction surfaces now include:
+    - `.just/lint_line_counts.py`
+    - `.just/lint_identity_literals.py`
+    - `.just/view_findings.py`
+    - `.just/python_adapter.py`
     - boundary enforcement with:
       - `SCB-BOUNDARY-001` internal_only visibility violation
       - `SCB-BOUNDARY-002` internal_only external reference
       - `SCB-BOUNDARY-003` forbid_external_impls violation
-    - temporary portability enforcement inside `sc-lint-boundary` with:
-      - `PORT-001` hardcoded Unix-only absolute paths in test code
-      - `PORT-002` direct `dirs::home_dir()` without configured override check
-      - `PORT-003` `std::env::set_var()` in test code
     - stable text/JSON findings output
     - graph export in:
       - JSON
       - Turtle
+- `sc-lint-portability`
+  - exists now
+  - currently shares the workspace `0.1.0` version line
+  - currently provides:
+    - `PORT-001` hardcoded Unix-only absolute paths in test code
+    - `PORT-002` direct `dirs::home_dir()` without configured override check
+    - `PORT-003` `std::env::set_var()` in test code
+    - `PORT-004` ungated `std::os::unix` imports in production code
+    - `PORT-005` `cfg_attr(not(unix), allow(dead_code))` portability suppressors
+    - stable text/JSON findings output
 - `sc-lint`
-  - planned now
-  - not implemented yet
-  - detailed CLI requirements and architecture are defined in:
+  - exists now
+  - currently provides the stable top-level CLI contract and delegated backend
+    dispatch for:
+    - `sc-boundary`
+    - `sc-portability`
+    - `sc-runtime`
+  - detailed CLI requirements and architecture remain defined in:
     - [`cli-requirements.md`](./cli-requirements.md)
     - [`cli-architecture.md`](./cli-architecture.md)
 
-Current code moves required for the planned partition:
+Current code moves completed for the current partition:
 
-- move portability rules out of `crates/sc-lint-boundary/src/portability.rs`
-  into the future `sc-lint-portability` crate:
-  - `PORT-001`
-  - `PORT-002`
-  - `PORT-003`
-  - `PORT-004`
-  - `PORT-005`
-- import std runtime/concurrency rules from the current `atm-core` proving
-  surface into the future `sc-lint-runtime` crate:
+- imported std runtime/concurrency rules from the current `atm-core` proving
+  surface into `sc-lint-runtime`:
   - `SCB-RUNTIME-001`
   - `SCB-RUNTIME-002`
-- retarget the current portability wrapper surface when that crate exists:
+- keep the portability wrapper surface pointed at `sc-lint-portability`:
   - `.just/lint_sc_portability.py`
   - `.just/run_lint.py`
 
@@ -164,15 +182,6 @@ Planned primary lint-target mapping for the top-level CLI:
 
 Grouped subset aliases may exist later, but these crate-mapped targets are the
 primary ownership-preserving command surface.
-
-Planned next shared rule imports from `atm-core`:
-
-- `sc-lint-portability`
-  - `PORT-004`
-  - `PORT-005`
-- `sc-lint-runtime`
-  - `SCB-RUNTIME-001`
-  - `SCB-RUNTIME-002`
 
 Kept local to consumer repos for now:
 
@@ -189,7 +198,7 @@ Current repo integration status:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
-Current planned profile policy:
+Current implemented profile policy:
 
 - `fast`
   - local low-latency lint profile
@@ -202,6 +211,25 @@ Current planned profile policy:
   - excludes `xwin`
 - top-level `ci`
   - lint plus tests
+
+Current wrapper mapping:
+
+- `just lint`
+  - defaults to `sc-lint lint full`
+- `just lint fast`
+  - maps to `sc-lint lint fast`
+- `just lint full`
+  - maps to `sc-lint lint full`
+- `just lint ci`
+  - maps to `sc-lint lint ci`
+- `just ci`
+  - maps to `sc-lint ci`
+
+Current rule-disable policy:
+
+- A.2 does not add top-level `sc-lint` rule-disable flags
+- profile orchestration does not override backend rule configuration
+- current rule-disable behavior stays with the owning backend or delegated tool
 
 Current repo boundary source status:
 

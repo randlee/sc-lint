@@ -1,6 +1,6 @@
 # `sc-lint` Structured Logging Plan
 
-This document defines the planned structured logging integration for
+This document defines the structured logging integration for
 `sc-lint`.
 
 Related ADRs:
@@ -13,8 +13,9 @@ its delegated backend calls without turning logging initialization into a
 backend-owned concern. Satisfies `REQ-LOG-001` and `REQ-LOG-005`.
 
 This document defines both the logging design and the sprint-level
-implementation assignments for Phase `A`. The current task is documentation
-only; the Rust implementation lands in the owning Phase `A` sprints.
+implementation assignments for Phase `A`. The A.1a bootstrap implementation is
+now present in `crates/sc-lint/src/logging.rs`; A.1b extends that same
+CLI-owned runtime with dispatch-seam logging for the first real backend path.
 
 ## Dependency Model
 
@@ -28,12 +29,10 @@ The planned dependency is:
 - crate:
   - `sc-observability`
 - source:
-  - local workspace path dependency declared in `Cargo.toml`
-  - expected local checkout layout:
-    - `../sc-observability/crates/sc-observability`
+  - published Cargo dependency resolved through crates.io
 - integration mode:
-  - path dependency from the `sc-lint` crate during local workspace
-    development
+  - regular workspace dependency from the `sc-lint` crate so CI runners and
+    local development use the same source of truth
 
 The design depends on the following public surface:
 
@@ -49,6 +48,17 @@ Planned implementation note:
   from the stable dotted `command` identifier
 - pass that validated service identity into logger setup and event emission
   helpers rather than rebuilding raw strings at each call site
+- the A.1a bootstrap currently maps:
+  - `version`
+    - `sc-lint`
+  - `lint.sc-boundary`
+    - `sc-boundary`
+  - `lint.sc-portability`
+    - `sc-portability`
+  - `lint.sc-runtime`
+    - `sc-runtime`
+  - remaining bootstrap-only command paths
+    - `sc-lint`
 
 ## Initialization Model
 
@@ -145,6 +155,9 @@ Planned implementation note:
 - represent the validated effective log root as a dedicated `LogRoot`
   wrapper/newtype at the CLI config boundary rather than passing a raw
   `String` through multiple modules
+- the A.1a implementation applies the service name to the resolved root so
+  `--log-root <path>` becomes:
+  - `<path>/<service-name>/`
 
 ## Sink Model
 
@@ -187,7 +200,10 @@ Planned controls:
 - config key:
   - `logging.console`
 
-When enabled, the CLI registers `ConsoleSink` through `LoggerBuilder`.
+When enabled, the A.1a bootstrap turns on
+`LoggerConfig.enable_console_sink` before `LoggerBuilder::new(...)`. Later
+sprints should preserve the same CLI surface unless explicit per-sink
+filtering becomes necessary.
 
 ## Concurrency Model
 
@@ -233,6 +249,14 @@ Every CLI invocation should emit:
    - failure category
    - summary message
 
+Event field table:
+
+| Event | Required fields | Python-adapter additions in A.3 |
+| --- | --- | --- |
+| `cli.command.started` | `command`, effective settings/config, resolved args, timestamp, service name | For `lint.line-counts`, `lint.identity-literals`, and `view.findings`, also include `adapter`, `config_scope`, and `script`. |
+| `cli.command.completed` | `command`, `verdict`, `summary`, elapsed time in ms, service name | Carry the same `adapter`, `config_scope`, and `script` fields when the completed command used the Python-adapter path. |
+| `cli.command.error` | `command`, stable error code, `CliError.kind`, failure category, summary message | Carry the same `adapter`, `config_scope`, and `script` fields when the emitted `CliError` came from a Python-adapter command path. |
+
 For delegated backends, the CLI also logs:
 
 - dispatch start
@@ -247,6 +271,17 @@ Dispatch failure contract:
   - one completion event with a failure verdict and elapsed time in ms
 - the CLI must not leave a started command path without either a completion
   event or a top-level failure envelope
+
+The A.1a bootstrap action names are:
+
+- `cli.command.started`
+- `cli.command.completed`
+- `cli.command.error`
+
+The A.1b dispatch action names are:
+
+- `cli.dispatch.started`
+- `cli.dispatch.normalized`
 
 ## Rollout By Sprint
 
@@ -265,23 +300,44 @@ Requirement coverage:
 - `A.1b`
   - log backend dispatch calls
   - log normalized delegated results
+  - load `logging.root` and `logging.console` through the top-level config
+    loader before initializing the runtime
 - `A.2`
-  - add `xwin` preflight entry/exit/error logging through the standard CLI
-    event pattern
+  - `xwin` preflight now emits entry/exit/error logging through the standard
+    CLI event pattern
+  - `check.xwin` and `clippy.xwin` log `preflight_mode=xwin` and the effective
+    Windows target triple in the CLI-owned event fields
 - `A.3`
   - add Python utility entry/exit/error logging through the adapter-normalized
     CLI event pattern
+  - include the Python-adapter metadata fields:
+    - `adapter`
+    - `config_scope`
+    - `script`
 - `A.4`
   - add `sc-portability` analyzer entry/exit/finding-count logging to the
     delegated backend pattern
 - `A.5`
-  - apply the same analyzer logging pattern to `sc-runtime`
+  - `sc-runtime` now uses the same delegated analyzer logging pattern as
+    `sc-portability`
+  - `cli.dispatch.started` and `cli.dispatch.normalized` carry the
+    `lint.sc-runtime` command identity and `sc-runtime` service name after
+    top-level normalization
 - `A.6`
-  - add boundary-inventory loader entry/exit/error logging to the
-    `sc-boundary` tool path
+  - the `sc-boundary` tool path now covers boundary-inventory loader
+    validation before graph analysis
+  - loader and schema failures surface through the existing top-level
+    `sc-boundary` command normalization and therefore reuse the standard
+    entry/completion/error event pattern
 - `A.7`
-  - add manifest-policy entry/exit/error logging to the `sc-boundary` tool
-    path during the parity window
+  - manifest-policy checks now execute inside the existing
+    `lint.sc-boundary` command path during the parity window
+  - entry/completion/error logging stays CLI-owned and covers manifest-policy
+    findings through the same `sc-boundary` command envelope used for loader,
+    graph, and inventory failures
+  - those events now carry `manifest_policy_mode = "rust-native"` and
+    `manifest_policy_parity = "python-oracle"` so the CLI log makes the
+    migration state explicit without initializing logging in backend code
 - `A.8`
   - document how users read command, verdict, elapsed-time, and stable-error
     log fields in the per-tool guides

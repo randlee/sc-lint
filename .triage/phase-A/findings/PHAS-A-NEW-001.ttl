@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PHAS-A-NEW-001>
+  a triage:Finding ;
+  triage:findingId "PHAS-A-NEW-001" ;
+  triage:title "Bare 'sc-lint-portability' string literal in tests.rs; TOOL_PORTABILITY constant unused (RULE-008)" ;
+  triage:description "crates/sc-lint/src/tests.rs line 315 uses bare string literal 'sc-lint-portability' instead of the TOOL_PORTABILITY constant. RULE-008 requires well-known tool name strings to use named constants. The TOOL_PORTABILITY constant exists but is not consumed at this call site." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "crate" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PHAS-A-NEW-001/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/c1c3133> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:occurrence/PHAS-A-NEW-001/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 315 ;
+  triage:snippet "assert_eq!(json[\"data\"][\"tool\"], \"sc-lint-portability\");" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/c1c3133> .
+
+<urn:atm:triage:worktree/integration-phase-A/c1c3133>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "c1c3133" ;
+  triage:orderIndex 99 .

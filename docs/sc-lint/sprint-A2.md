@@ -5,8 +5,8 @@ plan_type: sprint_plan
 phase: A
 sprint: "A.2"
 worktree: <repo-root>
-branch: develop
-status: planned
+branch: feature/sprint-A2
+status: completed
 estimated_scope: M
 ```
 
@@ -57,6 +57,9 @@ distinguishes:
 - `docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md`
 - `docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md`
 
+ADR-005 is the approved cross-target preflight strategy artifact for this
+sprint and supersedes earlier provisional profile/`xwin` rollout notes.
+
 ## Governing Boundaries
 
 - `BOUNDARY-ScLintCli`
@@ -87,8 +90,10 @@ distinguishes:
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/requirements.md`
+- `boundaries/sc-lint/top-level-cli.toml`
 - `boundaries/planning.toml`
 
 ## Sub-Tasks
@@ -125,7 +130,8 @@ distinguishes:
    - expose `sc-lint check xwin`
    - expose `sc-lint clippy xwin`
    - ensure `full` includes `xwin` only when installed
-   - ensure `fast` remains strictly zero-network/low-latency without `xwin`
+   - ensure `fast` remains low-latency and does not depend on `cargo xwin` or
+     cross-target bootstrap work
    - keep `xwin check` as an explicit command rather than default `fast`
      membership until a later policy change is approved
    Required tests:
@@ -177,13 +183,17 @@ and `ci` actually mean.
 - `OutputMode::{Human, Json}` is implemented and documented for the top-level
   CLI
 - `sc-lint ci` exists and includes tests
-- `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is installed
-- the `full` profile includes `xwin` when present, but `fast` and `ci` remain independent from `xwin`
+- `sc-lint check xwin` and `sc-lint clippy xwin` exist when `cargo xwin` is
+  installed
+- ADR-005 is recorded as the approved cross-target preflight strategy artifact
+  for the sprint
+- the `full` profile conditionally includes both `xwin` command paths when the
+  capability is present, while `fast` and `ci` remain `xwin`-free
 - `xwin` preflight command paths log entry, completion, and error events
   through the standard CLI event pattern
 - real Windows CI remains the authoritative release gate
-- the cross-target preflight strategy document exists and is approved before
-  A.2 closes
+- the approved preflight-strategy artifact remains ADR-005 rather than a
+  separate sprint-local profile-policy document
 
 ## Required Validation
 
@@ -196,6 +206,7 @@ and `ci` actually mean.
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/cli-contract.md`
+- `docs/sc-lint/logging.md`
 - `docs/sc-lint/README.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/project-plan.md`

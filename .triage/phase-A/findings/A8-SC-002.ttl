@@ -1,0 +1,37 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/A8-SC-002>
+  a triage:Finding ;
+  triage:findingId "A8-SC-002" ;
+  triage:title "README.md misattributes PORT-001/002/003 rules to sc-lint-boundary" ;
+  triage:description "README.md lines 96-101 lists PORT-001/002/003 under the sc-lint-boundary section. Per REQ-PRODUCT-004A and REQ-PRODUCT-015C these rules belong to sc-lint-portability. docs/sc-lint/README.md lines 143-151 is already correct. Fix: remove PORT-001/002/003 from sc-lint-boundary section in README.md; add sc-lint-portability section." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A8-SC-002/sprint-A8/1> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A8/e0a82b9> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A8/e0a82b9> .
+
+<urn:atm:triage:occurrence/A8-SC-002/sprint-A8/1>
+  a triage:Occurrence ;
+  triage:file "README.md" ;
+  triage:line 96 ;
+  triage:snippet "- `PORT-001`\\n  - hardcoded Unix-only absolute paths in test code\\n- `PORT-002`\\n  - `dirs::home_dir()` without configured override handling\\n- `PORT-003`\\n  - `std::env::set_var()` in test code" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A8" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A8/e0a82b9> .
+
+<urn:atm:triage:worktree/sprint-A8/e0a82b9>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "e0a82b9" ;
+  triage:orderIndex 8 .

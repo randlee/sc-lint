@@ -1,0 +1,37 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/A8-SC-001>
+  a triage:Finding ;
+  triage:findingId "A8-SC-001" ;
+  triage:title "sprint-A8.md frontmatter has stale placeholders" ;
+  triage:description "docs/sc-lint/sprint-A8.md lines 7-9 contain stale placeholder values: worktree: <repo-root>, branch: develop, status: planned. These should be updated to the actual sprint branch and status." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A8-SC-001/sprint-A8/1> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A8/e0a82b9> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A8/e0a82b9> .
+
+<urn:atm:triage:occurrence/A8-SC-001/sprint-A8/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/sprint-A8.md" ;
+  triage:line 7 ;
+  triage:snippet "worktree: <repo-root>\\nbranch: develop\\nstatus: planned" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A8" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A8/e0a82b9> .
+
+<urn:atm:triage:worktree/sprint-A8/e0a82b9>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "e0a82b9" ;
+  triage:orderIndex 8 .

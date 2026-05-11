@@ -1,0 +1,79 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/ARCH-NEW-001>
+  a triage:Finding ;
+  triage:findingId "ARCH-NEW-001" ;
+  triage:title "mod logging declared in lib.rs violates RULE-001" ;
+  triage:description "lib.rs declares `mod logging`, making logging.rs a library module. logging.rs imports sc_observability directly (lines 5-19). RULE-001 (ADR-008) confines sc-observability imports to main.rs/logging.rs binary modules only. Library modules must not import sc_observability." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:phaseId "phase-A" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-NEW-001/sprint-A4/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-NEW-001/sprint-A5/1> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A4/b60b763> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A5/d4c847a> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A5/d4c847a> .
+
+<urn:atm:triage:occurrence/ARCH-NEW-001/sprint-A4/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/lib.rs" ;
+  triage:line 9 ;
+  triage:snippet "mod logging;" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:headSha "b60b763" ;
+  triage:branch "feature/sprint-A4" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A4/b60b763> .
+
+<urn:atm:triage:occurrence/ARCH-NEW-001/sprint-A5/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/lib.rs" ;
+  triage:line 9 ;
+  triage:snippet "mod logging;" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:headSha "d4c847a" ;
+  triage:branch "feature/sprint-A5" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A5/d4c847a> .
+
+<urn:atm:triage:worktree/sprint-A4/b60b763>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A4" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A4" ;
+  triage:headSha "b60b763" ;
+  triage:orderIndex 4 .
+
+<urn:atm:triage:worktree/sprint-A5/d4c847a>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A5" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A5" ;
+  triage:headSha "d4c847a" ;
+  triage:orderIndex 5 .
+
+<urn:atm:triage:worktree/sprint-A6/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A6" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A6" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 6 .
+
+<urn:atm:triage:worktree/sprint-A7/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A7" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 7 .
+
+<urn:atm:triage:worktree/sprint-A8/8eee490>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "8eee490" ;
+  triage:orderIndex 8 .

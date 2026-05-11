@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/PROD-001>
+  a triage:Finding ;
+  triage:findingId "PROD-001" ;
+  triage:title "top-level-cli.toml records logging::dispatch_event as composition root — wrong symbol" ;
+  triage:description "boundaries/sc-lint/top-level-cli.toml lines 19-21 records logging::dispatch_event as a BOUNDARY-ScLintCli composition root, but that symbol is a private binary helper in crates/sc-lint/src/logging.rs:313 and is not part of owner_crate_path sc_lint. The boundary record points at the wrong surface." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:severity "blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/PROD-001/integration-phase-A/1> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/51e36af> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:occurrence/PROD-001/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "boundaries/sc-lint/top-level-cli.toml" ;
+  triage:line 21 ;
+  triage:snippet "roots = [... \"logging::dispatch_event\" ...]" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/51e36af> .
+
+<urn:atm:triage:worktree/integration-phase-A/51e36af>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "51e36af" ;
+  triage:orderIndex 99 .

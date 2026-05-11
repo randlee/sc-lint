@@ -1,8 +1,12 @@
 [workspace]
 members = [
+  "crates/sc-lint",
   "crates/sc-lint-directives",
   "crates/sc-lint-attributes",
   "crates/sc-lint-boundary",
+  "crates/sc-lint-portability",
+  "crates/sc-lint-runtime",
+  "crates/sc-lint-schema",
 ]
 resolver = "2"
 
@@ -18,5 +22,8 @@ rust-version = "1.94.1"
 [workspace.dependencies]
 anyhow = "1"
 cargo_metadata = "0.20"
+clap = { version = "4", features = ["derive"] }
+sc-observability = "1.0.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"

@@ -17,7 +17,7 @@ from lint_sc_portability import run
 
 
 class LintScPortabilityTests(unittest.TestCase):
-    def test_command_runs_sc_lint_boundary_portability_json(self) -> None:
+    def test_command_runs_sc_lint_portability_json(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
             cmd = command(repo_root)
@@ -28,13 +28,11 @@ class LintScPortabilityTests(unittest.TestCase):
                     "run",
                     "-q",
                     "-p",
-                    "sc-lint-boundary",
+                    "sc-lint-portability",
                     "--",
                     "analyze",
                     "--root",
                     str(repo_root),
-                    "--rule",
-                    "portability",
                     "--format",
                     "json",
                 ],

@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/A8-ARCH-001>
+  a triage:Finding ;
+  triage:findingId "A8-ARCH-001" ;
+  triage:title "Dead local consts module in main.rs re-declares constants already in consts.rs" ;
+  triage:description "crates/sc-lint/src/main.rs lines 19-36 contains a local consts module that re-declares constants already defined in consts.rs. None of the local constants are consumed by binary logic. Fix: remove unused consts module from main.rs." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/A8-ARCH-001/sprint-A8/1> ;
+  triage:openOn <urn:atm:triage:worktree/sprint-A8/e0a82b9> ;
+  triage:promoteTo <urn:atm:triage:worktree/sprint-A8/e0a82b9> .
+
+<urn:atm:triage:occurrence/A8-ARCH-001/sprint-A8/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/main.rs" ;
+  triage:line 19 ;
+  triage:snippet "mod consts { pub const SERVICE_NAME: &str = \"sc-lint\"; ... }" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/sprint-A8" ;
+  triage:headSha "e0a82b9" ;
+  triage:occursIn <urn:atm:triage:worktree/sprint-A8/e0a82b9> .
+
+<urn:atm:triage:worktree/sprint-A8/e0a82b9>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/sprint-A8" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A8" ;
+  triage:headSha "e0a82b9" ;
+  triage:orderIndex 8 .

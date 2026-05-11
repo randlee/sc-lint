@@ -4,23 +4,32 @@
 plan_type: sprint_plan
 phase: A
 sprint: "A.7"
-worktree: <repo-root>
-branch: develop
-status: planned
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-A7
+branch: feature/sprint-A7
+status: complete
 estimated_scope: M
 ```
 
 ## Goal
 
 Implement Rust-native manifest-policy enforcement in `sc-lint-boundary` and
-keep the Python boundary validator as the parity oracle until behavior is
-proven stable.
+keep the Python manifest-policy validator as the parity oracle until behavior
+is proven stable.
 
 ## Scope Summary
 
 This sprint completes the release-1 boundary migration path. It assumes the
 Rust loader/schema work from A.6 already exists and focuses on manifest
 ownership rules, manifest-section rules, and parity comparison.
+
+The current parity window is intentionally narrow:
+
+- Rust now owns the workspace-package inheritance checks from
+  `.just/lint_manifests.py`
+- Rust now owns the internal workspace path-dependency version-pin checks from
+  `.just/lint_manifests.py`
+- broader boundary-inventory parity remains an A.6 foundation concern plus a
+  later inventory-parity enforcement stage
 
 ## Governing Requirements
 
@@ -41,7 +50,7 @@ ownership rules, manifest-section rules, and parity comparison.
 ## Prerequisites
 
 - A.6 complete with Rust-native boundary loading/schema validation
-- Python boundary validator still available as the reference path
+- Python manifest-policy validator still available as the reference path
 
 ## Hard Dependencies
 
@@ -77,11 +86,11 @@ ownership rules, manifest-section rules, and parity comparison.
 
 2. Implement manifest section rules
    Development work:
-   - port manifest-section placement rules into Rust
+   - port the current package-section workspace-inheritance rules into Rust
    Required tests:
    - fixture workspace pass/fail tests
    Required doc or boundary updates:
-   - keep section-policy docs aligned with implemented checks
+   - keep section-policy docs aligned with the implemented inheritance checks
 
 3. Add parity validation
    Development work:
@@ -113,7 +122,7 @@ leave the product in an ambiguous transition state.
 ## Acceptance Criteria
 
 - manifest ownership and section rules exist in Rust
-- parity comparison to the Python validator exists
+- parity comparison to the Python manifest-policy validator exists
 - Python remains the oracle until parity is approved stable
 - docs explicitly state what remains Python-backed and what has become
   Rust-native
@@ -142,3 +151,17 @@ leave the product in an ambiguous transition state.
 - do not let consumer-repo edge cases vanish during fixture reduction
 - do not treat Python parity as a permanent architecture instead of a
   migration window
+
+## Sub-Task 4 Review Artifact
+
+Manifest-policy logging review for A.7:
+
+- `crates/sc-lint/src/main.rs` remains the only logger initialization point
+- `crates/sc-lint/src/logging.rs` emits the standard CLI
+  `cli.command.started`, `cli.command.completed`, and `cli.command.error`
+  events for `lint.sc-boundary`
+- those `sc-boundary` events now carry the manifest-policy migration metadata
+  fields `manifest_policy_mode = "rust-native"` and
+  `manifest_policy_parity = "python-oracle"`
+- `docs/sc-lint/logging.md` is aligned with the same command path and field
+  names

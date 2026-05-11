@@ -148,6 +148,7 @@ Requirements:
 - consumer-neutral naming
 - standalone fixture tests
 - top-level CLI exposure once the CLI exists
+- Python Adapter Protocol normalization rather than traceback scraping
 
 ### Workstream 5: Boundary logic migration to Rust
 
@@ -183,6 +184,8 @@ Requirements:
 - land portability rules in `sc-lint-portability`
 - preserve their existing rule ids
 - perform parity validation against the source implementation in `atm-core`
+- keep top-level `sc-lint lint sc-portability` delegated rather than adding a
+  direct `sc-lint -> sc-lint-portability` crate dependency
 
 ### Workstream 7: Add `sc-lint-runtime`
 
@@ -202,6 +205,9 @@ Requirements:
 - perform parity validation against the source implementation in `atm-core`
 - keep ATM-local policy lints out of `sc-lint` unless extracted only as
   configurable framework
+- keep release-1 CLI ownership in the top-level `sc-lint` crate by using the
+  delegated `lint sc-runtime` command path rather than backend-local logging
+  or envelope shaping
 
 ### Workstream 8: Cross-target preflight strategy
 
@@ -251,7 +257,7 @@ Required outputs for the current release line:
 
 - one guide for `sc-lint-boundary`
 - one guide for `sc-lint-portability`
-- one guide for each remaining shipped lint surface in the repo-local gate
+- one guide for `sc-lint-runtime`
   that is treated as productized behavior
 - all guide files live under `docs/sc-lint/tools/`
 - all guide files are named after the tool they document
@@ -284,6 +290,8 @@ The scheduled implementation sprints for this phase are:
 1. `A.1a`
    - top-level CLI bootstrap and contract definition
    - ends with the contract-review checkpoint for A.1b entry
+   - the checkpoint records the contract implications for Workstreams 4-7 in
+     `docs/sc-lint/sprint-A1a.md`
    - sprint plan: `docs/sc-lint/sprint-A1a.md`
 2. `A.1b`
    - top-level config loading and first delegated backend integration
@@ -298,16 +306,20 @@ The scheduled implementation sprints for this phase are:
    - `sc-lint-portability` creation and portability-rule migration
    - sprint plan: `docs/sc-lint/sprint-A4.md`
 6. `A.5`
-   - `sc-lint-runtime` creation and runtime-rule migration
-   - sprint plan: `docs/sc-lint/sprint-A5.md`
+  - `sc-lint-runtime` creation and runtime-rule migration
+  - active implementation branch: `feature/sprint-A5`
+  - sprint plan: `docs/sc-lint/sprint-A5.md`
 7. `A.6`
-   - Rust boundary inventory loader/schema/duplicate handling
-   - sprint plan: `docs/sc-lint/sprint-A6.md`
+  - Rust boundary inventory loader/schema/duplicate handling
+  - active implementation branch: `feature/sprint-A6`
+  - sprint plan: `docs/sc-lint/sprint-A6.md`
 8. `A.7`
    - Rust manifest-policy migration and Python parity window
+   - active implementation branch: `feature/sprint-A7`
    - sprint plan: `docs/sc-lint/sprint-A7.md`
 9. `A.8`
    - per-tool user guides and rule-disable documentation
+   - active implementation branch: `feature/sprint-A8`
    - sprint plan: `docs/sc-lint/sprint-A8.md`
 
 These sprint plans are the authoritative implementation breakdown of the

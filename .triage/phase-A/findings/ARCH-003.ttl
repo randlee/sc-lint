@@ -1,0 +1,65 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/ARCH-003>
+  a triage:Finding ;
+  triage:findingId "ARCH-003" ;
+  triage:title "RULE-006: /tmp/example/Cargo.toml fixture string — no intent comment at tests.rs:57" ;
+  triage:description "crates/sc-lint-boundary/src/tests.rs:57 contains the string '/tmp/example/Cargo.toml' as a fixture path with no intent comment explaining why /tmp/ is used. RULE-006 requires explicit intent comments for hardcoded /tmp/ paths in tests." ;
+  triage:phaseId "phase-A" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "ARCH" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-05-10T00:00:00Z"^^xsd:dateTime ;
+  triage:references "PR #19 QA-PHASE-A-FINAL comment" ;
+  triage:references "crates/sc-lint-boundary/src/tests.rs:57" ;
+  triage:notes "Repeatable file_only sweep on promote_to_branch found three /tmp/ occurrences without intent comments in crates/sc-lint-boundary/src/tests.rs." ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-003/integration-phase-A/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-003/integration-phase-A/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-003/integration-phase-A/3> ;
+  triage:openOn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> ;
+  triage:promoteTo <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/ARCH-003/integration-phase-A/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 57 ;
+  triage:snippet "manifest_path: \"/tmp/example/Cargo.toml\".to_string()," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/ARCH-003/integration-phase-A/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 58 ;
+  triage:snippet "source_path: Some(\"/tmp/example/src/lib.rs\".to_string())," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:occurrence/ARCH-003/integration-phase-A/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 99 ;
+  triage:snippet "source_path: Some(\"/tmp/example/src/lib.rs\".to_string())," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:occursIn <urn:atm:triage:worktree/integration-phase-A/2bb6d32> .
+
+<urn:atm:triage:worktree/integration-phase-A/2bb6d32>
+  a triage:WorktreeSnapshot ;
+  triage:branch "integration/phase-A" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/integration/phase-A" ;
+  triage:headSha "2bb6d32" ;
+  triage:orderIndex 99 .
