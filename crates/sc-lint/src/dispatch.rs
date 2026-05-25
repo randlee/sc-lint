@@ -2,7 +2,6 @@ use std::error::Error;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
-use std::sync::OnceLock;
 
 use sc_lint_boundary::AnalyzeOptions;
 use sc_lint_boundary::analyze_workspace;
@@ -134,9 +133,9 @@ fn run_delegated_backend(
     tool: &'static str,
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
-    let output = ProcessCommand::new("cargo")
-        .current_dir(backend_workspace_root())
-        .args(["run", "-q", "-p", tool, "--", "analyze", "--root"])
+    let backend_binary = find_backend_binary(tool);
+    let output = ProcessCommand::new(&backend_binary)
+        .args(["analyze", "--root"])
         .arg(repo_root)
         .args(["--format", "json"])
         .output()
@@ -148,6 +147,7 @@ fn run_delegated_backend(
             .with_source(error)
             .with_detail(consts::FIELD_TOOL, json!(tool))
             .with_detail(consts::FIELD_ROOT, json!(repo_root.display().to_string()))
+            .with_detail("backend_path", json!(backend_binary.display().to_string()))
         })?;
 
     if !output.status.success() {
@@ -167,6 +167,7 @@ fn run_delegated_backend(
         .with_cause(cause)
         .with_detail(consts::FIELD_TOOL, json!(tool))
         .with_detail(consts::FIELD_ROOT, json!(repo_root.display().to_string()))
+        .with_detail("backend_path", json!(backend_binary.display().to_string()))
         .with_detail("exit_status", json!(output.status.code())));
     }
 
@@ -174,6 +175,9 @@ fn run_delegated_backend(
         CliError::backend_protocol(format!("{tool} returned non-utf8 machine output"))
             .with_source(error)
             .with_detail(consts::FIELD_TOOL, json!(tool))
+            .with_suggested_action(
+                "Run the backend binary directly and inspect its stdout encoding before rerunning sc-lint.",
+            )
     })?;
     let normalized = normalize_backend_json(tool, raw)?;
     let finding_count = normalized
@@ -187,14 +191,76 @@ fn run_delegated_backend(
     ))
 }
 
-fn backend_workspace_root() -> &'static Path {
-    static ROOT: OnceLock<PathBuf> = OnceLock::new();
-    ROOT.get_or_init(|| {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+fn find_backend_binary(tool: &str) -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|current_exe| find_backend_binary_from_exe(&current_exe, tool))
+        // Falling back to PATH keeps local development, CI, and non-sibling
+        // binary layouts working when the installed sibling lookup does not.
+        .unwrap_or_else(|| PathBuf::from(tool))
+}
+
+fn find_backend_binary_from_exe(current_exe: &Path, tool: &str) -> Option<PathBuf> {
+    let parent = current_exe.parent()?;
+    find_backend_binary_in_dir(parent, tool).or_else(|| {
+        parent
             .parent()
-            .and_then(Path::parent)
-            .expect("workspace root")
-            .to_path_buf()
+            .and_then(|grandparent| find_backend_binary_in_dir(grandparent, tool))
     })
-    .as_path()
+}
+
+fn find_backend_binary_in_dir(dir: &Path, tool: &str) -> Option<PathBuf> {
+    let sibling = dir.join(tool);
+    if sibling.is_file() {
+        return Some(sibling);
+    }
+    if cfg!(windows) {
+        let sibling_exe = dir.join(format!("{tool}.exe"));
+        if sibling_exe.is_file() {
+            return Some(sibling_exe);
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_backend_binary_from_exe;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn prefers_installed_sibling_backend_binary() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let bin_dir = temp_dir.path().join("bin");
+        fs::create_dir_all(&bin_dir).expect("bin dir");
+        let current_exe = bin_dir.join("sc-lint");
+        let backend = bin_dir.join("sc-lint-portability");
+        fs::write(&current_exe, "").expect("current exe");
+        fs::write(&backend, "").expect("backend");
+
+        assert_eq!(
+            find_backend_binary_from_exe(&current_exe, "sc-lint-portability"),
+            Some(backend)
+        );
+    }
+
+    #[test]
+    fn falls_back_to_target_debug_backend_binary_for_test_layouts() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let deps_dir = temp_dir.path().join("target").join("debug").join("deps");
+        fs::create_dir_all(&deps_dir).expect("deps dir");
+        let current_exe = deps_dir.join("sc-lint-tests");
+        let backend = deps_dir
+            .parent()
+            .expect("target debug")
+            .join("sc-lint-runtime");
+        fs::write(&current_exe, "").expect("current exe");
+        fs::write(&backend, "").expect("backend");
+
+        assert_eq!(
+            find_backend_binary_from_exe(&current_exe, "sc-lint-runtime"),
+            Some(backend)
+        );
+    }
 }

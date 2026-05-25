@@ -41,8 +41,13 @@ jobs:
           echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release_version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Setup Python for release gate
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Run release gate
-        run: scripts/release_gate.sh
+        run: scripts/release_gate.sh origin/main origin/develop '${{ steps.meta.outputs.release_version }}'
 
       - name: Ensure tag is correct or create it
         shell: bash
@@ -355,7 +360,10 @@ jobs:
 
       - name: Generate checksums
         working-directory: release
-        run: sha256sum * > checksums.txt
+        run: |
+          # This release job runs on ubuntu-latest, so sha256sum is the expected
+          # checksum tool here. If the runner OS changes, update this step.
+          sha256sum * > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -416,6 +424,8 @@ jobs:
             "${common_args[@]}" \
             --formula sc-lint \
             --output homebrew-tap/Formula/sc-lint.rb
+          # Keep the standalone boundary formula in sync as a legacy
+          # compatibility surface for existing installs and automation.
           python3 scripts/release_artifacts.py render-homebrew-formula \
             "${common_args[@]}" \
             --formula sc-lint-boundary \
