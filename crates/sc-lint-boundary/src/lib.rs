@@ -533,10 +533,7 @@ pub fn render_findings_report(report: &FindingsReport) -> String {
     render::render_findings_report(report)
 }
 
-pub fn render_graph_export(
-    graph: &GraphExport,
-    format: GraphOutputFormat,
-) -> String {
+pub fn render_graph_export(graph: &GraphExport, format: GraphOutputFormat) -> String {
     render::render_graph_export(graph, format)
 }
 

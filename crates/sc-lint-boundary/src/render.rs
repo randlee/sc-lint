@@ -27,10 +27,7 @@ pub fn render_findings_report(report: &FindingsReport) -> String {
 /// JSON rendering is fallible because it relies on `serde_json` serialization.
 /// Turtle rendering is currently infallible because it formats the already-built
 /// graph export into a string without additional fallible I/O or encoding work.
-pub fn render_graph_export(
-    graph: &GraphExport,
-    format: GraphOutputFormat,
-) -> String {
+pub fn render_graph_export(graph: &GraphExport, format: GraphOutputFormat) -> String {
     match format {
         GraphOutputFormat::Json => render_graph_export_json(graph),
         GraphOutputFormat::Turtle => render_graph_export_turtle(graph),

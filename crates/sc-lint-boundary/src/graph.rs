@@ -799,8 +799,11 @@ fn resolve_reference_target(
     }
 
     if referenced_path.starts_with("super::") {
-        let mut module_segments: Vec<String> =
-            module_path.as_str().split("::").map(ToOwned::to_owned).collect();
+        let mut module_segments: Vec<String> = module_path
+            .as_str()
+            .split("::")
+            .map(ToOwned::to_owned)
+            .collect();
         let mut rest = referenced_path;
         while let Some(stripped) = rest.strip_prefix("super::") {
             if module_segments.len() > 1 {
