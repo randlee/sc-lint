@@ -1076,7 +1076,8 @@ state = "concrete_landed"
 "#,
         );
 
-        let error = load_boundary_inventory(fixture.root()).expect_err("unknown caller field fails");
+        let error =
+            load_boundary_inventory(fixture.root()).expect_err("unknown caller field fails");
         assert!(error.to_string().contains("failed to parse TOML file"));
     }
 
@@ -1232,7 +1233,11 @@ state = "concrete_landed"
 
         let error =
             load_boundary_inventory(fixture.root()).expect_err("duplicate approved symbol fails");
-        assert!(error.to_string().contains("duplicate approved caller symbol"));
+        assert!(
+            error
+                .to_string()
+                .contains("duplicate approved caller symbol")
+        );
     }
 
     #[test]

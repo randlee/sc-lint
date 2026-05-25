@@ -1432,7 +1432,11 @@ fn fails_when_external_named_caller_is_not_approved() {
     assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(report.findings.len(), 1);
     assert_eq!(report.findings[0].rule_id, RuleId::ScbCaller001);
-    assert!(report.findings[0].message.contains("other::blocked::Facade"));
+    assert!(
+        report.findings[0]
+            .message
+            .contains("other::blocked::Facade")
+    );
 
     let rendered_text = render_findings_report(&report);
     assert!(rendered_text.contains("SCB-CALLER-001"));

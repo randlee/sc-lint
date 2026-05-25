@@ -96,7 +96,10 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
                 target_name: target.name.clone(),
                 manifest_path: manifest_path.clone(),
                 crate_id: crate_id(&package.name, &target.name),
-                workspace_dependency_roots: workspace_dependency_roots(&workspace_packages, package),
+                workspace_dependency_roots: workspace_dependency_roots(
+                    &workspace_packages,
+                    package,
+                ),
             };
 
             builder.add_workspace_target(
@@ -822,7 +825,8 @@ fn workspace_dependency_roots(
     let mut dependency_roots = BTreeMap::new();
 
     for dependency in &package.dependencies {
-        let Some(workspace_package) = workspace_packages_by_name.get(dependency.name.as_str()) else {
+        let Some(workspace_package) = workspace_packages_by_name.get(dependency.name.as_str())
+        else {
             continue;
         };
         let Some(library_target) = workspace_package.targets.iter().find(|target| {
