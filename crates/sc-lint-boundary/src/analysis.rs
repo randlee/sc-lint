@@ -1,4 +1,8 @@
 use super::*;
+use crate::inventory::BoundaryInventory;
+use crate::inventory::BoundaryRecord;
+use crate::inventory::CallersSection;
+use crate::inventory::ReferenceScope;
 
 pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
     let node_map: BTreeMap<_, _> = graph
@@ -280,6 +284,109 @@ pub(crate) fn analyze_forbid_external_impls(graph: &GraphExport) -> Vec<Finding>
     findings
 }
 
+pub(crate) fn analyze_named_callers(
+    graph: &GraphExport,
+    inventory: &BoundaryInventory,
+) -> Vec<Finding> {
+    let node_map: BTreeMap<_, _> = graph
+        .nodes
+        .iter()
+        .map(|node| (node.id.clone(), node))
+        .collect();
+    let mut findings = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for edge in graph
+        .edges
+        .iter()
+        .filter(|edge| matches!(edge.kind, "references_type" | "references_expr"))
+    {
+        let Some(source_node) = node_map.get(&edge.from) else {
+            continue;
+        };
+        let Some(target_node) = node_map.get(&edge.to) else {
+            continue;
+        };
+        let Some(source_owner_id) = owner_id_for_node_id(&source_node.id, source_node.kind) else {
+            continue;
+        };
+        let Some(target_owner_id) = owner_id_for_node_id(&target_node.id, target_node.kind) else {
+            continue;
+        };
+        let Some(target_crate_path) = graph_crate_path(&target_node.id) else {
+            continue;
+        };
+        let Some(target_relative_path) = graph_relative_path(&target_node.id) else {
+            continue;
+        };
+        let Some(source_crate_path) = graph_crate_path(&source_owner_id) else {
+            continue;
+        };
+        let Some(source_relative_path) = graph_relative_path(&source_owner_id) else {
+            continue;
+        };
+
+        for record in &inventory.records {
+            let Some(callers) = &record.callers else {
+                continue;
+            };
+            if record.owner_crate_path.as_ref() != target_crate_path {
+                continue;
+            }
+            for approved_entry in &callers.approved {
+                if approved_entry.symbol.normalized() != target_relative_path {
+                    continue;
+                }
+                if caller_is_exempt(record, callers, source_crate_path, source_relative_path) {
+                    continue;
+                }
+
+                let caller_identity = format!("{source_crate_path}::{source_relative_path}");
+                if approved_entry
+                    .callers
+                    .iter()
+                    .any(|approved| approved.as_str() == caller_identity)
+                {
+                    continue;
+                }
+
+                let finding_key = (
+                    approved_entry.symbol.normalized().to_string(),
+                    caller_identity.clone(),
+                );
+                if !seen.insert(finding_key) {
+                    continue;
+                }
+
+                findings.push(Finding {
+                    rule_id: RuleId::ScbCaller001,
+                    kind: "named_caller_allowlist_violation".to_string(),
+                    message: format!(
+                        "restricted symbol {} called by unapproved external caller {}",
+                        approved_entry.symbol.as_str(),
+                        caller_identity
+                    ),
+                    owner_ids: vec![target_owner_id.clone(), source_owner_id.clone()],
+                    node_ids: vec![source_node.id.clone(), target_node.id.clone()],
+                });
+            }
+        }
+    }
+
+    findings.sort_by(|left, right| left.message.cmp(&right.message));
+    findings
+}
+
+fn caller_is_exempt(
+    record: &BoundaryRecord,
+    _callers: &CallersSection,
+    caller_package: &str,
+    _caller_path: &str,
+) -> bool {
+    matches!(record.references.scope, ReferenceScope::OutsideOwnerCrate)
+        && caller_package == record.owner_crate_path.as_ref()
+}
+
 pub(crate) fn finding_is_failure(finding: &Finding) -> bool {
     matches!(
         finding.rule_id,
@@ -287,6 +394,7 @@ pub(crate) fn finding_is_failure(finding: &Finding) -> bool {
             | RuleId::ScbBoundary001
             | RuleId::ScbBoundary002
             | RuleId::ScbBoundary003
+            | RuleId::ScbCaller001
             | RuleId::ScbManifest001
             | RuleId::ScbManifest002
     )
@@ -493,4 +601,20 @@ fn strongly_connected_components(owner_graph: &OwnerGraph) -> Vec<Vec<OwnerId>> 
         components.push(component);
     }
     components
+}
+
+fn graph_crate_path(graph_id: &str) -> Option<&str> {
+    let prefix = graph_id.split("::module::").next().unwrap_or(graph_id);
+    let mut segments = prefix.split("::");
+    match (segments.next(), segments.next(), segments.next()) {
+        (Some("crate"), Some(_package), Some(crate_path)) => Some(crate_path),
+        _ => None,
+    }
+}
+
+fn graph_relative_path(graph_id: &str) -> Option<&str> {
+    if let Some((_, relative)) = graph_id.split_once("::module::") {
+        return Some(relative.strip_prefix("crate::").unwrap_or(relative));
+    }
+    Some("crate")
 }

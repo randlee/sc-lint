@@ -34,6 +34,7 @@ The currently planned sprints in this phase are:
 - `B.2`
   - TOML-backed named-caller allowlist enforcement in `sc-lint-boundary`
   - new `SCB-CALLER-001` rule using the existing reference graph
+  - close issue `#29` with stable CLI/text/JSON surfaces for caller policy
   - CLI/config/documentation integration for approved-caller policy
   - see [docs/sc-lint/sprint-B2.md](./sprint-B2.md)
 - `B.3`
