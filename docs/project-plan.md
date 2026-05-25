@@ -24,6 +24,9 @@ The current project focus is:
   worth extracting
 - planning stable interface version checks and published interface artifacts
   for public APIs, CLI contracts, and transport surfaces
+- planning the next shared production portability follow-ons in
+  `sc-lint-portability`: production path literals, broad env portability,
+  shell invocation portability, and structural `cfg(unix)` parity
 - improving pre-CI developer confidence with cross-target compile checks where
   those checks can surface platform drift before a push
 - preserving CI and lint-runner parity during extraction
@@ -53,6 +56,7 @@ The current project focus is:
 - current phase execution plan
   - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
   - see [docs/sc-lint/phase-B-plan.md](./sc-lint/phase-B-plan.md)
+  - see [docs/sc-lint/phase-C-plan.md](./sc-lint/phase-C-plan.md)
   - see [docs/sc-lint/sprint-A1a.md](./sc-lint/sprint-A1a.md)
   - see [docs/sc-lint/sprint-A1b.md](./sc-lint/sprint-A1b.md)
   - see [docs/sc-lint/sprint-A2.md](./sc-lint/sprint-A2.md)
@@ -175,6 +179,23 @@ The currently scheduled sprint plans are:
 - `C.5`
   - minimal marketplace publication for the adoption skill
   - `docs/sc-lint/sprint-C5.md`
+- `C.6`
+  - production path-literal portability parity
+  - `PORT-006` Unix-only absolute path literals in production code
+  - `PORT-007` Windows-only absolute path literals in production code
+  - `docs/sc-lint/sprint-C6.md`
+- `C.7`
+  - broad environment-variable portability
+  - `PORT-008` production `HOME`, `USER`, and `XDG_*` portability checks
+  - `docs/sc-lint/sprint-C7.md`
+- `C.8`
+  - shell invocation portability
+  - `PORT-009` production `sh`/`bash` and `/bin/sh` shell assumption checks
+  - `docs/sc-lint/sprint-C8.md`
+- `C.9`
+  - cross-platform `cfg` parity enforcement
+  - `PORT-010` production `#[cfg(unix)]` companion-parity checks
+  - `docs/sc-lint/sprint-C9.md`
 
 ## Recent Sprint Deltas
 

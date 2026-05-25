@@ -159,6 +159,14 @@ Initial Phase-C scope is:
   - repo-local Claude Code skill planning
 - `C.5`
   - minimal marketplace publication planning for the adoption skill
+- `C.6`
+  - production path-literal portability parity
+- `C.7`
+  - broad environment-variable portability
+- `C.8`
+  - shell invocation portability
+- `C.9`
+  - structural cross-platform `cfg` parity enforcement
 
 ### Current code moves required
 

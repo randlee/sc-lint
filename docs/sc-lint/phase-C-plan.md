@@ -1,14 +1,18 @@
 # `sc-lint` Phase C Plan
 
-This document is the planning stub for Phase `C`, the interface-versioning and
-published-interface documentation phase.
+This document is the planning stub for Phase `C`, the interface-versioning,
+published-interface documentation, and queued shared portability follow-on
+phase.
 
 ## Objective
 
 Phase `C` introduces a planned `sc-lint-version` capability that turns stable
-interface monitoring into one explicit product feature. The phase must produce
-both machine-readable change detection and human-friendly published interface
-documentation from the same structured artifacts.
+interface monitoring into one explicit product feature, and it schedules the
+next four shared portability lint families that were intentionally left as
+follow-on product work after `ADR-010`. The phase must produce both
+machine-readable change detection and human-friendly published interface
+documentation from the same structured artifacts while also closing the next
+consumer-neutral cross-platform portability gaps in `sc-lint-portability`.
 
 ## Current Scope
 
@@ -41,6 +45,27 @@ The currently planned sprints in this phase are:
   - minimal repo-local Claude Code marketplace planning for the adoption skill
   - explicit forwarding/reference path for marketplace advertisement
   - see [docs/sc-lint/sprint-C5.md](./sprint-C5.md)
+- `C.6`
+  - production path-literal portability parity in `sc-lint-portability`
+  - Unix-only and Windows-only absolute path literals in production code
+  - see [docs/sc-lint/sprint-C6.md](./sprint-C6.md)
+- `C.7`
+  - broad production environment-variable portability in
+    `sc-lint-portability`
+  - `HOME`, `USER`, and `XDG_*` portability checks with platform-neutral
+    remediation guidance
+  - see [docs/sc-lint/sprint-C7.md](./sprint-C7.md)
+- `C.8`
+  - shared shell invocation portability in `sc-lint-portability`
+  - `Command::new("sh" | "bash")` and hardcoded `/bin/sh` or `/bin/bash`
+    production checks
+  - see [docs/sc-lint/sprint-C8.md](./sprint-C8.md)
+- `C.9`
+  - structural cross-platform `cfg` parity enforcement in
+    `sc-lint-portability`
+  - production `#[cfg(unix)]` branches that lack Windows companions or
+    explicit portable fallbacks
+  - see [docs/sc-lint/sprint-C9.md](./sprint-C9.md)
 
 ## Phase Structure
 
@@ -61,6 +86,17 @@ The currently planned sprints in this phase are:
    - package the adoption guidance as a repo-local skill
 5. `C.5`
    - publish the adoption skill through a minimal repo-local marketplace
+6. `C.6`
+   - extend shared path-literal portability linting into production code
+   - add Windows-path parity to the current Unix-path family
+7. `C.7`
+   - add one broad production env-portability family for Unix-centric
+     home/user/config variables
+8. `C.8`
+   - add one shared shell invocation portability family for Unix-shell
+     assumptions in production code
+9. `C.9`
+   - add one structural `cfg(unix)` companion-parity rule for production code
 
 ## Exit Direction
 
@@ -83,3 +119,9 @@ Phase `C` should leave the repo with:
 - a clear consumer-onboarding plan delivered through:
   - one repo-local skill
   - one minimal marketplace publication path
+- an implementation-ready Phase `C` sequence for the next shared portability
+  families in `sc-lint-portability`:
+  - production Unix-only and Windows-only path-literal detection
+  - broad production env-portability checks for `HOME`, `USER`, and `XDG_*`
+  - shell invocation portability checks for Unix-shell assumptions
+  - structural `cfg(unix)` / `cfg(windows)` parity enforcement

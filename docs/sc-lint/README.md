@@ -24,8 +24,8 @@ Current contents:
   extraction order
 - [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution plan and
   focused sprint-hardening sequence
-- [`phase-C-plan.md`](./phase-C-plan.md) — Phase C interface-versioning and
-  published-interface planning line
+- [`phase-C-plan.md`](./phase-C-plan.md) — Phase C interface-versioning,
+  published-interface, and queued portability planning line
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and current plan touchpoint guide
 - [`version-requirements.md`](./version-requirements.md) — planned
@@ -66,6 +66,13 @@ Current contents:
 - [`sprint-C4.md`](./sprint-C4.md) — consumer integration and skill design
   planning sprint
 - [`sprint-C5.md`](./sprint-C5.md) — minimal marketplace publication planning
+  sprint
+- [`sprint-C6.md`](./sprint-C6.md) — production path-literal portability
+  parity sprint
+- [`sprint-C7.md`](./sprint-C7.md) — broad environment-variable portability
+  sprint
+- [`sprint-C8.md`](./sprint-C8.md) — shell invocation portability sprint
+- [`sprint-C9.md`](./sprint-C9.md) — cross-platform `cfg` parity enforcement
   sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI

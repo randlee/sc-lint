@@ -73,7 +73,8 @@ needed to move from that stopgap to the full top-level install path:
 
 ## Phase C Planning Note
 
-Phase `C` is now the queued interface-versioning planning line:
+Phase `C` is now the queued interface-versioning and shared portability
+follow-on planning line:
 
 - `C.1`
   - ownership/policy/baseline definition
@@ -85,6 +86,14 @@ Phase `C` is now the queued interface-versioning planning line:
   - consumer-adoption document and repo-local skill design
 - `C.5`
   - minimal marketplace publication planning for the adoption skill
+- `C.6`
+  - production path-literal portability parity
+- `C.7`
+  - broad environment-variable portability
+- `C.8`
+  - shell invocation portability
+- `C.9`
+  - structural cross-platform `cfg` parity enforcement
 
 Current status:
 - no dedicated boundary record or `boundaries/planning.toml` entry is required
