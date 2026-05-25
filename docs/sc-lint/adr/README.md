@@ -22,7 +22,7 @@ current planning surface.
   - shared portability ownership and Unix/Windows parity scope policy
 - [`ADR-011-interface-versioning-and-published-artifacts.md`](./ADR-011-interface-versioning-and-published-artifacts.md)
   - accepted `sc-lint-version` form-factor, interface-family configuration
-    surface, and generated HTML/XHTML/JSON interface artifact policy
+    surface, and shared HTML/XHTML/JSON interface-report artifact policy
 
 ## Draft ADRs
 

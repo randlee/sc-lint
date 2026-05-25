@@ -1,15 +1,16 @@
 # `sc-lint-version` Requirements
 
 This document defines the planned requirements for `sc-lint-version`, the
-interface-versioning and published-interface artifact capability for
-`sc-lint`.
+interface-versioning capability for `sc-lint`, and its integration with the
+shared report-publishing pipeline.
 
 ## Purpose
 
 `sc-lint-version` exists to do two things from one canonical interface
 inventory:
 
-1. produce human-friendly published interface documentation
+1. produce canonical machine-readable interface artifacts and diffs that can
+   feed shared report publication
 2. hard-fail when a breaking interface change is introduced without an
    approved versioning action
 
@@ -31,9 +32,8 @@ later.
   - RPC/socket interfaces, when the repo defines any
 
 - `REQ-VERSION-003`
-  Each supported interface family must have both:
-  - a machine-readable canonical artifact used for change detection
-  - a human-friendly published report derived from the same structured source
+  Each supported interface family must have a machine-readable canonical
+  artifact used for change detection.
 
 ## Invocation And Configuration
 
@@ -66,6 +66,11 @@ later.
   config, CLI flags, baseline artifacts, and verdict output so one family does
   not silently acquire multiple names.
 
+- `REQ-VERSION-003G`
+  When a supported interface family is published for human readers, that
+  report must be derived from the same canonical structured artifact rather
+  than from a second hand-maintained documentation source.
+
 ### Interface Family Identifiers
 
 The only accepted canonical interface-family identifiers for the initial
@@ -78,12 +83,23 @@ Phase `C` planning line are:
 These identifiers are the only accepted values for family selection in config,
 CLI flags, baseline artifact names, and verdict output.
 
-## Artifact Model
+## Shared Reporting Contract
 
 - `REQ-VERSION-004`
-  Human-facing published interface documentation must be generated from
-  structured data and reusable templates rather than hand-written monolithic
-  HTML files.
+  Human-facing published interface documentation must be generated through a
+  shared reporting layer from structured data and reusable templates rather
+  than hand-written monolithic HTML files.
+
+- `REQ-VERSION-004A`
+  `sc-lint-version` must not own a feature-local HTML renderer; it owns the
+  canonical interface data, artifact metadata, and version verdicts consumed
+  by the shared reporting layer.
+
+- `REQ-VERSION-004B`
+  The preferred ownership target for the reusable reporting layer is the
+  `sc-compose` repo, potentially as a dedicated `sc-reporting` capability,
+  because the same XHTML-panel conventions are expected to serve non-lint
+  reports as well as interface-version reports.
 
 - `REQ-VERSION-005`
   Generated human-facing report packages must follow the XHTML fragment/report
@@ -98,15 +114,28 @@ CLI flags, baseline artifact names, and verdict output.
   change detection; HTML and XHTML outputs are presentation artifacts derived
   from it.
 
+- `REQ-VERSION-006A`
+  The initial report-template families must include:
+  - `public-api` for Rust crate public API reports
+  - `cli` for top-level CLI contract reports
+  - `icd` for RPC/socket interface-control-document reports when transport
+    surfaces exist
+
+- `REQ-VERSION-006B`
+  Template selection and override must use one canonical configuration surface
+  under `[reporting.templates.<report_kind>]` so consumers can swap template
+  packs or repo-local Jinja templates without editing generated HTML.
+
 - `REQ-VERSION-007`
   Every report package must be reproducible from structured inputs and
   templates alone and must not depend on manual HTML patching after render.
 
 - `REQ-VERSION-007A`
-  The generated report pipeline must use the repo-local reusable
-  HTML-report workflow described in
+  The generated report pipeline must use the repo-local reusable reporting
+  workflow described in
   [docs/sc-lint/interface-reporting-constraints.md](./interface-reporting-constraints.md)
-  rather than a separate ad hoc HTML rendering path.
+  and must prefer `sc-compose render` plus Jinja templates rather than a
+  separate ad hoc HTML rendering path.
 
 - `REQ-VERSION-007B`
   Each XHTML section fragment/panel must expose built-in copy actions for the

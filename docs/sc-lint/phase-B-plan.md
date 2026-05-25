@@ -89,8 +89,9 @@ Additional Phase `B` sprint scope may be added after the current numbered
 planning line through `B.4` is reviewed.
 
 The next queued planning line after Phase `B` is Phase `C`, covering
-`sc-lint-version`, published interface artifacts, and hard-fail breaking-change
-checks across Rust APIs, CLI contracts, and transport interfaces.
+`sc-lint-version`, the shared reporting pipeline it consumes, and hard-fail
+breaking-change checks across Rust APIs, CLI contracts, and transport
+interfaces.
 
 ## Exit Direction
 

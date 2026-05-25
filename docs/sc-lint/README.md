@@ -25,13 +25,14 @@ Current contents:
 - [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution plan and
   focused sprint-hardening sequence
 - [`phase-C-plan.md`](./phase-C-plan.md) — Phase C interface-versioning,
-  published-interface, and queued portability planning line
+  shared-reporting, observability-maintenance, and queued portability planning
+  line
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and current plan touchpoint guide
 - [`version-requirements.md`](./version-requirements.md) — planned
-  interface-versioning and published-artifact requirements
+  interface-versioning and shared-report integration requirements
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
-  repo-local constraints for HTML/XHTML/JSON published interface reports
+  repo-local constraints for the shared HTML/XHTML/JSON reporting line
 - [`skill-authoring-constraints.md`](./skill-authoring-constraints.md) —
   repo-local constraints for the `sc-lint-version` adoption skill
 - [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —
@@ -59,8 +60,8 @@ Current contents:
   distribution planning sprint
 - [`sprint-C1.md`](./sprint-C1.md) — `sc-lint-version` policy and baseline
   planning sprint
-- [`sprint-C2.md`](./sprint-C2.md) — published interface artifact pipeline
-  planning sprint
+- [`sprint-C2.md`](./sprint-C2.md) — shared report-template pipeline planning
+  sprint
 - [`sprint-C3.md`](./sprint-C3.md) — hard-fail version gate integration
   planning sprint
 - [`sprint-C4.md`](./sprint-C4.md) — consumer integration and skill design
@@ -73,6 +74,8 @@ Current contents:
   sprint
 - [`sprint-C8.md`](./sprint-C8.md) — shell invocation portability sprint
 - [`sprint-C9.md`](./sprint-C9.md) — cross-platform `cfg` parity enforcement
+  sprint
+- [`sprint-C10.md`](./sprint-C10.md) — `sc-observability` `1.1.0` adoption
   sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
@@ -153,12 +156,12 @@ Current intended crate split:
   - represented now as a reserved future boundary surface only
 - `sc-lint-version`
   - planned future workspace crate for stable interface version checks and
-    published interface artifacts
+    canonical interface artifacts
   - planned top-level invocation path:
     - `sc-lint check interfaces`
   - planned to start with `cargo-semver-checks` for Rust public APIs and
-    expand to CLI and transport surfaces through generated HTML/XHTML/JSON
-    artifacts
+    expand to CLI and transport surfaces while consuming a shared
+    `sc-compose`/Jinja reporting layer rather than owning HTML generation
 - `sc-lint-attributes`
   - proc-macro attribute crate
   - intentionally minimal at first

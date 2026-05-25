@@ -60,7 +60,8 @@ target: develop
   - `docs/requirements.md` states that interface-version checks can fail local
     and CI workflows across all supported interface families
   - `docs/architecture.md` states that the planned versioning layer owns one
-    aggregate multi-family hard-fail verdict for published interface artifacts
+    aggregate multi-family hard-fail verdict for canonical interface artifacts
+    and their published reports
 - explicit policy for how no-interface-present families are reported without
   silently dropping them from the published artifact set
 

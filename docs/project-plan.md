@@ -22,8 +22,8 @@ The current project focus is:
   than growing catch-all backends
 - keeping consumer-specific policy lints local unless only their framework is
   worth extracting
-- planning stable interface version checks and published interface artifacts
-  for public APIs, CLI contracts, and transport surfaces
+- planning stable interface version checks and shared report publication for
+  public APIs, CLI contracts, and transport surfaces
 - planning the next shared production portability follow-ons in
   `sc-lint-portability`: production path literals, broad env portability,
   shell invocation portability, and structural `cfg(unix)` parity
@@ -166,8 +166,9 @@ The currently scheduled sprint plans are:
     configuration surface
   - `docs/sc-lint/sprint-C1.md`
 - `C.2`
-  - published interface artifact pipeline
-  - versioned CLI baseline artifact schema and generation workflow
+  - shared report-template pipeline
+  - versioned CLI baseline artifact schema, `sc-compose`/Jinja template
+    direction, and generation workflow
   - `docs/sc-lint/sprint-C2.md`
 - `C.3`
   - hard-fail version gate integration
@@ -196,6 +197,11 @@ The currently scheduled sprint plans are:
   - cross-platform `cfg` parity enforcement
   - `PORT-010` production `#[cfg(unix)]` companion-parity checks
   - `docs/sc-lint/sprint-C9.md`
+- `C.10`
+  - `sc-observability` `1.1.0` adoption
+  - retained-log policy decision plus `emit` -> `log` / `try_log`, typestate,
+    and Windows-rotation compatibility review for the CLI-owned logging seam
+  - `docs/sc-lint/sprint-C10.md`
 
 ## Recent Sprint Deltas
 
@@ -280,8 +286,8 @@ follow-on feature work, and release/distribution planning. That does not imply
 that every release-1 follow-on item is already complete.
 
 Phase `C` is now the next queued planning line after the current Phase `B`
-sequence. It covers `sc-lint-version`, published interface artifacts, and
-multi-surface breaking-change detection.
+sequence. It covers `sc-lint-version`, the shared reporting pipeline it
+consumes, and multi-surface breaking-change detection.
 
 ## Planning Conventions
 

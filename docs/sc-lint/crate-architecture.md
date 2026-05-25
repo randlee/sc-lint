@@ -24,12 +24,13 @@ their governing docs, boundaries, and planned sprint work.
   - `docs/sc-lint/cli-contract.md`
 - governing boundary:
   - `boundaries/sc-lint/top-level-cli.toml`
-- primary Phase A sprints:
+- primary implementation and planning sprints:
   - `A.1a`
   - `A.1b`
   - `A.2`
   - `A.3`
   - `B.3`
+  - `C.10`
 
 ### `sc-lint-directives`
 
@@ -143,9 +144,11 @@ their governing docs, boundaries, and planned sprint work.
 
 - role:
   - planned dedicated workspace crate for stable interface-version checks and
-    published interface artifacts
+    canonical interface artifacts
   - planned owner of the `cargo-semver-checks` translation layer, multi-family
-    verdict model, and generated interface-report baseline workflow
+    verdict model, and interface-report baseline workflow metadata
+  - planned consumer of a shared `sc-compose`-orbit reporting layer rather
+    than owner of a crate-local HTML renderer
 - governing docs:
   - `docs/sc-lint/phase-C-plan.md`
   - `docs/sc-lint/version-requirements.md`
@@ -192,6 +195,10 @@ Phase `C` commits `sc-lint-version` as a planned dedicated workspace crate.
 - planned initial backend decision:
   - `cargo-semver-checks` powers the Rust public API family through a
     `sc-lint-version` translation layer
+- planned reporting decision:
+  - reusable HTML/XHTML rendering lives outside `sc-lint-version` itself
+  - preferred ownership target is the `sc-compose` repo, potentially as a
+    dedicated `sc-reporting` capability
 - dedicated crate boundary and implementation planning records remain future
   implementation work after the Phase `C` planning line
 

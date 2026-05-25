@@ -41,8 +41,8 @@ The product is organized into five layers:
 ## Planned Interface Versioning Layer
 
 The next planned product capability after the current Phase `B` line is
-`sc-lint-version`, which treats stable interfaces as publishable/versioned
-artifacts rather than relying on prose release notes alone.
+`sc-lint-version`, which treats stable interfaces as versioned artifacts
+rather than relying on prose release notes alone.
 
 That planned capability spans three interface families:
 
@@ -50,19 +50,15 @@ That planned capability spans three interface families:
 - stable top-level CLI commands and machine contracts
 - RPC/socket interfaces when such surfaces exist
 
-The intended artifact model is:
+The intended interface-artifact model is:
 
 - structured canonical interface data
-- generated main HTML reports for people through the reusable workflow
-  summarized in
-  [docs/sc-lint/interface-reporting-constraints.md](./sc-lint/interface-reporting-constraints.md)
 - JSON sidecars as the machine-readable source of truth
-- separate XHTML section fragments/panels for section-level deep context
-- built-in per-panel copy actions for canonical JSON payload and canonical
-  context text
-
-This layer is intentionally planned as template- and schema-driven output, not
-as a collection of hand-maintained HTML pages.
+- artifact metadata sufficient for a shared report pipeline to publish:
+  - main HTML reports
+  - separate XHTML section fragments/panels for section-level deep context
+  - built-in per-panel copy actions for canonical JSON payload and canonical
+    context text
 
 The current Phase `C` planning decision is that `sc-lint-version` is a
 dedicated planned workspace crate invoked from the top-level CLI through
@@ -76,6 +72,37 @@ families with no matching current repo surface remain visible as
 For the Rust public API family, `sc-lint-version` is planned to own one
 translation layer that consumes `cargo-semver-checks` machine-readable output
 and exit-status semantics into the shared multi-family verdict contract.
+
+## Planned Shared Reporting Layer
+
+Phase `C` also plans one shared report-publishing layer consumed by
+`sc-lint-version` and intended to be reusable by future non-lint report
+surfaces.
+
+That shared layer is intentionally planned as template- and schema-driven
+output, not as a collection of hand-maintained HTML pages.
+
+The preferred ownership target for the reusable reporting layer is the
+`sc-compose` repo, potentially as a dedicated `sc-reporting` capability,
+because the same XHTML-panel conventions are expected to serve:
+
+- public API reports
+- CLI contract reports
+- ICD-style RPC/socket reports
+- later smoke, integration, DB/query, and state-machine reports
+
+The planned report workflow uses:
+
+- structured canonical data from the producing feature
+- `sc-compose render`
+- Jinja (`.j2`) templates
+- one canonical JSON sidecar
+- one main HTML report
+- separate XHTML panels with mandatory copy controls
+
+Template selection and override are planned under
+`[reporting.templates.<report_kind>]` in `sc-lint` config so consumers can
+adopt repo-local template variants without forking the producing feature.
 
 Consumer adoption for this layer is also planned as a product surface:
 
@@ -253,6 +280,17 @@ Release `0.1.x` observability dependency policy is:
 - future direct-linked backends may reuse CLI-owned context and contract data,
   but must not own logger initialization or introduce alternative event-entry
   wrappers without a new ADR
+
+The queued Phase `C.10` maintenance line keeps this seam list intact while
+moving the CLI package to `sc-observability` `1.1.0`. That maintenance scope
+is limited to:
+
+- typestate-compatible logger construction and shutdown
+- explicit `log` versus `try_log` decisions at current top-level event sites
+- one explicit retained-log policy decision, with rotation/pruning/background
+  maintenance owned by the logger when enabled
+- one explicit `sc-observe` adoption decision that remains subordinate to the
+  existing CLI-owned boundary policy
 
 ### Rule-family distribution
 

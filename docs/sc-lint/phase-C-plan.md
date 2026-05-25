@@ -1,8 +1,8 @@
 # `sc-lint` Phase C Plan
 
 This document is the planning stub for Phase `C`, the interface-versioning,
-published-interface documentation, and queued shared portability follow-on
-phase.
+shared reporting, observability-maintenance, and queued shared portability
+follow-on phase.
 
 ## Objective
 
@@ -10,9 +10,10 @@ Phase `C` introduces a planned `sc-lint-version` capability that turns stable
 interface monitoring into one explicit product feature, and it schedules the
 next four shared portability lint families that were intentionally left as
 follow-on product work after `ADR-010`. The phase must produce both
-machine-readable change detection and human-friendly published interface
-documentation from the same structured artifacts while also closing the next
-consumer-neutral cross-platform portability gaps in `sc-lint-portability`.
+machine-readable change detection and a shared human-facing report model from
+the same structured artifacts, queue one explicit `sc-observability` `1.1.0`
+adoption pass, and close the next consumer-neutral cross-platform portability
+gaps in `sc-lint-portability`.
 
 ## Current Scope
 
@@ -27,10 +28,12 @@ The currently planned sprints in this phase are:
     RPC/socket interfaces
   - see [docs/sc-lint/sprint-C1.md](./sprint-C1.md)
 - `C.2`
-  - generated published interface artifact pipeline
-  - HTML/XHTML/JSON report package model for public APIs and stable contracts
-  - versioned CLI baseline artifact schema and generation/update workflow
-  - no hand-written monolithic HTML surfaces
+  - shared report-template pipeline planning
+  - `sc-compose`/Jinja report package model for public API, CLI, and ICD
+    reports
+  - template-selection and override contract for consumers
+  - no hand-written monolithic HTML surfaces and no `sc-lint-version`-owned
+    HTML renderer
   - see [docs/sc-lint/sprint-C2.md](./sprint-C2.md)
 - `C.3`
   - hard-fail version gate planning
@@ -66,6 +69,11 @@ The currently planned sprints in this phase are:
   - production `#[cfg(unix)]` branches that lack Windows companions or
     explicit portable fallbacks
   - see [docs/sc-lint/sprint-C9.md](./sprint-C9.md)
+- `C.10`
+  - `sc-observability` `1.1.0` adoption in the CLI-owned logging layer
+  - retained-log policy decision, `emit` -> `log` / `try_log` migration, and
+    Windows rotation validation target
+  - see [docs/sc-lint/sprint-C10.md](./sprint-C10.md)
 
 ## Phase Structure
 
@@ -75,9 +83,9 @@ The currently planned sprints in this phase are:
    - lock the initial Rust public API engine, command surface, and
      family-selection configuration strategy
 2. `C.2`
-   - define how stable interfaces are published for humans and tooling
-   - lock the structured artifact schema, XHTML fragment/report pattern, and
-     CLI baseline artifact workflow
+   - define the shared report system consumed by interface-version artifacts
+   - lock the structured artifact schema, XHTML fragment/report pattern,
+     `sc-compose`/Jinja template direction, and template-override workflow
 3. `C.3`
    - define how version checks hard-fail and where those checks run
    - connect the per-family artifact model to repo gates and release review
@@ -97,6 +105,11 @@ The currently planned sprints in this phase are:
      assumptions in production code
 9. `C.9`
    - add one structural `cfg(unix)` companion-parity rule for production code
+10. `C.10`
+   - adopt `sc-observability` `1.1.0`
+   - decide retained-log policy rollout for the current release line
+   - migrate deprecated `emit` call sites to `log` / `try_log`
+   - verify typestate-compatible shutdown and Windows rotation assumptions
 
 ## Exit Direction
 
@@ -107,13 +120,23 @@ Phase `C` should leave the repo with:
 - an accepted form-factor decision for a dedicated `sc-lint-version` crate
   invoked through `sc-lint check interfaces`
 - explicit requirements for CLI and RPC/socket breaking-change detection
+- a shared reporting decision that keeps reusable HTML/XHTML generation out of
+  `sc-lint-version` itself and instead targets the `sc-compose` orbit as the
+  preferred home for the reusable reporting layer, potentially as a dedicated
+  `sc-reporting` capability
 - a generated artifact model for published interface documentation:
   - main HTML report
   - JSON sidecar
   - separate XHTML section fragments/panels with built-in copy actions
+- a template family plan for:
+  - Rust public API reports
+  - CLI contract reports
+  - ICD-style RPC/socket reports
 - a plan for published interface coverage across all shipped crates
 - a defined configuration surface under `[version.families.<family>]` for
   selecting interface families and baselines
+- a defined configuration surface under `[reporting.templates.<report_kind>]`
+  for selecting or overriding report templates without patching generated HTML
 - a plan for hard-fail version checks against canonical interface artifacts in
   local and CI workflows
 - a clear consumer-onboarding plan delivered through:
@@ -125,3 +148,9 @@ Phase `C` should leave the repo with:
   - broad production env-portability checks for `HOME`, `USER`, and `XDG_*`
   - shell invocation portability checks for Unix-shell assumptions
   - structural `cfg(unix)` / `cfg(windows)` parity enforcement
+- one explicit plan for `sc-observability` `1.1.0` adoption in the top-level
+  CLI logging layer, including:
+  - typestate-compatible shutdown verification
+  - retained-log policy enable/defer decision
+  - deprecated `emit` call-site migration to `log` / `try_log`
+  - explicit `sc-observe` adoption decision

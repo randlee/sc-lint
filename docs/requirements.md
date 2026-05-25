@@ -211,20 +211,32 @@ The product should support both:
   families with explicit breaking-change rules.
 
 - `REQ-PRODUCT-006K`
-  Published interface documentation must be generated from structured data and
-  reusable templates rather than hand-written monolithic HTML documents.
+  Human-facing reports published by `sc-lint` must be generated from
+  structured data and reusable templates rather than hand-written monolithic
+  HTML documents.
 
 - `REQ-PRODUCT-006L`
-  Generated published interface report packages must follow the main
-  HTML-plus-JSON-sidecar model, with separate XHTML section fragments/panels
-  for deeper context and built-in copy actions per panel, so one canonical
-  machine-readable source can drive both documentation and hard-fail checks.
+  Generated report packages must follow the main HTML-plus-JSON-sidecar model,
+  with separate XHTML section fragments/panels for deeper context and
+  built-in copy actions per panel, so one canonical machine-readable source
+  can drive both documentation and hard-fail checks.
 
 - `REQ-PRODUCT-006LA`
-  The generated published-interface report path must follow the reusable
-  workflow described in
+  The generated report path must follow the reusable workflow described in
   [docs/sc-lint/interface-reporting-constraints.md](./sc-lint/interface-reporting-constraints.md)
-  rather than a repo-specific ad hoc HTML rendering path.
+  rather than a feature-local or repo-specific ad hoc HTML rendering path.
+
+- `REQ-PRODUCT-006LB`
+  The preferred ownership target for the reusable reporting layer is the
+  `sc-compose` repo, potentially as a dedicated `sc-reporting` capability,
+  because the same XHTML-panel conventions are expected to serve both lint and
+  non-lint reports.
+
+- `REQ-PRODUCT-006LC`
+  Report-template selection and override must use one canonical configuration
+  surface under `[reporting.templates.<report_kind>]` so consumers can switch
+  between default shared templates and repo-local variants without editing the
+  producing feature.
 
 - `REQ-PRODUCT-006M`
   The initial Rust public API version-checking approach should be based on
@@ -275,6 +287,29 @@ The product should support both:
 - `REQ-LOG-005`
   Backend crates must not initialize the logger; structured logging remains a
   CLI-layer responsibility even when backend execution is delegated.
+
+- `REQ-LOG-006`
+  The release-line logging integration must preserve the accepted CLI-owned
+  observability seam from ADR-008 and ADR-009 when the supported
+  `sc-observability` line changes; compatibility maintenance must adapt the
+  CLI boundary, not relax backend ownership rules.
+
+- `REQ-LOG-007`
+  When retained-log rotation, pruning, or background maintenance is enabled,
+  that behavior must be owned by the logger/runtime according to configured
+  policy rather than by wrapper-owned cleanup code.
+
+- `REQ-LOG-008`
+  Top-level event emission call sites must make an explicit blocking decision:
+  use non-blocking `try_log` where dropped events on a full queue are an
+  accepted tradeoff, and use blocking `log` only where waiting on a full queue
+  is an intentional documented behavior.
+
+- `REQ-LOG-009`
+  Adoption of any higher-level observability facade layered over
+  `sc-observability` must be an explicit documented yes/no decision that
+  preserves the current CLI-owned logger-initialization and event-dispatch
+  seams.
 
 ### Boundary definitions
 

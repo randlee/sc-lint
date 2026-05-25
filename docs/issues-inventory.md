@@ -73,13 +73,13 @@ needed to move from that stopgap to the full top-level install path:
 
 ## Phase C Planning Note
 
-Phase `C` is now the queued interface-versioning and shared portability
-follow-on planning line:
+Phase `C` is now the queued interface-versioning, shared reporting,
+observability-maintenance, and shared portability follow-on planning line:
 
 - `C.1`
   - ownership/policy/baseline definition
 - `C.2`
-  - generated HTML/XHTML/JSON artifact publication planning
+  - shared HTML/XHTML/JSON report-template pipeline planning
 - `C.3`
   - hard-fail version-gate planning
 - `C.4`
@@ -94,6 +94,8 @@ follow-on planning line:
   - shell invocation portability
 - `C.9`
   - structural cross-platform `cfg` parity enforcement
+- `C.10`
+  - `sc-observability` `1.1.0` adoption in the CLI logging layer
 
 Current status:
 - no dedicated boundary record or `boundaries/planning.toml` entry is required
@@ -101,5 +103,8 @@ Current status:
 - `C.1` has now committed the planned form-factor and invocation path:
   - dedicated workspace crate: `sc-lint-version`
   - top-level command path: `sc-lint check interfaces`
+- the Phase `C` reporting direction now keeps generic HTML/XHTML rendering out
+  of `sc-lint-version` itself and prefers reusable ownership in the
+  `sc-compose` repo, potentially as a dedicated `sc-reporting` capability
 - dedicated crate-boundary records remain future implementation work after the
   Phase `C` planning line rather than current planning prerequisites

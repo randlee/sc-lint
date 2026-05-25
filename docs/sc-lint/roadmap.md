@@ -147,9 +147,10 @@ Initial Phase-C scope is:
   - dedicated crate/form-factor, invocation command, and family-selection
     configuration surface
 - `C.2`
-  - generated interface artifact publication planning
+  - shared report-template pipeline planning
   - XHTML fragment/report pattern with JSON sidecars as canonical machine data
-  - versioned CLI baseline artifact workflow
+  - `sc-compose`/Jinja template direction and versioned CLI baseline artifact
+    workflow
 - `C.3`
   - hard-fail version gate integration planning across Rust APIs, CLI contracts, and RPC/socket interfaces
   - cargo-semver-checks ingestion into the shared verdict contract
@@ -166,6 +167,9 @@ Initial Phase-C scope is:
   - shell invocation portability
 - `C.9`
   - structural cross-platform `cfg` parity enforcement
+- `C.10`
+  - `sc-observability` `1.1.0` adoption, retained-log policy decision, and
+    `emit` -> `log` / `try_log` migration
 
 ### Current code moves required
 

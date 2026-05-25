@@ -47,8 +47,9 @@ target: develop
   - one planned Rust-public-API translation layer in `sc-lint-version` that
     consumes `cargo-semver-checks` machine-readable output and exit-status
     semantics into the multi-family verdict model
-  - generated HTML/XHTML/JSON published artifacts as the canonical reporting
-    model
+  - one explicit ownership split where `sc-lint-version` owns canonical
+    interface artifacts and version verdicts, while the shared report layer
+    owns reusable HTML/XHTML rendering
 - requirements define breaking-change semantics for:
   - Rust public APIs
   - stable top-level CLI commands and machine contracts
@@ -120,7 +121,8 @@ baseline_artifact = "artifacts/baselines/cli-v0.2.0.json"
 - `project-plan.md` and `phase-C-plan.md` both show the same `C.1`-`C.5`
   sequence
 - the plan explicitly states that generated report packages must follow the
-  XHTML fragment/report pattern and must not be hand-written HTML monoliths
+  XHTML fragment/report pattern, must not be hand-written HTML monoliths, and
+  must not be implemented as feature-local HTML code inside `sc-lint-version`
 
 ## Required Validation
 
