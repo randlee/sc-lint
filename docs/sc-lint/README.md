@@ -141,6 +141,11 @@ Current intended crate split:
   - AST parsing, graph construction, semantic boundary rule evaluation
 - `sc-lint-portability`
   - analyzer crate for shared OS/platform portability rules
+  - planned next shared follow-ons:
+    - production Unix-only and Windows-only path-literal checks
+    - broad production env-portability checks
+    - shell invocation portability checks
+    - structural `cfg(unix)` / `cfg(windows)` parity checks
 - `sc-lint-runtime`
   - analyzer crate for shared std runtime/concurrency rules
 - `sc-lint-tokio`
@@ -323,6 +328,8 @@ Current planned Phase-B follow-ons not implemented yet:
   - Windows-only path literal parity with the current Unix-only path checks
   - broader cross-platform environment-variable portability rules
   - shell-portability checks for OS-specific shell and command assumptions
+  - structural `cfg(unix)` / `cfg(windows)` parity enforcement for production
+    code
 
 Planned rule families not implemented yet:
 

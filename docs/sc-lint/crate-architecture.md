@@ -80,7 +80,10 @@ their governing docs, boundaries, and planned sprint work.
   - shared platform and OS portability rule family
   - planned future shared owner for Windows-path parity, env portability, and
     shell-portability rule families when those checks remain consumer-neutral
-  - current Phase `B.1` planning owner for that shared portability backlog
+  - planned future shared owner for structural cross-platform branch-parity
+    rules when those checks remain consumer-neutral
+  - current Phase `B.1` backlog owner and Phase `C.6`-`C.9` sprint owner for
+    that shared portability follow-on line
 - governing docs:
   - `docs/sc-lint/extraction-plan.md`
   - `docs/sc-lint/roadmap.md`
@@ -90,6 +93,10 @@ their governing docs, boundaries, and planned sprint work.
 - primary implementation and planning sprints:
   - `A.4`
   - `B.1`
+  - `C.6`
+  - `C.7`
+  - `C.8`
+  - `C.9`
 
 ### `sc-lint-runtime`
 

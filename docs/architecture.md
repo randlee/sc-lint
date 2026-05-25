@@ -277,6 +277,8 @@ Current intended distribution is:
     - Windows-only path literal parity companion rules
     - broader environment-variable portability rules
     - shell portability rules for OS-specific shell and command assumptions
+    - structural `cfg(unix)` / `cfg(windows)` parity enforcement for
+      production code
   - consumer-specific portability wrappers remain out of this crate unless they
     are generalized into shared product rules
 - `sc-lint-runtime`

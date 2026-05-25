@@ -113,8 +113,9 @@ The product should support both:
 
 - `REQ-PRODUCT-004AA`
   Future shared portability rules for cross-platform path literals,
-  environment-variable portability, and shell portability must remain owned by
-  `sc-lint-portability` when their semantics are consumer-neutral.
+  environment-variable portability, shell portability, and structural
+  cross-platform branch parity must remain owned by `sc-lint-portability`
+  when their semantics are consumer-neutral.
 
 - `REQ-PRODUCT-004AB`
   When `sc-lint` carries an OS-specific path-literal portability rule family

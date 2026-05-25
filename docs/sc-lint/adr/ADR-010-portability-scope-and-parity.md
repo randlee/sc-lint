@@ -22,7 +22,8 @@ consumer-local.
 ## Decision
 
 1. `sc-lint-portability` remains the canonical home for consumer-neutral
-   cross-platform path, environment-variable, and shell portability rules.
+   cross-platform path, environment-variable, shell-portability, and
+   structural branch-parity rules.
 2. When `sc-lint` ships or plans an OS-specific path-literal rule family for
    one major platform class, parity-companion detection for the matching
    opposite platform class belongs in the same shared portability crate when
@@ -41,5 +42,7 @@ consumer-local.
 - broader generic env-portability rules belong in `sc-lint-portability`
 - shell-portability rules for OS-specific shell-path and shell-command
   assumptions belong in `sc-lint-portability`
+- structural `cfg(unix)` / `cfg(windows)` parity enforcement belongs in
+  `sc-lint-portability` when the rule remains consumer-neutral
 - consumer repos may adapt wrappers such as `unix-gating`, but those wrappers
   do not redefine the core product boundary or ownership model
