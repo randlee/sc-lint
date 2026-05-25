@@ -3,6 +3,7 @@ set -euo pipefail
 
 MAIN_REF="${1:-origin/main}"
 DEVELOP_REF="${2:-origin/develop}"
+RELEASE_VERSION="${3:-}"
 
 fail() {
   echo "release-gate: FAIL - $*" >&2
@@ -30,6 +31,21 @@ fi
 
 if ! git merge-base --is-ancestor "$DEVELOP_REF" "$MAIN_REF"; then
   fail "$DEVELOP_REF is not an ancestor of $MAIN_REF"
+fi
+
+if [[ -n "${RELEASE_VERSION:-}" ]]; then
+  workspace_version="$(
+    python3 -c "
+import tomllib
+with open('Cargo.toml', 'rb') as f:
+    data = tomllib.load(f)
+print(data['workspace']['package']['version'])
+"
+  )"
+  if [[ "$workspace_version" != "$RELEASE_VERSION" ]]; then
+    fail "Cargo.toml workspace version ($workspace_version) does not match release input ($RELEASE_VERSION)"
+  fi
+  info "version check PASS: $workspace_version == $RELEASE_VERSION"
 fi
 
 info "PASS - release gate checks satisfied"

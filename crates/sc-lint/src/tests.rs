@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -282,11 +283,20 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
 }
 
 #[test]
+#[serial]
 fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope() {
     let fixture = AnalysisFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
     fixture.write_source("example", "lib.rs", "pub fn portable() {}\n");
+    let _mock_backend = MockBackend::install(
+        crate::consts::TOOL_PORTABILITY,
+        &json!({
+            "tool": crate::consts::TOOL_PORTABILITY,
+            "findings": [],
+            "status": "pass",
+        }),
+    );
     let repo_root = fixture.root();
     let cli = Cli::parse_from([
         "sc-lint",
@@ -323,6 +333,7 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
 }
 
 #[test]
+#[serial]
 fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
     let fixture = AnalysisFixture::new();
     fixture.write_workspace_root();
@@ -342,8 +353,16 @@ fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
                 if wait.timed_out() {
                     return;
                 }
-            }
+                }
         "#,
+    );
+    let _mock_backend = MockBackend::install(
+        crate::consts::TOOL_RUNTIME,
+        &json!({
+            "tool": crate::consts::TOOL_RUNTIME,
+            "findings": [],
+            "status": "pass",
+        }),
     );
     let repo_root = fixture.root();
     let cli = Cli::parse_from([
@@ -801,6 +820,72 @@ homepage = "https://example.invalid/sc-lint"
             std::fs::create_dir_all(parent).expect("parent dirs");
         }
         std::fs::write(path, contents).expect("write fixture file");
+    }
+}
+
+struct MockBackend {
+    _tempdir: TempDir,
+    original_path: Option<OsString>,
+}
+
+impl MockBackend {
+    fn install(tool: &str, payload: &Value) -> Self {
+        let tempdir = TempDir::new().expect("temp dir");
+        let script_name = if cfg!(windows) {
+            format!("{tool}.cmd")
+        } else {
+            tool.to_string()
+        };
+        let script_path = tempdir.path().join(script_name);
+        let payload = payload.to_string();
+        let script = if cfg!(windows) {
+            format!("@echo off\r\necho {payload}\r\n")
+        } else {
+            format!("#!/usr/bin/env sh\nprintf '%s\\n' '{payload}'\n")
+        };
+        std::fs::write(&script_path, script).expect("mock backend script");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = std::fs::metadata(&script_path)
+                .expect("mock backend metadata")
+                .permissions();
+            permissions.set_mode(0o755);
+            std::fs::set_permissions(&script_path, permissions).expect("mock backend perms");
+        }
+
+        let original_path = std::env::var_os("PATH");
+        let updated_path = std::env::join_paths(
+            std::iter::once(tempdir.path().to_path_buf()).chain(
+                original_path
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(std::env::split_paths),
+            ),
+        )
+        .expect("joined PATH");
+        // SAFETY: These tests are marked serial and this guard owns the full
+        // lifecycle of the PATH mutation, so no concurrent environment access
+        // occurs while the override is installed.
+        unsafe { std::env::set_var("PATH", updated_path) };
+
+        Self {
+            _tempdir: tempdir,
+            original_path,
+        }
+    }
+}
+
+impl Drop for MockBackend {
+    fn drop(&mut self) {
+        match &self.original_path {
+            // SAFETY: The matching install path mutation is test-local and
+            // synchronized by serial execution, so restoring PATH here is the
+            // only concurrent environment mutation.
+            Some(path) => unsafe { std::env::set_var("PATH", path) },
+            // SAFETY: See the safety note above for PATH restoration.
+            None => unsafe { std::env::remove_var("PATH") },
+        }
     }
 }
 
