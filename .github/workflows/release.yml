@@ -61,7 +61,11 @@ jobs:
               echo "Tag ${tag} already exists and points to origin/main (${main_sha}), skipping creation"
               exit 0
             fi
-            echo "Tag ${tag} exists but points to ${remote_tag_sha}, not origin/main (${main_sha})" >&2
+            if git merge-base --is-ancestor "$remote_tag_sha" "$main_sha"; then
+              echo "Tag ${tag} already exists at ${remote_tag_sha}, which is an ancestor of main (${main_sha}); skipping creation"
+              exit 0
+            fi
+            echo "Tag exists but points to ${remote_tag_sha}, which is not an ancestor of origin/main (${main_sha})" >&2
             exit 1
           fi
           git tag "$tag" origin/main
@@ -226,7 +230,11 @@ jobs:
           crate_exists() {
             local crate="$1"
             local version="$2"
-            cargo search "$crate" --limit 1 | grep -F "${crate} = \"${version}\"" >/dev/null
+            local published
+            published=$(curl -fsS "https://crates.io/api/v1/crates/${crate}/${version}" \
+              -H "User-Agent: sc-lint-release-publisher/1.0" 2>/dev/null \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',{}).get('num',''))" 2>/dev/null || echo "")
+            [[ "$published" == "$version" ]]
           }
 
           publish_if_missing() {
@@ -236,7 +244,17 @@ jobs:
               echo "${crate} ${version} already published; skipping"
               return 0
             fi
-            cargo publish -p "$crate" --locked
+            local publish_output
+            if ! publish_output=$(cargo publish -p "$crate" --locked 2>&1); then
+              if echo "$publish_output" | grep -q "already exists"; then
+                echo "${crate} ${version} already exists (race); skipping"
+              else
+                echo "$publish_output" >&2
+                return 1
+              fi
+            else
+              echo "$publish_output"
+            fi
             if [[ "$wait_seconds" -gt 0 ]]; then
               sleep "$wait_seconds"
             fi

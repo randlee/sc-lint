@@ -1,12 +1,23 @@
 schema_version = 1
 
 [[crates]]
+artifact = "sc-lint-schema"
+package = "sc-lint-schema"
+cargo_toml = "crates/sc-lint-schema/Cargo.toml"
+required = true
+publish = true
+publish_order = 1
+preflight_check = "full"
+wait_after_publish_seconds = 0
+verify_install = false
+
+[[crates]]
 artifact = "sc-lint-directives"
 package = "sc-lint-directives"
 cargo_toml = "crates/sc-lint-directives/Cargo.toml"
 required = true
 publish = true
-publish_order = 1
+publish_order = 2
 preflight_check = "full"
 wait_after_publish_seconds = 15
 verify_install = false
