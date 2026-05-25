@@ -1,9 +1,9 @@
 ---
 id: B.3
 title: Observability Boundary Policy ADR
-status: planned
+status: completed
 branch: feature/sprint-B3
-worktree: <repo-worktree>/feature/sprint-B3
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-B3
 target: integration/phase-B
 ---
 
