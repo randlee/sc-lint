@@ -1,4 +1,4 @@
-[core]
+[atm]
 identity = "team-lead"
 default_team = "sc-lint"
 

@@ -1,9 +1,9 @@
 ---
 name: plan-hardening
-version: 1.0.0
+version: 1.4.0
 description: >
-  Team-lead delegates plan hardening to clint after the user has already
-  discussed the plan details with clint.
+  Team-lead drives plan hardening after the current plan state already exists
+  in repo docs.
 depends_on:
   codex-orchestration: 0.x
 ---
@@ -14,95 +14,83 @@ Audience: `team-lead` only.
 
 Use this only for phase-plan hardening before implementation starts or resumes.
 
-If the user invokes this skill, that means that the plan details have already
-been discussed and are fresh in clint context. Do not request details from
-the user, the details will surface when the plan is delivered.
+## Assumptions
 
-`team-lead` is responsible for routing, worktree creation, and assignment
-metadata. `team-lead` is not the authority for rewriting the plan.
-
-## Preconditions
-
-- the target phase worktree already exists
-- `worktree_path` and `branch` are known
-- `sc-compose` is available
-- the plan has already been discussed with `clint`
+- the current plan state already exists in repo docs, though sprint docs may
+  still be partial or missing
+- do not ask the user to explain detailed plan content; read the planning docs
+  and references directly after they are created
+- `team-lead` routes the process but is not the authority for rewriting the
+  plan
+- the user-discussed deliverable scope is authoritative
+- if no target phase worktree exists, create one from `develop` before
+  starting
 
 ## Expected Result
 
-The task must end with:
-- complete/consistent planning docs
-- a hardened sprint doc for every sprint still required to finish the phase
-- no unassigned in-scope implementation work
-- branch pushed, validation reported, and plan review requested
+Sprint plan approved by:
+- `plan-scope-reviewer`
+- `critical-plan-reviewer`
+- `quality-mgr`
 
-Any remaining in-scope work without sprint ownership is a `GAP`. If more
-sprints are needed, hardening must create them.
+## Required Reference
 
-## Team-Lead Steps
+Always use:
+- `.claude/skills/plan-hardening/sprint-planning-guidelines.md`
 
-1. Prepare:
-   - `phase_id`
-   - `task_id`
-   - `description`
-   - `worktree_path`
-   - `branch`
-   - `pr_target`
-   - `source_of_truth`
-   - optional `questions_or_concerns`
-   - `references`
-2. Render `.claude/skills/plan-hardening/plan-hardening.xml.j2` with
-   `sc-compose`.
-3. Send the rendered ATM task to `clint`.
-4. Review the result:
-   - final finding count is `0`
-   - every remaining work item is assigned to a sprint
-   - missing sprint docs were created if needed
-   - branch was pushed and validation reported
+## Execution Table
 
-`source_of_truth` should point at the already-approved planning sources:
-- reviewed planning docs in the repo
-- a verbatim user-approved plan capsule
-- explicit references to prior planning discussion already completed with
-  `clint`
+| # | Route to | Input required | Output expected | Read before executing |
+|---|----------|----------------|-----------------|-----------------------|
+| 1 | `clint` | vars file | `step-1` fenced JSON | `steps/step-1.md` |
+| 2 | `plan-scope-reviewer` (background) | context + `step-1` JSON | `step-2` fenced JSON | `steps/step-2.md` |
+| 3 | `clint` | `step-2` JSON | `step-3` fenced JSON | `steps/step-3.md` |
+| 4 | `critical-plan-reviewer` (background) | context + `step-3` JSON | `step-4` fenced JSON | `steps/step-4.md` |
+| 5 | `clint` | `step-4` JSON | `step-5` fenced JSON | `steps/step-5.md` |
+| 6 | `quality-mgr` | `step-5` JSON + QA vars file | codex-orchestration plan-QA handoff | `steps/step-6.md` |
 
-If `questions_or_concerns` is present, `clint` should answer it in the ACK.
+## Round Tracking
 
-The ACK should also include a brief outline of the plan/work that `clint`
-understands to be in scope. `team-lead` should wait for that ACK and outline
-before raising scope concerns or discussing adjustments with the user.
+`team-lead` must keep a round table for every `/plan-hardening` run.
 
-Render:
-- `.claude/skills/plan-hardening/plan-hardening.xml.j2`
+Minimum columns:
 
-Example:
+| Round | Step | Reviewer | reviewed_commit | status | blocking | important | minor | findings_hash | supersedes | Note |
+|-------|------|----------|-----------------|--------|----------|-----------|-------|---------------|------------|------|
 
-```bash
-sc-compose render \
-  --root .claude/skills/plan-hardening \
-  --file plan-hardening.xml.j2 \
-  --var-file /tmp/plan-hardening-vars.json
-```
+Use the example in:
+- `.claude/skills/plan-hardening/examples/plan-hardening-rounds.example.md`
 
-Suggested vars file shape:
+## Hard Stops
 
-```json
-{
-  "task_id": "TASK-1234",
-  "phase": "phase-S",
-  "description": "Harden the second half of Phase S before implementation resumes.",
-  "worktree_path": "/abs/worktree",
-  "branch": "feature/pS-plan-hardening",
-  "pr_target": "integrate/phase-S",
-  "source_of_truth": "- User-approved planning discussion already completed with clint\n- docs/project-plan.md\n- docs/plan-phase-S.md\n- docs/requirements.md\n- docs/architecture.md",
-  "questions_or_concerns": "- Confirm whether missing follow-on sprints must be created on this branch if the current phase plan stops too early.",
-  "references": "- docs/project-plan.md\n- docs/plan-phase-S.md\n- docs/requirements.md\n- docs/architecture.md"
-}
-```
+- `team-lead` only checks the top-level `status` and expected `mode` fields on
+  each fenced JSON response before advancing
+- every step after step 1 must receive the previous step's fenced JSON
+- missing or malformed fenced JSON is a hard stop
+- a reviewer rerun is valid only when either `reviewed_commit` changed or
+  `findings_hash` changed
+- if the same reviewer returns the same `reviewed_commit` and the same
+  `findings_hash` again, treat it as a stale replay and do not open a new
+  hardening round
+- substantial scope drift from the user-discussed plan is a hard stop
+- remaining in-scope work without sprint ownership is a hard stop
+- if a sprint cannot credibly land its committed deliverables at a
+  production-ready level, split it before implementation
+- if a reviewer loop returns `FAIL` three times without converging, escalate to
+  the user before continuing
 
-## Guardrails
+## Render
 
-- do not send the task before the worktree exists
-- do not rewrite the plan into a freeform summary
-- do not let the task stop while remaining work lacks sprint ownership
-- do not accept a phase plan that ends before the remaining work ends
+- `.claude/skills/plan-hardening/01-plan-scope-review.xml.j2`
+- `.claude/skills/plan-hardening/02-sprint-scope-hardening.xml.j2`
+- `.claude/skills/plan-hardening/03-consistency-hardening.xml.j2`
+- `.claude/skills/plan-hardening/steps/step-1.md`
+- `.claude/skills/plan-hardening/steps/step-2.md`
+- `.claude/skills/plan-hardening/steps/step-3.md`
+- `.claude/skills/plan-hardening/steps/step-4.md`
+- `.claude/skills/plan-hardening/steps/step-5.md`
+- `.claude/skills/plan-hardening/steps/step-6.md`
+- `.claude/skills/plan-hardening/examples/plan-hardening-vars.example.json`
+- `.claude/skills/plan-hardening/examples/plan-hardening-rounds.example.md`
+- `.claude/skills/plan-hardening/examples/plan-hardening-qa-vars.example.json`
+- `.claude/skills/plan-hardening/sprint-planning-guidelines.md`
