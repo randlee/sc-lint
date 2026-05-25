@@ -42,6 +42,25 @@ target: develop
   - hardcoded `/bin/sh`
   - hardcoded `/bin/bash`
 - `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port009`
+- `PORT-009` integrates into `collect_unix_portability_findings(...)` so it
+  reuses the existing `unix_gated` propagation path instead of inventing a
+  parallel suppression model
+- the shell-invocation detection seam is explicit and separates process-launch
+  calls from string-literal path checks:
+
+```rust
+fn is_shell_command_call(expr_call: &ExprCall) -> bool {
+    is_command_new_call(expr_call, "sh") || is_command_new_call(expr_call, "bash")
+}
+
+fn is_unix_shell_path_literal(value: &str) -> bool {
+    matches!(value, "/bin/sh" | "/bin/bash")
+}
+```
+
+- `/bin/sh` and `/bin/bash` fire through the dedicated `PORT-009` literal
+  helper above rather than through the generic Unix path-prefix matcher used
+  by `PORT-006`; both detection modes share the same production visitor walk
 - the shell-portability rule allows explicitly Unix-gated code paths to remain
   Unix-only rather than forcing fake parity into consumers that already expose
   an honest Unix boundary
@@ -81,7 +100,10 @@ pub fn run_unix_hook() -> std::io::Result<std::process::ExitStatus> {
 - the sprint explicitly covers both `Command::new("sh" | "bash")` and
   hardcoded `/bin/sh` or `/bin/bash` paths
 - the sprint states that explicitly Unix-gated code paths are not false
-  positives for this family
+  positives for this family, and names the existing `unix_gated` propagation
+  path as the suppression mechanism
+- the sprint names the dedicated helper boundary for shell-path literals
+  instead of leaving `/bin/sh` detection implicit in generic path matching
 - the sprint keeps repo-local shell conventions and wrapper policy out of the
   shared product scope
 - the sprint references GitHub issue `#55` in its hard dependencies
@@ -89,5 +111,9 @@ pub fn run_unix_hook() -> std::io::Result<std::process::ExitStatus> {
 ## Required Validation
 
 - `cargo test -p sc-lint-portability`
+- `cargo test -p sc-lint-portability flags_command_new_sh_in_production_code`
+- `cargo test -p sc-lint-portability flags_bin_bash_path_in_production_code`
+- `cargo test -p sc-lint-portability passes_std_process_command_with_binary_name_in_production_code`
+- `cargo test -p sc-lint-portability passes_cfg_unix_gated_shell_invocation_in_production_code`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `just lint`

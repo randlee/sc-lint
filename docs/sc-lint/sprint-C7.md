@@ -16,7 +16,8 @@ target: develop
 - catch Unix-centric home/user/config lookups that bypass platform-neutral
   abstractions
 - keep the new production env family distinct from the existing home-dir
-  wrapper and test-only `set_var` rules
+  wrapper and test-only `set_var` rules: `PORT-008` is production-scope,
+  `PORT-002` remains test-scope only, and `PORT-003` remains test-scope only
 
 ## Hard Dependencies
 
@@ -42,9 +43,25 @@ target: develop
   - `USER`
   - `XDG_*`
 - `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port008`
-- the new env-portability rule fires on direct production lookups used as
-  path, config-root, or user-identity inputs when no approved abstraction
-  layer is present
+- `PORT-008` fires on direct ungated production lookups of `std::env::var`
+  or `std::env::var_os` for `HOME`, `USER`, and `XDG_*`; it does not add a
+  new repo-configured allowlist or "approved abstraction" config key
+- the production env-portability seam is explicit and leaves
+  `#[cfg(unix)]`-gated items to `C.9` structural parity instead of adding a
+  separate suppression model:
+
+```rust
+fn production_env_portability_variable(expr_call: &ExprCall) -> Option<&'static str> {
+    if is_std_env_var_call(expr_call, "HOME")
+        || is_std_env_var_call(expr_call, "USER")
+        || is_std_env_var_prefix_call(expr_call, "XDG_")
+    {
+        return Some("PORT-008");
+    }
+    None
+}
+```
+
 - the rule text distinguishes this family from:
   - `PORT-002` configured home-dir wrapper enforcement
   - `PORT-003` test-only `std::env::set_var()` mutation
@@ -78,6 +95,9 @@ pub fn data_root() -> std::path::PathBuf {
   `sc-lint-portability`
 - the sprint explicitly names `HOME`, `USER`, and `XDG_*` as the initial
   covered variable family
+- the sprint states the suppression contract explicitly: `PORT-008` is not
+  config-driven, fires on ungated production lookups, and leaves
+  `#[cfg(unix)]`-gated items to `C.9`
 - the sprint keeps `PORT-002` and `PORT-003` semantics distinct instead of
   silently broadening either existing rule
 - the sprint names a platform-neutral remediation path for production callers
@@ -86,5 +106,9 @@ pub fn data_root() -> std::path::PathBuf {
 ## Required Validation
 
 - `cargo test -p sc-lint-portability`
+- `cargo test -p sc-lint-portability flags_home_env_lookup_in_production_code`
+- `cargo test -p sc-lint-portability flags_xdg_config_home_lookup_in_production_code`
+- `cargo test -p sc-lint-portability passes_dirs_data_dir_in_production_code`
+- `cargo test -p sc-lint-portability passes_cfg_unix_gated_home_lookup_in_production_code`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `just lint`
