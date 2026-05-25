@@ -32,6 +32,15 @@ The current boundary tooling validates and enforces many runtime and structural
 rules, but it does not yet act as a completion guard for "documented boundary
 item exists in code".
 
+Current implementation note for caller policy:
+
+- `SCB-CALLER-001` is the exact-symbol, exact-caller allowlist rule for
+  boundary records
+- it uses the same TOML inventory source as the rest of `sc-lint-boundary`
+- it is a fail-only rule; there is no warning mode for unapproved callers
+- `references.scope = "outside_owner_crate"` exempts owner-crate callers but
+  still enforces the allowlist for external callers
+
 That gap leaves room for two bad outcomes:
 
 - documented boundary items that never land in code
@@ -53,6 +62,36 @@ boundary may therefore contain:
 - satisfied items
 - warning-level planned gaps
 - error-level unscheduled or overdue gaps
+
+## Named Caller Policy
+
+Named caller policy is separate from inventory-parity enforcement.
+
+Use `[callers].approved` when a boundary symbol is intentionally callable from
+outside the owner crate, but only by a curated set of named external callers.
+
+Canonical example:
+
+```toml
+[callers]
+approved = [
+  { symbol = "restricted::run", callers = ["app::allowed::Facade"] },
+]
+```
+
+Operational rules:
+
+- `symbol` is an exact boundary-owned symbol path, such as `restricted::run`
+- each `callers` entry is an exact caller identity validated at inventory load
+- unknown fields, malformed paths, duplicate symbols, duplicate callers, and
+  empty caller lists fail inventory loading immediately
+- `SCB-CALLER-001` emits one failure per unapproved external caller identity
+
+This differs from `references.forbidden`:
+
+- use `references.forbidden` when the dependency edge should not exist at all
+- use `[callers].approved` when the edge is allowed, but only from named
+  external owners
 
 ## Inventory-Parity Scope
 

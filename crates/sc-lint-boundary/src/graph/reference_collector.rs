@@ -4,14 +4,20 @@ use super::*;
 pub(super) struct ReferenceCollector {
     owner_name: Option<String>,
     local_owner_names: BTreeSet<String>,
+    workspace_dependency_roots: BTreeSet<String>,
     references: BTreeSet<CollectedReference>,
 }
 
 impl ReferenceCollector {
-    fn new(local_owner_names: &BTreeSet<String>, owner_name: Option<&str>) -> Self {
+    fn new(
+        local_owner_names: &BTreeSet<String>,
+        owner_name: Option<&str>,
+        workspace_dependency_roots: &BTreeMap<String, CrateId>,
+    ) -> Self {
         Self {
             owner_name: owner_name.map(ToOwned::to_owned),
             local_owner_names: local_owner_names.clone(),
+            workspace_dependency_roots: workspace_dependency_roots.keys().cloned().collect(),
             references: BTreeSet::new(),
         }
     }
@@ -49,6 +55,7 @@ impl ReferenceCollector {
         // `segments` is non-empty because the early return above rejects empty paths.
         let last = segments.last().unwrap();
         let should_collect = matches!(first.as_str(), "crate" | "self" | "super")
+            || self.workspace_dependency_roots.contains(first)
             || self.local_owner_names.contains(first)
             || self.local_owner_names.contains(last);
 
@@ -78,9 +85,11 @@ impl<'ast> Visit<'ast> for ReferenceCollector {
 pub(super) fn collect_references_with(
     local_owner_names: &BTreeSet<String>,
     owner_name: Option<&str>,
+    workspace_dependency_roots: &BTreeMap<String, CrateId>,
     visit: impl FnOnce(&mut ReferenceCollector),
 ) -> BTreeSet<CollectedReference> {
-    let mut collector = ReferenceCollector::new(local_owner_names, owner_name);
+    let mut collector =
+        ReferenceCollector::new(local_owner_names, owner_name, workspace_dependency_roots);
     visit(&mut collector);
     collector.into_references()
 }

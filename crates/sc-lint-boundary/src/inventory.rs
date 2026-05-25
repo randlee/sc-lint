@@ -10,20 +10,85 @@ use anyhow::Context;
 use anyhow::Result;
 use serde::Deserialize;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum InventoryParseError {
+    BoundaryId(String),
+    SprintId(String),
+    TrackingId(String),
+    OwnerPackage(String),
+    OwnerCratePath(String),
+    PlanningKey(String),
+    ApprovedSymbol(String),
+    ApprovedCaller(String),
+}
+
+impl InventoryParseError {
+    fn boundary_id(detail: impl Into<String>) -> Self {
+        Self::BoundaryId(detail.into())
+    }
+
+    fn sprint_id(detail: impl Into<String>) -> Self {
+        Self::SprintId(detail.into())
+    }
+
+    fn tracking_id(detail: impl Into<String>) -> Self {
+        Self::TrackingId(detail.into())
+    }
+
+    fn owner_package(detail: impl Into<String>) -> Self {
+        Self::OwnerPackage(detail.into())
+    }
+
+    fn owner_crate_path(detail: impl Into<String>) -> Self {
+        Self::OwnerCratePath(detail.into())
+    }
+
+    fn planning_key(detail: impl Into<String>) -> Self {
+        Self::PlanningKey(detail.into())
+    }
+
+    fn approved_symbol(detail: impl Into<String>) -> Self {
+        Self::ApprovedSymbol(detail.into())
+    }
+
+    fn approved_caller(detail: impl Into<String>) -> Self {
+        Self::ApprovedCaller(detail.into())
+    }
+}
+
+impl fmt::Display for InventoryParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BoundaryId(detail)
+            | Self::SprintId(detail)
+            | Self::TrackingId(detail)
+            | Self::OwnerPackage(detail)
+            | Self::OwnerCratePath(detail)
+            | Self::PlanningKey(detail)
+            | Self::ApprovedSymbol(detail)
+            | Self::ApprovedCaller(detail) => formatter.write_str(detail),
+        }
+    }
+}
+
+impl std::error::Error for InventoryParseError {}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(try_from = "String")]
 pub(crate) struct BoundaryId(String);
 
 impl BoundaryId {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("boundary ids must not be empty".to_string());
+            return Err(InventoryParseError::boundary_id(
+                "boundary ids must not be empty",
+            ));
         }
         if !trimmed.starts_with("BOUNDARY-") {
-            return Err(format!(
+            return Err(InventoryParseError::boundary_id(format!(
                 "boundary ids must start with `BOUNDARY-` (got `{trimmed}`)"
-            ));
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -34,7 +99,7 @@ impl BoundaryId {
 }
 
 impl TryFrom<String> for BoundaryId {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -72,18 +137,22 @@ impl PartialEq<&str> for BoundaryId {
 pub(crate) struct SprintId(String);
 
 impl SprintId {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("sprint ids must not be empty".to_string());
+            return Err(InventoryParseError::sprint_id(
+                "sprint ids must not be empty",
+            ));
         }
         let Some((phase, step)) = trimmed.split_once('.') else {
-            return Err(format!(
+            return Err(InventoryParseError::sprint_id(format!(
                 "sprint ids must use <phase>.<step> format (got `{trimmed}`)"
-            ));
+            )));
         };
         if phase.is_empty() || step.is_empty() || trimmed.contains(char::is_whitespace) {
-            return Err(format!("invalid sprint id `{trimmed}`"));
+            return Err(InventoryParseError::sprint_id(format!(
+                "invalid sprint id `{trimmed}`"
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -98,7 +167,7 @@ impl SprintId {
 }
 
 impl TryFrom<String> for SprintId {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -136,22 +205,24 @@ impl PartialEq<&str> for SprintId {
 pub(crate) struct TrackingId(String);
 
 impl TrackingId {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("tracking ids must not be empty".to_string());
+            return Err(InventoryParseError::tracking_id(
+                "tracking ids must not be empty",
+            ));
         }
         if trimmed.contains(char::is_whitespace) {
-            return Err(format!(
+            return Err(InventoryParseError::tracking_id(format!(
                 "tracking ids must not contain whitespace (got `{trimmed}`)"
-            ));
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
 }
 
 impl TryFrom<String> for TrackingId {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -163,10 +234,12 @@ impl TryFrom<String> for TrackingId {
 pub(crate) struct OwnerPackage(String);
 
 impl OwnerPackage {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("owner packages must not be empty".to_string());
+            return Err(InventoryParseError::owner_package(
+                "owner packages must not be empty",
+            ));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -177,7 +250,7 @@ impl OwnerPackage {
 }
 
 impl TryFrom<String> for OwnerPackage {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -215,10 +288,12 @@ impl PartialEq<&str> for OwnerPackage {
 pub(crate) struct OwnerCratePath(String);
 
 impl OwnerCratePath {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("owner crate paths must not be empty".to_string());
+            return Err(InventoryParseError::owner_crate_path(
+                "owner crate paths must not be empty",
+            ));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -229,7 +304,7 @@ impl OwnerCratePath {
 }
 
 impl TryFrom<String> for OwnerCratePath {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -267,15 +342,17 @@ impl PartialEq<&str> for OwnerCratePath {
 pub(crate) struct PlanningKey(String);
 
 impl PlanningKey {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("planning keys must not be empty".to_string());
+            return Err(InventoryParseError::planning_key(
+                "planning keys must not be empty",
+            ));
         }
         if !trimmed.starts_with("BOUNDARY-") || !trimmed.contains('.') {
-            return Err(format!(
+            return Err(InventoryParseError::planning_key(format!(
                 "planning keys must use <boundary_id>.<section>.<field>[.<subfield>] shape (got `{trimmed}`)"
-            ));
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -286,7 +363,7 @@ impl PlanningKey {
 }
 
 impl TryFrom<String> for PlanningKey {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -358,6 +435,7 @@ pub(crate) struct BoundaryRecord {
     pub(crate) public: PublicSection,
     pub(crate) implementation: ImplementationSection,
     pub(crate) composition: CompositionSection,
+    pub(crate) callers: Option<CallersSection>,
     pub(crate) dependencies: DependenciesSection,
     pub(crate) references: ReferencesSection,
     pub(crate) testing: TestingSection,
@@ -385,6 +463,19 @@ pub(crate) struct ImplementationSection {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CompositionSection {
     pub(crate) roots: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CallersSection {
+    pub(crate) approved: Vec<ApprovedCallerEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApprovedCallerEntry {
+    pub(crate) symbol: ApprovedSymbol,
+    pub(crate) callers: Vec<ApprovedCaller>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -469,6 +560,110 @@ pub(crate) enum BoundaryState {
     Planned,
     ConcreteLanded,
     ReservedFuture,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct ApprovedSymbol(String);
+
+impl ApprovedSymbol {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err(InventoryParseError::approved_symbol(
+                "approved symbol must not be empty",
+            ));
+        }
+        validate_rust_like_path(trimmed, InventoryParseError::approved_symbol)?;
+        Ok(Self(trimmed.to_string()))
+    }
+
+    pub(crate) fn normalized(&self) -> &str {
+        self.0.strip_prefix("crate::").unwrap_or(&self.0)
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for ApprovedSymbol {
+    type Error = InventoryParseError;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(try_from = "String")]
+pub(crate) struct ApprovedCaller(String);
+
+impl ApprovedCaller {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err(InventoryParseError::approved_caller(
+                "approved caller must not be empty",
+            ));
+        }
+        validate_rust_like_path(trimmed, InventoryParseError::approved_caller)?;
+        if trimmed.split("::").count() < 2 {
+            return Err(InventoryParseError::approved_caller(format!(
+                "approved caller must include crate path plus owner path (got `{trimmed}`)"
+            )));
+        }
+        Ok(Self(trimmed.to_string()))
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for ApprovedCaller {
+    type Error = InventoryParseError;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+fn validate_rust_like_path(
+    value: &str,
+    error: impl FnOnce(String) -> InventoryParseError + Copy,
+) -> std::result::Result<(), InventoryParseError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.contains(char::is_whitespace) {
+        return Err(error(format!(
+            "path `{value}` must not be empty or contain whitespace"
+        )));
+    }
+    let trimmed = trimmed.strip_prefix("crate::").unwrap_or(trimmed);
+    for segment in trimmed.split("::") {
+        if segment.is_empty() {
+            return Err(error(format!(
+                "path `{value}` contains an empty path segment"
+            )));
+        }
+        let mut chars = segment.chars();
+        let Some(first) = chars.next() else {
+            return Err(error(format!(
+                "path `{value}` contains an empty path segment"
+            )));
+        };
+        if !(first == '_' || first.is_ascii_alphabetic()) {
+            return Err(error(format!(
+                "path `{value}` has invalid path segment `{segment}`"
+            )));
+        }
+        if !chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric()) {
+            return Err(error(format!(
+                "path `{value}` has invalid path segment `{segment}`"
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -664,6 +859,40 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
                     record.boundary_id,
                     path.display()
                 );
+            }
+        }
+    }
+
+    if let Some(callers) = &record.callers {
+        let mut seen_symbols = BTreeSet::new();
+        for approved_entry in &callers.approved {
+            if approved_entry.callers.is_empty() {
+                anyhow::bail!(
+                    "boundary `{}` in `{}` must define at least one approved caller for symbol `{}`",
+                    record.boundary_id,
+                    path.display(),
+                    approved_entry.symbol.as_str()
+                );
+            }
+            if !seen_symbols.insert(approved_entry.symbol.clone()) {
+                anyhow::bail!(
+                    "boundary `{}` in `{}` defines duplicate approved caller symbol `{}`",
+                    record.boundary_id,
+                    path.display(),
+                    approved_entry.symbol.as_str()
+                );
+            }
+            let mut seen_callers = BTreeSet::new();
+            for approved_caller in &approved_entry.callers {
+                if !seen_callers.insert(approved_caller.clone()) {
+                    anyhow::bail!(
+                        "boundary `{}` in `{}` defines duplicate approved caller `{}` for symbol `{}`",
+                        record.boundary_id,
+                        path.display(),
+                        approved_caller.as_str(),
+                        approved_entry.symbol.as_str()
+                    );
+                }
             }
         }
     }
@@ -887,6 +1116,62 @@ state = "concrete_landed"
     }
 
     #[test]
+    fn rejects_unknown_approved_caller_fields() {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.write(
+            "boundaries/sc-lint-boundary/boundary-analyzer.toml",
+            r#"
+boundary_id = "BOUNDARY-ScLintBoundaryAnalyzer"
+owner_package = "sc-lint-boundary"
+owner_crate_path = "sc_lint_boundary"
+name = "ScLintBoundaryAnalyzer"
+
+[public]
+facade = "analyze_workspace"
+
+[implementation]
+type = "analyze_workspace"
+module = "sc_lint_boundary"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[callers]
+approved = [
+  { symbol = "send::hook::maybe_run_post_send_hook", callers = ["example::Api"], unexpected = "nope" },
+]
+
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = ["sc-lint-directives"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
+review_gates = ["no_proc_macro_dependency"]
+
+[status]
+state = "concrete_landed"
+"#,
+        );
+
+        let error =
+            load_boundary_inventory(fixture.root()).expect_err("unknown caller field fails");
+        assert!(error.to_string().contains("failed to parse TOML file"));
+    }
+
+    #[test]
     fn rejects_public_visibility_without_type_and_module() {
         let fixture = InventoryFixture::new();
         fixture.write_valid_inventory();
@@ -982,6 +1267,179 @@ state = "concrete_landed"
 
         let error = load_boundary_inventory(fixture.root()).expect_err("duplicate id fails");
         assert!(error.to_string().contains("duplicate boundary_id"));
+    }
+
+    #[test]
+    fn rejects_duplicate_approved_caller_symbols() {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.write(
+            "boundaries/sc-lint-boundary/boundary-analyzer.toml",
+            r#"
+boundary_id = "BOUNDARY-ScLintBoundaryAnalyzer"
+owner_package = "sc-lint-boundary"
+owner_crate_path = "sc_lint_boundary"
+name = "ScLintBoundaryAnalyzer"
+
+[public]
+facade = "analyze_workspace"
+
+[implementation]
+type = "analyze_workspace"
+module = "sc_lint_boundary"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[callers]
+approved = [
+  { symbol = "send::hook::maybe_run_post_send_hook", callers = ["example::Api"] },
+  { symbol = "send::hook::maybe_run_post_send_hook", callers = ["example::OtherApi"] },
+]
+
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = ["sc-lint-directives"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
+review_gates = ["no_proc_macro_dependency"]
+
+[status]
+state = "concrete_landed"
+"#,
+        );
+
+        let error =
+            load_boundary_inventory(fixture.root()).expect_err("duplicate approved symbol fails");
+        assert!(
+            error
+                .to_string()
+                .contains("duplicate approved caller symbol")
+        );
+    }
+
+    #[test]
+    fn rejects_empty_approved_caller_list() {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.write(
+            "boundaries/sc-lint-boundary/boundary-analyzer.toml",
+            r#"
+boundary_id = "BOUNDARY-ScLintBoundaryAnalyzer"
+owner_package = "sc-lint-boundary"
+owner_crate_path = "sc_lint_boundary"
+name = "ScLintBoundaryAnalyzer"
+
+[public]
+facade = "analyze_workspace"
+
+[implementation]
+type = "analyze_workspace"
+module = "sc_lint_boundary"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[callers]
+approved = [
+  { symbol = "send::hook::maybe_run_post_send_hook", callers = [] },
+]
+
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = ["sc-lint-directives"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
+review_gates = ["no_proc_macro_dependency"]
+
+[status]
+state = "concrete_landed"
+"#,
+        );
+
+        let error =
+            load_boundary_inventory(fixture.root()).expect_err("empty approved caller list fails");
+        assert!(error.to_string().contains("at least one approved caller"));
+    }
+
+    #[test]
+    fn rejects_malformed_approved_caller_symbol() {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.write(
+            "boundaries/sc-lint-boundary/boundary-analyzer.toml",
+            r#"
+boundary_id = "BOUNDARY-ScLintBoundaryAnalyzer"
+owner_package = "sc-lint-boundary"
+owner_crate_path = "sc_lint_boundary"
+name = "ScLintBoundaryAnalyzer"
+
+[public]
+facade = "analyze_workspace"
+
+[implementation]
+type = "analyze_workspace"
+module = "sc_lint_boundary"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[callers]
+approved = [
+  { symbol = "send::hook::", callers = ["example::Api"] },
+]
+
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = ["sc-lint-directives"]
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-BOUNDARY-ISOLATION"]
+review_gates = ["no_proc_macro_dependency"]
+
+[status]
+state = "concrete_landed"
+"#,
+        );
+
+        let error =
+            load_boundary_inventory(fixture.root()).expect_err("malformed approved symbol fails");
+        assert!(error.to_string().contains("failed to parse TOML file"));
     }
 
     #[test]
