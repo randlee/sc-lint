@@ -5,6 +5,7 @@ This document defines the structured logging integration for
 
 Related ADRs:
 - [ADR-008 — `sc-observability` For `sc-lint` Structured Logging](./adr/ADR-008-sc-observability-logging.md)
+- [ADR-009 — Observability Boundary Policy](./adr/ADR-009-observability-boundary-policy.md)
 
 ## Goal
 
@@ -16,6 +17,15 @@ This document defines both the logging design and the sprint-level
 implementation assignments for Phase `A`. The A.1a bootstrap implementation is
 now present in `crates/sc-lint/src/logging.rs`; A.1b extends that same
 CLI-owned runtime with dispatch-seam logging for the first real backend path.
+
+ADR-009 now governs the accepted observability boundary seams layered on top of
+ADR-008. This document therefore treats the following current seams as locked
+release-1 policy rather than provisional implementation detail:
+
+- `logging::ObservedCommand`
+- `logging::dispatch_event`
+- `contract::ServiceName`
+- `CommandEnvelope.command`
 
 ## Dependency Model
 
@@ -41,6 +51,13 @@ The design depends on the following public surface:
 - `JsonlFileSink`
 - `ConsoleSink`
 - `ServiceName`
+
+The accepted boundary translation seam is:
+
+- `contract::ServiceName`
+  - CLI-owned library newtype that stays free of `sc-observability`
+- `sc_observability::ServiceName`
+  - binary-only runtime type constructed in `crates/sc-lint/src/logging.rs`
 
 Planned implementation note:
 
@@ -81,6 +98,16 @@ Logging is a CLI-layer responsibility.
 
 This keeps one process-wide logging authority for each `sc-lint` binary
 invocation.
+
+ADR-009 also constrains future direct-linked backends:
+
+- they may receive CLI-owned context and contract data after command
+  normalization
+- they must not accept or own `sc-observability` runtime handles in their
+  public APIs
+- they must not replace `ObservedCommand`, `dispatch_event`, or
+  `CommandEnvelope.command` with parallel observability-only seams without a
+  successor ADR
 
 ### Initialization Failure Contract
 
@@ -129,6 +156,17 @@ The planned service names are:
 
 The CLI chooses the service name from the active command path before
 initializing the runtime for that invocation.
+
+Current validated service-identity flow:
+
+- `CommandContext`
+  - resolves the stable command and CLI-owned service name
+- `contract::ServiceName`
+  - carries that identity through library code
+- `logging::ObservedCommand`
+  - couples the validated command/service metadata with the loaded config
+- `dispatch_event`
+  - converts the validated service identity into `sc_observability` event data
 
 ## Log Root Model
 
@@ -283,6 +321,13 @@ The A.1b dispatch action names are:
 - `cli.dispatch.started`
 - `cli.dispatch.normalized`
 
+ADR-009 boundary note:
+
+- `dispatch_event` remains the only approved low-level event emission helper
+- custom `emit_*` wrappers remain forbidden by ADR-008
+- `ObservedCommand` remains the approved binary-side observation context until
+  a later ADR records a reconciled successor
+
 ## Rollout By Sprint
 
 Requirement coverage:
@@ -351,6 +396,8 @@ Requirement coverage:
 - the CLI owns logger initialization
 - backend crates may emit through CLI-owned logging hooks later, but must not
   construct their own logger runtime
+- backend crates must not take direct `sc-observability` dependencies even when
+  later promoted from delegated execution to direct linkage
 
 That rule is part of the product requirements and must remain true even if
 some backends later move from delegated execution to direct library linkage.

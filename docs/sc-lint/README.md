@@ -68,6 +68,25 @@ Current contents:
 - [`../../crates/sc-lint-attributes/README.md`](../../crates/sc-lint-attributes/README.md) —
   proc-macro attribute crate guide
 
+## Homebrew Distribution
+
+The primary supported Homebrew install path is:
+
+```bash
+brew install randlee/tap/sc-lint
+```
+
+That top-level formula is intended to expose the shipped CLI plus backend
+analyzer binaries from one install path:
+
+- `sc-lint`
+- `sc-lint-boundary`
+- `sc-lint-portability`
+- `sc-lint-runtime`
+
+`randlee/tap/sc-lint-boundary` may remain as a legacy compatibility surface
+for boundary-only callers, but it is not the supported default install path.
+
 Current intended crate split:
 
 - `sc-lint`
@@ -311,6 +330,8 @@ Related architecture decisions:
   — analyzer-crate partitioning and primary lint-target mapping
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
   — `sc-observability` selection plus CLI-owned structured logging policy
+- [`./adr/ADR-009-observability-boundary-policy.md`](./adr/ADR-009-observability-boundary-policy.md)
+  — accepted observability boundary seams and future direct-link constraints
 - [`./adr/ADR-010-portability-scope-and-parity.md`](./adr/ADR-010-portability-scope-and-parity.md)
   — shared portability ownership/parity policy for Windows-path, env, and shell lint expansion
 
