@@ -16,9 +16,13 @@ required_variables:
   - references
 optional_variables:
   - changed_files
+  - round_limit
+  - carry_forward_findings_json
   - triage_records
 defaults:
   changed_files: ""
+  round_limit: "false"
+  carry_forward_findings_json: "[]"
   triage_records: ""
 ---
 <repo-qa-task id="{{ task_id }}" sprint="{{ sprint }}" assignee="quality-mgr">
@@ -29,6 +33,7 @@ defaults:
   <branch>{{ branch }}</branch>
   <worktree>{{ worktree_path }}</worktree>
   <commits>{{ commits }}</commits>
+  <round-limit>{{ round_limit }}</round-limit>
 
   <review-targets>
 {{ review_targets }}
@@ -42,6 +47,8 @@ defaults:
 {{ triage_records }}
   </triage-records>
 
+  <carry-forward-findings-json>{{ carry_forward_findings_json }}</carry-forward-findings-json>
+
   <references>
 {{ references }}
   </references>
@@ -51,10 +58,12 @@ defaults:
     <step id="b">Render structured JSON assignments for `req-qa` and `arch-qa` using the templates in `.claude/skills/codex-orchestration/`. Do not send free-form reviewer prompts.</step>
     <step id="c">Read `.claude/assets/sc-rust/quality-mgr/quality-mgr.rust.md` and render any required Rust reviewer assignments from `.claude/assets/sc-rust/quality-mgr/templates/`. Rust best-practices review is QA-1 only; omit it from QA-2 and later rounds on the same sprint branch.</step>
     <step id="d">If triage records are provided, read them before spawning reviewers. Treat them as the canonical prior scope for follow-up QA, not as a substitute for verification.</step>
-    <step id="e">Spawn every selected reviewer in background mode. Do not run cargo, clippy, or broad QA analysis yourself in the foreground.</step>
-    <step id="f">Collect reviewer outputs and summarize PASS or FAIL, including blocking finding ids and file:line references where available. For every finding that is a repeatable pattern (missing gate, wrong value, forbidden construct, naming violation), search the entire workspace for other occurrences of the same pattern and include all affected locations in the finding — not just the first one found. A finding is not complete until the full scope is known.</step>
-    <step id="g">When triage records are present, explicitly state whether each rechecked finding is still open, fixed on the reviewed branch, regressed, or requires a new triage pass because the scope changed.</step>
-    <step id="h">If a PR number is present and CI is not already green, monitor it with `gh pr checks {{ pr_number }} --watch`.</step>
-    <step id="i">Send the final QA verdict to team-lead. PASS means merge-ready from the QA perspective; FAIL means concrete fixes are required before merge.</step>
+    <step id="e">When `{{ round_limit }}` is `true`, treat this as a targeted follow-up QA pass. Keep `changed_files` as the minimum verification scope, use `{{ carry_forward_findings_json }}` as the carry-forward routing input, and do not re-run `rust-best-practices` as the default broad reviewer.</step>
+    <step id="f">Spawn every selected reviewer in background mode. Do not run cargo, clippy, or broad QA analysis yourself in the foreground.</step>
+    <step id="g">Collect reviewer outputs and summarize PASS or FAIL, including blocking finding ids and file:line references where available. For every finding that is a repeatable pattern (missing gate, wrong value, forbidden construct, naming violation), search the entire workspace for other occurrences of the same pattern and include all affected locations in the finding — not just the first one found. A finding is not complete until the full scope is known.</step>
+    <step id="h">When triage records are present, explicitly state whether each rechecked finding is still open, fixed on the reviewed branch, regressed, or requires a new triage pass because the scope changed.</step>
+    <step id="i">Run the TODO scan from `scripts/find_todos.py` during implementation sprint-end or integration review before issuing a PASS verdict.</step>
+    <step id="j">If a PR number is present and CI is not already green, monitor it with `gh pr checks {{ pr_number }} --watch`.</step>
+    <step id="k">Send the final QA verdict to team-lead. PASS means merge-ready from the QA perspective; FAIL means concrete fixes are required before merge.</step>
   </workflow>
 </repo-qa-task>

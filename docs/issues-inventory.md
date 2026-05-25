@@ -44,8 +44,20 @@ reserved for a later phase:
   - TODO scan and carry-forward triage automation
   - see `docs/sc-lint/sprint-B4.md`
 
-Until `B.4` lands, the imported prompt/script surfaces are available in-repo
-but are not yet the fully hardened authoritative default by plan status alone.
+The B.4 authoritative routing surfaces are now:
+
+- `.claude/agents/quality-mgr.md`
+- `.claude/agents/qa-triage.md`
+- `.claude/skills/codex-orchestration/SKILL.md`
+- `.claude/skills/triaging-findings/SKILL.md`
+- `.claude/skills/todo-triage/SKILL.md`
+- `.claude/skills/codex-orchestration/qa-template.xml.j2`
+- `.claude/skills/codex-orchestration/fix-assignment.xml.j2`
+- `scripts/find_todos.py`
+- `scripts/triage_carry_forward.py`
+
+These are now the authoritative default by plan status, not an imported
+placeholder awaiting later hardening.
 
 ## Distribution Planning Scope
 

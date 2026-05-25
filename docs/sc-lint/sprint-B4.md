@@ -1,10 +1,10 @@
 ---
 id: B.4
 title: QA Process Hardening
-status: planned
-branch: feature/phase-B-sprint-plans
-worktree: <repo-worktree>/feature/phase-B-sprint-plans
-target: develop
+status: complete
+branch: feature/sprint-B4
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-B4
+target: integration/phase-B
 ---
 
 # Sprint B.4 — QA Process Hardening
@@ -68,6 +68,31 @@ silently dropped or partially deferred.
   discovery and carry-forward classification so later prompt changes do not
   silently break routing behavior
 
+## Authoritative Process Surfaces
+
+The B.4 QA-routing workflow is owned by these handoff surfaces:
+
+- `.claude/agents/quality-mgr.md`
+- `.claude/agents/qa-triage.md`
+- `.claude/skills/codex-orchestration/SKILL.md`
+- `.claude/skills/codex-orchestration/qa-template.xml.j2`
+- `.claude/skills/codex-orchestration/fix-assignment.xml.j2`
+- `.claude/skills/triaging-findings/SKILL.md`
+- `.claude/skills/todo-triage/SKILL.md`
+- `scripts/find_todos.py`
+- `scripts/triage_carry_forward.py`
+- `scripts/test_find_todos.py`
+- `scripts/test_triage_carry_forward.py`
+
+Required ownership model:
+
+- `quality-mgr` runs QA and emits findings
+- `team-lead` runs triage before any fix dispatch
+- `qa-triage` writes the canonical `.ttl` evidence
+- `fix-assignment.xml.j2` is the post-triage fix handoff template
+- `scripts/find_todos.py` and `scripts/triage_carry_forward.py` provide the
+  authoritative later-round routing inputs
+
 ## Explicit Code Samples
 
 If the sprint introduces or changes important traits, features, enums, protocol
@@ -89,6 +114,7 @@ QA-2+:
 ```json
 {
   "round": "QA-2",
+  "round_limit": true,
   "triage_records": [
     {
       "finding_id": "REQ-001",
@@ -96,6 +122,15 @@ QA-2+:
       "carry_forward": true
     }
   ],
+  "carry_forward_findings_json": [
+    {
+      "id": "REQ-001",
+      "file": "crates/sc-lint/src/lib.rs",
+      "line": 41,
+      "summary": "carry forward unresolved structural finding"
+    }
+  ],
+  "todo_rows_command": "python3 scripts/find_todos.py /abs/worktree",
   "run_rust_best_practices": false
 }
 ```
@@ -124,4 +159,7 @@ QA-2+:
 
 - `python3 -m unittest scripts/test_find_todos.py`
 - `python3 -m unittest scripts/test_triage_carry_forward.py`
+  The triage carry-forward tests mock the oxigraph subprocess seam by patching
+  `load_records` and `query_records`, so this suite passes without `oxigraph`
+  in `PATH`.
 - `just lint`

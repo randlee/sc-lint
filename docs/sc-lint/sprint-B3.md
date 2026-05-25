@@ -1,10 +1,10 @@
 ---
 id: B.3
 title: Observability Boundary Policy ADR
-status: planned
-branch: feature/phase-B-sprint-plans
-worktree: <repo-worktree>/feature/phase-B-sprint-plans
-target: develop
+status: completed
+branch: feature/sprint-B3
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-B3
+target: integration/phase-B
 ---
 
 # Sprint B.3 — Observability Boundary Policy ADR
@@ -102,9 +102,11 @@ pub struct CommandEnvelope<T> {
 [dependencies]
 allowed_dependencies = ["sc-lint-boundary", "sc-lint-schema", "sc-observability"]
 forbidden_edges = [
+  "sc-lint-attributes -> sc-lint",
   "sc-lint-boundary -> sc-observability",
   "sc-lint-portability -> sc-observability",
   "sc-lint-runtime -> sc-observability",
+  "sc-lint-tokio -> sc-observability",
 ]
 ```
 

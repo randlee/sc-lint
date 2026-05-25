@@ -56,6 +56,16 @@ After initialization, use these repo-local skills to coordinate work:
 
 Additional orchestration guides live in `.claude/skills/*/SKILL.md`.
 
+## B.4 QA Routing Default
+
+When sprint QA fails:
+1. run `/triaging-findings` before any fix dispatch
+2. use `scripts/triage_carry_forward.py` output for QA-2+ carry-forward routing
+3. use `/todo-triage` and `scripts/find_todos.py` during sprint-end or
+   integration review so TODOs become QA findings rather than silent deferral
+
+Do not send raw QA findings directly to `clint`.
+
 ### Phased Development — Mandatory
 
 For any multi-sprint phased development, `/codex-orchestration` or

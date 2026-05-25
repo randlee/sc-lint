@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find TODO comments in repo files and emit structured rows."""
+"""Find Rust TODO comments in repo files and emit structured rows."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ class TodoRow:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Recursively find TODO comments in repo source and docs files."
+        description="Recursively find TODO comments in repo Rust source files."
     )
     parser.add_argument(
         "root",
