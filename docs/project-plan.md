@@ -42,6 +42,7 @@ The current project focus is:
   - see [docs/sc-lint/adr/README.md](./sc-lint/adr/README.md)
   - see [docs/sc-lint/logging.md](./sc-lint/logging.md)
   - see [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+  - see [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
   - see [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
@@ -128,6 +129,14 @@ The currently scheduled sprint plans are:
   - `docs/sc-lint/sprint-A8.md`
 - `B.1`
   - carry-forward lint-gate and portability-scope hardening
+  - active implementation branch: `feature/sprint-B1`
+  - explicit backlog planning for seven recurring shared lint-gate families:
+    identity literals, `/tmp/` paths, public API `anyhow::Error`, duplicated
+    `CrateId` newtypes, `for_kv_map`-style loops, over-broad `pub`, and raw
+    `String` structured identifiers
+  - explicit backlog planning for shared portability follow-ons in
+    `sc-lint-portability`: Windows-path parity, broader env portability, and
+    shell portability
   - `docs/sc-lint/sprint-B1.md`
 - `B.2`
   - named-caller allowlist enforcement in `sc-lint-boundary`
@@ -135,10 +144,11 @@ The currently scheduled sprint plans are:
 - `B.3`
   - observability boundary-policy ADR acceptance, including promotion of
     `ADR-009` from stub to accepted policy text plus boundary/planning
-    alignment
+    alignment for the approved CLI-owned observability seams
   - `docs/sc-lint/sprint-B3.md`
 - `B.4`
   - QA-process hardening
+  - triage-first fix routing plus regression-tested TODO/carry-forward tooling
   - `docs/sc-lint/sprint-B4.md`
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew toolset distribution planning
@@ -157,6 +167,14 @@ The currently scheduled sprint plans are:
   - per-tool user guides now live under `docs/sc-lint/tools/`
   - direct guide links are now published from both `README.md` and
     `docs/sc-lint/README.md`
+- `B.4`
+  - triage-first QA routing is now the authoritative default before fix
+    dispatch
+  - QA-2+ now stays in targeted-fix mode with QA-1-only default
+    `rust-best-practices`
+  - TODO discovery and carry-forward routing helpers now have explicit
+    regression coverage in `scripts/test_find_todos.py` and
+    `scripts/test_triage_carry_forward.py`
 
 ## Next Analyzer-Crate Additions
 

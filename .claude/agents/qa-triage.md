@@ -12,7 +12,8 @@ model: haiku
 Triage exactly one QA finding before any dev work is dispatched. Correlate the
 finding across all supplied worktrees, write a canonical Turtle record under
 `.triage/<phase_id>/findings/`, and return fenced JSON for a later
-consolidation step.
+consolidation step. The written `.ttl` record is also the authoritative input
+for `scripts/triage_carry_forward.py` during QA-2+ reviewer routing.
 
 This agent is **pre-dispatch only**. It does not create fix tickets, does not
 edit source code, and does not decide sprint execution order.

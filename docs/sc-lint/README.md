@@ -39,8 +39,8 @@ Current contents:
 - [`sprint-A6.md`](./sprint-A6.md) — Rust boundary inventory loader sprint
 - [`sprint-A7.md`](./sprint-A7.md) — manifest-policy and parity sprint
 - [`sprint-A8.md`](./sprint-A8.md) — per-tool user-guide sprint
-- [`sprint-B1.md`](./sprint-B1.md) — carry-forward lint-gate and portability
-  scope-hardening sprint
+- [`sprint-B1.md`](./sprint-B1.md) — carry-forward lint-gate backlog and
+  portability-scope hardening sprint
 - [`sprint-B2.md`](./sprint-B2.md) — named-caller allowlist enforcement sprint
 - [`sprint-B3.md`](./sprint-B3.md) — observability boundary-policy ADR sprint
 - [`sprint-B4.md`](./sprint-B4.md) — QA-process hardening sprint
@@ -67,6 +67,25 @@ Current contents:
   shared directives crate guide
 - [`../../crates/sc-lint-attributes/README.md`](../../crates/sc-lint-attributes/README.md) —
   proc-macro attribute crate guide
+
+## Homebrew Distribution
+
+The primary supported Homebrew install path is:
+
+```bash
+brew install randlee/tap/sc-lint
+```
+
+That top-level formula is intended to expose the shipped CLI plus backend
+analyzer binaries from one install path:
+
+- `sc-lint`
+- `sc-lint-boundary`
+- `sc-lint-portability`
+- `sc-lint-runtime`
+
+`randlee/tap/sc-lint-boundary` may remain as a legacy compatibility surface
+for boundary-only callers, but it is not the supported default install path.
 
 Current intended crate split:
 
@@ -250,9 +269,24 @@ Current rule-disable policy:
 Current repo boundary source status:
 
 - canonical boundary TOML is expected under `boundaries/`
-- `sc-lint` crate boundaries are now defined there for current phase planning
-- default lint enforcement against those records is scheduled to land with the
-  Rust boundary inventory loader migration
+- `sc-lint` crate boundaries are now defined there for current planning and
+  active inventory-backed linting
+
+Current planned Phase-B follow-ons not implemented yet:
+
+- recurring shared lint-gate backlog:
+  - raw identity string literals without named constants
+  - `/tmp/` paths without intent comments
+  - public API error types exposing `anyhow::Error`
+  - duplicated `CrateId` newtypes across workspace crates
+  - `clippy::for_kv_map` and similar structural for-loop anti-patterns
+  - `pub` visibility exceeding the documented contract surface
+  - raw `String` fields used for structured identifiers such as `boundary_id`,
+    sprint ids, owner ids, and planning keys
+- shared portability backlog in `sc-lint-portability`:
+  - Windows-only path literal parity with the current Unix-only path checks
+  - broader cross-platform environment-variable portability rules
+  - shell-portability checks for OS-specific shell and command assumptions
 
 Planned rule families not implemented yet:
 
@@ -296,6 +330,10 @@ Related architecture decisions:
   — analyzer-crate partitioning and primary lint-target mapping
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
   — `sc-observability` selection plus CLI-owned structured logging policy
+- [`./adr/ADR-009-observability-boundary-policy.md`](./adr/ADR-009-observability-boundary-policy.md)
+  — accepted observability boundary seams and future direct-link constraints
+- [`./adr/ADR-010-portability-scope-and-parity.md`](./adr/ADR-010-portability-scope-and-parity.md)
+  — shared portability ownership/parity policy for Windows-path, env, and shell lint expansion
 
 Planned A.8 user-guide convention:
 
