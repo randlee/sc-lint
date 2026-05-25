@@ -146,6 +146,23 @@ later.
   When an interface family is not present in the repo, the published artifact
   set must state that explicitly rather than silently omitting the family.
 
+- `REQ-VERSION-022A`
+  The planning and published-documentation line must include one clear consumer
+  integration document describing what a consuming repository must provide to
+  exercise `sc-lint-version` for:
+  - CLI surfaces
+  - Rust public API baselines
+  - RPC/socket interfaces when present
+
+- `REQ-VERSION-022B`
+  The consumer integration guidance must be packaged as a repo-local Claude
+  Code skill so the adoption workflow is discoverable and reusable.
+
+- `REQ-VERSION-022C`
+  The repo-local Claude Code skill must be advertised through a minimal
+  repo-local Claude Code marketplace rather than relying on ad hoc path
+  knowledge.
+
 ## Non-Goals
 
 - `REQ-VERSION-023`

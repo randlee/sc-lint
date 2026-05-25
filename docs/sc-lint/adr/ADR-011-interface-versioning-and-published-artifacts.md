@@ -43,6 +43,9 @@ The planning direction approved for this line is:
    - Rust public APIs for all shipped crates
    - stable top-level CLI commands and machine contracts
    - RPC/socket interfaces when such surfaces exist
+6. Consumer adoption guidance for `sc-lint-version` will be planned as a
+   first-class product artifact, delivered through a repo-local Claude Code
+   skill and advertised through a minimal repo-local marketplace entry.
 
 ## Consequences
 
@@ -54,6 +57,9 @@ The planning direction approved for this line is:
   published artifacts
 - future implementation must carry both machine-readability and human
   readability from one shared structured artifact model
+- consumer repos will need a documented adoption path, but that path should be
+  packaged as structured skill/marketplace assets rather than prose hidden in
+  scattered docs
 
 ## Follow-on Planning
 

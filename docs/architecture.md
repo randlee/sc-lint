@@ -60,6 +60,12 @@ The intended artifact model is:
 This layer is intentionally planned as template- and schema-driven output, not
 as a collection of hand-maintained HTML pages.
 
+Consumer adoption for this layer is also planned as a product surface:
+
+- one clear adoption document for consuming repos
+- one repo-local Claude Code skill that explains the adoption workflow
+- one minimal repo-local marketplace entry that advertises that skill
+
 ## Current and Planned Crates
 
 Current primary crates:

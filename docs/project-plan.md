@@ -165,6 +165,9 @@ The currently scheduled sprint plans are:
 - `C.3`
   - hard-fail version gate integration
   - `docs/sc-lint/sprint-C3.md`
+- `C.4`
+  - consumer integration skill and minimal marketplace
+  - `docs/sc-lint/sprint-C4.md`
 
 ## Recent Sprint Deltas
 

@@ -149,7 +149,10 @@ Initial Phase-C scope is:
   - XHTML fragment/report pattern with JSON sidecars as canonical machine data
 - `C.3`
   - hard-fail version gate integration planning across Rust APIs, CLI
-    contracts, and RPC/socket interfaces
+  contracts, and RPC/socket interfaces
+- `C.4`
+  - consuming-repo adoption guidance
+  - repo-local Claude Code skill and minimal marketplace planning
 
 ### Current code moves required
 

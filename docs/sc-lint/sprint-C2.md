@@ -65,6 +65,7 @@ artifacts/interfaces/
 - the semver decision logic for Rust APIs
 - hard-fail policy enforcement in CI
 - final implementation of HTML templates or rendering commands
+- consumer-onboarding skill or marketplace delivery
 
 ## Acceptance Criteria
 

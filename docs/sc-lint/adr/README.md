@@ -25,7 +25,8 @@ current planning surface.
 
 - [`ADR-011-interface-versioning-and-published-artifacts.md`](./ADR-011-interface-versioning-and-published-artifacts.md)
   - planned `sc-lint-version` capability, `cargo-semver-checks` baseline, and
-    generated HTML/XHTML/JSON interface artifact policy
+    generated HTML/XHTML/JSON interface artifact policy, including consumer
+    adoption through a repo-local skill and minimal marketplace
 
 ## Index Rules
 

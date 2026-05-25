@@ -221,6 +221,16 @@ The product should support both:
   The initial Rust public API version-checking approach should be based on
   `cargo-semver-checks` rather than a new custom semver engine.
 
+- `REQ-PRODUCT-006N`
+  The version-checking planning line must include one explicit consuming-repo
+  adoption document describing the required repo-side harness, fixtures, and
+  interface inventory responsibilities.
+
+- `REQ-PRODUCT-006O`
+  The consuming-repo adoption guidance for `sc-lint-version` must be packaged
+  as a repo-local Claude Code skill and advertised through a minimal repo-local
+  Claude Code marketplace.
+
 ### Logging and observability
 
 - `REQ-LOG-001`
