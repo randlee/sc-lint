@@ -109,6 +109,7 @@ pub type FindingsReport = sc_lint_schema::FindingsReport<RuleId>;
 pub type Finding = sc_lint_schema::Finding<RuleId>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum RuleId {
     ScbCycle001,
     ScbCycle002,
@@ -116,6 +117,7 @@ pub enum RuleId {
     ScbBoundary001,
     ScbBoundary002,
     ScbBoundary003,
+    ScbCaller001,
     ScbManifest001,
     ScbManifest002,
 }
@@ -129,6 +131,7 @@ impl RuleId {
             Self::ScbBoundary001 => "SCB-BOUNDARY-001",
             Self::ScbBoundary002 => "SCB-BOUNDARY-002",
             Self::ScbBoundary003 => "SCB-BOUNDARY-003",
+            Self::ScbCaller001 => "SCB-CALLER-001",
             Self::ScbManifest001 => "SCB-MANIFEST-001",
             Self::ScbManifest002 => "SCB-MANIFEST-002",
         }
@@ -293,6 +296,7 @@ struct TargetContext {
     target_name: String,
     manifest_path: String,
     crate_id: CrateId,
+    workspace_dependency_roots: BTreeMap<String, CrateId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -444,6 +448,9 @@ pub fn analyze_workspace(
         || filter == Some(RuleFilter::ForbidExternalImpls)
     {
         findings.extend(analysis::analyze_forbid_external_impls(&graph));
+    }
+    if filter.is_none() || filter == Some(RuleFilter::Boundaries) {
+        findings.extend(analysis::analyze_named_callers(&graph, &inventory));
     }
     if filter.is_none() {
         findings.extend(

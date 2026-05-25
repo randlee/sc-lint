@@ -76,13 +76,14 @@ impl NodeKind {
 pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
     let metadata = load_metadata(root)?;
     let workspace_members = metadata.workspace_members.clone();
+    let workspace_packages = metadata
+        .packages
+        .iter()
+        .filter(|package| workspace_members.iter().any(|id| id == &package.id))
+        .collect::<Vec<_>>();
     let mut builder = GraphBuilder::default();
 
-    for package in &metadata.packages {
-        if !workspace_members.iter().any(|id| id == &package.id) {
-            continue;
-        }
-
+    for package in &workspace_packages {
         let manifest_path = package.manifest_path.as_std_path().display().to_string();
         for target in &package.targets {
             if !is_supported_target(target) {
@@ -95,6 +96,7 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
                 target_name: target.name.clone(),
                 manifest_path: manifest_path.clone(),
                 crate_id: crate_id(&package.name, &target.name),
+                workspace_dependency_roots: workspace_dependency_roots(&workspace_packages, package),
             };
 
             builder.add_workspace_target(
@@ -251,11 +253,17 @@ fn ingest_module_items(
                 );
                 add_reference_edges(
                     builder,
+                    context,
                     &node_id,
                     module_path,
-                    collect_references_with(&local_owner_names, Some(&owner_name), |collector| {
-                        collector.visit_fields(&item_struct.fields);
-                    }),
+                    collect_references_with(
+                        &local_owner_names,
+                        Some(&owner_name),
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            collector.visit_fields(&item_struct.fields);
+                        },
+                    ),
                 );
                 add_field_nodes(
                     builder,
@@ -287,13 +295,19 @@ fn ingest_module_items(
                 );
                 add_reference_edges(
                     builder,
+                    context,
                     &node_id,
                     module_path,
-                    collect_references_with(&local_owner_names, Some(&owner_name), |collector| {
-                        for variant in &item_enum.variants {
-                            collector.visit_fields(&variant.fields);
-                        }
-                    }),
+                    collect_references_with(
+                        &local_owner_names,
+                        Some(&owner_name),
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            for variant in &item_enum.variants {
+                                collector.visit_fields(&variant.fields);
+                            }
+                        },
+                    ),
                 );
                 for variant in &item_enum.variants {
                     let variant_id = NodeId::new(format!("{node_id}::variant::{}", variant.ident));
@@ -343,11 +357,17 @@ fn ingest_module_items(
                 );
                 add_reference_edges(
                     builder,
+                    context,
                     &node_id,
                     module_path,
-                    collect_references_with(&local_owner_names, Some(&owner_name), |collector| {
-                        collector.visit_fields_named(&item_union.fields);
-                    }),
+                    collect_references_with(
+                        &local_owner_names,
+                        Some(&owner_name),
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            collector.visit_fields_named(&item_union.fields);
+                        },
+                    ),
                 );
                 let union_fields = syn::Fields::Named(item_union.fields.clone());
                 add_field_nodes(
@@ -380,11 +400,17 @@ fn ingest_module_items(
                 );
                 add_reference_edges(
                     builder,
+                    context,
                     &node_id,
                     module_path,
-                    collect_references_with(&local_owner_names, Some(&owner_name), |collector| {
-                        collector.visit_type(&item_type.ty);
-                    }),
+                    collect_references_with(
+                        &local_owner_names,
+                        Some(&owner_name),
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            collector.visit_type(&item_type.ty);
+                        },
+                    ),
                 );
             }
             Item::Trait(item_trait) => {
@@ -404,13 +430,19 @@ fn ingest_module_items(
                 );
                 add_reference_edges(
                     builder,
+                    context,
                     &node_id,
                     module_path,
-                    collect_references_with(&local_owner_names, Some(&owner_name), |collector| {
-                        for trait_item in &item_trait.items {
-                            collector.visit_trait_item(trait_item);
-                        }
-                    }),
+                    collect_references_with(
+                        &local_owner_names,
+                        Some(&owner_name),
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            for trait_item in &item_trait.items {
+                                collector.visit_trait_item(trait_item);
+                            }
+                        },
+                    ),
                 );
             }
             Item::Fn(item_fn) => {
@@ -430,11 +462,17 @@ fn ingest_module_items(
                 );
                 add_reference_edges(
                     builder,
+                    context,
                     &node_id,
                     module_path,
-                    collect_references_with(&local_owner_names, None, |collector| {
-                        collector.visit_item_fn(&item_fn);
-                    }),
+                    collect_references_with(
+                        &local_owner_names,
+                        None,
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            collector.visit_item_fn(&item_fn);
+                        },
+                    ),
                 );
             }
             Item::Impl(item_impl) => {
@@ -501,8 +539,12 @@ fn ingest_module_items(
 
                 if let Some((_, path, _)) = &item_impl.trait_ {
                     let trait_reference_path = trait_path_key(path);
-                    let trait_target_node_id =
-                        resolve_reference_target(&impl_node_id, module_path, &trait_reference_path);
+                    let trait_target_node_id = resolve_reference_target(
+                        context,
+                        &impl_node_id,
+                        module_path,
+                        &trait_reference_path,
+                    );
                     ensure_trait_reference_node(
                         builder,
                         context,
@@ -540,11 +582,13 @@ fn ingest_module_items(
                         builder.add_edge("contains", impl_node_id.clone(), method_id.clone());
                         add_reference_edges(
                             builder,
+                            context,
                             &method_id,
                             module_path,
                             collect_references_with(
                                 &local_owner_names,
                                 Some(&owner_name),
+                                &context.workspace_dependency_roots,
                                 |collector| {
                                     collector.visit_impl_item_fn(&method);
                                 },
@@ -616,11 +660,17 @@ fn add_field_nodes(builder: &mut GraphBuilder, context: &TargetContext, args: Fi
                 builder.add_edge("contains", args.parent_id.clone(), field_id.clone());
                 add_reference_edges(
                     builder,
+                    context,
                     &field_id,
                     args.module_path,
-                    collect_references_with(args.local_owner_names, args.owner_name, |collector| {
-                        collector.visit_type(&field.ty);
-                    }),
+                    collect_references_with(
+                        args.local_owner_names,
+                        args.owner_name,
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            collector.visit_type(&field.ty);
+                        },
+                    ),
                 );
             }
         }
@@ -646,11 +696,17 @@ fn add_field_nodes(builder: &mut GraphBuilder, context: &TargetContext, args: Fi
                 builder.add_edge("contains", args.parent_id.clone(), field_id.clone());
                 add_reference_edges(
                     builder,
+                    context,
                     &field_id,
                     args.module_path,
-                    collect_references_with(args.local_owner_names, args.owner_name, |collector| {
-                        collector.visit_type(&field.ty);
-                    }),
+                    collect_references_with(
+                        args.local_owner_names,
+                        args.owner_name,
+                        &context.workspace_dependency_roots,
+                        |collector| {
+                            collector.visit_type(&field.ty);
+                        },
+                    ),
                 );
             }
         }
@@ -692,13 +748,14 @@ fn ensure_trait_reference_node(
 
 fn add_reference_edges(
     builder: &mut GraphBuilder,
+    context: &TargetContext,
     source_node_id: &NodeId,
     module_path: &str,
     referenced_paths: BTreeSet<CollectedReference>,
 ) {
     for referenced in referenced_paths {
         let target_node_id =
-            resolve_reference_target(source_node_id, module_path, &referenced.path);
+            resolve_reference_target(context, source_node_id, module_path, &referenced.path);
         builder.add_edge(
             referenced.kind.edge_kind(),
             source_node_id.clone(),
@@ -709,6 +766,7 @@ fn add_reference_edges(
 }
 
 fn resolve_reference_target(
+    context: &TargetContext,
     source_node_id: &NodeId,
     module_path: &str,
     referenced_path: &str,
@@ -717,6 +775,12 @@ fn resolve_reference_target(
         .split("::module::")
         .next()
         .unwrap_or(source_node_id);
+
+    if let Some((dependency_root, rest)) = referenced_path.split_once("::") {
+        if let Some(dependency_crate_id) = context.workspace_dependency_roots.get(dependency_root) {
+            return NodeId::new(format!("{dependency_crate_id}::module::crate::{rest}"));
+        }
+    }
 
     if let Some(rest) = referenced_path.strip_prefix("crate::") {
         return NodeId::new(format!("{crate_prefix}::module::crate::{rest}"));
@@ -745,6 +809,41 @@ fn resolve_reference_target(
     NodeId::new(format!(
         "{crate_prefix}::module::{module_path}::{referenced_path}"
     ))
+}
+
+fn workspace_dependency_roots(
+    workspace_packages: &[&cargo_metadata::Package],
+    package: &cargo_metadata::Package,
+) -> BTreeMap<String, CrateId> {
+    let workspace_packages_by_name = workspace_packages
+        .iter()
+        .map(|workspace_package| (workspace_package.name.as_str(), *workspace_package))
+        .collect::<BTreeMap<_, _>>();
+    let mut dependency_roots = BTreeMap::new();
+
+    for dependency in &package.dependencies {
+        let Some(workspace_package) = workspace_packages_by_name.get(dependency.name.as_str()) else {
+            continue;
+        };
+        let Some(library_target) = workspace_package.targets.iter().find(|target| {
+            target
+                .kind
+                .iter()
+                .any(|kind| matches!(kind, cargo_metadata::TargetKind::Lib))
+        }) else {
+            continue;
+        };
+        let dependency_root = dependency
+            .rename
+            .clone()
+            .unwrap_or_else(|| library_target.name.clone());
+        dependency_roots.insert(
+            dependency_root,
+            crate_id(&workspace_package.name, &library_target.name),
+        );
+    }
+
+    dependency_roots
 }
 
 fn parse_lint_attributes(attrs: &[Attribute]) -> Result<Vec<LintAttribute>> {

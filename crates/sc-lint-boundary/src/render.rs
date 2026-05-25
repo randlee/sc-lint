@@ -2,14 +2,25 @@ use super::*;
 use serde_json::Error as JsonError;
 
 pub fn render_findings_report(report: &FindingsReport) -> String {
-    format!(
+    let mut rendered = format!(
         "{} {} status={} scanned_crates={} findings={}",
         report.tool,
         report.version,
         report.status.as_str(),
         report.scanned_crates,
         report.findings.len()
-    )
+    );
+
+    for finding in &report.findings {
+        rendered.push('\n');
+        rendered.push_str(finding.rule_id.as_str());
+        rendered.push(' ');
+        rendered.push_str(&finding.kind);
+        rendered.push_str(": ");
+        rendered.push_str(&finding.message);
+    }
+
+    rendered
 }
 
 /// Render a graph export to the requested wire format.
