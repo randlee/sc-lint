@@ -13,10 +13,11 @@ target: develop
 
 - make `brew install randlee/tap/sc-lint` the primary supported Homebrew entry
   point
-- extend the existing `sc-lint` Homebrew formula so one install path ships the
-  full released `sc-lint` toolset
-- close issue `#30` with one production-ready release and tap update path for
-  macOS Intel, macOS ARM, and Linux
+- bootstrap a new primary `sc-lint.rb` formula through the existing
+  `update-homebrew` pipeline so one install path ships the full released
+  `sc-lint` toolset
+- define a production-ready plan for issue `#30`, covering the full toolset
+  release and tap update path for macOS Intel, macOS ARM, and Linux
 
 ## Hard Dependencies
 
@@ -31,9 +32,11 @@ target: develop
 - `release/publish-artifacts.toml`
 - `.github/workflows/release.yml`
 - `docs/release-inventory-schema.json`
+- `scripts/release_artifacts.py`
 - `README.md`
 - `docs/sc-lint/README.md`
 - `homebrew-tap/Formula/sc-lint.rb`
+- `homebrew-tap/Formula/sc-lint-boundary.rb`
 
 ## Deliverables
 
@@ -44,11 +47,22 @@ silently dropped or partially deferred.
 
 - Homebrew distribution ships one primary `sc-lint` install path that gives the
   user the full released toolset needed for normal repo use
+- the sprint includes the tap bootstrap step that creates
+  `homebrew-tap/Formula/sc-lint.rb`, because the current tap surface only ships
+  `sc-lint-boundary.rb`
 - release manifest and GitHub release artifacts cover the binaries required for
   that full toolset: `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
   `sc-lint-runtime`
-- the existing `sc-lint` formula is updated to install the complete released
-  toolset; no new standalone formula files are introduced for backend crates
+- `release/publish-artifacts.toml` expands the existing schema-version-1
+  `[[crates]]` and `[[release_binaries]]` tables to the full multi-crate,
+  multi-binary toolset without requiring a schema-version bump
+- `scripts/release_artifacts.py` is reviewed and updated only if needed so the
+  existing validate-manifest, validate-preflight-checks, validate-publish-order,
+  list-release-binaries, and cargo-build-bin-args paths handle the expanded
+  multi-binary manifest shape
+- `sc-lint.rb` becomes the primary supported install path; the sprint makes the
+  disposition of `sc-lint-boundary.rb` explicit by either retiring it from the
+  tap or retaining it only as a documented legacy compatibility surface
 - release workflow updates the Homebrew tap deterministically for macOS Intel,
   macOS ARM, and Linux with per-artifact checksums taken from published release
   tarballs
@@ -95,6 +109,20 @@ class ScLint < Formula
 end
 ```
 
+```toml
+[[crates]]
+artifact = "sc-lint"
+package = "sc-lint"
+
+[[crates]]
+artifact = "sc-lint-portability"
+package = "sc-lint-portability"
+
+[[crates]]
+artifact = "sc-lint-runtime"
+package = "sc-lint-runtime"
+```
+
 ## This Sprint Does Not Close
 
 - Winget or other non-Homebrew package-manager parity
@@ -107,7 +135,10 @@ end
   binaries
 - `release/publish-artifacts.toml` and `.github/workflows/release.yml` define a
   publish path for `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
-  `sc-lint-runtime` through the existing `sc-lint` Homebrew formula update path
+  `sc-lint-runtime` through the tap-bootstrap + `sc-lint.rb` update path
+- the sprint explicitly records the disposition of `homebrew-tap/Formula/sc-lint-boundary.rb`
+  as either retired in this sprint or retained only as a legacy compatibility
+  surface that is not the supported install path for normal users
 - the CI `update-homebrew` job reaches its formula-generation and
   commit-or-noop path using the workflow checkout root `homebrew-tap/` without
   path-resolution errors
@@ -119,6 +150,9 @@ end
   packaging shape
 - user docs point at the primary `sc-lint` formula and explain that backend
   binaries are included in that install path
+- the sprint doc makes the manifest/schema plan explicit enough that a
+  developer knows whether `scripts/release_artifacts.py` needs code changes or
+  only expanded data entries for the multi-binary release shape
 
 ## Required Validation
 

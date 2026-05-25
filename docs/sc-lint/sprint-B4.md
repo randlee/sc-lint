@@ -15,7 +15,8 @@ target: develop
 - lock in bounded `rust-best-practices` usage so broad structural review
   happens on the first quality pass and later rounds stay in targeted fix mode
 - make the prompt/process surface auditable enough that sprint closeout can run
-  without ad hoc routing decisions
+  from the `qa-triage` agent definition, fix-assignment template, and
+  regression-tested triage scripts rather than ad hoc routing decisions
 
 ## Hard Dependencies
 
@@ -58,6 +59,10 @@ silently dropped or partially deferred.
   carry-forward triage inputs available to the routing layer
 - the prompt/process surface identifies the authoritative scripts, skills, and
   handoff points needed for the triage-first workflow
+- `scripts/test_find_todos.py` is created as the regression test entrypoint
+  for TODO discovery behavior
+- `scripts/test_triage_carry_forward.py` is created as the regression test
+  entrypoint for carry-forward triage classification behavior
 - the triage-first workflow lands with explicit test coverage for TODO
   discovery and carry-forward classification so later prompt changes do not
   silently break routing behavior
@@ -110,10 +115,12 @@ QA-2+:
   later-round routing flow
 - the plan identifies the prompt, template, and script surfaces that own this
   process, including `qa-triage` and `fix-assignment.xml.j2`
-- the sprint requires regression coverage for TODO discovery and carry-forward
-  triage classification instead of relying on prompt prose only
+- the sprint requires regression coverage from the newly created
+  `scripts/test_find_todos.py` and `scripts/test_triage_carry_forward.py`
+  files instead of relying on prompt prose only
 
 ## Required Validation
 
-- `python3 -m unittest scripts/test_find_todos.py scripts/test_triage_carry_forward.py`
+- `python3 -m unittest scripts/test_find_todos.py`
+- `python3 -m unittest scripts/test_triage_carry_forward.py`
 - `just lint`

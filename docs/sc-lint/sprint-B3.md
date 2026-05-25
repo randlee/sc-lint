@@ -48,6 +48,10 @@ silently dropped or partially deferred.
 - the accepted ADR defines the approved observability entry points for
   `sc-lint`, the allowed cross-crate type crossings, and the constraints on
   future direct-linked backend observability integration
+- the accepted ADR explicitly maps the allowed logging contract surface back to
+  ADR-008, keeping `logging::ObservedCommand`, `logging::dispatch_event`, the
+  CLI-owned `contract::ServiceName` seam, and the existing `CommandEnvelope`
+  `command: String` field unless ADR-009 records a reconciled successor
 - architecture, logging, and planning docs align with the accepted
   observability boundary policy without weakening the CLI-owned logger
   initialization invariant from `ADR-008`
@@ -62,42 +66,36 @@ types, boundary contracts, or execution seams, this section must include
 explicit code samples or signatures showing the intended end state.
 
 ```rust
-pub struct CommandObservability {
-    pub command: CommandId,
-    pub service_name: ServiceName,
+pub(crate) struct ObservedCommand<'a> {
+    context: &'a CommandContext,
+    loaded_config: &'a LoadedConfig,
 }
 
-pub fn dispatch_command(
-    observability: &CommandObservability,
-    command: Command,
-) -> Result<CommandEnvelope<RenderedOutput>, CliError>;
+fn dispatch_event(
+    logger: &Logger,
+    observed: &ObservedCommand<'_>,
+    outcome: OutcomeLabel,
+    action: ActionName,
+    fields: Map<String, Value>,
+);
 ```
 
 ```rust
-pub fn emit_cli_command_started(
-    observability: &CommandObservability,
-    args: &[String],
-);
+pub(crate) struct ServiceName(&'static str);
 
-pub fn emit_cli_command_completed(
-    observability: &CommandObservability,
-    verdict: CommandVerdict,
-    summary: &str,
-    elapsed_ms: u64,
-);
+impl ServiceName {
+    pub(crate) const fn new(value: &'static str) -> Self;
+    pub(crate) const fn as_str(&self) -> &str;
+}
 ```
 
 ```rust
 pub struct CommandEnvelope<T> {
     pub ok: bool,
-    pub command: CommandId,
+    pub command: String,
     pub data: Option<T>,
     pub error: Option<CliError>,
 }
-```
-
-```rust
-pub struct CommandId(String);
 ```
 
 ```toml
@@ -125,9 +123,11 @@ forbidden_edges = [
   - constraints for future direct-linked backend observability integration
   - the preserved `CLI-LAYER-OWNS-LOGGER-INITIALIZATION` invariant from
     `ADR-008`
-- the sprint doc leaves no ambiguity about which validated command/service
-  metadata types may cross crate boundaries and which observability setup work
-  remains CLI-owned only
+- the sprint doc leaves no ambiguity about which current validated command and
+  service metadata types may cross crate boundaries and which observability
+  setup work remains CLI-owned only
+- the sprint doc does not introduce forbidden `emit_*` wrappers or undefined
+  successor types without explicit ADR-008 reconciliation in ADR-009
 - `docs/architecture.md`, `docs/sc-lint/logging.md`, the ADR index, and the
   relevant machine-readable boundary/planning records align with the accepted
   `ADR-009` text

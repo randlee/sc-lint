@@ -46,6 +46,9 @@ silently dropped or partially deferred.
 - approved caller symbols and caller identities are parsed into validated
   wrapper types at the inventory boundary rather than flowing through analysis
   as unconstrained raw `String` values
+- `SCB-CALLER-001` rule evaluation lands in `crates/sc-lint-boundary/src/analysis.rs`
+  with the existing boundary-rule evaluation path; this sprint does not split
+  caller policy into a separate `callers.rs` module
 - `SCB-CALLER-001` lands as a fail-only rule in `sc-lint-boundary`, using the
   existing reference graph to enumerate all callers of an approved-list symbol
   and emitting a finding for every caller not listed in TOML
@@ -105,6 +108,7 @@ pub(crate) struct ApprovedCaller(String);
 ```
 
 ```rust
+#[non_exhaustive]
 pub enum RuleId {
     ScbCycle001,
     ScbCycle002,
@@ -149,6 +153,11 @@ fn caller_is_exempt(
 - the sprint doc makes the chosen TOML integration point explicit:
   `[callers]` extends each per-boundary `BoundaryRecord` without relaxing the
   surrounding `#[serde(deny_unknown_fields)]` contract
+- `SCB-CALLER-001` implementation ownership is explicit:
+  `analyze_named_callers` and `caller_is_exempt` land in `analysis.rs` during
+  this sprint rather than in an undefined future module
+- the public `RuleId` extension strategy is explicit before `ScbCaller001`
+  lands: `RuleId` becomes `#[non_exhaustive]` in `crates/sc-lint-boundary/src/lib.rs`
 - `SCB-CALLER-001` exits non-zero when a non-exempt external caller reaches a
   restricted symbol and stays clean when all callers are approved or exempt
 - `references.scope = "outside_owner_crate"` exempts owner-crate callers
@@ -161,7 +170,8 @@ fn caller_is_exempt(
   - multi-symbol caller configuration
 - `sc-lint-boundary analyze --format text` and `--format json` both surface
   `SCB-CALLER-001` through the existing analysis command path
-- crate README and boundary-enforcement docs both include one canonical
+- `crates/sc-lint-boundary/README.md` and
+  `docs/sc-lint/boundary-enforcement-model.md` both include one canonical
   approved-caller example plus operator guidance on how it differs from
   `references.forbidden`
 
