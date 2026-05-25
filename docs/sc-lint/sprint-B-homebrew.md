@@ -33,6 +33,7 @@ target: develop
 - `docs/release-inventory-schema.json`
 - `README.md`
 - `docs/sc-lint/README.md`
+- `homebrew-tap/Formula/sc-lint.rb`
 - `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb`
 - `${HOMEBREW_TAP_DIR}/Formula/sc-lint-boundary.rb`
 
@@ -113,6 +114,9 @@ end
 - `release/publish-artifacts.toml` and `.github/workflows/release.yml` define a
   publish path for `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
   `sc-lint-runtime` through the chosen Homebrew formula strategy
+- the CI `update-homebrew` job reaches its formula-generation and
+  commit-or-noop path using the workflow checkout root `homebrew-tap/` without
+  path-resolution errors
 - Homebrew automation computes checksums from published release artifacts and
   updates `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb` deterministically for macOS
   Intel, macOS ARM, and Linux
@@ -128,4 +132,5 @@ end
 - `python3 scripts/release_artifacts.py validate-preflight-checks --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`
 - `python3 scripts/release_artifacts.py validate-publish-order --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`
 - `cargo build --workspace`
+- `ruby -c homebrew-tap/Formula/sc-lint.rb`
 - `ruby -c "${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb"`

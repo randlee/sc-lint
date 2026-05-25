@@ -75,6 +75,15 @@ approved = [
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct BoundaryRecord {
+    pub(crate) id: BoundaryId,
+    pub(crate) owner: OwnerId,
+    pub(crate) roots: Vec<BoundaryRoot>,
+    pub(crate) callers: Option<CallersSection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CallersSection {
     pub(crate) approved: Vec<ApprovedCallerEntry>,
 }
@@ -117,6 +126,7 @@ pub(crate) fn analyze_named_callers(
 
 fn caller_is_exempt(
     record: &BoundaryRecord,
+    callers: &CallersSection,
     caller_package: &str,
     caller_path: &str,
 ) -> bool;
@@ -136,6 +146,9 @@ fn caller_is_exempt(
   fields fail during inventory load
 - approved symbols and caller identities are validated once at inventory load
   and do not propagate through rule analysis as unconstrained raw strings
+- the sprint doc makes the chosen TOML integration point explicit:
+  `[callers]` extends each per-boundary `BoundaryRecord` without relaxing the
+  surrounding `#[serde(deny_unknown_fields)]` contract
 - `SCB-CALLER-001` exits non-zero when a non-exempt external caller reaches a
   restricted symbol and stays clean when all callers are approved or exempt
 - `references.scope = "outside_owner_crate"` exempts owner-crate callers

@@ -36,7 +36,8 @@ The currently planned sprints in this phase are:
   - primary `brew install randlee/tap/sc-lint` path
   - release/tap update strategy for the full binary set
   - sprint number intentionally TBD; keep this item at the end of the Phase `B`
-    sequence until numbering is assigned
+    sequence until numbering is assigned after the `B.1`-`B.4`
+    implementation order is reviewed and locked
   - see [docs/sc-lint/sprint-B-homebrew.md](./sprint-B-homebrew.md)
 
 ## Phase Structure
