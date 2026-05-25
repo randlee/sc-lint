@@ -40,6 +40,12 @@ target: develop
   - local developer execution
   - CI gate usage
   - release review usage
+- concise top-level requirements and architecture updates that keep the
+  hard-fail gate visible outside the Phase `C` sprint docs:
+  - `docs/requirements.md` states that interface-version checks can fail local
+    and CI workflows across all supported interface families
+  - `docs/architecture.md` states that the planned versioning layer owns one
+    aggregate multi-family hard-fail verdict for published interface artifacts
 - explicit policy for how no-interface-present families are reported without
   silently dropping them from the published artifact set
 
@@ -96,6 +102,9 @@ target: develop
 - `docs/sc-lint/version-requirements.md` keeps “not present in this repo”
   explicit for unsupported current interface families instead of omitting them
   silently
+- `docs/requirements.md` and `docs/architecture.md` each carry one concise
+  Phase `C`-level hard-fail gate statement consistent with
+  `docs/sc-lint/version-requirements.md`
 
 ## Required Validation
 
