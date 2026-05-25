@@ -49,7 +49,7 @@ target: develop
     - module body
     - impl block
   - an explicit portable fallback is an item with the same identifier as the
-    `#[cfg(unix)]` item and no `#[cfg(...)]` attribute
+    `#[cfg(unix)]` item, no `#[cfg(...)]` attribute, and non-test scope
   - a Windows companion is a sibling item with the same identifier and an
     explicit `#[cfg(windows)]` gate
 - the structural detection seam is explicit and uses the same parent-scope
@@ -82,7 +82,9 @@ fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
 
 fn has_portable_fallback(unix_item: &Item, sibling_items: &[Item]) -> bool {
     sibling_items.iter().any(|candidate| {
-        same_identifier(unix_item, candidate) && !item_has_any_cfg(candidate)
+        same_identifier(unix_item, candidate)
+            && !item_has_any_cfg(candidate)
+            && !item_is_test_scoped(candidate)
     })
 }
 ```
@@ -91,6 +93,10 @@ fn has_portable_fallback(unix_item: &Item, sibling_items: &[Item]) -> bool {
   module-level traversal points that already own full `&[Item]` slices, so
   `PORT-010` does not depend on reconstructing sibling context from a
   single-item visitor callback
+- `#[cfg(test)]` siblings never satisfy portable-fallback matching; if the
+  only same-identifier sibling is test-scoped, `has_portable_fallback(...)`
+  returns `false` and the production `#[cfg(unix)]` item still emits
+  `PORT-010`
 
 - the rule operates on structural production items rather than only leaf
   string patterns, and its production scan covers:
@@ -142,6 +148,8 @@ pub fn runtime_socket_name() -> &'static str {
 - the sprint names `collect_parity_findings(items, ...)` as the integration
   seam that supplies sibling context to `has_windows_companion(...)` and
   `has_portable_fallback(...)`
+- the sprint states that `#[cfg(test)]` siblings are excluded from
+  portable-fallback matching
 - the sprint requires the structural scan to cover all three production item
   categories:
   - free functions
@@ -156,6 +164,7 @@ pub fn runtime_socket_name() -> &'static str {
 - `cargo test -p sc-lint-portability`
 - `cargo test -p sc-lint-portability flags_cfg_unix_item_without_windows_companion`
 - `cargo test -p sc-lint-portability flags_cfg_unix_item_without_portable_fallback`
+- `cargo test -p sc-lint-portability does_not_pass_cfg_unix_item_with_cfg_test_only_sibling`
 - `cargo test -p sc-lint-portability passes_cfg_unix_item_with_windows_companion`
 - `cargo test -p sc-lint-portability passes_cfg_unix_item_with_portable_fallback`
 - `cargo clippy --workspace --all-targets -- -D warnings`
