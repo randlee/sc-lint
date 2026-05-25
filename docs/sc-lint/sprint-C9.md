@@ -33,6 +33,7 @@ target: develop
 - `crates/sc-lint-portability/src/source_scan.rs`
 - `crates/sc-lint-portability/src/tests.rs`
 - `crates/sc-lint-portability/README.md`
+- `docs/sc-lint/phase-C-plan.md`
 - `docs/sc-lint/sprint-C9.md`
 
 ## Deliverables

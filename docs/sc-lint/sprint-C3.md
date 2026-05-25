@@ -70,8 +70,10 @@ target: develop
 ```json
 {
   "ok": true,
+  // outer ok = command execution succeeded without CliError
   "command": "check.interfaces",
   "data": {
+    // data.ok = business verdict; false means a breaking change was detected
     "ok": false,
     "families": [
       {

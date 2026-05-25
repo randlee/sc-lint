@@ -242,6 +242,14 @@ The next planned tool crates after the current line are:
 - `sc-lint-tokio`
   - planned crate reservation only for now
   - no initial implementation scope until Tokio-specific rules justify it
+- `sc-lint-version`
+  - planned dedicated interface-versioning crate
+  - governing sprint sequence:
+    - `C.1`
+    - `C.2`
+    - `C.3`
+    - `C.4`
+    - `C.5`
 
 ## Release 1 Target
 

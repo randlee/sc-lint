@@ -137,6 +137,12 @@ Current primary crates:
 
 Planned later crate:
 
+- `sc-lint-version`
+  - planned dedicated workspace crate for multi-family interface versioning
+    and baseline artifacts
+  - governed by the Phase `C.1` through `C.5` sprint sequence
+  - out of current implementation scope until the Phase `C` versioning line
+    moves from planning into execution
 - `sc-lint-tokio`
   - reserved home for Tokio-specific async/runtime lint rules when Tokio-specific
     dependencies or semantics justify a dedicated crate
@@ -632,6 +638,10 @@ The architecture should not require:
   - see [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - AI-first CLI contract ADR
   - see [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
+- portability scope and parity ADR
+  - see [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- interface versioning and published artifacts ADR
+  - see [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 
 ## Architecture Management
 
