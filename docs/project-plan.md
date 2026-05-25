@@ -139,6 +139,7 @@ The currently scheduled sprint plans are:
   - `docs/sc-lint/sprint-B3.md`
 - `B.4`
   - QA-process hardening
+  - triage-first fix routing plus regression-tested TODO/carry-forward tooling
   - `docs/sc-lint/sprint-B4.md`
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew toolset distribution planning
@@ -157,6 +158,14 @@ The currently scheduled sprint plans are:
   - per-tool user guides now live under `docs/sc-lint/tools/`
   - direct guide links are now published from both `README.md` and
     `docs/sc-lint/README.md`
+- `B.4`
+  - triage-first QA routing is now the authoritative default before fix
+    dispatch
+  - QA-2+ now stays in targeted-fix mode with QA-1-only default
+    `rust-best-practices`
+  - TODO discovery and carry-forward routing helpers now have explicit
+    regression coverage in `scripts/test_find_todos.py` and
+    `scripts/test_triage_carry_forward.py`
 
 ## Next Analyzer-Crate Additions
 

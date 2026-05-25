@@ -49,6 +49,9 @@ python3 scripts/find_todos.py
 
 The script scans repo Rust source files only.
 
+Regression coverage for this helper lives in:
+- `scripts/test_find_todos.py`
+
 Output format:
 
 ```text
@@ -72,6 +75,9 @@ Tag rules:
 5. If the underlying work is genuinely out of sprint scope, record it through
    the normal QA finding / Turtle triage flow and remove or rewrite the TODO in
    source. The source comment itself must not remain as deferral authority.
+6. When QA is already in a follow-up round, hand the emitted rows to the
+   routing layer as authoritative targeted-fix inputs instead of downgrading
+   them to planning notes.
 
 ## Required Report Shape
 

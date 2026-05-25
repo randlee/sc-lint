@@ -189,11 +189,23 @@ python3 scripts/triage_carry_forward.py \
 
 Use the script output as the `carry_forward_findings_json` template input.
 
+For implementation sprint-end QA or QA-2+ routing, also run the TODO scan on
+the promoted branch worktree:
+
+```bash
+python3 scripts/find_todos.py <worktree-root>
+```
+
+Treat every emitted TODO row as a QA finding input. Do not let TODO comments
+act as silent deferral markers in follow-up routing.
+
 Prompt/handoff contract:
 - `qa-triage` itself is a JSON-in / fenced-JSON-out agent prompt
 - ATM task assignment templates remain XML ATM messages
 - when dispatching work, pass triage record paths or rendered carry-forward JSON
   rather than copying raw `.ttl` contents into the task body
+- use `fix-assignment.xml.j2` as the branch-scoped handoff template after
+  triage completes
 
 ## Dispatch Rules
 

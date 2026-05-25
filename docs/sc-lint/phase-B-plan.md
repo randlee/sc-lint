@@ -30,6 +30,7 @@ The currently planned sprints in this phase are:
 - `B.4`
   - QA-process hardening
   - triage-first routing and QA-1-only rust-best-practices default
+  - regression-tested TODO discovery and carry-forward routing helpers
   - see [docs/sc-lint/sprint-B4.md](./sprint-B4.md)
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew distribution planning
@@ -81,5 +82,7 @@ Phase `B` should leave the repo with:
   `sc-lint-boundary`
 - a documented QA-process line with triage-first routing and QA-1-only broad
   rust-best-practices review
+- regression-tested TODO discovery and carry-forward triage tooling that keeps
+  QA-2+ in targeted-fix mode
 - a numbered-or-explicitly-queued plan for moving Homebrew from a
   boundary-only stopgap to the full released `sc-lint` toolset
