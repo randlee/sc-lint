@@ -8,7 +8,18 @@ required = true
 publish = true
 publish_order = 1
 preflight_check = "full"
-wait_after_publish_seconds = 0
+wait_after_publish_seconds = 15
+verify_install = false
+
+[[crates]]
+artifact = "sc-lint-schema"
+package = "sc-lint-schema"
+cargo_toml = "crates/sc-lint-schema/Cargo.toml"
+required = true
+publish = true
+publish_order = 2
+preflight_check = "full"
+wait_after_publish_seconds = 15
 verify_install = false
 
 [[crates]]
@@ -17,7 +28,7 @@ package = "sc-lint-attributes"
 cargo_toml = "crates/sc-lint-attributes/Cargo.toml"
 required = true
 publish = true
-publish_order = 2
+publish_order = 3
 preflight_check = "locked"
 wait_after_publish_seconds = 0
 verify_install = false
@@ -28,10 +39,52 @@ package = "sc-lint-boundary"
 cargo_toml = "crates/sc-lint-boundary/Cargo.toml"
 required = true
 publish = true
-publish_order = 3
+publish_order = 4
+preflight_check = "locked"
+wait_after_publish_seconds = 15
+verify_install = true
+
+[[crates]]
+artifact = "sc-lint-portability"
+package = "sc-lint-portability"
+cargo_toml = "crates/sc-lint-portability/Cargo.toml"
+required = true
+publish = true
+publish_order = 5
+preflight_check = "locked"
+wait_after_publish_seconds = 0
+verify_install = true
+
+[[crates]]
+artifact = "sc-lint-runtime"
+package = "sc-lint-runtime"
+cargo_toml = "crates/sc-lint-runtime/Cargo.toml"
+required = true
+publish = true
+publish_order = 6
+preflight_check = "locked"
+wait_after_publish_seconds = 0
+verify_install = true
+
+[[crates]]
+artifact = "sc-lint"
+package = "sc-lint"
+cargo_toml = "crates/sc-lint/Cargo.toml"
+required = true
+publish = true
+publish_order = 7
 preflight_check = "locked"
 wait_after_publish_seconds = 0
 verify_install = true
 
 [[release_binaries]]
+name = "sc-lint"
+
+[[release_binaries]]
 name = "sc-lint-boundary"
+
+[[release_binaries]]
+name = "sc-lint-portability"
+
+[[release_binaries]]
+name = "sc-lint-runtime"

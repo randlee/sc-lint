@@ -1,9 +1,9 @@
 ---
 id: B.1
 title: Carry-Forward Lint-Gate And Portability Scope Hardening
-status: planned
-branch: feature/phase-B-sprint-plans
-worktree: <repo-worktree>/feature/phase-B-sprint-plans
+status: completed
+branch: feature/sprint-B1
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-B1
 target: develop
 ---
 

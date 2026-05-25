@@ -20,6 +20,7 @@ Current rule families include:
 - `SCB-BOUNDARY-001`
 - `SCB-BOUNDARY-002`
 - `SCB-BOUNDARY-003`
+- `SCB-CALLER-001`
 - `SCB-MANIFEST-001`
 - `SCB-MANIFEST-002`
 
@@ -114,6 +115,33 @@ Manifest-policy failures also surface through the same tool:
 SCB-MANIFEST-001:
 workspace.package.version missing from Cargo.toml
 ```
+
+Named-caller policy uses boundary inventory, not source annotations. A
+canonical allowlist entry looks like this:
+
+```toml
+[callers]
+approved = [
+  { symbol = "restricted::run", callers = ["app::allowed::Facade"] },
+]
+```
+
+That entry means `restricted::run` may be reached by `app::allowed::Facade`,
+while any other external caller produces:
+
+```text
+SCB-CALLER-001 named caller allowlist violation:
+restricted symbol restricted::run called by unapproved external caller other::blocked::Facade
+```
+
+Operator guidance:
+
+- use `[callers].approved` when a symbol is valid but only for a named set of
+  external callers
+- use `references.forbidden` when the boundary should reject the dependency
+  edge entirely rather than allow a curated caller set
+- `references.scope = "outside_owner_crate"` still exempts owner-crate callers
+  for `SCB-CALLER-001`; the allowlist only governs external callers
 
 ## Disable Model
 

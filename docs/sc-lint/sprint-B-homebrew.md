@@ -1,10 +1,10 @@
 ---
 id: sprint-B-homebrew
 title: Full Toolset Homebrew Distribution
-status: planned
-branch: feature/phase-B-sprint-plans
-worktree: <repo-worktree>/feature/phase-B-sprint-plans
-target: develop
+status: completed
+branch: feature/sprint-B-homebrew
+worktree: <repo-worktree>/feature/sprint-B-homebrew
+target: integration/phase-B
 ---
 
 # Sprint B Homebrew — Full Toolset Homebrew Distribution
@@ -75,6 +75,20 @@ silently dropped or partially deferred.
 - operator docs clearly state the supported `brew` install command, the
   installed binaries, and that the backend tools are included by the top-level
   `sc-lint` formula rather than installed via separate formulas
+
+## Implementation Notes
+
+- `release/publish-artifacts.toml` now keeps the full publishable workspace in
+  one schema-version-1 manifest and declares the shipped release binaries in
+  top-level-toolset order with `sc-lint` first
+- `scripts/release_artifacts.py` owns the Homebrew formula renderer so the
+  workflow and local validation path share one deterministic generator
+- the release archives for Homebrew are packaged as `sc-lint_<version>_<target>`
+  bundles that contain `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`,
+  and `sc-lint-runtime`
+- `homebrew-tap/Formula/sc-lint-boundary.rb` is retained only as a documented
+  legacy compatibility surface; normal users should install
+  `randlee/tap/sc-lint`
 
 ## Explicit Code Samples
 

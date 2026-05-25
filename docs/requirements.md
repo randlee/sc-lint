@@ -345,9 +345,10 @@ The product should support both:
   `REQ-CLI-007E`.
 
 - `REQ-PRODUCT-017`
-  Canonical `sc-lint` boundary definitions may exist as planning inputs before
-  loader migration completes, but they must become lint-enforced once boundary
-  inventory loading lands in `sc-lint-boundary`.
+  Canonical `sc-lint` boundary definitions must remain the shared planning and
+  lint-enforcement inputs under `boundaries/`. With boundary inventory loading
+  now implemented in `sc-lint-boundary`, the current release line treats those
+  records as active lint inputs rather than future planning-only data.
 
 - `REQ-PRODUCT-018`
   `sc-lint-boundary` may enforce named-caller allowlist policy for explicitly
@@ -382,7 +383,19 @@ The current execution phase, Phase `B`, requires:
   - `B.4`
   - `sprint-B-homebrew`
 - explicit top-level traceability for the new Phase-B product lines:
+  - recurring shared lint-gate backlog for:
+    - raw identity string literals without named constants
+    - `/tmp/` paths without intent comments
+    - public API error types exposing `anyhow::Error`
+    - duplicated `CrateId` newtypes across workspace crates
+    - `clippy::for_kv_map` and similar structural for-loop anti-patterns
+    - `pub` visibility exceeding the documented contract surface
+    - raw `String` fields used for structured identifiers such as
+      `boundary_id`, sprint ids, owner ids, and planning keys
   - portability-scope expansion in `sc-lint-portability`
+    - Windows-only path literal parity with the current Unix-only path checks
+    - broader cross-platform environment-variable portability rules
+    - shell-portability checks for OS-specific shell and command assumptions
   - named-caller allowlist enforcement in `sc-lint-boundary`
   - observability boundary-policy acceptance
   - Homebrew release/distribution planning

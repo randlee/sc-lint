@@ -120,6 +120,15 @@ Current implementation status:
 
 - `version`
   - direct CLI-owned success path
+- `lint.line-counts`
+  - delegated Python-backed utility success path through the stable top-level
+    CLI contract
+- `lint.identity-literals`
+  - delegated Python-backed utility success path through the stable top-level
+    CLI contract
+- `view.findings`
+  - delegated Python-backed utility success path through the stable top-level
+    CLI contract
 - `lint.sc-boundary`
   - real backend-normalized success path
   - config loading and logger initialization stay in the top-level CLI
@@ -149,8 +158,9 @@ For release `0.1.x`, this means:
 
 - `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-directives` when shared directive parsing/types are needed
-- `sc-lint-boundary`, `sc-lint-portability`, and the top-level `sc-lint` CLI
-  may depend on `sc-lint-schema` for the canonical machine-schema types
+- `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`, and the
+  top-level `sc-lint` CLI may depend on `sc-lint-schema` for the canonical
+  machine-schema types
 - the top-level `sc-lint` CLI does not directly depend on
   `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
   integration mode
@@ -226,6 +236,20 @@ Current intended distribution is:
   - future Tokio-specific runtime rules
   - must remain distinct from generic runtime rules
 
+### Phase B Shared Backlog
+
+Phase `B.1` keeps the following reusable lint families explicitly planned
+without claiming current implementation:
+
+- raw identity string literals without named constants
+- `/tmp/` paths without intent comments
+- public API error types exposing `anyhow::Error`
+- duplicated `CrateId` newtypes across workspace crates
+- `clippy::for_kv_map` and similar structural for-loop anti-patterns
+- `pub` visibility exceeding the documented contract surface
+- raw `String` fields used for structured identifiers such as `boundary_id`,
+  sprint ids, owner ids, and planning keys
+
 ## Boundary and Planning Data
 
 Canonical machine policy should live in:
@@ -248,10 +272,9 @@ boundaries/
 
 The repository's own crate/tool surfaces should be represented there as part of
 the product architecture, not treated only as future consumer-facing examples.
-
-At the current phase boundary, these TOML records exist as canonical planning
-inputs. Default lint enforcement against them becomes active when boundary
-inventory loading is moved into `sc-lint-boundary`.
+These TOML records are now both canonical planning inputs and active lint
+inputs for the boundary inventory behavior already implemented in
+`sc-lint-boundary`.
 
 ## Current Canonical Boundary Facades
 

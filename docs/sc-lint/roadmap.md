@@ -111,6 +111,13 @@ Initial Phase-B scope is split into focused planning sprints:
 
 - `B.1`
   - carry-forward lint-gate and portability-scope hardening
+  - explicit backlog planning for seven recurring shared lint-gate families:
+    identity literals, `/tmp/` paths, public API `anyhow::Error`, duplicated
+    `CrateId` newtypes, `for_kv_map`-style loops, over-broad `pub`, and raw
+    `String` structured identifiers
+  - explicit backlog planning for shared portability follow-ons in
+    `sc-lint-portability`: Windows-path parity, broader env portability, and
+    shell portability
 - `B.2`
   - named-caller allowlist enforcement planning
 - `B.3`

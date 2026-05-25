@@ -74,8 +74,7 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
         }],
     };
 
-    let rendered =
-        render_graph_export(&graph, GraphOutputFormat::Json).expect("json graph render succeeds");
+    let rendered = render_graph_export(&graph, GraphOutputFormat::Json);
     let json: serde_json::Value = serde_json::from_str(&rendered).expect("graph json");
 
     assert_eq!(json["tool"], "sc-lint-boundary");
@@ -1333,6 +1332,231 @@ fn allows_forbid_external_impls_trait_impl_in_same_module() {
 }
 
 #[test]
+fn allows_approved_named_external_caller() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/api", "crates/app"]);
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write_source("api", "lib.rs", "pub mod restricted { pub fn run() {} }");
+    fixture.write_source(
+        "app",
+        "lib.rs",
+        r#"
+            pub mod allowed {
+                pub struct Facade;
+
+                impl Facade {
+                    pub fn call(&self) {
+                        api::restricted::run();
+                    }
+                }
+            }
+        "#,
+    );
+    write_named_caller_boundary_record(
+        &fixture,
+        &[r#"{ symbol = "restricted::run", callers = ["app::allowed::Facade"] }"#],
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn fails_when_external_named_caller_is_not_approved() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/api", "crates/app", "crates/other"]);
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write(
+        "crates/other/Cargo.toml",
+        &path_dependency_manifest("other", "api", "../api", "0.1.0"),
+    );
+    fixture.write_source("api", "lib.rs", "pub mod restricted { pub fn run() {} }");
+    fixture.write_source(
+        "app",
+        "lib.rs",
+        r#"
+            pub mod allowed {
+                pub struct Facade;
+
+                impl Facade {
+                    pub fn call(&self) {
+                        api::restricted::run();
+                    }
+                }
+            }
+        "#,
+    );
+    fixture.write_source(
+        "other",
+        "lib.rs",
+        r#"
+            pub mod blocked {
+                pub struct Facade;
+
+                impl Facade {
+                    pub fn call(&self) {
+                        api::restricted::run();
+                    }
+                }
+            }
+        "#,
+    );
+    write_named_caller_boundary_record(
+        &fixture,
+        &[r#"{ symbol = "restricted::run", callers = ["app::allowed::Facade"] }"#],
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbCaller001);
+    assert!(
+        report.findings[0]
+            .message
+            .contains("other::blocked::Facade")
+    );
+
+    let rendered_text = render_findings_report(&report);
+    assert!(rendered_text.contains("SCB-CALLER-001"));
+
+    let rendered_json = serde_json::to_string(&report).expect("json render");
+    assert!(rendered_json.contains("\"SCB-CALLER-001\""));
+}
+
+#[test]
+fn exempts_owner_crate_callers_for_outside_owner_crate_scope() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/api"]);
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_source(
+        "api",
+        "lib.rs",
+        r#"
+            pub mod restricted {
+                pub fn run() {}
+            }
+
+            pub mod owner {
+                pub struct Facade;
+
+                impl Facade {
+                    pub fn call(&self) {
+                        crate::restricted::run();
+                    }
+                }
+            }
+        "#,
+    );
+    write_named_caller_boundary_record(
+        &fixture,
+        &[r#"{ symbol = "restricted::run", callers = ["external::allowed::Facade"] }"#],
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn supports_multi_symbol_named_caller_configuration() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/api", "crates/app", "crates/admin"]);
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write(
+        "crates/admin/Cargo.toml",
+        &path_dependency_manifest("admin", "api", "../api", "0.1.0"),
+    );
+    fixture.write_source(
+        "api",
+        "lib.rs",
+        r#"
+            pub mod restricted {
+                pub fn run() {}
+                pub fn repair() {}
+            }
+        "#,
+    );
+    fixture.write_source(
+        "app",
+        "lib.rs",
+        r#"
+            pub mod allowed {
+                pub struct RunFacade;
+
+                impl RunFacade {
+                    pub fn call(&self) {
+                        api::restricted::run();
+                    }
+                }
+            }
+        "#,
+    );
+    fixture.write_source(
+        "admin",
+        "lib.rs",
+        r#"
+            pub mod repair {
+                pub struct Facade;
+
+                impl Facade {
+                    pub fn call(&self) {
+                        api::restricted::repair();
+                    }
+                }
+            }
+        "#,
+    );
+    write_named_caller_boundary_record(
+        &fixture,
+        &[
+            r#"{ symbol = "restricted::run", callers = ["app::allowed::RunFacade"] }"#,
+            r#"{ symbol = "restricted::repair", callers = ["admin::repair::Facade"] }"#,
+        ],
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Boundaries),
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
 fn does_not_flag_acyclic_chain() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
@@ -1802,6 +2026,69 @@ impl WorkspaceFixture {
         }
         fs::write(path, trim_indentation(contents)).unwrap();
     }
+}
+
+fn write_named_caller_boundary_record(fixture: &WorkspaceFixture, approved_entries: &[&str]) {
+    let approved_entries = approved_entries
+        .iter()
+        .map(|entry| format!("                {entry},"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    fixture.write(
+        "boundaries/planning.toml",
+        r#"
+            [planning]
+            current_sprint = "B.2"
+        "#,
+    );
+    fixture.write(
+        "boundaries/api/restricted-api.toml",
+        &format!(
+            r#"
+                boundary_id = "BOUNDARY-ApiRestricted"
+                owner_package = "api"
+                owner_crate_path = "api"
+                name = "ApiRestricted"
+
+                [public]
+                facade = "restricted::run"
+
+                [implementation]
+                type = "run"
+                module = "api::restricted"
+                visibility = "public"
+                constructor = "none"
+
+                [composition]
+                roots = ["run", "repair"]
+
+                [callers]
+                approved = [
+{approved_entries}
+                ]
+
+                [dependencies]
+                allowed_dependents = ["app", "admin", "other"]
+                allowed_dependencies = []
+                forbidden_edges = []
+
+                [references]
+                scope = "outside_owner_crate"
+                forbidden = []
+
+                [testing]
+                allowed_test_double_paths = []
+                forbidden_test_bypasses = []
+
+                [enforcement]
+                lint_rules = ["SCB-CALLER-001"]
+                review_gates = ["approved_named_callers"]
+
+                [status]
+                state = "concrete_landed"
+            "#
+        ),
+    );
 }
 
 struct ManifestPolicyFixture {

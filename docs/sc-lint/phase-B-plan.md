@@ -15,12 +15,26 @@ The currently planned sprints in this phase are:
 
 - `B.1`
   - post-mortem carry-forward lint-gate backlog hardening
+  - explicit shared backlog planning for:
+    - raw identity string literals without named constants
+    - `/tmp/` paths without intent comments
+    - public API error types exposing `anyhow::Error`
+    - duplicated `CrateId` newtypes across workspace crates
+    - `clippy::for_kv_map` and similar structural for-loop anti-patterns
+    - `pub` visibility exceeding the documented contract surface
+    - raw `String` fields used for structured identifiers such as
+      `boundary_id`, sprint ids, owner ids, and planning keys
   - portability-scope hardening for Windows-path, env, and shell portability
+  - explicit portability backlog planning for:
+    - Windows-only path literal parity with the current Unix-only path checks
+    - broader cross-platform environment-variable portability rules
+    - shell-portability checks for OS-specific shell and command assumptions
   - portability ownership/parity ADR coverage
   - see [docs/sc-lint/sprint-B1.md](./sprint-B1.md)
 - `B.2`
   - TOML-backed named-caller allowlist enforcement in `sc-lint-boundary`
   - new `SCB-CALLER-001` rule using the existing reference graph
+  - close issue `#29` with stable CLI/text/JSON surfaces for caller policy
   - CLI/config/documentation integration for approved-caller policy
   - see [docs/sc-lint/sprint-B2.md](./sprint-B2.md)
 - `B.3`
@@ -35,6 +49,7 @@ The currently planned sprints in this phase are:
 - `B.4`
   - QA-process hardening
   - triage-first routing and QA-1-only rust-best-practices default
+  - regression-tested TODO discovery and carry-forward routing helpers
   - see [docs/sc-lint/sprint-B4.md](./sprint-B4.md)
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew distribution planning
@@ -53,7 +68,8 @@ open:
 
 1. `B.1`
    - encode Phase-A post-mortem findings as planned product/process work
-   - define the next lint gates and architecture-policy follow-ups
+   - define the next lint gates and architecture-policy follow-ups for the
+     seven recurring shared lint-gate families carried from Phase `A`
    - tighten QA expectations before additional Phase-B feature scope begins
 2. `B.2`
    - convert approved-caller policy from prose into TOML-backed enforcement
@@ -80,6 +96,10 @@ Phase `B` should leave the repo with:
 - an explicit product-side backlog for reusable consumer-proven lint gaps
   without importing consumer-specific wrapper names or report formats into the
   core tool contract
+- explicit Phase-B planning for the recurring shared lint-gate backlog around
+  identity literals, `/tmp/` paths, public API `anyhow::Error`, duplicated
+  `CrateId` newtypes, `for_kv_map`-style loops, over-broad `pub`, and raw
+  structured-identifier `String` fields
 - an explicit Phase-B portability expansion line covering Windows-only path
   literals, broader env portability checks, and shell-portability linting
 - accepted ADR coverage for shared portability ownership/parity and
@@ -89,5 +109,7 @@ Phase `B` should leave the repo with:
   `sc-lint-boundary`
 - a documented QA-process line with triage-first routing and QA-1-only broad
   rust-best-practices review
+- regression-tested TODO discovery and carry-forward triage tooling that keeps
+  QA-2+ in targeted-fix mode
 - a numbered-or-explicitly-queued plan for moving Homebrew from a
   boundary-only stopgap to the full released `sc-lint` toolset
