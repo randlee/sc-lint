@@ -159,4 +159,7 @@ QA-2+:
 
 - `python3 -m unittest scripts/test_find_todos.py`
 - `python3 -m unittest scripts/test_triage_carry_forward.py`
+  The triage carry-forward tests mock the oxigraph subprocess seam by patching
+  `load_records` and `query_records`, so this suite passes without `oxigraph`
+  in `PATH`.
 - `just lint`
