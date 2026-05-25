@@ -68,6 +68,25 @@ Current contents:
 - [`../../crates/sc-lint-attributes/README.md`](../../crates/sc-lint-attributes/README.md) —
   proc-macro attribute crate guide
 
+## Homebrew Distribution
+
+The primary supported Homebrew install path is:
+
+```bash
+brew install randlee/tap/sc-lint
+```
+
+That top-level formula is intended to expose the shipped CLI plus backend
+analyzer binaries from one install path:
+
+- `sc-lint`
+- `sc-lint-boundary`
+- `sc-lint-portability`
+- `sc-lint-runtime`
+
+`randlee/tap/sc-lint-boundary` may remain as a legacy compatibility surface
+for boundary-only callers, but it is not the supported default install path.
+
 Current intended crate split:
 
 - `sc-lint`
