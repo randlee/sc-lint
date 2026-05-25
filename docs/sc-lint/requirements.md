@@ -1,70 +1,38 @@
-# `sc-lint` Requirements
+# `sc-lint` Crate Requirements
 
-These requirements define the planned behavior for the boundary-definition and
-inventory-parity work in the `sc-lint` tool family.
+These requirements define the top-level `sc-lint` crate surface.
 
-## Canonical Boundary Source
+## Purpose
 
-- `REQ-SCB-001`
-  Canonical machine-readable boundary definitions must live in standalone TOML
-  files under the `boundaries/` directory.
+The `sc-lint` crate is the stable user-facing CLI package. It owns:
 
-## Dual-Loader Transition
+- command parsing
+- config loading
+- top-level success and error normalization
+- backend dispatch
+- CLI-owned structured logging
 
-- `REQ-SCB-002`
-  During migration, the loader must accept both Markdown-embedded boundary
-  records and TOML boundary records while mapping both sources into one shared
-  internal boundary model.
+## Authoritative Requirement Sources
 
-- `REQ-SCB-003`
-  During the dual-loader phase, duplicate `boundary_id` authority across
-  sources is a hard error by default.
+The detailed requirement authorities for this crate are:
 
-- `REQ-SCB-004`
-  During the dual-loader phase, conflicting definitions for the same
-  `boundary_id` across Markdown and TOML are a hard error.
+- [cli-requirements.md](./cli-requirements.md)
+- [../requirements.md](../requirements.md)
+- [logging.md](./logging.md)
 
-- `REQ-SCB-005`
-  Any migration equivalence mode that permits duplicate-source fixtures must be
-  test-only and disabled in default developer runs and CI.
+## Scope Rules
 
-## TOML-First Evolution
+- the crate must remain the canonical top-level entry point for end users
+- non-interactive command families must keep the shared `--json` envelope and
+  `CliError` contract
+- backend-specific machine contracts must be normalized at the top-level CLI
+  boundary rather than exposed directly as the stable product surface
+- structured logging remains CLI-owned even when execution is delegated to a
+  backend binary
 
-- `REQ-SCB-006`
-  Once TOML loading exists, new boundary-enforcement features that depend on
-  boundary metadata must be implemented against TOML-backed data first.
+## Related Docs
 
-## Inventory-Parity Enforcement
-
-- `REQ-SCB-007`
-  Inventory-parity checks must compare structured boundary requirements against
-  the code graph at item-key granularity.
-
-- `REQ-SCB-008`
-  A missing documented item with no valid planning mapping must fail with
-  `SCB-INVENTORY-001`.
-
-- `REQ-SCB-009`
-  A missing documented item scheduled in a future sprint may warn with
-  `SCB-INVENTORY-002`.
-
-- `REQ-SCB-010`
-  A missing documented item whose scheduled sprint is current or past must fail
-  with `SCB-INVENTORY-003`.
-
-- `REQ-SCB-011`
-  Inventory-parity warning eligibility must come only from structured planning
-  metadata, not prose, comments, or freeform allowlists.
-
-- `REQ-SCB-012`
-  The default planning metadata source for inventory parity is
-  `boundaries/planning.toml`.
-
-- `REQ-SCB-013`
-  `boundaries/planning.toml` must define `[planning].current_sprint`, and
-  current-sprint parsing failure must cause planned-but-missing items to fail
-  rather than warn.
-
-- `REQ-SCB-014`
-  Sprint comparison for inventory parity must use parsed ordering, not lexical
-  string comparison.
+- [architecture.md](./architecture.md)
+- [cli-contract.md](./cli-contract.md)
+- [logging.md](./logging.md)
+- [crate-architecture.md](./crate-architecture.md)

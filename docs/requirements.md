@@ -12,7 +12,7 @@ Related ADRs:
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
-- [docs/sc-lint/version-requirements.md](./sc-lint/version-requirements.md)
+- [docs/sc-lint-version/requirements.md](./sc-lint-version/requirements.md)
 
 For release `0.1.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
@@ -446,22 +446,22 @@ The product should support both:
   `sc-lint-boundary` may enforce named-caller allowlist policy for explicitly
   configured restricted symbols when that policy is expressed as structured
   boundary metadata. Detailed schema and inventory-loading behavior for that
-  feature lives in [docs/sc-lint/requirements.md](./sc-lint/requirements.md).
+  feature lives in [docs/sc-lint-boundary/requirements.md](./sc-lint-boundary/requirements.md).
 
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
-  - see [docs/sc-lint/requirements.md](./sc-lint/requirements.md)
+  - see [docs/sc-lint-boundary/requirements.md](./sc-lint-boundary/requirements.md)
 - Structured boundary source migration requirements
-  - see [docs/sc-lint/boundary-toml-migration.md](./sc-lint/boundary-toml-migration.md)
+  - see [docs/sc-lint-boundary/boundary-toml-migration.md](./sc-lint-boundary/boundary-toml-migration.md)
 - Boundary enforcement model requirements
-  - see [docs/sc-lint/boundary-enforcement-model.md](./sc-lint/boundary-enforcement-model.md)
+  - see [docs/sc-lint-boundary/boundary-enforcement-model.md](./sc-lint-boundary/boundary-enforcement-model.md)
 - CLI-specific requirements
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - Extraction and phase execution requirements
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
-  - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
+  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
 
 ## Current Phase Requirements
 
@@ -504,7 +504,7 @@ The current execution phase, Phase `B`, requires:
 Phase `C` is the queued next planning line after the current Phase `B`
 sequence. Its governing forward-pointer artifacts are:
 
-- `docs/sc-lint/version-requirements.md`
+- `docs/sc-lint-version/requirements.md`
 - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
 
 Phase `C` also includes the next shared `sc-lint-portability` follow-on line:

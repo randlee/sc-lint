@@ -625,13 +625,13 @@ The architecture should not require:
 - current extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - current phase execution plan
-  - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
+  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
 - CLI-specific architecture
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
 - CLI-specific contract
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - graph/export contract
-  - see [docs/sc-lint/graph-schema.md](./sc-lint/graph-schema.md)
+  - see [docs/sc-lint-boundary/graph-schema.md](./sc-lint-boundary/graph-schema.md)
 - structured boundary definitions ADR
   - see [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](./sc-lint/adr/ADR-004-structured-boundary-definitions.md)
 - CLI/profile/xwin execution-model ADR

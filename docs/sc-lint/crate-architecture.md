@@ -19,6 +19,8 @@ their governing docs, boundaries, and planned sprint work.
   - owns command parsing, config loading, top-level output normalization, and
     backend dispatch
 - governing docs:
+  - `docs/sc-lint/requirements.md`
+  - `docs/sc-lint/architecture.md`
   - `docs/sc-lint/cli-requirements.md`
   - `docs/sc-lint/cli-architecture.md`
   - `docs/sc-lint/cli-contract.md`
@@ -53,7 +55,7 @@ their governing docs, boundaries, and planned sprint work.
 - governing docs:
   - `docs/architecture.md`
   - `docs/sc-lint/README.md`
-  - `docs/sc-lint/version-requirements.md`
+  - `docs/sc-lint-version/requirements.md`
 - governing boundary:
   - `boundaries/sc-lint-schema/schema.toml`
 - primary implementation and planning sprints:
@@ -80,9 +82,11 @@ their governing docs, boundaries, and planned sprint work.
   - boundary inventory, ownership, manifest-policy, and AST-sensitive boundary
     analysis
 - governing docs:
-  - `docs/sc-lint/boundary-enforcement-model.md`
-  - `docs/sc-lint/boundary-toml-migration.md`
-  - `docs/sc-lint/graph-schema.md`
+  - `docs/sc-lint-boundary/requirements.md`
+  - `docs/sc-lint-boundary/architecture.md`
+  - `docs/sc-lint-boundary/boundary-enforcement-model.md`
+  - `docs/sc-lint-boundary/boundary-toml-migration.md`
+  - `docs/sc-lint-boundary/graph-schema.md`
 - governing boundary:
   - `boundaries/sc-lint-boundary/boundary-analyzer.toml`
 - primary implementation and planning sprints:
@@ -102,6 +106,8 @@ their governing docs, boundaries, and planned sprint work.
   - current Phase `B.1` backlog owner and Phase `C.6`-`C.9` sprint owner for
     that shared portability follow-on line
 - governing docs:
+  - `docs/sc-lint-portability/requirements.md`
+  - `docs/sc-lint-portability/architecture.md`
   - `docs/sc-lint/extraction-plan.md`
   - `docs/sc-lint/roadmap.md`
   - `docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md`
@@ -120,6 +126,8 @@ their governing docs, boundaries, and planned sprint work.
 - role:
   - shared std runtime and concurrency rule family
 - governing docs:
+  - `docs/sc-lint-runtime/requirements.md`
+  - `docs/sc-lint-runtime/architecture.md`
   - `docs/sc-lint/extraction-plan.md`
   - `docs/sc-lint/roadmap.md`
 - governing boundary:
@@ -150,14 +158,15 @@ their governing docs, boundaries, and planned sprint work.
   - planned consumer of a shared `sc-compose`-orbit reporting layer rather
     than owner of a crate-local HTML renderer
 - governing docs:
-  - `docs/sc-lint/phase-C-plan.md`
-  - `docs/sc-lint/version-requirements.md`
+  - `docs/phase-C/phase-C-plan.md`
+  - `docs/sc-lint-version/requirements.md`
+  - `docs/sc-lint-version/architecture.md`
   - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
-  - `docs/sc-lint/sprint-C1.md`
-  - `docs/sc-lint/sprint-C2.md`
-  - `docs/sc-lint/sprint-C3.md`
-  - `docs/sc-lint/sprint-C4.md`
-  - `docs/sc-lint/sprint-C5.md`
+  - `docs/phase-C/sprint-C1.md`
+  - `docs/phase-C/sprint-C2.md`
+  - `docs/phase-C/sprint-C3.md`
+  - `docs/phase-C/sprint-C4.md`
+  - `docs/phase-C/sprint-C5.md`
 - planned governing boundary:
   - `boundaries/sc-lint-version/version-checker.toml`
 - primary Phase C sprints:
@@ -181,12 +190,12 @@ their governing docs, boundaries, and planned sprint work.
 Phase `C` commits `sc-lint-version` as a planned dedicated workspace crate.
 
 - authoritative planning docs:
-  - `docs/sc-lint/phase-C-plan.md`
-  - `docs/sc-lint/sprint-C1.md`
-  - `docs/sc-lint/sprint-C2.md`
-  - `docs/sc-lint/sprint-C3.md`
-  - `docs/sc-lint/sprint-C4.md`
-  - `docs/sc-lint/sprint-C5.md`
+  - `docs/phase-C/phase-C-plan.md`
+  - `docs/phase-C/sprint-C1.md`
+  - `docs/phase-C/sprint-C2.md`
+  - `docs/phase-C/sprint-C3.md`
+  - `docs/phase-C/sprint-C4.md`
+  - `docs/phase-C/sprint-C5.md`
   - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
 - planned invocation path:
   - `sc-lint check interfaces`
@@ -208,11 +217,11 @@ Phase `C` also extends the existing `sc-lint-portability` crate through the
 planned portability follow-on sprints `C.6` through `C.9`.
 
 - authoritative planning docs:
-  - `docs/sc-lint/phase-C-plan.md`
-  - `docs/sc-lint/sprint-C6.md`
-  - `docs/sc-lint/sprint-C7.md`
-  - `docs/sc-lint/sprint-C8.md`
-  - `docs/sc-lint/sprint-C9.md`
+  - `docs/phase-C/phase-C-plan.md`
+  - `docs/phase-C/sprint-C6.md`
+  - `docs/phase-C/sprint-C7.md`
+  - `docs/phase-C/sprint-C8.md`
+  - `docs/phase-C/sprint-C9.md`
   - `docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md`
 - planned rule-family additions:
   - `PORT-006` and `PORT-007`

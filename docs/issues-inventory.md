@@ -42,7 +42,7 @@ reserved for a later phase:
   - triage-first QA routing
   - QA-1-only default `rust-best-practices` usage
   - TODO scan and carry-forward triage automation
-  - see `docs/sc-lint/sprint-B4.md`
+  - see `docs/phase-B/sprint-B4.md`
 
 The B.4 authoritative routing surfaces are now:
 
@@ -69,7 +69,7 @@ needed to move from that stopgap to the full top-level install path:
   - planned primary `brew install randlee/tap/sc-lint` surface
   - explicit disposition for `sc-lint-boundary.rb`
   - full release-manifest and tap-update planning
-  - see `docs/sc-lint/sprint-B-homebrew.md`
+  - see `docs/phase-B/sprint-B-homebrew.md`
 
 ## Phase C Planning Note
 
