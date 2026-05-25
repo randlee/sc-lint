@@ -24,8 +24,12 @@ Current contents:
   extraction order
 - [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution plan and
   focused sprint-hardening sequence
+- [`phase-C-plan.md`](./phase-C-plan.md) — Phase C interface-versioning and
+  published-interface planning line
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and current plan touchpoint guide
+- [`version-requirements.md`](./version-requirements.md) — planned
+  interface-versioning and published-artifact requirements
 - [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
   decisions
 - [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract
@@ -46,6 +50,12 @@ Current contents:
 - [`sprint-B4.md`](./sprint-B4.md) — QA-process hardening sprint
 - [`sprint-B-homebrew.md`](./sprint-B-homebrew.md) — full Homebrew toolset
   distribution planning sprint
+- [`sprint-C1.md`](./sprint-C1.md) — `sc-lint-version` policy and baseline
+  planning sprint
+- [`sprint-C2.md`](./sprint-C2.md) — published interface artifact pipeline
+  planning sprint
+- [`sprint-C3.md`](./sprint-C3.md) — hard-fail version gate integration
+  planning sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
@@ -118,6 +128,12 @@ Current intended crate split:
 - `sc-lint-tokio`
   - planned future analyzer crate for Tokio-specific rules
   - represented now as a reserved future boundary surface only
+- `sc-lint-version`
+  - planned future capability for stable interface version checks and
+    published interface artifacts
+  - planned to start with `cargo-semver-checks` for Rust public APIs and
+    expand to CLI and transport surfaces through generated HTML/XHTML/JSON
+    artifacts
 - `sc-lint-attributes`
   - proc-macro attribute crate
   - intentionally minimal at first

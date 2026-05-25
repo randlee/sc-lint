@@ -10,6 +10,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
 - [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 
 For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -36,6 +37,28 @@ The product is organized into five layers:
 3. repo-local Python utilities
 4. structured boundary definitions and planning metadata
 5. repo-local development/CI automation
+
+## Planned Interface Versioning Layer
+
+The next planned product capability after the current Phase `B` line is
+`sc-lint-version`, which treats stable interfaces as publishable/versioned
+artifacts rather than relying on prose release notes alone.
+
+That planned capability spans three interface families:
+
+- Rust public APIs for all shipped crates
+- stable top-level CLI commands and machine contracts
+- RPC/socket interfaces when such surfaces exist
+
+The intended artifact model is:
+
+- structured canonical interface data
+- generated main HTML reports for people
+- JSON sidecars as the machine-readable source of truth
+- optional XHTML fragments for section-level deep context
+
+This layer is intentionally planned as template- and schema-driven output, not
+as a collection of hand-maintained HTML pages.
 
 ## Current and Planned Crates
 

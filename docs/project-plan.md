@@ -22,6 +22,8 @@ The current project focus is:
   than growing catch-all backends
 - keeping consumer-specific policy lints local unless only their framework is
   worth extracting
+- planning stable interface version checks and published interface artifacts
+  for public APIs, CLI contracts, and transport surfaces
 - improving pre-CI developer confidence with cross-target compile checks where
   those checks can surface platform drift before a push
 - preserving CI and lint-runner parity during extraction
@@ -154,6 +156,15 @@ The currently scheduled sprint plans are:
   - full `sc-lint` Homebrew toolset distribution planning
   - sprint number intentionally pending
   - `docs/sc-lint/sprint-B-homebrew.md`
+- `C.1`
+  - `sc-lint-version` policy and baseline definition
+  - `docs/sc-lint/sprint-C1.md`
+- `C.2`
+  - published interface artifact pipeline
+  - `docs/sc-lint/sprint-C2.md`
+- `C.3`
+  - hard-fail version gate integration
+  - `docs/sc-lint/sprint-C3.md`
 
 ## Recent Sprint Deltas
 
@@ -236,6 +247,10 @@ Phase `A` completed the release-1 foundation implementation line. Phase `B` is
 the current planning and hardening line for post-Phase-A defect prevention,
 follow-on feature work, and release/distribution planning. That does not imply
 that every release-1 follow-on item is already complete.
+
+Phase `C` is now the next queued planning line after the current Phase `B`
+sequence. It covers `sc-lint-version`, published interface artifacts, and
+multi-surface breaking-change detection.
 
 ## Planning Conventions
 

@@ -21,6 +21,12 @@ current planning surface.
 - [`ADR-010-portability-scope-and-parity.md`](./ADR-010-portability-scope-and-parity.md)
   - shared portability ownership and Unix/Windows parity scope policy
 
+## Draft ADRs
+
+- [`ADR-011-interface-versioning-and-published-artifacts.md`](./ADR-011-interface-versioning-and-published-artifacts.md)
+  - planned `sc-lint-version` capability, `cargo-semver-checks` baseline, and
+    generated HTML/XHTML/JSON interface artifact policy
+
 ## Index Rules
 
 - add every accepted ADR that affects the release line here

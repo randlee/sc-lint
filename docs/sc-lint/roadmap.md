@@ -135,6 +135,22 @@ See [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md),
 [docs/sc-lint/sprint-B4.md](./sprint-B4.md), and
 [docs/sc-lint/sprint-B-homebrew.md](./sprint-B-homebrew.md).
 
+### Phase C
+
+Phase `C` is the queued planning line after the current Phase `B` sequence.
+
+Initial Phase-C scope is:
+
+- `C.1`
+  - `sc-lint-version` policy and baseline definition
+  - initial `cargo-semver-checks` integration plan for Rust public APIs
+- `C.2`
+  - generated interface artifact publication planning
+  - XHTML fragment/report pattern with JSON sidecars as canonical machine data
+- `C.3`
+  - hard-fail version gate integration planning across Rust APIs, CLI
+    contracts, and RPC/socket interfaces
+
 ### Current code moves required
 
 The current implementation now places the shared portability rule family in

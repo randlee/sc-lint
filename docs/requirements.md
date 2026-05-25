@@ -7,10 +7,12 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
+- [docs/sc-lint/version-requirements.md](./sc-lint/version-requirements.md)
 
 For release `0.1.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
@@ -193,6 +195,31 @@ The product should support both:
   backend binaries promised by the corresponding release manifest. Legacy
   per-backend formulas may remain only when they are explicitly documented as
   secondary compatibility surfaces rather than the normal user install path.
+
+### Interface versioning and publication
+
+- `REQ-PRODUCT-006I`
+  The product should define one version-checking capability that covers stable
+  interface families beyond Rust crate APIs alone.
+
+- `REQ-PRODUCT-006J`
+  The initial version-checking plan must treat Rust public APIs, stable
+  top-level CLI contracts, and RPC/socket interfaces as separate interface
+  families with explicit breaking-change rules.
+
+- `REQ-PRODUCT-006K`
+  Published interface documentation must be generated from structured data and
+  reusable templates rather than hand-written monolithic HTML documents.
+
+- `REQ-PRODUCT-006L`
+  Generated published interface report packages must follow the main
+  HTML-plus-JSON-sidecar model, with optional XHTML section fragments for
+  deeper context, so one canonical machine-readable source can drive both
+  documentation and hard-fail checks.
+
+- `REQ-PRODUCT-006M`
+  The initial Rust public API version-checking approach should be based on
+  `cargo-semver-checks` rather than a new custom semver engine.
 
 ### Logging and observability
 
