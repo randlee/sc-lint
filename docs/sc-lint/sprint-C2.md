@@ -104,6 +104,9 @@ artifacts/baselines/
   `sc-lint check interfaces --family cli --write-baseline <path>`
   generation workflow, and the approved baseline-replacement path for major
   version updates
+- `docs/sc-lint/version-requirements.md` is updated to keep the CLI baseline
+  acceptance path explicitly tied to `REQ-VERSION-012A`,
+  `REQ-VERSION-012B`, and `REQ-VERSION-012C`
 
 ## Required Validation
 

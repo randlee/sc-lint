@@ -165,6 +165,39 @@ CLI flags, baseline artifact names, and verdict output.
   rerunning the baseline-generation workflow and reviewing the updated
   versioned artifact.
 
+### Version Bump Sequencing
+
+- `REQ-VERSION-012D`
+  A breaking change in the `rust-public-api` family must update the affected
+  crate release version before publication by changing the crate's
+  `Cargo.toml` `package.version` field, or the workspace-level version field
+  when that crate inherits the shared workspace version line, and by updating
+  dependent workspace crate version requirements that reference the changed
+  crate.
+
+- `REQ-VERSION-012E`
+  A breaking change in the `cli` or `rpc-socket` family must update the
+  released top-level `sc-lint` package version before publication by changing
+  the `sc-lint` crate `Cargo.toml` `package.version` field, or the
+  workspace-level version field when `sc-lint` inherits it, along with any
+  release or tag metadata that publishes the same version line.
+
+- `REQ-VERSION-012F`
+  Approved baseline replacement under `REQ-VERSION-012C` is only valid as part
+  of a coordinated major-version update for the owning interface family; the
+  CLI baseline artifact must not be replaced on a release that leaves the
+  owning published version line unchanged.
+
+- `REQ-VERSION-012G`
+  When one release updates multiple published crates for interface-version
+  reasons, the release plan must publish crates in dependency order:
+  - shared leaf crates such as `sc-lint-directives`, `sc-lint-schema`, and
+    `sc-lint-attributes`
+  - analyzer and interface crates such as `sc-lint-boundary`,
+    `sc-lint-portability`, `sc-lint-runtime`, and planned `sc-lint-version`
+  - the top-level `sc-lint` crate after the crates it depends on are already
+    published
+
 - `REQ-VERSION-013`
   For the CLI family, a breaking change is detected when any of the following
   occur in the canonical artifact set without an approved major-version path:

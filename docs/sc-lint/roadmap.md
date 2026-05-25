@@ -152,7 +152,7 @@ Initial Phase-C scope is:
   - versioned CLI baseline artifact workflow
 - `C.3`
   - hard-fail version gate integration planning across Rust APIs, CLI
-  contracts, and RPC/socket interfaces
+    contracts, and RPC/socket interfaces
   - cargo-semver-checks ingestion into the shared verdict contract
 - `C.4`
   - consuming-repo adoption guidance

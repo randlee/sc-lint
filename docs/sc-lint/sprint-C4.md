@@ -97,10 +97,12 @@ description: Guides a consuming repository through sc-lint-version adoption.
   available
 - `.claude/skills/sc-lint-version-adoption/SKILL.md` exists and contains
   versioned frontmatter scoped to `sc-lint-version` adoption
-- `docs/sc-lint/README.md` adds the `C.4` links for
-  `docs/sc-lint/version-adoption.md` and
-  `.claude/skills/sc-lint-version-adoption/SKILL.md`
-- `docs/sc-lint/roadmap.md` adds the `C.4` adoption/skill milestone entry
+- `.claude/skills/sc-lint-version-adoption/SKILL.md` is updated to stay
+  narrowly scoped to `sc-lint-version` adoption rather than broad repo policy
+  guidance
+- `docs/sc-lint/README.md` and `docs/sc-lint/roadmap.md` are updated so the
+  adoption document and skill remain discoverable from the normal Phase `C`
+  entry points without becoming the authoritative source of adoption steps
 - `docs/sc-lint/skill-authoring-constraints.md` requires the planned skill
   surface to be versioned and to stay scoped to `sc-lint-version` adoption
 - the sprint references `docs/sc-lint/skill-authoring-constraints.md` as the

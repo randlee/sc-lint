@@ -464,6 +464,12 @@ The current execution phase, Phase `B`, requires:
   - the default local development lint gate
   - documented `fast` / `full` / `ci` profile semantics
 
+Phase `C` is the queued next planning line after the current Phase `B`
+sequence. Its governing forward-pointer artifacts are:
+
+- `docs/sc-lint/version-requirements.md`
+- `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
+
 ## Requirement Management
 
 - This file owns project-level product requirements.

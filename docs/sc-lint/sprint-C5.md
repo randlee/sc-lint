@@ -88,6 +88,8 @@ target: develop
 - `docs/sc-lint/README.md` adds the `C.5` link for
   `.claude-plugin/marketplace.json`
 - `docs/sc-lint/roadmap.md` adds the `C.5` marketplace milestone entry
+- `docs/sc-lint/version-requirements.md` is updated to keep the marketplace
+  acceptance scope aligned with `REQ-VERSION-022E`
 - `docs/sc-lint/minimal-marketplace-constraints.md` requires the source-repo
   publication shape for both marketplace files
 

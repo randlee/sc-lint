@@ -44,6 +44,22 @@ their governing docs, boundaries, and planned sprint work.
   - existing support surface only
   - no dedicated migration sprint in Phase A
 
+### `sc-lint-schema`
+
+- role:
+  - shared machine-schema types for analyzer inputs, outputs, and shared
+    interface artifacts
+- governing docs:
+  - `docs/architecture.md`
+  - `docs/sc-lint/README.md`
+  - `docs/sc-lint/version-requirements.md`
+- governing boundary:
+  - `boundaries/sc-lint-schema/schema.toml`
+- primary implementation and planning sprints:
+  - existing support surface only
+  - updated whenever shared machine contracts expand across analyzer or
+    interface-versioning surfaces
+
 ### `sc-lint-attributes`
 
 - role:
@@ -123,6 +139,31 @@ their governing docs, boundaries, and planned sprint work.
   - no implementation sprint in Phase A
   - remains reserved only
 
+### `sc-lint-version`
+
+- role:
+  - planned dedicated workspace crate for stable interface-version checks and
+    published interface artifacts
+  - planned owner of the `cargo-semver-checks` translation layer, multi-family
+    verdict model, and generated interface-report baseline workflow
+- governing docs:
+  - `docs/sc-lint/phase-C-plan.md`
+  - `docs/sc-lint/version-requirements.md`
+  - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
+  - `docs/sc-lint/sprint-C1.md`
+  - `docs/sc-lint/sprint-C2.md`
+  - `docs/sc-lint/sprint-C3.md`
+  - `docs/sc-lint/sprint-C4.md`
+  - `docs/sc-lint/sprint-C5.md`
+- planned governing boundary:
+  - `boundaries/sc-lint-version/version-checker.toml`
+- primary Phase C sprints:
+  - `C.1`
+  - `C.2`
+  - `C.3`
+  - `C.4`
+  - `C.5`
+
 ## Ownership Rules
 
 - backend crates remain self-contained and do not depend on each other directly
@@ -158,4 +199,4 @@ Phase `C` commits `sc-lint-version` as a planned dedicated workspace crate.
 
 This document keeps crate-level ownership, responsibility, and governing
 references explicit for every crate touched by the implemented Phase A line and
-the currently planned Phase B follow-ons.
+the currently planned Phase B and Phase C follow-ons.

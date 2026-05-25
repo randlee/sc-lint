@@ -114,32 +114,33 @@ target: develop
 
 ## Acceptance Criteria
 
-- `docs/sc-lint/version-requirements.md` defines one hard-fail verdict model
-  across Rust API, CLI, and RPC/socket families
-- `docs/sc-lint/version-requirements.md` defines the
-  `[version.families.<family>]` configuration surface and uses it to
+- `docs/sc-lint/version-requirements.md` is updated to define one hard-fail
+  verdict model across Rust API, CLI, and RPC/socket families
+- `docs/sc-lint/version-requirements.md` is updated to define the
+  `[version.families.<family>]` configuration surface and use it to
   distinguish omitted families from configured-but-not-present families
-- `docs/sc-lint/version-requirements.md` defines the aggregate top-level `ok`
-  rollup plus per-family verdict entries for a multi-family run, and the
-  sprint code sample illustrates a conforming example
-- `docs/sc-lint/version-requirements.md` defines the
+- `docs/sc-lint/version-requirements.md` is updated to define the aggregate
+  top-level `ok` rollup plus per-family verdict entries for a multi-family
+  run, and the sprint code sample is updated to illustrate a conforming
+  example
+- `docs/sc-lint/version-requirements.md` is updated to define the
   `cargo-semver-checks` ingestion contract for the `rust-public-api` family
   rather than leaving the `breaking_items` translation implicit
-- `docs/sc-lint/version-requirements.md` references the versioned CLI
-  baseline artifact schema and the `C.2` baseline-generation workflow for the
-  `cli` family
-- `docs/sc-lint/version-requirements.md` states explicitly that the
-  multi-family verdict is carried under the existing top-level
+- `docs/sc-lint/version-requirements.md` is updated to reference the versioned
+  CLI baseline artifact schema and the `C.2` baseline-generation workflow for
+  the `cli` family
+- `docs/sc-lint/version-requirements.md` is updated to state explicitly that
+  the multi-family verdict is carried under the existing top-level
   `CommandEnvelope<T>` / `CliError` CLI contract rather than a parallel
   machine-readable envelope
-- `docs/sc-lint/version-requirements.md` requires concrete
+- `docs/sc-lint/version-requirements.md` is updated to require concrete
   published-artifact paths in failure output for present families, and the
-  sprint code sample illustrates a conforming example
-- `docs/sc-lint/version-requirements.md` keeps “not present in this repo”
-  explicit for unsupported current interface families instead of omitting them
-  silently
-- `docs/requirements.md` and `docs/architecture.md` each carry one concise
-  Phase `C`-level hard-fail gate statement consistent with
+  sprint code sample is updated to illustrate a conforming example
+- `docs/sc-lint/version-requirements.md` is updated to keep “not present in
+  this repo” explicit for unsupported current interface families instead of
+  omitting them silently
+- `docs/requirements.md` and `docs/architecture.md` are updated to carry one
+  concise Phase `C`-level hard-fail gate statement consistent with
   `docs/sc-lint/version-requirements.md`
 
 ## Required Validation
