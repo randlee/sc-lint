@@ -26,6 +26,11 @@ The currently planned sprints in this phase are:
 - `B.3`
   - observability boundary-policy ADR acceptance plus doc/boundary alignment
   - promote `ADR-009` from stub to accepted policy
+  - lock the approved observability seam list:
+    - `logging::ObservedCommand`
+    - `logging::dispatch_event`
+    - `contract::ServiceName`
+    - `CommandEnvelope.command`
   - see [docs/sc-lint/sprint-B3.md](./sprint-B3.md)
 - `B.4`
   - QA-process hardening
@@ -55,6 +60,8 @@ open:
    - add the next boundary-rule family needed to stop review-only caller drift
 3. `B.3`
    - close observability boundary-policy ADR work only
+   - keep logger initialization CLI-owned while documenting the allowed
+     observability boundary seams and forbidden backend dependencies
 4. `B.4`
    - close QA-process hardening only
 5. `sprint-B-homebrew`
@@ -76,7 +83,8 @@ Phase `B` should leave the repo with:
 - an explicit Phase-B portability expansion line covering Windows-only path
   literals, broader env portability checks, and shell-portability linting
 - accepted ADR coverage for shared portability ownership/parity and
-  observability boundary policy
+  observability boundary policy, including the CLI-only `sc-observability`
+  dependency seam and the validated observability crossing types
 - a production-ready plan for caller-identity enforcement in
   `sc-lint-boundary`
 - a documented QA-process line with triage-first routing and QA-1-only broad
