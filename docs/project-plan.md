@@ -133,7 +133,9 @@ The currently scheduled sprint plans are:
   - named-caller allowlist enforcement in `sc-lint-boundary`
   - `docs/sc-lint/sprint-B2.md`
 - `B.3`
-  - observability boundary-policy ADR acceptance and boundary/planning alignment
+  - observability boundary-policy ADR acceptance, including promotion of
+    `ADR-009` from stub to accepted policy text plus boundary/planning
+    alignment
   - `docs/sc-lint/sprint-B3.md`
 - `B.4`
   - QA-process hardening

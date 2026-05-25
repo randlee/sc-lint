@@ -137,4 +137,6 @@ forbidden_edges = [
 
 ## Required Validation
 
+- `cargo build --workspace`
+- `just lint sc-boundary`
 - `just lint`

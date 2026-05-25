@@ -349,6 +349,12 @@ The product should support both:
   loader migration completes, but they must become lint-enforced once boundary
   inventory loading lands in `sc-lint-boundary`.
 
+- `REQ-PRODUCT-018`
+  `sc-lint-boundary` may enforce named-caller allowlist policy for explicitly
+  configured restricted symbols when that policy is expressed as structured
+  boundary metadata. Detailed schema and inventory-loading behavior for that
+  feature lives in [docs/sc-lint/requirements.md](./sc-lint/requirements.md).
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
@@ -366,28 +372,29 @@ The product should support both:
 
 ## Current Phase Requirements
 
-The current execution phase, Phase `A`, requires:
+The current execution phase, Phase `B`, requires:
 
-- a top-level `sc-lint` CLI plan with crate-isolated backends
-- an AI-first top-level CLI contract with:
-  - canonical `--json` machine mode
-  - stable request/response seams
-  - structured machine-readable failures
-- canonical TOML boundary definitions for the current `sc-lint` crates
-- a default local development lint gate that runs the repo's own analyzer
-  checks
-- documented `fast` / `full` / `ci` profile semantics and the distinction
-  between `sc-lint lint ci` and top-level `sc-lint ci`
-- repo-local wrappers that map `just lint` and `just ci` onto the CLI-owned
-  profile and CI contracts instead of redefining them separately
-- a staged migration plan for:
-  - generic Python utilities
-  - boundary inventory and manifest-policy logic moving into Rust
-- a documented partition for newly proven lint families so release `0.1.x`
-  does not blur reusable analyzer rules with consumer-local policy
-- a documented position on cross-target preflight checks for developer
-  confidence versus real multi-platform CI validation, with ADR-005 serving as
-  the approved Phase A strategy artifact
+- phase-plan and sprint-plan hardening for the post-Phase-A follow-on work
+  currently scheduled in:
+  - `B.1`
+  - `B.2`
+  - `B.3`
+  - `B.4`
+  - `sprint-B-homebrew`
+- explicit top-level traceability for the new Phase-B product lines:
+  - portability-scope expansion in `sc-lint-portability`
+  - named-caller allowlist enforcement in `sc-lint-boundary`
+  - observability boundary-policy acceptance
+  - Homebrew release/distribution planning
+- requirements and architecture baselines that match the current active phase
+  rather than preserving stale Phase-A-only execution wording
+- continued preservation of the Phase-A release-1 foundation decisions already
+  accepted for:
+  - crate-isolated backends
+  - the AI-first top-level CLI contract
+  - canonical TOML boundary definitions
+  - the default local development lint gate
+  - documented `fast` / `full` / `ci` profile semantics
 
 ## Requirement Management
 

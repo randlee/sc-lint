@@ -125,7 +125,8 @@ See [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md),
 [docs/sc-lint/sprint-B1.md](./sprint-B1.md),
 [docs/sc-lint/sprint-B2.md](./sprint-B2.md),
 [docs/sc-lint/sprint-B3.md](./sprint-B3.md), and
-[docs/sc-lint/sprint-B4.md](./sprint-B4.md).
+[docs/sc-lint/sprint-B4.md](./sprint-B4.md), and
+[docs/sc-lint/sprint-B-homebrew.md](./sprint-B-homebrew.md).
 
 ### Current code moves required
 

@@ -32,7 +32,8 @@ target: develop
 ## Exact Targets
 
 Paths under `homebrew-tap/` are relative to the workflow's secondary tap
-checkout root, not to this repository root.
+checkout root, not to this repository root. Use `${HOMEBREW_TAP_DIR}` for
+local validation and the workflow checkout path `homebrew-tap/` in CI.
 
 - `release/publish-artifacts.toml`
 - `.github/workflows/release.yml`
@@ -110,6 +111,7 @@ class ScLint < Formula
     system "#{bin}/sc-lint", "--version"
     system "#{bin}/sc-lint-boundary", "--version"
     system "#{bin}/sc-lint-portability", "--version"
+    system "#{bin}/sc-lint-runtime", "--version"
   end
 end
 ```
@@ -158,8 +160,8 @@ must include the full schema-version-1 field set already required by
   updates `homebrew-tap/Formula/sc-lint.rb` deterministically for macOS Intel,
   macOS ARM, and Linux
 - formula verification proves the selected Homebrew path exposes
-  `sc-lint --version` and the backend binaries promised by the chosen release
-  packaging shape
+  `sc-lint --version`, `sc-lint-boundary --version`,
+  `sc-lint-portability --version`, and `sc-lint-runtime --version`
 - user docs point at the primary `sc-lint` formula and explain that backend
   binaries are included in that install path
 - the sprint doc makes the manifest/schema plan explicit enough that a
@@ -172,4 +174,4 @@ must include the full schema-version-1 field set already required by
 - `python3 scripts/release_artifacts.py validate-preflight-checks --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`
 - `python3 scripts/release_artifacts.py validate-publish-order --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`
 - `cargo build --workspace`
-- `ruby -c homebrew-tap/Formula/sc-lint.rb`
+- `ruby -c "${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb"`

@@ -18,6 +18,7 @@ target: develop
 ## Hard Dependencies
 
 - [docs/sc-lint/sprint-B1.md](./sprint-B1.md)
+- [docs/requirements.md](../requirements.md), especially `REQ-PRODUCT-018`
 - [docs/sc-lint/requirements.md](./requirements.md), especially `REQ-SCB-006`, `REQ-SCB-007`, and `REQ-SCB-011`
 - [boundaries/sc-lint-boundary/boundary-analyzer.toml](../../boundaries/sc-lint-boundary/boundary-analyzer.toml)
 - the landed TOML inventory loader and `syn`-backed reference graph in `sc-lint-boundary`

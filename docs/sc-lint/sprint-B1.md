@@ -62,6 +62,9 @@ silently dropped or partially deferred.
   - Windows-only path literal parity with the current Unix-only path checks
   - broader cross-platform environment-variable portability rules
   - shell-portability checks for OS-specific shell and command assumptions
+- `docs/requirements.md` updates its `Current Phase Requirements` section so
+  Phase `B`, not Phase `A`, is the active execution phase and the current
+  baseline traceability reflects the live planning line
 - `ADR-010` records the portability-scope and parity decision so the new
   cross-platform rule families stay in `sc-lint-portability` and
   consumer-specific wrappers stay out of the core product
@@ -113,9 +116,20 @@ let home = std::env::var("USERPROFILE");
   - parity expectations between Unix-only and Windows-only path-literal checks
   - the rule that consumer-specific portability wrappers do not migrate
     unchanged into the core product
-- no Phase `B` planning doc still claims that observability ADR work or QA
-  process hardening closes inside `B.1`
+- `docs/requirements.md` `Current Phase Requirements` names Phase `B` as the
+  active execution phase
+- `docs/sc-lint/phase-B-plan.md` assigns observability ADR work to `B.3` and
+  QA-process hardening to `B.4` rather than implying either closes inside
+  `B.1`
 
 ## Required Validation
 
 - `just lint`
+- human review of:
+  - `docs/requirements.md`
+  - `docs/architecture.md`
+  - `docs/sc-lint/crate-architecture.md`
+  - `docs/sc-lint/README.md`
+  - `docs/sc-lint/phase-B-plan.md`
+  to confirm the portability-ownership and Phase-B sequencing statements named
+  in the acceptance criteria remain aligned
