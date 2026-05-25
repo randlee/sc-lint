@@ -22,12 +22,17 @@ target: develop
 ## Hard Dependencies
 
 - [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md)
+- [docs/requirements.md](../requirements.md)
+- [docs/architecture.md](../architecture.md)
 - [release/publish-artifacts.toml](../../release/publish-artifacts.toml)
 - [.github/workflows/release.yml](../../.github/workflows/release.yml)
 - [docs/release-inventory-schema.json](../release-inventory-schema.json)
 - the existing `update-homebrew` workflow checkout rooted at `homebrew-tap/`
 
 ## Exact Targets
+
+Paths under `homebrew-tap/` are relative to the workflow's secondary tap
+checkout root, not to this repository root.
 
 - `release/publish-artifacts.toml`
 - `.github/workflows/release.yml`
@@ -122,6 +127,13 @@ package = "sc-lint-portability"
 artifact = "sc-lint-runtime"
 package = "sc-lint-runtime"
 ```
+
+The `[[crates]]` sample above is intentionally partial. Real manifest entries
+must include the full schema-version-1 field set already required by
+`scripts/release_artifacts.py` and demonstrated in
+`release/publish-artifacts.toml`:
+`cargo_toml`, `required`, `publish`, `publish_order`, `preflight_check`,
+`wait_after_publish_seconds`, and `verify_install`.
 
 ## This Sprint Does Not Close
 

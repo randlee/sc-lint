@@ -180,6 +180,20 @@ The product should support both:
   that translation must not leak backend-specific contract drift into the
   stable user-facing surface.
 
+### Release distribution
+
+- `REQ-PRODUCT-006G`
+  The release-distribution metadata surface must support multi-crate publish
+  planning and multiple released binaries without requiring a distributor- or
+  formula-specific schema fork.
+
+- `REQ-PRODUCT-006H`
+  When Homebrew distribution is provided, the primary supported tap entry point
+  must be `randlee/tap/sc-lint`, and that install path must expose the
+  backend binaries promised by the corresponding release manifest. Legacy
+  per-backend formulas may remain only when they are explicitly documented as
+  secondary compatibility surfaces rather than the normal user install path.
+
 ### Logging and observability
 
 - `REQ-LOG-001`

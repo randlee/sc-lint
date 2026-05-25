@@ -41,6 +41,7 @@ target: develop
 - `scripts/triage_carry_forward.py`
 - `scripts/test_find_todos.py`
 - `scripts/test_triage_carry_forward.py`
+- `docs/issues-inventory.md`
 - `docs/sc-lint/phase-B-plan.md`
 - `docs/project-plan.md`
 

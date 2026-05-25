@@ -317,6 +317,36 @@ For release `0.1.x`, these repo-local automation/profile surfaces remain
 documented product surfaces but are intentionally out of boundary inventory
 enforcement scope unless later modeled as explicit boundary records.
 
+## Release Distribution
+
+For release `0.1.x`, release packaging and distributor updates should remain
+driven by one canonical manifest surface:
+
+- `release/publish-artifacts.toml`
+
+That manifest is expected to describe:
+
+- multi-crate publish order
+- released binary inventory
+- preflight and verification requirements
+
+The planned Homebrew path layers on top of that manifest rather than defining a
+parallel release inventory. The intended supported install surface is:
+
+- `brew install randlee/tap/sc-lint`
+
+Architecture consequences:
+
+- the `update-homebrew` workflow may use a secondary `homebrew-tap/` checkout
+  to rewrite tap-local formula files
+- the top-level `sc-lint` formula is the primary supported Homebrew surface
+  for normal users
+- backend binaries included in the release manifest should be installed from
+  that top-level formula when they are part of the supported toolset
+- any retained per-backend formula, such as `sc-lint-boundary.rb`, must remain
+  explicitly documented as a legacy compatibility surface rather than the
+  normal user install path
+
 ## Consumer-Proven Rule Promotion
 
 `sc-lint` should treat some rule families as consumer-proven first and
