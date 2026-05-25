@@ -105,8 +105,8 @@ end
 
 ## Acceptance Criteria
 
-- the doc stays unnumbered in filename and headers while the planned install
-  path remains `brew install randlee/tap/sc-lint`
+- `brew install randlee/tap/sc-lint` succeeds and installs the full toolset
+  binaries
 - the selected formula strategy is documented with `sc-lint` as the primary
   production formula and any retained `sc-lint-boundary` formula limited to an
   explicit compatibility role
