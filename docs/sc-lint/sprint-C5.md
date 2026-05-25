@@ -38,8 +38,9 @@ target: develop
   - `.claude-plugin/marketplace.json`
   - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
 - documentation updates that keep the marketplace path discoverable:
-  - `docs/sc-lint/README.md` links the minimal marketplace publication path
-  - `docs/sc-lint/roadmap.md` references the `C.5` marketplace milestone
+  - `docs/sc-lint/README.md` adds the `C.5` link for
+    `.claude-plugin/marketplace.json`
+  - `docs/sc-lint/roadmap.md` adds the `C.5` marketplace milestone entry only
 - explicit reference in the sprint plan that the marketplace design follows
   `docs/sc-lint/minimal-marketplace-constraints.md`
 - clear division between:
@@ -83,6 +84,9 @@ target: develop
 - the plan names both planned repo-local marketplace publication surfaces:
   - `.claude-plugin/marketplace.json`
   - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
+- `docs/sc-lint/README.md` adds the `C.5` link for
+  `.claude-plugin/marketplace.json`
+- `docs/sc-lint/roadmap.md` adds the `C.5` marketplace milestone entry
 - `docs/sc-lint/minimal-marketplace-constraints.md` requires the source-repo
   publication shape for both marketplace files
 
