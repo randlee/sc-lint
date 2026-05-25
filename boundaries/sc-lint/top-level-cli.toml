@@ -14,18 +14,26 @@ constructor = "none"
 
 [composition]
 # `CommandEnvelope` records the generic success-envelope family documented in
-# the CLI contract as `CommandEnvelope<T>`.
-roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "logging", "run"]
+# the CLI contract as `CommandEnvelope<T>`. ADR-009 also locks the current
+# observability seam list: `contract::ServiceName`, `logging::ObservedCommand`,
+# `logging::dispatch_event`, and the existing `CommandEnvelope.command` field.
+roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "contract::ServiceName", "logging::ObservedCommand", "logging::dispatch_event", "run"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the boundary backend crate, the
 # shared machine-schema crate, and binary-only support. Other backend execution
 # happens through delegated subprocess dispatch behind the CLI contract.
+# ADR-009 preserves `sc-observability` as a CLI-only dependency seam even
+# though Cargo resolves it at the package level for the mixed lib+bin crate.
 allowed_dependents = []
 allowed_dependencies = ["sc-lint-boundary", "sc-lint-schema", "sc-observability"]
 forbidden_edges = [
   "sc-lint-attributes -> sc-lint",
   "sc-lint-boundary -> sc-lint",
+  "sc-lint-boundary -> sc-observability",
+  "sc-lint-portability -> sc-observability",
+  "sc-lint-runtime -> sc-observability",
+  "sc-lint-tokio -> sc-observability",
 ]
 
 [references]

@@ -1,7 +1,7 @@
 # `sc-lint` ADR Index
 
 This index lists the architecture decision records that currently govern the
-Phase A planning surface.
+current planning surface.
 
 ## Accepted ADRs
 
@@ -15,6 +15,11 @@ Phase A planning surface.
   - analyzer-crate partitioning and primary lint-target mapping
 - [`ADR-008-sc-observability-logging.md`](./ADR-008-sc-observability-logging.md)
   - `sc-observability` selection and CLI-owned structured logging policy
+- [`ADR-009-observability-boundary-policy.md`](./ADR-009-observability-boundary-policy.md)
+  - accepted observability boundary seams, permitted type crossings, and
+    direct-link constraints
+- [`ADR-010-portability-scope-and-parity.md`](./ADR-010-portability-scope-and-parity.md)
+  - shared portability ownership and Unix/Windows parity scope policy
 
 ## Index Rules
 

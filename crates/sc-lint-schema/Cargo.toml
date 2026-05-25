@@ -1,6 +1,6 @@
 [package]
 name = "sc-lint-schema"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
@@ -8,6 +8,7 @@ license.workspace = true
 description = "Shared machine schema types for sc-lint analyzer outputs."
 repository.workspace = true
 homepage.workspace = true
+readme = "README.md"
 
 [lib]
 name = "sc_lint_schema"

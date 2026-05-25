@@ -28,10 +28,45 @@ hardening changes are applied.
 
 ## Process / QA / Triage Scope
 
-Phase A planning does not introduce a new ATM workflow, QA-routing scheme, or
-triage-protocol change. The current governing process documents remain:
+Phase A planning did not introduce a new ATM workflow, QA-routing scheme, or
+triage-protocol change.
+
+Current live governing process documents remain:
 
 - `docs/team-protocol.md`
 
-If a later phase changes team routing or QA handoff behavior, add that work as
-an explicit phase or sprint deliverable rather than leaving it implicit.
+Phase `B` now contains the explicit follow-on process work that was previously
+reserved for a later phase:
+
+- `B.4`
+  - triage-first QA routing
+  - QA-1-only default `rust-best-practices` usage
+  - TODO scan and carry-forward triage automation
+  - see `docs/sc-lint/sprint-B4.md`
+
+The B.4 authoritative routing surfaces are now:
+
+- `.claude/agents/quality-mgr.md`
+- `.claude/agents/qa-triage.md`
+- `.claude/skills/codex-orchestration/SKILL.md`
+- `.claude/skills/triaging-findings/SKILL.md`
+- `.claude/skills/todo-triage/SKILL.md`
+- `.claude/skills/codex-orchestration/qa-template.xml.j2`
+- `.claude/skills/codex-orchestration/fix-assignment.xml.j2`
+- `scripts/find_todos.py`
+- `scripts/triage_carry_forward.py`
+
+These are now the authoritative default by plan status, not an imported
+placeholder awaiting later hardening.
+
+## Distribution Planning Scope
+
+The current released Homebrew automation still reflects the boundary-only
+stopgap path. Phase `B` contains the explicit follow-on distribution planning
+needed to move from that stopgap to the full top-level install path:
+
+- `sprint-B-homebrew`
+  - planned primary `brew install randlee/tap/sc-lint` surface
+  - explicit disposition for `sc-lint-boundary.rb`
+  - full release-manifest and tap-update planning
+  - see `docs/sc-lint/sprint-B-homebrew.md`

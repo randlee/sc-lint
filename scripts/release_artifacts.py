@@ -10,9 +10,17 @@ import sys
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
+from textwrap import dedent
 
 PREFLIGHT_FULL = "full"
 PREFLIGHT_LOCKED = "locked"
+HOMEBREW_PRIMARY_FORMULA = "sc-lint"
+HOMEBREW_LEGACY_BOUNDARY_FORMULA = "sc-lint-boundary"
+HOMEBREW_TARGETS = (
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+)
 
 
 def load_manifest(path: Path) -> dict:
@@ -77,6 +85,141 @@ def require_str(obj: dict, key: str, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise SystemExit(f"{label}.{key} must be a non-empty string")
     return value
+
+
+def release_binary_names(manifest: dict) -> list[str]:
+    names = []
+    for idx, entry in enumerate(manifest["release_binaries"]):
+        names.append(require_str(entry, "name", f"release_binaries[{idx}]"))
+    return names
+
+
+def primary_release_binary(manifest: dict) -> str:
+    names = release_binary_names(manifest)
+    if HOMEBREW_PRIMARY_FORMULA not in names:
+        raise SystemExit(
+            f"release_binaries must include {HOMEBREW_PRIMARY_FORMULA!r} for Homebrew packaging"
+        )
+    return HOMEBREW_PRIMARY_FORMULA
+
+
+def release_archive_name(manifest: dict, version: str, target: str, extension: str) -> str:
+    return f"{primary_release_binary(manifest)}_{version}_{target}.{extension}"
+
+
+def formula_class_name(formula_name: str) -> str:
+    return "".join(part.capitalize() for part in formula_name.split("-"))
+
+
+def homebrew_sha_map(args: argparse.Namespace) -> dict[str, str]:
+    mapping = {
+        "x86_64-apple-darwin": args.sha256_x86_64_apple_darwin,
+        "aarch64-apple-darwin": args.sha256_aarch64_apple_darwin,
+        "x86_64-unknown-linux-gnu": args.sha256_x86_64_unknown_linux_gnu,
+    }
+    for target in HOMEBREW_TARGETS:
+        sha = mapping[target]
+        if not isinstance(sha, str) or len(sha) != 64:
+            raise SystemExit(f"{target} sha256 must be a 64-character hex string")
+        if any(ch not in "0123456789abcdefABCDEF" for ch in sha):
+            raise SystemExit(f"{target} sha256 must contain only hex characters")
+    return mapping
+
+
+def install_block(binary_names: list[str], indent: str) -> str:
+    lines = [f'{indent}def install']
+    for binary in binary_names:
+        lines.append(f'{indent}  bin.install "{binary}"')
+    lines.append(f"{indent}end")
+    return "\n".join(lines)
+
+
+def test_block(binary_names: list[str]) -> str:
+    lines = ["  test do"]
+    for binary in binary_names:
+        lines.append(f'    system "#{{bin}}/{binary}", "--version"')
+    lines.append("  end")
+    return "\n".join(lines)
+
+
+def render_homebrew_formula_text(
+    manifest: dict,
+    *,
+    formula_name: str,
+    version: str,
+    tag: str,
+    sha_map: dict[str, str],
+) -> str:
+    if formula_name == HOMEBREW_PRIMARY_FORMULA:
+        desc = "Top-level sc-lint CLI and analyzer toolset for Rust workspaces"
+        installed_binaries = release_binary_names(manifest)
+    elif formula_name == HOMEBREW_LEGACY_BOUNDARY_FORMULA:
+        desc = "Legacy compatibility formula for the sc-lint boundary analyzer"
+        if HOMEBREW_LEGACY_BOUNDARY_FORMULA not in release_binary_names(manifest):
+            raise SystemExit(
+                f"release_binaries must include {HOMEBREW_LEGACY_BOUNDARY_FORMULA!r} to render its legacy formula"
+            )
+        installed_binaries = [HOMEBREW_LEGACY_BOUNDARY_FORMULA]
+    else:
+        raise SystemExit(f"unsupported formula {formula_name!r}")
+
+    archive_prefix = primary_release_binary(manifest)
+    class_name = formula_class_name(formula_name)
+    macos_intel_url = (
+        f"https://github.com/randlee/sc-lint/releases/download/{tag}/"
+        f"{archive_prefix}_{version}_x86_64-apple-darwin.tar.gz"
+    )
+    macos_arm_url = (
+        f"https://github.com/randlee/sc-lint/releases/download/{tag}/"
+        f"{archive_prefix}_{version}_aarch64-apple-darwin.tar.gz"
+    )
+    linux_intel_url = (
+        f"https://github.com/randlee/sc-lint/releases/download/{tag}/"
+        f"{archive_prefix}_{version}_x86_64-unknown-linux-gnu.tar.gz"
+    )
+
+    formula = dedent(
+        f"""\
+        # typed: false
+        # frozen_string_literal: true
+
+        class {class_name} < Formula
+          desc "{desc}"
+          homepage "https://github.com/randlee/sc-lint"
+          version "{version}"
+          license "MIT"
+
+          on_macos do
+            on_intel do
+              url "{macos_intel_url}"
+              sha256 "{sha_map['x86_64-apple-darwin']}"
+
+        {install_block(installed_binaries, "      ")}
+            end
+            on_arm do
+              url "{macos_arm_url}"
+              sha256 "{sha_map['aarch64-apple-darwin']}"
+
+        {install_block(installed_binaries, "      ")}
+            end
+          end
+
+          on_linux do
+            on_intel do
+              if Hardware::CPU.is_64_bit?
+                url "{linux_intel_url}"
+                sha256 "{sha_map['x86_64-unknown-linux-gnu']}"
+
+        {install_block(installed_binaries, "        ")}
+              end
+            end
+          end
+
+        {test_block(installed_binaries)}
+        end
+        """
+    )
+    return formula
 
 
 def cargo_search_version_exists(crate: str, version: str) -> bool:
@@ -154,13 +297,35 @@ def list_publish_plan(args: argparse.Namespace) -> int:
 
 
 def list_release_binaries(args: argparse.Namespace) -> int:
-    for entry in load_manifest(Path(args.manifest))["release_binaries"]:
-        print(entry["name"])
+    for name in release_binary_names(load_manifest(Path(args.manifest))):
+        print(name)
     return 0
 
 
 def cargo_build_bin_args(args: argparse.Namespace) -> int:
-    print(" ".join(f'--bin {entry["name"]}' for entry in load_manifest(Path(args.manifest))["release_binaries"]))
+    print(" ".join(f"--bin {name}" for name in release_binary_names(load_manifest(Path(args.manifest)))))
+    return 0
+
+
+def print_primary_release_binary(args: argparse.Namespace) -> int:
+    print(primary_release_binary(load_manifest(Path(args.manifest))))
+    return 0
+
+
+def render_homebrew_formula(args: argparse.Namespace) -> int:
+    manifest = load_manifest(Path(args.manifest))
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        render_homebrew_formula_text(
+            manifest,
+            formula_name=args.formula,
+            version=args.version,
+            tag=args.tag,
+            sha_map=homebrew_sha_map(args),
+        ),
+        encoding="utf-8",
+    )
     return 0
 
 
@@ -389,6 +554,25 @@ def build_parser() -> argparse.ArgumentParser:
     build_bins = subparsers.add_parser("cargo-build-bin-args")
     build_bins.add_argument("--manifest", required=True)
     build_bins.set_defaults(func=cargo_build_bin_args)
+
+    primary_bin = subparsers.add_parser("primary-release-binary")
+    primary_bin.add_argument("--manifest", required=True)
+    primary_bin.set_defaults(func=print_primary_release_binary)
+
+    render_formula = subparsers.add_parser("render-homebrew-formula")
+    render_formula.add_argument("--manifest", required=True)
+    render_formula.add_argument(
+        "--formula",
+        required=True,
+        choices=[HOMEBREW_PRIMARY_FORMULA, HOMEBREW_LEGACY_BOUNDARY_FORMULA],
+    )
+    render_formula.add_argument("--version", required=True)
+    render_formula.add_argument("--tag", required=True)
+    render_formula.add_argument("--output", required=True)
+    render_formula.add_argument("--sha256-x86_64-apple-darwin", required=True)
+    render_formula.add_argument("--sha256-aarch64-apple-darwin", required=True)
+    render_formula.add_argument("--sha256-x86_64-unknown-linux-gnu", required=True)
+    render_formula.set_defaults(func=render_homebrew_formula)
 
     unpublished = subparsers.add_parser("check-version-unpublished")
     unpublished.add_argument("--manifest", required=True)

@@ -21,7 +21,7 @@ jobs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_version: ${{ steps.meta.outputs.release_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -41,8 +41,13 @@ jobs:
           echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release_version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Setup Python for release gate
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Run release gate
-        run: scripts/release_gate.sh
+        run: scripts/release_gate.sh origin/main origin/develop '${{ steps.meta.outputs.release_version }}'
 
       - name: Ensure tag is correct or create it
         shell: bash
@@ -70,7 +75,7 @@ jobs:
     needs: gate-and-tag
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -162,7 +167,7 @@ jobs:
           PY
 
       - name: Upload release inventory artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: release-inventory
           path: release/release-inventory.json
@@ -171,7 +176,7 @@ jobs:
     needs: [gate-and-tag, prepare-release-inventory]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -207,7 +212,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: crates-io
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -283,7 +288,7 @@ jobs:
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
@@ -308,10 +313,19 @@ jobs:
         run: |
           set -euo pipefail
           VERSION='${{ needs.gate-and-tag.outputs.release_version }}'
-          ARCHIVE="sc-lint-boundary_${VERSION}_${{ matrix.target }}.tar.gz"
-          cd target/${{ matrix.target }}/release
-          tar czf "../../../${ARCHIVE}" sc-lint-boundary
-          cd ../../..
+          ARCHIVE_PREFIX="$(python3 scripts/release_artifacts.py primary-release-binary --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          ARCHIVE="${ARCHIVE_PREFIX}_${VERSION}_${{ matrix.target }}.tar.gz"
+          STAGING_DIR="${RUNNER_TEMP}/release-${{ matrix.target }}"
+          rm -rf "${STAGING_DIR}"
+          mkdir -p "${STAGING_DIR}"
+          while IFS= read -r binary; do
+            [[ -n "${binary}" ]] || continue
+            cp "target/${{ matrix.target }}/release/${binary}" "${STAGING_DIR}/${binary}"
+          done < <(
+            python3 scripts/release_artifacts.py list-release-binaries \
+              --manifest "${RELEASE_ARTIFACT_MANIFEST}"
+          )
+          tar czf "${ARCHIVE}" -C "${STAGING_DIR}" .
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
 
       - name: Package (windows)
@@ -319,12 +333,24 @@ jobs:
         shell: pwsh
         run: |
           $VERSION = '${{ needs.gate-and-tag.outputs.release_version }}'
-          $ARCHIVE = "sc-lint-boundary_${VERSION}_${{ matrix.target }}.zip"
-          Compress-Archive -Path "target/${{ matrix.target }}/release/sc-lint-boundary.exe" -DestinationPath $ARCHIVE
+          $ARCHIVE_PREFIX = python3 scripts/release_artifacts.py primary-release-binary --manifest "${env:RELEASE_ARTIFACT_MANIFEST}"
+          $ARCHIVE = "${ARCHIVE_PREFIX}_${VERSION}_${{ matrix.target }}.zip"
+          $STAGING_DIR = Join-Path $env:RUNNER_TEMP "release-${{ matrix.target }}"
+          if (Test-Path $STAGING_DIR) {
+            Remove-Item -Recurse -Force $STAGING_DIR
+          }
+          New-Item -ItemType Directory -Path $STAGING_DIR | Out-Null
+          $Binaries = python3 scripts/release_artifacts.py list-release-binaries --manifest "${env:RELEASE_ARTIFACT_MANIFEST}"
+          foreach ($Binary in $Binaries) {
+            if (-not [string]::IsNullOrWhiteSpace($Binary)) {
+              Copy-Item "target/${{ matrix.target }}/release/$Binary.exe" -Destination (Join-Path $STAGING_DIR "$Binary.exe")
+            }
+          }
+          Compress-Archive -Path (Join-Path $STAGING_DIR '*') -DestinationPath $ARCHIVE
           echo "ARCHIVE=$ARCHIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
@@ -333,12 +359,12 @@ jobs:
     needs: [gate-and-tag, build, publish-crates]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ needs.gate-and-tag.outputs.release_tag }}
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
 
@@ -352,7 +378,10 @@ jobs:
 
       - name: Generate checksums
         working-directory: release
-        run: sha256sum * > checksums.txt
+        run: |
+          # This release job runs on ubuntu-latest, so sha256sum is the expected
+          # checksum tool here. If the runner OS changes, update this step.
+          sha256sum * > checksums.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -361,3 +390,82 @@ jobs:
           generate_release_notes: true
           files: |
             release/*
+
+  update-homebrew:
+    needs: [gate-and-tag, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sc-lint
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v5
+        with:
+          repository: randlee/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Compute release tarball SHA256 values
+        id: sha
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag='${{ needs.gate-and-tag.outputs.release_tag }}'
+          version='${{ needs.gate-and-tag.outputs.release_version }}'
+          archive_prefix="$(python3 scripts/release_artifacts.py primary-release-binary --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          for target in x86_64-apple-darwin aarch64-apple-darwin x86_64-unknown-linux-gnu; do
+            tarball_url="https://github.com/randlee/sc-lint/releases/download/${tag}/${archive_prefix}_${version}_${target}.tar.gz"
+            tarball_path="${RUNNER_TEMP}/${archive_prefix}_${target}.tar.gz"
+            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors -o "${tarball_path}" "${tarball_url}"
+            sha256=$(sha256sum "${tarball_path}" | awk '{print $1}')
+            echo "sha256_${target//-/_}=${sha256}" >> "$GITHUB_OUTPUT"
+          done
+          echo "archive_prefix=${archive_prefix}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Render Homebrew formulas
+        shell: bash
+        run: |
+          set -euo pipefail
+          common_args=(
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}"
+            --version '${{ steps.sha.outputs.version }}'
+            --tag '${{ steps.sha.outputs.tag }}'
+            --sha256-x86_64-apple-darwin '${{ steps.sha.outputs.sha256_x86_64_apple_darwin }}'
+            --sha256-aarch64-apple-darwin '${{ steps.sha.outputs.sha256_aarch64_apple_darwin }}'
+            --sha256-x86_64-unknown-linux-gnu '${{ steps.sha.outputs.sha256_x86_64_unknown_linux_gnu }}'
+          )
+          python3 scripts/release_artifacts.py render-homebrew-formula \
+            "${common_args[@]}" \
+            --formula sc-lint \
+            --output homebrew-tap/Formula/sc-lint.rb
+          # Keep the standalone boundary formula in sync as a legacy
+          # compatibility surface for existing installs and automation.
+          python3 scripts/release_artifacts.py render-homebrew-formula \
+            "${common_args[@]}" \
+            --formula sc-lint-boundary \
+            --output homebrew-tap/Formula/sc-lint-boundary.rb
+
+      - name: Verify formula syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -c homebrew-tap/Formula/sc-lint.rb
+          ruby -c homebrew-tap/Formula/sc-lint-boundary.rb
+
+      - name: Commit and push to homebrew-tap
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='${{ steps.sha.outputs.version }}'
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/sc-lint.rb
+          git add Formula/sc-lint-boundary.rb
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "chore: bump sc-lint formulas to v${version}"
+          git push

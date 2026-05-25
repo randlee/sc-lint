@@ -7,6 +7,9 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
+- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -117,6 +120,15 @@ Current implementation status:
 
 - `version`
   - direct CLI-owned success path
+- `lint.line-counts`
+  - delegated Python-backed utility success path through the stable top-level
+    CLI contract
+- `lint.identity-literals`
+  - delegated Python-backed utility success path through the stable top-level
+    CLI contract
+- `view.findings`
+  - delegated Python-backed utility success path through the stable top-level
+    CLI contract
 - `lint.sc-boundary`
   - real backend-normalized success path
   - config loading and logger initialization stay in the top-level CLI
@@ -146,8 +158,9 @@ For release `0.1.x`, this means:
 
 - `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-directives` when shared directive parsing/types are needed
-- `sc-lint-boundary`, `sc-lint-portability`, and the top-level `sc-lint` CLI
-  may depend on `sc-lint-schema` for the canonical machine-schema types
+- `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`, and the
+  top-level `sc-lint` CLI may depend on `sc-lint-schema` for the canonical
+  machine-schema types
 - the top-level `sc-lint` CLI does not directly depend on
   `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
   integration mode
@@ -160,6 +173,35 @@ and not in:
 
 - direct backend crate cross-calls
 
+## Observability Boundary Policy
+
+ADR-008 and ADR-009 define the release-1 observability ownership model.
+
+The current approved observability seams are:
+
+- binary-only entry points:
+  - `logging::ObservedCommand`
+  - `logging::dispatch_event`
+- CLI-owned library seam:
+  - `contract::ServiceName`
+- shared contract field:
+  - `CommandEnvelope.command`
+
+Those seams exist so command identity, service identity, and event metadata can
+cross the library/binary split without exposing `sc-observability` runtime
+types from backend crates or backend public APIs.
+
+Release `0.1.x` observability dependency policy is:
+
+- the mixed lib+bin `sc-lint` package may keep `sc-observability` in
+  `[dependencies]`
+- that dependency seam is CLI-owned only by architecture policy
+- backend crates remain forbidden from taking direct `sc-observability`
+  dependencies
+- future direct-linked backends may reuse CLI-owned context and contract data,
+  but must not own logger initialization or introduce alternative event-entry
+  wrappers without a new ADR
+
 ### Rule-family distribution
 
 The release line should avoid growing large catch-all analyzer crates.
@@ -169,6 +211,8 @@ Current intended distribution is:
 - `sc-lint-boundary`
   - boundary inventory and ownership rules
   - boundary declarations and attribute-driven boundary policy
+  - planned next boundary rule-family addition:
+    - `SCB-CALLER-001` named-caller allowlist enforcement
 - `sc-lint-portability`
   - OS/platform portability rules
   - current planned moves/imports:
@@ -177,6 +221,12 @@ Current intended distribution is:
     - `PORT-003`
     - `PORT-004`
     - `PORT-005`
+  - planned next shared scope:
+    - Windows-only path literal parity companion rules
+    - broader environment-variable portability rules
+    - shell portability rules for OS-specific shell and command assumptions
+  - consumer-specific portability wrappers remain out of this crate unless they
+    are generalized into shared product rules
 - `sc-lint-runtime`
   - std runtime/concurrency correctness rules
   - current owned rules:
@@ -185,6 +235,20 @@ Current intended distribution is:
 - `sc-lint-tokio`
   - future Tokio-specific runtime rules
   - must remain distinct from generic runtime rules
+
+### Phase B Shared Backlog
+
+Phase `B.1` keeps the following reusable lint families explicitly planned
+without claiming current implementation:
+
+- raw identity string literals without named constants
+- `/tmp/` paths without intent comments
+- public API error types exposing `anyhow::Error`
+- duplicated `CrateId` newtypes across workspace crates
+- `clippy::for_kv_map` and similar structural for-loop anti-patterns
+- `pub` visibility exceeding the documented contract surface
+- raw `String` fields used for structured identifiers such as `boundary_id`,
+  sprint ids, owner ids, and planning keys
 
 ## Boundary and Planning Data
 
@@ -208,10 +272,9 @@ boundaries/
 
 The repository's own crate/tool surfaces should be represented there as part of
 the product architecture, not treated only as future consumer-facing examples.
-
-At the current phase boundary, these TOML records exist as canonical planning
-inputs. Default lint enforcement against them becomes active when boundary
-inventory loading is moved into `sc-lint-boundary`.
+These TOML records are now both canonical planning inputs and active lint
+inputs for the boundary inventory behavior already implemented in
+`sc-lint-boundary`.
 
 ## Current Canonical Boundary Facades
 
@@ -307,6 +370,36 @@ These provide:
 For release `0.1.x`, these repo-local automation/profile surfaces remain
 documented product surfaces but are intentionally out of boundary inventory
 enforcement scope unless later modeled as explicit boundary records.
+
+## Release Distribution
+
+For release `0.1.x`, release packaging and distributor updates should remain
+driven by one canonical manifest surface:
+
+- `release/publish-artifacts.toml`
+
+That manifest is expected to describe:
+
+- multi-crate publish order
+- released binary inventory
+- preflight and verification requirements
+
+The planned Homebrew path layers on top of that manifest rather than defining a
+parallel release inventory. The intended supported install surface is:
+
+- `brew install randlee/tap/sc-lint`
+
+Architecture consequences:
+
+- the `update-homebrew` workflow may use a secondary `homebrew-tap/` checkout
+  to rewrite tap-local formula files
+- the top-level `sc-lint` formula is the primary supported Homebrew surface
+  for normal users
+- backend binaries included in the release manifest should be installed from
+  that top-level formula when they are part of the supported toolset
+- any retained per-backend formula, such as `sc-lint-boundary.rb`, must remain
+  explicitly documented as a legacy compatibility surface rather than the
+  normal user install path
 
 ## Consumer-Proven Rule Promotion
 

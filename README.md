@@ -22,8 +22,25 @@ This repository currently ships these primary crates:
 - `sc-lint-runtime`
   - runtime/concurrency analyzer crate
 
-The workspace version is managed from the root `Cargo.toml` and currently
-starts at `0.1.0`.
+The workspace version is managed from the root `Cargo.toml` via `version.workspace = true` in each crate.
+
+## Homebrew
+
+The primary supported Homebrew install path is:
+
+```bash
+brew install randlee/tap/sc-lint
+```
+
+That formula is intended to install the released end-user toolset together:
+
+- `sc-lint`
+- `sc-lint-boundary`
+- `sc-lint-portability`
+- `sc-lint-runtime`
+
+The older `randlee/tap/sc-lint-boundary` formula may remain as a legacy
+compatibility surface, but it is not the normal user install path.
 
 ## Current Lint Surface
 
@@ -172,9 +189,12 @@ The current GitHub Actions sequence mirrors the local workflow:
 Detailed design and planning material lives under:
 
 - [`docs/sc-lint/README.md`](docs/sc-lint/README.md)
-- [`docs/sc-lint/tools/sc-boundary.md`](docs/sc-lint/tools/sc-boundary.md)
-- [`docs/sc-lint/tools/sc-portability.md`](docs/sc-lint/tools/sc-portability.md)
-- [`docs/sc-lint/tools/sc-runtime.md`](docs/sc-lint/tools/sc-runtime.md)
+- [`crates/sc-lint-boundary/README.md`](crates/sc-lint-boundary/README.md)
+- [`crates/sc-lint-portability/README.md`](crates/sc-lint-portability/README.md)
+- [`crates/sc-lint-runtime/README.md`](crates/sc-lint-runtime/README.md)
+- [`crates/sc-lint-schema/README.md`](crates/sc-lint-schema/README.md)
+- [`crates/sc-lint-directives/README.md`](crates/sc-lint-directives/README.md)
+- [`crates/sc-lint-attributes/README.md`](crates/sc-lint-attributes/README.md)
 - [`docs/sc-lint/requirements.md`](docs/sc-lint/requirements.md)
 - [`docs/sc-lint/graph-schema.md`](docs/sc-lint/graph-schema.md)
 - [`docs/sc-lint/boundary-enforcement-model.md`](docs/sc-lint/boundary-enforcement-model.md)

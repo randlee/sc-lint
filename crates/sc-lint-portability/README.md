@@ -18,6 +18,20 @@ Use `sc-portability` to catch portability drift such as:
 - `PORT-005`
   - `#[cfg_attr(not(unix), allow(dead_code))]` portability suppressors
 
+## Ownership And Scope
+
+Per [ADR-010](../../docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md),
+`sc-lint-portability` is the shared product owner for consumer-neutral:
+
+- Windows-path parity companion rules for the current Unix-only path checks
+- broader environment-variable portability rules
+- shell-portability rules for OS-specific shell-path and shell-command
+  assumptions
+
+Consumer-specific portability wrappers may still exist in downstream repos, but
+they do not replace `sc-lint-portability` as the core shared ownership
+boundary for these rule families.
+
 ## Invocation
 
 Primary product surface:
@@ -138,6 +152,5 @@ Delegated/backend normalization records also appear:
 
 See:
 
-- [logging.md](../logging.md)
-- [cli-contract.md](../cli-contract.md)
-
+- [logging.md](../../docs/sc-lint/logging.md)
+- [cli-contract.md](../../docs/sc-lint/cli-contract.md)
