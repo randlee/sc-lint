@@ -98,9 +98,16 @@ baseline_artifact = "artifacts/baselines/cli-v0.2.0.json"
 
 ## Acceptance Criteria
 
-- `ADR-011` is promoted to Accepted status before `C.2` begins
+- `ADR-011` decision text, consequences, and follow-on planning sections stay
+  consistent with the `C.1` deliverables for breaking-change semantics, the
+  `[version.families.<family>]` config surface, the dedicated `sc-lint-version`
+  form-factor, the `sc-lint check interfaces` invocation path, and the
+  Rust-public-API translation-layer contract
 - `version-requirements.md` defines interface-family-specific breaking-change
   rules
+- `version-requirements.md` contains one normative Interface Family
+  Identifiers section listing the canonical machine token strings used across
+  config, CLI flags, baseline artifacts, and verdict output
 - `version-requirements.md` defines the planned `[version.families.<family>]`
   configuration surface, including the distinction between omitted families
   and configured-but-not-present families

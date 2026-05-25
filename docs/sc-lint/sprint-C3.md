@@ -68,37 +68,41 @@ target: develop
 
 ```json
 {
-  "command": "sc-lint check interfaces",
-  "ok": false,
-  "families": [
-    {
-      "interface_family": "rust-public-api",
-      "baseline": "crates.io:0.2.0",
-      "breaking_items": ["function_missing"],
-      "artifact_paths": [
-        "artifacts/interfaces/crate-api/sc-lint/index.html",
-        "artifacts/interfaces/crate-api/sc-lint/index.json"
-      ]
-    },
-    {
-      "interface_family": "cli",
-      "baseline": {
-        "schema": "sc-lint-cli-interface-v1",
-        "artifact": "artifacts/baselines/cli-v0.2.0.json"
+  "ok": true,
+  "command": "check.interfaces",
+  "data": {
+    "ok": false,
+    "families": [
+      {
+        "interface_family": "rust-public-api",
+        "baseline": "crates.io:0.2.0",
+        "breaking_items": ["function_missing"],
+        "artifact_paths": [
+          "artifacts/interfaces/crate-api/sc-lint/index.html",
+          "artifacts/interfaces/crate-api/sc-lint/index.json"
+        ]
       },
-      "breaking_items": [],
-      "artifact_paths": [
-        "artifacts/interfaces/cli/index.html",
-        "artifacts/interfaces/cli/index.json"
-      ]
-    },
-    {
-      "interface_family": "rpc-socket",
-      "status": "not_present",
-      "breaking_items": [],
-      "artifact_paths": []
-    }
-  ]
+      {
+        "interface_family": "cli",
+        "baseline": {
+          "schema": "sc-lint-cli-interface-v1",
+          "artifact": "artifacts/baselines/cli-v0.2.0.json"
+        },
+        "breaking_items": [],
+        "artifact_paths": [
+          "artifacts/interfaces/cli/index.html",
+          "artifacts/interfaces/cli/index.json"
+        ]
+      },
+      {
+        "interface_family": "rpc-socket",
+        "status": "not_present",
+        "breaking_items": [],
+        "artifact_paths": []
+      }
+    ]
+  },
+  "diagnostics": []
 }
 ```
 
@@ -124,6 +128,10 @@ target: develop
 - `docs/sc-lint/version-requirements.md` references the versioned CLI
   baseline artifact schema and the `C.2` baseline-generation workflow for the
   `cli` family
+- `docs/sc-lint/version-requirements.md` states explicitly that the
+  multi-family verdict is carried under the existing top-level
+  `CommandEnvelope<T>` / `CliError` CLI contract rather than a parallel
+  machine-readable envelope
 - `docs/sc-lint/version-requirements.md` requires concrete
   published-artifact paths in failure output for present families, and the
   sprint code sample illustrates a conforming example

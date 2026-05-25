@@ -47,7 +47,8 @@ target: develop
 - one planned CLI baseline artifact definition that includes:
   - a versioned JSON schema for command ids, required request/response
     fields, and stable machine error codes
-  - generation through `sc-lint check interfaces --family cli --write-baseline`
+  - generation through
+    `sc-lint check interfaces --family cli --write-baseline <path>`
   - one explicit replacement workflow for approved major-version changes
 - explicit planning language that generated templates and structured data own
   the output, not manually maintained HTML pages
@@ -99,7 +100,8 @@ artifacts/baselines/
 - `docs/sc-lint/version-requirements.md` requires published coverage across
   all shipped crates, not only the top-level crate
 - `docs/sc-lint/version-requirements.md` defines the CLI baseline artifact
-  schema, the `sc-lint check interfaces --family cli --write-baseline`
+  schema, the
+  `sc-lint check interfaces --family cli --write-baseline <path>`
   generation workflow, and the approved baseline-replacement path for major
   version updates
 

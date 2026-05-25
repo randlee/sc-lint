@@ -66,6 +66,18 @@ later.
   config, CLI flags, baseline artifacts, and verdict output so one family does
   not silently acquire multiple names.
 
+### Interface Family Identifiers
+
+The only accepted canonical interface-family identifiers for the initial
+Phase `C` planning line are:
+
+- `rust-public-api`
+- `cli`
+- `rpc-socket`
+
+These identifiers are the only accepted values for family selection in config,
+CLI flags, baseline artifact names, and verdict output.
+
 ## Artifact Model
 
 - `REQ-VERSION-004`
@@ -188,6 +200,10 @@ later.
 - `REQ-VERSION-017`
   `sc-lint-version` must provide a hard-fail mode that exits non-zero when a
   detected breaking change is present in any enabled interface family.
+  The multi-family verdict for `sc-lint check interfaces` must travel through
+  the existing top-level `CommandEnvelope<T>` success path and the existing
+  `CliError` failure path rather than defining a parallel machine-readable
+  envelope.
 
 - `REQ-VERSION-017A`
   The multi-family hard-fail result must use one top-level verdict record for
