@@ -95,6 +95,14 @@ fn visit_expr_for_unix_portability(
 - `crates/sc-lint-portability/README.md` documents the new production
   env-portability rule and the intended abstraction strategy
 
+## This Sprint Establishes
+
+- `visit_expr_for_unix_portability(...)`, as extended by `C.7`, serves as the
+  integration base for sprint `C.8`
+- sprint `C.8` extends this same `Expr::Call` dispatch seam for
+  shell-invocation portability and therefore depends on this sprint
+  completing first
+
 ## Explicit Code Samples
 
 ```rust

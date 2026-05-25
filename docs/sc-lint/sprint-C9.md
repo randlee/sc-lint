@@ -23,6 +23,7 @@ target: develop
 - [docs/requirements.md](../requirements.md)
 - [docs/architecture.md](../architecture.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./adr/ADR-010-portability-scope-and-parity.md)
+- [docs/sc-lint/sprint-C8.md](./sprint-C8.md)
 - [crates/sc-lint-portability/README.md](../../crates/sc-lint-portability/README.md)
 
 ## Exact Targets
