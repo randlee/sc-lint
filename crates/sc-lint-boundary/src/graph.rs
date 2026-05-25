@@ -776,10 +776,10 @@ fn resolve_reference_target(
         .next()
         .unwrap_or(source_node_id);
 
-    if let Some((dependency_root, rest)) = referenced_path.split_once("::") {
-        if let Some(dependency_crate_id) = context.workspace_dependency_roots.get(dependency_root) {
-            return NodeId::new(format!("{dependency_crate_id}::module::crate::{rest}"));
-        }
+    if let Some((dependency_root, rest)) = referenced_path.split_once("::")
+        && let Some(dependency_crate_id) = context.workspace_dependency_roots.get(dependency_root)
+    {
+        return NodeId::new(format!("{dependency_crate_id}::module::crate::{rest}"));
     }
 
     if let Some(rest) = referenced_path.strip_prefix("crate::") {
