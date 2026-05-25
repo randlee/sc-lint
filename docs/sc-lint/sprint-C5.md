@@ -37,6 +37,9 @@ target: develop
   `sc-lint-version` adoption skill through:
   - `.claude-plugin/marketplace.json`
   - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
+- documentation updates that keep the marketplace path discoverable:
+  - `docs/sc-lint/README.md` links the minimal marketplace publication path
+  - `docs/sc-lint/roadmap.md` references the `C.5` marketplace milestone
 - explicit reference in the sprint plan that the marketplace design follows
   `docs/sc-lint/minimal-marketplace-constraints.md`
 - clear division between:

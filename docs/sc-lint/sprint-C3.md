@@ -87,12 +87,12 @@ target: develop
 
 - `docs/sc-lint/version-requirements.md` defines one hard-fail verdict model
   across Rust API, CLI, and RPC/socket families
-- the sprint code sample and `docs/sc-lint/version-requirements.md` both show
-  the aggregate top-level `ok` rollup plus per-family verdict entries for a
-  multi-family run
-- the sprint code sample and `docs/sc-lint/version-requirements.md` both
-  require concrete published-artifact paths in failure output for present
-  families
+- `docs/sc-lint/version-requirements.md` defines the aggregate top-level `ok`
+  rollup plus per-family verdict entries for a multi-family run, and the
+  sprint code sample illustrates a conforming example
+- `docs/sc-lint/version-requirements.md` requires concrete
+  published-artifact paths in failure output for present families, and the
+  sprint code sample illustrates a conforming example
 - `docs/sc-lint/version-requirements.md` keeps “not present in this repo”
   explicit for unsupported current interface families instead of omitting them
   silently

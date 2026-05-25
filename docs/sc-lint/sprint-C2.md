@@ -85,9 +85,8 @@ artifacts/interfaces/
   canonical machine-readable output
 - `docs/sc-lint/interface-reporting-constraints.md` requires separate XHTML
   section fragments/panels and built-in copy actions per panel
-- `docs/sc-lint/version-requirements.md` and `docs/sc-lint/phase-C-plan.md`
-  both require published coverage across all shipped crates, not only the
-  top-level crate
+- `docs/sc-lint/version-requirements.md` requires published coverage across
+  all shipped crates, not only the top-level crate
 
 ## Required Validation
 

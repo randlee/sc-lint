@@ -50,6 +50,10 @@ target: develop
     removed at the canonical artifact layer
 - one planned repo-local Claude Code skill dedicated to `sc-lint-version`
   adoption and usage guidance
+- documentation updates that keep the adoption path discoverable:
+  - `docs/sc-lint/README.md` links the consumer-adoption document and planned
+    skill surface
+  - `docs/sc-lint/roadmap.md` references the `C.4` adoption/skill milestone
 - explicit references in the sprint plan that:
   - the skill design follows
     `docs/sc-lint/skill-authoring-constraints.md`
@@ -81,15 +85,16 @@ description: Guides a consuming repository through sc-lint-version adoption.
 
 ## Acceptance Criteria
 
-- the plan names one authoritative consumer-integration document rather than
-  scattering adoption steps across multiple unrelated docs
-- the sprint plan explicitly states that `docs/sc-lint/version-adoption.md`
-  must define harness, fixture, simulator/transcript, and normalization
-  responsibilities for consuming repos
-- the plan explicitly says consuming repos should leverage existing CLI
-  testability and simulator infrastructure where available
-- the plan explicitly requires a repo-local Claude Code skill for consumer
-  adoption guidance
+- `docs/sc-lint/version-adoption.md` is the authoritative consumer-integration
+  document rather than scattering adoption steps across multiple unrelated
+  docs
+- `docs/sc-lint/version-adoption.md` defines harness, fixture,
+  simulator/transcript, and normalization responsibilities for consuming repos
+- `docs/sc-lint/version-adoption.md` explicitly states that consuming repos
+  should reuse existing CLI testability and simulator infrastructure where
+  available
+- `.claude/skills/sc-lint-version-adoption/SKILL.md` exists and contains
+  versioned frontmatter scoped to `sc-lint-version` adoption
 - `docs/sc-lint/skill-authoring-constraints.md` requires the planned skill
   surface to be versioned and to stay scoped to `sc-lint-version` adoption
 - the sprint references `docs/sc-lint/skill-authoring-constraints.md` as the
