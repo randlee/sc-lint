@@ -107,16 +107,26 @@ release-foundation work for:
 
 Phase `B` is now the next planned line of work.
 
-Initial Phase-B scope is post-mortem carry-forwards from Phase `A`, starting
-with Sprint `B.1`:
+Initial Phase-B scope is split into focused planning sprints:
 
-- systemic lint-gate planning for recurring Phase-A finding patterns
-- observability boundary-policy ADR work
-- QA-process tightening so `rust-best-practices` runs in
-  `practice_mode:all` on every sprint
+- `B.1`
+  - carry-forward lint-gate and portability-scope hardening
+- `B.2`
+  - named-caller allowlist enforcement planning
+- `B.3`
+  - observability boundary-policy ADR acceptance
+- `B.4`
+  - QA-process hardening with triage-first routing and QA-1-only broad
+    `rust-best-practices`
+- `sprint-B-homebrew`
+  - full Homebrew toolset distribution planning
 
-See [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md) and
-[docs/sc-lint/sprint-B1.md](./sprint-B1.md).
+See [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md),
+[docs/sc-lint/sprint-B1.md](./sprint-B1.md),
+[docs/sc-lint/sprint-B2.md](./sprint-B2.md),
+[docs/sc-lint/sprint-B3.md](./sprint-B3.md), and
+[docs/sc-lint/sprint-B4.md](./sprint-B4.md), and
+[docs/sc-lint/sprint-B-homebrew.md](./sprint-B-homebrew.md).
 
 ### Current code moves required
 

@@ -22,10 +22,10 @@ Current contents:
 - [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
   execution plan for repo self-hosting, boundaries, CLI introduction, and
   extraction order
-- [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution stub and
-  post-mortem carry-forward planning line
+- [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution plan and
+  focused sprint-hardening sequence
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
-  ownership, and Phase A touchpoint guide
+  ownership, and current plan touchpoint guide
 - [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
   decisions
 - [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract
@@ -39,8 +39,13 @@ Current contents:
 - [`sprint-A6.md`](./sprint-A6.md) — Rust boundary inventory loader sprint
 - [`sprint-A7.md`](./sprint-A7.md) — manifest-policy and parity sprint
 - [`sprint-A8.md`](./sprint-A8.md) — per-tool user-guide sprint
-- [`sprint-B1.md`](./sprint-B1.md) — post-mortem carry-forward and systemic
-  lint-gate planning sprint
+- [`sprint-B1.md`](./sprint-B1.md) — carry-forward lint-gate and portability
+  scope-hardening sprint
+- [`sprint-B2.md`](./sprint-B2.md) — named-caller allowlist enforcement sprint
+- [`sprint-B3.md`](./sprint-B3.md) — observability boundary-policy ADR sprint
+- [`sprint-B4.md`](./sprint-B4.md) — QA-process hardening sprint
+- [`sprint-B-homebrew.md`](./sprint-B-homebrew.md) — full Homebrew toolset
+  distribution planning sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for

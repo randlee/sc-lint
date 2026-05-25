@@ -13,28 +13,36 @@ target: develop
 
 - make `brew install randlee/tap/sc-lint` the primary supported Homebrew entry
   point
-- extend Homebrew distribution from `sc-lint-boundary` only to the full
-  released `sc-lint` toolset
-- close issue `#30` with one production-ready release and tap update path for
-  macOS Intel, macOS ARM, and Linux
+- bootstrap a new primary `sc-lint.rb` formula through the existing
+  `update-homebrew` pipeline so one install path ships the full released
+  `sc-lint` toolset
+- define a production-ready plan for issue `#30`, covering the full toolset
+  release and tap update path for macOS Intel, macOS ARM, and Linux
 
 ## Hard Dependencies
 
 - [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md)
+- [docs/requirements.md](../requirements.md)
+- [docs/architecture.md](../architecture.md)
 - [release/publish-artifacts.toml](../../release/publish-artifacts.toml)
 - [.github/workflows/release.yml](../../.github/workflows/release.yml)
 - [docs/release-inventory-schema.json](../release-inventory-schema.json)
-- external Homebrew tap checkout rooted at `${HOMEBREW_TAP_DIR}`
+- the existing `update-homebrew` workflow checkout rooted at `homebrew-tap/`
 
 ## Exact Targets
+
+Paths under `homebrew-tap/` are relative to the workflow's secondary tap
+checkout root, not to this repository root. Use `${HOMEBREW_TAP_DIR}` for
+local validation and the workflow checkout path `homebrew-tap/` in CI.
 
 - `release/publish-artifacts.toml`
 - `.github/workflows/release.yml`
 - `docs/release-inventory-schema.json`
+- `scripts/release_artifacts.py`
 - `README.md`
 - `docs/sc-lint/README.md`
-- `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb`
-- `${HOMEBREW_TAP_DIR}/Formula/sc-lint-boundary.rb`
+- `homebrew-tap/Formula/sc-lint.rb`
+- `homebrew-tap/Formula/sc-lint-boundary.rb`
 
 ## Deliverables
 
@@ -45,19 +53,28 @@ silently dropped or partially deferred.
 
 - Homebrew distribution ships one primary `sc-lint` install path that gives the
   user the full released toolset needed for normal repo use
+- the sprint includes the tap bootstrap step that creates
+  `homebrew-tap/Formula/sc-lint.rb`, because the current tap surface only ships
+  `sc-lint-boundary.rb`
 - release manifest and GitHub release artifacts cover the binaries required for
   that full toolset: `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
   `sc-lint-runtime`
-- one formula strategy is selected and documented: a unified `sc-lint` formula
-  is the default production path, while any direct backend formula remains
-  optional compatibility surface only if the release automation keeps it in
-  sync
+- `release/publish-artifacts.toml` expands the existing schema-version-1
+  `[[crates]]` and `[[release_binaries]]` tables to the full multi-crate,
+  multi-binary toolset without requiring a schema-version bump
+- `scripts/release_artifacts.py` is reviewed and updated only if needed so the
+  existing validate-manifest, validate-preflight-checks, validate-publish-order,
+  list-release-binaries, and cargo-build-bin-args paths handle the expanded
+  multi-binary manifest shape
+- `sc-lint.rb` becomes the primary supported install path; the sprint makes the
+  disposition of `sc-lint-boundary.rb` explicit by either retiring it from the
+  tap or retaining it only as a documented legacy compatibility surface
 - release workflow updates the Homebrew tap deterministically for macOS Intel,
   macOS ARM, and Linux with per-artifact checksums taken from published release
   tarballs
 - operator docs clearly state the supported `brew` install command, the
-  installed binaries, and the expected relationship between the top-level
-  formula and any optional backend-specific formula
+  installed binaries, and that the backend tools are included by the top-level
+  `sc-lint` formula rather than installed via separate formulas
 
 ## Explicit Code Samples
 
@@ -93,9 +110,32 @@ class ScLint < Formula
   test do
     system "#{bin}/sc-lint", "--version"
     system "#{bin}/sc-lint-boundary", "--version"
+    system "#{bin}/sc-lint-portability", "--version"
+    system "#{bin}/sc-lint-runtime", "--version"
   end
 end
 ```
+
+```toml
+[[crates]]
+artifact = "sc-lint"
+package = "sc-lint"
+
+[[crates]]
+artifact = "sc-lint-portability"
+package = "sc-lint-portability"
+
+[[crates]]
+artifact = "sc-lint-runtime"
+package = "sc-lint-runtime"
+```
+
+The `[[crates]]` sample above is intentionally partial. Real manifest entries
+must include the full schema-version-1 field set already required by
+`scripts/release_artifacts.py` and demonstrated in
+`release/publish-artifacts.toml`:
+`cargo_toml`, `required`, `publish`, `publish_order`, `preflight_check`,
+`wait_after_publish_seconds`, and `verify_install`.
 
 ## This Sprint Does Not Close
 
@@ -107,20 +147,26 @@ end
 
 - `brew install randlee/tap/sc-lint` succeeds and installs the full toolset
   binaries
-- the selected formula strategy is documented with `sc-lint` as the primary
-  production formula and any retained `sc-lint-boundary` formula limited to an
-  explicit compatibility role
 - `release/publish-artifacts.toml` and `.github/workflows/release.yml` define a
   publish path for `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
-  `sc-lint-runtime` through the chosen Homebrew formula strategy
+  `sc-lint-runtime` through the tap-bootstrap + `sc-lint.rb` update path
+- the sprint explicitly records the disposition of `homebrew-tap/Formula/sc-lint-boundary.rb`
+  as either retired in this sprint or retained only as a legacy compatibility
+  surface that is not the supported install path for normal users
+- the CI `update-homebrew` job reaches its formula-generation and
+  commit-or-noop path using the workflow checkout root `homebrew-tap/` without
+  path-resolution errors
 - Homebrew automation computes checksums from published release artifacts and
-  updates `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb` deterministically for macOS
-  Intel, macOS ARM, and Linux
+  updates `homebrew-tap/Formula/sc-lint.rb` deterministically for macOS Intel,
+  macOS ARM, and Linux
 - formula verification proves the selected Homebrew path exposes
-  `sc-lint --version` and the backend binaries promised by the chosen release
-  packaging shape
-- user docs point at the primary `sc-lint` formula and explain any retained
-  compatibility role for `sc-lint-boundary`
+  `sc-lint --version`, `sc-lint-boundary --version`,
+  `sc-lint-portability --version`, and `sc-lint-runtime --version`
+- user docs point at the primary `sc-lint` formula and explain that backend
+  binaries are included in that install path
+- the sprint doc makes the manifest/schema plan explicit enough that a
+  developer knows whether `scripts/release_artifacts.py` needs code changes or
+  only expanded data entries for the multi-binary release shape
 
 ## Required Validation
 

@@ -7,6 +7,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -169,6 +170,8 @@ Current intended distribution is:
 - `sc-lint-boundary`
   - boundary inventory and ownership rules
   - boundary declarations and attribute-driven boundary policy
+  - planned next boundary rule-family addition:
+    - `SCB-CALLER-001` named-caller allowlist enforcement
 - `sc-lint-portability`
   - OS/platform portability rules
   - current planned moves/imports:
@@ -177,6 +180,12 @@ Current intended distribution is:
     - `PORT-003`
     - `PORT-004`
     - `PORT-005`
+  - planned next shared scope:
+    - Windows-only path literal parity companion rules
+    - broader environment-variable portability rules
+    - shell portability rules for OS-specific shell and command assumptions
+  - consumer-specific portability wrappers remain out of this crate unless they
+    are generalized into shared product rules
 - `sc-lint-runtime`
   - std runtime/concurrency correctness rules
   - current owned rules:
@@ -307,6 +316,36 @@ These provide:
 For release `0.1.x`, these repo-local automation/profile surfaces remain
 documented product surfaces but are intentionally out of boundary inventory
 enforcement scope unless later modeled as explicit boundary records.
+
+## Release Distribution
+
+For release `0.1.x`, release packaging and distributor updates should remain
+driven by one canonical manifest surface:
+
+- `release/publish-artifacts.toml`
+
+That manifest is expected to describe:
+
+- multi-crate publish order
+- released binary inventory
+- preflight and verification requirements
+
+The planned Homebrew path layers on top of that manifest rather than defining a
+parallel release inventory. The intended supported install surface is:
+
+- `brew install randlee/tap/sc-lint`
+
+Architecture consequences:
+
+- the `update-homebrew` workflow may use a secondary `homebrew-tap/` checkout
+  to rewrite tap-local formula files
+- the top-level `sc-lint` formula is the primary supported Homebrew surface
+  for normal users
+- backend binaries included in the release manifest should be installed from
+  that top-level formula when they are part of the supported toolset
+- any retained per-backend formula, such as `sc-lint-boundary.rb`, must remain
+  explicitly documented as a legacy compatibility surface rather than the
+  normal user install path
 
 ## Consumer-Proven Rule Promotion
 

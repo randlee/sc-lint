@@ -88,7 +88,7 @@ This phase should execute in the following order:
 
 ## Scheduled Sprint Plans
 
-The currently scheduled foundation sprints are:
+The currently scheduled sprint plans are:
 
 - `A.1a`
   - CLI bootstrap and contract definition
@@ -127,11 +127,19 @@ The currently scheduled foundation sprints are:
   - active implementation branch: `feature/sprint-A8`
   - `docs/sc-lint/sprint-A8.md`
 - `B.1`
-  - phase-A post-mortem carry-forwards and systemic lint-gate planning
+  - carry-forward lint-gate and portability-scope hardening
   - `docs/sc-lint/sprint-B1.md`
 - `B.2`
   - named-caller allowlist enforcement in `sc-lint-boundary`
   - `docs/sc-lint/sprint-B2.md`
+- `B.3`
+  - observability boundary-policy ADR acceptance, including promotion of
+    `ADR-009` from stub to accepted policy text plus boundary/planning
+    alignment
+  - `docs/sc-lint/sprint-B3.md`
+- `B.4`
+  - QA-process hardening
+  - `docs/sc-lint/sprint-B4.md`
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew toolset distribution planning
   - sprint number intentionally pending
@@ -206,8 +214,10 @@ Release `0.1.x` should establish:
   - one document per tool named after the lint tool and linked from the
     repository-root `README.md`
 
-The current phase, Phase `A`, is the release-1 foundation phase. It does not imply that
-every release-1 implementation item is already complete.
+Phase `A` completed the release-1 foundation implementation line. Phase `B` is
+the current planning and hardening line for post-Phase-A defect prevention,
+follow-on feature work, and release/distribution planning. That does not imply
+that every release-1 follow-on item is already complete.
 
 ## Planning Conventions
 

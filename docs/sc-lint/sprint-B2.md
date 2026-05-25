@@ -18,6 +18,7 @@ target: develop
 ## Hard Dependencies
 
 - [docs/sc-lint/sprint-B1.md](./sprint-B1.md)
+- [docs/requirements.md](../requirements.md), especially `REQ-PRODUCT-018`
 - [docs/sc-lint/requirements.md](./requirements.md), especially `REQ-SCB-006`, `REQ-SCB-007`, and `REQ-SCB-011`
 - [boundaries/sc-lint-boundary/boundary-analyzer.toml](../../boundaries/sc-lint-boundary/boundary-analyzer.toml)
 - the landed TOML inventory loader and `syn`-backed reference graph in `sc-lint-boundary`
@@ -43,6 +44,12 @@ silently dropped or partially deferred.
 - boundary TOML gains a structured `[callers]` section for named-caller
   approvals, with schema validation that rejects malformed symbol rows,
   duplicate entries, and unknown fields
+- approved caller symbols and caller identities are parsed into validated
+  wrapper types at the inventory boundary rather than flowing through analysis
+  as unconstrained raw `String` values
+- `SCB-CALLER-001` rule evaluation lands in `crates/sc-lint-boundary/src/analysis.rs`
+  with the existing boundary-rule evaluation path; this sprint does not split
+  caller policy into a separate `callers.rs` module
 - `SCB-CALLER-001` lands as a fail-only rule in `sc-lint-boundary`, using the
   existing reference graph to enumerate all callers of an approved-list symbol
   and emitting a finding for every caller not listed in TOML
@@ -72,6 +79,15 @@ approved = [
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct BoundaryRecord {
+    pub(crate) id: BoundaryId,
+    pub(crate) owner: OwnerId,
+    pub(crate) roots: Vec<BoundaryRoot>,
+    pub(crate) callers: Option<CallersSection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CallersSection {
     pub(crate) approved: Vec<ApprovedCallerEntry>,
 }
@@ -79,12 +95,21 @@ pub(crate) struct CallersSection {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApprovedCallerEntry {
-    pub(crate) symbol: String,
-    pub(crate) callers: Vec<String>,
+    pub(crate) symbol: ApprovedSymbol,
+    pub(crate) callers: Vec<ApprovedCaller>,
 }
 ```
 
 ```rust
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct ApprovedSymbol(String);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct ApprovedCaller(String);
+```
+
+```rust
+#[non_exhaustive]
 pub enum RuleId {
     ScbCycle001,
     ScbCycle002,
@@ -106,6 +131,7 @@ pub(crate) fn analyze_named_callers(
 
 fn caller_is_exempt(
     record: &BoundaryRecord,
+    callers: &CallersSection,
     caller_package: &str,
     caller_path: &str,
 ) -> bool;
@@ -123,6 +149,16 @@ fn caller_is_exempt(
 
 - malformed `[callers]` rows, duplicate symbol entries, and unknown caller
   fields fail during inventory load
+- approved symbols and caller identities are validated once at inventory load
+  and do not propagate through rule analysis as unconstrained raw strings
+- the sprint doc makes the chosen TOML integration point explicit:
+  `[callers]` extends each per-boundary `BoundaryRecord` without relaxing the
+  surrounding `#[serde(deny_unknown_fields)]` contract
+- `SCB-CALLER-001` implementation ownership is explicit:
+  `analyze_named_callers` and `caller_is_exempt` land in `analysis.rs` during
+  this sprint rather than in an undefined future module
+- the public `RuleId` extension strategy is explicit before `ScbCaller001`
+  lands: `RuleId` becomes `#[non_exhaustive]` in `crates/sc-lint-boundary/src/lib.rs`
 - `SCB-CALLER-001` exits non-zero when a non-exempt external caller reaches a
   restricted symbol and stays clean when all callers are approved or exempt
 - `references.scope = "outside_owner_crate"` exempts owner-crate callers
@@ -135,7 +171,8 @@ fn caller_is_exempt(
   - multi-symbol caller configuration
 - `sc-lint-boundary analyze --format text` and `--format json` both surface
   `SCB-CALLER-001` through the existing analysis command path
-- crate README and boundary-enforcement docs both include one canonical
+- `crates/sc-lint-boundary/README.md` and
+  `docs/sc-lint/boundary-enforcement-model.md` both include one canonical
   approved-caller example plus operator guidance on how it differs from
   `references.forbidden`
 

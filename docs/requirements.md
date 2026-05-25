@@ -7,6 +7,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
@@ -108,6 +109,22 @@ The product should support both:
   Current A.4 implementation status:
   `PORT-001` through `PORT-005` are assigned to `sc-lint-portability`.
 
+- `REQ-PRODUCT-004AA`
+  Future shared portability rules for cross-platform path literals,
+  environment-variable portability, and shell portability must remain owned by
+  `sc-lint-portability` when their semantics are consumer-neutral.
+
+- `REQ-PRODUCT-004AB`
+  When `sc-lint` carries an OS-specific path-literal portability rule family
+  for one major platform class, parity-companion shared detection for the
+  matching opposite platform class should remain in `sc-lint-portability`
+  rather than drifting into consumer-local wrappers.
+
+- `REQ-PRODUCT-004AC`
+  Repo-specific portability policies or shell conventions must not migrate
+  into `sc-lint` unchanged; only generic shared portability rules should land
+  in `sc-lint-portability`.
+
 - `REQ-PRODUCT-004B`
   `sc-lint-runtime` must be the home for shared AST-sensitive std
   runtime/concurrency correctness rules.
@@ -162,6 +179,20 @@ The product should support both:
   machine contract to backend-specific machine-output flags or adapters, but
   that translation must not leak backend-specific contract drift into the
   stable user-facing surface.
+
+### Release distribution
+
+- `REQ-PRODUCT-006G`
+  The release-distribution metadata surface must support multi-crate publish
+  planning and multiple released binaries without requiring a distributor- or
+  formula-specific schema fork.
+
+- `REQ-PRODUCT-006H`
+  When Homebrew distribution is provided, the primary supported tap entry point
+  must be `randlee/tap/sc-lint`, and that install path must expose the
+  backend binaries promised by the corresponding release manifest. Legacy
+  per-backend formulas may remain only when they are explicitly documented as
+  secondary compatibility surfaces rather than the normal user install path.
 
 ### Logging and observability
 
@@ -318,6 +349,12 @@ The product should support both:
   loader migration completes, but they must become lint-enforced once boundary
   inventory loading lands in `sc-lint-boundary`.
 
+- `REQ-PRODUCT-018`
+  `sc-lint-boundary` may enforce named-caller allowlist policy for explicitly
+  configured restricted symbols when that policy is expressed as structured
+  boundary metadata. Detailed schema and inventory-loading behavior for that
+  feature lives in [docs/sc-lint/requirements.md](./sc-lint/requirements.md).
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
@@ -335,28 +372,29 @@ The product should support both:
 
 ## Current Phase Requirements
 
-The current execution phase, Phase `A`, requires:
+The current execution phase, Phase `B`, requires:
 
-- a top-level `sc-lint` CLI plan with crate-isolated backends
-- an AI-first top-level CLI contract with:
-  - canonical `--json` machine mode
-  - stable request/response seams
-  - structured machine-readable failures
-- canonical TOML boundary definitions for the current `sc-lint` crates
-- a default local development lint gate that runs the repo's own analyzer
-  checks
-- documented `fast` / `full` / `ci` profile semantics and the distinction
-  between `sc-lint lint ci` and top-level `sc-lint ci`
-- repo-local wrappers that map `just lint` and `just ci` onto the CLI-owned
-  profile and CI contracts instead of redefining them separately
-- a staged migration plan for:
-  - generic Python utilities
-  - boundary inventory and manifest-policy logic moving into Rust
-- a documented partition for newly proven lint families so release `0.1.x`
-  does not blur reusable analyzer rules with consumer-local policy
-- a documented position on cross-target preflight checks for developer
-  confidence versus real multi-platform CI validation, with ADR-005 serving as
-  the approved Phase A strategy artifact
+- phase-plan and sprint-plan hardening for the post-Phase-A follow-on work
+  currently scheduled in:
+  - `B.1`
+  - `B.2`
+  - `B.3`
+  - `B.4`
+  - `sprint-B-homebrew`
+- explicit top-level traceability for the new Phase-B product lines:
+  - portability-scope expansion in `sc-lint-portability`
+  - named-caller allowlist enforcement in `sc-lint-boundary`
+  - observability boundary-policy acceptance
+  - Homebrew release/distribution planning
+- requirements and architecture baselines that match the current active phase
+  rather than preserving stale Phase-A-only execution wording
+- continued preservation of the Phase-A release-1 foundation decisions already
+  accepted for:
+  - crate-isolated backends
+  - the AI-first top-level CLI contract
+  - canonical TOML boundary definitions
+  - the default local development lint gate
+  - documented `fast` / `full` / `ci` profile semantics
 
 ## Requirement Management
 

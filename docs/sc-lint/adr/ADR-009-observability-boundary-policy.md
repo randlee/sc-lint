@@ -10,7 +10,7 @@
 ## Purpose
 
 This ADR stub is reserved for the broader observability boundary policy work
-planned in Sprint `B.1`.
+planned in Sprint `B.3`.
 
 ## Planned Scope
 
@@ -34,4 +34,4 @@ planned in Sprint `B.1`.
 ## Status Note
 
 This ADR is intentionally a draft stub during Phase-B planning. The accepted
-policy text is expected to be written as part of Sprint `B.1`.
+policy text is expected to be written as part of Sprint `B.3`.
