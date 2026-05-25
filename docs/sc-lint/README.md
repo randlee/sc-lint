@@ -296,6 +296,8 @@ Related architecture decisions:
   — analyzer-crate partitioning and primary lint-target mapping
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
   — `sc-observability` selection plus CLI-owned structured logging policy
+- [`./adr/ADR-009-observability-boundary-policy.md`](./adr/ADR-009-observability-boundary-policy.md)
+  — accepted observability boundary seams and future direct-link constraints
 
 Planned A.8 user-guide convention:
 

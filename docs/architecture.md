@@ -7,6 +7,8 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
@@ -160,6 +162,35 @@ This means coordination belongs in:
 and not in:
 
 - direct backend crate cross-calls
+
+## Observability Boundary Policy
+
+ADR-008 and ADR-009 define the release-1 observability ownership model.
+
+The current approved observability seams are:
+
+- binary-only entry points:
+  - `logging::ObservedCommand`
+  - `logging::dispatch_event`
+- CLI-owned library seam:
+  - `contract::ServiceName`
+- shared contract field:
+  - `CommandEnvelope.command`
+
+Those seams exist so command identity, service identity, and event metadata can
+cross the library/binary split without exposing `sc-observability` runtime
+types from backend crates or backend public APIs.
+
+Release `0.1.x` observability dependency policy is:
+
+- the mixed lib+bin `sc-lint` package may keep `sc-observability` in
+  `[dependencies]`
+- that dependency seam is CLI-owned only by architecture policy
+- backend crates remain forbidden from taking direct `sc-observability`
+  dependencies
+- future direct-linked backends may reuse CLI-owned context and contract data,
+  but must not own logger initialization or introduce alternative event-entry
+  wrappers without a new ADR
 
 ### Rule-family distribution
 

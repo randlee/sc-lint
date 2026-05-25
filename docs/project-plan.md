@@ -42,6 +42,7 @@ The current project focus is:
   - see [docs/sc-lint/adr/README.md](./sc-lint/adr/README.md)
   - see [docs/sc-lint/logging.md](./sc-lint/logging.md)
   - see [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+  - see [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
   - see [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
@@ -135,7 +136,7 @@ The currently scheduled sprint plans are:
 - `B.3`
   - observability boundary-policy ADR acceptance, including promotion of
     `ADR-009` from stub to accepted policy text plus boundary/planning
-    alignment
+    alignment for the approved CLI-owned observability seams
   - `docs/sc-lint/sprint-B3.md`
 - `B.4`
   - QA-process hardening
