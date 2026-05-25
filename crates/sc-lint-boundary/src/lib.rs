@@ -150,6 +150,9 @@ impl Serialize for RuleId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuleFilter {
     Cycles,
+    // SCB-CALLER-001 is enforced as part of boundary policy, so it routes
+    // through the existing boundaries filter instead of a separate callers
+    // variant.
     Boundaries,
     InternalOnly,
     ForbidExternalImpls,

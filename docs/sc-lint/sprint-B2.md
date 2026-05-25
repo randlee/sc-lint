@@ -1,10 +1,10 @@
 ---
 id: B.2
 title: Named Caller Allowlist Enforcement
-status: planned
-branch: feature/phase-B-sprint-plans
-worktree: <repo-worktree>/feature/phase-B-sprint-plans
-target: develop
+status: completed
+branch: feature/sprint-B2
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-B2
+target: integration/phase-B
 ---
 
 # Sprint B.2 — Named Caller Allowlist Enforcement
