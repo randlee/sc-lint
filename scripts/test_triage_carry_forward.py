@@ -110,15 +110,17 @@ class TestTriageCarryForward(unittest.TestCase):
         )
 
     def test_missing_file_fails_closed(self) -> None:
-        with self.assertRaises(SystemExit) as exc:
-            _MOD.main(
-                [
-                    "--branch",
-                    "feature/sprint-B4",
-                    "--ttl",
-                    "/tmp/does-not-exist.ttl",
-                ]
-            )
+        with tempfile.TemporaryDirectory() as tmp:
+            missing_ttl = Path(tmp) / "does-not-exist.ttl"
+            with self.assertRaises(SystemExit) as exc:
+                _MOD.main(
+                    [
+                        "--branch",
+                        "feature/sprint-B4",
+                        "--ttl",
+                        str(missing_ttl),
+                    ]
+                )
         self.assertIn("missing triage record", str(exc.exception))
 
     def test_missing_category_or_severity_still_emits_rows(self) -> None:
