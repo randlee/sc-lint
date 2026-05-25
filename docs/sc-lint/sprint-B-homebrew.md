@@ -13,8 +13,8 @@ target: develop
 
 - make `brew install randlee/tap/sc-lint` the primary supported Homebrew entry
   point
-- extend Homebrew distribution from `sc-lint-boundary` only to the full
-  released `sc-lint` toolset
+- extend the existing `sc-lint` Homebrew formula so one install path ships the
+  full released `sc-lint` toolset
 - close issue `#30` with one production-ready release and tap update path for
   macOS Intel, macOS ARM, and Linux
 
@@ -24,7 +24,7 @@ target: develop
 - [release/publish-artifacts.toml](../../release/publish-artifacts.toml)
 - [.github/workflows/release.yml](../../.github/workflows/release.yml)
 - [docs/release-inventory-schema.json](../release-inventory-schema.json)
-- external Homebrew tap checkout rooted at `${HOMEBREW_TAP_DIR}`
+- the existing `update-homebrew` workflow checkout rooted at `homebrew-tap/`
 
 ## Exact Targets
 
@@ -34,8 +34,6 @@ target: develop
 - `README.md`
 - `docs/sc-lint/README.md`
 - `homebrew-tap/Formula/sc-lint.rb`
-- `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb`
-- `${HOMEBREW_TAP_DIR}/Formula/sc-lint-boundary.rb`
 
 ## Deliverables
 
@@ -49,16 +47,14 @@ silently dropped or partially deferred.
 - release manifest and GitHub release artifacts cover the binaries required for
   that full toolset: `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
   `sc-lint-runtime`
-- one formula strategy is selected and documented: a unified `sc-lint` formula
-  is the default production path, while any direct backend formula remains
-  optional compatibility surface only if the release automation keeps it in
-  sync
+- the existing `sc-lint` formula is updated to install the complete released
+  toolset; no new standalone formula files are introduced for backend crates
 - release workflow updates the Homebrew tap deterministically for macOS Intel,
   macOS ARM, and Linux with per-artifact checksums taken from published release
   tarballs
 - operator docs clearly state the supported `brew` install command, the
-  installed binaries, and the expected relationship between the top-level
-  formula and any optional backend-specific formula
+  installed binaries, and that the backend tools are included by the top-level
+  `sc-lint` formula rather than installed via separate formulas
 
 ## Explicit Code Samples
 
@@ -94,6 +90,7 @@ class ScLint < Formula
   test do
     system "#{bin}/sc-lint", "--version"
     system "#{bin}/sc-lint-boundary", "--version"
+    system "#{bin}/sc-lint-portability", "--version"
   end
 end
 ```
@@ -108,23 +105,20 @@ end
 
 - `brew install randlee/tap/sc-lint` succeeds and installs the full toolset
   binaries
-- the selected formula strategy is documented with `sc-lint` as the primary
-  production formula and any retained `sc-lint-boundary` formula limited to an
-  explicit compatibility role
 - `release/publish-artifacts.toml` and `.github/workflows/release.yml` define a
   publish path for `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
-  `sc-lint-runtime` through the chosen Homebrew formula strategy
+  `sc-lint-runtime` through the existing `sc-lint` Homebrew formula update path
 - the CI `update-homebrew` job reaches its formula-generation and
   commit-or-noop path using the workflow checkout root `homebrew-tap/` without
   path-resolution errors
 - Homebrew automation computes checksums from published release artifacts and
-  updates `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb` deterministically for macOS
-  Intel, macOS ARM, and Linux
+  updates `homebrew-tap/Formula/sc-lint.rb` deterministically for macOS Intel,
+  macOS ARM, and Linux
 - formula verification proves the selected Homebrew path exposes
   `sc-lint --version` and the backend binaries promised by the chosen release
   packaging shape
-- user docs point at the primary `sc-lint` formula and explain any retained
-  compatibility role for `sc-lint-boundary`
+- user docs point at the primary `sc-lint` formula and explain that backend
+  binaries are included in that install path
 
 ## Required Validation
 
@@ -133,4 +127,3 @@ end
 - `python3 scripts/release_artifacts.py validate-publish-order --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`
 - `cargo build --workspace`
 - `ruby -c homebrew-tap/Formula/sc-lint.rb`
-- `ruby -c "${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb"`
