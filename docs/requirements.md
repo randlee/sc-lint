@@ -110,6 +110,8 @@ The product should support both:
   platform/OS portability rules.
   Current A.4 implementation status:
   `PORT-001` through `PORT-005` are assigned to `sc-lint-portability`.
+  Phase `C` extends this same crate-owned family with `PORT-006` through
+  `PORT-010`.
 
 - `REQ-PRODUCT-004AA`
   Future shared portability rules for cross-platform path literals,
@@ -469,6 +471,19 @@ sequence. Its governing forward-pointer artifacts are:
 
 - `docs/sc-lint/version-requirements.md`
 - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
+
+Phase `C` also includes the next shared `sc-lint-portability` follow-on line:
+
+- `PORT-006`
+  - Unix-only absolute path literals in production code
+- `PORT-007`
+  - Windows-only absolute path literals in production code
+- `PORT-008`
+  - production `HOME`, `USER`, and `XDG_*` portability checks
+- `PORT-009`
+  - production `sh` / `bash` shell-invocation portability checks
+- `PORT-010`
+  - production structural `#[cfg(unix)]` companion-parity checks
 
 ## Requirement Management
 

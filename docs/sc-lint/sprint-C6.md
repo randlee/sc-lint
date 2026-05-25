@@ -39,6 +39,8 @@ target: develop
   - `PORT-006` hardcoded Unix-only absolute path literals in production code
   - `PORT-007` hardcoded Windows-only absolute path literals in production
     code
+  - closes `REQ-PRODUCT-004AA` for production path-literal expansion
+  - closes `REQ-PRODUCT-004AB` for Windows-path parity in the shared crate
 - `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port006` and
   `Port007`
 - `crates/sc-lint-portability/src/portability.rs` extends
@@ -47,8 +49,10 @@ target: develop
   to own `PORT-001`, `PORT-002`, and `PORT-003`
 - the production path-literal rule seam is explicit and uses the existing
   production walk rather than silently broadening the test-only collector;
-  `visit_item_for_unix_portability(...)` is the integration seam and calls the
-  new helper only when `scope == ScopeKind::NonTest` and `unix_gated == false`:
+  `visit_item_for_unix_portability(...)` is the integration seam, delegates
+  into `visit_expr_for_unix_portability(...)` for the inner expression walk,
+  and calls the new helper only when `scope == ScopeKind::NonTest` and
+  `unix_gated == false`:
 
 ```rust
 fn collect_production_path_literal_findings(
@@ -71,6 +75,7 @@ fn visit_item_for_unix_portability(
     if scope == ScopeKind::NonTest && !unix_gated {
         collect_production_path_literal_findings(item, file_context, findings);
     }
+    visit_expr_for_unix_portability(/* recurse into the item's expressions */);
 }
 ```
 
@@ -135,8 +140,9 @@ pub fn cache_dir() -> std::path::PathBuf {
   literal patterns in production code
 - the sprint names the concrete implementation seam in
   `visit_item_for_unix_portability(...)`, states that
-  `collect_production_path_literal_findings(...)` is called from that seam,
-  and keeps `PortabilityCollector` test-scope-only
+  `collect_production_path_literal_findings(...)` and
+  `visit_expr_for_unix_portability(...)` are both called from that seam, and
+  keeps `PortabilityCollector` test-scope-only
 - the sprint defines `PORT-007` detection for both drive-letter absolute paths
   and UNC paths instead of leaving Windows matching implicit
 - the sprint names at least one platform-aware alternative path source for

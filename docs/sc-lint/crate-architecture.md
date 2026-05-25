@@ -173,7 +173,7 @@ their governing docs, boundaries, and planned sprint work.
   - `sc-portability`
   - `sc-runtime`
 
-## Planned Capability Note
+## Planned Capability Note — sc-lint-version Sub-Line
 
 Phase `C` commits `sc-lint-version` as a planned dedicated workspace crate.
 
@@ -194,6 +194,31 @@ Phase `C` commits `sc-lint-version` as a planned dedicated workspace crate.
     `sc-lint-version` translation layer
 - dedicated crate boundary and implementation planning records remain future
   implementation work after the Phase `C` planning line
+
+## Planned Capability Note — sc-lint-portability Sub-Line
+
+Phase `C` also extends the existing `sc-lint-portability` crate through the
+planned portability follow-on sprints `C.6` through `C.9`.
+
+- authoritative planning docs:
+  - `docs/sc-lint/phase-C-plan.md`
+  - `docs/sc-lint/sprint-C6.md`
+  - `docs/sc-lint/sprint-C7.md`
+  - `docs/sc-lint/sprint-C8.md`
+  - `docs/sc-lint/sprint-C9.md`
+  - `docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md`
+- planned rule-family additions:
+  - `PORT-006` and `PORT-007`
+    - production path-literal portability expansion
+  - `PORT-008`
+    - production environment-variable portability expansion
+  - `PORT-009`
+    - shell invocation portability expansion
+  - `PORT-010`
+    - structural `cfg` parity expansion
+- planned ownership rule:
+  - the Phase `C` portability follow-ons stay inside the existing
+    `sc-lint-portability` crate rather than creating a separate crate line
 
 ## Current Plan Coverage
 

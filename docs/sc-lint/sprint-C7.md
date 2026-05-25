@@ -25,6 +25,7 @@ target: develop
 - [docs/requirements.md](../requirements.md)
 - [docs/architecture.md](../architecture.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./adr/ADR-010-portability-scope-and-parity.md)
+- [docs/sc-lint/sprint-C6.md](./sprint-C6.md)
 - [crates/sc-lint-portability/README.md](../../crates/sc-lint-portability/README.md)
 
 ## Exact Targets
@@ -42,6 +43,8 @@ target: develop
   - `HOME`
   - `USER`
   - `XDG_*`
+  - continues `REQ-PRODUCT-004AA` through the production env-portability
+    follow-on owned by `sc-lint-portability`
 - `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port008`
 - `PORT-008` fires on direct ungated production lookups of `std::env::var`
   or `std::env::var_os` for `HOME`, `USER`, and `XDG_*`; it does not add a
@@ -50,7 +53,9 @@ target: develop
   `#[cfg(unix)]`-gated items to `C.9` structural parity instead of adding a
   separate suppression model; `visit_expr_for_unix_portability(...)` is the
   expression visitor seam and must gain an `Expr::Call` arm that dispatches to
-  `production_env_portability_variable(...)`:
+  `production_env_portability_variable(...)`. This builds directly on the
+  `visit_item_for_unix_portability(...) -> visit_expr_for_unix_portability(...)`
+  call chain established in `C.6`:
 
 ```rust
 fn production_env_portability_variable(expr_call: &ExprCall) -> Option<&'static str> {
@@ -122,6 +127,9 @@ pub fn data_root() -> std::path::PathBuf {
   `#[cfg(unix)]`-gated items to `C.9`
 - the sprint names `visit_expr_for_unix_portability(...)` as the expression
   visitor seam for `production_env_portability_variable(...)`
+- the sprint states `C.6` as an ordering dependency because `C.7` extends the
+  same `visit_item_for_unix_portability(...) -> visit_expr_for_unix_portability(...)`
+  production call chain
 - the sprint keeps `PORT-002` and `PORT-003` semantics distinct instead of
   silently broadening either existing rule
 - the sprint names a platform-neutral remediation path for production callers

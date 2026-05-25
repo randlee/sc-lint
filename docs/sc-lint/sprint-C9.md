@@ -39,6 +39,8 @@ target: develop
 - `sc-lint-portability` adds `PORT-010` for production `cfg` parity drift when
   a Unix-only implementation branch has no Windows companion or explicit
   portable fallback
+  - continues `REQ-PRODUCT-004AA` through the structural parity follow-on
+    owned by `sc-lint-portability`
 - `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port010`
 - the rule defines the accepted parity shapes for production code:
   - sibling `#[cfg(unix)]` and `#[cfg(windows)]` items

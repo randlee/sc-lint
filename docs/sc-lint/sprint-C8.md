@@ -23,6 +23,7 @@ target: develop
 - [docs/requirements.md](../requirements.md)
 - [docs/architecture.md](../architecture.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./adr/ADR-010-portability-scope-and-parity.md)
+- [docs/sc-lint/sprint-C7.md](./sprint-C7.md)
 - [crates/sc-lint-portability/README.md](../../crates/sc-lint-portability/README.md)
 
 ## Exact Targets
@@ -41,10 +42,14 @@ target: develop
   - `Command::new("bash")`
   - hardcoded `/bin/sh`
   - hardcoded `/bin/bash`
+  - continues `REQ-PRODUCT-004AA` through the shared shell-portability
+    follow-on owned by `sc-lint-portability`
 - `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port009`
 - `PORT-009` integrates into `collect_unix_portability_findings(...)` so it
   reuses the existing `unix_gated` propagation path instead of inventing a
-  parallel suppression model
+  parallel suppression model; `collect_unix_portability_findings(...)`
+  orchestrates the production walk and routes expression analysis through
+  `visit_expr_for_unix_portability(...)`
 - the shell-invocation detection seam is explicit and separates process-launch
   calls from string-literal path checks; `visit_expr_for_unix_portability(...)`
   must gain an `Expr::Call` arm that invokes `is_shell_command_call(...)`:
@@ -67,6 +72,9 @@ fn visit_expr_for_unix_portability(
     match expr {
         Expr::Call(expr_call) if !unix_gated && is_shell_command_call(expr_call) => {
             // emit PORT-009
+        }
+        Expr::Lit(expr_lit) if !unix_gated && is_unix_shell_path_literal(/* literal text */) => {
+            // emit PORT-009 for /bin/sh or /bin/bash literal paths
         }
         Expr::Block(expr_block) => { /* existing recursion */ }
         Expr::If(expr_if) => { /* existing recursion */ }
@@ -122,6 +130,8 @@ pub fn run_unix_hook() -> std::io::Result<std::process::ExitStatus> {
   path as the suppression mechanism
 - the sprint names `visit_expr_for_unix_portability(...)` as the expression
   visitor seam for `is_shell_command_call(...)`
+- the sprint states `C.7` as an ordering dependency because `C.8` extends the
+  same expression-visitor seam added for the production env-portability family
 - the sprint names the dedicated helper boundary for shell-path literals
   instead of leaving `/bin/sh` detection implicit in generic path matching
 - the sprint keeps repo-local shell conventions and wrapper policy out of the
