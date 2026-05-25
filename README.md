@@ -25,6 +25,24 @@ This repository currently ships these primary crates:
 The workspace version is managed from the root `Cargo.toml` and currently
 starts at `0.1.0`.
 
+## Homebrew
+
+The primary supported Homebrew install path is:
+
+```bash
+brew install randlee/tap/sc-lint
+```
+
+That formula is intended to install the released end-user toolset together:
+
+- `sc-lint`
+- `sc-lint-boundary`
+- `sc-lint-portability`
+- `sc-lint-runtime`
+
+The older `randlee/tap/sc-lint-boundary` formula may remain as a legacy
+compatibility surface, but it is not the normal user install path.
+
 ## Current Lint Surface
 
 The repo exposes its lint surface through `just lint`.
