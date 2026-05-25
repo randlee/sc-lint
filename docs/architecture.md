@@ -7,6 +7,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -177,6 +178,12 @@ Current intended distribution is:
     - `PORT-003`
     - `PORT-004`
     - `PORT-005`
+  - planned next shared scope:
+    - Windows-only path literal parity companion rules
+    - broader environment-variable portability rules
+    - shell portability rules for OS-specific shell and command assumptions
+  - consumer-specific portability wrappers remain out of this crate unless they
+    are generalized into shared product rules
 - `sc-lint-runtime`
   - std runtime/concurrency correctness rules
   - current owned rules:

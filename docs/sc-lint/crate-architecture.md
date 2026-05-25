@@ -75,13 +75,17 @@ their governing docs, boundaries, and planned sprint work.
 
 - role:
   - shared platform and OS portability rule family
+  - planned future shared owner for Windows-path parity, env portability, and
+    shell-portability rule families when those checks remain consumer-neutral
 - governing docs:
   - `docs/sc-lint/extraction-plan.md`
   - `docs/sc-lint/roadmap.md`
+  - `docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md`
 - governing boundary:
   - `boundaries/sc-lint-portability/portability-analyzer.toml`
-- primary Phase A sprints:
+- primary implementation and planning sprints:
   - `A.4`
+  - `B.1`
 
 ### `sc-lint-runtime`
 

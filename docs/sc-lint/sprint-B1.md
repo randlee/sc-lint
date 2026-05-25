@@ -1,135 +1,115 @@
-# Sprint B.1
+---
+id: B.1
+title: Carry-Forward Lint-Gate And Portability Scope Hardening
+status: planned
+branch: feature/phase-B-sprint-plans
+worktree: <repo-worktree>/feature/phase-B-sprint-plans
+target: develop
+---
+
+# Sprint B.1 — Carry-Forward Lint-Gate And Portability Scope Hardening
 
 ## Goal
 
-Plan and stage the systemic carry-forward work from the Phase `A` post-mortem
-so recurring QA and architecture findings become explicit product and process
-deliverables instead of ad hoc cleanup.
+- turn recurring Phase `A` findings into one explicit planned lint-gate
+  backlog rather than ad hoc future cleanup
+- harden the shared portability scope so cross-platform path, env, and shell
+  drift are planned product work rather than review-only findings
+- close the scope-definition loop before later Phase `B` implementation sprints
+  begin
 
-## Governing References
+## Hard Dependencies
 
 - [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md)
-- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./adr/ADR-008-sc-observability-logging.md)
 - [docs/requirements.md](../requirements.md)
 - [docs/architecture.md](../architecture.md)
+- [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./adr/ADR-007-analyzer-crate-partition.md)
+- [crates/sc-lint-portability/README.md](../../crates/sc-lint-portability/README.md)
+
+## Exact Targets
+
+- `docs/sc-lint/phase-B-plan.md`
+- `docs/sc-lint/sprint-B1.md`
+- `docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md`
+- `docs/sc-lint/adr/README.md`
+- `docs/project-plan.md`
+- `docs/sc-lint/roadmap.md`
+- `docs/sc-lint/README.md`
+- `docs/requirements.md`
+- `docs/architecture.md`
 
 ## Deliverables
 
-1. Post-mortem lint-gate planning for the recurring Phase-A finding families:
-   - `RULE-010`: raw identity string literals without named constants
-   - `RULE-006`: `/tmp/` paths without intent comments
-   - public API error types exposing `anyhow::Error`
-   - duplicated `CrateId` newtypes across workspace crates
-   - `clippy::for_kv_map` and similar structural for-loop anti-patterns
-   - `pub` visibility exceeding the documented contract surface
-   - raw `String` fields used for structured identifiers such as
-     `boundary_id`, sprint ids, owner ids, and planning keys
-   - Windows-only path literals as a parity companion to Unix-only path checks
-   - broader cross-platform environment-variable portability rules
-   - shell-portability checks for OS-specific shell and command assumptions
-2. ADR draft stub
-   ([`ADR-009 — Observability Boundary Policy`](./adr/ADR-009-observability-boundary-policy.md))
-   for observability boundary policy beyond the current structured-logging
-   rollout.
-3. QA-process carry-forward: require `rust-best-practices` in
-   `practice_mode:all` on every sprint.
+Every listed deliverable is expected to land at a production-ready level for
+the scope this sprint claims. If that cannot be done cleanly in one sprint, the
+sprint must be split before implementation begins. No deliverable may be
+silently dropped or partially deferred.
 
-## Planned Work
+- the recurring shared lint-gate backlog is explicitly planned for:
+  - raw identity string literals without named constants
+  - `/tmp/` paths without intent comments
+  - public API error types exposing `anyhow::Error`
+  - duplicated `CrateId` newtypes across workspace crates
+  - `clippy::for_kv_map` and similar structural for-loop anti-patterns
+  - `pub` visibility exceeding the documented contract surface
+  - raw `String` fields used for structured identifiers such as `boundary_id`,
+    sprint ids, owner ids, and planning keys
+- the shared portability backlog is explicitly planned in
+  `sc-lint-portability` for:
+  - Windows-only path literal parity with the current Unix-only path checks
+  - broader cross-platform environment-variable portability rules
+  - shell-portability checks for OS-specific shell and command assumptions
+- `ADR-010` records the portability-scope and parity decision so the new
+  cross-platform rule families stay in `sc-lint-portability` and
+  consumer-specific wrappers stay out of the core product
 
-### Lint-Gate Expansion
+## Explicit Code Samples
 
-Document and schedule the next lint-gate additions so the repo can detect the
-most common systemic regressions before they escape to late QA:
+If the sprint introduces or changes important traits, features, enums, protocol
+types, boundary contracts, or execution seams, this section must include
+explicit code samples or signatures showing the intended end state.
 
-- identity-literal gate for actor/service names and similar stable identifiers
-- intent-comment gate for `/tmp/` fixture paths
-- API-error gate for `anyhow::Error` exposure in public types
-- shared-newtype gate for canonical workspace identifiers such as `CrateId`
-- structural clippy-pattern gate for `for_kv_map`-style issues
-- visibility-contract gate for `pub` vs `pub(crate)` drift
-- structured-identifier gate for typed `boundary_id`/owner/sprint/planning
-  fields
-- Windows-path-literal gate that complements the current Unix-only path checks
-  by catching hardcoded drive-prefix and other Windows-only path literals where
-  platform-aware path construction is required
-- env-portability gate that expands beyond the current `set_var` and
-  `dirs::home_dir()` coverage to catch non-portable environment-variable
-  assumptions and unscoped env-mutation patterns
-- shell-portability gate for OS-specific shell paths, shell-only command
-  idioms, and cross-platform command assumptions that should be routed through
-  a portable wrapper or abstraction
+```rust
+let tmp = std::path::PathBuf::from(r"C:\Temp\example.txt");
+// Planned shared portability target: Windows-only path literal parity
+// companion to the existing Unix-only absolute-path checks.
+```
 
-The planned gate contracts for this sprint are:
+```rust
+let shell = "/bin/bash";
+// Planned shared portability target: shell-portability lint coverage for
+// OS-specific shell-path assumptions in portable code paths.
+```
 
-- API-error gate
-  - ban public API error types from exposing `anyhow::Error` or `AnyhowError`
-    directly in public signatures, fields, or enum variants
-  - require the Phase-A replacement contract already established by
-    `RuntimeError`, `BoundaryError`, and `PortabilityError`:
-    use an opaque wrapper type where the error surface is crate-owned, or
-    `Box<dyn std::error::Error + Send + Sync>` at the public boundary when a
-    dynamic source must cross that boundary
-  - treat the Phase-A wrapper pattern as the canonical precedent so
-    implementers do not invent per-crate ad hoc replacements
-  - sprint success criteria:
-    - no public API error type exposes `anyhow` in its public signature
-    - all public error sources are concrete types or boxed trait objects
-- shared-newtype gate
-  - declare `sc-lint-schema` as the canonical owner of workspace-shared
-    identifier types such as `CrateId`
-  - sprint work must consolidate duplicate `CrateId` definitions into that
-    canonical crate instead of tolerating parallel local copies
-  - sprint success criteria:
-    - all shared `CrateId` usage resolves to the canonical definition in
-      `sc-lint-schema`
-- structured-identifier gate
-  - treat raw `String` fields for structured identifiers such as
-    `boundary_id`, sprint ids, owner ids, and planning keys as a required-fix
-    design issue rather than something to suppress
-  - sprint work must introduce the missing identifier newtypes instead of
-    adding waivers or documentation-only exceptions
-  - sprint success criteria:
-    - structured identifier fields use the newtype surface introduced by the
-      sprint rather than raw `String`
-- Windows-path-literal gate
-  - treat hardcoded Windows-only path literals as the same class of
-    portability drift already recognized for Unix-only path literals
-  - the planned rule family should preserve parity in findings and remediation
-    guidance across Unix-only and Windows-only literal detection
-- env-portability gate
-  - extend portability analysis beyond the current `std::env::set_var()` and
-    home-dir override checks
-  - planned rule work should target cross-platform env assumptions such as
-    OS-specific home/temp variable reliance and env access patterns that bypass
-    the repo's portability wrapper expectations
-- shell-portability gate
-  - treat absolute shell paths and OS-specific shell-command assumptions as
-    planned portability lint scope rather than ad hoc review findings
-  - planned rule work should identify where a portable wrapper or command
-    abstraction is required instead of direct shell-specific invocation
+```rust
+let home = std::env::var("USERPROFILE");
+// Planned shared portability target: broader environment-variable portability
+// checks beyond the current home-dir override and set_var-specific coverage.
+```
 
-### Observability ADR
+## This Sprint Does Not Close
 
-Create a new ADR stub that captures the longer-lived observability boundary
-policy for `sc-lint`, including how observability-owned types, entry points,
-and future direct-linked backends are allowed to interact across crate
-boundaries.
-
-### QA Process
-
-Record the new standing QA expectation:
-
-- every sprint uses `rust-best-practices` in `practice_mode:all`
-- the repo should not treat full RBP review as a one-time first-pass activity
-  when systemic design drift is still possible
+- implementation of any new lint family named here
+- observability boundary-policy ADR acceptance
+- QA-process prompt or workflow hardening
+- Homebrew release/distribution work
 
 ## Acceptance Criteria
 
-1. All seven recurring Phase-A finding patterns are named in the sprint plan,
-   and the agreed cross-platform follow-on checks for Windows-only path
-   literals, environment portability, and shell portability are explicitly in
-   scope.
-2. The observability-boundary ADR work is explicitly tracked as a deliverable.
-3. The QA-process change calls for `rust-best-practices` in
-   `practice_mode:all` on every sprint.
-4. The sprint is linked from the Phase-B plan and the project planning index.
+- the sprint names the seven recurring shared lint-gate families and the three
+  agreed cross-platform portability follow-ons without claiming they are
+  already implemented
+- `docs/requirements.md` and `docs/architecture.md` both align on
+  `sc-lint-portability` as the shared owner of future Windows-path, env, and
+  shell portability rules
+- `ADR-010` exists and records:
+  - shared portability ownership in `sc-lint-portability`
+  - parity expectations between Unix-only and Windows-only path-literal checks
+  - the rule that consumer-specific portability wrappers do not migrate
+    unchanged into the core product
+- no Phase `B` planning doc still claims that observability ADR work or QA
+  process hardening closes inside `B.1`
+
+## Required Validation
+
+- `just lint`

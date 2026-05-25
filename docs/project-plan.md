@@ -127,11 +127,17 @@ The currently scheduled foundation sprints are:
   - active implementation branch: `feature/sprint-A8`
   - `docs/sc-lint/sprint-A8.md`
 - `B.1`
-  - phase-A post-mortem carry-forwards and systemic lint-gate planning
+  - carry-forward lint-gate and portability-scope hardening
   - `docs/sc-lint/sprint-B1.md`
 - `B.2`
   - named-caller allowlist enforcement in `sc-lint-boundary`
   - `docs/sc-lint/sprint-B2.md`
+- `B.3`
+  - observability boundary-policy ADR acceptance
+  - `docs/sc-lint/sprint-B3.md`
+- `B.4`
+  - QA-process hardening
+  - `docs/sc-lint/sprint-B4.md`
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew toolset distribution planning
   - sprint number intentionally pending

@@ -7,6 +7,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
@@ -107,6 +108,22 @@ The product should support both:
   platform/OS portability rules.
   Current A.4 implementation status:
   `PORT-001` through `PORT-005` are assigned to `sc-lint-portability`.
+
+- `REQ-PRODUCT-004AA`
+  Future shared portability rules for cross-platform path literals,
+  environment-variable portability, and shell portability must remain owned by
+  `sc-lint-portability` when their semantics are consumer-neutral.
+
+- `REQ-PRODUCT-004AB`
+  When `sc-lint` carries an OS-specific path-literal portability rule family
+  for one major platform class, parity-companion shared detection for the
+  matching opposite platform class should remain in `sc-lint-portability`
+  rather than drifting into consumer-local wrappers.
+
+- `REQ-PRODUCT-004AC`
+  Repo-specific portability policies or shell conventions must not migrate
+  into `sc-lint` unchanged; only generic shared portability rules should land
+  in `sc-lint-portability`.
 
 - `REQ-PRODUCT-004B`
   `sc-lint-runtime` must be the home for shared AST-sensitive std
