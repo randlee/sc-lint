@@ -133,6 +133,16 @@ later.
   `sc-lint-version` must provide a hard-fail mode that exits non-zero when a
   detected breaking change is present in any enabled interface family.
 
+- `REQ-VERSION-017A`
+  The multi-family hard-fail result must use one top-level verdict record for
+  the full run that includes:
+  - `ok` as the aggregate rollup for the run
+  - one per-family verdict entry for every enabled interface family
+  - explicit `not_present` or equivalent status for configured families that
+    are absent in the current repo
+  The aggregate `ok` value must be `false` when any enabled family reports a
+  breaking change.
+
 - `REQ-VERSION-018`
   The hard-fail verdict must identify:
   - the interface family

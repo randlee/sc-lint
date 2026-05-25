@@ -83,8 +83,9 @@ description: Guides a consuming repository through sc-lint-version adoption.
 
 - the plan names one authoritative consumer-integration document rather than
   scattering adoption steps across multiple unrelated docs
-- that document explicitly defines harness, fixture, simulator/transcript, and
-  normalization responsibilities for consuming repos
+- the sprint plan explicitly states that `docs/sc-lint/version-adoption.md`
+  must define harness, fixture, simulator/transcript, and normalization
+  responsibilities for consuming repos
 - the plan explicitly says consuming repos should leverage existing CLI
   testability and simulator infrastructure where available
 - the plan explicitly requires a repo-local Claude Code skill for consumer

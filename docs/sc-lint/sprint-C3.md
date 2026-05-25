@@ -48,12 +48,31 @@ target: develop
 ```json
 {
   "ok": false,
-  "interface_family": "rust-public-api",
-  "baseline": "crates.io:0.2.0",
-  "breaking_items": ["function_missing"],
-  "artifact_paths": [
-    "artifacts/interfaces/crate-api/sc-lint/index.html",
-    "artifacts/interfaces/crate-api/sc-lint/index.json"
+  "families": [
+    {
+      "interface_family": "rust-public-api",
+      "baseline": "crates.io:0.2.0",
+      "breaking_items": ["function_missing"],
+      "artifact_paths": [
+        "artifacts/interfaces/crate-api/sc-lint/index.html",
+        "artifacts/interfaces/crate-api/sc-lint/index.json"
+      ]
+    },
+    {
+      "interface_family": "cli",
+      "baseline": "artifacts/baselines/cli-v0.2.0.json",
+      "breaking_items": [],
+      "artifact_paths": [
+        "artifacts/interfaces/cli/index.html",
+        "artifacts/interfaces/cli/index.json"
+      ]
+    },
+    {
+      "interface_family": "rpc-socket",
+      "status": "not_present",
+      "breaking_items": [],
+      "artifact_paths": []
+    }
   ]
 }
 ```
@@ -68,8 +87,12 @@ target: develop
 
 - `docs/sc-lint/version-requirements.md` defines one hard-fail verdict model
   across Rust API, CLI, and RPC/socket families
+- the sprint code sample and `docs/sc-lint/version-requirements.md` both show
+  the aggregate top-level `ok` rollup plus per-family verdict entries for a
+  multi-family run
 - the sprint code sample and `docs/sc-lint/version-requirements.md` both
-  require concrete published-artifact paths in failure output
+  require concrete published-artifact paths in failure output for present
+  families
 - `docs/sc-lint/version-requirements.md` keeps “not present in this repo”
   explicit for unsupported current interface families instead of omitting them
   silently
