@@ -242,6 +242,12 @@ The product should support both:
   The skill-design sprint and the minimal-marketplace sprint must remain
   separate closures in the planning line.
 
+- `REQ-PRODUCT-006Q`
+  The planned interface-versioning command surface must not reuse the existing
+  tool-version command. It must use a distinct top-level invocation path and a
+  documented configuration surface for interface-family selection and
+  baselines.
+
 ### Logging and observability
 
 - `REQ-LOG-001`

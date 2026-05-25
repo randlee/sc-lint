@@ -35,6 +35,37 @@ later.
   - a machine-readable canonical artifact used for change detection
   - a human-friendly published report derived from the same structured source
 
+## Invocation And Configuration
+
+- `REQ-VERSION-003A`
+  The planned top-level invocation path for interface-version checks is
+  `sc-lint check interfaces`; the existing `sc-lint version` command remains
+  reserved for reporting the tool version itself.
+
+- `REQ-VERSION-003B`
+  The planned Phase `C` form-factor for this capability is a dedicated
+  workspace crate named `sc-lint-version`, integrated into the top-level CLI
+  through `sc-lint check interfaces`.
+
+- `REQ-VERSION-003C`
+  Interface-family selection must use one canonical configuration surface
+  inside `sc-lint` config under `[version.families.<family>]`.
+
+- `REQ-VERSION-003D`
+  Only family tables explicitly declared under `[version.families]` are part
+  of a given run; omitted families are outside the run rather than implicitly
+  reported as absent.
+
+- `REQ-VERSION-003E`
+  When a family is configured under `[version.families.<family>]` but the repo
+  does not currently define that surface, the verdict must report
+  `not_present` or equivalent rather than silently dropping the family.
+
+- `REQ-VERSION-003F`
+  Canonical interface-family identifiers must keep the same spelling across
+  config, CLI flags, baseline artifacts, and verdict output so one family does
+  not silently acquire multiple names.
+
 ## Artifact Model
 
 - `REQ-VERSION-004`
@@ -74,6 +105,16 @@ later.
 - `REQ-VERSION-008`
   The initial Rust public API comparison engine must be `cargo-semver-checks`.
 
+- `REQ-VERSION-008A`
+  The `rust-public-api` family must consume `cargo-semver-checks` through one
+  explicit `sc-lint-version` translation layer that reads the tool's
+  machine-readable output mode and exit-status semantics.
+
+- `REQ-VERSION-008B`
+  That translation layer must map the `cargo-semver-checks` result into one
+  per-family verdict record, including the `breaking_items` list used by
+  `REQ-VERSION-017A`.
+
 - `REQ-VERSION-009`
   For Rust public APIs, a breaking change is detected when
   `cargo-semver-checks` reports a deny-level semver violation against the
@@ -96,6 +137,21 @@ later.
 - `REQ-VERSION-012`
   The stable top-level CLI command surface must be versioned as an explicit
   interface family separate from Rust crate public APIs.
+
+- `REQ-VERSION-012A`
+  The CLI family baseline must use a versioned JSON artifact schema that
+  records stable command identifiers, required request fields, required
+  response fields, and stable machine-readable error codes.
+
+- `REQ-VERSION-012B`
+  The planned CLI baseline-generation workflow is
+  `sc-lint check interfaces --family cli --write-baseline <path>`, which
+  emits the versioned JSON baseline artifact used for later comparisons.
+
+- `REQ-VERSION-012C`
+  Approved major-version CLI changes must replace the stored CLI baseline by
+  rerunning the baseline-generation workflow and reviewing the updated
+  versioned artifact.
 
 - `REQ-VERSION-013`
   For the CLI family, a breaking change is detected when any of the following

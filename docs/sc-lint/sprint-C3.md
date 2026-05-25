@@ -25,6 +25,7 @@ target: develop
 
 - `docs/sc-lint/phase-C-plan.md`
 - `docs/sc-lint/sprint-C3.md`
+- `docs/sc-lint/version-requirements.md`
 - `docs/requirements.md`
 - `docs/architecture.md`
 - `docs/project-plan.md`
@@ -36,10 +37,24 @@ target: develop
   - baseline source
   - breaking items
   - associated published artifact paths
+- planned family-selection contract for hard-fail runs:
+  - `sc-lint-version` reads configured families from
+    `[version.families.<family>]`
+  - omitted family tables are outside the run
+  - configured families with no current repo surface emit `not_present`
 - planned workflow integration for:
   - local developer execution
   - CI gate usage
   - release review usage
+- planned Rust-public-API ingestion contract for the hard-fail path:
+  - `sc-lint-version` consumes `cargo-semver-checks` machine-readable output
+    and exit-status semantics
+  - one adapter translates tool findings into the `REQ-VERSION-017A`
+    `breaking_items` record for the `rust-public-api` family
+- planned CLI-baseline usage contract for the hard-fail path:
+  - the `cli` family compares current extracted contract artifacts against the
+    versioned baseline artifact defined in `C.2`
+  - failure output names the baseline artifact path that was evaluated
 - concise top-level requirements and architecture updates that keep the
   hard-fail gate visible outside the Phase `C` sprint docs:
   - `docs/requirements.md` states that interface-version checks can fail local
@@ -53,6 +68,7 @@ target: develop
 
 ```json
 {
+  "command": "sc-lint check interfaces",
   "ok": false,
   "families": [
     {
@@ -66,7 +82,10 @@ target: develop
     },
     {
       "interface_family": "cli",
-      "baseline": "artifacts/baselines/cli-v0.2.0.json",
+      "baseline": {
+        "schema": "sc-lint-cli-interface-v1",
+        "artifact": "artifacts/baselines/cli-v0.2.0.json"
+      },
       "breaking_items": [],
       "artifact_paths": [
         "artifacts/interfaces/cli/index.html",
@@ -93,9 +112,18 @@ target: develop
 
 - `docs/sc-lint/version-requirements.md` defines one hard-fail verdict model
   across Rust API, CLI, and RPC/socket families
+- `docs/sc-lint/version-requirements.md` defines the
+  `[version.families.<family>]` configuration surface and uses it to
+  distinguish omitted families from configured-but-not-present families
 - `docs/sc-lint/version-requirements.md` defines the aggregate top-level `ok`
   rollup plus per-family verdict entries for a multi-family run, and the
   sprint code sample illustrates a conforming example
+- `docs/sc-lint/version-requirements.md` defines the
+  `cargo-semver-checks` ingestion contract for the `rust-public-api` family
+  rather than leaving the `breaking_items` translation implicit
+- `docs/sc-lint/version-requirements.md` references the versioned CLI
+  baseline artifact schema and the `C.2` baseline-generation workflow for the
+  `cli` family
 - `docs/sc-lint/version-requirements.md` requires concrete
   published-artifact paths in failure output for present families, and the
   sprint code sample illustrates a conforming example

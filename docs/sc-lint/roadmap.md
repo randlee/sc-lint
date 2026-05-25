@@ -144,12 +144,16 @@ Initial Phase-C scope is:
 - `C.1`
   - `sc-lint-version` policy and baseline definition
   - initial `cargo-semver-checks` integration plan for Rust public APIs
+  - dedicated crate/form-factor, invocation command, and family-selection
+    configuration surface
 - `C.2`
   - generated interface artifact publication planning
   - XHTML fragment/report pattern with JSON sidecars as canonical machine data
+  - versioned CLI baseline artifact workflow
 - `C.3`
   - hard-fail version gate integration planning across Rust APIs, CLI
   contracts, and RPC/socket interfaces
+  - cargo-semver-checks ingestion into the shared verdict contract
 - `C.4`
   - consuming-repo adoption guidance
   - repo-local Claude Code skill planning

@@ -65,6 +65,7 @@ target: develop
 {
   "name": "sc-lint-version-adoption",
   "version": "1.0.0",
+  "description": "Publishes the sc-lint-version adoption skill through the repo-local marketplace.",
   "author": { "name": "sc-lint" }
 }
 ```

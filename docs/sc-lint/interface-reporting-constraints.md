@@ -16,6 +16,8 @@ published interface reporting.
 
 - the rendering path uses one reusable HTML-report workflow rather than
   repo-specific ad hoc HTML generation
+- the reusable workflow is the shared `html-report` skill used by the Phase
+  `C` planning line for generated interface reports
 - the workflow must keep report meaning in structured inputs and templates
   instead of agent-authored prose patches
 - the JSON sidecar remains authoritative for change detection; HTML and XHTML

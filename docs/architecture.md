@@ -64,6 +64,19 @@ The intended artifact model is:
 This layer is intentionally planned as template- and schema-driven output, not
 as a collection of hand-maintained HTML pages.
 
+The current Phase `C` planning decision is that `sc-lint-version` is a
+dedicated planned workspace crate invoked from the top-level CLI through
+`sc-lint check interfaces`.
+
+Configured interface families are selected through `[version.families]` in
+`sc-lint` config. Omitted family tables are outside the run; configured
+families with no matching current repo surface remain visible as
+`not_present`.
+
+For the Rust public API family, `sc-lint-version` is planned to own one
+translation layer that consumes `cargo-semver-checks` machine-readable output
+and exit-status semantics into the shared multi-family verdict contract.
+
 Consumer adoption for this layer is also planned as a product surface:
 
 - one clear adoption document for consuming repos covering harness, fixture,

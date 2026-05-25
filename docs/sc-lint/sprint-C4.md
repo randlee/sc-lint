@@ -65,7 +65,7 @@ target: develop
 ```json
 {
   "adoption_doc": "docs/sc-lint/version-adoption.md",
-  "cli_commands": ["sc-lint --json version"],
+  "cli_commands": ["sc-lint --json check interfaces --family cli"],
   "rpc_simulators": ["tests/interface/simulators/session_start.json"]
 }
 ```

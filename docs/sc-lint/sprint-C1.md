@@ -26,23 +26,37 @@ target: develop
 ## Exact Targets
 
 - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
+- `docs/sc-lint/adr/README.md`
 - `docs/sc-lint/version-requirements.md`
 - `docs/sc-lint/phase-C-plan.md`
+- `docs/sc-lint/crate-architecture.md`
 - `docs/requirements.md`
 - `docs/architecture.md`
 - `docs/project-plan.md`
 
 ## Deliverables
 
-- `ADR-011` draft records:
-  - `sc-lint-version` as the planned owner of interface-version checks
+- `ADR-011` accepted records:
+  - `sc-lint-version` as a planned dedicated workspace crate that owns
+    interface-version checks and integrates with the top-level CLI through
+    `sc-lint check interfaces`
   - `cargo-semver-checks` as the initial Rust public API decision engine
+  - one canonical version-configuration surface under
+    `[version.families.<family>]` in `sc-lint` config so configured families
+    can be distinguished from omitted families
+  - one planned Rust-public-API translation layer in `sc-lint-version` that
+    consumes `cargo-semver-checks` machine-readable output and exit-status
+    semantics into the multi-family verdict model
   - generated HTML/XHTML/JSON published artifacts as the canonical reporting
     model
 - requirements define breaking-change semantics for:
   - Rust public APIs
   - stable top-level CLI commands and machine contracts
   - RPC/socket interfaces
+- crate/phase architecture records the committed Phase `C` form-factor and
+  invocation shape for version checks:
+  - planned dedicated workspace crate: `sc-lint-version`
+  - planned top-level invocation command: `sc-lint check interfaces`
 - Phase `C` sequence is added to the project planning line with separate
   closures for:
   - policy/baseline definition
@@ -54,14 +68,25 @@ target: develop
 ## Explicit Code Samples
 
 ```bash
-cargo semver-checks --baseline-version 0.2.0
+sc-lint check interfaces --family rust-public-api --baseline-version 0.2.0
+```
+
+```toml
+[version.families."rust-public-api"]
+enabled = true
+baseline = { published = "0.2.0" }
+
+[version.families.cli]
+enabled = true
+baseline_artifact = "artifacts/baselines/cli-v0.2.0.json"
 ```
 
 ```json
 {
-  "interface_family": "cli",
-  "breaking_change": "required_response_field_removed",
-  "command": "lint.sc-boundary"
+  "tool": "cargo-semver-checks",
+  "output_mode": "machine-readable-json",
+  "adapter": "sc_lint_version::rust_public_api::SemverChecksAdapter",
+  "verdict_family": "rust-public-api"
 }
 ```
 
@@ -73,9 +98,18 @@ cargo semver-checks --baseline-version 0.2.0
 
 ## Acceptance Criteria
 
-- `ADR-011` exists and stays in Draft status
+- `ADR-011` is promoted to Accepted status before `C.2` begins
 - `version-requirements.md` defines interface-family-specific breaking-change
   rules
+- `version-requirements.md` defines the planned `[version.families.<family>]`
+  configuration surface, including the distinction between omitted families
+  and configured-but-not-present families
+- `version-requirements.md`, `phase-C-plan.md`, and
+  `crate-architecture.md` all identify `sc-lint-version` as a planned
+  dedicated workspace crate invoked through `sc-lint check interfaces`
+- the plan defines the `cargo-semver-checks` ingestion contract as a
+  `sc-lint-version` translation layer from machine-readable tool output into
+  the multi-family verdict model
 - `project-plan.md` and `phase-C-plan.md` both show the same `C.1`-`C.5`
   sequence
 - the plan explicitly states that generated report packages must follow the

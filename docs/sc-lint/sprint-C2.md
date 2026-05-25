@@ -26,6 +26,8 @@ target: develop
 
 - `docs/sc-lint/phase-C-plan.md`
 - `docs/sc-lint/sprint-C2.md`
+- `docs/sc-lint/version-requirements.md`
+- `docs/sc-lint/interface-reporting-constraints.md`
 - `docs/architecture.md`
 - `docs/project-plan.md`
 
@@ -42,6 +44,11 @@ target: develop
   - all shipped crate public APIs
   - stable top-level CLI commands and machine contracts
   - RPC/socket interfaces when present
+- one planned CLI baseline artifact definition that includes:
+  - a versioned JSON schema for command ids, required request/response
+    fields, and stable machine error codes
+  - generation through `sc-lint check interfaces --family cli --write-baseline`
+  - one explicit replacement workflow for approved major-version changes
 - explicit planning language that generated templates and structured data own
   the output, not manually maintained HTML pages
 
@@ -49,6 +56,7 @@ target: develop
 
 ```json
 {
+  "schema": "sc-lint-cli-interface-v1",
   "output_path": "artifacts/interfaces/sc-lint-cli/index.html",
   "json_output_path": "artifacts/interfaces/sc-lint-cli/index.json",
   "title": "sc-lint CLI Interface Report",
@@ -67,6 +75,9 @@ artifacts/interfaces/
   crate-api/
   cli/
   transport/
+
+artifacts/baselines/
+  cli-v0.2.0.json
 ```
 
 ## This Sprint Does Not Close
@@ -87,6 +98,10 @@ artifacts/interfaces/
   section fragments/panels and built-in copy actions per panel
 - `docs/sc-lint/version-requirements.md` requires published coverage across
   all shipped crates, not only the top-level crate
+- `docs/sc-lint/version-requirements.md` defines the CLI baseline artifact
+  schema, the `sc-lint check interfaces --family cli --write-baseline`
+  generation workflow, and the approved baseline-replacement path for major
+  version updates
 
 ## Required Validation
 

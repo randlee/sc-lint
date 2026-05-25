@@ -140,8 +140,10 @@ Current intended crate split:
   - planned future analyzer crate for Tokio-specific rules
   - represented now as a reserved future boundary surface only
 - `sc-lint-version`
-  - planned future capability for stable interface version checks and
+  - planned future workspace crate for stable interface version checks and
     published interface artifacts
+  - planned top-level invocation path:
+    - `sc-lint check interfaces`
   - planned to start with `cargo-semver-checks` for Rust public APIs and
     expand to CLI and transport surfaces through generated HTML/XHTML/JSON
     artifacts

@@ -20,13 +20,11 @@ current planning surface.
     direct-link constraints
 - [`ADR-010-portability-scope-and-parity.md`](./ADR-010-portability-scope-and-parity.md)
   - shared portability ownership and Unix/Windows parity scope policy
+- [`ADR-011-interface-versioning-and-published-artifacts.md`](./ADR-011-interface-versioning-and-published-artifacts.md)
+  - accepted `sc-lint-version` form-factor, interface-family configuration
+    surface, and generated HTML/XHTML/JSON interface artifact policy
 
 ## Draft ADRs
-
-- [`ADR-011-interface-versioning-and-published-artifacts.md`](./ADR-011-interface-versioning-and-published-artifacts.md)
-  - planned `sc-lint-version` capability, `cargo-semver-checks` baseline, and
-    generated HTML/XHTML/JSON interface artifact policy, including consumer
-    adoption through a repo-local skill and minimal marketplace
 
 ## Index Rules
 

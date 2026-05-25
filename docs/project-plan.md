@@ -158,12 +158,16 @@ The currently scheduled sprint plans are:
   - `docs/sc-lint/sprint-B-homebrew.md`
 - `C.1`
   - `sc-lint-version` policy and baseline definition
+  - dedicated crate/form-factor, invocation command, and family-selection
+    configuration surface
   - `docs/sc-lint/sprint-C1.md`
 - `C.2`
   - published interface artifact pipeline
+  - versioned CLI baseline artifact schema and generation workflow
   - `docs/sc-lint/sprint-C2.md`
 - `C.3`
   - hard-fail version gate integration
+  - cargo-semver-checks ingestion and multi-family verdict wiring
   - `docs/sc-lint/sprint-C3.md`
 - `C.4`
   - consumer integration and skill design

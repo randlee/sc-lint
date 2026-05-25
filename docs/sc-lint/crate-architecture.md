@@ -127,8 +127,7 @@ their governing docs, boundaries, and planned sprint work.
 
 ## Planned Capability Note
 
-Phase `C` adds planning for `sc-lint-version`, but that line is currently a
-capability plan rather than a committed crate/form-factor decision.
+Phase `C` commits `sc-lint-version` as a planned dedicated workspace crate.
 
 - authoritative planning docs:
   - `docs/sc-lint/phase-C-plan.md`
@@ -138,8 +137,15 @@ capability plan rather than a committed crate/form-factor decision.
   - `docs/sc-lint/sprint-C4.md`
   - `docs/sc-lint/sprint-C5.md`
   - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
-- no dedicated crate boundary or planning record should be inferred before
-  `C.1` closes the ownership/form-factor decision
+- planned invocation path:
+  - `sc-lint check interfaces`
+- planned configuration surface:
+  - `[version.families.<family>]` in `sc-lint` config
+- planned initial backend decision:
+  - `cargo-semver-checks` powers the Rust public API family through a
+    `sc-lint-version` translation layer
+- dedicated crate boundary and implementation planning records remain future
+  implementation work after the Phase `C` planning line
 
 ## Current Plan Coverage
 
