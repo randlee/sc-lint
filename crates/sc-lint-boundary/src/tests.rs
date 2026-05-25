@@ -74,8 +74,7 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
         }],
     };
 
-    let rendered =
-        render_graph_export(&graph, GraphOutputFormat::Json).expect("json graph render succeeds");
+    let rendered = render_graph_export(&graph, GraphOutputFormat::Json);
     let json: serde_json::Value = serde_json::from_str(&rendered).expect("graph json");
 
     assert_eq!(json["tool"], "sc-lint-boundary");

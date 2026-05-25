@@ -1,5 +1,4 @@
 use super::*;
-use serde_json::Error as JsonError;
 
 pub fn render_findings_report(report: &FindingsReport) -> String {
     let mut rendered = format!(
@@ -31,15 +30,16 @@ pub fn render_findings_report(report: &FindingsReport) -> String {
 pub fn render_graph_export(
     graph: &GraphExport,
     format: GraphOutputFormat,
-) -> Result<String, JsonError> {
+) -> String {
     match format {
         GraphOutputFormat::Json => render_graph_export_json(graph),
-        GraphOutputFormat::Turtle => Ok(render_graph_export_turtle(graph)),
+        GraphOutputFormat::Turtle => render_graph_export_turtle(graph),
     }
 }
 
-pub fn render_graph_export_json(graph: &GraphExport) -> Result<String, JsonError> {
+pub fn render_graph_export_json(graph: &GraphExport) -> String {
     serde_json::to_string_pretty(graph)
+        .expect("graph export serialization is infallible for GraphExport")
 }
 
 pub fn render_graph_export_turtle(graph: &GraphExport) -> String {

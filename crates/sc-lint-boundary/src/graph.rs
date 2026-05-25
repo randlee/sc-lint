@@ -96,6 +96,7 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
                 target_name: target.name.clone(),
                 manifest_path: manifest_path.clone(),
                 crate_id: crate_id(&package.name, &target.name),
+                root_module_path: ModulePath::crate_root(),
                 workspace_dependency_roots: workspace_dependency_roots(
                     &workspace_packages,
                     package,
@@ -109,7 +110,11 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
                 &source_path,
             );
 
-            let root_module_id = format!("{}::module::crate", context.crate_id.as_str());
+            let root_module_id = format!(
+                "{}::module::{}",
+                context.crate_id.as_str(),
+                context.root_module_path
+            );
             let root_attributes = Vec::new();
             builder.add_node(GraphNode {
                 id: NodeId::new(root_module_id.clone()),
@@ -120,7 +125,7 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
                 target: Some(context.target_name.clone()),
                 manifest_path: context.manifest_path.clone(),
                 source_path: Some(source_path.display().to_string()),
-                module_path: Some("crate".to_string()),
+                module_path: Some(context.root_module_path.to_string()),
                 impl_kind: None,
                 impl_trait: None,
                 attributes: root_attributes,
@@ -135,7 +140,7 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
                 &mut builder,
                 &context,
                 &NodeId::new(root_module_id.clone()),
-                "crate",
+                &context.root_module_path,
                 &root_dir,
                 &source_path,
                 parse_rust_file(&source_path)?,
@@ -150,7 +155,7 @@ fn ingest_module_items(
     builder: &mut GraphBuilder,
     context: &TargetContext,
     parent_module_id: &NodeId,
-    module_path: &str,
+    module_path: &ModulePath,
     module_dir: &Path,
     source_path: &Path,
     file: File,
@@ -161,7 +166,7 @@ fn ingest_module_items(
         match item {
             Item::Mod(item_mod) => {
                 let name = item_mod.ident.to_string();
-                let child_module_path = format!("{module_path}::{name}");
+                let child_module_path = module_path.child(&name);
                 let child_module_id =
                     format!("{}::module::{child_module_path}", context.crate_id.as_str());
                 let attributes = parse_lint_attributes(&item_mod.attrs)?;
@@ -175,7 +180,7 @@ fn ingest_module_items(
                     target: Some(context.target_name.clone()),
                     manifest_path: context.manifest_path.clone(),
                     source_path: Some(source_path.display().to_string()),
-                    module_path: Some(child_module_path.clone()),
+                    module_path: Some(child_module_path.to_string()),
                     impl_kind: None,
                     impl_trait: None,
                     attributes,
@@ -721,7 +726,7 @@ fn ensure_trait_reference_node(
     builder: &mut GraphBuilder,
     context: &TargetContext,
     source_path: &Path,
-    module_path: &str,
+    module_path: &ModulePath,
     trait_node_id: &NodeId,
     trait_label: &str,
 ) {
@@ -753,7 +758,7 @@ fn add_reference_edges(
     builder: &mut GraphBuilder,
     context: &TargetContext,
     source_node_id: &NodeId,
-    module_path: &str,
+    module_path: &ModulePath,
     referenced_paths: BTreeSet<CollectedReference>,
 ) {
     for referenced in referenced_paths {
@@ -771,7 +776,7 @@ fn add_reference_edges(
 fn resolve_reference_target(
     context: &TargetContext,
     source_node_id: &NodeId,
-    module_path: &str,
+    module_path: &ModulePath,
     referenced_path: &str,
 ) -> NodeId {
     let crate_prefix = source_node_id
@@ -795,7 +800,7 @@ fn resolve_reference_target(
 
     if referenced_path.starts_with("super::") {
         let mut module_segments: Vec<String> =
-            module_path.split("::").map(ToOwned::to_owned).collect();
+            module_path.as_str().split("::").map(ToOwned::to_owned).collect();
         let mut rest = referenced_path;
         while let Some(stripped) = rest.strip_prefix("super::") {
             if module_segments.len() > 1 {
@@ -1051,7 +1056,7 @@ pub(crate) fn load_metadata(root: &Path) -> Result<cargo_metadata::Metadata> {
 }
 struct ItemNodeArgs<'a> {
     parent_module_id: &'a NodeId,
-    module_path: &'a str,
+    module_path: &'a ModulePath,
     source_path: &'a Path,
     ident: &'a Ident,
     kind: NodeKind,
@@ -1061,7 +1066,7 @@ struct ItemNodeArgs<'a> {
 
 struct FieldNodeArgs<'a> {
     parent_id: &'a NodeId,
-    module_path: &'a str,
+    module_path: &'a ModulePath,
     source_path: &'a Path,
     local_owner_names: &'a BTreeSet<String>,
     owner_name: Option<&'a str>,

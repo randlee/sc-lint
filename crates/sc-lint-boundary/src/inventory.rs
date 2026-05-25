@@ -10,20 +10,85 @@ use anyhow::Context;
 use anyhow::Result;
 use serde::Deserialize;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum InventoryParseError {
+    BoundaryId(String),
+    SprintId(String),
+    TrackingId(String),
+    OwnerPackage(String),
+    OwnerCratePath(String),
+    PlanningKey(String),
+    ApprovedSymbol(String),
+    ApprovedCaller(String),
+}
+
+impl InventoryParseError {
+    fn boundary_id(detail: impl Into<String>) -> Self {
+        Self::BoundaryId(detail.into())
+    }
+
+    fn sprint_id(detail: impl Into<String>) -> Self {
+        Self::SprintId(detail.into())
+    }
+
+    fn tracking_id(detail: impl Into<String>) -> Self {
+        Self::TrackingId(detail.into())
+    }
+
+    fn owner_package(detail: impl Into<String>) -> Self {
+        Self::OwnerPackage(detail.into())
+    }
+
+    fn owner_crate_path(detail: impl Into<String>) -> Self {
+        Self::OwnerCratePath(detail.into())
+    }
+
+    fn planning_key(detail: impl Into<String>) -> Self {
+        Self::PlanningKey(detail.into())
+    }
+
+    fn approved_symbol(detail: impl Into<String>) -> Self {
+        Self::ApprovedSymbol(detail.into())
+    }
+
+    fn approved_caller(detail: impl Into<String>) -> Self {
+        Self::ApprovedCaller(detail.into())
+    }
+}
+
+impl fmt::Display for InventoryParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BoundaryId(detail)
+            | Self::SprintId(detail)
+            | Self::TrackingId(detail)
+            | Self::OwnerPackage(detail)
+            | Self::OwnerCratePath(detail)
+            | Self::PlanningKey(detail)
+            | Self::ApprovedSymbol(detail)
+            | Self::ApprovedCaller(detail) => formatter.write_str(detail),
+        }
+    }
+}
+
+impl std::error::Error for InventoryParseError {}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(try_from = "String")]
 pub(crate) struct BoundaryId(String);
 
 impl BoundaryId {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("boundary ids must not be empty".to_string());
+            return Err(InventoryParseError::boundary_id(
+                "boundary ids must not be empty",
+            ));
         }
         if !trimmed.starts_with("BOUNDARY-") {
-            return Err(format!(
+            return Err(InventoryParseError::boundary_id(format!(
                 "boundary ids must start with `BOUNDARY-` (got `{trimmed}`)"
-            ));
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -34,7 +99,7 @@ impl BoundaryId {
 }
 
 impl TryFrom<String> for BoundaryId {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -72,18 +137,22 @@ impl PartialEq<&str> for BoundaryId {
 pub(crate) struct SprintId(String);
 
 impl SprintId {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("sprint ids must not be empty".to_string());
+            return Err(InventoryParseError::sprint_id(
+                "sprint ids must not be empty",
+            ));
         }
         let Some((phase, step)) = trimmed.split_once('.') else {
-            return Err(format!(
+            return Err(InventoryParseError::sprint_id(format!(
                 "sprint ids must use <phase>.<step> format (got `{trimmed}`)"
-            ));
+            )));
         };
         if phase.is_empty() || step.is_empty() || trimmed.contains(char::is_whitespace) {
-            return Err(format!("invalid sprint id `{trimmed}`"));
+            return Err(InventoryParseError::sprint_id(format!(
+                "invalid sprint id `{trimmed}`"
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -98,7 +167,7 @@ impl SprintId {
 }
 
 impl TryFrom<String> for SprintId {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -136,22 +205,24 @@ impl PartialEq<&str> for SprintId {
 pub(crate) struct TrackingId(String);
 
 impl TrackingId {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("tracking ids must not be empty".to_string());
+            return Err(InventoryParseError::tracking_id(
+                "tracking ids must not be empty",
+            ));
         }
         if trimmed.contains(char::is_whitespace) {
-            return Err(format!(
+            return Err(InventoryParseError::tracking_id(format!(
                 "tracking ids must not contain whitespace (got `{trimmed}`)"
-            ));
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
 }
 
 impl TryFrom<String> for TrackingId {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -163,10 +234,12 @@ impl TryFrom<String> for TrackingId {
 pub(crate) struct OwnerPackage(String);
 
 impl OwnerPackage {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("owner packages must not be empty".to_string());
+            return Err(InventoryParseError::owner_package(
+                "owner packages must not be empty",
+            ));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -177,7 +250,7 @@ impl OwnerPackage {
 }
 
 impl TryFrom<String> for OwnerPackage {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -215,10 +288,12 @@ impl PartialEq<&str> for OwnerPackage {
 pub(crate) struct OwnerCratePath(String);
 
 impl OwnerCratePath {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("owner crate paths must not be empty".to_string());
+            return Err(InventoryParseError::owner_crate_path(
+                "owner crate paths must not be empty",
+            ));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -229,7 +304,7 @@ impl OwnerCratePath {
 }
 
 impl TryFrom<String> for OwnerCratePath {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -267,15 +342,17 @@ impl PartialEq<&str> for OwnerCratePath {
 pub(crate) struct PlanningKey(String);
 
 impl PlanningKey {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("planning keys must not be empty".to_string());
+            return Err(InventoryParseError::planning_key(
+                "planning keys must not be empty",
+            ));
         }
         if !trimmed.starts_with("BOUNDARY-") || !trimmed.contains('.') {
-            return Err(format!(
+            return Err(InventoryParseError::planning_key(format!(
                 "planning keys must use <boundary_id>.<section>.<field>[.<subfield>] shape (got `{trimmed}`)"
-            ));
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -286,7 +363,7 @@ impl PlanningKey {
 }
 
 impl TryFrom<String> for PlanningKey {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -490,12 +567,14 @@ pub(crate) enum BoundaryState {
 pub(crate) struct ApprovedSymbol(String);
 
 impl ApprovedSymbol {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("approved symbol must not be empty".to_string());
+            return Err(InventoryParseError::approved_symbol(
+                "approved symbol must not be empty",
+            ));
         }
-        validate_rust_like_path(trimmed, "approved symbol")?;
+        validate_rust_like_path(trimmed, InventoryParseError::approved_symbol)?;
         Ok(Self(trimmed.to_string()))
     }
 
@@ -509,7 +588,7 @@ impl ApprovedSymbol {
 }
 
 impl TryFrom<String> for ApprovedSymbol {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
@@ -521,16 +600,18 @@ impl TryFrom<String> for ApprovedSymbol {
 pub(crate) struct ApprovedCaller(String);
 
 impl ApprovedCaller {
-    fn parse(value: String) -> std::result::Result<Self, String> {
+    fn parse(value: String) -> std::result::Result<Self, InventoryParseError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err("approved caller must not be empty".to_string());
-        }
-        validate_rust_like_path(trimmed, "approved caller")?;
-        if trimmed.split("::").count() < 2 {
-            return Err(format!(
-                "approved caller must include crate path plus owner path (got `{trimmed}`)"
+            return Err(InventoryParseError::approved_caller(
+                "approved caller must not be empty",
             ));
+        }
+        validate_rust_like_path(trimmed, InventoryParseError::approved_caller)?;
+        if trimmed.split("::").count() < 2 {
+            return Err(InventoryParseError::approved_caller(format!(
+                "approved caller must include crate path plus owner path (got `{trimmed}`)"
+            )));
         }
         Ok(Self(trimmed.to_string()))
     }
@@ -541,36 +622,45 @@ impl ApprovedCaller {
 }
 
 impl TryFrom<String> for ApprovedCaller {
-    type Error = String;
+    type Error = InventoryParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         Self::parse(value)
     }
 }
 
-fn validate_rust_like_path(value: &str, label: &str) -> std::result::Result<(), String> {
+fn validate_rust_like_path(
+    value: &str,
+    error: impl FnOnce(String) -> InventoryParseError + Copy,
+) -> std::result::Result<(), InventoryParseError> {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.contains(char::is_whitespace) {
-        return Err(format!("{label} must not be empty or contain whitespace"));
+        return Err(error(format!(
+            "path `{value}` must not be empty or contain whitespace"
+        )));
     }
     let trimmed = trimmed.strip_prefix("crate::").unwrap_or(trimmed);
     for segment in trimmed.split("::") {
         if segment.is_empty() {
-            return Err(format!("{label} `{value}` contains an empty path segment"));
+            return Err(error(format!(
+                "path `{value}` contains an empty path segment"
+            )));
         }
         let mut chars = segment.chars();
         let Some(first) = chars.next() else {
-            return Err(format!("{label} `{value}` contains an empty path segment"));
+            return Err(error(format!(
+                "path `{value}` contains an empty path segment"
+            )));
         };
         if !(first == '_' || first.is_ascii_alphabetic()) {
-            return Err(format!(
-                "{label} `{value}` has invalid path segment `{segment}`"
-            ));
+            return Err(error(format!(
+                "path `{value}` has invalid path segment `{segment}`"
+            )));
         }
         if !chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric()) {
-            return Err(format!(
-                "{label} `{value}` has invalid path segment `{segment}`"
-            ));
+            return Err(error(format!(
+                "path `{value}` has invalid path segment `{segment}`"
+            )));
         }
     }
     Ok(())

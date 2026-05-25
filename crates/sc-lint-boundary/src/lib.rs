@@ -50,7 +50,7 @@ pub struct BoundaryErrorSource(Box<str>);
 
 impl From<anyhow_crate::Error> for BoundaryErrorSource {
     fn from(value: anyhow_crate::Error) -> Self {
-        Self(value.to_string().into_boxed_str())
+        Self(format!("{value:#}").into_boxed_str())
     }
 }
 
@@ -291,11 +291,41 @@ pub struct LintAttribute {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct ModulePath(String);
+
+impl ModulePath {
+    fn crate_root() -> Self {
+        Self("crate".to_string())
+    }
+
+    fn child(&self, name: &str) -> Self {
+        Self(format!("{}::{name}", self.0))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for ModulePath {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for ModulePath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct TargetContext {
     package_name: String,
     target_name: String,
     manifest_path: String,
     crate_id: CrateId,
+    root_module_path: ModulePath,
     workspace_dependency_roots: BTreeMap<String, CrateId>,
 }
 
@@ -506,13 +536,11 @@ pub fn render_findings_report(report: &FindingsReport) -> String {
 pub fn render_graph_export(
     graph: &GraphExport,
     format: GraphOutputFormat,
-) -> std::result::Result<String, serde_json::Error> {
+) -> String {
     render::render_graph_export(graph, format)
 }
 
-pub fn render_graph_export_json(
-    graph: &GraphExport,
-) -> std::result::Result<String, serde_json::Error> {
+pub fn render_graph_export_json(graph: &GraphExport) -> String {
     render::render_graph_export_json(graph)
 }
 
