@@ -104,7 +104,9 @@ description: Guides a consuming repository through sc-lint-version adoption.
   adoption document and skill remain discoverable from the normal Phase `C`
   entry points without becoming the authoritative source of adoption steps
 - `docs/sc-lint/skill-authoring-constraints.md` requires the planned skill
-  surface to be versioned and to stay scoped to `sc-lint-version` adoption
+  surface to be versioned, narrowly scoped to `sc-lint-version` adoption, and
+  define harness, fixture, and normalization responsibilities for consuming
+  repos
 - the sprint references `docs/sc-lint/skill-authoring-constraints.md` as the
   authoritative skill-design constraint doc
 

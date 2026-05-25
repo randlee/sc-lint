@@ -168,19 +168,20 @@ CLI flags, baseline artifact names, and verdict output.
 ### Version Bump Sequencing
 
 - `REQ-VERSION-012D`
-  A breaking change in the `rust-public-api` family must update the affected
-  crate release version before publication by changing the crate's
-  `Cargo.toml` `package.version` field, or the workspace-level version field
-  when that crate inherits the shared workspace version line, and by updating
-  dependent workspace crate version requirements that reference the changed
-  crate.
+  A breaking change in the `rust-public-api` family must increment the major
+  version component of the affected published crate before publication (for
+  example `1.x.y -> 2.0.0`) by changing the crate's `Cargo.toml`
+  `package.version` field, or the workspace-level version field when that
+  crate inherits the shared workspace version line, and by updating dependent
+  workspace crate version requirements that reference the changed crate.
 
 - `REQ-VERSION-012E`
-  A breaking change in the `cli` or `rpc-socket` family must update the
-  released top-level `sc-lint` package version before publication by changing
-  the `sc-lint` crate `Cargo.toml` `package.version` field, or the
-  workspace-level version field when `sc-lint` inherits it, along with any
-  release or tag metadata that publishes the same version line.
+  A breaking change in the `cli` or `rpc-socket` family must increment the
+  major version component of the released top-level `sc-lint` package before
+  publication (for example `1.x.y -> 2.0.0`) by changing the `sc-lint` crate
+  `Cargo.toml` `package.version` field, or the workspace-level version field
+  when `sc-lint` inherits it, along with any release or tag metadata that
+  publishes the same version line.
 
 - `REQ-VERSION-012F`
   Approved baseline replacement under `REQ-VERSION-012C` is only valid as part
@@ -250,6 +251,16 @@ CLI flags, baseline artifact names, and verdict output.
     are absent in the current repo
   The aggregate `ok` value must be `false` when any enabled family reports a
   breaking change.
+
+- `REQ-VERSION-017B`
+  A gate pass that detects a breaking change is not publication-ready until
+  the owning interface family also satisfies the required versioning follow-up:
+  - `rust-public-api` findings require the major-version bump path from
+    `REQ-VERSION-012D`
+  - `cli` and `rpc-socket` findings require the major-version bump path from
+    `REQ-VERSION-012E`
+  - `cli` findings additionally require the approved baseline replacement path
+    from `REQ-VERSION-012F` before publication
 
 - `REQ-VERSION-018`
   The hard-fail verdict must identify:
