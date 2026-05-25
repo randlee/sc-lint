@@ -25,7 +25,7 @@ Current contents:
 - [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution plan and
   focused sprint-hardening sequence
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
-  ownership, and Phase A touchpoint guide
+  ownership, and current plan touchpoint guide
 - [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
   decisions
 - [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract

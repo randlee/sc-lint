@@ -24,7 +24,7 @@ The currently planned sprints in this phase are:
   - CLI/config/documentation integration for approved-caller policy
   - see [docs/sc-lint/sprint-B2.md](./sprint-B2.md)
 - `B.3`
-  - observability boundary-policy ADR acceptance and doc alignment
+  - observability boundary-policy ADR acceptance plus doc/boundary alignment
   - promote `ADR-009` from stub to accepted policy
   - see [docs/sc-lint/sprint-B3.md](./sprint-B3.md)
 - `B.4`

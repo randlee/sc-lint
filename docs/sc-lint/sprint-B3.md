@@ -13,8 +13,8 @@ target: develop
 
 - accept the broader observability boundary policy that remains only stubbed in
   `ADR-009`
-- align observability ownership language across ADR, architecture, and planning
-  docs
+- align observability ownership language across ADR, architecture,
+  machine-readable boundary records, and planning docs
 - close the remaining design ambiguity around how observability-owned types and
   entry points may cross crate boundaries
 
@@ -34,6 +34,8 @@ target: develop
 - `docs/architecture.md`
 - `docs/sc-lint/logging.md`
 - `docs/sc-lint/README.md`
+- `boundaries/sc-lint/top-level-cli.toml`
+- `boundaries/planning.toml`
 
 ## Deliverables
 
@@ -49,6 +51,9 @@ silently dropped or partially deferred.
 - architecture, logging, and planning docs align with the accepted
   observability boundary policy without weakening the CLI-owned logger
   initialization invariant from `ADR-008`
+- the machine-readable boundary and planning records that describe CLI-owned
+  observability dependency seams align with the accepted policy, so backend
+  crates remain forbidden from taking direct `sc-observability` dependencies
 
 ## Explicit Code Samples
 
@@ -95,6 +100,16 @@ pub struct CommandEnvelope<T> {
 pub struct CommandId(String);
 ```
 
+```toml
+[dependencies]
+allowed_dependencies = ["sc-lint-boundary", "sc-lint-schema", "sc-observability"]
+forbidden_edges = [
+  "sc-lint-boundary -> sc-observability",
+  "sc-lint-portability -> sc-observability",
+  "sc-lint-runtime -> sc-observability",
+]
+```
+
 ## This Sprint Does Not Close
 
 - implementation of new observability backends
@@ -113,8 +128,12 @@ pub struct CommandId(String);
 - the sprint doc leaves no ambiguity about which validated command/service
   metadata types may cross crate boundaries and which observability setup work
   remains CLI-owned only
-- `docs/architecture.md`, `docs/sc-lint/logging.md`, and the ADR index align
-  with the accepted `ADR-009` text
+- `docs/architecture.md`, `docs/sc-lint/logging.md`, the ADR index, and the
+  relevant machine-readable boundary/planning records align with the accepted
+  `ADR-009` text
+- `boundaries/sc-lint/top-level-cli.toml` and the observability-related
+  planning records preserve the CLI-only `sc-observability` dependency seam
+  and the backend `forbidden_edges` documented by the accepted policy
 
 ## Required Validation
 
