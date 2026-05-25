@@ -43,7 +43,13 @@ target: develop
   - Rust public APIs
   - stable top-level CLI commands and machine contracts
   - RPC/socket interfaces
-- Phase `C` sequence is added to the project planning line
+- Phase `C` sequence is added to the project planning line with separate
+  closures for:
+  - policy/baseline definition
+  - artifact publication
+  - hard-fail gate planning
+  - consumer-adoption skill design
+  - minimal marketplace publication
 
 ## Explicit Code Samples
 
@@ -70,7 +76,7 @@ cargo semver-checks --baseline-version 0.2.0
 - `ADR-011` exists and stays in Draft status
 - `version-requirements.md` defines interface-family-specific breaking-change
   rules
-- `project-plan.md` and `phase-C-plan.md` both show the same `C.1`-`C.3`
+- `project-plan.md` and `phase-C-plan.md` both show the same `C.1`-`C.5`
   sequence
 - the plan explicitly states that generated report packages must follow the
   XHTML fragment/report pattern and must not be hand-written HTML monoliths

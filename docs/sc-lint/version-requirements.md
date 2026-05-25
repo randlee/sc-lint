@@ -47,7 +47,7 @@ later.
   pattern used by `/Users/randlee/.claude/skills/html-report/SKILL.md`:
   - one self-contained main HTML report
   - one JSON sidecar as the machine-readable source of truth
-  - optional XHTML section fragments for deeper per-section context
+  - separate XHTML section fragments/panels for deeper per-section context
 
 - `REQ-VERSION-006`
   The JSON sidecar must remain the authoritative machine-readable baseline for
@@ -57,6 +57,15 @@ later.
 - `REQ-VERSION-007`
   Every report package must be reproducible from structured inputs and
   templates alone and must not depend on manual HTML patching after render.
+
+- `REQ-VERSION-007A`
+  The generated report pipeline must use the
+  `/Users/randlee/.claude/skills/html-report/SKILL.md` workflow rather than a
+  separate ad hoc HTML rendering path.
+
+- `REQ-VERSION-007B`
+  Each XHTML section fragment/panel must expose built-in copy actions for the
+  canonical section JSON payload and canonical section context text.
 
 ## Rust Public API Rules
 
@@ -154,14 +163,31 @@ later.
   - Rust public API baselines
   - RPC/socket interfaces when present
 
+- `REQ-VERSION-022AA`
+  That consumer integration document must explicitly describe the expected
+  repo-side harness, fixture, simulator, and normalization responsibilities,
+  including the rule that consuming repos should reuse existing CLI
+  testability and simulator/transcript infrastructure where available instead
+  of rebuilding bespoke interface exercisers.
+
 - `REQ-VERSION-022B`
   The consumer integration guidance must be packaged as a repo-local Claude
   Code skill so the adoption workflow is discoverable and reusable.
 
 - `REQ-VERSION-022C`
+  The skill-design sprint and the minimal-marketplace sprint must remain
+  separate planning closures.
+
+- `REQ-VERSION-022D`
   The repo-local Claude Code skill must be advertised through a minimal
   repo-local Claude Code marketplace rather than relying on ad hoc path
   knowledge.
+
+- `REQ-VERSION-022E`
+  The minimal-marketplace planning line must name both source-repo publication
+  surfaces required by the marketplace design:
+  - `.claude-plugin/marketplace.json`
+  - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
 
 ## Non-Goals
 

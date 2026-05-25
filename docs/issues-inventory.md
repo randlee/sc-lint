@@ -70,3 +70,25 @@ needed to move from that stopgap to the full top-level install path:
   - explicit disposition for `sc-lint-boundary.rb`
   - full release-manifest and tap-update planning
   - see `docs/sc-lint/sprint-B-homebrew.md`
+
+## Phase C Planning Note
+
+Phase `C` is now the queued interface-versioning planning line:
+
+- `C.1`
+  - ownership/policy/baseline definition
+- `C.2`
+  - generated HTML/XHTML/JSON artifact publication planning
+- `C.3`
+  - hard-fail version-gate planning
+- `C.4`
+  - consumer-adoption document and repo-local skill design
+- `C.5`
+  - minimal marketplace publication planning for the adoption skill
+
+Current status:
+- no dedicated boundary record or `boundaries/planning.toml` entry is required
+  yet for `sc-lint-version`
+- that ownership/form-factor decision remains intentionally deferred to `C.1`
+  so later docs do not imply a crate or binary shape before the plan selects
+  one

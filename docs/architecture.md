@@ -53,18 +53,27 @@ That planned capability spans three interface families:
 The intended artifact model is:
 
 - structured canonical interface data
-- generated main HTML reports for people
+- generated main HTML reports for people through the workflow in
+  `/Users/randlee/.claude/skills/html-report/SKILL.md`
 - JSON sidecars as the machine-readable source of truth
-- optional XHTML fragments for section-level deep context
+- separate XHTML section fragments/panels for section-level deep context
+- built-in per-panel copy actions for canonical JSON payload and canonical
+  context text
 
 This layer is intentionally planned as template- and schema-driven output, not
 as a collection of hand-maintained HTML pages.
 
 Consumer adoption for this layer is also planned as a product surface:
 
-- one clear adoption document for consuming repos
+- one clear adoption document for consuming repos covering harness, fixture,
+  simulator/transcript, and normalization responsibilities
 - one repo-local Claude Code skill that explains the adoption workflow
 - one minimal repo-local marketplace entry that advertises that skill
+- separate planning closures for the skill-design surface and the marketplace
+  publication surface
+- consuming repos should leverage existing CLI testability and simulator
+  infrastructure where available instead of rebuilding custom interface
+  exercisers
 
 ## Current and Planned Crates
 

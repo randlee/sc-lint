@@ -1,20 +1,21 @@
 ---
 id: C.4
-title: Consumer Integration Skill And Minimal Marketplace
+title: Consumer Integration And Skill Design
 status: planned
 branch: feature/plan-sc-lint-version
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
 target: develop
 ---
 
-# Sprint C.4 — Consumer Integration Skill And Minimal Marketplace
+# Sprint C.4 — Consumer Integration And Skill Design
 
 ## Goal
 
 - define exactly what a consuming repository must do to adopt
   `sc-lint-version`
 - package that guidance as a repo-local Claude Code skill
-- advertise the skill through a minimal repo-local Claude Code marketplace
+- keep marketplace publication out of this sprint so the skill closure remains
+  reviewable on its own
 
 ## Hard Dependencies
 
@@ -22,56 +23,53 @@ target: develop
 - [docs/sc-lint/sprint-C2.md](./sprint-C2.md)
 - [docs/sc-lint/sprint-C3.md](./sprint-C3.md)
 - [docs/sc-lint/version-requirements.md](./version-requirements.md)
-- `/Users/randlee/Documents/github/synaptic-canvas/docs/marketplace-forwarding.md`
 - `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
 
 ## Exact Targets
 
 - `docs/sc-lint/phase-C-plan.md`
 - `docs/sc-lint/sprint-C4.md`
+- planned authoritative consumer-adoption document:
+  - `docs/sc-lint/version-adoption.md`
 - `docs/project-plan.md`
 - `docs/sc-lint/README.md`
 - `docs/sc-lint/roadmap.md`
 - planned repo-local skill design surface:
   - `.claude/skills/sc-lint-version-adoption/SKILL.md`
-- planned repo-local minimal marketplace surface:
-  - `.claude-plugin/marketplace.json`
 
 ## Deliverables
 
 - one explicit consumer integration document that states what a consuming repo
   must provide to exercise:
   - Rust public API checks
-  - CLI interface checks
-  - RPC/socket interface checks when present
+  - CLI interface checks using existing CLI testability surfaces where
+    available
+  - RPC/socket interface checks when present, using existing simulators or
+    transcript fixtures where available
+  - repo-local normalization hooks only when unstable values cannot be
+    removed at the canonical artifact layer
 - one planned repo-local Claude Code skill dedicated to `sc-lint-version`
   adoption and usage guidance
-- one planned minimal repo-local marketplace entry advertising that skill
 - explicit references in the sprint plan that:
-  - the minimal marketplace design follows
-    `synaptic-canvas/docs/marketplace-forwarding.md`
   - the skill design follows
-    `synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
+    `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
 
 ## Explicit Code Samples
 
 ```json
 {
-  "name": "sc-lint-version-adoption",
-  "description": "Guides a consuming repo through sc-lint-version adoption."
+  "adoption_doc": "docs/sc-lint/version-adoption.md",
+  "cli_commands": ["sc-lint --json version"],
+  "rpc_simulators": ["tests/interface/simulators/session_start.json"]
 }
 ```
 
-```json
-{
-  "name": "sc-lint-marketplace",
-  "plugins": [
-    {
-      "name": "sc-lint-version-adoption",
-      "source": "./packages/sc-lint-version-adoption"
-    }
-  ]
-}
+```yaml
+---
+name: sc-lint-version-adoption
+version: 1.0.0
+description: Guides a consuming repository through sc-lint-version adoption.
+---
 ```
 
 ## This Sprint Does Not Close
@@ -79,18 +77,20 @@ target: develop
 - implementation of the version-check engine itself
 - implementation of HTML/XHTML report rendering
 - final CI gate rollout for every consuming repository
+- minimal marketplace publication for the adoption skill
 
 ## Acceptance Criteria
 
 - the plan names one authoritative consumer-integration document rather than
   scattering adoption steps across multiple unrelated docs
+- that document explicitly defines harness, fixture, simulator/transcript, and
+  normalization responsibilities for consuming repos
+- the plan explicitly says consuming repos should leverage existing CLI
+  testability and simulator infrastructure where available
 - the plan explicitly requires a repo-local Claude Code skill for consumer
   adoption guidance
-- the plan explicitly requires a repo-local minimal marketplace entry for that
-  skill
-- the sprint references
-  `/Users/randlee/Documents/github/synaptic-canvas/docs/marketplace-forwarding.md`
-  for the marketplace design
+- the planned skill surface is versioned and shaped consistently with
+  `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
 - the sprint references
   `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
   for the skill design

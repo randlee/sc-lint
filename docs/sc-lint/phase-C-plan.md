@@ -30,10 +30,13 @@ The currently planned sprints in this phase are:
   - multi-interface-family verdict model and CI/developer workflow wiring
   - see [docs/sc-lint/sprint-C3.md](./sprint-C3.md)
 - `C.4`
-  - consumer integration documentation, Claude Code skill, and minimal
-    marketplace planning
+  - consumer integration documentation and Claude Code skill planning
   - explicit “what a consuming repo must do” scope
   - see [docs/sc-lint/sprint-C4.md](./sprint-C4.md)
+- `C.5`
+  - minimal repo-local Claude Code marketplace planning for the adoption skill
+  - explicit forwarding/reference path for marketplace advertisement
+  - see [docs/sc-lint/sprint-C5.md](./sprint-C5.md)
 
 ## Phase Structure
 
@@ -49,8 +52,9 @@ The currently planned sprints in this phase are:
    - connect the per-family artifact model to repo gates and release review
 4. `C.4`
    - define how consuming repos adopt the capability
-   - package the adoption guidance as a repo-local skill and minimal
-     marketplace surface
+   - package the adoption guidance as a repo-local skill
+5. `C.5`
+   - publish the adoption skill through a minimal repo-local marketplace
 
 ## Exit Direction
 
@@ -62,9 +66,10 @@ Phase `C` should leave the repo with:
 - a generated artifact model for published interface documentation:
   - main HTML report
   - JSON sidecar
-  - optional XHTML fragments
+  - separate XHTML section fragments/panels with built-in copy actions
 - a plan for published interface coverage across all shipped crates
 - a plan for hard-fail version checks against canonical interface artifacts in
   local and CI workflows
-- a clear consumer-onboarding plan delivered through a repo-local skill and a
-  minimal marketplace entry
+- a clear consumer-onboarding plan delivered through:
+  - one repo-local skill
+  - one minimal marketplace publication path

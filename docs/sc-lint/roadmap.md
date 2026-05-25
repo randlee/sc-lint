@@ -152,7 +152,9 @@ Initial Phase-C scope is:
   contracts, and RPC/socket interfaces
 - `C.4`
   - consuming-repo adoption guidance
-  - repo-local Claude Code skill and minimal marketplace planning
+  - repo-local Claude Code skill planning
+- `C.5`
+  - minimal marketplace publication planning for the adoption skill
 
 ### Current code moves required
 

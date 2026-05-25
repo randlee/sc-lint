@@ -32,9 +32,12 @@ target: develop
 ## Deliverables
 
 - a planned report package model that includes:
-  - main HTML report for human readers
+  - main HTML report for human readers generated through
+    `/Users/randlee/.claude/skills/html-report/SKILL.md`
   - JSON sidecar as the machine source of truth
-  - optional XHTML fragments for section-level context
+  - separate XHTML section fragments/panels for section-level context
+  - built-in copy actions per XHTML panel for canonical JSON and canonical
+    context text
 - coverage planning for published interfaces across:
   - all shipped crate public APIs
   - stable top-level CLI commands and machine contracts
@@ -49,7 +52,13 @@ target: develop
   "output_path": "artifacts/interfaces/sc-lint-cli/index.html",
   "json_output_path": "artifacts/interfaces/sc-lint-cli/index.json",
   "title": "sc-lint CLI Interface Report",
-  "sections": []
+  "sections": [
+    {
+      "id": "lint-sc-boundary",
+      "title": "lint.sc-boundary",
+      "xhtml_path": "artifacts/interfaces/cli/sections/lint-sc-boundary.xhtml"
+    }
+  ]
 }
 ```
 
@@ -71,7 +80,11 @@ artifacts/interfaces/
 
 - the plan requires generated report packages rather than hand-written HTML
 - the plan requires a JSON sidecar as canonical machine-readable output
-- the plan requires optional XHTML fragments for deeper section-level context
+- the plan requires the `/Users/randlee/.claude/skills/html-report/SKILL.md`
+  rendering pattern
+- the plan requires separate XHTML section fragments/panels for deeper
+  section-level context
+- the plan requires built-in copy actions per XHTML panel
 - the plan requires published coverage for all shipped crates, not only the
   top-level crate
 

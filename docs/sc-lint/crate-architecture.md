@@ -125,6 +125,22 @@ their governing docs, boundaries, and planned sprint work.
   - `sc-portability`
   - `sc-runtime`
 
+## Planned Capability Note
+
+Phase `C` adds planning for `sc-lint-version`, but that line is currently a
+capability plan rather than a committed crate/form-factor decision.
+
+- authoritative planning docs:
+  - `docs/sc-lint/phase-C-plan.md`
+  - `docs/sc-lint/sprint-C1.md`
+  - `docs/sc-lint/sprint-C2.md`
+  - `docs/sc-lint/sprint-C3.md`
+  - `docs/sc-lint/sprint-C4.md`
+  - `docs/sc-lint/sprint-C5.md`
+  - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
+- no dedicated crate boundary or planning record should be inferred before
+  `C.1` closes the ownership/form-factor decision
+
 ## Current Plan Coverage
 
 This document keeps crate-level ownership, responsibility, and governing

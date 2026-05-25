@@ -213,9 +213,14 @@ The product should support both:
 
 - `REQ-PRODUCT-006L`
   Generated published interface report packages must follow the main
-  HTML-plus-JSON-sidecar model, with optional XHTML section fragments for
-  deeper context, so one canonical machine-readable source can drive both
-  documentation and hard-fail checks.
+  HTML-plus-JSON-sidecar model, with separate XHTML section fragments/panels
+  for deeper context and built-in copy actions per panel, so one canonical
+  machine-readable source can drive both documentation and hard-fail checks.
+
+- `REQ-PRODUCT-006LA`
+  The generated published-interface report path must follow the workflow in
+  `/Users/randlee/.claude/skills/html-report/SKILL.md` rather than a
+  repo-specific ad hoc HTML rendering path.
 
 - `REQ-PRODUCT-006M`
   The initial Rust public API version-checking approach should be based on
@@ -223,13 +228,18 @@ The product should support both:
 
 - `REQ-PRODUCT-006N`
   The version-checking planning line must include one explicit consuming-repo
-  adoption document describing the required repo-side harness, fixtures, and
-  interface inventory responsibilities.
+  adoption document describing the required repo-side harness, fixtures,
+  simulators/transcripts when present, and interface inventory
+  responsibilities.
 
 - `REQ-PRODUCT-006O`
   The consuming-repo adoption guidance for `sc-lint-version` must be packaged
   as a repo-local Claude Code skill and advertised through a minimal repo-local
   Claude Code marketplace.
+
+- `REQ-PRODUCT-006P`
+  The skill-design sprint and the minimal-marketplace sprint must remain
+  separate closures in the planning line.
 
 ### Logging and observability
 

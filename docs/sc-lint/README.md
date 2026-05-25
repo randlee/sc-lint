@@ -56,8 +56,10 @@ Current contents:
   planning sprint
 - [`sprint-C3.md`](./sprint-C3.md) — hard-fail version gate integration
   planning sprint
-- [`sprint-C4.md`](./sprint-C4.md) — consumer integration skill and minimal
-  marketplace planning sprint
+- [`sprint-C4.md`](./sprint-C4.md) — consumer integration and skill design
+  planning sprint
+- [`sprint-C5.md`](./sprint-C5.md) — minimal marketplace publication planning
+  sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for

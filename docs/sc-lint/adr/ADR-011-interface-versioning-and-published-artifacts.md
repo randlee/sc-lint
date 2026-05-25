@@ -37,29 +37,36 @@ The planning direction approved for this line is:
    and reusable templates using the XHTML-fragment/report pattern defined by
    `/Users/randlee/.claude/skills/html-report/SKILL.md`.
 4. The generated JSON sidecar is the canonical machine-readable baseline;
-   main HTML reports and optional XHTML fragments are human-facing derivatives
-   of that structured source.
-5. The versioning model applies to multiple interface families:
+   main HTML reports and separate XHTML section fragments/panels are
+   human-facing derivatives of that structured source.
+5. The reusable HTML/XHTML template stack must expose built-in copy actions
+   per section/panel for canonical JSON payload and canonical context text
+   rather than leaving copy behavior to per-report custom scripting.
+6. The versioning model applies to multiple interface families:
    - Rust public APIs for all shipped crates
    - stable top-level CLI commands and machine contracts
    - RPC/socket interfaces when such surfaces exist
-6. Consumer adoption guidance for `sc-lint-version` will be planned as a
+7. Consumer adoption guidance for `sc-lint-version` will be planned as a
    first-class product artifact, delivered through a repo-local Claude Code
-   skill and advertised through a minimal repo-local marketplace entry.
+   skill.
+8. Marketplace advertisement for that adoption skill will be planned as a
+   separate minimal repo-local marketplace closure rather than bundled into
+   the skill-design sprint.
 
 ## Consequences
 
 - `sc-lint-version` planning must define separate breaking-change semantics for
   Rust APIs, CLI contracts, and RPC/socket interfaces
 - the repo must inventory and publish more than just Rust library APIs
-- generated report templates become part of the versioning pipeline contract
+- generated report templates, including built-in panel copy controls, become
+  part of the versioning pipeline contract
 - hand-authored HTML monoliths are explicitly out of scope for canonical
   published artifacts
 - future implementation must carry both machine-readability and human
   readability from one shared structured artifact model
-- consumer repos will need a documented adoption path, but that path should be
-  packaged as structured skill/marketplace assets rather than prose hidden in
-  scattered docs
+- consumer repos will need a documented adoption path, and the planning line
+  must keep skill design and marketplace publication as separate closures
+  rather than prose hidden in scattered docs
 
 ## Follow-on Planning
 
@@ -70,3 +77,5 @@ The planning direction approved for this line is:
   - Rust public API baseline integration
   - generated interface report publication
   - hard-fail policy enforcement across all supported interface families
+  - consumer-adoption skill design
+  - minimal marketplace publication for that adoption skill
