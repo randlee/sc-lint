@@ -311,6 +311,8 @@ Related architecture decisions:
   — analyzer-crate partitioning and primary lint-target mapping
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
   — `sc-observability` selection plus CLI-owned structured logging policy
+- [`./adr/ADR-010-portability-scope-and-parity.md`](./adr/ADR-010-portability-scope-and-parity.md)
+  — shared portability ownership/parity policy for Windows-path, env, and shell lint expansion
 
 Planned A.8 user-guide convention:
 
