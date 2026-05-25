@@ -89,6 +89,8 @@ Phase `C` is now the queued interface-versioning planning line:
 Current status:
 - no dedicated boundary record or `boundaries/planning.toml` entry is required
   yet for `sc-lint-version`
-- that ownership/form-factor decision remains intentionally deferred to `C.1`
-  so later docs do not imply a crate or binary shape before the plan selects
-  one
+- `C.1` has now committed the planned form-factor and invocation path:
+  - dedicated workspace crate: `sc-lint-version`
+  - top-level command path: `sc-lint check interfaces`
+- dedicated crate-boundary records remain future implementation work after the
+  Phase `C` planning line rather than current planning prerequisites

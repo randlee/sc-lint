@@ -81,6 +81,14 @@ specialized backend tools and mixed Rust/Python implementations.
   - `CliError` under `error` on failure
   - additive diagnostics only, never family-specific top-level envelope keys
 
+- `REQ-CLI-005J`
+  Planned business-verdict commands may exit non-zero after successful
+  evaluation without reclassifying the result as `CliError`. For the current
+  planning line, `sc-lint check interfaces` is such a command: breaking-change
+  detection remains a `CommandEnvelope<T>` result with payload-owned verdict
+  fields, while `CliError` remains reserved for execution/config/protocol
+  failures.
+
 - `REQ-CLI-005I`
   Before a command family is considered implementation-ready, the contract docs
   must record:
@@ -117,6 +125,12 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-lint clippy`
   - `sc-lint ci`
   - `sc-lint version`
+
+- `REQ-CLI-007H`
+  The planned Phase `C` interface-versioning command surface must use:
+  - `sc-lint check interfaces`
+  and must preserve `sc-lint version` as the tool-version inspection path
+  rather than overloading it for interface-version checks.
 
 - `REQ-CLI-007A`
   The CLI should support first-class execution modes for common developer

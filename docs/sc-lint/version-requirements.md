@@ -203,7 +203,10 @@ CLI flags, baseline artifact names, and verdict output.
   The multi-family verdict for `sc-lint check interfaces` must travel through
   the existing top-level `CommandEnvelope<T>` success path and the existing
   `CliError` failure path rather than defining a parallel machine-readable
-  envelope.
+  envelope. A completed comparison that finds breaking changes remains a
+  business-verdict result under `CommandEnvelope<T>` with `data.ok = false`;
+  `CliError` remains reserved for execution, config, capability, and protocol
+  failures rather than for the detected-breaking-change verdict itself.
 
 - `REQ-VERSION-017A`
   The multi-family hard-fail result must use one top-level verdict record for
