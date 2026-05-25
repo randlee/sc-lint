@@ -844,15 +844,7 @@ impl MockBackend {
             format!("#!/usr/bin/env sh\nprintf '%s\\n' '{payload}'\n")
         };
         std::fs::write(&script_path, script).expect("mock backend script");
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions = std::fs::metadata(&script_path)
-                .expect("mock backend metadata")
-                .permissions();
-            permissions.set_mode(0o755);
-            std::fs::set_permissions(&script_path, permissions).expect("mock backend perms");
-        }
+        set_mock_backend_permissions(&script_path);
 
         let original_path = std::env::var_os("PATH");
         let updated_path = std::env::join_paths(
@@ -888,6 +880,20 @@ impl Drop for MockBackend {
         }
     }
 }
+
+#[cfg(unix)]
+fn set_mock_backend_permissions(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut permissions = std::fs::metadata(path)
+        .expect("mock backend metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(path, permissions).expect("mock backend perms");
+}
+
+#[cfg(not(unix))]
+fn set_mock_backend_permissions(_path: &Path) {}
 
 fn step_names(steps: &[Value]) -> Vec<String> {
     steps
