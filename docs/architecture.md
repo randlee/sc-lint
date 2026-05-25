@@ -170,6 +170,8 @@ Current intended distribution is:
 - `sc-lint-boundary`
   - boundary inventory and ownership rules
   - boundary declarations and attribute-driven boundary policy
+  - planned next boundary rule-family addition:
+    - `SCB-CALLER-001` named-caller allowlist enforcement
 - `sc-lint-portability`
   - OS/platform portability rules
   - current planned moves/imports:

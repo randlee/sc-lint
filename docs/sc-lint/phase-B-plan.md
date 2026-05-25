@@ -46,7 +46,9 @@ followed by one queued distribution-planning sprint whose numeric slot is still
 open:
 
 1. `B.1`
-   - harden the shared lint-gate backlog and portability scope only
+   - encode Phase-A post-mortem findings as planned product/process work
+   - define the next lint gates and architecture-policy follow-ups
+   - tighten QA expectations before additional Phase-B feature scope begins
 2. `B.2`
    - convert approved-caller policy from prose into TOML-backed enforcement
    - add the next boundary-rule family needed to stop review-only caller drift
@@ -67,6 +69,9 @@ planning line through `B.4` is reviewed.
 Phase `B` should leave the repo with:
 
 - explicit planned ownership for the recurring Phase-A defect families
+- an explicit product-side backlog for reusable consumer-proven lint gaps
+  without importing consumer-specific wrapper names or report formats into the
+  core tool contract
 - an explicit Phase-B portability expansion line covering Windows-only path
   literals, broader env portability checks, and shell-portability linting
 - accepted ADR coverage for shared portability ownership/parity and

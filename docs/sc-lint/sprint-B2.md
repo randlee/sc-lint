@@ -43,6 +43,9 @@ silently dropped or partially deferred.
 - boundary TOML gains a structured `[callers]` section for named-caller
   approvals, with schema validation that rejects malformed symbol rows,
   duplicate entries, and unknown fields
+- approved caller symbols and caller identities are parsed into validated
+  wrapper types at the inventory boundary rather than flowing through analysis
+  as unconstrained raw `String` values
 - `SCB-CALLER-001` lands as a fail-only rule in `sc-lint-boundary`, using the
   existing reference graph to enumerate all callers of an approved-list symbol
   and emitting a finding for every caller not listed in TOML
@@ -79,9 +82,17 @@ pub(crate) struct CallersSection {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ApprovedCallerEntry {
-    pub(crate) symbol: String,
-    pub(crate) callers: Vec<String>,
+    pub(crate) symbol: ApprovedSymbol,
+    pub(crate) callers: Vec<ApprovedCaller>,
 }
+```
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct ApprovedSymbol(String);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct ApprovedCaller(String);
 ```
 
 ```rust
@@ -123,6 +134,8 @@ fn caller_is_exempt(
 
 - malformed `[callers]` rows, duplicate symbol entries, and unknown caller
   fields fail during inventory load
+- approved symbols and caller identities are validated once at inventory load
+  and do not propagate through rule analysis as unconstrained raw strings
 - `SCB-CALLER-001` exits non-zero when a non-exempt external caller reaches a
   restricted symbol and stays clean when all callers are approved or exempt
 - `references.scope = "outside_owner_crate"` exempts owner-crate callers

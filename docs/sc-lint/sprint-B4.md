@@ -30,8 +30,10 @@ target: develop
 
 - `.atm.toml`
 - `.claude/agents/quality-mgr.md`
+- `.claude/agents/qa-triage.md`
 - `.claude/skills/team-lead/SKILL.md`
 - `.claude/skills/codex-orchestration/SKILL.md`
+- `.claude/skills/codex-orchestration/fix-assignment.xml.j2`
 - `.claude/skills/triaging-findings/SKILL.md`
 - `.claude/skills/todo-triage/SKILL.md`
 - `scripts/find_todos.py`
@@ -56,6 +58,9 @@ silently dropped or partially deferred.
   carry-forward triage inputs available to the routing layer
 - the prompt/process surface identifies the authoritative scripts, skills, and
   handoff points needed for the triage-first workflow
+- the triage-first workflow lands with explicit test coverage for TODO
+  discovery and carry-forward classification so later prompt changes do not
+  silently break routing behavior
 
 ## Explicit Code Samples
 
@@ -75,6 +80,20 @@ QA-2+:
   same broad structural review by default
 ```
 
+```json
+{
+  "round": "QA-2",
+  "triage_records": [
+    {
+      "finding_id": "REQ-001",
+      "classification": "structural",
+      "carry_forward": true
+    }
+  ],
+  "run_rust_best_practices": false
+}
+```
+
 ## This Sprint Does Not Close
 
 - product-rule implementation
@@ -89,8 +108,12 @@ QA-2+:
   is not the default broad reviewer on QA-2+
 - the plan explicitly requires TODO scan and carry-forward triage inputs in the
   later-round routing flow
-- the plan identifies the prompt and script surfaces that own this process
+- the plan identifies the prompt, template, and script surfaces that own this
+  process, including `qa-triage` and `fix-assignment.xml.j2`
+- the sprint requires regression coverage for TODO discovery and carry-forward
+  triage classification instead of relying on prompt prose only
 
 ## Required Validation
 
+- `python3 -m unittest scripts/test_find_todos.py scripts/test_triage_carry_forward.py`
 - `just lint`

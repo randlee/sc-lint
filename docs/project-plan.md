@@ -88,7 +88,7 @@ This phase should execute in the following order:
 
 ## Scheduled Sprint Plans
 
-The currently scheduled foundation sprints are:
+The currently scheduled sprint plans are:
 
 - `A.1a`
   - CLI bootstrap and contract definition
@@ -212,8 +212,10 @@ Release `0.1.x` should establish:
   - one document per tool named after the lint tool and linked from the
     repository-root `README.md`
 
-The current phase, Phase `A`, is the release-1 foundation phase. It does not imply that
-every release-1 implementation item is already complete.
+Phase `A` completed the release-1 foundation implementation line. Phase `B` is
+the current planning and hardening line for post-Phase-A defect prevention,
+follow-on feature work, and release/distribution planning. That does not imply
+that every release-1 follow-on item is already complete.
 
 ## Planning Conventions
 

@@ -35,6 +35,7 @@ target: develop
 - `docs/project-plan.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/sc-lint/README.md`
+- `docs/sc-lint/crate-architecture.md`
 - `docs/requirements.md`
 - `docs/architecture.md`
 
@@ -45,7 +46,9 @@ the scope this sprint claims. If that cannot be done cleanly in one sprint, the
 sprint must be split before implementation begins. No deliverable may be
 silently dropped or partially deferred.
 
-- the recurring shared lint-gate backlog is explicitly planned for:
+- the recurring shared lint-gate backlog is explicitly planned as the product
+  response to reusable consumer-proven gaps, without importing
+  consumer-specific wrapper names or repo-local report formats, for:
   - raw identity string literals without named constants
   - `/tmp/` paths without intent comments
   - public API error types exposing `anyhow::Error`
@@ -102,6 +105,9 @@ let home = std::env::var("USERPROFILE");
 - `docs/requirements.md` and `docs/architecture.md` both align on
   `sc-lint-portability` as the shared owner of future Windows-path, env, and
   shell portability rules
+- `docs/sc-lint/crate-architecture.md` and `docs/sc-lint/README.md` both align
+  with the same shared portability ownership and do not describe repo-local
+  wrapper surfaces as core product deliverables
 - `ADR-010` exists and records:
   - shared portability ownership in `sc-lint-portability`
   - parity expectations between Unix-only and Windows-only path-literal checks

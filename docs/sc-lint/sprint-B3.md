@@ -57,20 +57,42 @@ types, boundary contracts, or execution seams, this section must include
 explicit code samples or signatures showing the intended end state.
 
 ```rust
+pub struct CommandObservability {
+    pub command: CommandId,
+    pub service_name: ServiceName,
+}
+
+pub fn dispatch_command(
+    observability: &CommandObservability,
+    command: Command,
+) -> Result<CommandEnvelope<RenderedOutput>, CliError>;
+```
+
+```rust
+pub fn emit_cli_command_started(
+    observability: &CommandObservability,
+    args: &[String],
+);
+
+pub fn emit_cli_command_completed(
+    observability: &CommandObservability,
+    verdict: CommandVerdict,
+    summary: &str,
+    elapsed_ms: u64,
+);
+```
+
+```rust
 pub struct CommandEnvelope<T> {
     pub ok: bool,
-    pub command: String,
+    pub command: CommandId,
     pub data: Option<T>,
     pub error: Option<CliError>,
 }
 ```
 
 ```rust
-pub struct CliError {
-    pub code: String,
-    pub kind: String,
-    pub message: String,
-}
+pub struct CommandId(String);
 ```
 
 ## This Sprint Does Not Close
@@ -88,6 +110,9 @@ pub struct CliError {
   - constraints for future direct-linked backend observability integration
   - the preserved `CLI-LAYER-OWNS-LOGGER-INITIALIZATION` invariant from
     `ADR-008`
+- the sprint doc leaves no ambiguity about which validated command/service
+  metadata types may cross crate boundaries and which observability setup work
+  remains CLI-owned only
 - `docs/architecture.md`, `docs/sc-lint/logging.md`, and the ADR index align
   with the accepted `ADR-009` text
 
