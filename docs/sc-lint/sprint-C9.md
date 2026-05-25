@@ -53,9 +53,27 @@ target: develop
   - a Windows companion is a sibling item with the same identifier and an
     explicit `#[cfg(windows)]` gate
 - the structural detection seam is explicit and uses the same parent-scope
-  walk that already classifies production items through `source_scan.rs`:
+  walk that already classifies production items through `source_scan.rs`; the
+  sibling slice comes from a new scope-level pass that iterates complete item
+  lists before descending recursively:
 
 ```rust
+fn collect_parity_findings(
+    items: &[Item],
+    inherited_scope: ScopeKind,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
+    for item in items {
+        if is_cfg_unix_production_item(item, inherited_scope)
+            && !has_windows_companion(item, items)
+            && !has_portable_fallback(item, items)
+        {
+            // emit PORT-010
+        }
+    }
+}
+
 fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
     sibling_items.iter().any(|candidate| {
         same_identifier(unix_item, candidate) && item_has_cfg_windows(candidate)
@@ -68,6 +86,11 @@ fn has_portable_fallback(unix_item: &Item, sibling_items: &[Item]) -> bool {
     })
 }
 ```
+
+- `collect_parity_findings(items, ...)` is called from the file-level and
+  module-level traversal points that already own full `&[Item]` slices, so
+  `PORT-010` does not depend on reconstructing sibling context from a
+  single-item visitor callback
 
 - the rule operates on structural production items rather than only leaf
   string patterns, and its production scan covers:
@@ -116,6 +139,9 @@ pub fn runtime_socket_name() -> &'static str {
   Windows sibling or explicit portable fallback
 - the sprint defines sibling scope and portable fallback in machine-detectable
   terms instead of leaving companion matching implicit
+- the sprint names `collect_parity_findings(items, ...)` as the integration
+  seam that supplies sibling context to `has_windows_companion(...)` and
+  `has_portable_fallback(...)`
 - the sprint requires the structural scan to cover all three production item
   categories:
   - free functions

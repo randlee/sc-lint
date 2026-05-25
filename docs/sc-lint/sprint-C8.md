@@ -46,7 +46,8 @@ target: develop
   reuses the existing `unix_gated` propagation path instead of inventing a
   parallel suppression model
 - the shell-invocation detection seam is explicit and separates process-launch
-  calls from string-literal path checks:
+  calls from string-literal path checks; `visit_expr_for_unix_portability(...)`
+  must gain an `Expr::Call` arm that invokes `is_shell_command_call(...)`:
 
 ```rust
 fn is_shell_command_call(expr_call: &ExprCall) -> bool {
@@ -55,6 +56,23 @@ fn is_shell_command_call(expr_call: &ExprCall) -> bool {
 
 fn is_unix_shell_path_literal(value: &str) -> bool {
     matches!(value, "/bin/sh" | "/bin/bash")
+}
+
+fn visit_expr_for_unix_portability(
+    expr: &Expr,
+    unix_gated: bool,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
+    match expr {
+        Expr::Call(expr_call) if !unix_gated && is_shell_command_call(expr_call) => {
+            // emit PORT-009
+        }
+        Expr::Block(expr_block) => { /* existing recursion */ }
+        Expr::If(expr_if) => { /* existing recursion */ }
+        Expr::Match(expr_match) => { /* existing recursion */ }
+        _ => {}
+    }
 }
 ```
 
@@ -102,6 +120,8 @@ pub fn run_unix_hook() -> std::io::Result<std::process::ExitStatus> {
 - the sprint states that explicitly Unix-gated code paths are not false
   positives for this family, and names the existing `unix_gated` propagation
   path as the suppression mechanism
+- the sprint names `visit_expr_for_unix_portability(...)` as the expression
+  visitor seam for `is_shell_command_call(...)`
 - the sprint names the dedicated helper boundary for shell-path literals
   instead of leaving `/bin/sh` detection implicit in generic path matching
 - the sprint keeps repo-local shell conventions and wrapper policy out of the
