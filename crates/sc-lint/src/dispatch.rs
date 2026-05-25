@@ -175,6 +175,9 @@ fn run_delegated_backend(
         CliError::backend_protocol(format!("{tool} returned non-utf8 machine output"))
             .with_source(error)
             .with_detail(consts::FIELD_TOOL, json!(tool))
+            .with_suggested_action(
+                "Run the backend binary directly and inspect its stdout encoding before rerunning sc-lint.",
+            )
     })?;
     let normalized = normalize_backend_json(tool, raw)?;
     let finding_count = normalized
@@ -192,6 +195,8 @@ fn find_backend_binary(tool: &str) -> PathBuf {
     std::env::current_exe()
         .ok()
         .and_then(|current_exe| find_backend_binary_from_exe(&current_exe, tool))
+        // Falling back to PATH keeps local development, CI, and non-sibling
+        // binary layouts working when the installed sibling lookup does not.
         .unwrap_or_else(|| PathBuf::from(tool))
 }
 
