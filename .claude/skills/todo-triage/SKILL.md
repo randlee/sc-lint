@@ -52,6 +52,9 @@ The script scans repo Rust source files only.
 Regression coverage for this helper lives in:
 - `scripts/test_find_todos.py`
 
+Carry-forward routing for findings discovered in this pass is produced by:
+- `scripts/triage_carry_forward.py`
+
 Output format:
 
 ```text

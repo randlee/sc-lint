@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -14,6 +15,7 @@ from unittest.mock import patch
 _SCRIPT = Path(__file__).parent / "triage_carry_forward.py"
 _SPEC = importlib.util.spec_from_file_location("triage_carry_forward", _SCRIPT)
 _MOD = importlib.util.module_from_spec(_SPEC)
+sys.modules[_SPEC.name] = _MOD
 _SPEC.loader.exec_module(_MOD)
 
 
@@ -65,7 +67,25 @@ class TestTriageCarryForward(unittest.TestCase):
             ttl = Path(tmp) / "FTQ-001.ttl"
             _write_record(ttl)
             stdout = io.StringIO()
-            with patch.object(_MOD, "require_oxigraph"), patch("sys.stdout", stdout):
+            with (
+                patch.object(_MOD, "require_oxigraph"),
+                patch.object(_MOD, "load_records"),
+                patch.object(
+                    _MOD,
+                    "query_records",
+                    return_value=[
+                        {
+                            "id": "FTQ-001",
+                            "category": "FTQ",
+                            "severity": "important",
+                            "file": "crates/sc-lint/src/tests.rs",
+                            "line": 28,
+                            "summary": "Process-global shutdown state in tests",
+                        }
+                    ],
+                ),
+                patch("sys.stdout", stdout),
+            ):
                 rc = _MOD.main(
                     [
                         "--branch",
@@ -112,7 +132,33 @@ class TestTriageCarryForward(unittest.TestCase):
                 include_severity=False,
             )
             stdout = io.StringIO()
-            with patch.object(_MOD, "require_oxigraph"), patch("sys.stdout", stdout):
+            with (
+                patch.object(_MOD, "require_oxigraph"),
+                patch.object(_MOD, "load_records"),
+                patch.object(
+                    _MOD,
+                    "query_records",
+                    return_value=[
+                        {
+                            "id": "FTQ-001",
+                            "category": None,
+                            "severity": "important",
+                            "file": "crates/sc-lint/src/tests.rs",
+                            "line": 28,
+                            "summary": "Process-global shutdown state in tests",
+                        },
+                        {
+                            "id": "FTQ-002",
+                            "category": "FTQ",
+                            "severity": None,
+                            "file": "crates/sc-lint/src/tests.rs",
+                            "line": 28,
+                            "summary": "Process-global shutdown state in tests",
+                        },
+                    ],
+                ),
+                patch("sys.stdout", stdout),
+            ):
                 rc = _MOD.main(
                     [
                         "--branch",

@@ -174,7 +174,7 @@ Recommended render pattern:
 sc-compose render \
   --root .claude/skills/codex-orchestration \
   --file fix-assignment.xml.j2 \
-  --var-file /tmp/fix-vars.json
+  --var-file "$(mktemp)"
 ```
 
 For follow-up QA or reviewer rechecks, build the carry-forward payload from the
