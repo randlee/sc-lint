@@ -43,6 +43,8 @@ Treat the assignment as the source of truth for:
 - worktree path
 - review targets
 - changed files
+- round limit
+- carry-forward findings JSON
 - triage records
 - reference docs
 
@@ -51,8 +53,8 @@ status message to team-lead.
 
 ## Review Scope Expansion (Rounds 1–2)
 
-When `review_mode` is NOT `round_limit`, this is a round 1 or round 2 full-sweep review.
-Before dispatching reviewers, expand `review_targets` to the full sprint diff:
+When `round_limit` is false, this is a full-sweep QA pass. Before dispatching
+reviewers, expand `review_targets` to the full sprint diff:
 
 ```bash
 cd <worktree_path>
@@ -68,7 +70,16 @@ If the comparison base differs, use the repo's active integration branch:
 git diff <integration-branch>...HEAD --name-only
 ```
 
-Do NOT use the team-lead's `changed_files` field as a scope limiter for round 1/2.
+Do NOT use the team-lead's `changed_files` field as a scope limiter for a
+full-sweep pass.
+
+When `round_limit` is true, this is a targeted follow-up QA pass:
+
+- do not re-run the broad QA-1 sweep by default
+- keep `changed_files` as the minimum verification scope
+- treat `triage_records` and `carry_forward_findings_json` as the authoritative
+  prior-finding inputs for reviewer routing
+- still run the TODO scan before declaring PASS
 
 Additionally: when any reviewer surfaces a new violation pattern (unsafe set_var,
 ungated unix imports, missing ATM_CONFIG_HOME, etc.), sweep the full workspace for
@@ -84,7 +95,9 @@ TODO-specific rule:
 
 1. ACK immediately per `docs/team-protocol.md`.
 2. Read the task payload and determine the reviewer set.
-3. If NOT round_limit: expand review_targets to full sprint diff (see above).
+3. If `round_limit` is false: expand `review_targets` to the full sprint diff
+   (see above). If `round_limit` is true: stay in targeted-fix mode using
+   `changed_files`, `triage_records`, and `carry_forward_findings_json`.
 4. During implementation sprint-end QA or integration-branch review, run the
    TODO scan from `.claude/skills/todo-triage/SKILL.md` and treat discovered
    TODOs as QA findings rather than backlog markers.
@@ -108,7 +121,9 @@ TODO-specific rule:
    - use `gh run view <run-id>` when a specific workflow needs deeper inspection
 9. Publish the PR update using the templates from
    `.claude/skills/quality-management-gh/`.
-10. Report a final PASS, FAIL, or IN-FLIGHT gate to team-lead.
+10. If QA fails, route findings back to team-lead for triage-first dispatch.
+    Do not route raw QA findings directly to `clint`.
+11. Report a final PASS, FAIL, or IN-FLIGHT gate to team-lead.
 
 ## Default Reviewer Set
 
@@ -121,6 +136,16 @@ For implementation work in this Rust repo:
 - do not include `rust-service-hardening-agent` in the standing `sc-lint`
   reviewer set; only run it on an explicit override or when the Rust
   supplement says a service-hardening review is genuinely warranted
+- run `flaky-test-qa` when tests changed, CI shows intermittent behavior, or
+  `rust-qa-agent` surfaces unstable execution symptoms
+
+For QA-2 and later rechecks of implementation work:
+- always run `req-qa`
+- always run `arch-qa`
+- always run `rust-qa-agent`
+- do not re-run `rust-best-practices-agent` as the default broad reviewer
+- use `triage_records`, `changed_files`, and `carry_forward_findings_json` to
+  keep the pass in targeted-fix mode
 - run `flaky-test-qa` when tests changed, CI shows intermittent behavior, or
   `rust-qa-agent` surfaces unstable execution symptoms
 

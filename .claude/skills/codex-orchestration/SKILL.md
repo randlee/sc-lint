@@ -64,12 +64,20 @@ Before starting a sprint:
 7. QA-2 and later rounds must omit `rust-best-practices-agent`. Any unresolved
    QA-1 RBP findings that are not fixed in the first fix round carry to the
    next phase backlog automatically and are not re-raised in later QA rounds on
-   the same sprint branch.
+   the same sprint branch. QA-2+ stays in targeted-fix mode: use
+   `triage_records`, `changed_files`, and `carry_forward_findings_json` rather
+   than broad re-review by default.
 8. If QA passes and CI is green, merge may proceed.
 9. If QA fails, `team-lead` first runs `/triaging-findings` to correlate the
-   findings across worktrees and determine the promoted fix branch.
+   findings across worktrees and determine the promoted fix branch. Do not send
+   raw QA findings directly to `clint`.
 10. After triage completes, `team-lead` routes concrete fixes back to
-   `clint` using `fix-assignment.xml.j2`.
+   `clint` using `fix-assignment.xml.j2`. For follow-up QA rounds, the routing
+   layer must also preserve:
+   - triage records from `qa-triage`
+   - `carry_forward_findings_json` rendered by
+     `scripts/triage_carry_forward.py`
+   - TODO findings produced by `scripts/find_todos.py`
 
 ## Phase-End Review
 
@@ -98,6 +106,16 @@ Use the templates in this skill directory:
 
 Use the Rust assignment templates from:
 - `.claude/assets/sc-rust/quality-mgr/templates/`
+
+Authoritative B.4 QA-routing surfaces:
+- `.claude/agents/quality-mgr.md`
+- `.claude/agents/qa-triage.md`
+- `.claude/skills/triaging-findings/SKILL.md`
+- `.claude/skills/todo-triage/SKILL.md`
+- `.claude/skills/codex-orchestration/qa-template.xml.j2`
+- `.claude/skills/codex-orchestration/fix-assignment.xml.j2`
+- `scripts/find_todos.py`
+- `scripts/triage_carry_forward.py`
 
 ## Required Message Sequence
 
