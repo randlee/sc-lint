@@ -41,6 +41,7 @@ target: develop
   - `HOME`
   - `USER`
   - `XDG_*`
+- `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port008`
 - the new env-portability rule fires on direct production lookups used as
   path, config-root, or user-identity inputs when no approved abstraction
   layer is present

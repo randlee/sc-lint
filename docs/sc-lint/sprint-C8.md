@@ -41,6 +41,7 @@ target: develop
   - `Command::new("bash")`
   - hardcoded `/bin/sh`
   - hardcoded `/bin/bash`
+- `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port009`
 - the shell-portability rule allows explicitly Unix-gated code paths to remain
   Unix-only rather than forcing fake parity into consumers that already expose
   an honest Unix boundary

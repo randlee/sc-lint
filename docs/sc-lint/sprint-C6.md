@@ -38,6 +38,8 @@ target: develop
   - `PORT-006` hardcoded Unix-only absolute path literals in production code
   - `PORT-007` hardcoded Windows-only absolute path literals in production
     code
+- `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port006` and
+  `Port007`
 - the production path-literal rules reuse the existing source-scope walk so
   `PORT-001` remains test-only instead of silently changing semantics
 - rule messages point callers toward platform-aware path sources or explicit
