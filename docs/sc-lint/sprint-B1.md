@@ -24,6 +24,9 @@ deliverables instead of ad hoc cleanup.
    - `pub` visibility exceeding the documented contract surface
    - raw `String` fields used for structured identifiers such as
      `boundary_id`, sprint ids, owner ids, and planning keys
+   - Windows-only path literals as a parity companion to Unix-only path checks
+   - broader cross-platform environment-variable portability rules
+   - shell-portability checks for OS-specific shell and command assumptions
 2. ADR draft stub
    ([`ADR-009 — Observability Boundary Policy`](./adr/ADR-009-observability-boundary-policy.md))
    for observability boundary policy beyond the current structured-logging
@@ -46,6 +49,15 @@ most common systemic regressions before they escape to late QA:
 - visibility-contract gate for `pub` vs `pub(crate)` drift
 - structured-identifier gate for typed `boundary_id`/owner/sprint/planning
   fields
+- Windows-path-literal gate that complements the current Unix-only path checks
+  by catching hardcoded drive-prefix and other Windows-only path literals where
+  platform-aware path construction is required
+- env-portability gate that expands beyond the current `set_var` and
+  `dirs::home_dir()` coverage to catch non-portable environment-variable
+  assumptions and unscoped env-mutation patterns
+- shell-portability gate for OS-specific shell paths, shell-only command
+  idioms, and cross-platform command assumptions that should be routed through
+  a portable wrapper or abstraction
 
 The planned gate contracts for this sprint are:
 
@@ -79,6 +91,22 @@ The planned gate contracts for this sprint are:
   - sprint success criteria:
     - structured identifier fields use the newtype surface introduced by the
       sprint rather than raw `String`
+- Windows-path-literal gate
+  - treat hardcoded Windows-only path literals as the same class of
+    portability drift already recognized for Unix-only path literals
+  - the planned rule family should preserve parity in findings and remediation
+    guidance across Unix-only and Windows-only literal detection
+- env-portability gate
+  - extend portability analysis beyond the current `std::env::set_var()` and
+    home-dir override checks
+  - planned rule work should target cross-platform env assumptions such as
+    OS-specific home/temp variable reliance and env access patterns that bypass
+    the repo's portability wrapper expectations
+- shell-portability gate
+  - treat absolute shell paths and OS-specific shell-command assumptions as
+    planned portability lint scope rather than ad hoc review findings
+  - planned rule work should identify where a portable wrapper or command
+    abstraction is required instead of direct shell-specific invocation
 
 ### Observability ADR
 
@@ -97,7 +125,10 @@ Record the new standing QA expectation:
 
 ## Acceptance Criteria
 
-1. All seven recurring Phase-A finding patterns are named in the sprint plan.
+1. All seven recurring Phase-A finding patterns are named in the sprint plan,
+   and the agreed cross-platform follow-on checks for Windows-only path
+   literals, environment portability, and shell portability are explicitly in
+   scope.
 2. The observability-boundary ADR work is explicitly tracked as a deliverable.
 3. The QA-process change calls for `rust-best-practices` in
    `practice_mode:all` on every sprint.

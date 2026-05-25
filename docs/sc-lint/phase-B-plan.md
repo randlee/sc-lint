@@ -16,6 +16,8 @@ The currently planned sprints in this phase are:
 - `B.1`
   - post-mortem carry-forwards from Phase `A`
   - systemic lint-gate additions for repeat offender patterns
+  - portability follow-ons for Windows-only paths, env portability, and shell
+    portability
   - observability boundary-policy ADR work
   - QA-process tightening for rust-best-practices coverage on every sprint
   - see [docs/sc-lint/sprint-B1.md](./sprint-B1.md)
@@ -41,6 +43,8 @@ open:
 1. `B.1`
    - encode Phase-A post-mortem findings as planned product/process work
    - define the next lint gates and architecture-policy follow-ups
+   - extend the portability planning line beyond the current Unix-focused rules
+     so cross-platform path, env, and shell drift are explicit planned scope
    - tighten QA expectations before additional Phase-B feature scope begins
 2. `B.2`
    - convert approved-caller policy from prose into TOML-backed enforcement
@@ -57,6 +61,8 @@ Additional Phase `B` sprint scope may be added after `B.2` is reviewed.
 Phase `B` should leave the repo with:
 
 - explicit planned ownership for the recurring Phase-A defect families
+- an explicit Phase-B portability expansion line covering Windows-only path
+  literals, broader env portability checks, and shell-portability linting
 - a production-ready plan for caller-identity enforcement in
   `sc-lint-boundary`
 - a documented ADR track for observability boundary policy beyond the logging
