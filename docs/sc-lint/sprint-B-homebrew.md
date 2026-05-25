@@ -3,7 +3,7 @@ id: sprint-B-homebrew
 title: Full Toolset Homebrew Distribution
 status: planned
 branch: feature/phase-B-sprint-plans
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-B-sprint-plans
+worktree: <repo-worktree>/feature/phase-B-sprint-plans
 target: develop
 ---
 
@@ -24,7 +24,7 @@ target: develop
 - [release/publish-artifacts.toml](../../release/publish-artifacts.toml)
 - [.github/workflows/release.yml](../../.github/workflows/release.yml)
 - [docs/release-inventory-schema.json](../release-inventory-schema.json)
-- `/Users/randlee/Documents/github/homebrew-tap/Formula/sc-lint-boundary.rb`
+- external Homebrew tap checkout rooted at `${HOMEBREW_TAP_DIR}`
 
 ## Exact Targets
 
@@ -33,8 +33,8 @@ target: develop
 - `docs/release-inventory-schema.json`
 - `README.md`
 - `docs/sc-lint/README.md`
-- `/Users/randlee/Documents/github/homebrew-tap/Formula/sc-lint.rb`
-- `/Users/randlee/Documents/github/homebrew-tap/Formula/sc-lint-boundary.rb`
+- `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb`
+- `${HOMEBREW_TAP_DIR}/Formula/sc-lint-boundary.rb`
 
 ## Deliverables
 
@@ -58,26 +58,6 @@ silently dropped or partially deferred.
 - operator docs clearly state the supported `brew` install command, the
   installed binaries, and the expected relationship between the top-level
   formula and any optional backend-specific formula
-
-## Required Work
-
-- extend the publish manifest from boundary-only release binaries to the full
-  supported toolset
-- decide and record the tap packaging shape before implementation branches:
-  prefer a unified `sc-lint` formula that installs all supported binaries from
-  one release artifact set
-- update the release workflow to compute checksums for every shipped Homebrew
-  tarball and rewrite the tap formula deterministically
-- define the release-artifact naming and packaging contract so the formula can
-  install the same binary set across macOS Intel, macOS ARM, and Linux without
-  per-platform drift
-- keep `sc-lint-boundary` directly installable only if it can remain generated
-  from the same authoritative release metadata as `sc-lint`
-- add formula-level verification that proves the installed tap path exposes
-  `sc-lint --version` and the backend binaries expected from the selected
-  formula strategy
-- update user docs so Homebrew guidance points at the primary `sc-lint` formula
-  instead of the boundary-only stopgap
 
 ## Explicit Code Samples
 
@@ -125,17 +105,22 @@ end
 
 ## Acceptance Criteria
 
-- `docs/sc-lint/sprint-B-homebrew.md` remains unnumbered in filename and
-  headers while still acting as the authoritative plan for the sprint
-- the sprint chooses and documents one production-ready Homebrew formula
-  strategy, with `brew install randlee/tap/sc-lint` as the primary install path
-- release metadata and workflow updates are sufficient to publish and verify
-  `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and `sc-lint-runtime`
-  through the chosen Homebrew path
-- Homebrew automation covers macOS Intel, macOS ARM, and Linux with
-  deterministic checksum generation from published release artifacts
-- user docs name the installed binaries and no longer describe
-  `sc-lint-boundary` as the only supported Homebrew entrypoint
+- the doc stays unnumbered in filename and headers while the planned install
+  path remains `brew install randlee/tap/sc-lint`
+- the selected formula strategy is documented with `sc-lint` as the primary
+  production formula and any retained `sc-lint-boundary` formula limited to an
+  explicit compatibility role
+- `release/publish-artifacts.toml` and `.github/workflows/release.yml` define a
+  publish path for `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, and
+  `sc-lint-runtime` through the chosen Homebrew formula strategy
+- Homebrew automation computes checksums from published release artifacts and
+  updates `${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb` deterministically for macOS
+  Intel, macOS ARM, and Linux
+- formula verification proves the selected Homebrew path exposes
+  `sc-lint --version` and the backend binaries promised by the chosen release
+  packaging shape
+- user docs point at the primary `sc-lint` formula and explain any retained
+  compatibility role for `sc-lint-boundary`
 
 ## Required Validation
 
@@ -143,4 +128,4 @@ end
 - `python3 scripts/release_artifacts.py validate-preflight-checks --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`
 - `python3 scripts/release_artifacts.py validate-publish-order --manifest release/publish-artifacts.toml --workspace-toml Cargo.toml`
 - `cargo build --workspace`
-- `ruby -c /Users/randlee/Documents/github/homebrew-tap/Formula/sc-lint.rb`
+- `ruby -c "${HOMEBREW_TAP_DIR}/Formula/sc-lint.rb"`

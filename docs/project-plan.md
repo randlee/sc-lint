@@ -129,6 +129,13 @@ The currently scheduled foundation sprints are:
 - `B.1`
   - phase-A post-mortem carry-forwards and systemic lint-gate planning
   - `docs/sc-lint/sprint-B1.md`
+- `B.2`
+  - named-caller allowlist enforcement in `sc-lint-boundary`
+  - `docs/sc-lint/sprint-B2.md`
+- `sprint-B-homebrew`
+  - full `sc-lint` Homebrew toolset distribution planning
+  - sprint number intentionally pending
+  - `docs/sc-lint/sprint-B-homebrew.md`
 
 ## Recent Sprint Deltas
 

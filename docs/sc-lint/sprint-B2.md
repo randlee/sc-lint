@@ -3,7 +3,7 @@ id: B.2
 title: Named Caller Allowlist Enforcement
 status: planned
 branch: feature/phase-B-sprint-plans
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-B-sprint-plans
+worktree: <repo-worktree>/feature/phase-B-sprint-plans
 target: develop
 ---
 
@@ -55,30 +55,6 @@ silently dropped or partially deferred.
 - crate README and boundary-enforcement docs include one canonical example of a
   named-caller record plus the corresponding failure mode and operator
   expectations
-
-## Required Work
-
-- extend `BoundaryRecord` inventory parsing with a new callers section instead
-  of storing caller policy in prose, comments, or freeform side files
-- introduce a typed inventory model for approved-caller entries and validate it
-  during TOML load, before graph analysis begins
-- add `RuleId::ScbCaller001` and integrate the rule into the existing boundary
-  analysis path rather than a one-off analyzer mode
-- build caller enumeration on the existing `references_expr` and
-  `references_type` edges so the rule shares the already-proven graph source of
-  truth
-- resolve the caller identity comparison at owner/item granularity so the rule
-  remains stable across rendering order and duplicate reference edges
-- treat `references.scope` as the only exemption mechanism for owner-crate
-  callers; do not add separate suppression flags or warning-only planning modes
-- add regression fixtures for:
-  - allowed caller
-  - disallowed external caller
-  - `outside_owner_crate` exemption
-  - text output
-  - JSON output
-- update operator docs to show where the `[callers]` section lives and how it
-  differs from `references.forbidden`
 
 ## Explicit Code Samples
 
@@ -145,18 +121,23 @@ fn caller_is_exempt(
 
 ## Acceptance Criteria
 
-- `docs/sc-lint/sprint-B2.md` remains the authoritative plan for the sprint and
-  states the production-ready expectation for every listed deliverable
-- `BoundaryRecord` accepts a `[callers]` section with an `approved` array, and
-  malformed rows fail during inventory load
-- `SCB-CALLER-001` fires when an external caller reaches an approved-list
-  symbol without appearing in that symbol's caller list
-- `references.scope = "outside_owner_crate"` exempts owner-crate callers for
-  the new rule without exempting external callers
-- text and JSON output both report `SCB-CALLER-001` findings through the
-  existing `sc-lint-boundary analyze` surface
+- malformed `[callers]` rows, duplicate symbol entries, and unknown caller
+  fields fail during inventory load
+- `SCB-CALLER-001` exits non-zero when a non-exempt external caller reaches a
+  restricted symbol and stays clean when all callers are approved or exempt
+- `references.scope = "outside_owner_crate"` exempts owner-crate callers
+  without exempting external callers
+- `cargo test -p sc-lint-boundary` passes with regression coverage for:
+  - approved-caller pass
+  - unapproved external caller fail with `SCB-CALLER-001`
+  - `outside_owner_crate` owner-crate exemption
+  - empty approved-caller list
+  - multi-symbol caller configuration
+- `sc-lint-boundary analyze --format text` and `--format json` both surface
+  `SCB-CALLER-001` through the existing analysis command path
 - crate README and boundary-enforcement docs both include one canonical
-  approved-caller example and its enforcement expectations
+  approved-caller example plus operator guidance on how it differs from
+  `references.forbidden`
 
 ## Required Validation
 
