@@ -20,7 +20,7 @@ target: develop
 
 - [docs/sc-lint/sprint-C1.md](./sprint-C1.md)
 - [docs/sc-lint/version-requirements.md](./version-requirements.md)
-- `/Users/randlee/.claude/skills/html-report/SKILL.md`
+- [docs/sc-lint/interface-reporting-constraints.md](./interface-reporting-constraints.md)
 
 ## Exact Targets
 
@@ -33,7 +33,7 @@ target: develop
 
 - a planned report package model that includes:
   - main HTML report for human readers generated through
-    `/Users/randlee/.claude/skills/html-report/SKILL.md`
+    `sc-lint`'s reusable interface-report workflow
   - JSON sidecar as the machine source of truth
   - separate XHTML section fragments/panels for section-level context
   - built-in copy actions per XHTML panel for canonical JSON and canonical
@@ -78,14 +78,15 @@ artifacts/interfaces/
 
 ## Acceptance Criteria
 
-- the plan requires generated report packages rather than hand-written HTML
-- the plan requires a JSON sidecar as canonical machine-readable output
-- the plan requires the `/Users/randlee/.claude/skills/html-report/SKILL.md`
-  rendering pattern
-- the plan requires separate XHTML section fragments/panels for deeper
-  section-level context
-- the plan requires built-in copy actions per XHTML panel
-- the plan requires published coverage for all shipped crates, not only the
+- `docs/sc-lint/interface-reporting-constraints.md` states that the published
+  report package is generated from structured data and reusable templates
+  rather than hand-written HTML
+- `docs/sc-lint/version-requirements.md` requires a JSON sidecar as the
+  canonical machine-readable output
+- `docs/sc-lint/interface-reporting-constraints.md` requires separate XHTML
+  section fragments/panels and built-in copy actions per panel
+- `docs/sc-lint/version-requirements.md` and `docs/sc-lint/phase-C-plan.md`
+  both require published coverage across all shipped crates, not only the
   top-level crate
 
 ## Required Validation

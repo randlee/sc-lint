@@ -53,8 +53,9 @@ That planned capability spans three interface families:
 The intended artifact model is:
 
 - structured canonical interface data
-- generated main HTML reports for people through the workflow in
-  `/Users/randlee/.claude/skills/html-report/SKILL.md`
+- generated main HTML reports for people through the reusable workflow
+  summarized in
+  [docs/sc-lint/interface-reporting-constraints.md](./sc-lint/interface-reporting-constraints.md)
 - JSON sidecars as the machine-readable source of truth
 - separate XHTML section fragments/panels for section-level deep context
 - built-in per-panel copy actions for canonical JSON payload and canonical

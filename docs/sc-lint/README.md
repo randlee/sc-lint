@@ -30,6 +30,13 @@ Current contents:
   ownership, and current plan touchpoint guide
 - [`version-requirements.md`](./version-requirements.md) — planned
   interface-versioning and published-artifact requirements
+- [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
+  repo-local constraints for HTML/XHTML/JSON published interface reports
+- [`skill-authoring-constraints.md`](./skill-authoring-constraints.md) —
+  repo-local constraints for the `sc-lint-version` adoption skill
+- [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —
+  repo-local constraints for minimal marketplace publication of the adoption
+  skill
 - [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
   decisions
 - [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract

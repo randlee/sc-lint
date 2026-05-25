@@ -23,7 +23,7 @@ target: develop
 - [docs/sc-lint/sprint-C2.md](./sprint-C2.md)
 - [docs/sc-lint/sprint-C3.md](./sprint-C3.md)
 - [docs/sc-lint/version-requirements.md](./version-requirements.md)
-- `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
+- [docs/sc-lint/skill-authoring-constraints.md](./skill-authoring-constraints.md)
 
 ## Exact Targets
 
@@ -52,7 +52,7 @@ target: develop
   adoption and usage guidance
 - explicit references in the sprint plan that:
   - the skill design follows
-    `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
+    `docs/sc-lint/skill-authoring-constraints.md`
 
 ## Explicit Code Samples
 
@@ -89,11 +89,10 @@ description: Guides a consuming repository through sc-lint-version adoption.
   testability and simulator infrastructure where available
 - the plan explicitly requires a repo-local Claude Code skill for consumer
   adoption guidance
-- the planned skill surface is versioned and shaped consistently with
-  `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
-- the sprint references
-  `/Users/randlee/Documents/github/synaptic-canvas/docs/claude-code-skills-agents-guidelines.md`
-  for the skill design
+- `docs/sc-lint/skill-authoring-constraints.md` requires the planned skill
+  surface to be versioned and to stay scoped to `sc-lint-version` adoption
+- the sprint references `docs/sc-lint/skill-authoring-constraints.md` as the
+  authoritative skill-design constraint doc
 
 ## Required Validation
 

@@ -66,11 +66,13 @@ target: develop
 
 ## Acceptance Criteria
 
-- the plan defines one hard-fail verdict model across Rust API, CLI, and
-  RPC/socket families
-- the plan requires concrete artifact-path reporting in failure output
-- the plan keeps “not present in this repo” explicit for unsupported current
-  interface families instead of omitting them silently
+- `docs/sc-lint/version-requirements.md` defines one hard-fail verdict model
+  across Rust API, CLI, and RPC/socket families
+- the sprint code sample and `docs/sc-lint/version-requirements.md` both
+  require concrete published-artifact paths in failure output
+- `docs/sc-lint/version-requirements.md` keeps “not present in this repo”
+  explicit for unsupported current interface families instead of omitting them
+  silently
 
 ## Required Validation
 

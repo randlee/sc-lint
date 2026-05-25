@@ -35,7 +35,7 @@ The planning direction approved for this line is:
    `cargo-semver-checks` rather than a custom semver implementation.
 3. Published interface documentation will be generated from structured input
    and reusable templates using the XHTML-fragment/report pattern defined by
-   `/Users/randlee/.claude/skills/html-report/SKILL.md`.
+   [docs/sc-lint/interface-reporting-constraints.md](../interface-reporting-constraints.md).
 4. The generated JSON sidecar is the canonical machine-readable baseline;
    main HTML reports and separate XHTML section fragments/panels are
    human-facing derivatives of that structured source.

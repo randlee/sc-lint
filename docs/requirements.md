@@ -218,9 +218,10 @@ The product should support both:
   machine-readable source can drive both documentation and hard-fail checks.
 
 - `REQ-PRODUCT-006LA`
-  The generated published-interface report path must follow the workflow in
-  `/Users/randlee/.claude/skills/html-report/SKILL.md` rather than a
-  repo-specific ad hoc HTML rendering path.
+  The generated published-interface report path must follow the reusable
+  workflow described in
+  [docs/sc-lint/interface-reporting-constraints.md](./sc-lint/interface-reporting-constraints.md)
+  rather than a repo-specific ad hoc HTML rendering path.
 
 - `REQ-PRODUCT-006M`
   The initial Rust public API version-checking approach should be based on

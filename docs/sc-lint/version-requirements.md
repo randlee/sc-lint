@@ -44,7 +44,8 @@ later.
 
 - `REQ-VERSION-005`
   Generated human-facing report packages must follow the XHTML fragment/report
-  pattern used by `/Users/randlee/.claude/skills/html-report/SKILL.md`:
+  pattern summarized in
+  [docs/sc-lint/interface-reporting-constraints.md](./interface-reporting-constraints.md):
   - one self-contained main HTML report
   - one JSON sidecar as the machine-readable source of truth
   - separate XHTML section fragments/panels for deeper per-section context
@@ -59,9 +60,10 @@ later.
   templates alone and must not depend on manual HTML patching after render.
 
 - `REQ-VERSION-007A`
-  The generated report pipeline must use the
-  `/Users/randlee/.claude/skills/html-report/SKILL.md` workflow rather than a
-  separate ad hoc HTML rendering path.
+  The generated report pipeline must use the repo-local reusable
+  HTML-report workflow described in
+  [docs/sc-lint/interface-reporting-constraints.md](./interface-reporting-constraints.md)
+  rather than a separate ad hoc HTML rendering path.
 
 - `REQ-VERSION-007B`
   Each XHTML section fragment/panel must expose built-in copy actions for the
@@ -185,7 +187,8 @@ later.
 
 - `REQ-VERSION-022E`
   The minimal-marketplace planning line must name both source-repo publication
-  surfaces required by the marketplace design:
+  surfaces required by the marketplace design described in
+  [docs/sc-lint/minimal-marketplace-constraints.md](./minimal-marketplace-constraints.md):
   - `.claude-plugin/marketplace.json`
   - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
 

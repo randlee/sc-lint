@@ -18,7 +18,7 @@ target: develop
 ## Hard Dependencies
 
 - [docs/sc-lint/sprint-C4.md](./sprint-C4.md)
-- `/Users/randlee/Documents/github/synaptic-canvas/docs/marketplace-forwarding.md`
+- [docs/sc-lint/minimal-marketplace-constraints.md](./minimal-marketplace-constraints.md)
 
 ## Exact Targets
 
@@ -38,7 +38,7 @@ target: develop
   - `.claude-plugin/marketplace.json`
   - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
 - explicit reference in the sprint plan that the marketplace design follows
-  `/Users/randlee/Documents/github/synaptic-canvas/docs/marketplace-forwarding.md`
+  `docs/sc-lint/minimal-marketplace-constraints.md`
 - clear division between:
   - skill creation in `C.4`
   - marketplace advertisement in `C.5`
@@ -74,14 +74,14 @@ target: develop
 ## Acceptance Criteria
 
 - the sprint explicitly references
-  `/Users/randlee/Documents/github/synaptic-canvas/docs/marketplace-forwarding.md`
-  for the marketplace design
+  `docs/sc-lint/minimal-marketplace-constraints.md` for the marketplace
+  design
 - the sprint closure is only marketplace publication, not skill creation
 - the plan names both planned repo-local marketplace publication surfaces:
   - `.claude-plugin/marketplace.json`
   - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
-- the plan matches the source-repo publication shape described in
-  `/Users/randlee/Documents/github/synaptic-canvas/docs/marketplace-forwarding.md`
+- `docs/sc-lint/minimal-marketplace-constraints.md` requires the source-repo
+  publication shape for both marketplace files
 
 ## Required Validation
 
