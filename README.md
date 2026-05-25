@@ -22,8 +22,7 @@ This repository currently ships these primary crates:
 - `sc-lint-runtime`
   - runtime/concurrency analyzer crate
 
-The workspace version is managed from the root `Cargo.toml` and currently
-starts at `0.1.0`.
+The workspace version is managed from the root `Cargo.toml` via `version.workspace = true` in each crate.
 
 ## Homebrew
 
