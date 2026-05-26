@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sc-lint-marketplace",
+  "description": "Repo-local Claude Code marketplace entries for sc-lint adoption and workflow support.",
+  "owner": {
+    "name": "sc-lint"
+  },
+  "plugins": [
+    {
+      "name": "sc-lint-version-adoption",
+      "description": "Publishes the sc-lint-version adoption skill through the repo-local marketplace.",
+      "author": {
+        "name": "sc-lint"
+      },
+      "category": "tools",
+      "source": "./packages/sc-lint-version-adoption"
+    }
+  ]
+}
