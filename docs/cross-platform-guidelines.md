@@ -75,4 +75,3 @@ This applies to:
 
 - [docs/architecture.md](./architecture.md)
 - [docs/project-plan.md](./project-plan.md)
-- [docs/sc-lint-boundary/graph-schema.md](./sc-lint-boundary/graph-schema.md)
