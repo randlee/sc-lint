@@ -1,7 +1,7 @@
 ---
 id: C.5
 title: Minimal Marketplace Publication For sc-lint-version Adoption Skill
-status: planned
+status: completed
 branch: feature/sprint-C5
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C5
 target: develop
