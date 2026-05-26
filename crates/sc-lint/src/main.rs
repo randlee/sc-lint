@@ -28,8 +28,12 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
     let context = match sc_lint::CommandContext::from_cli(&cli) {
         Ok(context) => context,
         Err(error) => {
-            return sc_lint::RenderedOutput::render_failure("cli.parse_error", cli.json, &error)
-                .write(error.exit_code());
+            return sc_lint::RenderedOutput::render_failure(
+                consts::ACTION_CLI_PARSE_ERROR,
+                cli.json,
+                &error,
+            )
+            .write(error.exit_code());
         }
     };
     let loaded_config = match sc_lint::LoadedConfig::load(&cli, &context) {
@@ -39,13 +43,7 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
                 .write(error.exit_code());
         }
     };
-    let observed = match logging::ObservedCommand::from_context(&context, &loaded_config) {
-        Ok(observed) => observed,
-        Err(error) => {
-            return sc_lint::RenderedOutput::render_failure(context.command_id(), cli.json, &error)
-                .write(error.exit_code());
-        }
-    };
+    let observed = logging::ObservedCommand::from_context(&context, &loaded_config);
     let logger = match logging::initialize_logger(&observed, &cli) {
         Ok(logger) => logger,
         Err(error) => {

@@ -14,7 +14,7 @@ Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
 - [docs/sc-lint-version/requirements.md](./sc-lint-version/requirements.md)
 
-For release `0.1.x`, ADR-005 is the approved cross-target preflight strategy
+For release `0.2.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
 
 ## Product Purpose
@@ -167,7 +167,7 @@ The product should support both:
   The product should provide a documented cross-target preflight strategy for
   surfacing likely platform-specific compile failures before CI where that can
   be done without requiring native execution on every target platform. For
-  release `0.1.x`, that governing strategy artifact is
+  release `0.2.x`, that governing strategy artifact is
   [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md).
 
 - `REQ-PRODUCT-006D`
@@ -301,16 +301,20 @@ The product should support both:
   policy rather than by wrapper-owned cleanup code.
 
 - `REQ-LOG-008`
-  Top-level event emission call sites must stay on the supported
-  `sc-observability` API for the selected release line without wrapper-owned
-  compatibility shims. For `sc-observability` `1.1.0`, the accepted event
-  emission path remains direct `emit(...)`.
+  Top-level event emission call sites must stay on the accepted CLI-owned
+  logging surface for the selected `sc-observability` release line. For
+  `sc-observability` `1.1.0`, `0.2.x` keeps deprecated `emit(...)` behind the
+  binary-only logging seam and requires call sites to use the accepted
+  `try_log`/`log` compatibility verbs instead.
 
 - `REQ-LOG-009`
   Adoption of any higher-level observability facade layered over
   `sc-observability` must be an explicit documented yes/no decision that
   preserves the current CLI-owned logger-initialization and event-dispatch
-  seams.
+  seams. Release `0.2.x` records that decision as:
+  - no `sc-observe` adoption
+  - direct `sc-observability` remains required for logger construction,
+    retained-log policy, and health/reporting surfaces
 
 ### Boundary definitions
 
@@ -327,7 +331,7 @@ The product should support both:
   boundary definitions and remain machine-readable.
 
 - `REQ-PRODUCT-009A`
-  For release `0.1.x`, boundary inventory enforcement scope must include:
+  For release `0.2.x`, boundary inventory enforcement scope must include:
   - crate/tool boundary surfaces
   - planned top-level CLI contract items recorded as boundary composition roots
   and must exclude repo-local automation/profile orchestration surfaces unless
@@ -360,7 +364,7 @@ The product should support both:
 - `REQ-PRODUCT-012B`
   ADR-005 supersedes earlier provisional sequencing that treated `cargo xwin
   check` as the only initial profile-promotion candidate. The lighter explicit
-  preflight path remains `cargo xwin check`, but release `0.1.x` profile
+  preflight path remains `cargo xwin check`, but release `0.2.x` profile
   semantics may include both `cargo xwin check` and `cargo xwin clippy` in
   `full` when the capability is installed.
 
@@ -410,7 +414,7 @@ The product should support both:
   - `SCB-RUNTIME-001` and `SCB-RUNTIME-002` -> `sc-lint-runtime`
 
 - `REQ-PRODUCT-015C`
-  The current shared rule-family moves required for release `0.1.x` are:
+  The current shared rule-family moves required for release `0.2.x` are:
   - `PORT-001`
   - `PORT-002`
   - `PORT-003`
@@ -424,12 +428,12 @@ The product should support both:
 ### Release 1 objective
 
 - `REQ-PRODUCT-016`
-  Release `0.1.x` must establish the stable repo-local lint gate, canonical
+  Release `0.2.x` must establish the stable repo-local lint gate, canonical
   TOML boundaries, the documented top-level CLI contract, and the staged
   extraction/migration path for remaining generic tooling.
 
 - `REQ-PRODUCT-016A`
-  Release `0.1.x` must define the relationship between:
+  Release `0.2.x` must define the relationship between:
   - `sc-lint lint ci`
   - `sc-lint ci`
   so lint-only CI parity and full CI-equivalent execution are not ambiguous.

@@ -14,8 +14,8 @@ target: integration/phase-C
 - adopt `sc-observability` `1.1.0` in `sc-lint`
 - verify compatibility of the existing CLI-owned logging seam with the new
   logger typestate, deprecated `emit` replacement, and Windows rotation support
-- make one explicit release-line decision about whether retained-log rotation,
-  pruning, and background maintenance are enabled now or deferred
+- record the `0.2.x` release-line decision to keep retained-log rotation,
+  pruning, and background maintenance enabled through logger-owned defaults
 - record that retained-log rotation and maintenance are logger-owned behavior
   when enabled through config rather than wrapper-owned cleanup logic
 
@@ -38,6 +38,8 @@ Issue driver:
 - `crates/sc-lint/Cargo.toml`
 - `crates/sc-lint/src/logging.rs`
 - `crates/sc-lint/src/main.rs`
+- `crates/sc-lint-boundary/src/graph.rs`
+- `crates/sc-lint-boundary/src/graph/utils.rs`
 - `docs/sc-lint/logging.md`
 - `docs/requirements.md`
 - `docs/architecture.md`
@@ -48,31 +50,30 @@ Issue driver:
 - workspace dependency uplift from `sc-observability` `1.0.0` to `1.1.0`
 - explicit compatibility verification for the current logger call sites:
   - `initialize_logger(...)`
-  - event log paths that currently use deprecated `emit`
+  - event log paths that previously called deprecated `emit`
   - `shutdown(logger)` at the CLI boundary
 - one explicit migration decision for event emission:
-  - use `try_log` where `sc-lint` must remain non-blocking and may drop when
-    the queue is full
-  - use `log` only where blocking on a full queue is an intentional release
-    decision
+  - use CLI-owned `try_log` semantics at every current event site so command
+    completion stays non-blocking
+  - leave the CLI-owned `log` compatibility verb unused in `0.2.x` because no
+    current path intentionally blocks on a full queue
 - one explicit release-line decision for retained-log behavior:
-  - either enable `RetainedLogPolicy` with documented defaults
-  - or defer it explicitly and document why
-  - when enabled, the plan must state that logger-owned rotation, pruning, and
-    background maintenance replace wrapper-owned/manual cleanup assumptions
+  - enable `RetainedLogPolicy` with documented defaults
+  - keep rotation, pruning, and background maintenance logger-owned
 - one explicit decision about the new `sc-observe` facade:
-  - keep direct `sc-observability` usage when logger construction, file sinks,
-    and health/reporting still require the full crate
-  - or adopt `sc-observe` only where it reduces dependency surface without
-    weakening the current CLI-owned logging design
+  - keep direct `sc-observability` usage because logger construction, file
+    sinks, retained-log policy, and health/reporting still require the full
+    crate
 - Windows rotation compatibility called out as a validation target for the
   release line because `sc-lint` ships on Windows through `xwin`-validated
   paths and Homebrew/GitHub release installs
+- graph-utility extraction so `crates/sc-lint-boundary/src/graph.rs` stays
+  under the `RULE-003` non-test production line limit
 
 ## Explicit Code Samples
 
 ```rust
-pub(crate) fn shutdown(logger: &Logger) {
+pub(crate) fn shutdown(logger: Logger) {
     let _ = logger.shutdown();
 }
 ```
@@ -86,9 +87,8 @@ config.enable_console_sink = loaded_config.logging_console();
 ```
 
 ```rust
-// Existing emit-based event paths must migrate to one of these:
+// C.10 keeps direct emit() out of CLI event call sites:
 logger.try_log(event)?;
-logger.log(event)?;
 ```
 
 ## This Sprint Does Not Close
@@ -103,14 +103,21 @@ logger.log(event)?;
   seams that must compile unchanged or be minimally adapted for
   `Logger<Running>` / `Logger<Stopped>`
 - the sprint identifies the exact deprecated `emit` call sites and makes one
-  explicit `log` versus `try_log` decision for them
+  explicit `log` versus `try_log` decision for them; `0.2.x` chooses `try_log`
+  at every current event site
 - the plan keeps the CLI-only `sc-observability` dependency seam from
   `ADR-009`
 - the sprint makes one explicit yes/no decision on retained-log policy for the
-  `0.1.x` line instead of leaving rotation/pruning/maintenance implicit
+  `0.2.x` line instead of leaving rotation/pruning/maintenance implicit
 - when retained logging is enabled, the sprint states that the logger itself
   owns rotation/pruning/background maintenance based on configured settings
-- the sprint makes one explicit yes/no decision on adopting `sc-observe`
+- the sprint makes one explicit no decision on adopting `sc-observe` in
+  `0.2.x`
+- the sprint records that `shutdown(logger)` takes ownership by value because
+  the logger transitions from `Logger<Running>` to `Logger<Stopped>` on
+  shutdown
+- `crates/sc-lint-boundary/src/graph/utils.rs` exists and lowers
+  `graph.rs` to `<= 1000` non-test production lines
 - `docs/sc-lint/logging.md`, `docs/requirements.md`, and `docs/architecture.md`
   remain aligned on the chosen `1.1.0` integration shape
 

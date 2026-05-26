@@ -15,12 +15,12 @@ backend-owned concern. The release-line design and queued maintenance
 direction satisfy `REQ-LOG-001` through `REQ-LOG-009`.
 
 This document defines both the logging design and the sprint-level
-implementation assignments for Phase `A`, plus the queued Phase `C.10`
+implementation assignments for Phase `A`, plus the completed Phase `C.10`
 maintenance line. The A.1a bootstrap implementation is now present in
 `crates/sc-lint/src/logging.rs`; A.1b extends that same CLI-owned runtime with
 dispatch-seam logging for the first real backend path, and `C.10` records the
-next supported `sc-observability` maintenance decisions without changing seam
-ownership.
+supported `sc-observability` `1.1.0` maintenance decisions without changing
+seam ownership.
 
 ADR-009 now governs the accepted observability boundary seams layered on top of
 ADR-008. This document therefore treats the following current seams as locked
@@ -31,16 +31,16 @@ release-1 policy rather than provisional implementation detail:
 - `contract::ServiceName`
 - `CommandEnvelope.command`
 
-The queued Phase `C.10` maintenance line extends this design to the supported
-`sc-observability` `1.1.0` release without changing those ownership seams. The
-remaining release-line decisions are:
+Phase `C.10` extended this design to the supported `sc-observability` `1.1.0`
+release without changing those ownership seams. The `0.2.x` decisions are now:
 
-- whether retained-log maintenance is enabled now, using logger-owned
-  `RetainedLogPolicy` rather than wrapper-owned cleanup logic
-- which current event sites intentionally use blocking `log` versus
-  non-blocking `try_log`
-- whether `sc-observe` is adopted anywhere in the CLI path, while preserving
-  CLI-owned logger initialization and dispatch
+- retained-log maintenance is enabled through logger-owned
+  `RetainedLogPolicy` defaults rather than wrapper-owned cleanup logic
+- all current CLI event sites intentionally use non-blocking `try_log`
+  semantics; no `0.2.x` path intentionally blocks on a full queue
+- `sc-observe` is not adopted in the CLI path for `0.2.x`; direct
+  `sc-observability` remains required for logger construction, file-sink
+  policy, and health/query support
 
 ## Dependency Model
 
@@ -61,14 +61,10 @@ The planned dependency is:
 
 The design depends on the following public surface:
 
-- `LoggerBuilder`
 - `LoggerConfig`
-- `JsonlFileSink`
-- `ConsoleSink`
 - `ServiceName`
 - `RetainedLogPolicy`
-- `Logger::log`
-- `Logger::try_log`
+- `Logger::emit`
 
 The accepted boundary translation seam is:
 
@@ -99,11 +95,13 @@ Planned implementation note:
 
 - the supported dependency line moves from `sc-observability` `1.0.0` to
   `1.1.0`
-- any retained-log rotation/pruning/background maintenance enabled for the
-  release line is configured at logger construction time and stays
-  logger-owned
-- the compatible event-emission path for `1.1.0` remains direct `emit(...)`
-  on the CLI-owned logger without wrapper-specific compatibility shims
+- retained-log rotation/pruning/background maintenance stays enabled through
+  `LoggerConfig.retained_log_policy = RetainedLogPolicy::default()` at logger
+  construction time, so maintenance remains logger-owned
+- top-level event sites no longer call deprecated `emit(...)` directly; the
+  CLI-owned logging seam now uses local `try_log`/`log` compatibility verbs
+  that keep `emit(...)` behind one binary-only boundary while preserving the
+  ADR-008 prohibition on proliferating `emit_*` wrappers
 
 ## Initialization Model
 
@@ -239,6 +237,15 @@ Release `0.2.x` now uses the built-in logger-owned file sink so retained-log
 rotation, pruning, and background maintenance stay attached to
 `LoggerConfig.retained_log_policy`.
 
+The current retained-log defaults are:
+
+- rotate the active file at `64 MiB`
+- keep `10` rotated files beside the active file
+- retain rotated files for `7` days
+- run maintenance every `60` seconds
+- allow up to `5` seconds for maintenance shutdown join
+- leave `maintenance_max_work_per_pass` unset
+
 The active file path is:
 
 - `<log_root>/logs/<service>.log.jsonl`
@@ -250,6 +257,15 @@ The default root is:
 That yields the default active file path:
 
 - `~/sc-lint/logs/<service>.log.jsonl`
+
+Windows compatibility note:
+
+- `0.2.x` keeps retained-log rotation enabled on Windows through the same
+  library-owned JSONL file sink and maintenance runtime as Unix-like systems
+- `sc-lint` does not add wrapper-owned rename, pruning, or cleanup code on top
+  of that runtime, so Windows behavior stays aligned with the upstream
+  `sc-observability` `1.1.0` file-maintenance implementation rather than a
+  repo-local fork
 
 ### Console Sink
 
@@ -351,6 +367,14 @@ ADR-009 boundary note:
 - custom `emit_*` wrappers remain forbidden by ADR-008
 - `ObservedCommand` remains the approved binary-side observation context until
   a later ADR records a reconciled successor
+
+`C.10` implementation note:
+
+- `dispatch_event` now routes through CLI-owned `try_log` compatibility
+  semantics so direct `emit(...)` use stays internal to one binary-only seam
+- the branch-local `log` compatibility verb remains available for a later
+  release if `sc-observability` exposes an explicit bounded-queue blocking
+  path, but `0.2.x` intentionally does not use it
 
 ## Rollout By Sprint
 

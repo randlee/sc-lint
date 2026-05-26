@@ -3,6 +3,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use sc_observability::ActionName;
+use sc_observability::EventError;
 use sc_observability::Level;
 use sc_observability::LogEvent;
 use sc_observability::Logger;
@@ -10,8 +11,9 @@ use sc_observability::LoggerConfig;
 use sc_observability::OBSERVATION_ENVELOPE_VERSION;
 use sc_observability::OutcomeLabel;
 use sc_observability::ProcessIdentity;
+use sc_observability::Running;
 use sc_observability::SchemaVersion;
-use sc_observability::ServiceName;
+use sc_observability::ServiceName as ObservabilityServiceName;
 use sc_observability::TargetCategory;
 use sc_observability::Timestamp;
 use serde_json::Map;
@@ -46,18 +48,14 @@ pub(crate) struct ObservedCommand<'a> {
 }
 
 impl<'a> ObservedCommand<'a> {
-    #[expect(
-        clippy::result_large_err,
-        reason = "The binary logging seam preserves the same top-level CliError contract as the library execution path."
-    )]
     pub(crate) fn from_context(
         context: &'a CommandContext,
         loaded_config: &'a LoadedConfig,
-    ) -> Result<Self, CliError> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             context,
             loaded_config,
-        })
+        }
     }
 
     fn command_id(&self) -> &str {
@@ -68,9 +66,9 @@ impl<'a> ObservedCommand<'a> {
         self.context.service_name()
     }
 
-    fn observability_service_name(&self) -> ServiceName {
-        ServiceName::new(self.service_name())
-            .expect("command contexts only produce valid static observability service names")
+    fn observability_service_name(&self) -> Result<ObservabilityServiceName, &'static str> {
+        ObservabilityServiceName::new(self.service_name())
+            .map_err(|_| "invalid static observability service name")
     }
 
     fn summary(&self) -> &'static str {
@@ -120,9 +118,14 @@ pub(crate) fn initialize_logger(
             .or(cli.log_root.as_ref()),
         observed.service_name(),
     )?;
-    let mut config =
-        LoggerConfig::default_for(observed.observability_service_name(), log_root.0.clone());
+    let mut config = LoggerConfig::default_for(
+        observed
+            .observability_service_name()
+            .map_err(CliError::internal)?,
+        log_root.0.clone(),
+    );
     config.enable_console_sink = observed.loaded_config().logging_console();
+    config.retained_log_policy = sc_observability::RetainedLogPolicy::default();
     Logger::new(config).map_err(classify_logger_init_error)
 }
 
@@ -156,7 +159,7 @@ pub(crate) fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &C
         logger,
         observed,
         Level::Info,
-        started_action().cloned(),
+        started_action().cloned().ok(),
         None,
         Some("command invocation started"),
         fields,
@@ -174,7 +177,7 @@ pub(crate) fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>
         logger,
         observed,
         Level::Info,
-        dispatch_started_action().cloned(),
+        dispatch_started_action().cloned().ok(),
         None,
         Some("backend dispatch started"),
         fields,
@@ -200,7 +203,7 @@ pub(crate) fn log_dispatch_result(
         logger,
         observed,
         Level::Info,
-        dispatch_normalized_action().cloned(),
+        dispatch_normalized_action().cloned().ok(),
         success_outcome().cloned().ok(),
         Some("backend result normalized through top-level contract"),
         fields,
@@ -228,7 +231,7 @@ pub(crate) fn log_completion(
         logger,
         observed,
         Level::Info,
-        completed_action().cloned(),
+        completed_action().cloned().ok(),
         if ok {
             success_outcome().cloned().ok()
         } else {
@@ -270,7 +273,7 @@ pub(crate) fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: 
         logger,
         observed,
         Level::Error,
-        error_action().cloned(),
+        error_action().cloned().ok(),
         failure_outcome().cloned().ok(),
         Some("top-level cli error emitted"),
         fields,
@@ -289,11 +292,17 @@ fn dispatch_event(
     logger: &Logger,
     observed: &ObservedCommand<'_>,
     level: Level,
-    action: Result<ActionName, &'static str>,
+    action: Option<ActionName>,
     outcome: Option<OutcomeLabel>,
     message: Option<&str>,
     fields: Map<String, Value>,
 ) {
+    let Some(action) = action else {
+        debug_assert!(false, "failed to resolve static log action");
+        #[cfg(debug_assertions)]
+        eprintln!("[sc-lint] dispatch_event: missing static action");
+        return;
+    };
     let event = match build_event(observed, level, action, outcome, message, fields) {
         Ok(event) => event,
         Err(error) => {
@@ -304,7 +313,10 @@ fn dispatch_event(
             return;
         }
     };
-    let _ = logger.emit(event);
+    // C.10 keeps every current CLI event site intentionally non-blocking:
+    // telemetry must never stall command completion while the runtime still
+    // exposes only the synchronous emit path under the hood.
+    let _ = logger.try_log(event);
 }
 
 #[expect(
@@ -314,7 +326,7 @@ fn dispatch_event(
 fn build_event(
     observed: &ObservedCommand<'_>,
     level: Level,
-    action: Result<ActionName, &'static str>,
+    action: ActionName,
     outcome: Option<OutcomeLabel>,
     message: Option<&str>,
     fields: Map<String, Value>,
@@ -323,9 +335,11 @@ fn build_event(
         version: schema_version().map_err(CliError::internal)?.clone(),
         timestamp: Timestamp::now_utc(),
         level,
-        service: observed.observability_service_name(),
+        service: observed
+            .observability_service_name()
+            .map_err(CliError::internal)?,
         target: command_target().map_err(CliError::internal)?.clone(),
-        action: action.map_err(CliError::internal)?,
+        action,
         message: message.map(ToString::to_string),
         identity: ProcessIdentity::default(),
         trace: None,
@@ -556,6 +570,25 @@ where
         .with_suggested_action(
             "Re-run the command; if the failure persists, inspect the logger wiring.",
         )
+}
+
+#[expect(
+    dead_code,
+    reason = "C.10 introduces the blocking compatibility verb now so later queue-backed runtimes can opt into it without exposing emit at call sites."
+)]
+trait LoggerEventCompat {
+    fn try_log(&self, event: LogEvent) -> Result<(), EventError>;
+    fn log(&self, event: LogEvent) -> Result<(), EventError>;
+}
+
+impl LoggerEventCompat for Logger<Running> {
+    fn try_log(&self, event: LogEvent) -> Result<(), EventError> {
+        self.emit(event)
+    }
+
+    fn log(&self, event: LogEvent) -> Result<(), EventError> {
+        self.emit(event)
+    }
 }
 
 fn contains_config_signal(message: &str) -> bool {
