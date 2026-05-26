@@ -1,9 +1,9 @@
 ---
 id: C.6
 title: Production Path-Literal Portability Parity
-status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
+status: completed
+branch: feature/sprint-C6
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C6
 target: develop
 ---
 
@@ -50,13 +50,14 @@ target: develop
   `Port007`
 - `crates/sc-lint-portability/src/portability.rs` extends
   `collect_unix_portability_findings(...)` with production path-literal leaf
-  checks, while `PortabilityCollector` remains test-scope-only and continues
-  to own `PORT-001`, `PORT-002`, and `PORT-003`
+  checks, while `PortabilityCollector` remains limited to scanning test-scope
+  items and continues to own `PORT-001`, `PORT-002`, and `PORT-003`
 - the production path-literal rule seam is explicit and uses the existing
   production walk rather than silently broadening the test-only collector;
   `visit_item_for_unix_portability(...)` is the integration seam, delegates
-  into `visit_expr_for_unix_portability(...)` for the inner expression walk,
-  and calls the new helper only when `scope == ScopeKind::NonTest` and
+  into `visit_block_for_unix_portability(...)` and then
+  `visit_expr_for_unix_portability(...)` for the inner expression walk, and
+  calls the new helper only when `scope == ScopeKind::NonTest` and
   `unix_gated == false`:
 
 ```rust
@@ -136,6 +137,15 @@ pub fn cache_dir() -> std::path::PathBuf {
 - shell invocation portability rules
 - generic production `cfg(unix)` / `cfg(windows)` parity checks outside the
   path-literal family
+
+## This Sprint Establishes
+
+- `collect_production_path_literal_findings(item, file_context, findings)` is
+  the concrete production path-literal seam introduced here
+- sprint `C.7` extends the same production visitor line after
+  `collect_production_path_literal_findings(...)` has already established the
+  `visit_item_for_unix_portability(...) -> visit_block_for_unix_portability(...) ->
+  visit_expr_for_unix_portability(...)` call chain
 
 ## Acceptance Criteria
 
