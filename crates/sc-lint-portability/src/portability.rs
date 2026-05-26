@@ -4,9 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
-use quote::ToTokens;
 use serde::Deserialize;
-use syn::Attribute;
 use syn::Block;
 use syn::Expr;
 use syn::ExprCall;
@@ -20,7 +18,6 @@ use syn::ItemImpl;
 use syn::ItemMod;
 use syn::Lit;
 use syn::Stmt;
-use syn::UseTree;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -29,6 +26,24 @@ use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
+use crate::predicates::attr_is_cfg_attr_not_unix_allow_dead_code;
+use crate::predicates::attr_is_cfg_unix;
+use crate::predicates::attr_is_platform_cfg;
+use crate::predicates::extract_env_var_lookup;
+use crate::predicates::has_portable_fallback;
+use crate::predicates::has_windows_companion;
+use crate::predicates::impl_method_has_portable_fallback;
+use crate::predicates::impl_method_has_windows_companion;
+use crate::predicates::impl_method_is_cfg_unix_production_item;
+use crate::predicates::is_cfg_unix_production_item;
+use crate::predicates::is_dirs_home_dir_call;
+use crate::predicates::is_path_like_constructor;
+use crate::predicates::is_set_var_call;
+use crate::predicates::is_shell_command_call;
+use crate::predicates::is_unix_shell_path_literal;
+use crate::predicates::production_env_portability_variable;
+use crate::predicates::production_path_rule_id;
+use crate::predicates::use_tree_contains_std_os_unix;
 use crate::source_scan::FileContext;
 use crate::source_scan::PackageName;
 use crate::source_scan::ScopeKind;
@@ -744,7 +759,7 @@ fn push_cfg_parity_finding(
         rule_id: RuleId::Port010,
         kind: "cfg_unix_parity_missing",
         message: format!(
-            "PORT-010 production #[cfg(unix)] item `{detail}` has no #[cfg(windows)] companion or explicit portable fallback in the same scope"
+            "PORT-010 production #[cfg(unix)] item `{detail}` has no #[cfg(windows)] companion or explicit portable fallback in the same scope; consider adding a cfg(windows) sibling or an unguarded portable fallback"
         ),
         source_path: file_context.source_path.clone(),
         line,
@@ -825,9 +840,11 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
     }
 
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if self.platform_gated_depth == 0 && is_shell_command_call(node) {
+        if self.platform_gated_depth == 0
+            && let Some(command_name) = is_shell_command_call(node)
+        {
             self.push_shell_finding(
-                "Command::new(\"sh\" | \"bash\")",
+                &format!("Command::new(\"{command_name}\")"),
                 span_start_line(node.span()),
             );
         }
@@ -904,318 +921,4 @@ fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
         config_home_env: repo_config.portability.and_then(|cfg| cfg.config_home_env),
         unix_path_prefixes: defaults.portability.unix_path_prefixes,
     })
-}
-
-fn attr_is_cfg_unix(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("unix") && !rendered.contains("not(unix)")
-}
-
-fn attr_is_platform_cfg(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("unix") || rendered.contains("windows")
-}
-
-fn attr_is_cfg_windows(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("windows") && !rendered.contains("not(windows)")
-}
-
-fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg_attr") {
-        return false;
-    }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("not(unix)") && rendered.contains("allow(dead_code)")
-}
-
-fn use_tree_contains_std_os_unix(tree: &UseTree) -> bool {
-    fn walk(tree: &UseTree, prefix: &mut Vec<String>) -> bool {
-        match tree {
-            UseTree::Path(use_path) => {
-                prefix.push(use_path.ident.to_string());
-                let matched = walk(&use_path.tree, prefix);
-                prefix.pop();
-                matched
-            }
-            UseTree::Name(use_name) => {
-                prefix.push(use_name.ident.to_string());
-                let matched = matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix");
-                prefix.pop();
-                matched
-            }
-            UseTree::Rename(use_rename) => {
-                prefix.push(use_rename.ident.to_string());
-                let matched = matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix");
-                prefix.pop();
-                matched
-            }
-            UseTree::Glob(_) => {
-                matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix")
-            }
-            UseTree::Group(group) => group.items.iter().any(|item| walk(item, prefix)),
-        }
-    }
-
-    walk(tree, &mut Vec::new())
-}
-
-fn is_path_like_constructor(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    match segments.as_slice() {
-        [single, from] => {
-            single == "PathBuf" && from == "from" || single == "Path" && from == "new"
-        }
-        [std, path_mod, path_type, method] => {
-            std == "std"
-                && path_mod == "path"
-                && ((path_type == "PathBuf" && method == "from")
-                    || (path_type == "Path" && method == "new"))
-        }
-        _ => false,
-    }
-}
-
-fn is_cfg_unix_production_item(item: &Item, inherited_scope: ScopeKind) -> bool {
-    classify_scope(
-        item_attrs(item),
-        inherited_scope,
-        item_name_hint_is_tests(item),
-    ) == ScopeKind::NonTest
-        && item_attrs(item).iter().any(attr_is_cfg_unix)
-        && item_identifier(item).is_some()
-}
-
-fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
-    sibling_items.iter().any(|candidate| {
-        same_item_identifier(unix_item, candidate) && item_has_cfg_windows(candidate)
-    })
-}
-
-fn has_portable_fallback(
-    unix_item: &Item,
-    sibling_items: &[Item],
-    inherited_scope: ScopeKind,
-) -> bool {
-    sibling_items.iter().any(|candidate| {
-        same_item_identifier(unix_item, candidate)
-            && !item_has_any_cfg(candidate)
-            && !item_is_test_scoped(candidate, inherited_scope)
-    })
-}
-
-fn same_item_identifier(left: &Item, right: &Item) -> bool {
-    item_identifier(left) == item_identifier(right)
-}
-
-fn item_has_cfg_windows(item: &Item) -> bool {
-    item_attrs(item).iter().any(attr_is_cfg_windows)
-}
-
-fn item_has_any_cfg(item: &Item) -> bool {
-    item_attrs(item)
-        .iter()
-        .any(|attr| attr.path().is_ident("cfg"))
-}
-
-fn item_is_test_scoped(item: &Item, inherited_scope: ScopeKind) -> bool {
-    classify_scope(
-        item_attrs(item),
-        inherited_scope,
-        item_name_hint_is_tests(item),
-    ) == ScopeKind::Test
-}
-
-fn impl_method_is_cfg_unix_production_item(
-    item_fn: &syn::ImplItemFn,
-    inherited_scope: ScopeKind,
-) -> bool {
-    classify_scope(&item_fn.attrs, inherited_scope, None) == ScopeKind::NonTest
-        && item_fn.attrs.iter().any(attr_is_cfg_unix)
-}
-
-fn impl_method_has_windows_companion(
-    unix_method: &syn::ImplItemFn,
-    sibling_items: &[ImplItem],
-) -> bool {
-    sibling_items.iter().any(|candidate| {
-        let ImplItem::Fn(candidate_fn) = candidate else {
-            return false;
-        };
-        unix_method.sig.ident == candidate_fn.sig.ident
-            && candidate_fn.attrs.iter().any(attr_is_cfg_windows)
-    })
-}
-
-fn impl_method_has_portable_fallback(
-    unix_method: &syn::ImplItemFn,
-    sibling_items: &[ImplItem],
-    inherited_scope: ScopeKind,
-) -> bool {
-    sibling_items.iter().any(|candidate| {
-        let ImplItem::Fn(candidate_fn) = candidate else {
-            return false;
-        };
-        unix_method.sig.ident == candidate_fn.sig.ident
-            && !candidate_fn
-                .attrs
-                .iter()
-                .any(|attr| attr.path().is_ident("cfg"))
-            && classify_scope(&candidate_fn.attrs, inherited_scope, None) == ScopeKind::NonTest
-    })
-}
-
-fn is_dirs_home_dir_call(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    matches!(segments.as_slice(), [dirs, home_dir] if dirs == "dirs" && home_dir == "home_dir")
-}
-
-fn is_set_var_call(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    match segments.as_slice() {
-        [env, set_var] => env == "env" && set_var == "set_var",
-        [std, env, set_var] => std == "std" && env == "env" && set_var == "set_var",
-        _ => false,
-    }
-}
-
-fn is_shell_command_call(expr_call: &ExprCall) -> bool {
-    is_command_new_call(expr_call, "sh") || is_command_new_call(expr_call, "bash")
-}
-
-fn is_command_new_call(expr_call: &ExprCall, command_name: &str) -> bool {
-    let Expr::Path(expr_path) = &*expr_call.func else {
-        return false;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    let is_command_new = match segments.as_slice() {
-        [command, new] => command == "Command" && new == "new",
-        [process, command, new] => process == "process" && command == "Command" && new == "new",
-        [std, process, command, new] => {
-            std == "std" && process == "process" && command == "Command" && new == "new"
-        }
-        _ => false,
-    };
-    if !is_command_new {
-        return false;
-    }
-    let Some(first_arg) = expr_call.args.first() else {
-        return false;
-    };
-    let Expr::Lit(ExprLit {
-        lit: Lit::Str(lit), ..
-    }) = first_arg
-    else {
-        return false;
-    };
-    lit.value() == command_name
-}
-
-fn extract_env_var_lookup(expr_call: &ExprCall) -> Option<String> {
-    let Expr::Path(expr_path) = &*expr_call.func else {
-        return None;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    let is_env_var = match segments.as_slice() {
-        [env, var] => env == "env" && (var == "var" || var == "var_os"),
-        [std, env, var] => std == "std" && env == "env" && (var == "var" || var == "var_os"),
-        _ => false,
-    };
-    if !is_env_var {
-        return None;
-    }
-    let Expr::Lit(ExprLit {
-        lit: Lit::Str(lit), ..
-    }) = expr_call.args.first()?
-    else {
-        return None;
-    };
-    Some(lit.value())
-}
-
-fn production_env_portability_variable(expr_call: &ExprCall) -> Option<String> {
-    let variable_name = extract_env_var_lookup(expr_call)?;
-    if variable_name == "HOME" || variable_name == "USER" || variable_name.starts_with("XDG_") {
-        Some(variable_name)
-    } else {
-        None
-    }
-}
-
-fn production_path_rule_id(value: &str) -> Option<RuleId> {
-    if is_windows_path_literal(value) {
-        Some(RuleId::Port007)
-    } else if is_unix_path_literal(value) {
-        Some(RuleId::Port006)
-    } else {
-        None
-    }
-}
-
-fn is_unix_shell_path_literal(value: &str) -> bool {
-    matches!(value, "/bin/sh" | "/bin/bash")
-}
-
-fn is_unix_path_literal(value: &str) -> bool {
-    matches!(
-        value,
-        path if path.starts_with("/home/")
-            || path.starts_with("/usr/")
-            || path.starts_with("/etc/")
-            || path.starts_with("/var/")
-            || path.starts_with("/tmp/")
-    )
-}
-
-fn is_windows_path_literal(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    let drive_absolute = bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && (bytes[2] == b'\\' || bytes[2] == b'/');
-    let unc_absolute = value.starts_with("\\\\") && value.len() > 2;
-    drive_absolute || unc_absolute
 }

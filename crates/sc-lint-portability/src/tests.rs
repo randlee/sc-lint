@@ -499,6 +499,45 @@ fn flags_command_new_sh_in_production_code() {
 }
 
 #[test]
+fn flags_command_new_bash_in_production_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub fn run_hook() -> std::io::Result<std::process::ExitStatus> {
+                std::process::Command::new("bash")
+                    .arg("-lc")
+                    .arg("true")
+                    .status()
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port009)
+    );
+}
+
+#[test]
 fn flags_bin_bash_path_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
@@ -519,6 +558,40 @@ fn flags_bin_bash_path_in_production_code() {
                     .arg("true")
                     .status()
             }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port009)
+    );
+}
+
+#[test]
+fn flags_bin_sh_path_literal_in_production_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub const SHELL_PATH: &str = "/bin/sh";
         "#,
     );
 
@@ -842,6 +915,47 @@ fn passes_cfg_unix_impl_method_with_windows_companion() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn flags_cfg_unix_impl_method_without_windows_companion() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub struct RuntimeSocket;
+
+            impl RuntimeSocket {
+                #[cfg(unix)]
+                pub fn name() -> &'static str {
+                    "/var/run/sc-lint.sock"
+                }
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port010)
+    );
 }
 
 #[test]
