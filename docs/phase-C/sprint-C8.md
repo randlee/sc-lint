@@ -1,10 +1,10 @@
 ---
 id: C.8
 title: Shell Invocation Portability
-status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
-target: develop
+status: completed
+branch: feature/sprint-C8
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C8
+target: integration/phase-C
 ---
 
 # Sprint C.8 — Shell Invocation Portability
@@ -84,6 +84,11 @@ fn visit_expr_for_unix_portability(
     }
 }
 ```
+
+- in the shipped implementation, `visit_expr_for_unix_portability(...)`
+  delegates into `ProductionPathLiteralVisitor`, and the concrete `Expr::Call`
+  dispatch for shell detection happens in
+  `ProductionPathLiteralVisitor::visit_expr_call(...)`
 
 - `/bin/sh` and `/bin/bash` fire through the dedicated `PORT-009` literal
   helper above rather than through the generic Unix path-prefix matcher used

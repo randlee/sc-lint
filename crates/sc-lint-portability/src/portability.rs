@@ -4,9 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
-use quote::ToTokens;
 use serde::Deserialize;
-use syn::Attribute;
 use syn::Block;
 use syn::Expr;
 use syn::ExprCall;
@@ -20,7 +18,6 @@ use syn::ItemImpl;
 use syn::ItemMod;
 use syn::Lit;
 use syn::Stmt;
-use syn::UseTree;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -29,6 +26,24 @@ use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
+use crate::predicates::attr_is_cfg_attr_not_unix_allow_dead_code;
+use crate::predicates::attr_is_cfg_unix;
+use crate::predicates::attr_is_platform_cfg;
+use crate::predicates::extract_env_var_lookup;
+use crate::predicates::has_portable_fallback;
+use crate::predicates::has_windows_companion;
+use crate::predicates::impl_method_has_portable_fallback;
+use crate::predicates::impl_method_has_windows_companion;
+use crate::predicates::impl_method_is_cfg_unix_production_item;
+use crate::predicates::is_cfg_unix_production_item;
+use crate::predicates::is_dirs_home_dir_call;
+use crate::predicates::is_path_like_constructor;
+use crate::predicates::is_set_var_call;
+use crate::predicates::is_shell_command_call;
+use crate::predicates::is_unix_shell_path_literal;
+use crate::predicates::production_env_portability_variable;
+use crate::predicates::production_path_rule_id;
+use crate::predicates::use_tree_contains_std_os_unix;
 use crate::source_scan::FileContext;
 use crate::source_scan::PackageName;
 use crate::source_scan::ScopeKind;
@@ -37,6 +52,7 @@ use crate::source_scan::classify_scope;
 use crate::source_scan::count_scanned_crates as count_crates;
 use crate::source_scan::discover_source_files;
 use crate::source_scan::item_attrs;
+use crate::source_scan::item_identifier;
 use crate::source_scan::item_name_hint_is_tests;
 use crate::source_scan::span_start_line;
 
@@ -158,6 +174,7 @@ fn collect_unix_portability_findings(
         &file.items,
         initial_scope,
         false,
+        false,
         file_context,
         &mut findings,
     );
@@ -168,14 +185,23 @@ fn visit_items_for_unix_portability(
     items: &[Item],
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
+    collect_parity_findings(
+        items,
+        inherited_scope,
+        inherited_unix_gated,
+        file_context,
+        findings,
+    );
     for item in items {
         visit_item_for_unix_portability(
             item,
             inherited_scope,
             inherited_unix_gated,
+            inherited_platform_gated,
             file_context,
             findings,
         );
@@ -186,12 +212,18 @@ fn visit_item_for_unix_portability(
     item: &Item,
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
     let attrs = item_attrs(item);
     let scope = classify_scope(attrs, inherited_scope, item_name_hint_is_tests(item));
     let unix_gated = inherited_unix_gated || attrs.iter().any(attr_is_cfg_unix);
+    let platform_gated = inherited_platform_gated || attrs.iter().any(attr_is_platform_cfg);
+
+    if scope == ScopeKind::NonTest && !platform_gated {
+        collect_production_path_literal_findings(item, file_context, findings);
+    }
 
     if scope == ScopeKind::NonTest {
         for attr in attrs {
@@ -232,35 +264,67 @@ fn visit_item_for_unix_portability(
         }
     }
 
+    if let Item::Mod(item_mod) = item
+        && let Some((_, items)) = &item_mod.content
+    {
+        visit_items_for_unix_portability(
+            items,
+            scope,
+            unix_gated,
+            platform_gated,
+            file_context,
+            findings,
+        );
+    }
+}
+
+fn collect_production_path_literal_findings(
+    item: &Item,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
     match item {
-        Item::Fn(item_fn) => {
-            if scope == ScopeKind::NonTest {
-                visit_block_for_unix_portability(
-                    &item_fn.block,
-                    scope,
-                    unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        Item::Mod(item_mod) => {
-            if let Some((_, items)) = &item_mod.content {
-                visit_items_for_unix_portability(items, scope, unix_gated, file_context, findings);
-            }
-        }
+        Item::Fn(item_fn) => visit_block_for_unix_portability(
+            &item_fn.block,
+            ScopeKind::NonTest,
+            false,
+            false,
+            file_context,
+            findings,
+        ),
+        Item::Const(item_const) => visit_expr_for_unix_portability(
+            &item_const.expr,
+            ScopeKind::NonTest,
+            false,
+            false,
+            file_context,
+            findings,
+        ),
+        Item::Static(item_static) => visit_expr_for_unix_portability(
+            &item_static.expr,
+            ScopeKind::NonTest,
+            false,
+            false,
+            file_context,
+            findings,
+        ),
         Item::Impl(item_impl) => {
-            if scope != ScopeKind::NonTest {
-                return;
-            }
+            collect_impl_method_parity_findings(
+                item_impl,
+                ScopeKind::NonTest,
+                file_context,
+                findings,
+            );
             for impl_item in &item_impl.items {
                 if let ImplItem::Fn(item_fn) = impl_item {
-                    let fn_scope = classify_scope(&item_fn.attrs, scope, None);
-                    if fn_scope == ScopeKind::NonTest {
+                    let fn_scope = classify_scope(&item_fn.attrs, ScopeKind::NonTest, None);
+                    let fn_platform_gated = item_fn.attrs.iter().any(attr_is_platform_cfg);
+                    if fn_scope == ScopeKind::NonTest && !fn_platform_gated {
                         visit_block_for_unix_portability(
                             &item_fn.block,
-                            fn_scope,
-                            unix_gated,
+                            ScopeKind::NonTest,
+                            false,
+                            false,
                             file_context,
                             findings,
                         );
@@ -276,6 +340,7 @@ fn visit_block_for_unix_portability(
     block: &Block,
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
@@ -285,6 +350,7 @@ fn visit_block_for_unix_portability(
                 item,
                 inherited_scope,
                 inherited_unix_gated,
+                inherited_platform_gated,
                 file_context,
                 findings,
             ),
@@ -294,6 +360,7 @@ fn visit_block_for_unix_portability(
                         &init.expr,
                         inherited_scope,
                         inherited_unix_gated,
+                        inherited_platform_gated,
                         file_context,
                         findings,
                     );
@@ -303,6 +370,7 @@ fn visit_block_for_unix_portability(
                 expr,
                 inherited_scope,
                 inherited_unix_gated,
+                inherited_platform_gated,
                 file_context,
                 findings,
             ),
@@ -315,62 +383,15 @@ fn visit_expr_for_unix_portability(
     expr: &Expr,
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
-    match expr {
-        Expr::Block(expr_block) => visit_block_for_unix_portability(
-            &expr_block.block,
-            inherited_scope,
-            inherited_unix_gated,
-            file_context,
-            findings,
-        ),
-        Expr::If(expr_if) => {
-            visit_expr_for_unix_portability(
-                &expr_if.cond,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            visit_block_for_unix_portability(
-                &expr_if.then_branch,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            if let Some((_, else_expr)) = &expr_if.else_branch {
-                visit_expr_for_unix_portability(
-                    else_expr,
-                    inherited_scope,
-                    inherited_unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        Expr::Match(expr_match) => {
-            visit_expr_for_unix_portability(
-                &expr_match.expr,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            for arm in &expr_match.arms {
-                visit_expr_for_unix_portability(
-                    &arm.body,
-                    inherited_scope,
-                    inherited_unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        _ => {}
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated || inherited_platform_gated {
+        return;
     }
+    let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings);
+    visitor.visit_expr(expr);
 }
 
 impl<'a> PortabilityCollector<'a> {
@@ -651,6 +672,204 @@ struct FunctionBodyVisitor {
     usages: Vec<Usage>,
 }
 
+struct ProductionPathLiteralVisitor<'a, 'b> {
+    file_context: &'a FileContext,
+    findings: &'b mut Vec<PortabilityFinding>,
+    platform_gated_depth: usize,
+}
+
+impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
+    fn new(file_context: &'a FileContext, findings: &'b mut Vec<PortabilityFinding>) -> Self {
+        Self {
+            file_context,
+            findings,
+            platform_gated_depth: 0,
+        }
+    }
+
+    fn push_path_finding(&mut self, rule_id: RuleId, value: &str, line: usize) {
+        let message = match rule_id {
+            RuleId::Port006 => format!(
+                "PORT-006 hardcoded Unix-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), std::env::temp_dir(), or a platform-gated path abstraction"
+            ),
+            RuleId::Port007 => format!(
+                "PORT-007 hardcoded Windows-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction"
+            ),
+            _ => return,
+        };
+        self.findings.push(PortabilityFinding {
+            rule_id,
+            kind: "hardcoded_production_path_literal",
+            message,
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
+
+    fn push_env_finding(&mut self, variable_name: &str, line: usize) {
+        self.findings.push(PortabilityFinding {
+            rule_id: RuleId::Port008,
+            kind: "production_env_portability_lookup",
+            message: format!(
+                "PORT-008 direct std::env lookup of `{variable_name}` in production code bypasses platform-neutral path or identity abstractions; prefer dirs::data_dir(), dirs::config_dir(), dirs::home_dir(), or another platform-aware wrapper"
+            ),
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
+
+    fn push_shell_finding(&mut self, detail: &str, line: usize) {
+        self.findings.push(PortabilityFinding {
+            rule_id: RuleId::Port009,
+            kind: "production_shell_portability",
+            message: format!(
+                "PORT-009 Unix shell invocation `{detail}` in production code assumes a Unix shell exists; prefer invoking the target binary directly or move the shell path behind an explicit Unix-only boundary"
+            ),
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
+}
+
+fn push_cfg_parity_finding(
+    findings: &mut Vec<PortabilityFinding>,
+    file_context: &FileContext,
+    line: usize,
+    detail: &str,
+) {
+    findings.push(PortabilityFinding {
+        rule_id: RuleId::Port010,
+        kind: "cfg_unix_parity_missing",
+        message: format!(
+            "PORT-010 production #[cfg(unix)] item `{detail}` has no #[cfg(windows)] companion or explicit portable fallback in the same scope; consider adding a cfg(windows) sibling or an unguarded portable fallback"
+        ),
+        source_path: file_context.source_path.clone(),
+        line,
+        package: file_context.package.clone(),
+        target: file_context.target.clone(),
+        node_label: format!(
+            "crate::{}::{}::portability",
+            file_context.package, file_context.target
+        ),
+    });
+}
+
+fn collect_parity_findings(
+    items: &[Item],
+    inherited_scope: ScopeKind,
+    inherited_unix_gated: bool,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
+        return;
+    }
+    for item in items {
+        if is_cfg_unix_production_item(item, inherited_scope)
+            && !has_windows_companion(item, items)
+            && !has_portable_fallback(item, items, inherited_scope)
+        {
+            let detail = item_identifier(item)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "cfg(unix) item".to_string());
+            push_cfg_parity_finding(
+                findings,
+                file_context,
+                span_start_line(item.span()),
+                &detail,
+            );
+        }
+    }
+}
+
+fn collect_impl_method_parity_findings(
+    item_impl: &ItemImpl,
+    inherited_scope: ScopeKind,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
+    if inherited_scope != ScopeKind::NonTest {
+        return;
+    }
+    for impl_item in &item_impl.items {
+        let ImplItem::Fn(unix_method) = impl_item else {
+            continue;
+        };
+        if impl_method_is_cfg_unix_production_item(unix_method, inherited_scope)
+            && !impl_method_has_windows_companion(unix_method, &item_impl.items)
+            && !impl_method_has_portable_fallback(unix_method, &item_impl.items, inherited_scope)
+        {
+            push_cfg_parity_finding(
+                findings,
+                file_context,
+                span_start_line(unix_method.span()),
+                &unix_method.sig.ident.to_string(),
+            );
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
+    fn visit_expr_block(&mut self, node: &'ast syn::ExprBlock) {
+        let is_platform_gated = node.attrs.iter().any(attr_is_platform_cfg);
+        if is_platform_gated {
+            self.platform_gated_depth += 1;
+        }
+        syn::visit::visit_expr_block(self, node);
+        if is_platform_gated {
+            self.platform_gated_depth -= 1;
+        }
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if self.platform_gated_depth == 0
+            && let Some(command_name) = is_shell_command_call(node)
+        {
+            self.push_shell_finding(
+                &format!("Command::new(\"{command_name}\")"),
+                span_start_line(node.span()),
+            );
+        }
+        if self.platform_gated_depth == 0
+            && let Some(variable_name) = production_env_portability_variable(node)
+        {
+            self.push_env_finding(&variable_name, span_start_line(node.span()));
+        }
+        syn::visit::visit_expr_call(self, node);
+    }
+
+    fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
+        if self.platform_gated_depth == 0
+            && let Lit::Str(lit) = &node.lit
+        {
+            if is_unix_shell_path_literal(&lit.value()) {
+                self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
+            } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
+                self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            }
+        }
+        syn::visit::visit_expr_lit(self, node);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Usage {
     EnvVarCheck { name: String, line: usize },
@@ -659,7 +878,7 @@ enum Usage {
 
 impl<'ast> Visit<'ast> for FunctionBodyVisitor {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if let Some(env_var_name) = extract_env_var_check(node) {
+        if let Some(env_var_name) = extract_env_var_lookup(node) {
             self.usages.push(Usage::EnvVarCheck {
                 name: env_var_name,
                 line: span_start_line(node.span()),
@@ -702,132 +921,4 @@ fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
         config_home_env: repo_config.portability.and_then(|cfg| cfg.config_home_env),
         unix_path_prefixes: defaults.portability.unix_path_prefixes,
     })
-}
-
-fn attr_is_cfg_unix(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("unix") && !rendered.contains("not(unix)")
-}
-
-fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg_attr") {
-        return false;
-    }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("not(unix)") && rendered.contains("allow(dead_code)")
-}
-
-fn use_tree_contains_std_os_unix(tree: &UseTree) -> bool {
-    fn walk(tree: &UseTree, prefix: &mut Vec<String>) -> bool {
-        match tree {
-            UseTree::Path(use_path) => {
-                prefix.push(use_path.ident.to_string());
-                let matched = walk(&use_path.tree, prefix);
-                prefix.pop();
-                matched
-            }
-            UseTree::Name(use_name) => {
-                prefix.push(use_name.ident.to_string());
-                let matched = matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix");
-                prefix.pop();
-                matched
-            }
-            UseTree::Rename(use_rename) => {
-                prefix.push(use_rename.ident.to_string());
-                let matched = matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix");
-                prefix.pop();
-                matched
-            }
-            UseTree::Glob(_) => {
-                matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix")
-            }
-            UseTree::Group(group) => group.items.iter().any(|item| walk(item, prefix)),
-        }
-    }
-
-    walk(tree, &mut Vec::new())
-}
-
-fn is_path_like_constructor(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    match segments.as_slice() {
-        [single, from] => {
-            single == "PathBuf" && from == "from" || single == "Path" && from == "new"
-        }
-        [std, path_mod, path_type, method] => {
-            std == "std"
-                && path_mod == "path"
-                && ((path_type == "PathBuf" && method == "from")
-                    || (path_type == "Path" && method == "new"))
-        }
-        _ => false,
-    }
-}
-
-fn is_dirs_home_dir_call(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    matches!(segments.as_slice(), [dirs, home_dir] if dirs == "dirs" && home_dir == "home_dir")
-}
-
-fn is_set_var_call(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    match segments.as_slice() {
-        [env, set_var] => env == "env" && set_var == "set_var",
-        [std, env, set_var] => std == "std" && env == "env" && set_var == "set_var",
-        _ => false,
-    }
-}
-
-fn extract_env_var_check(expr_call: &ExprCall) -> Option<String> {
-    let Expr::Path(expr_path) = &*expr_call.func else {
-        return None;
-    };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    let is_env_var = match segments.as_slice() {
-        [env, var] => env == "env" && var == "var",
-        [std, env, var] => std == "std" && env == "env" && var == "var",
-        _ => false,
-    };
-    if !is_env_var {
-        return None;
-    }
-    let Expr::Lit(ExprLit {
-        lit: Lit::Str(lit), ..
-    }) = expr_call.args.first()?
-    else {
-        return None;
-    };
-    Some(lit.value())
 }

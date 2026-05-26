@@ -17,6 +17,21 @@ Use `sc-portability` to catch portability drift such as:
   - ungated `std::os::unix` imports in production code
 - `PORT-005`
   - `#[cfg_attr(not(unix), allow(dead_code))]` portability suppressors
+- `PORT-006`
+  - hardcoded Unix-only absolute path literals in production code
+- `PORT-007`
+  - hardcoded Windows absolute path literals, including drive-letter and UNC
+    forms, in production code
+- `PORT-008`
+  - direct production lookups of `HOME`, `USER`, and `XDG_*` without a
+    platform-neutral abstraction
+- `PORT-009`
+  - production `Command::new("sh" | "bash")` or hardcoded `/bin/sh` /
+    `/bin/bash` shell-invocation assumptions without an explicit Unix-only
+    boundary
+- `PORT-010`
+  - production `#[cfg(unix)]` items without a `#[cfg(windows)]` companion or
+    explicit portable fallback in the same scope
 
 ## Ownership And Scope
 
@@ -27,6 +42,7 @@ Per [ADR-010](../../docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md),
 - broader environment-variable portability rules
 - shell-portability rules for OS-specific shell-path and shell-command
   assumptions
+- structural `cfg` parity rules for Unix-only production branches
 
 Consumer-specific portability wrappers may still exist in downstream repos, but
 they do not replace `sc-lint-portability` as the core shared ownership
@@ -87,6 +103,36 @@ Representative finding:
 
 ```text
 PORT-004 ungated std::os::unix import in production code; wrap the item with #[cfg(unix)] or move the import behind a Unix-only boundary
+```
+
+Production code with a hardcoded Unix-only runtime path is also flagged:
+
+```text
+PORT-006 hardcoded Unix-only absolute path literal `/var/run/sc-lint` in production code; prefer dirs::cache_dir(), dirs::config_dir(), std::env::temp_dir(), or a platform-gated path abstraction
+```
+
+Production code with a hardcoded Windows runtime path is also flagged:
+
+```text
+PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction
+```
+
+Production code with Unix-centric environment lookups is also flagged:
+
+```text
+PORT-008 direct std::env lookup of `HOME` in production code bypasses platform-neutral path or identity abstractions; prefer dirs::data_dir(), dirs::config_dir(), dirs::home_dir(), or another platform-aware wrapper
+```
+
+Production code with Unix-shell assumptions is also flagged:
+
+```text
+PORT-009 Unix shell invocation `Command::new("sh" | "bash")` in production code assumes a Unix shell exists; prefer invoking the target binary directly or move the shell path behind an explicit Unix-only boundary
+```
+
+Production code with a Unix-only branch and no companion is also flagged:
+
+```text
+PORT-010 production #[cfg(unix)] item `runtime_socket_name` has no #[cfg(windows)] companion or explicit portable fallback in the same scope
 ```
 
 Test-only path literals are also flagged:

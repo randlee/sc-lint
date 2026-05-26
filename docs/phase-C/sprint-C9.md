@@ -1,10 +1,10 @@
 ---
 id: C.9
 title: Cross-Platform cfg Parity Enforcement
-status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
-target: develop
+status: completed
+branch: feature/sprint-C9
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C9
+target: integration/phase-C
 ---
 
 # Sprint C.9 — Cross-Platform cfg Parity Enforcement
@@ -65,13 +65,14 @@ target: develop
 fn collect_parity_findings(
     items: &[Item],
     inherited_scope: ScopeKind,
+    inherited_unix_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
     for item in items {
         if is_cfg_unix_production_item(item, inherited_scope)
             && !has_windows_companion(item, items)
-            && !has_portable_fallback(item, items)
+            && !has_portable_fallback(item, items, inherited_scope)
         {
             // emit PORT-010
         }
@@ -80,15 +81,20 @@ fn collect_parity_findings(
 
 fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
     sibling_items.iter().any(|candidate| {
-        same_identifier(unix_item, candidate) && item_has_cfg_windows(candidate)
+        same_item_identifier(unix_item, candidate)
+            && item_has_cfg_windows(candidate)
     })
 }
 
-fn has_portable_fallback(unix_item: &Item, sibling_items: &[Item]) -> bool {
+fn has_portable_fallback(
+    unix_item: &Item,
+    sibling_items: &[Item],
+    scope: ScopeKind,
+) -> bool {
     sibling_items.iter().any(|candidate| {
-        same_identifier(unix_item, candidate)
+        same_item_identifier(unix_item, candidate)
             && !item_has_any_cfg(candidate)
-            && !item_is_test_scoped(candidate)
+            && !item_is_test_scoped(candidate, scope)
     })
 }
 ```
@@ -97,6 +103,10 @@ fn has_portable_fallback(unix_item: &Item, sibling_items: &[Item]) -> bool {
   module-level traversal points that already own full `&[Item]` slices, so
   `PORT-010` does not depend on reconstructing sibling context from a
   single-item visitor callback
+- `collect_impl_method_parity_findings(item_impl: &ItemImpl, inherited_scope:
+  ScopeKind, file_context: &FileContext, findings: &mut Vec<PortabilityFinding>)`
+  is the companion impl-method seam and becomes the `C.10+` integration base
+  for later parity extensions inside method bodies
 - `#[cfg(test)]` siblings never satisfy portable-fallback matching; if the
   only same-identifier sibling is test-scoped, `has_portable_fallback(...)`
   returns `false` and the production `#[cfg(unix)]` item still emits
@@ -152,6 +162,8 @@ pub fn runtime_socket_name() -> &'static str {
 - the sprint names `collect_parity_findings(items, ...)` as the integration
   seam that supplies sibling context to `has_windows_companion(...)` and
   `has_portable_fallback(...)`
+- the sprint names `collect_impl_method_parity_findings(...)` as the impl
+  method companion seam and the `C.10+` integration base
 - the sprint states that `#[cfg(test)]` siblings are excluded from
   portable-fallback matching
 - the sprint requires the structural scan to cover all three production item

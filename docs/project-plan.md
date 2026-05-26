@@ -176,9 +176,13 @@ The currently scheduled sprint plans are:
   - `docs/phase-C/sprint-C3.md`
 - `C.4`
   - consumer integration and skill design
+  - `docs/sc-lint/version-adoption.md`
+  - `.claude/skills/sc-lint-version-adoption/SKILL.md`
   - `docs/phase-C/sprint-C4.md`
 - `C.5`
   - minimal marketplace publication for the adoption skill
+  - `.claude-plugin/marketplace.json`
+  - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
   - `docs/phase-C/sprint-C5.md`
 - `C.6`
   - production path-literal portability parity
@@ -199,8 +203,9 @@ The currently scheduled sprint plans are:
   - `docs/phase-C/sprint-C9.md`
 - `C.10`
   - `sc-observability` `1.1.0` adoption
-  - retained-log policy decision plus `emit` -> `log` / `try_log`, typestate,
-    and Windows-rotation compatibility review for the CLI-owned logging seam
+  - retained-log policy enablement plus typestate, supported `emit(...)`
+    compatibility, and Windows-rotation compatibility review for the CLI-owned
+    logging seam
   - `docs/phase-C/sprint-C10.md`
 
 ## Recent Sprint Deltas
@@ -253,7 +258,7 @@ The next planned tool crates after the current line are:
 
 ## Release 1 Target
 
-Release `0.1.x` should establish:
+Release `0.2.x` should establish:
 
 - a stable repo-local development and CI gate
 - canonical TOML boundaries for the repo's own tool surfaces

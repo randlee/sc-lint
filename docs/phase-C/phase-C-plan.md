@@ -43,10 +43,17 @@ The currently planned sprints in this phase are:
 - `C.4`
   - consumer integration documentation and Claude Code skill planning
   - explicit “what a consuming repo must do” scope
+  - authoritative adoption doc:
+    `docs/sc-lint/version-adoption.md`
+  - repo-local adoption skill:
+    `.claude/skills/sc-lint-version-adoption/SKILL.md`
   - see [docs/phase-C/sprint-C4.md](./sprint-C4.md)
 - `C.5`
   - minimal repo-local Claude Code marketplace planning for the adoption skill
   - explicit forwarding/reference path for marketplace advertisement
+  - source-repo publication surfaces:
+    - `.claude-plugin/marketplace.json`
+    - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
   - see [docs/phase-C/sprint-C5.md](./sprint-C5.md)
 - `C.6`
   - production path-literal portability parity in `sc-lint-portability`
@@ -62,17 +69,20 @@ The currently planned sprints in this phase are:
   - shared shell invocation portability in `sc-lint-portability`
   - `Command::new("sh" | "bash")` and hardcoded `/bin/sh` or `/bin/bash`
     production checks
+  - implemented on `feature/sprint-C8`
   - see [docs/phase-C/sprint-C8.md](./sprint-C8.md)
 - `C.9`
   - structural cross-platform `cfg` parity enforcement in
     `sc-lint-portability`
   - production `#[cfg(unix)]` branches that lack Windows companions or
     explicit portable fallbacks
+  - implemented on `feature/sprint-C9`
   - see [docs/phase-C/sprint-C9.md](./sprint-C9.md)
 - `C.10`
   - `sc-observability` `1.1.0` adoption in the CLI-owned logging layer
-  - retained-log policy decision, `emit` -> `log` / `try_log` migration, and
+  - retained-log policy decision, `emit(...)` compatibility verification, and
     Windows rotation validation target
+  - implemented on `feature/sprint-C10`
   - see [docs/phase-C/sprint-C10.md](./sprint-C10.md)
 
 ## Phase Structure
@@ -92,8 +102,12 @@ The currently planned sprints in this phase are:
 4. `C.4`
    - define how consuming repos adopt the capability
    - package the adoption guidance as a repo-local skill
+   - keep `docs/sc-lint/version-adoption.md` authoritative for the adoption
+     workflow
 5. `C.5`
    - publish the adoption skill through a minimal repo-local marketplace
+   - keep marketplace publication separate from the `C.4` skill-design
+     closure
 6. `C.6`
    - extend shared path-literal portability linting into production code
    - add Windows-path parity to the current Unix-path family

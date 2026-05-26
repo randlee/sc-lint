@@ -63,7 +63,7 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
         .expect("reserved command runs");
     assert_eq!(failure.status.code(), Some(4));
 
-    let cli_log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    let cli_log_path = service_log_path(&temp_root, "sc-lint");
     assert_log_file_contains_action(&cli_log_path, "cli.command.started");
     assert_log_file_contains_error_action(&cli_log_path, "cli.command.error");
     assert_log_file_contains_field(
@@ -74,7 +74,7 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     );
     assert_log_file_contains_elapsed_ms(&cli_log_path);
 
-    let dispatch_log_path = temp_root.join("sc-boundary").join("sc-boundary.log.jsonl");
+    let dispatch_log_path = service_log_path(&temp_root, "sc-boundary");
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.started");
     assert_log_file_contains_action(&dispatch_log_path, "cli.dispatch.normalized");
     assert_log_file_contains_elapsed_ms(&dispatch_log_path);
@@ -97,7 +97,7 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
         String::from_utf8_lossy(&runtime.stderr)
     );
 
-    let runtime_log_path = temp_root.join("sc-runtime").join("sc-runtime.log.jsonl");
+    let runtime_log_path = service_log_path(&temp_root, "sc-runtime");
     assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.started");
     assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.normalized");
     assert_log_file_contains_elapsed_ms(&runtime_log_path);
@@ -138,7 +138,7 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
         String::from_utf8_lossy(&success.stderr)
     );
 
-    let success_log_path = success_logs.join("sc-lint").join("sc-lint.log.jsonl");
+    let success_log_path = service_log_path(&success_logs, "sc-lint");
     assert_log_file_contains_field(
         &success_log_path,
         "cli.command.started",
@@ -173,7 +173,7 @@ fn xwin_logging_records_target_metadata_for_success_and_error_paths() {
         .expect("xwin failure command runs");
     assert_eq!(failure.status.code(), Some(4));
 
-    let failure_log_path = failure_logs.join("sc-lint").join("sc-lint.log.jsonl");
+    let failure_log_path = service_log_path(&failure_logs, "sc-lint");
     assert_log_file_contains_field(
         &failure_log_path,
         "cli.command.error",
@@ -213,10 +213,7 @@ fn sc_boundary_logs_manifest_policy_metadata_for_completion_and_error_paths() {
         String::from_utf8_lossy(&success_output.stderr)
     );
 
-    let success_log_path = success_logs
-        .path()
-        .join("sc-boundary")
-        .join("sc-boundary.log.jsonl");
+    let success_log_path = service_log_path(success_logs.path(), "sc-boundary");
     for action in ["cli.command.started", "cli.command.completed"] {
         assert_log_file_contains_field(
             &success_log_path,
@@ -249,10 +246,7 @@ fn sc_boundary_logs_manifest_policy_metadata_for_completion_and_error_paths() {
         .expect("boundary failure command runs");
     assert_eq!(failure_output.status.code(), Some(5));
 
-    let failure_log_path = failure_logs
-        .path()
-        .join("sc-boundary")
-        .join("sc-boundary.log.jsonl");
+    let failure_log_path = service_log_path(failure_logs.path(), "sc-boundary");
     assert_log_file_contains_field(
         &failure_log_path,
         "cli.command.error",
@@ -295,7 +289,7 @@ fn python_backed_commands_log_adapter_metadata() {
     );
     let expected = adapter_metadata_from_output(&output.stdout);
 
-    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    let log_path = service_log_path(&temp_root, "sc-lint");
     assert_log_file_contains_field(
         &log_path,
         "cli.command.started",
@@ -385,7 +379,7 @@ fn line_counts_logs_adapter_metadata_for_error() {
         String::from_utf8_lossy(&output.stdout)
     );
     let output_json = parse_command_output(&output.stderr);
-    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    let log_path = service_log_path(&temp_root, "sc-lint");
     assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
     assert_log_file_contains_field(
         &log_path,
@@ -430,7 +424,7 @@ fn identity_literals_logs_adapter_metadata_for_completion() {
     );
     let expected = adapter_metadata_from_output(&output.stdout);
 
-    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    let log_path = service_log_path(&temp_root, "sc-lint");
     for action in ["cli.command.started", "cli.command.completed"] {
         assert_log_file_contains_field(&log_path, action, "adapter", &expected.adapter);
         assert_log_file_contains_field(&log_path, action, "config_scope", &expected.config_scope);
@@ -493,7 +487,7 @@ fn identity_literals_logs_adapter_metadata_for_error() {
         String::from_utf8_lossy(&output.stdout)
     );
     let output_json = parse_command_output(&output.stderr);
-    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    let log_path = service_log_path(&temp_root, "sc-lint");
     assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
     assert_log_file_contains_field(
         &log_path,
@@ -562,7 +556,7 @@ fn view_findings_logs_adapter_metadata_for_error() {
         String::from_utf8_lossy(&output.stdout)
     );
     let output_json = parse_command_output(&output.stderr);
-    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    let log_path = service_log_path(&temp_root, "sc-lint");
     assert_log_file_contains_field(&log_path, "cli.command.error", "adapter", &expected.adapter);
     assert_log_file_contains_field(
         &log_path,
@@ -607,7 +601,7 @@ fn view_findings_logs_adapter_metadata_for_completion() {
     );
     let expected = adapter_metadata_from_output(&output.stdout);
 
-    let log_path = temp_root.join("sc-lint").join("sc-lint.log.jsonl");
+    let log_path = service_log_path(&temp_root, "sc-lint");
     for action in ["cli.command.started", "cli.command.completed"] {
         assert_log_file_contains_field(&log_path, action, "adapter", &expected.adapter);
         assert_log_file_contains_field(&log_path, action, "config_scope", &expected.config_scope);
@@ -643,6 +637,12 @@ fn adapter_metadata_from_output(output: &[u8]) -> AdapterMetadata {
 
 fn parse_command_output(output: &[u8]) -> Value {
     serde_json::from_slice(output).expect("command writes json")
+}
+
+fn service_log_path(log_root: &Path, service_name: &str) -> PathBuf {
+    log_root
+        .join("logs")
+        .join(format!("{service_name}.log.jsonl"))
 }
 
 struct LintConfigOverride {
