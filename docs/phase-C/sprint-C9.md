@@ -1,0 +1,187 @@
+---
+id: C.9
+title: Cross-Platform cfg Parity Enforcement
+status: completed
+branch: feature/sprint-C9
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C9
+target: integration/phase-C
+---
+
+# Sprint C.9 — Cross-Platform cfg Parity Enforcement
+
+## Goal
+
+- add one shared structural parity rule to `sc-lint-portability`
+- detect production `#[cfg(unix)]` items that define one platform branch with
+  no Windows companion or explicit portable fallback
+- keep structural branch-parity analysis distinct from path, env, and shell
+  leaf-pattern rules
+
+## Hard Dependencies
+
+- GitHub issue `#56` — cross-platform parity enforcement gap
+- [docs/requirements.md](../requirements.md)
+- [docs/architecture.md](../architecture.md)
+- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](../sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- [docs/phase-C/sprint-C8.md](./sprint-C8.md)
+- [crates/sc-lint-portability/README.md](../../crates/sc-lint-portability/README.md)
+
+## Exact Targets
+
+- `crates/sc-lint-portability/src/lib.rs`
+- `crates/sc-lint-portability/src/portability.rs`
+- `crates/sc-lint-portability/src/source_scan.rs`
+- `crates/sc-lint-portability/src/tests.rs`
+- `crates/sc-lint-portability/README.md`
+- `docs/phase-C/phase-C-plan.md`
+- `docs/phase-C/sprint-C9.md`
+
+## Deliverables
+
+- `sc-lint-portability` adds `PORT-010` for production `cfg` parity drift when
+  a Unix-only implementation branch has no Windows companion or explicit
+  portable fallback
+  - continues `REQ-PRODUCT-004AA` through the structural parity follow-on
+    owned by `sc-lint-portability`
+- `crates/sc-lint-portability/src/lib.rs` extends `RuleId` with `Port010`
+- the rule defines the accepted parity shapes for production code:
+  - sibling `#[cfg(unix)]` and `#[cfg(windows)]` items
+  - one `#[cfg(unix)]` item plus one explicit unguarded portable fallback item
+- the rule defines companion detection in machine-checkable terms:
+  - sibling items share the same immediate parent scope:
+    - file top-level
+    - module body
+    - impl block
+  - an explicit portable fallback is an item with the same identifier as the
+    `#[cfg(unix)]` item, no `#[cfg(...)]` attribute, and non-test scope
+  - a Windows companion is a sibling item with the same identifier and an
+    explicit `#[cfg(windows)]` gate
+- the structural detection seam is explicit and uses the same parent-scope
+  walk that already classifies production items through `source_scan.rs`; the
+  sibling slice comes from a new scope-level pass that iterates complete item
+  lists before descending recursively:
+
+```rust
+fn collect_parity_findings(
+    items: &[Item],
+    inherited_scope: ScopeKind,
+    inherited_unix_gated: bool,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
+    for item in items {
+        if is_cfg_unix_production_item(item, inherited_scope)
+            && !has_windows_companion(item, items)
+            && !has_portable_fallback(item, items, inherited_scope)
+        {
+            // emit PORT-010
+        }
+    }
+}
+
+fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
+    sibling_items.iter().any(|candidate| {
+        same_item_identifier(unix_item, candidate)
+            && item_has_cfg_windows(candidate)
+    })
+}
+
+fn has_portable_fallback(
+    unix_item: &Item,
+    sibling_items: &[Item],
+    scope: ScopeKind,
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        same_item_identifier(unix_item, candidate)
+            && !item_has_any_cfg(candidate)
+            && !item_is_test_scoped(candidate, scope)
+    })
+}
+```
+
+- `collect_parity_findings(items, ...)` is called from the file-level and
+  module-level traversal points that already own full `&[Item]` slices, so
+  `PORT-010` does not depend on reconstructing sibling context from a
+  single-item visitor callback
+- `collect_impl_method_parity_findings(item_impl: &ItemImpl, inherited_scope:
+  ScopeKind, file_context: &FileContext, findings: &mut Vec<PortabilityFinding>)`
+  is the companion impl-method seam and becomes the `C.10+` integration base
+  for later parity extensions inside method bodies
+- `#[cfg(test)]` siblings never satisfy portable-fallback matching; if the
+  only same-identifier sibling is test-scoped, `has_portable_fallback(...)`
+  returns `false` and the production `#[cfg(unix)]` item still emits
+  `PORT-010`
+
+- the rule operates on structural production items rather than only leaf
+  string patterns, and its production scan covers:
+  - free functions
+  - modules
+  - impl methods
+- `crates/sc-lint-portability/README.md` documents the new structural parity
+  rule and the accepted companion patterns
+
+## Explicit Code Samples
+
+```rust
+#[cfg(unix)]
+pub fn runtime_socket_name() -> &'static str {
+    "/var/run/sc-lint.sock"
+}
+```
+
+```rust
+#[cfg(unix)]
+pub fn runtime_socket_name() -> &'static str {
+    "/var/run/sc-lint.sock"
+}
+
+#[cfg(windows)]
+pub fn runtime_socket_name() -> &'static str {
+    r"\\.\pipe\sc-lint"
+}
+```
+
+## This Sprint Does Not Close
+
+- production path-literal portability rules on their own
+- broad production environment-variable portability rules
+- shell invocation portability rules
+- leaf portability findings inside explicit `#[cfg(unix)]` items stay owned by
+  `C.6`, `C.7`, and `C.8`; `PORT-010` owns the structural decision about
+  whether that Unix-only branch has an acceptable companion or portable
+  fallback
+
+## Acceptance Criteria
+
+- the sprint defines `PORT-010` as a structural production parity rule in
+  `sc-lint-portability`
+- the sprint states the accepted companion forms for a Unix-only branch:
+  Windows sibling or explicit portable fallback
+- the sprint defines sibling scope and portable fallback in machine-detectable
+  terms instead of leaving companion matching implicit
+- the sprint names `collect_parity_findings(items, ...)` as the integration
+  seam that supplies sibling context to `has_windows_companion(...)` and
+  `has_portable_fallback(...)`
+- the sprint names `collect_impl_method_parity_findings(...)` as the impl
+  method companion seam and the `C.10+` integration base
+- the sprint states that `#[cfg(test)]` siblings are excluded from
+  portable-fallback matching
+- the sprint requires the structural scan to cover all three production item
+  categories:
+  - free functions
+  - modules
+  - impl methods
+- the sprint keeps leaf-pattern path, env, and shell portability findings in
+  `C.6`, `C.7`, and `C.8` rather than duplicating those closures here
+- the sprint references GitHub issue `#56` in its hard dependencies
+
+## Required Validation
+
+- `cargo test -p sc-lint-portability`
+- `cargo test -p sc-lint-portability flags_cfg_unix_item_without_windows_companion`
+- `cargo test -p sc-lint-portability flags_cfg_unix_item_without_portable_fallback`
+- `cargo test -p sc-lint-portability does_not_pass_cfg_unix_item_with_cfg_test_only_sibling`
+- `cargo test -p sc-lint-portability passes_cfg_unix_item_with_windows_companion`
+- `cargo test -p sc-lint-portability passes_cfg_unix_item_with_portable_fallback`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `just lint`

@@ -11,6 +11,7 @@ use crate::ClippyTarget;
 use crate::cli::LintProfile;
 use crate::command::CommandSuccess;
 use crate::config::LoadedConfig;
+use crate::consts;
 
 pub const WINDOWS_XWIN_TARGET: &str = "x86_64-pc-windows-msvc";
 
@@ -245,7 +246,7 @@ pub(crate) fn run_check_with(
     Ok(CommandSuccess::direct(json!({
         "status": "pass",
         "mode": target.command_suffix(),
-        "tool": "cargo",
+        consts::FIELD_TOOL: "cargo",
         "step_count": 1,
         "steps": [report.to_json()],
         "xwin": {
@@ -307,7 +308,7 @@ pub(crate) fn run_clippy_with(
     Ok(CommandSuccess::direct(json!({
         "status": "pass",
         "mode": target.command_suffix(),
-        "tool": "cargo",
+        consts::FIELD_TOOL: "cargo",
         "step_count": 1,
         "steps": [report.to_json()],
         "xwin": {
@@ -535,7 +536,7 @@ fn ensure_xwin_available(command_id: &str, xwin_available: bool) -> Result<(), C
         "{command_id} requires `cargo xwin`, but that capability is not available",
     ))
     .with_detail("command", json!(command_id))
-    .with_detail("tool", json!("cargo xwin"))
+    .with_detail(consts::FIELD_TOOL, json!("cargo xwin"))
     .with_detail("target", json!(WINDOWS_XWIN_TARGET))
     .with_suggested_action(
         "Install `cargo-xwin` to enable Windows preflight or use the native check/clippy path instead.",

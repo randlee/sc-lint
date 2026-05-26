@@ -160,7 +160,7 @@ because they depend on the profile/preflight strategy gate.
      sequenced before delegated backend work
    Required doc or boundary updates:
    - keep `docs/project-plan.md` and
-     `docs/sc-lint/foundation-phase-plan.md` aligned with the A.1a/A.1b gate
+     `docs/phase-A/foundation-phase-plan.md` aligned with the A.1a/A.1b gate
 
 4. Plan structured logging bootstrap
    Development work:

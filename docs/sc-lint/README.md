@@ -4,48 +4,104 @@ This folder is the home for `sc-lint` design and planning material.
 
 Current contents:
 
-- [`requirements.md`](./requirements.md) — consumer-neutral requirements for
-  boundary-source migration and inventory-parity behavior
+- [`requirements.md`](./requirements.md) — top-level `sc-lint` crate
+  requirements summary
+- [`architecture.md`](./architecture.md) — top-level `sc-lint` crate
+  architecture summary
 - [`mvp.md`](./mvp.md) — MVP design for the initial `sc-lint-boundary`
   analyzer and the paired `sc-lint-attributes` plan
 - [`roadmap.md`](./roadmap.md) — decisions, rollout sequence, and what stays in
   Python vs what moves to Rust
-- [`graph-schema.md`](./graph-schema.md) — current graph/export contract and
-  rule-id inventory
-- [`boundary-enforcement-model.md`](./boundary-enforcement-model.md) — planned
-  warn/error escalation model for inventory-parity boundary enforcement
-- [`boundary-toml-migration.md`](./boundary-toml-migration.md) — migration plan
-  for moving canonical boundary data from Markdown-embedded records to
-  standalone TOML
 - [`extraction-plan.md`](./extraction-plan.md) — extraction plan for remaining
   generic lint/view tooling and the Python-to-Rust boundary migration
-- [`foundation-phase-plan.md`](./foundation-phase-plan.md) — current detailed
+- [`foundation-phase-plan.md`](../phase-A/foundation-phase-plan.md) — current detailed
   execution plan for repo self-hosting, boundaries, CLI introduction, and
   extraction order
-- [`phase-B-plan.md`](./phase-B-plan.md) — current Phase B execution plan and
+- [`phase-B-plan.md`](../phase-B/phase-B-plan.md) — current Phase B execution plan and
   focused sprint-hardening sequence
+- [`phase-C-plan.md`](../phase-C/phase-C-plan.md) — Phase C interface-versioning,
+  shared-reporting, observability-maintenance, and queued portability planning
+  line
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and current plan touchpoint guide
+- [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
+  repo-local constraints for the shared HTML/XHTML/JSON reporting line
+- [`version-adoption.md`](./version-adoption.md) — authoritative consumer
+  adoption guide for the planned `sc-lint-version` interface-checking line
+- [`skill-authoring-constraints.md`](./skill-authoring-constraints.md) —
+  repo-local constraints for the `sc-lint-version` adoption skill
+- [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —
+  repo-local constraints for minimal marketplace publication of the adoption
+  skill
+<<<<<<< HEAD
+- [`../../.claude/skills/sc-lint-version-adoption/SKILL.md`](../../.claude/skills/sc-lint-version-adoption/SKILL.md) —
+  repo-local Claude Code skill for `sc-lint-version` consumer adoption
+- [`../../.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json) —
+  repo-local marketplace entry advertising the `sc-lint-version` adoption
+  skill package
 - [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
   decisions
-- [`sprint-A1a.md`](./sprint-A1a.md) — top-level CLI bootstrap and contract
+- [`../sc-lint-boundary/requirements.md`](../sc-lint-boundary/requirements.md) —
+  `sc-lint-boundary` crate requirements
+- [`../sc-lint-boundary/architecture.md`](../sc-lint-boundary/architecture.md) —
+  `sc-lint-boundary` crate architecture
+- [`../sc-lint-boundary/graph-schema.md`](../sc-lint-boundary/graph-schema.md) —
+  current graph/export contract and rule-id inventory
+- [`../sc-lint-boundary/boundary-enforcement-model.md`](../sc-lint-boundary/boundary-enforcement-model.md) —
+  planned warn/error escalation model for inventory-parity boundary
+  enforcement
+- [`../sc-lint-boundary/boundary-toml-migration.md`](../sc-lint-boundary/boundary-toml-migration.md) —
+  migration plan for moving canonical boundary data from Markdown-embedded
+  records to standalone TOML
+- [`../sc-lint-portability/requirements.md`](../sc-lint-portability/requirements.md) —
+  `sc-lint-portability` crate requirements
+- [`../sc-lint-portability/architecture.md`](../sc-lint-portability/architecture.md) —
+  `sc-lint-portability` crate architecture
+- [`../sc-lint-runtime/requirements.md`](../sc-lint-runtime/requirements.md) —
+  `sc-lint-runtime` crate requirements
+- [`../sc-lint-runtime/architecture.md`](../sc-lint-runtime/architecture.md) —
+  `sc-lint-runtime` crate architecture
+- [`../sc-lint-version/requirements.md`](../sc-lint-version/requirements.md) —
+  planned `sc-lint-version` crate requirements
+- [`../sc-lint-version/architecture.md`](../sc-lint-version/architecture.md) —
+  planned `sc-lint-version` crate architecture
+- [`sprint-A1a.md`](../phase-A/sprint-A1a.md) — top-level CLI bootstrap and contract
   definition sprint
-- [`sprint-A1b.md`](./sprint-A1b.md) — top-level config loading and first
+- [`sprint-A1b.md`](../phase-A/sprint-A1b.md) — top-level config loading and first
   backend integration sprint
-- [`sprint-A2.md`](./sprint-A2.md) — profiles and `xwin` sprint
-- [`sprint-A3.md`](./sprint-A3.md) — generic utility extraction sprint
-- [`sprint-A4.md`](./sprint-A4.md) — portability crate extraction sprint
-- [`sprint-A5.md`](./sprint-A5.md) — runtime crate extraction sprint
-- [`sprint-A6.md`](./sprint-A6.md) — Rust boundary inventory loader sprint
-- [`sprint-A7.md`](./sprint-A7.md) — manifest-policy and parity sprint
-- [`sprint-A8.md`](./sprint-A8.md) — per-tool user-guide sprint
-- [`sprint-B1.md`](./sprint-B1.md) — carry-forward lint-gate backlog and
+- [`sprint-A2.md`](../phase-A/sprint-A2.md) — profiles and `xwin` sprint
+- [`sprint-A3.md`](../phase-A/sprint-A3.md) — generic utility extraction sprint
+- [`sprint-A4.md`](../phase-A/sprint-A4.md) — portability crate extraction sprint
+- [`sprint-A5.md`](../phase-A/sprint-A5.md) — runtime crate extraction sprint
+- [`sprint-A6.md`](../phase-A/sprint-A6.md) — Rust boundary inventory loader sprint
+- [`sprint-A7.md`](../phase-A/sprint-A7.md) — manifest-policy and parity sprint
+- [`sprint-A8.md`](../phase-A/sprint-A8.md) — per-tool user-guide sprint
+- [`sprint-B1.md`](../phase-B/sprint-B1.md) — carry-forward lint-gate backlog and
   portability-scope hardening sprint
-- [`sprint-B2.md`](./sprint-B2.md) — named-caller allowlist enforcement sprint
-- [`sprint-B3.md`](./sprint-B3.md) — observability boundary-policy ADR sprint
-- [`sprint-B4.md`](./sprint-B4.md) — QA-process hardening sprint
-- [`sprint-B-homebrew.md`](./sprint-B-homebrew.md) — full Homebrew toolset
+- [`sprint-B2.md`](../phase-B/sprint-B2.md) — named-caller allowlist enforcement sprint
+- [`sprint-B3.md`](../phase-B/sprint-B3.md) — observability boundary-policy ADR sprint
+- [`sprint-B4.md`](../phase-B/sprint-B4.md) — QA-process hardening sprint
+- [`sprint-B-homebrew.md`](../phase-B/sprint-B-homebrew.md) — full Homebrew toolset
   distribution planning sprint
+- [`sprint-C1.md`](../phase-C/sprint-C1.md) — `sc-lint-version` policy and baseline
+  planning sprint
+- [`sprint-C2.md`](../phase-C/sprint-C2.md) — shared report-template pipeline planning
+  sprint
+- [`sprint-C3.md`](../phase-C/sprint-C3.md) — hard-fail version gate integration
+  planning sprint
+- [`sprint-C4.md`](../phase-C/sprint-C4.md) — consumer integration and skill design
+  planning sprint
+- [`sprint-C5.md`](../phase-C/sprint-C5.md) — minimal marketplace publication planning
+  for the adoption skill
+- [`sprint-C6.md`](../phase-C/sprint-C6.md) — production path-literal portability
+  parity sprint
+- [`sprint-C7.md`](../phase-C/sprint-C7.md) — broad environment-variable portability
+  sprint
+- [`sprint-C8.md`](../phase-C/sprint-C8.md) — shell invocation portability sprint
+- [`sprint-C9.md`](../phase-C/sprint-C9.md) — cross-platform `cfg` parity enforcement
+  sprint
+- [`sprint-C10.md`](../phase-C/sprint-C10.md) — `sc-observability` `1.1.0` adoption
+  sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
@@ -113,11 +169,24 @@ Current intended crate split:
   - AST parsing, graph construction, semantic boundary rule evaluation
 - `sc-lint-portability`
   - analyzer crate for shared OS/platform portability rules
+  - planned next shared follow-ons:
+    - production Unix-only and Windows-only path-literal checks
+    - broad production env-portability checks
+    - shell invocation portability checks
+    - structural `cfg(unix)` / `cfg(windows)` parity checks
 - `sc-lint-runtime`
   - analyzer crate for shared std runtime/concurrency rules
 - `sc-lint-tokio`
   - planned future analyzer crate for Tokio-specific rules
   - represented now as a reserved future boundary surface only
+- `sc-lint-version`
+  - planned future workspace crate for stable interface version checks and
+    canonical interface artifacts
+  - planned top-level invocation path:
+    - `sc-lint check interfaces`
+  - planned to start with `cargo-semver-checks` for Rust public APIs and
+    expand to CLI and transport surfaces while consuming a shared
+    `sc-compose`/Jinja reporting layer rather than owning HTML generation
 - `sc-lint-attributes`
   - proc-macro attribute crate
   - intentionally minimal at first
@@ -287,6 +356,8 @@ Current planned Phase-B follow-ons not implemented yet:
   - Windows-only path literal parity with the current Unix-only path checks
   - broader cross-platform environment-variable portability rules
   - shell-portability checks for OS-specific shell and command assumptions
+  - structural `cfg(unix)` / `cfg(windows)` parity enforcement for production
+    code
 
 Planned rule families not implemented yet:
 

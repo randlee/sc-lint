@@ -21,7 +21,7 @@ target: integration/phase-B
 
 ## Hard Dependencies
 
-- [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md)
+- [docs/phase-B/phase-B-plan.md](./phase-B-plan.md)
 - [docs/requirements.md](../requirements.md)
 - [docs/architecture.md](../architecture.md)
 - [release/publish-artifacts.toml](../../release/publish-artifacts.toml)

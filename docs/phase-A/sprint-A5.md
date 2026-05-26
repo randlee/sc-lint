@@ -147,7 +147,7 @@ one contained sprint and should not be split across two crates or two phases.
 ## Required Document Updates
 
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/sc-lint/README.md`
 - `docs/project-plan.md`

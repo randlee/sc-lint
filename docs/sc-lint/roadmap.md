@@ -128,12 +128,54 @@ Initial Phase-B scope is split into focused planning sprints:
 - `sprint-B-homebrew`
   - full Homebrew toolset distribution planning
 
-See [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md),
-[docs/sc-lint/sprint-B1.md](./sprint-B1.md),
-[docs/sc-lint/sprint-B2.md](./sprint-B2.md),
-[docs/sc-lint/sprint-B3.md](./sprint-B3.md), and
-[docs/sc-lint/sprint-B4.md](./sprint-B4.md), and
-[docs/sc-lint/sprint-B-homebrew.md](./sprint-B-homebrew.md).
+See [docs/phase-B/phase-B-plan.md](../phase-B/phase-B-plan.md),
+[docs/phase-B/sprint-B1.md](../phase-B/sprint-B1.md),
+[docs/phase-B/sprint-B2.md](../phase-B/sprint-B2.md),
+[docs/phase-B/sprint-B3.md](../phase-B/sprint-B3.md), and
+[docs/phase-B/sprint-B4.md](../phase-B/sprint-B4.md), and
+[docs/phase-B/sprint-B-homebrew.md](../phase-B/sprint-B-homebrew.md).
+
+### Phase C
+
+Phase `C` is the queued planning line after the current Phase `B` sequence.
+
+Initial Phase-C scope is:
+
+- `C.1`
+  - `sc-lint-version` policy and baseline definition
+  - initial `cargo-semver-checks` integration plan for Rust public APIs
+  - dedicated crate/form-factor, invocation command, and family-selection
+    configuration surface
+- `C.2`
+  - shared report-template pipeline planning
+  - XHTML fragment/report pattern with JSON sidecars as canonical machine data
+  - `sc-compose`/Jinja template direction and versioned CLI baseline artifact
+    workflow
+- `C.3`
+  - hard-fail version gate integration planning across Rust APIs, CLI contracts, and RPC/socket interfaces
+  - cargo-semver-checks ingestion into the shared verdict contract
+- `C.4`
+  - consuming-repo adoption guidance
+  - `docs/sc-lint/version-adoption.md` as the authoritative consumer guide
+  - `.claude/skills/sc-lint-version-adoption/SKILL.md` as the repo-local
+    adoption skill
+  - `docs/sc-lint/skill-authoring-constraints.md` as the authoritative
+    skill-design constraint doc for the adoption skill
+- `C.5`
+  - minimal marketplace publication planning for the adoption skill
+  - `.claude-plugin/marketplace.json`
+  - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
+- `C.6`
+  - production path-literal portability parity
+- `C.7`
+  - broad environment-variable portability
+- `C.8`
+  - shell invocation portability
+- `C.9`
+  - structural cross-platform `cfg` parity enforcement
+- `C.10`
+  - `sc-observability` `1.1.0` adoption, retained-log policy decision, and
+    `emit` -> `log` / `try_log` migration
 
 ### Current code moves required
 

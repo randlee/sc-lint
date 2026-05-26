@@ -22,6 +22,11 @@ The current project focus is:
   than growing catch-all backends
 - keeping consumer-specific policy lints local unless only their framework is
   worth extracting
+- planning stable interface version checks and shared report publication for
+  public APIs, CLI contracts, and transport surfaces
+- planning the next shared production portability follow-ons in
+  `sc-lint-portability`: production path literals, broad env portability,
+  shell invocation portability, and structural `cfg(unix)` parity
 - improving pre-CI developer confidence with cross-target compile checks where
   those checks can surface platform drift before a push
 - preserving CI and lint-runner parity during extraction
@@ -31,9 +36,9 @@ The current project focus is:
 - project roadmap
   - see [docs/sc-lint/roadmap.md](./sc-lint/roadmap.md)
 - boundary TOML migration plan
-  - see [docs/sc-lint/boundary-toml-migration.md](./sc-lint/boundary-toml-migration.md)
+  - see [docs/sc-lint-boundary/boundary-toml-migration.md](./sc-lint-boundary/boundary-toml-migration.md)
 - boundary enforcement model rollout
-  - see [docs/sc-lint/boundary-enforcement-model.md](./sc-lint/boundary-enforcement-model.md)
+  - see [docs/sc-lint-boundary/boundary-enforcement-model.md](./sc-lint-boundary/boundary-enforcement-model.md)
 - CLI requirements and contract
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
@@ -49,17 +54,18 @@ The current project focus is:
 - known issues inventory
   - see [docs/issues-inventory.md](./issues-inventory.md)
 - current phase execution plan
-  - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
-  - see [docs/sc-lint/phase-B-plan.md](./sc-lint/phase-B-plan.md)
-  - see [docs/sc-lint/sprint-A1a.md](./sc-lint/sprint-A1a.md)
-  - see [docs/sc-lint/sprint-A1b.md](./sc-lint/sprint-A1b.md)
-  - see [docs/sc-lint/sprint-A2.md](./sc-lint/sprint-A2.md)
-  - see [docs/sc-lint/sprint-A3.md](./sc-lint/sprint-A3.md)
-  - see [docs/sc-lint/sprint-A4.md](./sc-lint/sprint-A4.md)
-  - see [docs/sc-lint/sprint-A5.md](./sc-lint/sprint-A5.md)
-  - see [docs/sc-lint/sprint-A6.md](./sc-lint/sprint-A6.md)
-  - see [docs/sc-lint/sprint-A7.md](./sc-lint/sprint-A7.md)
-  - see [docs/sc-lint/sprint-A8.md](./sc-lint/sprint-A8.md)
+  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
+  - see [docs/phase-B/phase-B-plan.md](./phase-B/phase-B-plan.md)
+  - see [docs/phase-C/phase-C-plan.md](./phase-C/phase-C-plan.md)
+  - see [docs/phase-A/sprint-A1a.md](./phase-A/sprint-A1a.md)
+  - see [docs/phase-A/sprint-A1b.md](./phase-A/sprint-A1b.md)
+  - see [docs/phase-A/sprint-A2.md](./phase-A/sprint-A2.md)
+  - see [docs/phase-A/sprint-A3.md](./phase-A/sprint-A3.md)
+  - see [docs/phase-A/sprint-A4.md](./phase-A/sprint-A4.md)
+  - see [docs/phase-A/sprint-A5.md](./phase-A/sprint-A5.md)
+  - see [docs/phase-A/sprint-A6.md](./phase-A/sprint-A6.md)
+  - see [docs/phase-A/sprint-A7.md](./phase-A/sprint-A7.md)
+  - see [docs/phase-A/sprint-A8.md](./phase-A/sprint-A8.md)
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
@@ -94,39 +100,39 @@ The currently scheduled sprint plans are:
 - `A.1a`
   - CLI bootstrap and contract definition
   - includes the A.1a exit-review checkpoint for Workstreams 4-7
-  - `docs/sc-lint/sprint-A1a.md`
+  - `docs/phase-A/sprint-A1a.md`
 - `A.1b`
   - config loading and first backend integration
   - first operational path is `sc-lint lint sc-boundary`
-  - `docs/sc-lint/sprint-A1b.md`
+  - `docs/phase-A/sprint-A1b.md`
 - `A.2`
   - profiles and Windows preflight
   - active implementation branch: `feature/sprint-A2`
-  - `docs/sc-lint/sprint-A2.md`
+  - `docs/phase-A/sprint-A2.md`
 - `A.3`
   - generic utility extraction
   - active implementation branch: `feature/sprint-A3`
-  - `docs/sc-lint/sprint-A3.md`
+  - `docs/phase-A/sprint-A3.md`
 - `A.4`
   - `sc-lint-portability` crate creation and portability-rule moves/imports
   - current status: complete
-  - `docs/sc-lint/sprint-A4.md`
+  - `docs/phase-A/sprint-A4.md`
 - `A.5`
   - `sc-lint-runtime` crate creation and runtime-rule imports
   - active implementation branch: `feature/sprint-A5`
-  - `docs/sc-lint/sprint-A5.md`
+  - `docs/phase-A/sprint-A5.md`
 - `A.6`
   - Rust boundary inventory loading, schema validation, and duplicate handling
   - active implementation branch: `feature/sprint-A6`
-  - `docs/sc-lint/sprint-A6.md`
+  - `docs/phase-A/sprint-A6.md`
 - `A.7`
   - Rust manifest-policy enforcement and Python parity window
   - active implementation branch: `feature/sprint-A7`
-  - `docs/sc-lint/sprint-A7.md`
+  - `docs/phase-A/sprint-A7.md`
 - `A.8`
   - per-tool user guides and rule-disable documentation
   - active implementation branch: `feature/sprint-A8`
-  - `docs/sc-lint/sprint-A8.md`
+  - `docs/phase-A/sprint-A8.md`
 - `B.1`
   - carry-forward lint-gate and portability-scope hardening
   - active implementation branch: `feature/sprint-B1`
@@ -137,23 +143,70 @@ The currently scheduled sprint plans are:
   - explicit backlog planning for shared portability follow-ons in
     `sc-lint-portability`: Windows-path parity, broader env portability, and
     shell portability
-  - `docs/sc-lint/sprint-B1.md`
+  - `docs/phase-B/sprint-B1.md`
 - `B.2`
   - named-caller allowlist enforcement in `sc-lint-boundary`
-  - `docs/sc-lint/sprint-B2.md`
+  - `docs/phase-B/sprint-B2.md`
 - `B.3`
   - observability boundary-policy ADR acceptance, including promotion of
     `ADR-009` from stub to accepted policy text plus boundary/planning
     alignment for the approved CLI-owned observability seams
-  - `docs/sc-lint/sprint-B3.md`
+  - `docs/phase-B/sprint-B3.md`
 - `B.4`
   - QA-process hardening
   - triage-first fix routing plus regression-tested TODO/carry-forward tooling
-  - `docs/sc-lint/sprint-B4.md`
+  - `docs/phase-B/sprint-B4.md`
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew toolset distribution planning
   - sprint number intentionally pending
-  - `docs/sc-lint/sprint-B-homebrew.md`
+  - `docs/phase-B/sprint-B-homebrew.md`
+- `C.1`
+  - `sc-lint-version` policy and baseline definition
+  - dedicated crate/form-factor, invocation command, and family-selection
+    configuration surface
+  - `docs/phase-C/sprint-C1.md`
+- `C.2`
+  - shared report-template pipeline
+  - versioned CLI baseline artifact schema, `sc-compose`/Jinja template
+    direction, and generation workflow
+  - `docs/phase-C/sprint-C2.md`
+- `C.3`
+  - hard-fail version gate integration
+  - cargo-semver-checks ingestion and multi-family verdict wiring
+  - `docs/phase-C/sprint-C3.md`
+- `C.4`
+  - consumer integration and skill design
+  - `docs/sc-lint/version-adoption.md`
+  - `.claude/skills/sc-lint-version-adoption/SKILL.md`
+  - `docs/phase-C/sprint-C4.md`
+- `C.5`
+  - minimal marketplace publication for the adoption skill
+  - `.claude-plugin/marketplace.json`
+  - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
+  - `docs/phase-C/sprint-C5.md`
+- `C.6`
+  - production path-literal portability parity
+  - `PORT-006` Unix-only absolute path literals in production code
+  - `PORT-007` Windows-only absolute path literals in production code
+  - `docs/phase-C/sprint-C6.md`
+- `C.7`
+  - broad environment-variable portability
+  - `PORT-008` production `HOME`, `USER`, and `XDG_*` portability checks
+  - `docs/phase-C/sprint-C7.md`
+- `C.8`
+  - shell invocation portability
+  - `PORT-009` production `sh`/`bash` and `/bin/sh` shell assumption checks
+  - `docs/phase-C/sprint-C8.md`
+- `C.9`
+  - cross-platform `cfg` parity enforcement
+  - `PORT-010` production `#[cfg(unix)]` companion-parity checks
+  - `docs/phase-C/sprint-C9.md`
+- `C.10`
+  - `sc-observability` `1.1.0` adoption
+  - retained-log policy enablement plus typestate, supported `emit(...)`
+    compatibility, and Windows-rotation compatibility review for the CLI-owned
+    logging seam
+  - `docs/phase-C/sprint-C10.md`
 
 ## Recent Sprint Deltas
 
@@ -194,10 +247,18 @@ The next planned tool crates after the current line are:
 - `sc-lint-tokio`
   - planned crate reservation only for now
   - no initial implementation scope until Tokio-specific rules justify it
+- `sc-lint-version`
+  - planned dedicated interface-versioning crate
+  - governing sprint sequence:
+    - `C.1`
+    - `C.2`
+    - `C.3`
+    - `C.4`
+    - `C.5`
 
 ## Release 1 Target
 
-Release `0.1.x` should establish:
+Release `0.2.x` should establish:
 
 - a stable repo-local development and CI gate
 - canonical TOML boundaries for the repo's own tool surfaces
@@ -236,6 +297,10 @@ Phase `A` completed the release-1 foundation implementation line. Phase `B` is
 the current planning and hardening line for post-Phase-A defect prevention,
 follow-on feature work, and release/distribution planning. That does not imply
 that every release-1 follow-on item is already complete.
+
+Phase `C` is now the next queued planning line after the current Phase `B`
+sequence. It covers `sc-lint-version`, the shared reporting pipeline it
+consumes, and multi-surface breaking-change detection.
 
 ## Planning Conventions
 

@@ -10,8 +10,9 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
 - [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 
-For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
+For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
 
 ## Architecture Goals
@@ -37,6 +38,84 @@ The product is organized into five layers:
 4. structured boundary definitions and planning metadata
 5. repo-local development/CI automation
 
+## Planned Interface Versioning Layer
+
+The next planned product capability after the current Phase `B` line is
+`sc-lint-version`, which treats stable interfaces as versioned artifacts
+rather than relying on prose release notes alone.
+
+That planned capability spans three interface families:
+
+- Rust public APIs for all shipped crates
+- stable top-level CLI commands and machine contracts
+- RPC/socket interfaces when such surfaces exist
+
+The intended interface-artifact model is:
+
+- structured canonical interface data
+- JSON sidecars as the machine-readable source of truth
+- artifact metadata sufficient for a shared report pipeline to publish:
+  - main HTML reports
+  - separate XHTML section fragments/panels for section-level deep context
+  - built-in per-panel copy actions for canonical JSON payload and canonical
+    context text
+
+The current Phase `C` planning decision is that `sc-lint-version` is a
+dedicated planned workspace crate invoked from the top-level CLI through
+`sc-lint check interfaces`.
+
+Configured interface families are selected through `[version.families]` in
+`sc-lint` config. Omitted family tables are outside the run; configured
+families with no matching current repo surface remain visible as
+`not_present`.
+
+For the Rust public API family, `sc-lint-version` is planned to own one
+translation layer that consumes `cargo-semver-checks` machine-readable output
+and exit-status semantics into the shared multi-family verdict contract.
+
+## Planned Shared Reporting Layer
+
+Phase `C` also plans one shared report-publishing layer consumed by
+`sc-lint-version` and intended to be reusable by future non-lint report
+surfaces.
+
+That shared layer is intentionally planned as template- and schema-driven
+output, not as a collection of hand-maintained HTML pages.
+
+The preferred ownership target for the reusable reporting layer is the
+`sc-compose` repo, potentially as a dedicated `sc-reporting` capability,
+because the same XHTML-panel conventions are expected to serve:
+
+- public API reports
+- CLI contract reports
+- ICD-style RPC/socket reports
+- later smoke, integration, DB/query, and state-machine reports
+
+The planned report workflow uses:
+
+- structured canonical data from the producing feature
+- `sc-compose render`
+- Jinja (`.j2`) templates
+- one canonical JSON sidecar
+- one main HTML report
+- separate XHTML panels with mandatory copy controls
+
+Template selection and override are planned under
+`[reporting.templates.<report_kind>]` in `sc-lint` config so consumers can
+adopt repo-local template variants without forking the producing feature.
+
+Consumer adoption for this layer is also planned as a product surface:
+
+- one clear adoption document for consuming repos covering harness, fixture,
+  simulator/transcript, and normalization responsibilities
+- one repo-local Claude Code skill that explains the adoption workflow
+- one minimal repo-local marketplace entry that advertises that skill
+- separate planning closures for the skill-design surface and the marketplace
+  publication surface
+- consuming repos should leverage existing CLI testability and simulator
+  infrastructure where available instead of rebuilding custom interface
+  exercisers
+
 ## Current and Planned Crates
 
 Current primary crates:
@@ -58,6 +137,12 @@ Current primary crates:
 
 Planned later crate:
 
+- `sc-lint-version`
+  - planned dedicated workspace crate for multi-family interface versioning
+    and baseline artifacts
+  - governed by the Phase `C.1` through `C.5` sprint sequence
+  - out of current implementation scope until the Phase `C` versioning line
+    moves from planning into execution
 - `sc-lint-tokio`
   - reserved home for Tokio-specific async/runtime lint rules when Tokio-specific
     dependencies or semantics justify a dedicated crate
@@ -154,7 +239,7 @@ Allowed shared support:
 - `sc-lint-schema`
 - future shared support crates only after explicit design approval
 
-For release `0.1.x`, this means:
+For release `0.2.x`, this means:
 
 - `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-directives` when shared directive parsing/types are needed
@@ -191,7 +276,7 @@ Those seams exist so command identity, service identity, and event metadata can
 cross the library/binary split without exposing `sc-observability` runtime
 types from backend crates or backend public APIs.
 
-Release `0.1.x` observability dependency policy is:
+Release `0.2.x` observability dependency policy is:
 
 - the mixed lib+bin `sc-lint` package may keep `sc-observability` in
   `[dependencies]`
@@ -201,6 +286,18 @@ Release `0.1.x` observability dependency policy is:
 - future direct-linked backends may reuse CLI-owned context and contract data,
   but must not own logger initialization or introduce alternative event-entry
   wrappers without a new ADR
+
+The completed Phase `C.10` maintenance line kept this seam list intact while
+moving the CLI package to `sc-observability` `1.1.0`. That maintenance scope
+was limited to:
+
+- typestate-compatible logger construction and shutdown
+- confirmation that direct top-level `emit(...)` call sites remain on the
+  supported `Logger<Running>` public API in `1.1.0`
+- one explicit retained-log policy decision, with rotation/pruning/background
+  maintenance owned by the logger through `RetainedLogPolicy::default()`
+- one explicit no decision on `sc-observe` adoption that remains subordinate
+  to the existing CLI-owned boundary policy
 
 ### Rule-family distribution
 
@@ -225,6 +322,8 @@ Current intended distribution is:
     - Windows-only path literal parity companion rules
     - broader environment-variable portability rules
     - shell portability rules for OS-specific shell and command assumptions
+    - structural `cfg(unix)` / `cfg(windows)` parity enforcement for
+      production code
   - consumer-specific portability wrappers remain out of this crate unless they
     are generalized into shared product rules
 - `sc-lint-runtime`
@@ -331,7 +430,7 @@ planned top-level CLI surface should also name these important contract types:
 These types are part of the intended architectural contract, and for the
 A.1b/A.2 line they already match the implemented CLI crate surfaces.
 
-For release `0.1.x`, these planned CLI contract types should also be carried in
+For release `0.2.x`, these planned CLI contract types should also be carried in
 machine-readable boundary/planning metadata as `BOUNDARY-ScLintCli`
 composition-root items so future inventory-parity work can reason about them
 mechanically.
@@ -367,13 +466,13 @@ These provide:
 - external tool wrapping
 - Python-based utilities that are not yet migrated to Rust
 
-For release `0.1.x`, these repo-local automation/profile surfaces remain
+For release `0.2.x`, these repo-local automation/profile surfaces remain
 documented product surfaces but are intentionally out of boundary inventory
 enforcement scope unless later modeled as explicit boundary records.
 
 ## Release Distribution
 
-For release `0.1.x`, release packaging and distributor updates should remain
+For release `0.2.x`, release packaging and distributor updates should remain
 driven by one canonical manifest surface:
 
 - `release/publish-artifacts.toml`
@@ -502,7 +601,7 @@ For this repo, that gate should exercise:
 Advisory/manual targets may remain outside the default gate only when they are
 not yet stable enough for routine development use.
 
-For release `0.1.x`, the intended architecture is that this repo self-hosts
+For release `0.2.x`, the intended architecture is that this repo self-hosts
 its own analyzer checks through the default development gate wherever those
 checks are stable.
 
@@ -527,19 +626,23 @@ The architecture should not require:
 - current extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - current phase execution plan
-  - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
+  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
 - CLI-specific architecture
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
 - CLI-specific contract
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - graph/export contract
-  - see [docs/sc-lint/graph-schema.md](./sc-lint/graph-schema.md)
+  - see [docs/sc-lint-boundary/graph-schema.md](./sc-lint-boundary/graph-schema.md)
 - structured boundary definitions ADR
   - see [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](./sc-lint/adr/ADR-004-structured-boundary-definitions.md)
 - CLI/profile/xwin execution-model ADR
   - see [docs/sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md](./sc-lint/adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - AI-first CLI contract ADR
   - see [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
+- portability scope and parity ADR
+  - see [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- interface versioning and published artifacts ADR
+  - see [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 
 ## Architecture Management
 

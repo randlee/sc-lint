@@ -10,6 +10,7 @@ use anyhow::Result;
 use cargo_metadata::MetadataCommand;
 use proc_macro2::Span;
 use syn::Attribute;
+use syn::Ident;
 use syn::Item;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -231,6 +232,14 @@ pub(crate) fn item_name_hint_is_tests(item: &Item) -> Option<bool> {
     match item {
         Item::Fn(item_fn) => Some(item_fn.sig.ident == "tests"),
         Item::Mod(item_mod) => Some(item_mod.ident == "tests"),
+        _ => None,
+    }
+}
+
+pub(crate) fn item_identifier(item: &Item) -> Option<&Ident> {
+    match item {
+        Item::Fn(item_fn) => Some(&item_fn.sig.ident),
+        Item::Mod(item_mod) => Some(&item_mod.ident),
         _ => None,
     }
 }

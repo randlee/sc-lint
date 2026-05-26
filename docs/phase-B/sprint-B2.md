@@ -17,9 +17,9 @@ target: integration/phase-B
 
 ## Hard Dependencies
 
-- [docs/sc-lint/sprint-B1.md](./sprint-B1.md)
+- [docs/phase-B/sprint-B1.md](./sprint-B1.md)
 - [docs/requirements.md](../requirements.md), especially `REQ-PRODUCT-018`
-- [docs/sc-lint/requirements.md](./requirements.md), especially `REQ-SCB-006`, `REQ-SCB-007`, and `REQ-SCB-011`
+- [docs/sc-lint-boundary/requirements.md](../sc-lint-boundary/requirements.md), especially `REQ-SCB-006`, `REQ-SCB-007`, and `REQ-SCB-011`
 - [boundaries/sc-lint-boundary/boundary-analyzer.toml](../../boundaries/sc-lint-boundary/boundary-analyzer.toml)
 - the landed TOML inventory loader and `syn`-backed reference graph in `sc-lint-boundary`
 
@@ -31,8 +31,8 @@ target: integration/phase-B
 - `crates/sc-lint-boundary/src/main.rs`
 - `crates/sc-lint-boundary/src/tests.rs`
 - `crates/sc-lint-boundary/README.md`
-- `docs/sc-lint/boundary-enforcement-model.md`
-- `docs/sc-lint/phase-B-plan.md`
+- `docs/sc-lint-boundary/boundary-enforcement-model.md`
+- `docs/phase-B/phase-B-plan.md`
 
 ## Deliverables
 
@@ -172,7 +172,7 @@ fn caller_is_exempt(
 - `sc-lint-boundary analyze --format text` and `--format json` both surface
   `SCB-CALLER-001` through the existing analysis command path
 - `crates/sc-lint-boundary/README.md` and
-  `docs/sc-lint/boundary-enforcement-model.md` both include one canonical
+  `docs/sc-lint-boundary/boundary-enforcement-model.md` both include one canonical
   approved-caller example plus operator guidance on how it differs from
   `references.forbidden`
 

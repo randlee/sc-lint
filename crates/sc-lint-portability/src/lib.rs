@@ -11,6 +11,7 @@ use serde::Serializer;
 use thiserror::Error;
 
 mod portability;
+mod predicates;
 mod render;
 mod source_scan;
 #[cfg(test)]
@@ -29,12 +30,18 @@ pub type FindingsReport = sc_lint_schema::FindingsReport<RuleId>;
 pub type Finding = sc_lint_schema::Finding<RuleId>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum RuleId {
     Port001,
     Port002,
     Port003,
     Port004,
     Port005,
+    Port006,
+    Port007,
+    Port008,
+    Port009,
+    Port010,
 }
 
 impl RuleId {
@@ -45,6 +52,11 @@ impl RuleId {
             Self::Port003 => "PORT-003",
             Self::Port004 => "PORT-004",
             Self::Port005 => "PORT-005",
+            Self::Port006 => "PORT-006",
+            Self::Port007 => "PORT-007",
+            Self::Port008 => "PORT-008",
+            Self::Port009 => "PORT-009",
+            Self::Port010 => "PORT-010",
         }
     }
 }
@@ -58,13 +70,13 @@ impl Serialize for RuleId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{0}")]
-pub struct PortabilityErrorSource(Box<str>);
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct PortabilityErrorSource(Box<dyn std::error::Error + Send + Sync>);
 
 impl From<anyhow_crate::Error> for PortabilityErrorSource {
     fn from(value: anyhow_crate::Error) -> Self {
-        Self(value.to_string().into_boxed_str())
+        Self(value.into())
     }
 }
 

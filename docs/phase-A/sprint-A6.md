@@ -65,10 +65,10 @@ item semantics can stabilize independently.
 - `crates/sc-lint-boundary/`
 - `boundaries/`
 - `.just/tests/`
-- `docs/sc-lint/boundary-toml-migration.md`
-- `docs/sc-lint/boundary-enforcement-model.md`
+- `docs/sc-lint-boundary/boundary-toml-migration.md`
+- `docs/sc-lint-boundary/boundary-enforcement-model.md`
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/project-plan.md`
 
 ## Sub-Tasks
@@ -150,10 +150,10 @@ normalization through `CommandEnvelope<T>` or `CliError`.
 
 ## Required Document Updates
 
-- `docs/sc-lint/boundary-toml-migration.md`
-- `docs/sc-lint/boundary-enforcement-model.md`
+- `docs/sc-lint-boundary/boundary-toml-migration.md`
+- `docs/sc-lint-boundary/boundary-enforcement-model.md`
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/project-plan.md`
 
 ## Risks And Watchouts

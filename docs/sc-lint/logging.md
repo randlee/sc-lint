@@ -11,12 +11,16 @@ Related ADRs:
 
 Use `sc-observability` as the logging-only runtime for the top-level CLI and
 its delegated backend calls without turning logging initialization into a
-backend-owned concern. Satisfies `REQ-LOG-001` and `REQ-LOG-005`.
+backend-owned concern. The release-line design and queued maintenance
+direction satisfy `REQ-LOG-001` through `REQ-LOG-009`.
 
 This document defines both the logging design and the sprint-level
-implementation assignments for Phase `A`. The A.1a bootstrap implementation is
-now present in `crates/sc-lint/src/logging.rs`; A.1b extends that same
-CLI-owned runtime with dispatch-seam logging for the first real backend path.
+implementation assignments for Phase `A`, plus the completed Phase `C.10`
+maintenance line. The A.1a bootstrap implementation is now present in
+`crates/sc-lint/src/logging.rs`; A.1b extends that same CLI-owned runtime with
+dispatch-seam logging for the first real backend path, and `C.10` records the
+supported `sc-observability` `1.1.0` maintenance decisions without changing
+seam ownership.
 
 ADR-009 now governs the accepted observability boundary seams layered on top of
 ADR-008. This document therefore treats the following current seams as locked
@@ -26,6 +30,17 @@ release-1 policy rather than provisional implementation detail:
 - `logging::dispatch_event`
 - `contract::ServiceName`
 - `CommandEnvelope.command`
+
+Phase `C.10` extended this design to the supported `sc-observability` `1.1.0`
+release without changing those ownership seams. The `0.2.x` decisions are now:
+
+- retained-log maintenance is enabled through logger-owned
+  `RetainedLogPolicy` defaults rather than wrapper-owned cleanup logic
+- all current CLI event sites remain on the supported `emit(...)` path exposed
+  by `Logger<Running>` in `sc-observability` `1.1.0`
+- `sc-observe` is not adopted in the CLI path for `0.2.x`; direct
+  `sc-observability` remains required for logger construction, file-sink
+  policy, and health/query support
 
 ## Dependency Model
 
@@ -46,11 +61,10 @@ The planned dependency is:
 
 The design depends on the following public surface:
 
-- `LoggerBuilder`
 - `LoggerConfig`
-- `JsonlFileSink`
-- `ConsoleSink`
 - `ServiceName`
+- `RetainedLogPolicy`
+- `Logger::emit`
 
 The accepted boundary translation seam is:
 
@@ -76,6 +90,17 @@ Planned implementation note:
     - `sc-runtime`
   - remaining bootstrap-only command paths
     - `sc-lint`
+
+`1.1.0` maintenance note:
+
+- the supported dependency line moves from `sc-observability` `1.0.0` to
+  `1.1.0`
+- retained-log rotation/pruning/background maintenance stays enabled through
+  `LoggerConfig::default_for(...)`, which already carries
+  `RetainedLogPolicy::default()` and therefore keeps maintenance logger-owned
+- the supported event-emission path for `1.1.0` remains direct `emit(...)` on
+  the CLI-owned logger because `Logger<Running>` does not expose `try_log` or
+  `log` in this release line
 
 ## Initialization Model
 
@@ -193,9 +218,9 @@ Planned implementation note:
 - represent the validated effective log root as a dedicated `LogRoot`
   wrapper/newtype at the CLI config boundary rather than passing a raw
   `String` through multiple modules
-- the A.1a implementation applies the service name to the resolved root so
-  `--log-root <path>` becomes:
-  - `<path>/<service-name>/`
+- the A.1a implementation resolves one base log root and lets the built-in
+  logger file sink place the active file at:
+  - `<log_root>/logs/<service>.log.jsonl`
 
 ## Sink Model
 
@@ -207,25 +232,39 @@ Requirement coverage:
 
 File logging is on by default.
 
-`sc-lint` should use `LoggerBuilder` rather than `Logger::new(...)` for the
-default path, because the desired service-scoped directory layout is:
+Release `0.2.x` now uses the built-in logger-owned file sink so retained-log
+rotation, pruning, and background maintenance stay attached to
+`LoggerConfig.retained_log_policy`.
 
-- `~/sc-lint/logs/<service-name>/`
+The current retained-log defaults are:
 
-while `LoggerConfig::default_for(...)` plus the built-in sink would otherwise
-resolve the active file path relative to the provided root as:
+- rotate the active file at `64 MiB`
+- keep `10` rotated files beside the active file
+- retain rotated files for `7` days
+- run maintenance every `60` seconds
+- allow up to `5` seconds for maintenance shutdown join
+- leave `maintenance_max_work_per_pass` unset
+
+The active file path is:
 
 - `<log_root>/logs/<service>.log.jsonl`
 
-The planned integration is therefore:
+The default root is:
 
-1. build `LoggerConfig`
-2. disable the built-in file sink
-3. register one `JsonlFileSink` explicitly at a service-scoped path inside the
-   chosen root directory
+- `~/sc-lint`
 
-This preserves the requested directory model without requiring backend-local
-logger setup.
+That yields the default active file path:
+
+- `~/sc-lint/logs/<service>.log.jsonl`
+
+Windows compatibility note:
+
+- `0.2.x` keeps retained-log rotation enabled on Windows through the same
+  library-owned JSONL file sink and maintenance runtime as Unix-like systems
+- `sc-lint` does not add wrapper-owned rename, pruning, or cleanup code on top
+  of that runtime, so Windows behavior stays aligned with the upstream
+  `sc-observability` `1.1.0` file-maintenance implementation rather than a
+  repo-local fork
 
 ### Console Sink
 
@@ -239,7 +278,7 @@ Planned controls:
   - `logging.console`
 
 When enabled, the A.1a bootstrap turns on
-`LoggerConfig.enable_console_sink` before `LoggerBuilder::new(...)`. Later
+`LoggerConfig.enable_console_sink` before logger construction. Later
 sprints should preserve the same CLI surface unless explicit per-sink
 filtering becomes necessary.
 

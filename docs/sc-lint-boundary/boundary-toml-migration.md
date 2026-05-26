@@ -1,7 +1,7 @@
 # Boundary TOML Migration Plan
 
 Related ADR:
-- [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
+- [`../sc-lint/adr/ADR-004-structured-boundary-definitions.md`](../sc-lint/adr/ADR-004-structured-boundary-definitions.md)
 
 Related requirements:
 - [`./requirements.md`](./requirements.md)

@@ -53,6 +53,14 @@ For release `0.1.x`, the CLI may satisfy that role through a mix of:
 The stable contract is the top-level envelope and command surface, not the
 dispatch mechanism used behind it.
 
+Planned Phase `C` note:
+
+- `sc-lint check interfaces` is treated as a business-verdict command
+- a completed comparison remains a top-level `CommandEnvelope<T>` result even
+  when the nested verdict reports breaking changes
+- `CliError` remains reserved for execution/config/protocol failures rather
+  than the detected-breaking-change verdict itself
+
 ## Dispatch Principles
 
 - backend crates remain self-contained
@@ -76,6 +84,8 @@ Planned direct platform-aware command family:
 
 - `check`
   - native or cross-target compile checks
+  - later planned Phase `C` interface-versioning entry:
+    - `sc-lint check interfaces`
 - `clippy`
   - native or cross-target clippy runs
 

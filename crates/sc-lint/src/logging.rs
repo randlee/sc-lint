@@ -3,18 +3,15 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use sc_observability::ActionName;
-use sc_observability::JsonlFileSink;
 use sc_observability::Level;
 use sc_observability::LogEvent;
 use sc_observability::Logger;
-use sc_observability::LoggerBuilder;
 use sc_observability::LoggerConfig;
 use sc_observability::OBSERVATION_ENVELOPE_VERSION;
 use sc_observability::OutcomeLabel;
 use sc_observability::ProcessIdentity;
 use sc_observability::SchemaVersion;
-use sc_observability::ServiceName;
-use sc_observability::SinkRegistration;
+use sc_observability::ServiceName as ObservabilityServiceName;
 use sc_observability::TargetCategory;
 use sc_observability::Timestamp;
 use serde_json::Map;
@@ -32,7 +29,6 @@ const FIELD_MANIFEST_POLICY_MODE: &str = "manifest_policy_mode";
 const FIELD_MANIFEST_POLICY_PARITY: &str = "manifest_policy_parity";
 const FIELD_PREFLIGHT_MODE: &str = "preflight_mode";
 const FIELD_REPO_ROOT: &str = "repo_root";
-const FIELD_SUMMARY: &str = "summary";
 const FIELD_TARGET_TRIPLE: &str = "target_triple";
 use crate::Cli;
 use crate::CliError;
@@ -49,18 +45,14 @@ pub(crate) struct ObservedCommand<'a> {
 }
 
 impl<'a> ObservedCommand<'a> {
-    #[expect(
-        clippy::result_large_err,
-        reason = "The binary logging seam preserves the same top-level CliError contract as the library execution path."
-    )]
     pub(crate) fn from_context(
         context: &'a CommandContext,
         loaded_config: &'a LoadedConfig,
-    ) -> Result<Self, CliError> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             context,
             loaded_config,
-        })
+        }
     }
 
     fn command_id(&self) -> &str {
@@ -71,9 +63,9 @@ impl<'a> ObservedCommand<'a> {
         self.context.service_name()
     }
 
-    fn observability_service_name(&self) -> ServiceName {
-        ServiceName::new(self.service_name())
-            .expect("command contexts only produce valid static observability service names")
+    fn observability_service_name(&self) -> Result<ObservabilityServiceName, &'static str> {
+        ObservabilityServiceName::new(self.service_name())
+            .map_err(|_| "invalid static observability service name")
     }
 
     fn summary(&self) -> &'static str {
@@ -102,15 +94,8 @@ impl LogRoot {
             None => default_log_base()?,
         };
 
-        Ok(Self(base.join(service_name)))
-    }
-
-    fn service_root(&self) -> &PathBuf {
-        &self.0
-    }
-
-    fn active_log_path(&self, service_name: &str) -> PathBuf {
-        self.0.join(format!("{service_name}.log.jsonl"))
+        let _ = service_name;
+        Ok(Self(base))
     }
 }
 
@@ -131,24 +116,13 @@ pub(crate) fn initialize_logger(
         observed.service_name(),
     )?;
     let mut config = LoggerConfig::default_for(
-        observed.observability_service_name(),
-        log_root.service_root().clone(),
+        observed
+            .observability_service_name()
+            .map_err(CliError::internal)?,
+        log_root.0.clone(),
     );
-    let rotation = config.rotation;
-    let retention = config.retention;
-    config.enable_file_sink = false;
     config.enable_console_sink = observed.loaded_config().logging_console();
-
-    let mut builder = LoggerBuilder::new(config).map_err(classify_logger_init_error)?;
-    builder.register_sink(SinkRegistration::new(std::sync::Arc::new(
-        JsonlFileSink::new(
-            log_root.active_log_path(observed.service_name()),
-            rotation,
-            retention,
-        ),
-    )));
-
-    Ok(builder.build())
+    Logger::new(config).map_err(classify_logger_init_error)
 }
 
 pub(crate) fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
@@ -241,7 +215,7 @@ pub(crate) fn log_completion(
 ) {
     let mut fields = base_fields(observed);
     fields.insert(
-        FIELD_SUMMARY.to_string(),
+        consts::FIELD_SUMMARY.to_string(),
         Value::String(summary.to_string()),
     );
     fields.insert(
@@ -306,7 +280,7 @@ pub(crate) fn flush(logger: &Logger) {
     let _ = logger.flush();
 }
 
-pub(crate) fn shutdown(logger: &Logger) {
+pub(crate) fn shutdown(logger: Logger) {
     let _ = logger.shutdown();
 }
 
@@ -348,7 +322,9 @@ fn build_event(
         version: schema_version().map_err(CliError::internal)?.clone(),
         timestamp: Timestamp::now_utc(),
         level,
-        service: observed.observability_service_name(),
+        service: observed
+            .observability_service_name()
+            .map_err(CliError::internal)?,
         target: command_target().map_err(CliError::internal)?.clone(),
         action: action.map_err(CliError::internal)?,
         message: message.map(ToString::to_string),
@@ -370,20 +346,20 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
             FIELD_COMMAND.to_string(),
             Value::String(observed.command_id().to_string()),
         ),
-        (FIELD_SUMMARY.to_string(), json!(observed.summary())),
+        (consts::FIELD_SUMMARY.to_string(), json!(observed.summary())),
     ]);
     if observed.context.is_xwin_preflight() {
         fields.insert(FIELD_PREFLIGHT_MODE.to_string(), json!("xwin"));
         fields.insert(FIELD_TARGET_TRIPLE.to_string(), json!(WINDOWS_XWIN_TARGET));
     }
     if let Some(adapter_kind) = observed.context.adapter_kind() {
-        fields.insert("adapter".to_string(), json!(adapter_kind));
+        fields.insert(consts::FIELD_ADAPTER.to_string(), json!(adapter_kind));
     }
     if let Some(config_scope) = observed.context.adapter_config_scope() {
-        fields.insert("config_scope".to_string(), json!(config_scope));
+        fields.insert(consts::FIELD_CONFIG_SCOPE.to_string(), json!(config_scope));
     }
     if let Some(script) = observed.context.adapter_script() {
-        fields.insert("script".to_string(), json!(script));
+        fields.insert(consts::FIELD_SCRIPT.to_string(), json!(script));
     }
     if observed.command_id() == consts::CMD_BOUNDARY {
         fields.insert(FIELD_MANIFEST_POLICY_MODE.to_string(), json!("rust-native"));
@@ -527,7 +503,7 @@ fn elapsed_ms(elapsed: Duration) -> u64 {
 )]
 fn default_log_base() -> Result<PathBuf, CliError> {
     home_directory()
-        .map(|home| home.join(consts::SERVICE_NAME).join("logs"))
+        .map(|home| home.join(consts::SERVICE_NAME))
         .ok_or_else(|| {
             CliError::capability("could not resolve the current user's home directory for logging")
                 .with_suggested_action(
@@ -551,9 +527,13 @@ fn home_directory() -> Option<PathBuf> {
                 )))
             })
     }
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     {
         std::env::var_os("HOME").map(PathBuf::from)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        None
     }
 }
 
@@ -561,6 +541,9 @@ fn classify_logger_init_error<E>(error: E) -> CliError
 where
     E: std::fmt::Display,
 {
+    // Third-party init errors do not currently expose stable typed categories,
+    // so this classifier intentionally uses message heuristics to preserve the
+    // existing CliError contract without forking the upstream error model.
     let message = error.to_string().to_ascii_lowercase();
     if contains_config_signal(&message) {
         return CliError::config("failed to initialize the structured logger")

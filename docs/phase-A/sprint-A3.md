@@ -65,7 +65,7 @@ standalone fixture coverage.
 - `crates/sc-lint/`
 - `.just/`
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/README.md`
 - `docs/project-plan.md`
@@ -179,7 +179,7 @@ extraction.
 ## Required Document Updates
 
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/project-plan.md`
 - `docs/sc-lint/README.md`
 

@@ -20,16 +20,16 @@ target: integration/phase-B
 
 ## Hard Dependencies
 
-- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./adr/ADR-008-sc-observability-logging.md)
-- [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./adr/ADR-009-observability-boundary-policy.md)
-- [docs/sc-lint/logging.md](./logging.md)
-- [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md)
+- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](../sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](../sc-lint/adr/ADR-009-observability-boundary-policy.md)
+- [docs/sc-lint/logging.md](../sc-lint/logging.md)
+- [docs/phase-B/phase-B-plan.md](./phase-B-plan.md)
 
 ## Exact Targets
 
 - `docs/sc-lint/adr/ADR-009-observability-boundary-policy.md`
 - `docs/sc-lint/adr/README.md`
-- `docs/sc-lint/phase-B-plan.md`
+- `docs/phase-B/phase-B-plan.md`
 - `docs/project-plan.md`
 - `docs/architecture.md`
 - `docs/sc-lint/logging.md`

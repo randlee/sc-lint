@@ -68,7 +68,7 @@ permits.
 - `docs/sc-lint/README.md`
 - `README.md`
 - `docs/project-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 
 ## Sub-Tasks
 
@@ -151,7 +151,7 @@ grows materially, split by tool family rather than by document section.
 - `docs/sc-lint/README.md`
 - `README.md`
 - `docs/project-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - the new per-tool guide documents created in this sprint
 
 ## Risks And Watchouts
