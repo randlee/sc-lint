@@ -1,9 +1,9 @@
 ---
 id: C.7
 title: Broad Environment-Variable Portability
-status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
+status: completed
+branch: feature/sprint-C7
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C7
 target: develop
 ---
 
@@ -52,40 +52,43 @@ target: develop
   new repo-configured allowlist or "approved abstraction" config key
 - the production env-portability seam is explicit and leaves
   `#[cfg(unix)]`-gated items to `C.9` structural parity instead of adding a
-  separate suppression model; `visit_expr_for_unix_portability(...)` is the
-  expression visitor seam and must gain an `Expr::Call` arm that dispatches to
-  `production_env_portability_variable(...)`. This builds directly on the
-  `visit_item_for_unix_portability(...) -> visit_expr_for_unix_portability(...)`
-  call chain established in `C.6`:
+  separate suppression model; `visit_expr_for_unix_portability(expr,
+  inherited_scope: ScopeKind, inherited_unix_gated: bool, file_context,
+  findings)` is the expression visitor seam, and the actual `PORT-008`
+  dispatch happens in `ProductionPathLiteralVisitor::visit_expr_call(...)`
+  through `production_env_portability_variable(...)`. This builds directly on
+  the `visit_item_for_unix_portability(...) ->
+  visit_expr_for_unix_portability(...)` call chain established in `C.6`:
 
 ```rust
-fn production_env_portability_variable(expr_call: &ExprCall) -> Option<&'static str> {
-    if is_std_env_var_call(expr_call, "HOME")
-        || is_std_env_var_call(expr_call, "USER")
-        || is_std_env_var_prefix_call(expr_call, "XDG_")
+fn production_env_portability_variable(expr_call: &ExprCall) -> Option<String> {
+    let variable_name = extract_env_var_lookup(expr_call)?;
+    if variable_name == "HOME"
+        || variable_name == "USER"
+        || variable_name.starts_with("XDG_")
     {
-        return Some("PORT-008");
+        return Some(variable_name);
     }
     None
 }
 
 fn visit_expr_for_unix_portability(
     expr: &Expr,
-    unix_gated: bool,
+    inherited_scope: ScopeKind,
+    inherited_unix_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
-    match expr {
-        Expr::Call(expr_call)
-            if !unix_gated
-                && production_env_portability_variable(expr_call).is_some() =>
-        {
-            // emit PORT-008
+    let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings);
+    visitor.visit_expr(expr);
+}
+
+impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if let Some(variable_name) = production_env_portability_variable(node) {
+            // emit PORT-008 for HOME / USER / XDG_* here
         }
-        Expr::Block(expr_block) => { /* existing recursion */ }
-        Expr::If(expr_if) => { /* existing recursion */ }
-        Expr::Match(expr_match) => { /* existing recursion */ }
-        _ => {}
+        syn::visit::visit_expr_call(self, node);
     }
 }
 ```
@@ -98,10 +101,14 @@ fn visit_expr_for_unix_portability(
 
 ## This Sprint Establishes
 
-- `visit_expr_for_unix_portability(...)`, as extended by `C.7`, serves as the
+- `visit_expr_for_unix_portability(expr, inherited_scope: ScopeKind,
+  inherited_unix_gated: bool, file_context, findings)`, as extended by `C.7`,
+  continues to be the expression-walk seam inherited from `C.6`
+- `ProductionPathLiteralVisitor::visit_expr_call(node: &ExprCall)`, as
+  extended by `C.7`, serves as the concrete `Expr::Call` dispatch seam and the
   integration base for sprint `C.8`
-- sprint `C.8` extends this same `Expr::Call` dispatch seam for
-  shell-invocation portability and therefore depends on this sprint
+- sprint `C.8` extends this same `ProductionPathLiteralVisitor::visit_expr_call`
+  seam for shell-invocation portability and therefore depends on this sprint
   completing first
 
 ## Explicit Code Samples
@@ -148,6 +155,7 @@ pub fn data_root() -> std::path::PathBuf {
 
 - `cargo test -p sc-lint-portability`
 - `cargo test -p sc-lint-portability flags_home_env_lookup_in_production_code`
+- `cargo test -p sc-lint-portability flags_user_env_lookup_in_production_code`
 - `cargo test -p sc-lint-portability flags_xdg_config_home_lookup_in_production_code`
 - `cargo test -p sc-lint-portability passes_dirs_data_dir_in_production_code`
 - `cargo test -p sc-lint-portability passes_cfg_unix_gated_home_lookup_in_production_code`

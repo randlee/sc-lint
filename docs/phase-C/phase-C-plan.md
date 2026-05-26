@@ -51,6 +51,9 @@ The currently planned sprints in this phase are:
 - `C.5`
   - minimal repo-local Claude Code marketplace planning for the adoption skill
   - explicit forwarding/reference path for marketplace advertisement
+  - source-repo publication surfaces:
+    - `.claude-plugin/marketplace.json`
+    - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
   - see [docs/phase-C/sprint-C5.md](./sprint-C5.md)
 - `C.6`
   - production path-literal portability parity in `sc-lint-portability`
@@ -101,6 +104,8 @@ The currently planned sprints in this phase are:
      workflow
 5. `C.5`
    - publish the adoption skill through a minimal repo-local marketplace
+   - keep marketplace publication separate from the `C.4` skill-design
+     closure
 6. `C.6`
    - extend shared path-literal portability linting into production code
    - add Windows-path parity to the current Unix-path family

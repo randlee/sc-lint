@@ -33,8 +33,12 @@ Current contents:
 - [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —
   repo-local constraints for minimal marketplace publication of the adoption
   skill
+<<<<<<< HEAD
 - [`../../.claude/skills/sc-lint-version-adoption/SKILL.md`](../../.claude/skills/sc-lint-version-adoption/SKILL.md) —
   repo-local Claude Code skill for `sc-lint-version` consumer adoption
+- [`../../.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json) —
+  repo-local marketplace entry advertising the `sc-lint-version` adoption
+  skill package
 - [`adr/README.md`](./adr/README.md) — ADR index for the current architecture
   decisions
 - [`../sc-lint-boundary/requirements.md`](../sc-lint-boundary/requirements.md) —
@@ -88,7 +92,7 @@ Current contents:
 - [`sprint-C4.md`](../phase-C/sprint-C4.md) — consumer integration and skill design
   planning sprint
 - [`sprint-C5.md`](../phase-C/sprint-C5.md) — minimal marketplace publication planning
-  sprint
+  for the adoption skill
 - [`sprint-C6.md`](../phase-C/sprint-C6.md) — production path-literal portability
   parity sprint
 - [`sprint-C7.md`](../phase-C/sprint-C7.md) — broad environment-variable portability
