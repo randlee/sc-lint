@@ -1,7 +1,7 @@
 ---
 id: C.4
 title: Consumer Integration And Skill Design
-status: planned
+status: completed
 branch: feature/sprint-C4
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C4
 target: develop
