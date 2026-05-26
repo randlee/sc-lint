@@ -30,7 +30,7 @@ This applies to:
   - `ubuntu-latest`
   - `macos-latest`
   - `windows-latest`
-- Portability rules in `sc-lint-boundary` should continue to evolve as a
+- Portability rules in `sc-lint-portability` should continue to evolve as a
   separate lint family.
 
 ## Related Docs

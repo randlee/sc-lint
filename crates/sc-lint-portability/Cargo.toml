@@ -27,7 +27,6 @@ serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 syn = { version = "2", features = ["full", "parsing", "visit"] }
-quote = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 thiserror = "1"
 
