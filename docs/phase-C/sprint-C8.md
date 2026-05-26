@@ -1,10 +1,10 @@
 ---
 id: C.8
 title: Shell Invocation Portability
-status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
-target: develop
+status: completed
+branch: feature/sprint-C8
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C8
+target: integration/phase-C
 ---
 
 # Sprint C.8 — Shell Invocation Portability

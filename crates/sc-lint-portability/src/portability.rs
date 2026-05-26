@@ -678,6 +678,24 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             ),
         });
     }
+
+    fn push_shell_finding(&mut self, detail: &str, line: usize) {
+        self.findings.push(PortabilityFinding {
+            rule_id: RuleId::Port009,
+            kind: "production_shell_portability",
+            message: format!(
+                "PORT-009 Unix shell invocation `{detail}` in production code assumes a Unix shell exists; prefer invoking the target binary directly or move the shell path behind an explicit Unix-only boundary"
+            ),
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
 }
 
 impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
@@ -693,6 +711,12 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
     }
 
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if self.platform_gated_depth == 0 && is_shell_command_call(node) {
+            self.push_shell_finding(
+                "Command::new(\"sh\" | \"bash\")",
+                span_start_line(node.span()),
+            );
+        }
         if self.platform_gated_depth == 0
             && let Some(variable_name) = production_env_portability_variable(node)
         {
@@ -704,9 +728,12 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
     fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
         if self.platform_gated_depth == 0
             && let Lit::Str(lit) = &node.lit
-            && let Some(rule_id) = production_path_rule_id(&lit.value())
         {
-            self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            if is_unix_shell_path_literal(&lit.value()) {
+                self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
+            } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
+                self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            }
         }
         syn::visit::visit_expr_lit(self, node);
     }
@@ -874,6 +901,43 @@ fn is_set_var_call(expr: &Expr) -> bool {
     }
 }
 
+fn is_shell_command_call(expr_call: &ExprCall) -> bool {
+    is_command_new_call(expr_call, "sh") || is_command_new_call(expr_call, "bash")
+}
+
+fn is_command_new_call(expr_call: &ExprCall, command_name: &str) -> bool {
+    let Expr::Path(expr_path) = &*expr_call.func else {
+        return false;
+    };
+    let segments: Vec<_> = expr_path
+        .path
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect();
+    let is_command_new = match segments.as_slice() {
+        [command, new] => command == "Command" && new == "new",
+        [process, command, new] => process == "process" && command == "Command" && new == "new",
+        [std, process, command, new] => {
+            std == "std" && process == "process" && command == "Command" && new == "new"
+        }
+        _ => false,
+    };
+    if !is_command_new {
+        return false;
+    }
+    let Some(first_arg) = expr_call.args.first() else {
+        return false;
+    };
+    let Expr::Lit(ExprLit {
+        lit: Lit::Str(lit), ..
+    }) = first_arg
+    else {
+        return false;
+    };
+    lit.value() == command_name
+}
+
 fn extract_env_var_lookup(expr_call: &ExprCall) -> Option<String> {
     let Expr::Path(expr_path) = &*expr_call.func else {
         return None;
@@ -918,6 +982,10 @@ fn production_path_rule_id(value: &str) -> Option<RuleId> {
     } else {
         None
     }
+}
+
+fn is_unix_shell_path_literal(value: &str) -> bool {
+    matches!(value, "/bin/sh" | "/bin/bash")
 }
 
 fn is_unix_path_literal(value: &str) -> bool {

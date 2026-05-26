@@ -25,6 +25,10 @@ Use `sc-portability` to catch portability drift such as:
 - `PORT-008`
   - direct production lookups of `HOME`, `USER`, and `XDG_*` without a
     platform-neutral abstraction
+- `PORT-009`
+  - production `Command::new("sh" | "bash")` or hardcoded `/bin/sh` /
+    `/bin/bash` shell-invocation assumptions without an explicit Unix-only
+    boundary
 
 ## Ownership And Scope
 
@@ -35,6 +39,7 @@ Per [ADR-010](../../docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md),
 - broader environment-variable portability rules
 - shell-portability rules for OS-specific shell-path and shell-command
   assumptions
+- structural `cfg` parity rules for Unix-only production branches
 
 Consumer-specific portability wrappers may still exist in downstream repos, but
 they do not replace `sc-lint-portability` as the core shared ownership
@@ -113,6 +118,12 @@ Production code with Unix-centric environment lookups is also flagged:
 
 ```text
 PORT-008 direct std::env lookup of `HOME` in production code bypasses platform-neutral path or identity abstractions; prefer dirs::data_dir(), dirs::config_dir(), dirs::home_dir(), or another platform-aware wrapper
+```
+
+Production code with Unix-shell assumptions is also flagged:
+
+```text
+PORT-009 Unix shell invocation `Command::new("sh" | "bash")` in production code assumes a Unix shell exists; prefer invoking the target binary directly or move the shell path behind an explicit Unix-only boundary
 ```
 
 Test-only path literals are also flagged:
