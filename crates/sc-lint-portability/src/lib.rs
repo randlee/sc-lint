@@ -11,6 +11,7 @@ use serde::Serializer;
 use thiserror::Error;
 
 mod portability;
+mod predicates;
 mod render;
 mod source_scan;
 #[cfg(test)]

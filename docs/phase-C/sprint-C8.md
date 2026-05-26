@@ -85,6 +85,11 @@ fn visit_expr_for_unix_portability(
 }
 ```
 
+- in the shipped implementation, `visit_expr_for_unix_portability(...)`
+  delegates into `ProductionPathLiteralVisitor`, and the concrete `Expr::Call`
+  dispatch for shell detection happens in
+  `ProductionPathLiteralVisitor::visit_expr_call(...)`
+
 - `/bin/sh` and `/bin/bash` fire through the dedicated `PORT-009` literal
   helper above rather than through the generic Unix path-prefix matcher used
   by `PORT-006`; both detection modes share the same production visitor walk
