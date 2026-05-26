@@ -471,7 +471,7 @@ The product should support both:
 
 ## Current Phase Requirements
 
-The current execution phase, Phase `B`, requires:
+The current execution phase, Phase `C`, requires:
 
 - phase-plan and sprint-plan hardening for the post-Phase-A follow-on work
   currently scheduled in:

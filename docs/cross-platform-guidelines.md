@@ -37,9 +37,10 @@ This applies to:
 
 - `PORT-008` flags `HOME`, `USER`, and `XDG_*` lookups in ungated production
   code.
-- The canonical constant sources are `PORTABILITY_ENV_NAMES` and
-  `PORTABILITY_ENV_PREFIXES` in
-  `crates/sc-lint-portability/src/predicates.rs`.
+- The canonical detector is
+  `production_env_portability_variable(...)` in
+  `crates/sc-lint-portability/src/predicates.rs`, which matches `HOME`,
+  `USER`, and `XDG_*` lookups inline.
 - Preferred alternatives are `dirs::data_dir()`, `dirs::config_dir()`, and
   `dirs::home_dir()`.
 - If the lookup is intentionally Unix-only, wrap the production code path in

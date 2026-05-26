@@ -72,7 +72,7 @@ fn collect_parity_findings(
     for item in items {
         if is_cfg_unix_production_item(item, inherited_scope)
             && !has_windows_companion(item, items)
-            && !has_portable_fallback(item, items)
+            && !has_portable_fallback(item, items, inherited_scope)
         {
             // emit PORT-010
         }
@@ -81,7 +81,7 @@ fn collect_parity_findings(
 
 fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
     sibling_items.iter().any(|candidate| {
-        same_identifier(unix_item, candidate)
+        same_item_identifier(unix_item, candidate)
             && item_has_cfg_windows(candidate)
     })
 }
@@ -92,7 +92,7 @@ fn has_portable_fallback(
     scope: ScopeKind,
 ) -> bool {
     sibling_items.iter().any(|candidate| {
-        same_identifier(unix_item, candidate)
+        same_item_identifier(unix_item, candidate)
             && !item_has_any_cfg(candidate)
             && !item_is_test_scoped(candidate, scope)
     })
