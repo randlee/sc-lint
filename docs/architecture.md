@@ -12,7 +12,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 
-For release `0.1.x`, ADR-005 supersedes earlier provisional profile/`xwin`
+For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
 
 ## Architecture Goals
@@ -239,7 +239,7 @@ Allowed shared support:
 - `sc-lint-schema`
 - future shared support crates only after explicit design approval
 
-For release `0.1.x`, this means:
+For release `0.2.x`, this means:
 
 - `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-directives` when shared directive parsing/types are needed
@@ -276,7 +276,7 @@ Those seams exist so command identity, service identity, and event metadata can
 cross the library/binary split without exposing `sc-observability` runtime
 types from backend crates or backend public APIs.
 
-Release `0.1.x` observability dependency policy is:
+Release `0.2.x` observability dependency policy is:
 
 - the mixed lib+bin `sc-lint` package may keep `sc-observability` in
   `[dependencies]`
@@ -287,16 +287,17 @@ Release `0.1.x` observability dependency policy is:
   but must not own logger initialization or introduce alternative event-entry
   wrappers without a new ADR
 
-The queued Phase `C.10` maintenance line keeps this seam list intact while
+The completed Phase `C.10` maintenance line kept this seam list intact while
 moving the CLI package to `sc-observability` `1.1.0`. That maintenance scope
-is limited to:
+was limited to:
 
 - typestate-compatible logger construction and shutdown
-- explicit `log` versus `try_log` decisions at current top-level event sites
+- confirmation that direct top-level `emit(...)` call sites remain on the
+  supported `Logger<Running>` public API in `1.1.0`
 - one explicit retained-log policy decision, with rotation/pruning/background
-  maintenance owned by the logger when enabled
-- one explicit `sc-observe` adoption decision that remains subordinate to the
-  existing CLI-owned boundary policy
+  maintenance owned by the logger through `RetainedLogPolicy::default()`
+- one explicit no decision on `sc-observe` adoption that remains subordinate
+  to the existing CLI-owned boundary policy
 
 ### Rule-family distribution
 
@@ -429,7 +430,7 @@ planned top-level CLI surface should also name these important contract types:
 These types are part of the intended architectural contract, and for the
 A.1b/A.2 line they already match the implemented CLI crate surfaces.
 
-For release `0.1.x`, these planned CLI contract types should also be carried in
+For release `0.2.x`, these planned CLI contract types should also be carried in
 machine-readable boundary/planning metadata as `BOUNDARY-ScLintCli`
 composition-root items so future inventory-parity work can reason about them
 mechanically.
@@ -465,13 +466,13 @@ These provide:
 - external tool wrapping
 - Python-based utilities that are not yet migrated to Rust
 
-For release `0.1.x`, these repo-local automation/profile surfaces remain
+For release `0.2.x`, these repo-local automation/profile surfaces remain
 documented product surfaces but are intentionally out of boundary inventory
 enforcement scope unless later modeled as explicit boundary records.
 
 ## Release Distribution
 
-For release `0.1.x`, release packaging and distributor updates should remain
+For release `0.2.x`, release packaging and distributor updates should remain
 driven by one canonical manifest surface:
 
 - `release/publish-artifacts.toml`
@@ -600,7 +601,7 @@ For this repo, that gate should exercise:
 Advisory/manual targets may remain outside the default gate only when they are
 not yet stable enough for routine development use.
 
-For release `0.1.x`, the intended architecture is that this repo self-hosts
+For release `0.2.x`, the intended architecture is that this repo self-hosts
 its own analyzer checks through the default development gate wherever those
 checks are stable.
 

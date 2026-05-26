@@ -79,8 +79,9 @@ The currently planned sprints in this phase are:
   - see [docs/phase-C/sprint-C9.md](./sprint-C9.md)
 - `C.10`
   - `sc-observability` `1.1.0` adoption in the CLI-owned logging layer
-  - retained-log policy decision, `emit` -> `log` / `try_log` migration, and
+  - retained-log policy decision, `emit(...)` compatibility verification, and
     Windows rotation validation target
+  - implemented on `feature/sprint-C10`
   - see [docs/phase-C/sprint-C10.md](./sprint-C10.md)
 
 ## Phase Structure
