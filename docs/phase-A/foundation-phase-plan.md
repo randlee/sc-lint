@@ -291,36 +291,36 @@ The scheduled implementation sprints for this phase are:
    - top-level CLI bootstrap and contract definition
    - ends with the contract-review checkpoint for A.1b entry
    - the checkpoint records the contract implications for Workstreams 4-7 in
-     `docs/sc-lint/sprint-A1a.md`
-   - sprint plan: `docs/sc-lint/sprint-A1a.md`
+     `docs/phase-A/sprint-A1a.md`
+   - sprint plan: `docs/phase-A/sprint-A1a.md`
 2. `A.1b`
    - top-level config loading and first delegated backend integration
-   - sprint plan: `docs/sc-lint/sprint-A1b.md`
+   - sprint plan: `docs/phase-A/sprint-A1b.md`
 3. `A.2`
    - profile semantics and `xwin` capability support
-   - sprint plan: `docs/sc-lint/sprint-A2.md`
+   - sprint plan: `docs/phase-A/sprint-A2.md`
 4. `A.3`
    - generic utility extraction
-   - sprint plan: `docs/sc-lint/sprint-A3.md`
+   - sprint plan: `docs/phase-A/sprint-A3.md`
 5. `A.4`
    - `sc-lint-portability` creation and portability-rule migration
-   - sprint plan: `docs/sc-lint/sprint-A4.md`
+   - sprint plan: `docs/phase-A/sprint-A4.md`
 6. `A.5`
   - `sc-lint-runtime` creation and runtime-rule migration
   - active implementation branch: `feature/sprint-A5`
-  - sprint plan: `docs/sc-lint/sprint-A5.md`
+  - sprint plan: `docs/phase-A/sprint-A5.md`
 7. `A.6`
   - Rust boundary inventory loader/schema/duplicate handling
   - active implementation branch: `feature/sprint-A6`
-  - sprint plan: `docs/sc-lint/sprint-A6.md`
+  - sprint plan: `docs/phase-A/sprint-A6.md`
 8. `A.7`
    - Rust manifest-policy migration and Python parity window
    - active implementation branch: `feature/sprint-A7`
-   - sprint plan: `docs/sc-lint/sprint-A7.md`
+   - sprint plan: `docs/phase-A/sprint-A7.md`
 9. `A.8`
    - per-tool user guides and rule-disable documentation
    - active implementation branch: `feature/sprint-A8`
-   - sprint plan: `docs/sc-lint/sprint-A8.md`
+   - sprint plan: `docs/phase-A/sprint-A8.md`
 
 These sprint plans are the authoritative implementation breakdown of the
 foundation phase once execution begins. This phase document remains the

@@ -1,8 +1,8 @@
 # Boundary Enforcement Model
 
 Related ADR:
-- [`./adr/ADR-004-structured-boundary-definitions.md`](./adr/ADR-004-structured-boundary-definitions.md)
-- [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
+- [`../sc-lint/adr/ADR-004-structured-boundary-definitions.md`](../sc-lint/adr/ADR-004-structured-boundary-definitions.md)
+- [`../sc-lint/adr/ADR-006-ai-first-cli-contract.md`](../sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 
 Related requirements:
 - [`./requirements.md`](./requirements.md)

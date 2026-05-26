@@ -11,12 +11,16 @@ Related ADRs:
 
 Use `sc-observability` as the logging-only runtime for the top-level CLI and
 its delegated backend calls without turning logging initialization into a
-backend-owned concern. Satisfies `REQ-LOG-001` and `REQ-LOG-005`.
+backend-owned concern. The release-line design and queued maintenance
+direction satisfy `REQ-LOG-001` through `REQ-LOG-009`.
 
 This document defines both the logging design and the sprint-level
-implementation assignments for Phase `A`. The A.1a bootstrap implementation is
-now present in `crates/sc-lint/src/logging.rs`; A.1b extends that same
-CLI-owned runtime with dispatch-seam logging for the first real backend path.
+implementation assignments for Phase `A`, plus the queued Phase `C.10`
+maintenance line. The A.1a bootstrap implementation is now present in
+`crates/sc-lint/src/logging.rs`; A.1b extends that same CLI-owned runtime with
+dispatch-seam logging for the first real backend path, and `C.10` records the
+next supported `sc-observability` maintenance decisions without changing seam
+ownership.
 
 ADR-009 now governs the accepted observability boundary seams layered on top of
 ADR-008. This document therefore treats the following current seams as locked
@@ -26,6 +30,17 @@ release-1 policy rather than provisional implementation detail:
 - `logging::dispatch_event`
 - `contract::ServiceName`
 - `CommandEnvelope.command`
+
+The queued Phase `C.10` maintenance line extends this design to the supported
+`sc-observability` `1.1.0` release without changing those ownership seams. The
+remaining release-line decisions are:
+
+- whether retained-log maintenance is enabled now, using logger-owned
+  `RetainedLogPolicy` rather than wrapper-owned cleanup logic
+- which current event sites intentionally use blocking `log` versus
+  non-blocking `try_log`
+- whether `sc-observe` is adopted anywhere in the CLI path, while preserving
+  CLI-owned logger initialization and dispatch
 
 ## Dependency Model
 
@@ -51,6 +66,9 @@ The design depends on the following public surface:
 - `JsonlFileSink`
 - `ConsoleSink`
 - `ServiceName`
+- `RetainedLogPolicy`
+- `Logger::log`
+- `Logger::try_log`
 
 The accepted boundary translation seam is:
 
@@ -76,6 +94,16 @@ Planned implementation note:
     - `sc-runtime`
   - remaining bootstrap-only command paths
     - `sc-lint`
+
+Queued `1.1.0` maintenance note:
+
+- the supported dependency line moves from `sc-observability` `1.0.0` to
+  `1.1.0`
+- any retained-log rotation/pruning/background maintenance enabled for the
+  release line is configured at logger construction time and stays
+  logger-owned
+- deprecated event-emission call sites migrate to explicit `log` or `try_log`
+  choices instead of wrapper-specific compatibility shims
 
 ## Initialization Model
 

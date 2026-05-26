@@ -7,10 +7,12 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-006-ai-first-cli-contract.md](./sc-lint/adr/ADR-006-ai-first-cli-contract.md)
 - [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
+- [docs/sc-lint-version/requirements.md](./sc-lint-version/requirements.md)
 
 For release `0.1.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
@@ -108,11 +110,14 @@ The product should support both:
   platform/OS portability rules.
   Current A.4 implementation status:
   `PORT-001` through `PORT-005` are assigned to `sc-lint-portability`.
+  Phase `C` extends this same crate-owned family with `PORT-006` through
+  `PORT-010`.
 
 - `REQ-PRODUCT-004AA`
   Future shared portability rules for cross-platform path literals,
-  environment-variable portability, and shell portability must remain owned by
-  `sc-lint-portability` when their semantics are consumer-neutral.
+  environment-variable portability, shell portability, and structural
+  cross-platform branch parity must remain owned by `sc-lint-portability`
+  when their semantics are consumer-neutral.
 
 - `REQ-PRODUCT-004AB`
   When `sc-lint` carries an OS-specific path-literal portability rule family
@@ -194,6 +199,70 @@ The product should support both:
   per-backend formulas may remain only when they are explicitly documented as
   secondary compatibility surfaces rather than the normal user install path.
 
+### Interface versioning and publication
+
+- `REQ-PRODUCT-006I`
+  The product should define one version-checking capability that covers stable
+  interface families beyond Rust crate APIs alone.
+
+- `REQ-PRODUCT-006J`
+  The initial version-checking plan must treat Rust public APIs, stable
+  top-level CLI contracts, and RPC/socket interfaces as separate interface
+  families with explicit breaking-change rules.
+
+- `REQ-PRODUCT-006K`
+  Human-facing reports published by `sc-lint` must be generated from
+  structured data and reusable templates rather than hand-written monolithic
+  HTML documents.
+
+- `REQ-PRODUCT-006L`
+  Generated report packages must follow the main HTML-plus-JSON-sidecar model,
+  with separate XHTML section fragments/panels for deeper context and
+  built-in copy actions per panel, so one canonical machine-readable source
+  can drive both documentation and hard-fail checks.
+
+- `REQ-PRODUCT-006LA`
+  The generated report path must follow the reusable workflow described in
+  [docs/sc-lint/interface-reporting-constraints.md](./sc-lint/interface-reporting-constraints.md)
+  rather than a feature-local or repo-specific ad hoc HTML rendering path.
+
+- `REQ-PRODUCT-006LB`
+  The preferred ownership target for the reusable reporting layer is the
+  `sc-compose` repo, potentially as a dedicated `sc-reporting` capability,
+  because the same XHTML-panel conventions are expected to serve both lint and
+  non-lint reports.
+
+- `REQ-PRODUCT-006LC`
+  Report-template selection and override must use one canonical configuration
+  surface under `[reporting.templates.<report_kind>]` so consumers can switch
+  between default shared templates and repo-local variants without editing the
+  producing feature.
+
+- `REQ-PRODUCT-006M`
+  The initial Rust public API version-checking approach should be based on
+  `cargo-semver-checks` rather than a new custom semver engine.
+
+- `REQ-PRODUCT-006N`
+  The version-checking planning line must include one explicit consuming-repo
+  adoption document describing the required repo-side harness, fixtures,
+  simulators/transcripts when present, and interface inventory
+  responsibilities.
+
+- `REQ-PRODUCT-006O`
+  The consuming-repo adoption guidance for `sc-lint-version` must be packaged
+  as a repo-local Claude Code skill and advertised through a minimal repo-local
+  Claude Code marketplace.
+
+- `REQ-PRODUCT-006P`
+  The skill-design sprint and the minimal-marketplace sprint must remain
+  separate closures in the planning line.
+
+- `REQ-PRODUCT-006Q`
+  The planned interface-versioning command surface must not reuse the existing
+  tool-version command. It must use a distinct top-level invocation path and a
+  documented configuration surface for interface-family selection and
+  baselines.
+
 ### Logging and observability
 
 - `REQ-LOG-001`
@@ -218,6 +287,29 @@ The product should support both:
 - `REQ-LOG-005`
   Backend crates must not initialize the logger; structured logging remains a
   CLI-layer responsibility even when backend execution is delegated.
+
+- `REQ-LOG-006`
+  The release-line logging integration must preserve the accepted CLI-owned
+  observability seam from ADR-008 and ADR-009 when the supported
+  `sc-observability` line changes; compatibility maintenance must adapt the
+  CLI boundary, not relax backend ownership rules.
+
+- `REQ-LOG-007`
+  When retained-log rotation, pruning, or background maintenance is enabled,
+  that behavior must be owned by the logger/runtime according to configured
+  policy rather than by wrapper-owned cleanup code.
+
+- `REQ-LOG-008`
+  Top-level event emission call sites must make an explicit blocking decision:
+  use non-blocking `try_log` where dropped events on a full queue are an
+  accepted tradeoff, and use blocking `log` only where waiting on a full queue
+  is an intentional documented behavior.
+
+- `REQ-LOG-009`
+  Adoption of any higher-level observability facade layered over
+  `sc-observability` must be an explicit documented yes/no decision that
+  preserves the current CLI-owned logger-initialization and event-dispatch
+  seams.
 
 ### Boundary definitions
 
@@ -354,22 +446,22 @@ The product should support both:
   `sc-lint-boundary` may enforce named-caller allowlist policy for explicitly
   configured restricted symbols when that policy is expressed as structured
   boundary metadata. Detailed schema and inventory-loading behavior for that
-  feature lives in [docs/sc-lint/requirements.md](./sc-lint/requirements.md).
+  feature lives in [docs/sc-lint-boundary/requirements.md](./sc-lint-boundary/requirements.md).
 
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
-  - see [docs/sc-lint/requirements.md](./sc-lint/requirements.md)
+  - see [docs/sc-lint-boundary/requirements.md](./sc-lint-boundary/requirements.md)
 - Structured boundary source migration requirements
-  - see [docs/sc-lint/boundary-toml-migration.md](./sc-lint/boundary-toml-migration.md)
+  - see [docs/sc-lint-boundary/boundary-toml-migration.md](./sc-lint-boundary/boundary-toml-migration.md)
 - Boundary enforcement model requirements
-  - see [docs/sc-lint/boundary-enforcement-model.md](./sc-lint/boundary-enforcement-model.md)
+  - see [docs/sc-lint-boundary/boundary-enforcement-model.md](./sc-lint-boundary/boundary-enforcement-model.md)
 - CLI-specific requirements
   - see [docs/sc-lint/cli-requirements.md](./sc-lint/cli-requirements.md)
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - Extraction and phase execution requirements
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
-  - see [docs/sc-lint/foundation-phase-plan.md](./sc-lint/foundation-phase-plan.md)
+  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
 
 ## Current Phase Requirements
 
@@ -408,6 +500,25 @@ The current execution phase, Phase `B`, requires:
   - canonical TOML boundary definitions
   - the default local development lint gate
   - documented `fast` / `full` / `ci` profile semantics
+
+Phase `C` is the queued next planning line after the current Phase `B`
+sequence. Its governing forward-pointer artifacts are:
+
+- `docs/sc-lint-version/requirements.md`
+- `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
+
+Phase `C` also includes the next shared `sc-lint-portability` follow-on line:
+
+- `PORT-006`
+  - Unix-only absolute path literals in production code
+- `PORT-007`
+  - Windows-only absolute path literals in production code
+- `PORT-008`
+  - production `HOME`, `USER`, and `XDG_*` portability checks
+- `PORT-009`
+  - production `sh` / `bash` shell-invocation portability checks
+- `PORT-010`
+  - production structural `#[cfg(unix)]` companion-parity checks
 
 ## Requirement Management
 

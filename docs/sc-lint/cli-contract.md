@@ -79,6 +79,8 @@ Initial convention:
   - `view.graph`
 - `sc-lint check xwin`
   - `check.xwin`
+- `sc-lint check interfaces`
+  - `check.interfaces`
 - `sc-lint clippy xwin`
   - `clippy.xwin`
 - `sc-lint ci`
@@ -111,6 +113,8 @@ Current implementation status:
   - implemented native preflight path
 - `check.xwin`
   - implemented capability-gated Windows preflight path
+- `check.interfaces`
+  - planned Phase `C` interface-versioning command path
 - `clippy.native`
   - implemented native clippy path
 - `clippy.xwin`
@@ -159,6 +163,15 @@ Required properties:
 - backend payload lives under a stable field rather than changing the top-level
   JSON shape per backend
 - diagnostics are additive and do not replace the business payload
+
+Planned Phase `C` business-verdict rule:
+
+- `sc-lint check interfaces` is a business-verdict command rather than a
+  transport or protocol failure surface
+- a completed comparison that detects breaking changes remains a
+  `CommandEnvelope<T>` result with the negative verdict carried inside `data`
+- nonzero exit for that negative verdict is planned policy behavior, not a
+  `CliError` reclassification
 
 The implemented field names are stable for the Phase A bootstrap line.
 

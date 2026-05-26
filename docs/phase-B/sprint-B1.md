@@ -20,16 +20,16 @@ target: develop
 
 ## Hard Dependencies
 
-- [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md)
+- [docs/phase-B/phase-B-plan.md](./phase-B-plan.md)
 - [docs/requirements.md](../requirements.md)
 - [docs/architecture.md](../architecture.md)
-- [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./adr/ADR-007-analyzer-crate-partition.md)
+- [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](../sc-lint/adr/ADR-007-analyzer-crate-partition.md)
 - [crates/sc-lint-portability/README.md](../../crates/sc-lint-portability/README.md)
 
 ## Exact Targets
 
-- `docs/sc-lint/phase-B-plan.md`
-- `docs/sc-lint/sprint-B1.md`
+- `docs/phase-B/phase-B-plan.md`
+- `docs/phase-B/sprint-B1.md`
 - `docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md`
 - `docs/sc-lint/adr/README.md`
 - `docs/project-plan.md`
@@ -118,7 +118,7 @@ let home = std::env::var("USERPROFILE");
     unchanged into the core product
 - `docs/requirements.md` `Current Phase Requirements` names Phase `B` as the
   active execution phase
-- `docs/sc-lint/phase-B-plan.md` assigns observability ADR work to `B.3` and
+- `docs/phase-B/phase-B-plan.md` assigns observability ADR work to `B.3` and
   QA-process hardening to `B.4` rather than implying either closes inside
   `B.1`
 
@@ -130,6 +130,6 @@ let home = std::env::var("USERPROFILE");
   - `docs/architecture.md`
   - `docs/sc-lint/crate-architecture.md`
   - `docs/sc-lint/README.md`
-  - `docs/sc-lint/phase-B-plan.md`
+  - `docs/phase-B/phase-B-plan.md`
   to confirm the portability-ownership and Phase-B sequencing statements named
   in the acceptance criteria remain aligned

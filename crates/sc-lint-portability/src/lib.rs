@@ -29,6 +29,7 @@ pub type FindingsReport = sc_lint_schema::FindingsReport<RuleId>;
 pub type Finding = sc_lint_schema::Finding<RuleId>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum RuleId {
     Port001,
     Port002,

@@ -42,7 +42,7 @@ reserved for a later phase:
   - triage-first QA routing
   - QA-1-only default `rust-best-practices` usage
   - TODO scan and carry-forward triage automation
-  - see `docs/sc-lint/sprint-B4.md`
+  - see `docs/phase-B/sprint-B4.md`
 
 The B.4 authoritative routing surfaces are now:
 
@@ -69,4 +69,42 @@ needed to move from that stopgap to the full top-level install path:
   - planned primary `brew install randlee/tap/sc-lint` surface
   - explicit disposition for `sc-lint-boundary.rb`
   - full release-manifest and tap-update planning
-  - see `docs/sc-lint/sprint-B-homebrew.md`
+  - see `docs/phase-B/sprint-B-homebrew.md`
+
+## Phase C Planning Note
+
+Phase `C` is now the queued interface-versioning, shared reporting,
+observability-maintenance, and shared portability follow-on planning line:
+
+- `C.1`
+  - ownership/policy/baseline definition
+- `C.2`
+  - shared HTML/XHTML/JSON report-template pipeline planning
+- `C.3`
+  - hard-fail version-gate planning
+- `C.4`
+  - consumer-adoption document and repo-local skill design
+- `C.5`
+  - minimal marketplace publication planning for the adoption skill
+- `C.6`
+  - production path-literal portability parity
+- `C.7`
+  - broad environment-variable portability
+- `C.8`
+  - shell invocation portability
+- `C.9`
+  - structural cross-platform `cfg` parity enforcement
+- `C.10`
+  - `sc-observability` `1.1.0` adoption in the CLI logging layer
+
+Current status:
+- no dedicated boundary record or `boundaries/planning.toml` entry is required
+  yet for `sc-lint-version`
+- `C.1` has now committed the planned form-factor and invocation path:
+  - dedicated workspace crate: `sc-lint-version`
+  - top-level command path: `sc-lint check interfaces`
+- the Phase `C` reporting direction now keeps generic HTML/XHTML rendering out
+  of `sc-lint-version` itself and prefers reusable ownership in the
+  `sc-compose` repo, potentially as a dedicated `sc-reporting` capability
+- dedicated crate-boundary records remain future implementation work after the
+  Phase `C` planning line rather than current planning prerequisites

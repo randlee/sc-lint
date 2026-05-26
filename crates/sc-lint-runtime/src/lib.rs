@@ -32,6 +32,7 @@ pub type FindingsReport = SchemaFindingsReport<RuleId>;
 pub type Finding = SchemaFinding<RuleId>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum RuleId {
     ScbRuntime001,
     ScbRuntime002,

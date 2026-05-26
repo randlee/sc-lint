@@ -30,6 +30,13 @@ The library defines its own `pub(crate)` `ServiceName` newtype in `contract.rs`.
 ### OnceLock metadata cells
 Lazy-initialized `OnceLock` metadata cells (service name, crate version, etc.) are held in the binary module tree. They are initialized once per process in `main.rs` and read by `dispatch_event` at each event emission.
 
+### RELEASE-001 — Release-line maintenance stays inside the CLI seam
+Compatibility work for later supported `sc-observability` releases must keep
+the existing CLI-owned logger seam intact. If retained-log maintenance is
+enabled, rotation/pruning/background cleanup remains logger-owned behavior,
+and deprecated event-emission APIs must be replaced by explicit `log` or
+`try_log` call-site decisions rather than new wrapper layers.
+
 ## Consequences
 - Library types are clean of sc-observability imports ✓
 - The binary module tree can use sc-observability freely ✓

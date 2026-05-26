@@ -20,7 +20,7 @@ target: integration/phase-B
 
 ## Hard Dependencies
 
-- [docs/sc-lint/phase-B-plan.md](./phase-B-plan.md)
+- [docs/phase-B/phase-B-plan.md](./phase-B-plan.md)
 - `.claude/skills/triaging-findings/SKILL.md`
 - `.claude/skills/todo-triage/SKILL.md`
 - `.claude/skills/codex-orchestration/SKILL.md`
@@ -42,7 +42,7 @@ target: integration/phase-B
 - `scripts/test_find_todos.py`
 - `scripts/test_triage_carry_forward.py`
 - `docs/issues-inventory.md`
-- `docs/sc-lint/phase-B-plan.md`
+- `docs/phase-B/phase-B-plan.md`
 - `docs/project-plan.md`
 
 ## Deliverables

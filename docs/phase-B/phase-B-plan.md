@@ -30,13 +30,13 @@ The currently planned sprints in this phase are:
     - broader cross-platform environment-variable portability rules
     - shell-portability checks for OS-specific shell and command assumptions
   - portability ownership/parity ADR coverage
-  - see [docs/sc-lint/sprint-B1.md](./sprint-B1.md)
+  - see [docs/phase-B/sprint-B1.md](./sprint-B1.md)
 - `B.2`
   - TOML-backed named-caller allowlist enforcement in `sc-lint-boundary`
   - new `SCB-CALLER-001` rule using the existing reference graph
   - close issue `#29` with stable CLI/text/JSON surfaces for caller policy
   - CLI/config/documentation integration for approved-caller policy
-  - see [docs/sc-lint/sprint-B2.md](./sprint-B2.md)
+  - see [docs/phase-B/sprint-B2.md](./sprint-B2.md)
 - `B.3`
   - observability boundary-policy ADR acceptance plus doc/boundary alignment
   - promote `ADR-009` from stub to accepted policy
@@ -45,12 +45,12 @@ The currently planned sprints in this phase are:
     - `logging::dispatch_event`
     - `contract::ServiceName`
     - `CommandEnvelope.command`
-  - see [docs/sc-lint/sprint-B3.md](./sprint-B3.md)
+  - see [docs/phase-B/sprint-B3.md](./sprint-B3.md)
 - `B.4`
   - QA-process hardening
   - triage-first routing and QA-1-only rust-best-practices default
   - regression-tested TODO discovery and carry-forward routing helpers
-  - see [docs/sc-lint/sprint-B4.md](./sprint-B4.md)
+  - see [docs/phase-B/sprint-B4.md](./sprint-B4.md)
 - `sprint-B-homebrew`
   - full `sc-lint` Homebrew distribution planning
   - primary `brew install randlee/tap/sc-lint` path
@@ -58,7 +58,7 @@ The currently planned sprints in this phase are:
   - sprint number intentionally TBD; keep this item at the end of the Phase `B`
     sequence until numbering is assigned after the `B.1`-`B.4`
     implementation order is reviewed and locked
-  - see [docs/sc-lint/sprint-B-homebrew.md](./sprint-B-homebrew.md)
+  - see [docs/phase-B/sprint-B-homebrew.md](./sprint-B-homebrew.md)
 
 ## Phase Structure
 
@@ -87,6 +87,11 @@ open:
 
 Additional Phase `B` sprint scope may be added after the current numbered
 planning line through `B.4` is reviewed.
+
+The next queued planning line after Phase `B` is Phase `C`, covering
+`sc-lint-version`, the shared reporting pipeline it consumes, and hard-fail
+breaking-change checks across Rust APIs, CLI contracts, and transport
+interfaces.
 
 ## Exit Direction
 

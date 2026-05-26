@@ -68,9 +68,9 @@ The current parity window is intentionally narrow:
 - `crates/sc-lint-boundary/`
 - `.just/tests/`
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/boundary-toml-migration.md`
-- `docs/sc-lint/boundary-enforcement-model.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/sc-lint-boundary/boundary-toml-migration.md`
+- `docs/sc-lint-boundary/boundary-enforcement-model.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/project-plan.md`
 
@@ -139,9 +139,9 @@ leave the product in an ambiguous transition state.
 ## Required Document Updates
 
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/boundary-toml-migration.md`
-- `docs/sc-lint/boundary-enforcement-model.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/sc-lint-boundary/boundary-toml-migration.md`
+- `docs/sc-lint-boundary/boundary-enforcement-model.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/project-plan.md`
 - `docs/sc-lint/roadmap.md`
 

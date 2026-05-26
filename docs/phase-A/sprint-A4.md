@@ -166,7 +166,7 @@ portability rules rather than leaving the rule family split across crates.
 ## Required Document Updates
 
 - `docs/sc-lint/extraction-plan.md`
-- `docs/sc-lint/foundation-phase-plan.md`
+- `docs/phase-A/foundation-phase-plan.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/sc-lint/README.md`
 - `docs/project-plan.md`
