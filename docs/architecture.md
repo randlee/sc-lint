@@ -292,8 +292,8 @@ moving the CLI package to `sc-observability` `1.1.0`. That maintenance scope
 was limited to:
 
 - typestate-compatible logger construction and shutdown
-- replacement of direct top-level `emit(...)` call sites with the accepted
-  CLI-owned `try_log` compatibility path
+- confirmation that direct top-level `emit(...)` call sites remain on the
+  supported `Logger<Running>` public API in `1.1.0`
 - one explicit retained-log policy decision, with rotation/pruning/background
   maintenance owned by the logger through `RetainedLogPolicy::default()`
 - one explicit no decision on `sc-observe` adoption that remains subordinate

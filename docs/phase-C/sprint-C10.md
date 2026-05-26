@@ -38,8 +38,6 @@ Issue driver:
 - `crates/sc-lint/Cargo.toml`
 - `crates/sc-lint/src/logging.rs`
 - `crates/sc-lint/src/main.rs`
-- `crates/sc-lint-boundary/src/graph.rs`
-- `crates/sc-lint-boundary/src/graph/utils.rs`
 - `docs/sc-lint/logging.md`
 - `docs/requirements.md`
 - `docs/architecture.md`
@@ -50,13 +48,8 @@ Issue driver:
 - workspace dependency uplift from `sc-observability` `1.0.0` to `1.1.0`
 - explicit compatibility verification for the current logger call sites:
   - `initialize_logger(...)`
-  - event log paths that previously called deprecated `emit`
+  - event log paths that continue to use the supported `emit(...)` API
   - `shutdown(logger)` at the CLI boundary
-- one explicit migration decision for event emission:
-  - use CLI-owned `try_log` semantics at every current event site so command
-    completion stays non-blocking
-  - leave the CLI-owned `log` compatibility verb unused in `0.2.x` because no
-    current path intentionally blocks on a full queue
 - one explicit release-line decision for retained-log behavior:
   - enable `RetainedLogPolicy` with documented defaults
   - keep rotation, pruning, and background maintenance logger-owned
@@ -67,8 +60,6 @@ Issue driver:
 - Windows rotation compatibility called out as a validation target for the
   release line because `sc-lint` ships on Windows through `xwin`-validated
   paths and Homebrew/GitHub release installs
-- graph-utility extraction so `crates/sc-lint-boundary/src/graph.rs` stays
-  under the `RULE-003` non-test production line limit
 
 ## Explicit Code Samples
 
@@ -87,8 +78,8 @@ config.enable_console_sink = loaded_config.logging_console();
 ```
 
 ```rust
-// C.10 keeps direct emit() out of CLI event call sites:
-logger.try_log(event)?;
+// C.10 stays on the supported sc-observability 1.1.0 public API:
+logger.emit(event)?;
 ```
 
 ## This Sprint Does Not Close
@@ -102,9 +93,9 @@ logger.try_log(event)?;
 - the sprint identifies the exact `sc-lint` logger construction and shutdown
   seams that must compile unchanged or be minimally adapted for
   `Logger<Running>` / `Logger<Stopped>`
-- the sprint identifies the exact deprecated `emit` call sites and makes one
-  explicit `log` versus `try_log` decision for them; `0.2.x` chooses `try_log`
-  at every current event site
+- the sprint identifies the exact event call sites and confirms that
+  `sc-observability` `1.1.0` keeps `emit(...)` as the supported public API for
+  `Logger<Running>`
 - the plan keeps the CLI-only `sc-observability` dependency seam from
   `ADR-009`
 - the sprint makes one explicit yes/no decision on retained-log policy for the
@@ -116,8 +107,6 @@ logger.try_log(event)?;
 - the sprint records that `shutdown(logger)` takes ownership by value because
   the logger transitions from `Logger<Running>` to `Logger<Stopped>` on
   shutdown
-- `crates/sc-lint-boundary/src/graph/utils.rs` exists and lowers
-  `graph.rs` to `<= 1000` non-test production lines
 - `docs/sc-lint/logging.md`, `docs/requirements.md`, and `docs/architecture.md`
   remain aligned on the chosen `1.1.0` integration shape
 

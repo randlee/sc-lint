@@ -3,7 +3,6 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use sc_observability::ActionName;
-use sc_observability::EventError;
 use sc_observability::Level;
 use sc_observability::LogEvent;
 use sc_observability::Logger;
@@ -11,7 +10,6 @@ use sc_observability::LoggerConfig;
 use sc_observability::OBSERVATION_ENVELOPE_VERSION;
 use sc_observability::OutcomeLabel;
 use sc_observability::ProcessIdentity;
-use sc_observability::Running;
 use sc_observability::SchemaVersion;
 use sc_observability::ServiceName as ObservabilityServiceName;
 use sc_observability::TargetCategory;
@@ -125,7 +123,6 @@ pub(crate) fn initialize_logger(
         log_root.0.clone(),
     );
     config.enable_console_sink = observed.loaded_config().logging_console();
-    config.retained_log_policy = sc_observability::RetainedLogPolicy::default();
     Logger::new(config).map_err(classify_logger_init_error)
 }
 
@@ -159,7 +156,7 @@ pub(crate) fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &C
         logger,
         observed,
         Level::Info,
-        started_action().cloned().ok(),
+        started_action().cloned(),
         None,
         Some("command invocation started"),
         fields,
@@ -177,7 +174,7 @@ pub(crate) fn log_dispatch_start(logger: &Logger, observed: &ObservedCommand<'_>
         logger,
         observed,
         Level::Info,
-        dispatch_started_action().cloned().ok(),
+        dispatch_started_action().cloned(),
         None,
         Some("backend dispatch started"),
         fields,
@@ -203,7 +200,7 @@ pub(crate) fn log_dispatch_result(
         logger,
         observed,
         Level::Info,
-        dispatch_normalized_action().cloned().ok(),
+        dispatch_normalized_action().cloned(),
         success_outcome().cloned().ok(),
         Some("backend result normalized through top-level contract"),
         fields,
@@ -231,7 +228,7 @@ pub(crate) fn log_completion(
         logger,
         observed,
         Level::Info,
-        completed_action().cloned().ok(),
+        completed_action().cloned(),
         if ok {
             success_outcome().cloned().ok()
         } else {
@@ -273,7 +270,7 @@ pub(crate) fn log_error(logger: &Logger, observed: &ObservedCommand<'_>, error: 
         logger,
         observed,
         Level::Error,
-        error_action().cloned().ok(),
+        error_action().cloned(),
         failure_outcome().cloned().ok(),
         Some("top-level cli error emitted"),
         fields,
@@ -292,17 +289,11 @@ fn dispatch_event(
     logger: &Logger,
     observed: &ObservedCommand<'_>,
     level: Level,
-    action: Option<ActionName>,
+    action: Result<ActionName, &'static str>,
     outcome: Option<OutcomeLabel>,
     message: Option<&str>,
     fields: Map<String, Value>,
 ) {
-    let Some(action) = action else {
-        debug_assert!(false, "failed to resolve static log action");
-        #[cfg(debug_assertions)]
-        eprintln!("[sc-lint] dispatch_event: missing static action");
-        return;
-    };
     let event = match build_event(observed, level, action, outcome, message, fields) {
         Ok(event) => event,
         Err(error) => {
@@ -313,10 +304,7 @@ fn dispatch_event(
             return;
         }
     };
-    // C.10 keeps every current CLI event site intentionally non-blocking:
-    // telemetry must never stall command completion while the runtime still
-    // exposes only the synchronous emit path under the hood.
-    let _ = logger.try_log(event);
+    let _ = logger.emit(event);
 }
 
 #[expect(
@@ -326,7 +314,7 @@ fn dispatch_event(
 fn build_event(
     observed: &ObservedCommand<'_>,
     level: Level,
-    action: ActionName,
+    action: Result<ActionName, &'static str>,
     outcome: Option<OutcomeLabel>,
     message: Option<&str>,
     fields: Map<String, Value>,
@@ -339,7 +327,7 @@ fn build_event(
             .observability_service_name()
             .map_err(CliError::internal)?,
         target: command_target().map_err(CliError::internal)?.clone(),
-        action,
+        action: action.map_err(CliError::internal)?,
         message: message.map(ToString::to_string),
         identity: ProcessIdentity::default(),
         trace: None,
@@ -366,13 +354,13 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
         fields.insert(FIELD_TARGET_TRIPLE.to_string(), json!(WINDOWS_XWIN_TARGET));
     }
     if let Some(adapter_kind) = observed.context.adapter_kind() {
-        fields.insert("adapter".to_string(), json!(adapter_kind));
+        fields.insert(consts::FIELD_ADAPTER.to_string(), json!(adapter_kind));
     }
     if let Some(config_scope) = observed.context.adapter_config_scope() {
-        fields.insert("config_scope".to_string(), json!(config_scope));
+        fields.insert(consts::FIELD_CONFIG_SCOPE.to_string(), json!(config_scope));
     }
     if let Some(script) = observed.context.adapter_script() {
-        fields.insert("script".to_string(), json!(script));
+        fields.insert(consts::FIELD_SCRIPT.to_string(), json!(script));
     }
     if observed.command_id() == consts::CMD_BOUNDARY {
         fields.insert(FIELD_MANIFEST_POLICY_MODE.to_string(), json!("rust-native"));
@@ -550,6 +538,9 @@ fn classify_logger_init_error<E>(error: E) -> CliError
 where
     E: std::fmt::Display,
 {
+    // Third-party init errors do not currently expose stable typed categories,
+    // so this classifier intentionally uses message heuristics to preserve the
+    // existing CliError contract without forking the upstream error model.
     let message = error.to_string().to_ascii_lowercase();
     if contains_config_signal(&message) {
         return CliError::config("failed to initialize the structured logger")
@@ -570,25 +561,6 @@ where
         .with_suggested_action(
             "Re-run the command; if the failure persists, inspect the logger wiring.",
         )
-}
-
-#[expect(
-    dead_code,
-    reason = "C.10 introduces the blocking compatibility verb now so later queue-backed runtimes can opt into it without exposing emit at call sites."
-)]
-trait LoggerEventCompat {
-    fn try_log(&self, event: LogEvent) -> Result<(), EventError>;
-    fn log(&self, event: LogEvent) -> Result<(), EventError>;
-}
-
-impl LoggerEventCompat for Logger<Running> {
-    fn try_log(&self, event: LogEvent) -> Result<(), EventError> {
-        self.emit(event)
-    }
-
-    fn log(&self, event: LogEvent) -> Result<(), EventError> {
-        self.emit(event)
-    }
 }
 
 fn contains_config_signal(message: &str) -> bool {

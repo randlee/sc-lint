@@ -10,6 +10,7 @@ use crate::CliErrorKind;
 use crate::command::CommandSuccess;
 use crate::command::DispatchTelemetry;
 use crate::config::LoadedConfig;
+use crate::consts;
 
 pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
 
@@ -79,8 +80,8 @@ pub(crate) fn run_python_tool(
         .map_err(|error| {
             CliError::backend_failure(format!("{} failed to start", tool.tool_name()))
                 .with_source(error)
-                .with_detail("tool", json!(tool.tool_name()))
-                .with_detail("script", json!(tool.script_relative_path()))
+                .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
+                .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()))
         })?;
 
     let parsed = parse_adapter_output(tool, &output.stdout)?;
@@ -90,20 +91,20 @@ pub(crate) fn run_python_tool(
             let mut data = parsed.data.unwrap_or_else(|| json!({}));
             if let Some(object) = data.as_object_mut() {
                 object
-                    .entry("adapter".to_string())
+                    .entry(consts::FIELD_ADAPTER.to_string())
                     .or_insert_with(|| json!(ADAPTER_SCHEMA));
                 object
-                    .entry("config_scope".to_string())
+                    .entry(consts::FIELD_CONFIG_SCOPE.to_string())
                     .or_insert_with(|| json!(tool.config_scope()));
                 object
-                    .entry("script".to_string())
+                    .entry(consts::FIELD_SCRIPT.to_string())
                     .or_insert_with(|| json!(tool.script_relative_path()));
                 object
-                    .entry("summary".to_string())
+                    .entry(consts::FIELD_SUMMARY.to_string())
                     .or_insert_with(|| json!(parsed.summary));
             }
             let finding_count = data
-                .get("findings")
+                .get(consts::FIELD_FINDINGS)
                 .and_then(Value::as_array)
                 .map_or(0, std::vec::Vec::len);
             Ok(CommandSuccess::with_dispatch(
@@ -183,12 +184,12 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
                 "{} returned an adapter failure without a message",
                 tool.tool_name()
             ))
-            .with_detail("tool", json!(tool.tool_name()))
+            .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         })?
         .to_string();
     let mut error = CliError::new(kind, message)
-        .with_detail("tool", json!(tool.tool_name()))
-        .with_detail("script", json!(tool.script_relative_path()));
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
+        .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()));
     if let Some(details) = error_object.get("details").and_then(Value::as_object) {
         error = merge_details(error, details);
     }

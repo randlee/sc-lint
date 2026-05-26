@@ -36,8 +36,8 @@ release without changing those ownership seams. The `0.2.x` decisions are now:
 
 - retained-log maintenance is enabled through logger-owned
   `RetainedLogPolicy` defaults rather than wrapper-owned cleanup logic
-- all current CLI event sites intentionally use non-blocking `try_log`
-  semantics; no `0.2.x` path intentionally blocks on a full queue
+- all current CLI event sites remain on the supported `emit(...)` path exposed
+  by `Logger<Running>` in `sc-observability` `1.1.0`
 - `sc-observe` is not adopted in the CLI path for `0.2.x`; direct
   `sc-observability` remains required for logger construction, file-sink
   policy, and health/query support
@@ -96,12 +96,11 @@ Planned implementation note:
 - the supported dependency line moves from `sc-observability` `1.0.0` to
   `1.1.0`
 - retained-log rotation/pruning/background maintenance stays enabled through
-  `LoggerConfig.retained_log_policy = RetainedLogPolicy::default()` at logger
-  construction time, so maintenance remains logger-owned
-- top-level event sites no longer call deprecated `emit(...)` directly; the
-  CLI-owned logging seam now uses local `try_log`/`log` compatibility verbs
-  that keep `emit(...)` behind one binary-only boundary while preserving the
-  ADR-008 prohibition on proliferating `emit_*` wrappers
+  `LoggerConfig::default_for(...)`, which already carries
+  `RetainedLogPolicy::default()` and therefore keeps maintenance logger-owned
+- the supported event-emission path for `1.1.0` remains direct `emit(...)` on
+  the CLI-owned logger because `Logger<Running>` does not expose `try_log` or
+  `log` in this release line
 
 ## Initialization Model
 
@@ -367,14 +366,6 @@ ADR-009 boundary note:
 - custom `emit_*` wrappers remain forbidden by ADR-008
 - `ObservedCommand` remains the approved binary-side observation context until
   a later ADR records a reconciled successor
-
-`C.10` implementation note:
-
-- `dispatch_event` now routes through CLI-owned `try_log` compatibility
-  semantics so direct `emit(...)` use stays internal to one binary-only seam
-- the branch-local `log` compatibility verb remains available for a later
-  release if `sc-observability` exposes an explicit bounded-queue blocking
-  path, but `0.2.x` intentionally does not use it
 
 ## Rollout By Sprint
 

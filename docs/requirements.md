@@ -303,9 +303,10 @@ The product should support both:
 - `REQ-LOG-008`
   Top-level event emission call sites must stay on the accepted CLI-owned
   logging surface for the selected `sc-observability` release line. For
-  `sc-observability` `1.1.0`, `0.2.x` keeps deprecated `emit(...)` behind the
-  binary-only logging seam and requires call sites to use the accepted
-  `try_log`/`log` compatibility verbs instead.
+  `sc-observability` `1.1.0`, `0.2.x` records that `Logger<Running>` continues
+  to expose `emit(...)` as the supported public API and therefore keeps
+  top-level event sites on that API rather than inventing repo-local
+  alternatives.
 
 - `REQ-LOG-009`
   Adoption of any higher-level observability facade layered over
