@@ -270,8 +270,9 @@ The product should support both:
   before command execution begins.
 
 - `REQ-LOG-002`
-  The default log root must be `~/sc-lint/logs/<service>/`, with a
-  per-lint-system override available through config or CLI flag.
+  The default log root must be `~/sc-lint`, with the active JSONL file written
+  under `<log_root>/logs/<service>.log.jsonl` and a per-lint-system override
+  available through config or CLI flag.
 
 - `REQ-LOG-003`
   File logging must be enabled by default and console logging must remain
@@ -300,10 +301,10 @@ The product should support both:
   policy rather than by wrapper-owned cleanup code.
 
 - `REQ-LOG-008`
-  Top-level event emission call sites must make an explicit blocking decision:
-  use non-blocking `try_log` where dropped events on a full queue are an
-  accepted tradeoff, and use blocking `log` only where waiting on a full queue
-  is an intentional documented behavior.
+  Top-level event emission call sites must stay on the supported
+  `sc-observability` API for the selected release line without wrapper-owned
+  compatibility shims. For `sc-observability` `1.1.0`, the accepted event
+  emission path remains direct `emit(...)`.
 
 - `REQ-LOG-009`
   Adoption of any higher-level observability facade layered over

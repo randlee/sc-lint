@@ -292,9 +292,10 @@ moving the CLI package to `sc-observability` `1.1.0`. That maintenance scope
 is limited to:
 
 - typestate-compatible logger construction and shutdown
-- explicit `log` versus `try_log` decisions at current top-level event sites
+- verification that the existing top-level event sites remain on the supported
+  `emit(...)` path for `1.1.0`
 - one explicit retained-log policy decision, with rotation/pruning/background
-  maintenance owned by the logger when enabled
+  maintenance owned by the logger through `RetainedLogPolicy`
 - one explicit `sc-observe` adoption decision that remains subordinate to the
   existing CLI-owned boundary policy
 

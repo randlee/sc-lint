@@ -47,36 +47,32 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
         }
     };
     let logger = match logging::initialize_logger(&observed, &cli) {
-        Ok(logger) => Some(logger),
+        Ok(logger) => logger,
         Err(error) => {
             return sc_lint::RenderedOutput::render_failure(context.command_id(), cli.json, &error)
                 .write(error.exit_code());
         }
     };
     let started_at = Instant::now();
-    if let Some(logger) = logger.as_ref() {
-        logging::log_entry(logger, &observed, &cli);
-        if let Some(tool) = context.dispatch_tool() {
-            logging::log_dispatch_start(logger, &observed, tool);
-        }
+    logging::log_entry(&logger, &observed, &cli);
+    if let Some(tool) = context.dispatch_tool() {
+        logging::log_dispatch_start(&logger, &observed, tool);
     }
     let outcome = sc_lint::ExecutionOutcome::run(context.clone(), &loaded_config, cli.json);
-    if let Some(logger) = logger.as_ref() {
-        if let Some(dispatch) = outcome.dispatch.as_ref() {
-            logging::log_dispatch_result(logger, &observed, dispatch);
-        }
-        if let Some(error) = outcome.error.as_ref() {
-            logging::log_error(logger, &observed, error);
-        }
-        logging::log_completion(
-            logger,
-            &observed,
-            outcome.ok,
-            &outcome.summary,
-            started_at.elapsed(),
-        );
-        logging::flush(logger);
-        logging::shutdown(logger);
+    if let Some(dispatch) = outcome.dispatch.as_ref() {
+        logging::log_dispatch_result(&logger, &observed, dispatch);
     }
+    if let Some(error) = outcome.error.as_ref() {
+        logging::log_error(&logger, &observed, error);
+    }
+    logging::log_completion(
+        &logger,
+        &observed,
+        outcome.ok,
+        &outcome.summary,
+        started_at.elapsed(),
+    );
+    logging::flush(&logger);
+    logging::shutdown(logger);
     outcome.rendered.write(outcome.exit_code)
 }

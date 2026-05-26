@@ -95,15 +95,15 @@ Planned implementation note:
   - remaining bootstrap-only command paths
     - `sc-lint`
 
-Queued `1.1.0` maintenance note:
+`1.1.0` maintenance note:
 
 - the supported dependency line moves from `sc-observability` `1.0.0` to
   `1.1.0`
 - any retained-log rotation/pruning/background maintenance enabled for the
   release line is configured at logger construction time and stays
   logger-owned
-- deprecated event-emission call sites migrate to explicit `log` or `try_log`
-  choices instead of wrapper-specific compatibility shims
+- the compatible event-emission path for `1.1.0` remains direct `emit(...)`
+  on the CLI-owned logger without wrapper-specific compatibility shims
 
 ## Initialization Model
 
@@ -221,9 +221,9 @@ Planned implementation note:
 - represent the validated effective log root as a dedicated `LogRoot`
   wrapper/newtype at the CLI config boundary rather than passing a raw
   `String` through multiple modules
-- the A.1a implementation applies the service name to the resolved root so
-  `--log-root <path>` becomes:
-  - `<path>/<service-name>/`
+- the A.1a implementation resolves one base log root and lets the built-in
+  logger file sink place the active file at:
+  - `<log_root>/logs/<service>.log.jsonl`
 
 ## Sink Model
 
@@ -235,25 +235,21 @@ Requirement coverage:
 
 File logging is on by default.
 
-`sc-lint` should use `LoggerBuilder` rather than `Logger::new(...)` for the
-default path, because the desired service-scoped directory layout is:
+Release `0.2.x` now uses the built-in logger-owned file sink so retained-log
+rotation, pruning, and background maintenance stay attached to
+`LoggerConfig.retained_log_policy`.
 
-- `~/sc-lint/logs/<service-name>/`
-
-while `LoggerConfig::default_for(...)` plus the built-in sink would otherwise
-resolve the active file path relative to the provided root as:
+The active file path is:
 
 - `<log_root>/logs/<service>.log.jsonl`
 
-The planned integration is therefore:
+The default root is:
 
-1. build `LoggerConfig`
-2. disable the built-in file sink
-3. register one `JsonlFileSink` explicitly at a service-scoped path inside the
-   chosen root directory
+- `~/sc-lint`
 
-This preserves the requested directory model without requiring backend-local
-logger setup.
+That yields the default active file path:
+
+- `~/sc-lint/logs/<service>.log.jsonl`
 
 ### Console Sink
 
@@ -267,7 +263,7 @@ Planned controls:
   - `logging.console`
 
 When enabled, the A.1a bootstrap turns on
-`LoggerConfig.enable_console_sink` before `LoggerBuilder::new(...)`. Later
+`LoggerConfig.enable_console_sink` before logger construction. Later
 sprints should preserve the same CLI surface unless explicit per-sink
 filtering becomes necessary.
 

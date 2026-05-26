@@ -1,10 +1,10 @@
 ---
 id: C.10
 title: sc-observability 1.1.0 Adoption
-status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
-target: develop
+status: completed
+branch: feature/sprint-C10
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C10
+target: integration/phase-C
 ---
 
 # Sprint C.10 — sc-observability 1.1.0 Adoption

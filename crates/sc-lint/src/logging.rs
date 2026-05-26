@@ -3,18 +3,15 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use sc_observability::ActionName;
-use sc_observability::JsonlFileSink;
 use sc_observability::Level;
 use sc_observability::LogEvent;
 use sc_observability::Logger;
-use sc_observability::LoggerBuilder;
 use sc_observability::LoggerConfig;
 use sc_observability::OBSERVATION_ENVELOPE_VERSION;
 use sc_observability::OutcomeLabel;
 use sc_observability::ProcessIdentity;
 use sc_observability::SchemaVersion;
 use sc_observability::ServiceName;
-use sc_observability::SinkRegistration;
 use sc_observability::TargetCategory;
 use sc_observability::Timestamp;
 use serde_json::Map;
@@ -102,15 +99,8 @@ impl LogRoot {
             None => default_log_base()?,
         };
 
-        Ok(Self(base.join(service_name)))
-    }
-
-    fn service_root(&self) -> &PathBuf {
-        &self.0
-    }
-
-    fn active_log_path(&self, service_name: &str) -> PathBuf {
-        self.0.join(format!("{service_name}.log.jsonl"))
+        let _ = service_name;
+        Ok(Self(base))
     }
 }
 
@@ -130,25 +120,10 @@ pub(crate) fn initialize_logger(
             .or(cli.log_root.as_ref()),
         observed.service_name(),
     )?;
-    let mut config = LoggerConfig::default_for(
-        observed.observability_service_name(),
-        log_root.service_root().clone(),
-    );
-    let rotation = config.rotation;
-    let retention = config.retention;
-    config.enable_file_sink = false;
+    let mut config =
+        LoggerConfig::default_for(observed.observability_service_name(), log_root.0.clone());
     config.enable_console_sink = observed.loaded_config().logging_console();
-
-    let mut builder = LoggerBuilder::new(config).map_err(classify_logger_init_error)?;
-    builder.register_sink(SinkRegistration::new(std::sync::Arc::new(
-        JsonlFileSink::new(
-            log_root.active_log_path(observed.service_name()),
-            rotation,
-            retention,
-        ),
-    )));
-
-    Ok(builder.build())
+    Logger::new(config).map_err(classify_logger_init_error)
 }
 
 pub(crate) fn log_entry(logger: &Logger, observed: &ObservedCommand<'_>, cli: &Cli) {
@@ -306,7 +281,7 @@ pub(crate) fn flush(logger: &Logger) {
     let _ = logger.flush();
 }
 
-pub(crate) fn shutdown(logger: &Logger) {
+pub(crate) fn shutdown(logger: Logger) {
     let _ = logger.shutdown();
 }
 
@@ -527,7 +502,7 @@ fn elapsed_ms(elapsed: Duration) -> u64 {
 )]
 fn default_log_base() -> Result<PathBuf, CliError> {
     home_directory()
-        .map(|home| home.join(consts::SERVICE_NAME).join("logs"))
+        .map(|home| home.join(consts::SERVICE_NAME))
         .ok_or_else(|| {
             CliError::capability("could not resolve the current user's home directory for logging")
                 .with_suggested_action(

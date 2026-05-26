@@ -199,7 +199,7 @@ The currently scheduled sprint plans are:
   - `docs/phase-C/sprint-C9.md`
 - `C.10`
   - `sc-observability` `1.1.0` adoption
-  - retained-log policy decision plus `emit` -> `log` / `try_log`, typestate,
+  - retained-log policy decision plus typestate, `emit(...)` compatibility,
     and Windows-rotation compatibility review for the CLI-owned logging seam
   - `docs/phase-C/sprint-C10.md`
 
