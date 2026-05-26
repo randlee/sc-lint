@@ -62,3 +62,12 @@ The consuming repo can run the planned interface-check flow and produce:
 - canonical interface artifacts
 - shared HTML/XHTML/JSON reports
 - hard-fail verdicts for breaking drift
+
+## Related Documents
+
+- `docs/sc-lint/version-adoption.md`
+- `docs/sc-lint/skill-authoring-constraints.md`
+
+Marketplace packaging for this adoption skill is deferred to `C.5`. This skill
+document remains scoped to adoption workflow and does not own marketplace
+publication shape.

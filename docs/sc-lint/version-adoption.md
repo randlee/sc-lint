@@ -174,3 +174,12 @@ The intended end state for a consuming repo is:
 - canonical machine-readable artifacts for each enabled family
 - shared HTML/XHTML/JSON publication through the reusable reporting line
 - hard-fail checks driven by those same canonical artifacts
+
+## Governing Documents
+
+- [../sc-lint-version/requirements.md](../sc-lint-version/requirements.md)
+  Governing requirements:
+  `REQ-VERSION-022A`, `REQ-VERSION-022AA`.
+- [./skill-authoring-constraints.md](./skill-authoring-constraints.md)
+  Governing adoption-skill constraints for scope, structure, and authoring
+  responsibilities.

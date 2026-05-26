@@ -159,6 +159,8 @@ Initial Phase-C scope is:
   - `docs/sc-lint/version-adoption.md` as the authoritative consumer guide
   - `.claude/skills/sc-lint-version-adoption/SKILL.md` as the repo-local
     adoption skill
+  - `docs/sc-lint/skill-authoring-constraints.md` as the authoritative
+    skill-design constraint doc for the adoption skill
 - `C.5`
   - minimal marketplace publication planning for the adoption skill
 - `C.6`
