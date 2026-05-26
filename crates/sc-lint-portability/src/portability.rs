@@ -1,4 +1,5 @@
 use std::fs;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -61,7 +62,7 @@ struct RepoPortabilityConfig {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 struct PortabilityDefaults {
-    unix_path_prefixes: Vec<String>,
+    unix_path_prefixes: Vec<UnixPathPrefix>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -72,7 +73,48 @@ struct BuiltInDefaults {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PortabilityConfig {
     config_home_env: Option<String>,
-    unix_path_prefixes: Vec<String>,
+    unix_path_prefixes: Vec<UnixPathPrefix>,
+}
+
+const REPO_LINT_CONFIG_PATHS: &[&str] = &["sc-lint.toml", ".just/lint-config.toml"];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UnixPathPrefix(String);
+
+impl UnixPathPrefix {
+    fn new(value: String) -> std::result::Result<Self, String> {
+        if value.is_empty() {
+            return Err("Unix path prefixes must not be empty".to_string());
+        }
+        if !value.starts_with('/') {
+            return Err(format!(
+                "Unix path prefixes must start with `/`, got `{value}`"
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for UnixPathPrefix {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl<'de> Deserialize<'de> for UnixPathPrefix {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -147,6 +189,9 @@ pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {
     count_crates(root)
 }
 
+// This collector analyzes test-scope items only; it is runtime code because the
+// analyzer must scan test modules in production workspaces, not because it is a
+// unit-test-only helper.
 struct PortabilityCollector<'a> {
     file_context: &'a FileContext,
     config: &'a PortabilityConfig,
@@ -621,7 +666,7 @@ impl<'a> PortabilityCollector<'a> {
         self.config
             .unix_path_prefixes
             .iter()
-            .any(|prefix| value.starts_with(prefix))
+            .any(|prefix| value.starts_with(prefix.as_str()))
     }
 }
 
@@ -776,8 +821,9 @@ impl<'ast> Visit<'ast> for FunctionBodyVisitor {
 fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
     let defaults = toml::from_str::<BuiltInDefaults>(crate::DEFAULT_RULES_TOML)
         .context("failed to parse built-in portability defaults")?;
-    let repo_config_path = ["sc-lint.toml", ".just/lint-config.toml"]
-        .into_iter()
+    let repo_config_path = REPO_LINT_CONFIG_PATHS
+        .iter()
+        .copied()
         .map(|relative| root.join(relative))
         .find(|path| path.exists());
     let repo_config = if let Some(repo_config_path) = repo_config_path {
