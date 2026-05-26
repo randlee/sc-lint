@@ -159,6 +159,8 @@ Initial Phase-C scope is:
   - repo-local Claude Code skill planning
 - `C.5`
   - minimal marketplace publication planning for the adoption skill
+  - `.claude-plugin/marketplace.json`
+  - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
 - `C.6`
   - production path-literal portability parity
 - `C.7`

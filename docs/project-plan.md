@@ -179,6 +179,8 @@ The currently scheduled sprint plans are:
   - `docs/phase-C/sprint-C4.md`
 - `C.5`
   - minimal marketplace publication for the adoption skill
+  - `.claude-plugin/marketplace.json`
+  - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
   - `docs/phase-C/sprint-C5.md`
 - `C.6`
   - production path-literal portability parity
