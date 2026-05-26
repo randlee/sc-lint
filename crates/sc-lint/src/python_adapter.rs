@@ -126,7 +126,7 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
             tool.tool_name()
         ))
         .with_source(error)
-        .with_detail("tool", json!(tool.tool_name()))
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
     })?;
     let payload: Value = serde_json::from_str(text).map_err(|error| {
         CliError::backend_protocol(format!(
@@ -134,21 +134,21 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
             tool.tool_name()
         ))
         .with_source(error)
-        .with_detail("tool", json!(tool.tool_name()))
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
     })?;
     let object = payload.as_object().ok_or_else(|| {
         CliError::backend_protocol(format!(
             "{} returned a non-object adapter payload",
             tool.tool_name()
         ))
-        .with_detail("tool", json!(tool.tool_name()))
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
     })?;
     if object.get("adapter_schema").and_then(Value::as_str) != Some(ADAPTER_SCHEMA) {
         return Err(CliError::backend_protocol(format!(
             "{} returned an unknown adapter schema",
             tool.tool_name()
         ))
-        .with_detail("tool", json!(tool.tool_name()))
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         .with_detail("expected_schema", json!(ADAPTER_SCHEMA)));
     }
     let summary = object
@@ -173,7 +173,7 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
                 "{} returned an adapter failure without an error object",
                 tool.tool_name()
             ))
-            .with_detail("tool", json!(tool.tool_name()))
+            .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         })?;
     let kind = parse_error_kind(tool, error_object.get("kind"))?;
     let message = error_object
@@ -220,7 +220,7 @@ fn parse_error_kind(tool: PythonTool, value: Option<&Value>) -> Result<CliErrorK
             "{} returned an adapter failure without an error kind",
             tool.tool_name()
         ))
-        .with_detail("tool", json!(tool.tool_name()))
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
     })?;
     match kind {
         "usage" => Ok(CliErrorKind::Usage),
@@ -233,7 +233,7 @@ fn parse_error_kind(tool: PythonTool, value: Option<&Value>) -> Result<CliErrorK
             "{} returned an unknown adapter error kind `{kind}`",
             tool.tool_name()
         ))
-        .with_detail("tool", json!(tool.tool_name()))),
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))),
     }
 }
 

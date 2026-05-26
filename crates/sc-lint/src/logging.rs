@@ -29,7 +29,6 @@ const FIELD_MANIFEST_POLICY_MODE: &str = "manifest_policy_mode";
 const FIELD_MANIFEST_POLICY_PARITY: &str = "manifest_policy_parity";
 const FIELD_PREFLIGHT_MODE: &str = "preflight_mode";
 const FIELD_REPO_ROOT: &str = "repo_root";
-const FIELD_SUMMARY: &str = "summary";
 const FIELD_TARGET_TRIPLE: &str = "target_triple";
 use crate::Cli;
 use crate::CliError;
@@ -216,7 +215,7 @@ pub(crate) fn log_completion(
 ) {
     let mut fields = base_fields(observed);
     fields.insert(
-        FIELD_SUMMARY.to_string(),
+        consts::FIELD_SUMMARY.to_string(),
         Value::String(summary.to_string()),
     );
     fields.insert(
@@ -347,7 +346,7 @@ fn base_fields(observed: &ObservedCommand<'_>) -> Map<String, Value> {
             FIELD_COMMAND.to_string(),
             Value::String(observed.command_id().to_string()),
         ),
-        (FIELD_SUMMARY.to_string(), json!(observed.summary())),
+        (consts::FIELD_SUMMARY.to_string(), json!(observed.summary())),
     ]);
     if observed.context.is_xwin_preflight() {
         fields.insert(FIELD_PREFLIGHT_MODE.to_string(), json!("xwin"));
