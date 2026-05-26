@@ -119,6 +119,12 @@ impl<'de> Deserialize<'de> for UnixPathPrefix {
     }
 }
 
+/// Unix-centric env vars flagged by PORT-008 before callers normalize through a
+/// platform-aware abstraction.
+const PORTABILITY_ENV_NAMES: &[&str] = &["HOME", "USER"];
+/// Unix-centric env var prefixes flagged by PORT-008 in ungated production code.
+const PORTABILITY_ENV_PREFIXES: &[&str] = &["XDG_"];
+
 #[derive(Debug, Clone)]
 struct PortabilityFinding {
     rule_id: RuleId,
@@ -680,6 +686,7 @@ struct FunctionBodyVisitor {
 struct ProductionPathLiteralVisitor<'a, 'b> {
     file_context: &'a FileContext,
     findings: &'b mut Vec<PortabilityFinding>,
+    platform_gated_depth: usize,
 }
 
 impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
@@ -687,6 +694,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
         Self {
             file_context,
             findings,
+            platform_gated_depth: 0,
         }
     }
 
@@ -714,11 +722,50 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             ),
         });
     }
+
+    fn push_env_finding(&mut self, variable_name: &str, line: usize) {
+        self.findings.push(PortabilityFinding {
+            rule_id: RuleId::Port008,
+            kind: "production_env_portability_lookup",
+            message: format!(
+                "PORT-008 direct std::env lookup of `{variable_name}` in production code bypasses platform-neutral path or identity abstractions; prefer dirs::data_dir(), dirs::config_dir(), dirs::home_dir(), or another platform-aware wrapper"
+            ),
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
 }
 
 impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
+    fn visit_expr_block(&mut self, node: &'ast syn::ExprBlock) {
+        let is_platform_gated = node.attrs.iter().any(attr_is_platform_cfg);
+        if is_platform_gated {
+            self.platform_gated_depth += 1;
+        }
+        syn::visit::visit_expr_block(self, node);
+        if is_platform_gated {
+            self.platform_gated_depth -= 1;
+        }
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if self.platform_gated_depth == 0
+            && let Some(variable_name) = production_env_portability_variable(node)
+        {
+            self.push_env_finding(&variable_name, span_start_line(node.span()));
+        }
+        syn::visit::visit_expr_call(self, node);
+    }
+
     fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
-        if let Lit::Str(lit) = &node.lit
+        if self.platform_gated_depth == 0
+            && let Lit::Str(lit) = &node.lit
             && let Some(rule_id) = production_path_rule_id(&lit.value())
         {
             self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
@@ -735,7 +782,7 @@ enum Usage {
 
 impl<'ast> Visit<'ast> for FunctionBodyVisitor {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if let Some(env_var_name) = extract_env_var_check(node) {
+        if let Some(env_var_name) = extract_env_var_lookup(node) {
             self.usages.push(Usage::EnvVarCheck {
                 name: env_var_name,
                 line: span_start_line(node.span()),
@@ -786,6 +833,17 @@ fn attr_is_cfg_unix(attr: &Attribute) -> bool {
         return false;
     }
     nested_cfg_metas(attr).is_some_and(|metas| metas.iter().any(meta_is_unix_cfg))
+}
+
+fn attr_is_platform_cfg(attr: &Attribute) -> bool {
+    if !attr.path().is_ident("cfg") {
+        return false;
+    }
+    nested_cfg_metas(attr).is_some_and(|metas| {
+        metas
+            .iter()
+            .any(|meta| meta_is_unix_cfg(meta) || meta_is_windows_cfg(meta))
+    })
 }
 
 fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> bool {
@@ -857,12 +915,14 @@ fn is_set_var_call(expr: &Expr) -> bool {
         || path_segments_match(&expr_path.path, &["std", "env", "set_var"])
 }
 
-fn extract_env_var_check(expr_call: &ExprCall) -> Option<String> {
+fn extract_env_var_lookup(expr_call: &ExprCall) -> Option<String> {
     let Expr::Path(expr_path) = &*expr_call.func else {
         return None;
     };
     if !path_segments_match(&expr_path.path, &["env", "var"])
+        && !path_segments_match(&expr_path.path, &["env", "var_os"])
         && !path_segments_match(&expr_path.path, &["std", "env", "var"])
+        && !path_segments_match(&expr_path.path, &["std", "env", "var_os"])
     {
         return None;
     }
@@ -873,6 +933,19 @@ fn extract_env_var_check(expr_call: &ExprCall) -> Option<String> {
         return None;
     };
     Some(lit.value())
+}
+
+fn production_env_portability_variable(expr_call: &ExprCall) -> Option<String> {
+    let variable_name = extract_env_var_lookup(expr_call)?;
+    if PORTABILITY_ENV_NAMES.contains(&variable_name.as_str())
+        || PORTABILITY_ENV_PREFIXES
+            .iter()
+            .any(|prefix| variable_name.starts_with(prefix))
+    {
+        Some(variable_name)
+    } else {
+        None
+    }
 }
 
 fn production_path_rule_id(value: &str) -> Option<RuleId> {
@@ -925,6 +998,20 @@ fn meta_is_unix_cfg(meta: &Meta) -> bool {
             .parse2(list.tokens.clone())
             .ok()
             .is_some_and(|metas: Punctuated<Meta, Token![,]>| metas.iter().any(meta_is_unix_cfg)),
+        Meta::NameValue(_) => false,
+    }
+}
+
+fn meta_is_windows_cfg(meta: &Meta) -> bool {
+    match meta {
+        Meta::Path(path) => path.is_ident("windows"),
+        Meta::List(list) if list.path.is_ident("not") => false,
+        Meta::List(list) => Punctuated::<Meta, Token![,]>::parse_terminated
+            .parse2(list.tokens.clone())
+            .ok()
+            .is_some_and(|metas: Punctuated<Meta, Token![,]>| {
+                metas.iter().any(meta_is_windows_cfg)
+            }),
         Meta::NameValue(_) => false,
     }
 }

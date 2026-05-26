@@ -33,6 +33,18 @@ This applies to:
 - Portability rules in `sc-lint-portability` should continue to evolve as a
   separate lint family.
 
+## PORT-008 Environment Variables
+
+- `PORT-008` flags `HOME`, `USER`, and `XDG_*` lookups in ungated production
+  code.
+- The canonical constant sources are `PORTABILITY_ENV_NAMES` and
+  `PORTABILITY_ENV_PREFIXES` in
+  `crates/sc-lint-portability/src/portability.rs`.
+- Preferred alternatives are `dirs::data_dir()`, `dirs::config_dir()`, and
+  `dirs::home_dir()`.
+- If the lookup is intentionally Unix-only, wrap the production code path in
+  `#[cfg(unix)]` instead of leaving the env lookup ungated.
+
 ## Related Docs
 
 - [docs/architecture.md](./architecture.md)

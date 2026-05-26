@@ -22,6 +22,9 @@ Use `sc-portability` to catch portability drift such as:
 - `PORT-007`
   - hardcoded Windows absolute path literals, including drive-letter and UNC
     forms, in production code
+- `PORT-008`
+  - direct production lookups of `HOME`, `USER`, and `XDG_*` without a
+    platform-neutral abstraction
 
 ## Ownership And Scope
 
@@ -104,6 +107,12 @@ Production code with a hardcoded Windows runtime path is also flagged:
 
 ```text
 PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction
+```
+
+Production code with Unix-centric environment lookups is also flagged:
+
+```text
+PORT-008 direct std::env lookup of `HOME` in production code bypasses platform-neutral path or identity abstractions; prefer dirs::data_dir(), dirs::config_dir(), dirs::home_dir(), or another platform-aware wrapper
 ```
 
 Test-only path literals are also flagged:

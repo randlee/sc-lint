@@ -551,9 +551,13 @@ fn home_directory() -> Option<PathBuf> {
                 )))
             })
     }
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     {
         std::env::var_os("HOME").map(PathBuf::from)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        None
     }
 }
 
