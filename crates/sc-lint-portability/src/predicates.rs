@@ -1,4 +1,3 @@
-use quote::ToTokens;
 use syn::Attribute;
 use syn::Expr;
 use syn::ExprCall;
@@ -25,6 +24,14 @@ pub(crate) const UNIX_SHELL_COMMANDS: &[&str] = &["sh", "bash"];
 /// Shell path literals intentionally covered by PORT-009 instead of the
 /// generic PORT-006 Unix path matcher.
 pub(crate) const UNIX_SHELL_PATHS: &[&str] = &[concat!("/bin", "/sh"), concat!("/bin", "/bash")];
+/// Production-only Unix path prefixes intentionally covered by PORT-006.
+pub(crate) const UNIX_PATH_PREFIXES: &[&str] = &[
+    concat!("/", "home", "/"),
+    concat!("/", "usr", "/"),
+    concat!("/", "etc", "/"),
+    concat!("/", "var", "/"),
+    concat!("/", "tmp", "/"),
+];
 
 pub(crate) fn attr_is_cfg_unix(attr: &Attribute) -> bool {
     attr_is_cfg_target(attr, "unix")
@@ -34,8 +41,7 @@ pub(crate) fn attr_is_platform_cfg(attr: &Attribute) -> bool {
     if !attr.path().is_ident("cfg") {
         return false;
     }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("unix") || rendered.contains("windows")
+    attr_is_cfg_target(attr, "unix") || attr_is_cfg_target(attr, "windows")
 }
 
 pub(crate) fn attr_is_cfg_windows(attr: &Attribute) -> bool {
@@ -46,8 +52,13 @@ pub(crate) fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> boo
     if !attr.path().is_ident("cfg_attr") {
         return false;
     }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("not(unix)") && rendered.contains("allow(dead_code)")
+    nested_cfg_metas(attr).is_some_and(|metas| {
+        let mut metas = metas.iter();
+        let Some(first) = metas.next() else {
+            return false;
+        };
+        meta_is_not_cfg_target(first, "unix") && metas.any(meta_is_allow_dead_code)
+    })
 }
 
 pub(crate) fn use_tree_contains_std_os_unix(tree: &UseTree) -> bool {
@@ -318,14 +329,9 @@ pub(crate) fn is_unix_shell_path_literal(value: &str) -> bool {
 }
 
 pub(crate) fn is_unix_path_literal(value: &str) -> bool {
-    matches!(
-        value,
-        path if path.starts_with("/home/")
-            || path.starts_with("/usr/")
-            || path.starts_with("/etc/")
-            || path.starts_with("/var/")
-            || path.starts_with("/tmp/")
-    )
+    UNIX_PATH_PREFIXES
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
 }
 
 pub(crate) fn is_windows_path_literal(value: &str) -> bool {
@@ -375,4 +381,34 @@ fn meta_is_cfg_target(meta: &Meta, target: &str) -> bool {
             .ok()
             .is_some_and(|metas| metas.iter().any(|meta| meta_is_cfg_target(meta, target))),
     }
+}
+
+fn meta_is_not_cfg_target(meta: &Meta, target: &str) -> bool {
+    let Meta::List(list) = meta else {
+        return false;
+    };
+    if !list.path.is_ident("not") {
+        return false;
+    }
+    Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()
+        .is_some_and(|metas| metas.iter().any(|meta| meta_is_cfg_target(meta, target)))
+}
+
+fn meta_is_allow_dead_code(meta: &Meta) -> bool {
+    let Meta::List(list) = meta else {
+        return false;
+    };
+    if !list.path.is_ident("allow") {
+        return false;
+    }
+    Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()
+        .is_some_and(|metas| {
+            metas
+                .iter()
+                .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("dead_code")))
+        })
 }

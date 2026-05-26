@@ -247,7 +247,7 @@ fn passes_dirs_cache_dir_in_production_code() {
 }
 
 #[test]
-fn flags_windows_drive_letter_path_in_production_code() {
+fn flags_hardcoded_windows_path_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -262,6 +262,7 @@ fn flags_windows_drive_letter_path_in_production_code() {
         "lib.rs",
         r#"
             pub fn cache_file() -> std::path::PathBuf {
+                let _ = r"\\server\share\sc-lint\cache.json";
                 std::path::PathBuf::from(r"C:\ProgramData\sc-lint\cache.json")
             }
         "#,
@@ -274,45 +275,13 @@ fn flags_windows_drive_letter_path_in_production_code() {
     .unwrap();
 
     assert_eq!(report.status, ReportStatus::Fail);
-    assert!(
+    assert_eq!(
         report
             .findings
             .iter()
-            .any(|finding| finding.rule_id == RuleId::Port007)
-    );
-}
-
-#[test]
-fn flags_windows_unc_path_in_production_code() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root();
-    fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"
-        [portability]
-        config_home_env = "ATM_CONFIG_HOME"
-        "#,
-    );
-    fixture.write_source(
-        "example",
-        "lib.rs",
-        r#"
-            pub const CACHE_PATH: &str = r"\\server\share\sc-lint\cache.json";
-        "#,
-    );
-
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-    })
-    .unwrap();
-
-    assert_eq!(report.status, ReportStatus::Fail);
-    assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == RuleId::Port007)
+            .filter(|finding| finding.rule_id == RuleId::Port007)
+            .count(),
+        2
     );
 }
 
@@ -371,6 +340,42 @@ fn flags_xdg_config_home_lookup_in_production_code() {
             pub fn config_root() -> std::path::PathBuf {
                 let root = std::env::var_os("XDG_CONFIG_HOME").expect("XDG_CONFIG_HOME");
                 std::path::PathBuf::from(root).join("sc-lint")
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port008)
+    );
+}
+
+#[test]
+fn flags_user_env_lookup_in_production_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub fn current_user() -> String {
+                std::env::var("USER").expect("USER")
             }
         "#,
     );

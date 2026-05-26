@@ -156,9 +156,15 @@ Initial Phase-C scope is:
   - cargo-semver-checks ingestion into the shared verdict contract
 - `C.4`
   - consuming-repo adoption guidance
-  - repo-local Claude Code skill planning
+  - `docs/sc-lint/version-adoption.md` as the authoritative consumer guide
+  - `.claude/skills/sc-lint-version-adoption/SKILL.md` as the repo-local
+    adoption skill
+  - `docs/sc-lint/skill-authoring-constraints.md` as the authoritative
+    skill-design constraint doc for the adoption skill
 - `C.5`
   - minimal marketplace publication planning for the adoption skill
+  - `.claude-plugin/marketplace.json`
+  - `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
 - `C.6`
   - production path-literal portability parity
 - `C.7`
