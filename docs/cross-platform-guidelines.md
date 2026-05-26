@@ -45,6 +45,31 @@ This applies to:
 - If the lookup is intentionally Unix-only, wrap the production code path in
   `#[cfg(unix)]` instead of leaving the env lookup ungated.
 
+## PORT-009 Shell Invocation
+
+- `PORT-009` flags production shell assumptions through `Command::new("sh")`,
+  `Command::new("bash")`, and Unix shell path literals like `/bin/sh` or
+  `/bin/bash`.
+- The canonical detector sources are `UNIX_SHELL_COMMANDS` and
+  `UNIX_SHELL_PATHS` in `crates/sc-lint-portability/src/predicates.rs`.
+- Prefer direct binary invocation or a platform-neutral command abstraction
+  instead of assuming a Unix shell exists.
+- If shell execution is intentionally Unix-only, gate that production path with
+  `#[cfg(unix)]`.
+
+## PORT-010 `cfg` Parity
+
+- `PORT-010` flags production `#[cfg(unix)]` items and impl methods when they
+  do not have either a Windows companion or a portable ungated fallback.
+- The canonical parity helpers live in
+  `crates/sc-lint-portability/src/predicates.rs`, including
+  `is_cfg_unix_production_item(...)`, `has_windows_companion(...)`,
+  `has_portable_fallback(...)`, and the impl-method companion checks.
+- `#[cfg(test)]` siblings do not satisfy production parity; companions must be
+  production-facing.
+- If no Windows companion exists, provide an ungated portable implementation or
+  an explicit Windows-gated companion instead of leaving the Unix branch alone.
+
 ## Related Docs
 
 - [docs/architecture.md](./architecture.md)

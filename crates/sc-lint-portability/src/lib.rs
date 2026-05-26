@@ -41,6 +41,7 @@ pub enum RuleId {
     Port007,
     Port008,
     Port009,
+    Port010,
 }
 
 impl RuleId {
@@ -55,6 +56,7 @@ impl RuleId {
             Self::Port007 => "PORT-007",
             Self::Port008 => "PORT-008",
             Self::Port009 => "PORT-009",
+            Self::Port010 => "PORT-010",
         }
     }
 }

@@ -2,6 +2,9 @@ use syn::Attribute;
 use syn::Expr;
 use syn::ExprCall;
 use syn::ExprLit;
+use syn::ImplItem;
+use syn::ImplItemFn;
+use syn::Item;
 use syn::Lit;
 use syn::Meta;
 use syn::Token;
@@ -10,6 +13,11 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 
 use crate::RuleId;
+use crate::source_scan::ScopeKind;
+use crate::source_scan::classify_scope;
+use crate::source_scan::item_attrs;
+use crate::source_scan::item_identifier;
+use crate::source_scan::item_name_hint_is_tests;
 
 /// Shell command names intentionally covered by PORT-009.
 pub(crate) const UNIX_SHELL_COMMANDS: &[&str] = &["sh", "bash"];
@@ -26,21 +34,18 @@ pub(crate) const UNIX_PATH_PREFIXES: &[&str] = &[
 ];
 
 pub(crate) fn attr_is_cfg_unix(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    nested_cfg_metas(attr).is_some_and(|metas| metas.iter().any(meta_is_unix_cfg))
+    attr_is_cfg_target(attr, "unix")
 }
 
 pub(crate) fn attr_is_platform_cfg(attr: &Attribute) -> bool {
     if !attr.path().is_ident("cfg") {
         return false;
     }
-    nested_cfg_metas(attr).is_some_and(|metas| {
-        metas
-            .iter()
-            .any(|meta| meta_is_unix_cfg(meta) || meta_is_windows_cfg(meta))
-    })
+    attr_is_cfg_target(attr, "unix") || attr_is_cfg_target(attr, "windows")
+}
+
+pub(crate) fn attr_is_cfg_windows(attr: &Attribute) -> bool {
+    attr_is_cfg_target(attr, "windows")
 }
 
 pub(crate) fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> bool {
@@ -52,7 +57,7 @@ pub(crate) fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> boo
         let Some(first) = metas.next() else {
             return false;
         };
-        meta_is_not_unix_cfg(first) && metas.any(meta_is_allow_dead_code)
+        meta_is_not_cfg_target(first, "unix") && metas.any(meta_is_allow_dead_code)
     })
 }
 
@@ -109,6 +114,98 @@ pub(crate) fn is_path_like_constructor(expr: &Expr) -> bool {
         }
         _ => false,
     }
+}
+
+pub(crate) fn is_cfg_unix_production_item(item: &Item, inherited_scope: ScopeKind) -> bool {
+    // PORT-010 intentionally operates only on free functions, modules, and impl
+    // methods. Struct, enum, and trait items are excluded from this parity pass
+    // because they do not yet have a companion-shape contract in the sprint.
+    classify_scope(
+        item_attrs(item),
+        inherited_scope,
+        item_name_hint_is_tests(item),
+    ) == ScopeKind::NonTest
+        && item_attrs(item).iter().any(attr_is_cfg_unix)
+        && item_identifier(item).is_some()
+}
+
+pub(crate) fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
+    sibling_items.iter().any(|candidate| {
+        same_item_identifier(unix_item, candidate) && item_has_cfg_windows(candidate)
+    })
+}
+
+pub(crate) fn has_portable_fallback(
+    unix_item: &Item,
+    sibling_items: &[Item],
+    inherited_scope: ScopeKind,
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        same_item_identifier(unix_item, candidate)
+            && !item_has_any_cfg(candidate)
+            && !item_is_test_scoped(candidate, inherited_scope)
+    })
+}
+
+pub(crate) fn same_item_identifier(left: &Item, right: &Item) -> bool {
+    item_identifier(left) == item_identifier(right)
+}
+
+pub(crate) fn item_has_cfg_windows(item: &Item) -> bool {
+    item_attrs(item).iter().any(attr_is_cfg_windows)
+}
+
+pub(crate) fn item_has_any_cfg(item: &Item) -> bool {
+    item_attrs(item)
+        .iter()
+        .any(|attr| attr.path().is_ident("cfg"))
+}
+
+pub(crate) fn item_is_test_scoped(item: &Item, inherited_scope: ScopeKind) -> bool {
+    classify_scope(
+        item_attrs(item),
+        inherited_scope,
+        item_name_hint_is_tests(item),
+    ) == ScopeKind::Test
+}
+
+pub(crate) fn impl_method_is_cfg_unix_production_item(
+    item_fn: &ImplItemFn,
+    inherited_scope: ScopeKind,
+) -> bool {
+    classify_scope(&item_fn.attrs, inherited_scope, None) == ScopeKind::NonTest
+        && item_fn.attrs.iter().any(attr_is_cfg_unix)
+}
+
+pub(crate) fn impl_method_has_windows_companion(
+    unix_method: &ImplItemFn,
+    sibling_items: &[ImplItem],
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        let ImplItem::Fn(candidate_fn) = candidate else {
+            return false;
+        };
+        unix_method.sig.ident == candidate_fn.sig.ident
+            && candidate_fn.attrs.iter().any(attr_is_cfg_windows)
+    })
+}
+
+pub(crate) fn impl_method_has_portable_fallback(
+    unix_method: &ImplItemFn,
+    sibling_items: &[ImplItem],
+    inherited_scope: ScopeKind,
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        let ImplItem::Fn(candidate_fn) = candidate else {
+            return false;
+        };
+        unix_method.sig.ident == candidate_fn.sig.ident
+            && !candidate_fn
+                .attrs
+                .iter()
+                .any(|attr| attr.path().is_ident("cfg"))
+            && classify_scope(&candidate_fn.attrs, inherited_scope, None) == ScopeKind::NonTest
+    })
 }
 
 pub(crate) fn is_dirs_home_dir_call(expr: &Expr) -> bool {
@@ -247,6 +344,14 @@ pub(crate) fn is_windows_path_literal(value: &str) -> bool {
     drive_absolute || unc_absolute
 }
 
+fn attr_is_cfg_target(attr: &Attribute, target: &str) -> bool {
+    if !attr.path().is_ident("cfg") {
+        return false;
+    }
+    nested_cfg_metas(attr)
+        .is_some_and(|metas| metas.iter().any(|meta| meta_is_cfg_target(meta, target)))
+}
+
 fn nested_cfg_metas(attr: &Attribute) -> Option<Punctuated<Meta, Token![,]>> {
     let Meta::List(list) = &attr.meta else {
         return None;
@@ -256,33 +361,29 @@ fn nested_cfg_metas(attr: &Attribute) -> Option<Punctuated<Meta, Token![,]>> {
         .ok()
 }
 
-fn meta_is_unix_cfg(meta: &Meta) -> bool {
+fn meta_is_cfg_target(meta: &Meta, target: &str) -> bool {
     match meta {
-        Meta::Path(path) => path.is_ident("unix"),
+        Meta::Path(path) => path.is_ident(target),
         Meta::List(list) if list.path.is_ident("not") => false,
+        Meta::List(list) if list.path.is_ident("all") || list.path.is_ident("any") => {
+            Punctuated::<Meta, Token![,]>::parse_terminated
+                .parse2(list.tokens.clone())
+                .ok()
+                .is_some_and(|metas| metas.iter().any(|meta| meta_is_cfg_target(meta, target)))
+        }
+        Meta::List(list) if list.path.is_ident("target_os") => false,
+        Meta::NameValue(name_value) => {
+            name_value.path.is_ident("target_os")
+                && matches!(&name_value.value, Expr::Lit(ExprLit { lit: Lit::Str(lit), .. }) if lit.value() == target)
+        }
         Meta::List(list) => Punctuated::<Meta, Token![,]>::parse_terminated
             .parse2(list.tokens.clone())
             .ok()
-            .is_some_and(|metas: Punctuated<Meta, Token![,]>| metas.iter().any(meta_is_unix_cfg)),
-        Meta::NameValue(_) => false,
+            .is_some_and(|metas| metas.iter().any(|meta| meta_is_cfg_target(meta, target))),
     }
 }
 
-fn meta_is_windows_cfg(meta: &Meta) -> bool {
-    match meta {
-        Meta::Path(path) => path.is_ident("windows"),
-        Meta::List(list) if list.path.is_ident("not") => false,
-        Meta::List(list) => Punctuated::<Meta, Token![,]>::parse_terminated
-            .parse2(list.tokens.clone())
-            .ok()
-            .is_some_and(|metas: Punctuated<Meta, Token![,]>| {
-                metas.iter().any(meta_is_windows_cfg)
-            }),
-        Meta::NameValue(_) => false,
-    }
-}
-
-fn meta_is_not_unix_cfg(meta: &Meta) -> bool {
+fn meta_is_not_cfg_target(meta: &Meta, target: &str) -> bool {
     let Meta::List(list) = meta else {
         return false;
     };
@@ -292,7 +393,7 @@ fn meta_is_not_unix_cfg(meta: &Meta) -> bool {
     Punctuated::<Meta, Token![,]>::parse_terminated
         .parse2(list.tokens.clone())
         .ok()
-        .is_some_and(|metas: Punctuated<Meta, Token![,]>| metas.iter().any(meta_is_unix_cfg))
+        .is_some_and(|metas| metas.iter().any(|meta| meta_is_cfg_target(meta, target)))
 }
 
 fn meta_is_allow_dead_code(meta: &Meta) -> bool {
@@ -305,7 +406,7 @@ fn meta_is_allow_dead_code(meta: &Meta) -> bool {
     Punctuated::<Meta, Token![,]>::parse_terminated
         .parse2(list.tokens.clone())
         .ok()
-        .is_some_and(|metas: Punctuated<Meta, Token![,]>| {
+        .is_some_and(|metas| {
             metas
                 .iter()
                 .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("dead_code")))

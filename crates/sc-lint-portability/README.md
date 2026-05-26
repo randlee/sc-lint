@@ -29,6 +29,9 @@ Use `sc-portability` to catch portability drift such as:
   - production `Command::new("sh" | "bash")` or hardcoded `/bin/sh` /
     `/bin/bash` shell-invocation assumptions without an explicit Unix-only
     boundary
+- `PORT-010`
+  - production `#[cfg(unix)]` items without a `#[cfg(windows)]` companion or
+    explicit portable fallback in the same scope
 
 ## Ownership And Scope
 
@@ -124,6 +127,12 @@ Production code with Unix-shell assumptions is also flagged:
 
 ```text
 PORT-009 Unix shell invocation `Command::new("sh" | "bash")` in production code assumes a Unix shell exists; prefer invoking the target binary directly or move the shell path behind an explicit Unix-only boundary
+```
+
+Production code with a Unix-only branch and no companion is also flagged:
+
+```text
+PORT-010 production #[cfg(unix)] item `runtime_socket_name` has no #[cfg(windows)] companion or explicit portable fallback in the same scope
 ```
 
 Test-only path literals are also flagged:

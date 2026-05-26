@@ -892,7 +892,7 @@ fn set_mock_backend_permissions(path: &Path) {
     std::fs::set_permissions(path, permissions).expect("mock backend perms");
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
 fn set_mock_backend_permissions(_path: &Path) {}
 
 fn step_names(steps: &[Value]) -> Vec<String> {
