@@ -65,13 +65,13 @@ impl Serialize for RuleId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("{0}")]
-pub struct PortabilityErrorSource(Box<str>);
+#[derive(Debug, Error)]
+#[error(transparent)]
+pub struct PortabilityErrorSource(Box<dyn std::error::Error + Send + Sync>);
 
 impl From<anyhow_crate::Error> for PortabilityErrorSource {
     fn from(value: anyhow_crate::Error) -> Self {
-        Self(value.to_string().into_boxed_str())
+        Self(value.into())
     }
 }
 
