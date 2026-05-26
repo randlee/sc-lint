@@ -64,13 +64,13 @@ target: integration/phase-C
 ```rust
 fn collect_parity_findings(
     items: &[Item],
+    inherited_scope: ScopeKind,
+    inherited_unix_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
-    unix_gated: bool,
-    scope: ScopeKind,
 ) {
     for item in items {
-        if is_cfg_unix_production_item(item, scope)
+        if is_cfg_unix_production_item(item, inherited_scope)
             && !has_windows_companion(item, items)
             && !has_portable_fallback(item, items)
         {
