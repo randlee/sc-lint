@@ -37,6 +37,7 @@ use crate::source_scan::classify_scope;
 use crate::source_scan::count_scanned_crates as count_crates;
 use crate::source_scan::discover_source_files;
 use crate::source_scan::item_attrs;
+use crate::source_scan::item_identifier;
 use crate::source_scan::item_name_hint_is_tests;
 use crate::source_scan::span_start_line;
 
@@ -158,6 +159,7 @@ fn collect_unix_portability_findings(
         &file.items,
         initial_scope,
         false,
+        false,
         file_context,
         &mut findings,
     );
@@ -168,14 +170,23 @@ fn visit_items_for_unix_portability(
     items: &[Item],
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
+    collect_parity_findings(
+        items,
+        inherited_scope,
+        inherited_unix_gated,
+        file_context,
+        findings,
+    );
     for item in items {
         visit_item_for_unix_portability(
             item,
             inherited_scope,
             inherited_unix_gated,
+            inherited_platform_gated,
             file_context,
             findings,
         );
@@ -186,14 +197,16 @@ fn visit_item_for_unix_portability(
     item: &Item,
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
     let attrs = item_attrs(item);
     let scope = classify_scope(attrs, inherited_scope, item_name_hint_is_tests(item));
     let unix_gated = inherited_unix_gated || attrs.iter().any(attr_is_cfg_unix);
+    let platform_gated = inherited_platform_gated || attrs.iter().any(attr_is_platform_cfg);
 
-    if scope == ScopeKind::NonTest && !unix_gated {
+    if scope == ScopeKind::NonTest && !platform_gated {
         collect_production_path_literal_findings(item, file_context, findings);
     }
 
@@ -239,7 +252,14 @@ fn visit_item_for_unix_portability(
     if let Item::Mod(item_mod) = item
         && let Some((_, items)) = &item_mod.content
     {
-        visit_items_for_unix_portability(items, scope, unix_gated, file_context, findings);
+        visit_items_for_unix_portability(
+            items,
+            scope,
+            unix_gated,
+            platform_gated,
+            file_context,
+            findings,
+        );
     }
 }
 
@@ -253,12 +273,14 @@ fn collect_production_path_literal_findings(
             &item_fn.block,
             ScopeKind::NonTest,
             false,
+            false,
             file_context,
             findings,
         ),
         Item::Const(item_const) => visit_expr_for_unix_portability(
             &item_const.expr,
             ScopeKind::NonTest,
+            false,
             false,
             file_context,
             findings,
@@ -267,17 +289,26 @@ fn collect_production_path_literal_findings(
             &item_static.expr,
             ScopeKind::NonTest,
             false,
+            false,
             file_context,
             findings,
         ),
         Item::Impl(item_impl) => {
+            collect_impl_method_parity_findings(
+                item_impl,
+                ScopeKind::NonTest,
+                file_context,
+                findings,
+            );
             for impl_item in &item_impl.items {
                 if let ImplItem::Fn(item_fn) = impl_item {
                     let fn_scope = classify_scope(&item_fn.attrs, ScopeKind::NonTest, None);
-                    if fn_scope == ScopeKind::NonTest {
+                    let fn_platform_gated = item_fn.attrs.iter().any(attr_is_platform_cfg);
+                    if fn_scope == ScopeKind::NonTest && !fn_platform_gated {
                         visit_block_for_unix_portability(
                             &item_fn.block,
                             ScopeKind::NonTest,
+                            false,
                             false,
                             file_context,
                             findings,
@@ -294,6 +325,7 @@ fn visit_block_for_unix_portability(
     block: &Block,
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
@@ -303,6 +335,7 @@ fn visit_block_for_unix_portability(
                 item,
                 inherited_scope,
                 inherited_unix_gated,
+                inherited_platform_gated,
                 file_context,
                 findings,
             ),
@@ -312,6 +345,7 @@ fn visit_block_for_unix_portability(
                         &init.expr,
                         inherited_scope,
                         inherited_unix_gated,
+                        inherited_platform_gated,
                         file_context,
                         findings,
                     );
@@ -321,6 +355,7 @@ fn visit_block_for_unix_portability(
                 expr,
                 inherited_scope,
                 inherited_unix_gated,
+                inherited_platform_gated,
                 file_context,
                 findings,
             ),
@@ -333,10 +368,11 @@ fn visit_expr_for_unix_portability(
     expr: &Expr,
     inherited_scope: ScopeKind,
     inherited_unix_gated: bool,
+    inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
-    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated || inherited_platform_gated {
         return;
     }
     let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings);
@@ -698,6 +734,84 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
     }
 }
 
+fn push_cfg_parity_finding(
+    findings: &mut Vec<PortabilityFinding>,
+    file_context: &FileContext,
+    line: usize,
+    detail: &str,
+) {
+    findings.push(PortabilityFinding {
+        rule_id: RuleId::Port010,
+        kind: "cfg_unix_parity_missing",
+        message: format!(
+            "PORT-010 production #[cfg(unix)] item `{detail}` has no #[cfg(windows)] companion or explicit portable fallback in the same scope"
+        ),
+        source_path: file_context.source_path.clone(),
+        line,
+        package: file_context.package.clone(),
+        target: file_context.target.clone(),
+        node_label: format!(
+            "crate::{}::{}::portability",
+            file_context.package, file_context.target
+        ),
+    });
+}
+
+fn collect_parity_findings(
+    items: &[Item],
+    inherited_scope: ScopeKind,
+    inherited_unix_gated: bool,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
+        return;
+    }
+    for item in items {
+        if is_cfg_unix_production_item(item, inherited_scope)
+            && !has_windows_companion(item, items)
+            && !has_portable_fallback(item, items, inherited_scope)
+        {
+            let detail = item_identifier(item)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "cfg(unix) item".to_string());
+            push_cfg_parity_finding(
+                findings,
+                file_context,
+                span_start_line(item.span()),
+                &detail,
+            );
+        }
+    }
+}
+
+fn collect_impl_method_parity_findings(
+    item_impl: &ItemImpl,
+    inherited_scope: ScopeKind,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
+    if inherited_scope != ScopeKind::NonTest {
+        return;
+    }
+    for impl_item in &item_impl.items {
+        let ImplItem::Fn(unix_method) = impl_item else {
+            continue;
+        };
+        if impl_method_is_cfg_unix_production_item(unix_method, inherited_scope)
+            && !impl_method_has_windows_companion(unix_method, &item_impl.items)
+            && !impl_method_has_portable_fallback(unix_method, &item_impl.items, inherited_scope)
+        {
+            push_cfg_parity_finding(
+                findings,
+                file_context,
+                span_start_line(unix_method.span()),
+                &unix_method.sig.ident.to_string(),
+            );
+        }
+    }
+}
+
 impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
     fn visit_expr_block(&mut self, node: &'ast syn::ExprBlock) {
         let is_platform_gated = node.attrs.iter().any(attr_is_platform_cfg);
@@ -808,6 +922,14 @@ fn attr_is_platform_cfg(attr: &Attribute) -> bool {
     rendered.contains("unix") || rendered.contains("windows")
 }
 
+fn attr_is_cfg_windows(attr: &Attribute) -> bool {
+    if !attr.path().is_ident("cfg") {
+        return false;
+    }
+    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
+    rendered.contains("windows") && !rendered.contains("not(windows)")
+}
+
 fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> bool {
     if !attr.path().is_ident("cfg_attr") {
         return false;
@@ -869,6 +991,95 @@ fn is_path_like_constructor(expr: &Expr) -> bool {
         }
         _ => false,
     }
+}
+
+fn is_cfg_unix_production_item(item: &Item, inherited_scope: ScopeKind) -> bool {
+    classify_scope(
+        item_attrs(item),
+        inherited_scope,
+        item_name_hint_is_tests(item),
+    ) == ScopeKind::NonTest
+        && item_attrs(item).iter().any(attr_is_cfg_unix)
+        && item_identifier(item).is_some()
+}
+
+fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
+    sibling_items.iter().any(|candidate| {
+        same_item_identifier(unix_item, candidate) && item_has_cfg_windows(candidate)
+    })
+}
+
+fn has_portable_fallback(
+    unix_item: &Item,
+    sibling_items: &[Item],
+    inherited_scope: ScopeKind,
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        same_item_identifier(unix_item, candidate)
+            && !item_has_any_cfg(candidate)
+            && !item_is_test_scoped(candidate, inherited_scope)
+    })
+}
+
+fn same_item_identifier(left: &Item, right: &Item) -> bool {
+    item_identifier(left) == item_identifier(right)
+}
+
+fn item_has_cfg_windows(item: &Item) -> bool {
+    item_attrs(item).iter().any(attr_is_cfg_windows)
+}
+
+fn item_has_any_cfg(item: &Item) -> bool {
+    item_attrs(item)
+        .iter()
+        .any(|attr| attr.path().is_ident("cfg"))
+}
+
+fn item_is_test_scoped(item: &Item, inherited_scope: ScopeKind) -> bool {
+    classify_scope(
+        item_attrs(item),
+        inherited_scope,
+        item_name_hint_is_tests(item),
+    ) == ScopeKind::Test
+}
+
+fn impl_method_is_cfg_unix_production_item(
+    item_fn: &syn::ImplItemFn,
+    inherited_scope: ScopeKind,
+) -> bool {
+    classify_scope(&item_fn.attrs, inherited_scope, None) == ScopeKind::NonTest
+        && item_fn.attrs.iter().any(attr_is_cfg_unix)
+}
+
+fn impl_method_has_windows_companion(
+    unix_method: &syn::ImplItemFn,
+    sibling_items: &[ImplItem],
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        let ImplItem::Fn(candidate_fn) = candidate else {
+            return false;
+        };
+        unix_method.sig.ident == candidate_fn.sig.ident
+            && candidate_fn.attrs.iter().any(attr_is_cfg_windows)
+    })
+}
+
+fn impl_method_has_portable_fallback(
+    unix_method: &syn::ImplItemFn,
+    sibling_items: &[ImplItem],
+    inherited_scope: ScopeKind,
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        let ImplItem::Fn(candidate_fn) = candidate else {
+            return false;
+        };
+        unix_method.sig.ident == candidate_fn.sig.ident
+            && !candidate_fn
+                .attrs
+                .iter()
+                .any(|attr| attr.path().is_ident("cfg"))
+            && classify_scope(&candidate_fn.attrs, inherited_scope, None) == ScopeKind::NonTest
+    })
 }
 
 fn is_dirs_home_dir_call(expr: &Expr) -> bool {

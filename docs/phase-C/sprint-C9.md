@@ -1,10 +1,10 @@
 ---
 id: C.9
 title: Cross-Platform cfg Parity Enforcement
-status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
-target: develop
+status: completed
+branch: feature/sprint-C9
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C9
+target: integration/phase-C
 ---
 
 # Sprint C.9 — Cross-Platform cfg Parity Enforcement

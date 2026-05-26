@@ -159,8 +159,12 @@ fn passes_cfg_unix_gated_unix_path_in_production_code() {
         r#"
             #[cfg(unix)]
             pub fn socket_path() -> std::path::PathBuf {
-                // Intentional PORT-001 fixture: hardcoded /tmp/ path should be flagged.
                 std::path::PathBuf::from("/tmp/runtime-socket")
+            }
+
+            #[cfg(windows)]
+            pub fn socket_path() -> std::path::PathBuf {
+                std::path::PathBuf::from(r"\\.\pipe\sc-lint")
             }
         "#,
     );
@@ -437,6 +441,11 @@ fn passes_cfg_unix_gated_home_lookup_in_production_code() {
                 let home = std::env::var("HOME").expect("HOME");
                 std::path::PathBuf::from(home).join(".config").join("sc-lint")
             }
+
+            #[cfg(windows)]
+            pub fn config_root() -> std::path::PathBuf {
+                dirs::config_dir().expect("config directory").join("sc-lint")
+            }
         "#,
     );
 
@@ -583,6 +592,244 @@ fn passes_cfg_unix_gated_shell_invocation_in_production_code() {
                     .arg("-c")
                     .arg("true")
                     .status()
+            }
+
+            #[cfg(windows)]
+            pub fn run_unix_hook() -> std::io::Result<std::process::ExitStatus> {
+                std::process::Command::new("cmd")
+                    .arg("/C")
+                    .arg("ver")
+                    .status()
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn flags_cfg_unix_item_without_windows_companion() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            #[cfg(unix)]
+            pub fn runtime_socket_name() -> &'static str {
+                "/var/run/sc-lint.sock"
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port010)
+    );
+}
+
+#[test]
+fn flags_cfg_unix_item_without_portable_fallback() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            #[cfg(unix)]
+            pub mod runtime_socket_name {
+                pub const VALUE: &str = "/var/run/sc-lint.sock";
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port010)
+    );
+}
+
+#[test]
+fn does_not_pass_cfg_unix_item_with_cfg_test_only_sibling() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            #[cfg(unix)]
+            pub fn runtime_socket_name() -> &'static str {
+                "/var/run/sc-lint.sock"
+            }
+
+            #[cfg(test)]
+            pub fn runtime_socket_name() -> &'static str {
+                "test-socket"
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port010)
+    );
+}
+
+#[test]
+fn passes_cfg_unix_item_with_windows_companion() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            #[cfg(unix)]
+            pub fn runtime_socket_name() -> &'static str {
+                "/var/run/sc-lint.sock"
+            }
+
+            #[cfg(windows)]
+            pub fn runtime_socket_name() -> &'static str {
+                r"\\.\pipe\sc-lint"
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn passes_cfg_unix_item_with_portable_fallback() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            #[cfg(unix)]
+            pub fn runtime_socket_name() -> &'static str {
+                "/var/run/sc-lint.sock"
+            }
+
+            pub fn runtime_socket_name() -> &'static str {
+                "sc-lint.sock"
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn passes_cfg_unix_impl_method_with_windows_companion() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub struct RuntimeSocket;
+
+            impl RuntimeSocket {
+                #[cfg(unix)]
+                pub fn socket_name() -> &'static str {
+                    "/var/run/sc-lint.sock"
+                }
+
+                #[cfg(windows)]
+                pub fn socket_name() -> &'static str {
+                    r"\\.\pipe\sc-lint"
+                }
             }
         "#,
     );
@@ -766,6 +1013,11 @@ fn passes_cfg_unix_gated_std_os_unix_import_in_production_code() {
             pub fn os_string(bytes: Vec<u8>) -> std::ffi::OsString {
                 use std::os::unix::ffi::OsStringExt;
                 std::ffi::OsString::from_vec(bytes)
+            }
+
+            #[cfg(windows)]
+            pub fn os_string(bytes: Vec<u8>) -> std::ffi::OsString {
+                std::ffi::OsString::from(String::from_utf8_lossy(&bytes).into_owned())
             }
         "#,
     );

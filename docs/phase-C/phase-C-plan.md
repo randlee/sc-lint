@@ -69,6 +69,7 @@ The currently planned sprints in this phase are:
     `sc-lint-portability`
   - production `#[cfg(unix)]` branches that lack Windows companions or
     explicit portable fallbacks
+  - implemented on `feature/sprint-C9`
   - see [docs/phase-C/sprint-C9.md](./sprint-C9.md)
 - `C.10`
   - `sc-observability` `1.1.0` adoption in the CLI-owned logging layer
