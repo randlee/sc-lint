@@ -1,10 +1,10 @@
 use std::fs;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
-use quote::ToTokens;
 use serde::Deserialize;
 use syn::Attribute;
 use syn::Block;
@@ -19,8 +19,12 @@ use syn::ItemFn;
 use syn::ItemImpl;
 use syn::ItemMod;
 use syn::Lit;
+use syn::Meta;
 use syn::Stmt;
+use syn::Token;
 use syn::UseTree;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -52,7 +56,7 @@ struct RepoPortabilityConfig {
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 struct PortabilityDefaults {
-    unix_path_prefixes: Vec<String>,
+    unix_path_prefixes: Vec<UnixPathPrefix>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -63,7 +67,56 @@ struct BuiltInDefaults {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PortabilityConfig {
     config_home_env: Option<String>,
-    unix_path_prefixes: Vec<String>,
+    unix_path_prefixes: Vec<UnixPathPrefix>,
+}
+
+const REPO_LINT_CONFIG_PATHS: &[&str] = &["sc-lint.toml", ".just/lint-config.toml"];
+/// Production-only Unix path prefixes intentionally covered by PORT-006.
+const UNIX_PATH_PREFIXES: &[&str] = &[
+    concat!("/", "home", "/"),
+    concat!("/", "usr", "/"),
+    concat!("/", "etc", "/"),
+    concat!("/", "var", "/"),
+    concat!("/", "tmp", "/"),
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UnixPathPrefix(String);
+
+impl UnixPathPrefix {
+    fn new(value: String) -> std::result::Result<Self, String> {
+        if value.is_empty() {
+            return Err("Unix path prefixes must not be empty".to_string());
+        }
+        if !value.starts_with('/') {
+            return Err(format!(
+                "Unix path prefixes must start with `/`, got `{value}`"
+            ));
+        }
+        Ok(Self(value))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for UnixPathPrefix {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl<'de> Deserialize<'de> for UnixPathPrefix {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -138,6 +191,9 @@ pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {
     count_crates(root)
 }
 
+// This collector analyzes test-scope items only; it is runtime code because the
+// analyzer must scan test modules in production workspaces, not because it is a
+// unit-test-only helper.
 struct PortabilityCollector<'a> {
     file_context: &'a FileContext,
     config: &'a PortabilityConfig,
@@ -193,6 +249,10 @@ fn visit_item_for_unix_portability(
     let scope = classify_scope(attrs, inherited_scope, item_name_hint_is_tests(item));
     let unix_gated = inherited_unix_gated || attrs.iter().any(attr_is_cfg_unix);
 
+    if scope == ScopeKind::NonTest && !unix_gated {
+        collect_production_path_literal_findings(item, file_context, findings);
+    }
+
     if scope == ScopeKind::NonTest {
         for attr in attrs {
             if attr_is_cfg_attr_not_unix_allow_dead_code(attr) {
@@ -232,35 +292,49 @@ fn visit_item_for_unix_portability(
         }
     }
 
+    if let Item::Mod(item_mod) = item
+        && let Some((_, items)) = &item_mod.content
+    {
+        visit_items_for_unix_portability(items, scope, unix_gated, file_context, findings);
+    }
+}
+
+fn collect_production_path_literal_findings(
+    item: &Item,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
     match item {
-        Item::Fn(item_fn) => {
-            if scope == ScopeKind::NonTest {
-                visit_block_for_unix_portability(
-                    &item_fn.block,
-                    scope,
-                    unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        Item::Mod(item_mod) => {
-            if let Some((_, items)) = &item_mod.content {
-                visit_items_for_unix_portability(items, scope, unix_gated, file_context, findings);
-            }
-        }
+        Item::Fn(item_fn) => visit_block_for_unix_portability(
+            &item_fn.block,
+            ScopeKind::NonTest,
+            false,
+            file_context,
+            findings,
+        ),
+        Item::Const(item_const) => visit_expr_for_unix_portability(
+            &item_const.expr,
+            ScopeKind::NonTest,
+            false,
+            file_context,
+            findings,
+        ),
+        Item::Static(item_static) => visit_expr_for_unix_portability(
+            &item_static.expr,
+            ScopeKind::NonTest,
+            false,
+            file_context,
+            findings,
+        ),
         Item::Impl(item_impl) => {
-            if scope != ScopeKind::NonTest {
-                return;
-            }
             for impl_item in &item_impl.items {
                 if let ImplItem::Fn(item_fn) = impl_item {
-                    let fn_scope = classify_scope(&item_fn.attrs, scope, None);
+                    let fn_scope = classify_scope(&item_fn.attrs, ScopeKind::NonTest, None);
                     if fn_scope == ScopeKind::NonTest {
                         visit_block_for_unix_portability(
                             &item_fn.block,
-                            fn_scope,
-                            unix_gated,
+                            ScopeKind::NonTest,
+                            false,
                             file_context,
                             findings,
                         );
@@ -318,59 +392,11 @@ fn visit_expr_for_unix_portability(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
-    match expr {
-        Expr::Block(expr_block) => visit_block_for_unix_portability(
-            &expr_block.block,
-            inherited_scope,
-            inherited_unix_gated,
-            file_context,
-            findings,
-        ),
-        Expr::If(expr_if) => {
-            visit_expr_for_unix_portability(
-                &expr_if.cond,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            visit_block_for_unix_portability(
-                &expr_if.then_branch,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            if let Some((_, else_expr)) = &expr_if.else_branch {
-                visit_expr_for_unix_portability(
-                    else_expr,
-                    inherited_scope,
-                    inherited_unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        Expr::Match(expr_match) => {
-            visit_expr_for_unix_portability(
-                &expr_match.expr,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            for arm in &expr_match.arms {
-                visit_expr_for_unix_portability(
-                    &arm.body,
-                    inherited_scope,
-                    inherited_unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        _ => {}
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
+        return;
     }
+    let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings);
+    visitor.visit_expr(expr);
 }
 
 impl<'a> PortabilityCollector<'a> {
@@ -642,13 +668,63 @@ impl<'a> PortabilityCollector<'a> {
         self.config
             .unix_path_prefixes
             .iter()
-            .any(|prefix| value.starts_with(prefix))
+            .any(|prefix| value.starts_with(prefix.as_str()))
     }
 }
 
 #[derive(Default)]
 struct FunctionBodyVisitor {
     usages: Vec<Usage>,
+}
+
+struct ProductionPathLiteralVisitor<'a, 'b> {
+    file_context: &'a FileContext,
+    findings: &'b mut Vec<PortabilityFinding>,
+}
+
+impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
+    fn new(file_context: &'a FileContext, findings: &'b mut Vec<PortabilityFinding>) -> Self {
+        Self {
+            file_context,
+            findings,
+        }
+    }
+
+    fn push_path_finding(&mut self, rule_id: RuleId, value: &str, line: usize) {
+        let message = match rule_id {
+            RuleId::Port006 => format!(
+                "PORT-006 hardcoded Unix-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), std::env::temp_dir(), or a platform-gated path abstraction"
+            ),
+            RuleId::Port007 => format!(
+                "PORT-007 hardcoded Windows-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction"
+            ),
+            _ => return,
+        };
+        self.findings.push(PortabilityFinding {
+            rule_id,
+            kind: "hardcoded_production_path_literal",
+            message,
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
+}
+
+impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
+    fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
+        if let Lit::Str(lit) = &node.lit
+            && let Some(rule_id) = production_path_rule_id(&lit.value())
+        {
+            self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+        }
+        syn::visit::visit_expr_lit(self, node);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -677,8 +753,9 @@ impl<'ast> Visit<'ast> for FunctionBodyVisitor {
 fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
     let defaults = toml::from_str::<BuiltInDefaults>(crate::DEFAULT_RULES_TOML)
         .context("failed to parse built-in portability defaults")?;
-    let repo_config_path = ["sc-lint.toml", ".just/lint-config.toml"]
-        .into_iter()
+    let repo_config_path = REPO_LINT_CONFIG_PATHS
+        .iter()
+        .copied()
         .map(|relative| root.join(relative))
         .find(|path| path.exists());
     let repo_config = if let Some(repo_config_path) = repo_config_path {
@@ -708,16 +785,20 @@ fn attr_is_cfg_unix(attr: &Attribute) -> bool {
     if !attr.path().is_ident("cfg") {
         return false;
     }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("unix") && !rendered.contains("not(unix)")
+    nested_cfg_metas(attr).is_some_and(|metas| metas.iter().any(meta_is_unix_cfg))
 }
 
 fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> bool {
     if !attr.path().is_ident("cfg_attr") {
         return false;
     }
-    let rendered = attr.meta.to_token_stream().to_string().replace(' ', "");
-    rendered.contains("not(unix)") && rendered.contains("allow(dead_code)")
+    nested_cfg_metas(attr).is_some_and(|metas| {
+        let mut metas = metas.iter();
+        let Some(first) = metas.next() else {
+            return false;
+        };
+        meta_is_not_unix_cfg(first) && metas.any(meta_is_allow_dead_code)
+    })
 }
 
 fn use_tree_contains_std_os_unix(tree: &UseTree) -> bool {
@@ -755,72 +836,34 @@ fn is_path_like_constructor(expr: &Expr) -> bool {
     let Expr::Path(expr_path) = expr else {
         return false;
     };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    match segments.as_slice() {
-        [single, from] => {
-            single == "PathBuf" && from == "from" || single == "Path" && from == "new"
-        }
-        [std, path_mod, path_type, method] => {
-            std == "std"
-                && path_mod == "path"
-                && ((path_type == "PathBuf" && method == "from")
-                    || (path_type == "Path" && method == "new"))
-        }
-        _ => false,
-    }
+    path_segments_match(&expr_path.path, &["PathBuf", "from"])
+        || path_segments_match(&expr_path.path, &["Path", "new"])
+        || path_segments_match(&expr_path.path, &["std", "path", "PathBuf", "from"])
+        || path_segments_match(&expr_path.path, &["std", "path", "Path", "new"])
 }
 
 fn is_dirs_home_dir_call(expr: &Expr) -> bool {
     let Expr::Path(expr_path) = expr else {
         return false;
     };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    matches!(segments.as_slice(), [dirs, home_dir] if dirs == "dirs" && home_dir == "home_dir")
+    path_segments_match(&expr_path.path, &["dirs", "home_dir"])
 }
 
 fn is_set_var_call(expr: &Expr) -> bool {
     let Expr::Path(expr_path) = expr else {
         return false;
     };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    match segments.as_slice() {
-        [env, set_var] => env == "env" && set_var == "set_var",
-        [std, env, set_var] => std == "std" && env == "env" && set_var == "set_var",
-        _ => false,
-    }
+    path_segments_match(&expr_path.path, &["env", "set_var"])
+        || path_segments_match(&expr_path.path, &["std", "env", "set_var"])
 }
 
 fn extract_env_var_check(expr_call: &ExprCall) -> Option<String> {
     let Expr::Path(expr_path) = &*expr_call.func else {
         return None;
     };
-    let segments: Vec<_> = expr_path
-        .path
-        .segments
-        .iter()
-        .map(|segment| segment.ident.to_string())
-        .collect();
-    let is_env_var = match segments.as_slice() {
-        [env, var] => env == "env" && var == "var",
-        [std, env, var] => std == "std" && env == "env" && var == "var",
-        _ => false,
-    };
-    if !is_env_var {
+    if !path_segments_match(&expr_path.path, &["env", "var"])
+        && !path_segments_match(&expr_path.path, &["std", "env", "var"])
+    {
         return None;
     }
     let Expr::Lit(ExprLit {
@@ -830,4 +873,98 @@ fn extract_env_var_check(expr_call: &ExprCall) -> Option<String> {
         return None;
     };
     Some(lit.value())
+}
+
+fn production_path_rule_id(value: &str) -> Option<RuleId> {
+    if is_windows_path_literal(value) {
+        Some(RuleId::Port007)
+    } else if is_unix_path_literal(value) {
+        Some(RuleId::Port006)
+    } else {
+        None
+    }
+}
+
+fn is_unix_path_literal(value: &str) -> bool {
+    // PORT-006 intentionally keeps a narrower built-in production set than the
+    // repo-configured PORT-001 test prefixes so only clearly OS-specific
+    // production literals are flagged here.
+    UNIX_PATH_PREFIXES
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+}
+
+/// Detect drive-letter absolute paths and UNC paths for PORT-007.
+fn is_windows_path_literal(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let drive_absolute = bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/');
+    // Keep the extra length guard so the detector does not flag the bare `\\`
+    // prefix literal used in code or docs; PORT-007 should only trigger on an
+    // actual UNC path, not on the two-character prefix by itself.
+    let unc_absolute = value.starts_with("\\\\") && value.len() > 2;
+    drive_absolute || unc_absolute
+}
+
+fn nested_cfg_metas(attr: &Attribute) -> Option<Punctuated<Meta, Token![,]>> {
+    let Meta::List(list) = &attr.meta else {
+        return None;
+    };
+    Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()
+}
+
+fn meta_is_unix_cfg(meta: &Meta) -> bool {
+    match meta {
+        Meta::Path(path) => path.is_ident("unix"),
+        Meta::List(list) if list.path.is_ident("not") => false,
+        Meta::List(list) => Punctuated::<Meta, Token![,]>::parse_terminated
+            .parse2(list.tokens.clone())
+            .ok()
+            .is_some_and(|metas: Punctuated<Meta, Token![,]>| metas.iter().any(meta_is_unix_cfg)),
+        Meta::NameValue(_) => false,
+    }
+}
+
+fn meta_is_not_unix_cfg(meta: &Meta) -> bool {
+    let Meta::List(list) = meta else {
+        return false;
+    };
+    if !list.path.is_ident("not") {
+        return false;
+    }
+    Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()
+        .is_some_and(|metas: Punctuated<Meta, Token![,]>| metas.iter().any(meta_is_unix_cfg))
+}
+
+fn meta_is_allow_dead_code(meta: &Meta) -> bool {
+    let Meta::List(list) = meta else {
+        return false;
+    };
+    if !list.path.is_ident("allow") {
+        return false;
+    }
+    Punctuated::<Meta, Token![,]>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()
+        .is_some_and(|metas: Punctuated<Meta, Token![,]>| {
+            metas
+                .iter()
+                .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("dead_code")))
+        })
+}
+
+fn path_segments_match(path: &syn::Path, expected: &[&str]) -> bool {
+    if path.segments.len() != expected.len() {
+        return false;
+    }
+    path.segments
+        .iter()
+        .zip(expected.iter())
+        .all(|(segment, expected)| segment.ident == *expected)
 }

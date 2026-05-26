@@ -17,6 +17,11 @@ Use `sc-portability` to catch portability drift such as:
   - ungated `std::os::unix` imports in production code
 - `PORT-005`
   - `#[cfg_attr(not(unix), allow(dead_code))]` portability suppressors
+- `PORT-006`
+  - hardcoded Unix-only absolute path literals in production code
+- `PORT-007`
+  - hardcoded Windows absolute path literals, including drive-letter and UNC
+    forms, in production code
 
 ## Ownership And Scope
 
@@ -87,6 +92,18 @@ Representative finding:
 
 ```text
 PORT-004 ungated std::os::unix import in production code; wrap the item with #[cfg(unix)] or move the import behind a Unix-only boundary
+```
+
+Production code with a hardcoded Unix-only runtime path is also flagged:
+
+```text
+PORT-006 hardcoded Unix-only absolute path literal `/var/run/sc-lint` in production code; prefer dirs::cache_dir(), dirs::config_dir(), std::env::temp_dir(), or a platform-gated path abstraction
+```
+
+Production code with a hardcoded Windows runtime path is also flagged:
+
+```text
+PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction
 ```
 
 Test-only path literals are also flagged:

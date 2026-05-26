@@ -695,7 +695,6 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "proc-macro2",
- "quote",
  "sc-lint-schema",
  "serde",
  "serde_json",

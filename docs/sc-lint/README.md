@@ -26,11 +26,16 @@ Current contents:
   ownership, and current plan touchpoint guide
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
   repo-local constraints for the shared HTML/XHTML/JSON reporting line
+- [`version-adoption.md`](./version-adoption.md) — authoritative consumer
+  adoption guide for the planned `sc-lint-version` interface-checking line
 - [`skill-authoring-constraints.md`](./skill-authoring-constraints.md) —
   repo-local constraints for the `sc-lint-version` adoption skill
 - [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —
   repo-local constraints for minimal marketplace publication of the adoption
   skill
+<<<<<<< HEAD
+- [`../../.claude/skills/sc-lint-version-adoption/SKILL.md`](../../.claude/skills/sc-lint-version-adoption/SKILL.md) —
+  repo-local Claude Code skill for `sc-lint-version` consumer adoption
 - [`../../.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json) —
   repo-local marketplace entry advertising the `sc-lint-version` adoption
   skill package

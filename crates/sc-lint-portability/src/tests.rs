@@ -143,7 +143,7 @@ fn passes_temp_dir_usage_in_test_scope() {
 }
 
 #[test]
-fn does_not_flag_unix_only_production_code() {
+fn passes_cfg_unix_gated_unix_path_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -173,6 +173,112 @@ fn does_not_flag_unix_only_production_code() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn flags_hardcoded_unix_path_in_production_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub fn socket_dir() -> std::path::PathBuf {
+                std::path::PathBuf::from("/var/run/sc-lint")
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port006)
+    );
+}
+
+#[test]
+fn passes_dirs_cache_dir_in_production_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub fn cache_dir() -> std::path::PathBuf {
+                dirs::cache_dir().expect("cache directory")
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn flags_hardcoded_windows_path_in_production_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub fn cache_file() -> std::path::PathBuf {
+                let _ = r"\\server\share\sc-lint\cache.json";
+                std::path::PathBuf::from(r"C:\ProgramData\sc-lint\cache.json")
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::Port007)
+            .count(),
+        2
+    );
 }
 
 #[test]
