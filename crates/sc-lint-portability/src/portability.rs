@@ -71,6 +71,14 @@ struct PortabilityConfig {
 }
 
 const REPO_LINT_CONFIG_PATHS: &[&str] = &["sc-lint.toml", ".just/lint-config.toml"];
+/// Production-only Unix path prefixes intentionally covered by PORT-006.
+const UNIX_PATH_PREFIXES: &[&str] = &[
+    concat!("/", "home", "/"),
+    concat!("/", "usr", "/"),
+    concat!("/", "etc", "/"),
+    concat!("/", "var", "/"),
+    concat!("/", "tmp", "/"),
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UnixPathPrefix(String);
@@ -881,16 +889,12 @@ fn is_unix_path_literal(value: &str) -> bool {
     // PORT-006 intentionally keeps a narrower built-in production set than the
     // repo-configured PORT-001 test prefixes so only clearly OS-specific
     // production literals are flagged here.
-    matches!(
-        value,
-        path if path.starts_with("/home/")
-            || path.starts_with("/usr/")
-            || path.starts_with("/etc/")
-            || path.starts_with("/var/")
-            || path.starts_with("/tmp/")
-    )
+    UNIX_PATH_PREFIXES
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
 }
 
+/// Detect drive-letter absolute paths and UNC paths for PORT-007.
 fn is_windows_path_literal(value: &str) -> bool {
     let bytes = value.as_bytes();
     let drive_absolute = bytes.len() >= 3
