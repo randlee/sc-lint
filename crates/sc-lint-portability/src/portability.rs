@@ -193,6 +193,10 @@ fn visit_item_for_unix_portability(
     let scope = classify_scope(attrs, inherited_scope, item_name_hint_is_tests(item));
     let unix_gated = inherited_unix_gated || attrs.iter().any(attr_is_cfg_unix);
 
+    if scope == ScopeKind::NonTest && !unix_gated {
+        collect_production_path_literal_findings(item, file_context, findings);
+    }
+
     if scope == ScopeKind::NonTest {
         for attr in attrs {
             if attr_is_cfg_attr_not_unix_allow_dead_code(attr) {
@@ -232,35 +236,49 @@ fn visit_item_for_unix_portability(
         }
     }
 
+    if let Item::Mod(item_mod) = item
+        && let Some((_, items)) = &item_mod.content
+    {
+        visit_items_for_unix_portability(items, scope, unix_gated, file_context, findings);
+    }
+}
+
+fn collect_production_path_literal_findings(
+    item: &Item,
+    file_context: &FileContext,
+    findings: &mut Vec<PortabilityFinding>,
+) {
     match item {
-        Item::Fn(item_fn) => {
-            if scope == ScopeKind::NonTest {
-                visit_block_for_unix_portability(
-                    &item_fn.block,
-                    scope,
-                    unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        Item::Mod(item_mod) => {
-            if let Some((_, items)) = &item_mod.content {
-                visit_items_for_unix_portability(items, scope, unix_gated, file_context, findings);
-            }
-        }
+        Item::Fn(item_fn) => visit_block_for_unix_portability(
+            &item_fn.block,
+            ScopeKind::NonTest,
+            false,
+            file_context,
+            findings,
+        ),
+        Item::Const(item_const) => visit_expr_for_unix_portability(
+            &item_const.expr,
+            ScopeKind::NonTest,
+            false,
+            file_context,
+            findings,
+        ),
+        Item::Static(item_static) => visit_expr_for_unix_portability(
+            &item_static.expr,
+            ScopeKind::NonTest,
+            false,
+            file_context,
+            findings,
+        ),
         Item::Impl(item_impl) => {
-            if scope != ScopeKind::NonTest {
-                return;
-            }
             for impl_item in &item_impl.items {
                 if let ImplItem::Fn(item_fn) = impl_item {
-                    let fn_scope = classify_scope(&item_fn.attrs, scope, None);
+                    let fn_scope = classify_scope(&item_fn.attrs, ScopeKind::NonTest, None);
                     if fn_scope == ScopeKind::NonTest {
                         visit_block_for_unix_portability(
                             &item_fn.block,
-                            fn_scope,
-                            unix_gated,
+                            ScopeKind::NonTest,
+                            false,
                             file_context,
                             findings,
                         );
@@ -318,59 +336,11 @@ fn visit_expr_for_unix_portability(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
 ) {
-    match expr {
-        Expr::Block(expr_block) => visit_block_for_unix_portability(
-            &expr_block.block,
-            inherited_scope,
-            inherited_unix_gated,
-            file_context,
-            findings,
-        ),
-        Expr::If(expr_if) => {
-            visit_expr_for_unix_portability(
-                &expr_if.cond,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            visit_block_for_unix_portability(
-                &expr_if.then_branch,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            if let Some((_, else_expr)) = &expr_if.else_branch {
-                visit_expr_for_unix_portability(
-                    else_expr,
-                    inherited_scope,
-                    inherited_unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        Expr::Match(expr_match) => {
-            visit_expr_for_unix_portability(
-                &expr_match.expr,
-                inherited_scope,
-                inherited_unix_gated,
-                file_context,
-                findings,
-            );
-            for arm in &expr_match.arms {
-                visit_expr_for_unix_portability(
-                    &arm.body,
-                    inherited_scope,
-                    inherited_unix_gated,
-                    file_context,
-                    findings,
-                );
-            }
-        }
-        _ => {}
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
+        return;
     }
+    let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings);
+    visitor.visit_expr(expr);
 }
 
 impl<'a> PortabilityCollector<'a> {
@@ -651,6 +621,56 @@ struct FunctionBodyVisitor {
     usages: Vec<Usage>,
 }
 
+struct ProductionPathLiteralVisitor<'a, 'b> {
+    file_context: &'a FileContext,
+    findings: &'b mut Vec<PortabilityFinding>,
+}
+
+impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
+    fn new(file_context: &'a FileContext, findings: &'b mut Vec<PortabilityFinding>) -> Self {
+        Self {
+            file_context,
+            findings,
+        }
+    }
+
+    fn push_path_finding(&mut self, rule_id: RuleId, value: &str, line: usize) {
+        let message = match rule_id {
+            RuleId::Port006 => format!(
+                "PORT-006 hardcoded Unix-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), std::env::temp_dir(), or a platform-gated path abstraction"
+            ),
+            RuleId::Port007 => format!(
+                "PORT-007 hardcoded Windows-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction"
+            ),
+            _ => return,
+        };
+        self.findings.push(PortabilityFinding {
+            rule_id,
+            kind: "hardcoded_production_path_literal",
+            message,
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
+}
+
+impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
+    fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
+        if let Lit::Str(lit) = &node.lit
+            && let Some(rule_id) = production_path_rule_id(&lit.value())
+        {
+            self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+        }
+        syn::visit::visit_expr_lit(self, node);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Usage {
     EnvVarCheck { name: String, line: usize },
@@ -830,4 +850,35 @@ fn extract_env_var_check(expr_call: &ExprCall) -> Option<String> {
         return None;
     };
     Some(lit.value())
+}
+
+fn production_path_rule_id(value: &str) -> Option<RuleId> {
+    if is_windows_path_literal(value) {
+        Some(RuleId::Port007)
+    } else if is_unix_path_literal(value) {
+        Some(RuleId::Port006)
+    } else {
+        None
+    }
+}
+
+fn is_unix_path_literal(value: &str) -> bool {
+    matches!(
+        value,
+        path if path.starts_with("/home/")
+            || path.starts_with("/usr/")
+            || path.starts_with("/etc/")
+            || path.starts_with("/var/")
+            || path.starts_with("/tmp/")
+    )
+}
+
+fn is_windows_path_literal(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let drive_absolute = bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/');
+    let unc_absolute = value.starts_with("\\\\") && value.len() > 2;
+    drive_absolute || unc_absolute
 }
