@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "sc-lint",
+  "name": "sc-lint-marketplace",
   "description": "Repo-local Claude Code marketplace entries for sc-lint adoption and workflow support.",
   "owner": {
     "name": "sc-lint"

@@ -2,8 +2,8 @@
 id: C.5
 title: Minimal Marketplace Publication For sc-lint-version Adoption Skill
 status: planned
-branch: feature/plan-sc-lint-version
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/plan-sc-lint-version
+branch: feature/sprint-C5
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/sprint-C5
 target: develop
 ---
 
@@ -46,6 +46,9 @@ target: develop
 - clear division between:
   - skill creation in `C.4`
   - marketplace advertisement in `C.5`
+- explicit note that `packages/sc-lint-version-adoption/.claude-plugin/plugin.json`
+  is the only package-local deliverable in this sprint; the adoption-skill body
+  remains `C.4` scope
 
 ## Explicit Code Samples
 
@@ -92,6 +95,8 @@ target: develop
   acceptance scope aligned with `REQ-VERSION-022E`
 - `docs/sc-lint/minimal-marketplace-constraints.md` requires the source-repo
   publication shape for both marketplace files
+- no skill-authoring content (`SKILL.md` body, authoring rules, adoption
+  guidance prose) is created or modified by this sprint
 
 ## Required Validation
 

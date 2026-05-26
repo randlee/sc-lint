@@ -88,7 +88,6 @@ Current contents:
   planning sprint
 - [`sprint-C5.md`](../phase-C/sprint-C5.md) — minimal marketplace publication planning
   for the adoption skill
-  sprint
 - [`sprint-C6.md`](../phase-C/sprint-C6.md) — production path-literal portability
   parity sprint
 - [`sprint-C7.md`](../phase-C/sprint-C7.md) — broad environment-variable portability
