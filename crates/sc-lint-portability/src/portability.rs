@@ -66,6 +66,11 @@ struct PortabilityConfig {
     unix_path_prefixes: Vec<String>,
 }
 
+/// Unix-centric env vars flagged by PORT-008 before callers normalize through a
+/// platform-aware abstraction.
+const PORTABILITY_ENV_NAMES: &[&str] = &["HOME", "USER"];
+const PORTABILITY_ENV_PREFIXES: &[&str] = &["XDG_"];
+
 #[derive(Debug, Clone)]
 struct PortabilityFinding {
     rule_id: RuleId,
@@ -903,7 +908,11 @@ fn extract_env_var_lookup(expr_call: &ExprCall) -> Option<String> {
 
 fn production_env_portability_variable(expr_call: &ExprCall) -> Option<String> {
     let variable_name = extract_env_var_lookup(expr_call)?;
-    if variable_name == "HOME" || variable_name == "USER" || variable_name.starts_with("XDG_") {
+    if PORTABILITY_ENV_NAMES.contains(&variable_name.as_str())
+        || PORTABILITY_ENV_PREFIXES
+            .iter()
+            .any(|prefix| variable_name.starts_with(prefix))
+    {
         Some(variable_name)
     } else {
         None

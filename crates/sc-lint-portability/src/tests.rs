@@ -387,6 +387,42 @@ fn flags_xdg_config_home_lookup_in_production_code() {
 }
 
 #[test]
+fn flags_user_env_lookup_in_production_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [portability]
+        config_home_env = "ATM_CONFIG_HOME"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+            pub fn current_user() -> String {
+                std::env::var("USER").expect("USER")
+            }
+        "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port008)
+    );
+}
+
+#[test]
 fn passes_dirs_data_dir_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
