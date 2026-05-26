@@ -69,6 +69,7 @@ struct PortabilityConfig {
 /// Unix-centric env vars flagged by PORT-008 before callers normalize through a
 /// platform-aware abstraction.
 const PORTABILITY_ENV_NAMES: &[&str] = &["HOME", "USER"];
+/// Unix-centric env var prefixes flagged by PORT-008 in ungated production code.
 const PORTABILITY_ENV_PREFIXES: &[&str] = &["XDG_"];
 
 #[derive(Debug, Clone)]
