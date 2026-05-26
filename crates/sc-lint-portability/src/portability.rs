@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use anyhow::Context;
 use anyhow::Result;
 use serde::Deserialize;
-use syn::Attribute;
 use syn::Block;
 use syn::Expr;
 use syn::ExprCall;
@@ -19,12 +18,7 @@ use syn::ItemFn;
 use syn::ItemImpl;
 use syn::ItemMod;
 use syn::Lit;
-use syn::Meta;
 use syn::Stmt;
-use syn::Token;
-use syn::UseTree;
-use syn::parse::Parser;
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -33,6 +27,18 @@ use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
+use crate::predicates::attr_is_cfg_attr_not_unix_allow_dead_code;
+use crate::predicates::attr_is_cfg_unix;
+use crate::predicates::attr_is_platform_cfg;
+use crate::predicates::extract_env_var_lookup;
+use crate::predicates::is_dirs_home_dir_call;
+use crate::predicates::is_path_like_constructor;
+use crate::predicates::is_set_var_call;
+use crate::predicates::is_shell_command_call;
+use crate::predicates::is_unix_shell_path_literal;
+use crate::predicates::production_env_portability_variable;
+use crate::predicates::production_path_rule_id;
+use crate::predicates::use_tree_contains_std_os_unix;
 use crate::source_scan::FileContext;
 use crate::source_scan::PackageName;
 use crate::source_scan::ScopeKind;
@@ -71,14 +77,6 @@ struct PortabilityConfig {
 }
 
 const REPO_LINT_CONFIG_PATHS: &[&str] = &["sc-lint.toml", ".just/lint-config.toml"];
-/// Production-only Unix path prefixes intentionally covered by PORT-006.
-const UNIX_PATH_PREFIXES: &[&str] = &[
-    concat!("/", "home", "/"),
-    concat!("/", "usr", "/"),
-    concat!("/", "etc", "/"),
-    concat!("/", "var", "/"),
-    concat!("/", "tmp", "/"),
-];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UnixPathPrefix(String);
@@ -118,12 +116,6 @@ impl<'de> Deserialize<'de> for UnixPathPrefix {
         Self::new(value).map_err(serde::de::Error::custom)
     }
 }
-
-/// Unix-centric env vars flagged by PORT-008 before callers normalize through a
-/// platform-aware abstraction.
-const PORTABILITY_ENV_NAMES: &[&str] = &["HOME", "USER"];
-/// Unix-centric env var prefixes flagged by PORT-008 in ungated production code.
-const PORTABILITY_ENV_PREFIXES: &[&str] = &["XDG_"];
 
 #[derive(Debug, Clone)]
 struct PortabilityFinding {
@@ -740,6 +732,24 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             ),
         });
     }
+
+    fn push_shell_finding(&mut self, detail: &str, line: usize) {
+        self.findings.push(PortabilityFinding {
+            rule_id: RuleId::Port009,
+            kind: "production_shell_portability",
+            message: format!(
+                "PORT-009 Unix shell invocation `{detail}` in production code assumes a Unix shell exists; prefer invoking the target binary directly or move the shell path behind an explicit Unix-only boundary"
+            ),
+            source_path: self.file_context.source_path.clone(),
+            line,
+            package: self.file_context.package.clone(),
+            target: self.file_context.target.clone(),
+            node_label: format!(
+                "crate::{}::{}::portability",
+                self.file_context.package, self.file_context.target
+            ),
+        });
+    }
 }
 
 impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
@@ -756,6 +766,14 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
 
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if self.platform_gated_depth == 0
+            && let Some(command_name) = is_shell_command_call(node)
+        {
+            self.push_shell_finding(
+                &format!("Command::new(\"{command_name}\")"),
+                span_start_line(node.span()),
+            );
+        }
+        if self.platform_gated_depth == 0
             && let Some(variable_name) = production_env_portability_variable(node)
         {
             self.push_env_finding(&variable_name, span_start_line(node.span()));
@@ -766,9 +784,12 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
     fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
         if self.platform_gated_depth == 0
             && let Lit::Str(lit) = &node.lit
-            && let Some(rule_id) = production_path_rule_id(&lit.value())
         {
-            self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            if is_unix_shell_path_literal(&lit.value()) {
+                self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
+            } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
+                self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            }
         }
         syn::visit::visit_expr_lit(self, node);
     }
@@ -826,232 +847,4 @@ fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
         config_home_env: repo_config.portability.and_then(|cfg| cfg.config_home_env),
         unix_path_prefixes: defaults.portability.unix_path_prefixes,
     })
-}
-
-fn attr_is_cfg_unix(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    nested_cfg_metas(attr).is_some_and(|metas| metas.iter().any(meta_is_unix_cfg))
-}
-
-fn attr_is_platform_cfg(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    nested_cfg_metas(attr).is_some_and(|metas| {
-        metas
-            .iter()
-            .any(|meta| meta_is_unix_cfg(meta) || meta_is_windows_cfg(meta))
-    })
-}
-
-fn attr_is_cfg_attr_not_unix_allow_dead_code(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg_attr") {
-        return false;
-    }
-    nested_cfg_metas(attr).is_some_and(|metas| {
-        let mut metas = metas.iter();
-        let Some(first) = metas.next() else {
-            return false;
-        };
-        meta_is_not_unix_cfg(first) && metas.any(meta_is_allow_dead_code)
-    })
-}
-
-fn use_tree_contains_std_os_unix(tree: &UseTree) -> bool {
-    fn walk(tree: &UseTree, prefix: &mut Vec<String>) -> bool {
-        match tree {
-            UseTree::Path(use_path) => {
-                prefix.push(use_path.ident.to_string());
-                let matched = walk(&use_path.tree, prefix);
-                prefix.pop();
-                matched
-            }
-            UseTree::Name(use_name) => {
-                prefix.push(use_name.ident.to_string());
-                let matched = matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix");
-                prefix.pop();
-                matched
-            }
-            UseTree::Rename(use_rename) => {
-                prefix.push(use_rename.ident.to_string());
-                let matched = matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix");
-                prefix.pop();
-                matched
-            }
-            UseTree::Glob(_) => {
-                matches!(prefix.as_slice(), [std, os, unix, ..] if std == "std" && os == "os" && unix == "unix")
-            }
-            UseTree::Group(group) => group.items.iter().any(|item| walk(item, prefix)),
-        }
-    }
-
-    walk(tree, &mut Vec::new())
-}
-
-fn is_path_like_constructor(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    path_segments_match(&expr_path.path, &["PathBuf", "from"])
-        || path_segments_match(&expr_path.path, &["Path", "new"])
-        || path_segments_match(&expr_path.path, &["std", "path", "PathBuf", "from"])
-        || path_segments_match(&expr_path.path, &["std", "path", "Path", "new"])
-}
-
-fn is_dirs_home_dir_call(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    path_segments_match(&expr_path.path, &["dirs", "home_dir"])
-}
-
-fn is_set_var_call(expr: &Expr) -> bool {
-    let Expr::Path(expr_path) = expr else {
-        return false;
-    };
-    path_segments_match(&expr_path.path, &["env", "set_var"])
-        || path_segments_match(&expr_path.path, &["std", "env", "set_var"])
-}
-
-fn extract_env_var_lookup(expr_call: &ExprCall) -> Option<String> {
-    let Expr::Path(expr_path) = &*expr_call.func else {
-        return None;
-    };
-    if !path_segments_match(&expr_path.path, &["env", "var"])
-        && !path_segments_match(&expr_path.path, &["env", "var_os"])
-        && !path_segments_match(&expr_path.path, &["std", "env", "var"])
-        && !path_segments_match(&expr_path.path, &["std", "env", "var_os"])
-    {
-        return None;
-    }
-    let Expr::Lit(ExprLit {
-        lit: Lit::Str(lit), ..
-    }) = expr_call.args.first()?
-    else {
-        return None;
-    };
-    Some(lit.value())
-}
-
-fn production_env_portability_variable(expr_call: &ExprCall) -> Option<String> {
-    let variable_name = extract_env_var_lookup(expr_call)?;
-    if PORTABILITY_ENV_NAMES.contains(&variable_name.as_str())
-        || PORTABILITY_ENV_PREFIXES
-            .iter()
-            .any(|prefix| variable_name.starts_with(prefix))
-    {
-        Some(variable_name)
-    } else {
-        None
-    }
-}
-
-fn production_path_rule_id(value: &str) -> Option<RuleId> {
-    if is_windows_path_literal(value) {
-        Some(RuleId::Port007)
-    } else if is_unix_path_literal(value) {
-        Some(RuleId::Port006)
-    } else {
-        None
-    }
-}
-
-fn is_unix_path_literal(value: &str) -> bool {
-    // PORT-006 intentionally keeps a narrower built-in production set than the
-    // repo-configured PORT-001 test prefixes so only clearly OS-specific
-    // production literals are flagged here.
-    UNIX_PATH_PREFIXES
-        .iter()
-        .any(|prefix| value.starts_with(prefix))
-}
-
-/// Detect drive-letter absolute paths and UNC paths for PORT-007.
-fn is_windows_path_literal(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    let drive_absolute = bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && (bytes[2] == b'\\' || bytes[2] == b'/');
-    // Keep the extra length guard so the detector does not flag the bare `\\`
-    // prefix literal used in code or docs; PORT-007 should only trigger on an
-    // actual UNC path, not on the two-character prefix by itself.
-    let unc_absolute = value.starts_with("\\\\") && value.len() > 2;
-    drive_absolute || unc_absolute
-}
-
-fn nested_cfg_metas(attr: &Attribute) -> Option<Punctuated<Meta, Token![,]>> {
-    let Meta::List(list) = &attr.meta else {
-        return None;
-    };
-    Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse2(list.tokens.clone())
-        .ok()
-}
-
-fn meta_is_unix_cfg(meta: &Meta) -> bool {
-    match meta {
-        Meta::Path(path) => path.is_ident("unix"),
-        Meta::List(list) if list.path.is_ident("not") => false,
-        Meta::List(list) => Punctuated::<Meta, Token![,]>::parse_terminated
-            .parse2(list.tokens.clone())
-            .ok()
-            .is_some_and(|metas: Punctuated<Meta, Token![,]>| metas.iter().any(meta_is_unix_cfg)),
-        Meta::NameValue(_) => false,
-    }
-}
-
-fn meta_is_windows_cfg(meta: &Meta) -> bool {
-    match meta {
-        Meta::Path(path) => path.is_ident("windows"),
-        Meta::List(list) if list.path.is_ident("not") => false,
-        Meta::List(list) => Punctuated::<Meta, Token![,]>::parse_terminated
-            .parse2(list.tokens.clone())
-            .ok()
-            .is_some_and(|metas: Punctuated<Meta, Token![,]>| {
-                metas.iter().any(meta_is_windows_cfg)
-            }),
-        Meta::NameValue(_) => false,
-    }
-}
-
-fn meta_is_not_unix_cfg(meta: &Meta) -> bool {
-    let Meta::List(list) = meta else {
-        return false;
-    };
-    if !list.path.is_ident("not") {
-        return false;
-    }
-    Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse2(list.tokens.clone())
-        .ok()
-        .is_some_and(|metas: Punctuated<Meta, Token![,]>| metas.iter().any(meta_is_unix_cfg))
-}
-
-fn meta_is_allow_dead_code(meta: &Meta) -> bool {
-    let Meta::List(list) = meta else {
-        return false;
-    };
-    if !list.path.is_ident("allow") {
-        return false;
-    }
-    Punctuated::<Meta, Token![,]>::parse_terminated
-        .parse2(list.tokens.clone())
-        .ok()
-        .is_some_and(|metas: Punctuated<Meta, Token![,]>| {
-            metas
-                .iter()
-                .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("dead_code")))
-        })
-}
-
-fn path_segments_match(path: &syn::Path, expected: &[&str]) -> bool {
-    if path.segments.len() != expected.len() {
-        return false;
-    }
-    path.segments
-        .iter()
-        .zip(expected.iter())
-        .all(|(segment, expected)| segment.ident == *expected)
 }

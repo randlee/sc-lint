@@ -11,6 +11,7 @@ use serde::Serializer;
 use thiserror::Error;
 
 mod portability;
+mod predicates;
 mod render;
 mod source_scan;
 #[cfg(test)]
@@ -39,6 +40,7 @@ pub enum RuleId {
     Port006,
     Port007,
     Port008,
+    Port009,
 }
 
 impl RuleId {
@@ -52,6 +54,7 @@ impl RuleId {
             Self::Port006 => "PORT-006",
             Self::Port007 => "PORT-007",
             Self::Port008 => "PORT-008",
+            Self::Port009 => "PORT-009",
         }
     }
 }

@@ -39,7 +39,7 @@ This applies to:
   code.
 - The canonical constant sources are `PORTABILITY_ENV_NAMES` and
   `PORTABILITY_ENV_PREFIXES` in
-  `crates/sc-lint-portability/src/portability.rs`.
+  `crates/sc-lint-portability/src/predicates.rs`.
 - Preferred alternatives are `dirs::data_dir()`, `dirs::config_dir()`, and
   `dirs::home_dir()`.
 - If the lookup is intentionally Unix-only, wrap the production code path in

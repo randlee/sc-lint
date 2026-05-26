@@ -69,6 +69,7 @@ The currently planned sprints in this phase are:
   - shared shell invocation portability in `sc-lint-portability`
   - `Command::new("sh" | "bash")` and hardcoded `/bin/sh` or `/bin/bash`
     production checks
+  - implemented on `feature/sprint-C8`
   - see [docs/phase-C/sprint-C8.md](./sprint-C8.md)
 - `C.9`
   - structural cross-platform `cfg` parity enforcement in
