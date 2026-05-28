@@ -140,6 +140,17 @@ fn parse_errors_use_the_documented_command_identifier() {
 }
 
 #[test]
+fn version_flag_stops_immediately_with_exit_code_zero() {
+    let ParsedInvocation::Immediate(outcome) = crate::parse_args(["sc-lint", "--version"]) else {
+        panic!("--version should stop at parse time");
+    };
+
+    assert_eq!(outcome.exit_code, 0);
+    let stdout = outcome.rendered.stdout.expect("version emits stdout");
+    assert!(stdout.contains("sc-lint 0.3.0"));
+}
+
+#[test]
 fn version_failure_uses_the_canonical_top_level_envelope() {
     let error = CliError::internal("version rendering failure");
     let rendered = crate::render::render_error_json("version", &error);
