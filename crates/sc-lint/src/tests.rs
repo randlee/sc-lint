@@ -165,8 +165,7 @@ fn version_flag_routes_through_version_command_context() {
 
 #[test]
 fn version_flag_json_uses_the_canonical_top_level_envelope() {
-    let ParsedInvocation::Ready(cli) = crate::parse_args(["sc-lint", "--json", "--version"])
-    else {
+    let ParsedInvocation::Ready(cli) = crate::parse_args(["sc-lint", "--json", "--version"]) else {
         panic!("--version --json should parse into the standard execution path");
     };
 
