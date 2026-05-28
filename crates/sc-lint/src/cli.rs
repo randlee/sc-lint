@@ -8,10 +8,12 @@ use serde::Serialize;
 #[derive(Debug, Clone, Parser)]
 #[command(name = "sc-lint")]
 #[command(about = "Stable top-level CLI for the sc-lint tool family")]
-#[command(version)]
+#[command(disable_version_flag = true)]
 pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
+    #[arg(long, global = true)]
+    pub version: bool,
     #[arg(long, global = true, value_name = "path")]
     pub root: Option<PathBuf>,
     #[arg(long, global = true, value_name = "path")]
@@ -21,7 +23,7 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub log_console: bool,
     #[command(subcommand)]
-    pub(crate) command: Command,
+    pub(crate) command: Option<Command>,
 }
 
 #[derive(Debug, Clone, Subcommand)]
