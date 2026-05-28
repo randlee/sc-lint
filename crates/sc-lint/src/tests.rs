@@ -179,7 +179,7 @@ fn version_flag_json_uses_the_canonical_top_level_envelope() {
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "version");
     assert_eq!(json["data"]["crate_name"], "sc-lint");
-    assert_eq!(json["data"]["crate_version"], "0.3.0");
+    assert_eq!(json["data"]["crate_version"], env!("CARGO_PKG_VERSION"));
 }
 
 #[test]
