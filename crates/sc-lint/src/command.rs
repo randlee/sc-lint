@@ -219,25 +219,7 @@ impl CommandContext {
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
-        let command_id = match (&cli.command, cli.version) {
-            (Some(command), false) => CommandId::from_cli_command(command),
-            (None, true) => CommandId::Version,
-            (Some(_), true) => {
-                return Err(CliError::usage(
-                    "`--version` cannot be combined with a subcommand",
-                )
-                .with_suggested_action(
-                    "Use either `sc-lint --version` or a subcommand such as `sc-lint version`.",
-                ));
-            }
-            (None, false) => {
-                return Err(
-                    CliError::usage("a command is required").with_suggested_action(
-                        "Run `sc-lint --help` to inspect the supported command surface.",
-                    ),
-                );
-            }
-        };
+        let command_id = CommandId::from_cli_command(&cli.command);
         let service_name = ServiceName::new(command_id.service_name());
 
         Ok(Self {

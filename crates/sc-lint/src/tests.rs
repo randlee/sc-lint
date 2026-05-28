@@ -31,50 +31,50 @@ use crate::workflow;
 fn command_surface_parses_the_initial_grouped_shape() {
     let cli = Cli::parse_from(["sc-lint", "lint", "sc-boundary"]);
     assert!(matches!(
-        cli.command.as_ref(),
-        Some(Command::Lint {
+        cli.command,
+        Command::Lint {
             target: LintTarget::ScBoundary
-        })
+        }
     ));
 
     let cli = Cli::parse_from(["sc-lint", "view", "graph"]);
     assert!(matches!(
-        cli.command.as_ref(),
-        Some(Command::View {
+        cli.command,
+        Command::View {
             target: ViewTarget::Graph
-        })
+        }
     ));
 
     let cli = Cli::parse_from(["sc-lint", "lint", "line-counts"]);
     assert!(matches!(
-        cli.command.as_ref(),
-        Some(Command::Lint {
+        cli.command,
+        Command::Lint {
             target: LintTarget::LineCounts
-        })
+        }
     ));
 
     let cli = Cli::parse_from(["sc-lint", "view", "findings"]);
     assert!(matches!(
-        cli.command.as_ref(),
-        Some(Command::View {
+        cli.command,
+        Command::View {
             target: ViewTarget::Findings
-        })
+        }
     ));
 
     let cli = Cli::parse_from(["sc-lint", "check", "xwin"]);
     assert!(matches!(
-        cli.command.as_ref(),
-        Some(Command::Check {
+        cli.command,
+        Command::Check {
             target: CheckTarget::Xwin
-        })
+        }
     ));
 
     let cli = Cli::parse_from(["sc-lint", "clippy", "native"]);
     assert!(matches!(
-        cli.command.as_ref(),
-        Some(Command::Clippy {
+        cli.command,
+        Command::Clippy {
             target: ClippyTarget::Native
-        })
+        }
     ));
 }
 
@@ -148,45 +148,6 @@ fn version_failure_uses_the_canonical_top_level_envelope() {
     assert_eq!(json["ok"], false);
     assert_eq!(json["command"], "version");
     assert_eq!(json["error"]["code"], "CLI.INTERNAL_ERROR");
-}
-
-#[test]
-fn version_flag_routes_through_version_command_context() {
-    let ParsedInvocation::Ready(cli) = crate::parse_args(["sc-lint", "--version"]) else {
-        panic!("--version should parse into the standard execution path");
-    };
-
-    assert!(cli.version);
-    assert!(cli.command.is_none());
-
-    let context = CommandContext::from_cli(&cli).expect("version-flag context");
-    assert_eq!(context.command_id(), "version");
-}
-
-#[test]
-fn version_flag_json_uses_the_canonical_top_level_envelope() {
-    let ParsedInvocation::Ready(cli) = crate::parse_args(["sc-lint", "--json", "--version"]) else {
-        panic!("--version --json should parse into the standard execution path");
-    };
-
-    let context = CommandContext::from_cli(&cli).expect("version-flag json context");
-    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
-    let success = crate::command::execute(&context, &loaded).expect("version command succeeds");
-    let envelope = CommandEnvelope::success(context.command_id(), success.data);
-    let rendered = crate::render::render_success_json(&envelope);
-    let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
-
-    assert_eq!(json["ok"], true);
-    assert_eq!(json["command"], "version");
-    assert_eq!(json["data"]["crate_name"], "sc-lint");
-}
-
-#[test]
-fn missing_command_without_version_is_a_usage_error() {
-    let cli = Cli::parse_from(["sc-lint", "--json"]);
-    let error = CommandContext::from_cli(&cli).expect_err("missing command should fail");
-
-    assert_eq!(error.kind, CliErrorKind::Usage);
 }
 
 #[test]
