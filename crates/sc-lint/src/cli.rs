@@ -8,7 +8,6 @@ use serde::Serialize;
 #[derive(Debug, Clone, Parser)]
 #[command(name = "sc-lint")]
 #[command(about = "Stable top-level CLI for the sc-lint tool family")]
-#[command(disable_version_flag = true)]
 pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
