@@ -179,6 +179,7 @@ fn version_flag_json_uses_the_canonical_top_level_envelope() {
     assert_eq!(json["ok"], true);
     assert_eq!(json["command"], "version");
     assert_eq!(json["data"]["crate_name"], "sc-lint");
+    assert_eq!(json["data"]["crate_version"], "0.3.0");
 }
 
 #[test]
@@ -187,6 +188,17 @@ fn missing_command_without_version_is_a_usage_error() {
     let error = CommandContext::from_cli(&cli).expect_err("missing command should fail");
 
     assert_eq!(error.kind, CliErrorKind::Usage);
+}
+
+#[test]
+fn version_flag_conflicts_with_subcommand_as_a_usage_error() {
+    let cli = Cli::parse_from(["sc-lint", "--json", "--version", "lint", "sc-boundary"]);
+    let error = CommandContext::from_cli(&cli).expect_err("version flag conflict should fail");
+    let rendered = crate::render::render_error_json("cli.parse_error", &error);
+    let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
+
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert_eq!(json["error"]["code"], "CLI.USAGE_ERROR");
 }
 
 #[test]
