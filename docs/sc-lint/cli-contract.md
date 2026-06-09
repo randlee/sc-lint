@@ -87,6 +87,8 @@ Initial convention:
   - `ci`
 - `sc-lint version`
   - `version`
+- `sc-lint --version`
+  - `version`
 
 When parsing fails before a concrete command path is resolved, the CLI uses the
 fallback identifier:
