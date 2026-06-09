@@ -14,7 +14,7 @@ readme = "README.md"
 proc-macro = true
 
 [dependencies]
-sc-lint-directives = { version = "0.3.1", path = "../sc-lint-directives" }
+sc-lint-directives.workspace = true
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full", "parsing"] }
