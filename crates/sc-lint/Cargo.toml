@@ -22,8 +22,8 @@ path = "src/lib.rs"
 clap.workspace = true
 dunce = "1"
 sc-observability.workspace = true
-sc-lint-boundary = { version = "0.3.0", path = "../sc-lint-boundary" }
-sc-lint-schema = { version = "0.3.0", path = "../sc-lint-schema" }
+sc-lint-boundary = { version = "0.3.1", path = "../sc-lint-boundary" }
+sc-lint-schema = { version = "0.3.1", path = "../sc-lint-schema" }
 serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
