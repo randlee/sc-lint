@@ -1,0 +1,62 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/QA-001>
+  a triage:Finding ;
+  triage:findingId "QA-001" ;
+  triage:title "Hardcoded /tmp fixture literals (cross-platform anti-pattern)" ;
+  triage:description "crates/sc-lint-boundary/src/tests.rs:58,60,101 -- hardcoded /tmp/... fixture path literals match the cross-platform anti-pattern grep; should use a portable temp-dir helper (e.g. tempfile crate / std::env::temp_dir()) instead." ;
+  triage:category "QA" ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "Minor" ;
+  triage:repeatable true ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/0/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/0/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/QA-001/0/3> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/QA-001/0/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 58 ;
+  triage:snippet "manifest_path: \"/tmp/example/Cargo.toml\".to_string()" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/QA-001/0/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 60 ;
+  triage:snippet "source_path: Some(\"/tmp/example/src/lib.rs\".to_string())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/QA-001/0/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/tests.rs" ;
+  triage:line 101 ;
+  triage:snippet "source_path: Some(\"/tmp/example/src/lib.rs\".to_string())" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

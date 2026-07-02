@@ -1,0 +1,182 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F002>
+  a triage:Finding ;
+  triage:findingId "RBP-F002" ;
+  triage:title "Edge kind hardcoded as raw string literals instead of EdgeKind enum" ;
+  triage:description "crates/sc-lint-boundary/src/graph.rs:134 (+12 more sites) -- edge 'kind' is hardcoded as raw string literals, with no EdgeKind enum, unlike the existing NodeKind enum. Violates RBP-004. This is a repeatable pattern -- confirm ALL 13 total sites (1 cited + 12 more reported), not just the first." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "important" ;
+  triage:repeatable true ;
+  triage:sweepScope "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/3> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/4> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/5> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/6> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/7> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/8> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/9> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/10> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/11> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/12> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/feature-phase-D/13> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 134 ;
+  triage:snippet "builder.add_edge(\"contains\", context.crate_id.clone(), root_module_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/2>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 190 ;
+  triage:snippet "builder.add_edge(\"contains\", parent_module_id.clone(), child_module_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/3>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 337 ;
+  triage:snippet "builder.add_edge(\"contains\", node_id.clone(), variant_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/4>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 522 ;
+  triage:snippet "builder.add_edge(\"contains\", parent_module_id.clone(), owner_node_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/5>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 546 ;
+  triage:snippet "builder.add_edge(\"contains\", parent_module_id.clone(), impl_node_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/6>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 547 ;
+  triage:snippet "builder.add_edge(\"targets\", impl_node_id.clone(), owner_node_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/7>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 565 ;
+  triage:snippet "builder.add_edge(\"implements\", impl_node_id.clone(), trait_target_node_id);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/8>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 590 ;
+  triage:snippet "builder.add_edge(\"declares\", owner_node_id.clone(), method_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/9>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 591 ;
+  triage:snippet "builder.add_edge(\"contains\", impl_node_id.clone(), method_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/10>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 637 ;
+  triage:snippet "builder.add_edge(\"contains\", args.parent_module_id.clone(), NodeId::new(id.clone()));" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/11>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 669 ;
+  triage:snippet "builder.add_edge(\"contains\", args.parent_id.clone(), field_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/12>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 705 ;
+  triage:snippet "builder.add_edge(\"contains\", args.parent_id.clone(), field_id.clone());" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F002/feature-phase-D/13>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/graph.rs" ;
+  triage:line 773 ;
+  triage:snippet "builder.add_edge(\"references\", source_node_id.clone(), target_node_id);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

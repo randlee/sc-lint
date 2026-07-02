@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F003>
+  a triage:Finding ;
+  triage:findingId "RBP-F003" ;
+  triage:title "Finding.kind is a stringly-typed shadow of RuleId" ;
+  triage:description "Finding.kind duplicates RuleId as a raw string field instead of deriving from/using the RuleId enum directly, violating RBP-004." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "Minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "crates/sc-lint-boundary/src/" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z" ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F003/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F003/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-schema/src/lib.rs" ;
+  triage:line 265 ;
+  triage:snippet "pub kind: String," ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

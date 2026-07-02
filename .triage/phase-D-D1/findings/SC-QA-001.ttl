@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-001>
+  a triage:Finding ;
+  triage:findingId "SC-QA-001" ;
+  triage:title "Stale docs/phase-D/sprint-D1.md frontmatter" ;
+  triage:description "docs/phase-D/sprint-D1.md:4-6 frontmatter still says status: planned and references the old planning branch/worktree (feature/phase-D-planning), not the actual implementation state (implemented on feature/phase-D)." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/phase-D/" ;
+  triage:category "documentation" ;
+  triage:severity "Important" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-001/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/SC-QA-001/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "docs/phase-D/sprint-D1.md" ;
+  triage:line 4 ;
+  triage:snippet "status: planned; branch: feature/phase-D-planning; worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .
