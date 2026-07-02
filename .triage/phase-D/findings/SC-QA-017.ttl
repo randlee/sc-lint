@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-017>
+  a triage:Finding ;
+  triage:findingId "SC-QA-017" ;
+  triage:title "Stale phase framing in documentation" ;
+  triage:description "Phase B status inverted in docs/sc-lint/roadmap.md:108; states 'Phase B is now the next planned line of work' but should use past tense like Phase C which states 'Phase C was the planning line that followed Phase B and is now complete'. This contradicts line 98 where Phase A is marked complete." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable true ;
+  triage:sweepScope "docs/" ;
+  triage:category "req-qa" ;
+  triage:severity "Blocking" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T03:15:00Z" ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-017/feature-phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D-planning/a27c880> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D-planning/a27c880> .
+
+<urn:atm:triage:occurrence/SC-QA-017/feature-phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/roadmap.md" ;
+  triage:line 108 ;
+  triage:snippet "Phase `B` is now the next planned line of work." ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "a27c880" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D-planning/a27c880> .
+
+<urn:atm:triage:worktree/feature-phase-D-planning/a27c880>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "a27c880" ;
+  triage:orderIndex 0 .

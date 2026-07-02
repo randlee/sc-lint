@@ -1,17 +1,17 @@
 # `sc-lint` Phase B Plan
 
-This document is the execution stub for Phase `B`, the post-Phase-A hardening
-and process-tightening phase.
+This document is the archived execution stub for completed Phase `B`, the
+post-Phase-A hardening and process-tightening phase.
 
 ## Objective
 
-Phase `B` turns the recurring systemic findings from Phase `A` into explicit
-planned engineering work so the same defect patterns stop reappearing during
-later sprint implementation and QA.
+Phase `B` turned the recurring systemic findings from Phase `A` into explicit
+planned engineering work so the same defect patterns would stop reappearing
+during later sprint implementation and QA.
 
-## Current Scope
+## Recorded Scope
 
-The currently planned sprints in this phase are:
+The completed Phase `B` line consisted of:
 
 - `B.1`
   - post-mortem carry-forward lint-gate backlog hardening
@@ -62,9 +62,9 @@ The currently planned sprints in this phase are:
 
 ## Phase Structure
 
-Phase `B` currently starts with four focused planning-and-hardening sprints,
-followed by one queued distribution-planning sprint whose numeric slot is still
-open:
+Phase `B` started with four focused planning-and-hardening sprints, followed
+by one distribution-planning sprint whose numeric slot remained intentionally
+unassigned while the numbered implementation order was reviewed:
 
 1. `B.1`
    - encode Phase-A post-mortem findings as planned product/process work
@@ -85,13 +85,12 @@ open:
    - assign the final sprint number only after the numbered implementation
      sequence around it is decided
 
-Additional Phase `B` sprint scope may be added after the current numbered
-planning line through `B.4` is reviewed.
+Phase `B` closed with the recorded `B.1`-`B.4` line plus
+`sprint-B-homebrew`; no additional Phase `B` sprint scope remains open.
 
-The next queued planning line after Phase `B` is Phase `C`, covering
-`sc-lint-version`, the shared reporting pipeline it consumes, and hard-fail
-breaking-change checks across Rust APIs, CLI contracts, and transport
-interfaces.
+Phase `C` followed Phase `B`, covering `sc-lint-version`, the shared
+reporting pipeline it consumes, and hard-fail breaking-change checks across
+Rust APIs, CLI contracts, and transport interfaces.
 
 ## Exit Direction
 

@@ -2,9 +2,9 @@
 
 This document is the high-level planning index for the `sc-lint` project.
 
-## Current Planning Scope
+## Planning Scope
 
-The current project focus is:
+The project focus is:
 
 - extracting `sc-lint` into a standalone repository
 - stabilizing the initial crate set
@@ -16,6 +16,8 @@ The current project focus is:
 - migrating boundary-definition handling to structured TOML sources
 - migrating generic lint/view tooling into `sc-lint`
 - moving boundary inventory and manifest-policy enforcement from Python into
+  `sc-lint-boundary`
+- planning direct workspace package-edge enforcement from boundary inventory in
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`
 - splitting imported lint families into narrowly-scoped analyzer crates rather
@@ -31,7 +33,7 @@ The current project focus is:
   those checks can surface platform drift before a push
 - preserving CI and lint-runner parity during extraction
 
-## Current Detailed Planning References
+## Detailed Planning References
 
 - project roadmap
   - see [docs/sc-lint/roadmap.md](./sc-lint/roadmap.md)
@@ -53,10 +55,11 @@ The current project focus is:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - known issues inventory
   - see [docs/issues-inventory.md](./issues-inventory.md)
-- current phase execution plan
+- phase execution plans
   - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
   - see [docs/phase-B/phase-B-plan.md](./phase-B/phase-B-plan.md)
   - see [docs/phase-C/phase-C-plan.md](./phase-C/phase-C-plan.md)
+  - see [docs/phase-D/phase-D-plan.md](./phase-D/phase-D-plan.md)
   - see [docs/phase-A/sprint-A1a.md](./phase-A/sprint-A1a.md)
   - see [docs/phase-A/sprint-A1b.md](./phase-A/sprint-A1b.md)
   - see [docs/phase-A/sprint-A2.md](./phase-A/sprint-A2.md)
@@ -69,9 +72,9 @@ The current project focus is:
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
-## Current Phase Priorities
+## Phase A Foundation Priorities
 
-This phase should execute in the following order:
+Phase `A` was planned to execute in the following order:
 
 1. define canonical `sc-lint` boundaries in TOML
 2. make `just lint` self-host the repo's own analyzer checks by default
@@ -93,9 +96,14 @@ This phase should execute in the following order:
 15. publish comprehensive per-tool user guides and rule-disable guidance for
     the release-1 lint surface
 
+Active follow-on after the completed Phase `C` line:
+
+16. enforce direct workspace package dependency policy from canonical boundary
+    inventory in `sc-lint-boundary`
+
 ## Scheduled Sprint Plans
 
-The currently scheduled sprint plans are:
+The scheduled sprint plans are:
 
 - `A.1a`
   - CLI bootstrap and contract definition
@@ -207,6 +215,14 @@ The currently scheduled sprint plans are:
     compatibility, and Windows-rotation compatibility review for the CLI-owned
     logging seam
   - `docs/phase-C/sprint-C10.md`
+- `D.1`
+  - boundary inventory dependency policy enforcement
+  - direct workspace package-edge allowlist and forbidden-edge rule family
+  - dedicated `dependencies` rule filter for package-edge policy, separate
+    from source-graph boundary checks and manifest policy
+  - in-scope direct edges include normal, dev, build, and target-specific
+    workspace dependency sections
+  - `docs/phase-D/sprint-D1.md`
 
 ## Recent Sprint Deltas
 
@@ -293,14 +309,13 @@ Release `0.2.x` should establish:
   - one document per tool named after the lint tool and linked from the
     repository-root `README.md`
 
-Phase `A` completed the release-1 foundation implementation line. Phase `B` is
-the current planning and hardening line for post-Phase-A defect prevention,
-follow-on feature work, and release/distribution planning. That does not imply
-that every release-1 follow-on item is already complete.
+Phase `A` completed the release-1 foundation implementation line. Phase `B`
+and Phase `C` are both complete.
 
-Phase `C` is now the next queued planning line after the current Phase `B`
-sequence. It covers `sc-lint-version`, the shared reporting pipeline it
-consumes, and multi-surface breaking-change detection.
+Phase `D` is the current planning and hardening line, beginning with `D.1`.
+It covers boundary inventory dependency-policy enforcement and the remaining
+requirements/architecture hardening needed to keep the active planning surface
+aligned with the structured boundary roadmap.
 
 ## Planning Conventions
 

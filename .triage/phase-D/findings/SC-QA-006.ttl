@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-006>
+  a triage:Finding ;
+  triage:findingId "SC-QA-006" ;
+  triage:title "issues-inventory.md Phase B Homebrew follow-on ambiguous completion status" ;
+  triage:description "docs/issues-inventory.md:64-66 -- Phase B Homebrew follow-on work framed as still-pending without noting Phase B is complete; ambiguous whether sprint-B-homebrew remains open. Remediation: clarify completion status." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "documentation" ;
+  triage:severity "Important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-006/feature-phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-006/feature-phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/issues-inventory.md" ;
+  triage:line 64 ;
+  triage:snippet "The current released Homebrew automation still reflects the boundary-only stopgap path. Phase `B` contains the explicit follow-on distribution planning" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/feature-phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

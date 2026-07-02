@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-015>
+  a triage:Finding ;
+  triage:findingId "SC-QA-015" ;
+  triage:title "docs/architecture.md frames completed Phase C as current" ;
+  triage:description "docs/architecture.md:63 -- \"The current Phase `C` planning decision is that `sc-lint-version` is a...\" Phase C is complete, not current. Discovered by the comprehensive full-tree sweep (SC-QA-SWEEP-FINAL) as an occurrence missed by the original QA-3 report's 10 named findings. Remediation: reword to reflect Phase C as complete (historical decision record) and Phase D as current." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:category "documentation" ;
+  triage:severity "Blocking" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-015/feature-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-D-planning/29afdb3> ;
+  triage:triagedAt "2026-07-02T03:00:00Z"^^xsd:dateTime .
+
+<urn:atm:triage:occurrence/SC-QA-015/feature-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/architecture.md" ;
+  triage:line 63 ;
+  triage:snippet "The current Phase `C` planning decision is that `sc-lint-version` is a dedicated planned workspace crate invoked from the top-level CLI through `sc-lint check interfaces`." ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/feature-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

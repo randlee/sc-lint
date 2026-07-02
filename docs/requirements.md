@@ -469,51 +469,39 @@ The product should support both:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
   - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
 
-## Current Phase Requirements
+## Phase D Requirements
 
-The current execution phase, Phase `C`, requires:
+The current execution phase, Phase `D`, requires:
 
-- phase-plan and sprint-plan hardening for the post-Phase-A follow-on work
-  currently scheduled in:
-  - `B.1`
-  - `B.2`
-  - `B.3`
-  - `B.4`
-  - `sprint-B-homebrew`
-- explicit top-level traceability for the new Phase-B product lines:
-  - recurring shared lint-gate backlog for:
-    - raw identity string literals without named constants
-    - `/tmp/` paths without intent comments
-    - public API error types exposing `anyhow::Error`
-    - duplicated `CrateId` newtypes across workspace crates
-    - `clippy::for_kv_map` and similar structural for-loop anti-patterns
-    - `pub` visibility exceeding the documented contract surface
-    - raw `String` fields used for structured identifiers such as
-      `boundary_id`, sprint ids, owner ids, and planning keys
-  - portability-scope expansion in `sc-lint-portability`
-    - Windows-only path literal parity with the current Unix-only path checks
-    - broader cross-platform environment-variable portability rules
-    - shell-portability checks for OS-specific shell and command assumptions
-  - named-caller allowlist enforcement in `sc-lint-boundary`
-  - observability boundary-policy acceptance
-  - Homebrew release/distribution planning
-- requirements and architecture baselines that match the current active phase
-  rather than preserving stale Phase-A-only execution wording
-- continued preservation of the Phase-A release-1 foundation decisions already
-  accepted for:
+- delivery of `D.1`, the boundary inventory dependency-policy enforcement
+  sprint currently scheduled in:
+  - `docs/phase-D/phase-D-plan.md`
+  - `docs/phase-D/sprint-D1.md`
+- explicit traceability from top-level requirements into the active
+  `REQ-SCB-015` through `REQ-SCB-021` dependency-policy scope, including:
+  - TOML-backed package dependency policy in boundary inventory records
+  - direct workspace package-edge allowlist and forbidden-edge enforcement
+  - a dedicated `dependencies` rule filter for package-edge policy
+  - stable fail-only `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-003` rule
+    coverage in the default `analyze_workspace` path
+  - in-scope direct workspace edges across normal, dev, build, and
+    target-specific dependency sections
+- requirements and architecture baselines that match Phase `D` rather than
+  preserving stale Phase-B or Phase-C framing
+- continued preservation of already accepted earlier-phase decisions for:
   - crate-isolated backends
   - the AI-first top-level CLI contract
   - canonical TOML boundary definitions
   - the default local development lint gate
   - documented `fast` / `full` / `ci` profile semantics
 
-Phase `C` is the queued next planning line after the current Phase `B`
-sequence. Its governing forward-pointer artifacts are:
+Phase `C` is complete. Its governing versioning and published-artifact
+planning artifacts remain:
 
 - `docs/sc-lint-version/requirements.md`
 - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
 
-Phase `C` also includes the next shared `sc-lint-portability` follow-on line:
+Phase `C` also closed the shared `sc-lint-portability` follow-on line:
 
 - `PORT-006`
   - Unix-only absolute path literals in production code

@@ -31,7 +31,7 @@ Initial release.
 ### Features
 
 - **`sc-lint` CLI** — top-level composition root; `lint` subcommand dispatches to backend analyzers; structured JSON output via `sc-lint-schema`
-- **`sc-lint-boundary`** — AST-sensitive boundary analyzer; loads `boundary.toml` inventory; enforces `forbidden_edges`, `emit_*` rules, and `banned_imports`; named-caller groundwork
+- **`sc-lint-boundary`** — AST-sensitive boundary analyzer; loads `boundary.toml` inventory; carries dependency-policy metadata such as `forbidden_edges` for later enforcement; `emit_*` rules and `banned_imports`; named-caller groundwork
 - **`sc-lint-portability`** — AST-sensitive portability analyzer; Windows-path, env-var, and shell-portability lint rules
 - **`sc-lint-runtime`** — AST-sensitive runtime/concurrency analyzer
 - **`sc-lint-schema`** — shared machine output schema types used by all analyzer crates

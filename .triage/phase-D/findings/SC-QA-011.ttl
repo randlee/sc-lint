@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-011>
+  a triage:Finding ;
+  triage:findingId "SC-QA-011" ;
+  triage:title "phase-C-plan.md retains present-tense Current Scope framing with no completion marker" ;
+  triage:description "docs/phase-C/phase-C-plan.md -- whole doc retains present-tense \"Current Scope\"/\"currently planned sprints\" framing with no completion marker, contradicting project-plan.md. Remediation: add explicit status note (e.g. \"Phase C is complete; retained as historical planning record\"), consistent with the convention already used in docs/phase-A/sprint-A4.md." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:category "Documentation" ;
+  triage:severity "Minor" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-011/feature-phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> ;
+  triage:triagedAt "2026-07-02T02:59:00Z"^^xsd:dateTime .
+
+<urn:atm:triage:occurrence/SC-QA-011/feature-phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/phase-C/phase-C-plan.md" ;
+  triage:line 18 ;
+  triage:snippet "## Current Scope" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/feature-phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

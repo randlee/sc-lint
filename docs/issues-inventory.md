@@ -62,8 +62,8 @@ placeholder awaiting later hardening.
 ## Distribution Planning Scope
 
 The current released Homebrew automation still reflects the boundary-only
-stopgap path. Phase `B` contains the explicit follow-on distribution planning
-needed to move from that stopgap to the full top-level install path:
+stopgap path. Completed Phase `B` added the explicit follow-on distribution
+planning needed to move from that stopgap to the full top-level install path:
 
 - `sprint-B-homebrew`
   - planned primary `brew install randlee/tap/sc-lint` surface
@@ -73,7 +73,7 @@ needed to move from that stopgap to the full top-level install path:
 
 ## Phase C Planning Note
 
-Phase `C` is now the queued interface-versioning, shared reporting,
+Completed Phase `C` recorded the interface-versioning, shared reporting,
 observability-maintenance, and shared portability follow-on planning line:
 
 - `C.1`
@@ -97,14 +97,44 @@ observability-maintenance, and shared portability follow-on planning line:
 - `C.10`
   - `sc-observability` `1.1.0` adoption in the CLI logging layer
 
-Current status:
+Recorded Phase `C` decisions:
 - no dedicated boundary record or `boundaries/planning.toml` entry is required
   yet for `sc-lint-version`
 - `C.1` has now committed the planned form-factor and invocation path:
   - dedicated workspace crate: `sc-lint-version`
   - top-level command path: `sc-lint check interfaces`
-- the Phase `C` reporting direction now keeps generic HTML/XHTML rendering out
+- the Phase `C` reporting direction keeps generic HTML/XHTML rendering out
   of `sc-lint-version` itself and prefers reusable ownership in the
   `sc-compose` repo, potentially as a dedicated `sc-reporting` capability
 - dedicated crate-boundary records remain future implementation work after the
-  Phase `C` planning line rather than current planning prerequisites
+  completed Phase `C` planning line rather than prerequisites for the
+  archived Phase `C` plan
+
+## Phase D Planning Note
+
+Phase `D` is the active boundary-inventory improvement line that followed the
+completed Phase `C` sequence:
+
+- `D.1`
+  - direct workspace package-edge enforcement from canonical boundary inventory
+  - stable rule family for:
+    - direct dependency not in owner allowlist
+    - direct dependent not in owner allowlist
+    - explicit forbidden package edge present
+  - direct-edge scope includes normal, dev, build, and target-specific
+    workspace dependency sections
+  - explicit separation between:
+    - package-edge architectural policy
+    - manifest workspace/version hygiene
+    - future planning-aware inventory parity
+  - dedicated operator-visible `dependencies` rule filter for package-edge
+    policy, separate from boundary source-graph checks and manifest policy
+
+Current status:
+
+- package dependency fields such as `allowed_dependencies`,
+  `allowed_dependents`, and `forbidden_edges` already exist in boundary TOML
+  records
+- the current shipped analyzer does not yet enforce those fields
+- `D.1` is the authoritative planning surface for closing that gap without
+  absorbing transitive reachability or broader inventory-parity work

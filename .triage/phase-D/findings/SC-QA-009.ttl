@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-009>
+  a triage:Finding ;
+  triage:findingId "SC-QA-009" ;
+  triage:title "docs/sc-lint/README.md doc index missing Phase D entries" ;
+  triage:description "docs/sc-lint/README.md doc index has no entry at all for docs/phase-D/phase-D-plan.md or docs/phase-D/sprint-D1.md despite Phase D being current; combined with SC-QA-007/008 the index misdirects readers to stale plans. Remediation: add Phase D index entries; update currency labels." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "doc-index" ;
+  triage:severity "Important" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/sc-lint/README.md" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-009/feature-phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-009/feature-phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/README.md" ;
+  triage:line 0 ;
+  triage:snippet "doc index missing Phase D entries" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/feature-phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

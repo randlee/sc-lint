@@ -1,23 +1,23 @@
 # `sc-lint` Phase C Plan
 
-This document is the planning stub for Phase `C`, the interface-versioning,
-shared reporting, observability-maintenance, and queued shared portability
-follow-on phase.
+This document is the archived planning stub for completed Phase `C`, the
+interface-versioning, shared reporting, observability-maintenance, and shared
+portability follow-on phase.
 
 ## Objective
 
-Phase `C` introduces a planned `sc-lint-version` capability that turns stable
-interface monitoring into one explicit product feature, and it schedules the
+Phase `C` defined the planned `sc-lint-version` capability that turns stable
+interface monitoring into one explicit product feature, and it scheduled the
 next four shared portability lint families that were intentionally left as
-follow-on product work after `ADR-010`. The phase must produce both
+follow-on product work after `ADR-010`. The phase was intended to produce both
 machine-readable change detection and a shared human-facing report model from
 the same structured artifacts, queue one explicit `sc-observability` `1.1.0`
 adoption pass, and close the next consumer-neutral cross-platform portability
 gaps in `sc-lint-portability`.
 
-## Current Scope
+## Recorded Scope
 
-The currently planned sprints in this phase are:
+The completed Phase `C` line consisted of:
 
 - `C.1`
   - `sc-lint-version` architecture and policy foundation
