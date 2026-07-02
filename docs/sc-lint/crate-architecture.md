@@ -79,8 +79,8 @@ their governing docs, boundaries, and planned sprint work.
 ### `sc-lint-boundary`
 
 - role:
-  - boundary inventory, ownership, manifest-policy, and AST-sensitive boundary
-    analysis
+  - boundary inventory, ownership, manifest-policy, AST-sensitive boundary
+    analysis, and the planned package dependency-policy line
 - governing docs:
   - `docs/sc-lint-boundary/requirements.md`
   - `docs/sc-lint-boundary/architecture.md`
@@ -94,6 +94,7 @@ their governing docs, boundaries, and planned sprint work.
   - `A.6`
   - `A.7`
   - `B.2`
+  - `D.1`
 
 ### `sc-lint-portability`
 

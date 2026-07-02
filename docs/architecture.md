@@ -308,8 +308,11 @@ Current intended distribution is:
 - `sc-lint-boundary`
   - boundary inventory and ownership rules
   - boundary declarations and attribute-driven boundary policy
-  - planned next boundary rule-family addition:
+  - current owned extension:
     - `SCB-CALLER-001` named-caller allowlist enforcement
+  - planned next boundary rule-family addition:
+    - `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and
+      `SCB-DEPENDENCY-003` direct workspace package-edge policy
 - `sc-lint-portability`
   - OS/platform portability rules
   - current planned moves/imports:
@@ -358,6 +361,7 @@ Canonical machine policy should live in:
 This includes:
 
 - boundary records
+- package dependency policy
 - planning metadata
 
 The current target layout is:
@@ -374,6 +378,9 @@ the product architecture, not treated only as future consumer-facing examples.
 These TOML records are now both canonical planning inputs and active lint
 inputs for the boundary inventory behavior already implemented in
 `sc-lint-boundary`.
+That same canonical boundary data is also the planned source for direct
+workspace package-edge policy such as `allowed_dependencies`,
+`allowed_dependents`, and exact `forbidden_edges`.
 
 ## Current Canonical Boundary Facades
 

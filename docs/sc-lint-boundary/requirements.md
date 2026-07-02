@@ -1,7 +1,8 @@
 # `sc-lint` Requirements
 
-These requirements define the planned behavior for the boundary-definition and
-inventory-parity work in the `sc-lint` tool family.
+These requirements define the planned behavior for the boundary-definition,
+package dependency policy, and inventory-parity work in the `sc-lint` tool
+family.
 
 ## Canonical Boundary Source
 
@@ -33,6 +34,49 @@ inventory-parity work in the `sc-lint` tool family.
 - `REQ-SCB-006`
   Once TOML loading exists, new boundary-enforcement features that depend on
   boundary metadata must be implemented against TOML-backed data first.
+
+## Package Dependency Policy
+
+- `REQ-SCB-015`
+  Boundary inventory package dependency policy must be enforced from canonical
+  TOML boundary records plus workspace Cargo metadata, not from prose-only
+  review notes or ad hoc manifest scraping.
+
+- `REQ-SCB-016`
+  A direct workspace package dependency from owner package `X` to workspace
+  package `Y` that is not listed in `dependencies.allowed_dependencies` for the
+  owner record must fail with `SCB-DEPENDENCY-001`.
+
+- `REQ-SCB-017`
+  A direct workspace package dependency from workspace package `Y` to owner
+  package `X` must fail with `SCB-DEPENDENCY-002` when `Y` is not listed in
+  `dependencies.allowed_dependents` for the owner record. An empty
+  `allowed_dependents` list means no external workspace package may directly
+  depend on that owner package.
+
+- `REQ-SCB-018`
+  A direct workspace package dependency that matches an exact
+  `dependencies.forbidden_edges` entry must fail with `SCB-DEPENDENCY-003`
+  regardless of whether the same edge would otherwise pass owner/dependent
+  allowlists.
+
+- `REQ-SCB-019`
+  The first package dependency policy implementation scope is direct
+  workspace-member edges only. Transitive reachability and non-workspace
+  dependencies are out of scope until a later scheduled sprint adds them
+  explicitly.
+
+- `REQ-SCB-020`
+  Package dependency policy entries must be validated at inventory load.
+  Malformed forbidden-edge strings, duplicate forbidden edges, duplicate
+  package names inside one dependency-policy record, and unknown fields under
+  `[dependencies]` are hard errors.
+
+- `REQ-SCB-021`
+  Package dependency policy is a boundary-inventory rule family owned by
+  `sc-lint-boundary`, but it remains distinct from manifest workspace/version
+  hygiene. Package-edge enforcement must not be collapsed into the
+  manifest-policy rule family.
 
 ## Inventory-Parity Enforcement
 

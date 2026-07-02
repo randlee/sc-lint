@@ -17,6 +17,8 @@ The current project focus is:
 - migrating generic lint/view tooling into `sc-lint`
 - moving boundary inventory and manifest-policy enforcement from Python into
   `sc-lint-boundary`
+- planning direct workspace package-edge enforcement from boundary inventory in
+  `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`
 - splitting imported lint families into narrowly-scoped analyzer crates rather
   than growing catch-all backends
@@ -57,6 +59,7 @@ The current project focus is:
   - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
   - see [docs/phase-B/phase-B-plan.md](./phase-B/phase-B-plan.md)
   - see [docs/phase-C/phase-C-plan.md](./phase-C/phase-C-plan.md)
+  - see [docs/phase-D/phase-D-plan.md](./phase-D/phase-D-plan.md)
   - see [docs/phase-A/sprint-A1a.md](./phase-A/sprint-A1a.md)
   - see [docs/phase-A/sprint-A1b.md](./phase-A/sprint-A1b.md)
   - see [docs/phase-A/sprint-A2.md](./phase-A/sprint-A2.md)
@@ -92,6 +95,11 @@ This phase should execute in the following order:
 14. run parity validation before deprecating Python boundary logic
 15. publish comprehensive per-tool user guides and rule-disable guidance for
     the release-1 lint surface
+
+Current queued follow-on after the Phase `C` line:
+
+16. enforce direct workspace package dependency policy from canonical boundary
+    inventory in `sc-lint-boundary`
 
 ## Scheduled Sprint Plans
 
@@ -207,6 +215,10 @@ The currently scheduled sprint plans are:
     compatibility, and Windows-rotation compatibility review for the CLI-owned
     logging seam
   - `docs/phase-C/sprint-C10.md`
+- `D.1`
+  - boundary inventory dependency policy enforcement
+  - direct workspace package-edge allowlist and forbidden-edge rule family
+  - `docs/phase-D/sprint-D1.md`
 
 ## Recent Sprint Deltas
 

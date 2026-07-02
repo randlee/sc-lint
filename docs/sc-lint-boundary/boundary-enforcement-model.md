@@ -9,14 +9,21 @@ Related requirements:
 
 ## Purpose
 
-This document records the planned warn/error enforcement model for
-inventory-parity boundary checks in `sc-lint-boundary`.
+This document records the planned boundary-inventory enforcement models in
+`sc-lint-boundary`, including:
+
+- planning-aware inventory-parity checks for documented boundary items
+- fail-only package dependency policy for direct workspace package edges
 
 Current implementation note:
 
 - A.7 adds Rust-native manifest-policy checks and parity tests against
   `.just/lint_manifests.py`
 - that work does not replace the inventory-parity model described here
+- manifest policy remains separate from boundary-inventory package dependency
+  enforcement
+- package dependency fields already exist in boundary TOML, but direct
+  workspace package-edge enforcement is still the planned `D.1` follow-on
 - planning-aware missing-item enforcement remains a later stage built on the
   A.6 loader foundation
 
@@ -92,6 +99,59 @@ This differs from `references.forbidden`:
 - use `references.forbidden` when the dependency edge should not exist at all
 - use `[callers].approved` when the edge is allowed, but only from named
   external owners
+
+## Package Dependency Policy
+
+Package dependency policy is also separate from inventory-parity enforcement.
+
+Use `[dependencies]` when a boundary record needs to constrain which workspace
+packages may directly depend on the owner package or be depended on by the
+owner package.
+
+Canonical example:
+
+```toml
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
+forbidden_edges = [
+  "sc-lint-boundary -> sc-lint-attributes",
+  "sc-lint-boundary -> sc-observability",
+]
+```
+
+Operational rules:
+
+- `allowed_dependencies` is the complete allowlist of direct outgoing
+  workspace-member dependencies for the owner package
+- `allowed_dependents` is the complete allowlist of direct incoming
+  workspace-member dependents for the owner package
+- `allowed_dependents = []` means no external workspace package may directly
+  depend on that owner package
+- each `forbidden_edges` row is one exact denied direct edge in
+  `package-a -> package-b` form
+- malformed edge strings, duplicate edges, duplicate package names, and unknown
+  fields fail inventory loading immediately
+- `SCB-DEPENDENCY-001` reports direct outgoing workspace edges not present in
+  `allowed_dependencies`
+- `SCB-DEPENDENCY-002` reports direct incoming workspace edges not present in
+  `allowed_dependents`
+- `SCB-DEPENDENCY-003` reports exact forbidden direct edges even when the same
+  edge would otherwise pass owner/dependent allowlists
+
+Scope limits for the first rule family:
+
+- direct workspace-member edges only
+- no transitive reachability enforcement yet
+- no third-party crates.io or git dependency policy yet
+
+This differs from manifest policy:
+
+- use package dependency policy for architectural dependency seams between
+  workspace packages
+- use manifest policy for workspace-field inheritance and internal path
+  dependency version alignment
+- do not merge package dependency policy into the manifest-policy rule family
 
 ## Inventory-Parity Scope
 

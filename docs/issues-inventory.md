@@ -108,3 +108,28 @@ Current status:
   `sc-compose` repo, potentially as a dedicated `sc-reporting` capability
 - dedicated crate-boundary records remain future implementation work after the
   Phase `C` planning line rather than current planning prerequisites
+
+## Phase D Planning Note
+
+Phase `D` is now the queued boundary-inventory improvement line after the
+current Phase `C` sequence:
+
+- `D.1`
+  - direct workspace package-edge enforcement from canonical boundary inventory
+  - stable rule family for:
+    - direct dependency not in owner allowlist
+    - direct dependent not in owner allowlist
+    - explicit forbidden package edge present
+  - explicit separation between:
+    - package-edge architectural policy
+    - manifest workspace/version hygiene
+    - future planning-aware inventory parity
+
+Current status:
+
+- package dependency fields such as `allowed_dependencies`,
+  `allowed_dependents`, and `forbidden_edges` already exist in boundary TOML
+  records
+- the current shipped analyzer does not yet enforce those fields
+- `D.1` is the authoritative planning surface for closing that gap without
+  absorbing transitive reachability or broader inventory-parity work
