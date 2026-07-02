@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F003>
+  a triage:Finding ;
+  triage:findingId "RBP-F003" ;
+  triage:title "WorkspacePackageName newtype missing Display/AsRef<str>" ;
+  triage:description "docs/phase-D/sprint-D1.md:137 -- WorkspacePackageName newtype derives only Debug, Clone, PartialEq, Eq, Hash; no Display/AsRef<str> planned despite the same sprint requiring rendered package names in forbidden-edge text and error messages. Remediation: add Display/AsRef<str> as the single formatting entry point." ;
+  triage:phaseId "phase-D" ;
+  triage:category "RBP" ;
+  triage:triageMode "initial_pass" ;
+  triage:severity "Minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/phase-D/" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F003/feature-phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b> .
+
+<urn:atm:triage:occurrence/RBP-F003/feature-phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/phase-D/sprint-D1.md" ;
+  triage:line 137 ;
+  triage:snippet "#[derive(Debug, Clone, PartialEq, Eq, Hash)]\npub(crate) struct WorkspacePackageName(String);" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b> .
+
+<urn:atm:triage:worktree/feature-phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:orderIndex 0 .

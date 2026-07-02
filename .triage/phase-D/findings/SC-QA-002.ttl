@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-002>
+  a triage:Finding ;
+  triage:findingId "SC-QA-002" ;
+  triage:title "boundaries/planning.toml current_sprint stale (B.3)" ;
+  triage:description "boundaries/planning.toml:4 -- current_sprint = \"B.3\" is stale; project-plan.md records C.1-C.10 complete and D.1 as next. ADR-004's follow-up table designates this field as the authoritative current-sprint source for warn/error escalation. Remediation: advance current_sprint to the actual active/last-closed sprint and add sync to the sprint-closeout checklist." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC-QA" ;
+  triage:severity "Important" ;
+  triage:repeatable false ;
+  triage:sweepScope "boundaries/" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-002/phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b> .
+
+<urn:atm:triage:occurrence/SC-QA-002/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "boundaries/planning.toml" ;
+  triage:line 4 ;
+  triage:snippet "current_sprint = \"B.3\"" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b> .
+
+<urn:atm:triage:worktree/phase-D-planning/b6043b19434f9d37e9f2d1afb71065670e01c72b>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:orderIndex 0 .

@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F002>
+  a triage:Finding ;
+  triage:findingId "RBP-F002" ;
+  triage:title "forbidden_edges specified as delimited strings instead of structured TOML" ;
+  triage:description "forbidden_edges is specified as delimited strings (\"package-a -> package-b\") rather than structured TOML (e.g. inline tables { from = ..., to = ... }), requiring a parsing/validation step for data TOML can represent natively and duplicating the already-planned ForbiddenPackageEdge { from, to } runtime type. Remediation: model as inline tables directly." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:category "RBP" ;
+  triage:severity "Important" ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/phase-D-planning/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F002/phase-D-planning/2> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/b6043b19> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/b6043b19> .
+
+<urn:atm:triage:occurrence/RBP-F002/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint-boundary/boundary-enforcement-model.md" ;
+  triage:line 117 ;
+  triage:snippet "forbidden_edges specified as delimited strings (\"package-a -> package-b\")" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/b6043b19> .
+
+<urn:atm:triage:occurrence/RBP-F002/phase-D-planning/2>
+  a triage:Occurrence ;
+  triage:file "docs/phase-D/sprint-D1.md" ;
+  triage:line 126 ;
+  triage:snippet "forbidden_edges format definition (lines 126-134)" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/b6043b19> .
+
+<urn:atm:triage:worktree/phase-D-planning/b6043b19>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:orderIndex 0 .
