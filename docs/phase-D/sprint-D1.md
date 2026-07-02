@@ -167,6 +167,25 @@ pub enum RuleId {
     ScbManifest001,
     ScbManifest002,
 }
+
+impl RuleId {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ScbCycle001 => "SCB-CYCLE-001",
+            Self::ScbCycle002 => "SCB-CYCLE-002",
+            Self::ScbCycle003 => "SCB-CYCLE-003",
+            Self::ScbBoundary001 => "SCB-BOUNDARY-001",
+            Self::ScbBoundary002 => "SCB-BOUNDARY-002",
+            Self::ScbBoundary003 => "SCB-BOUNDARY-003",
+            Self::ScbCaller001 => "SCB-CALLER-001",
+            Self::ScbDependency001 => "SCB-DEPENDENCY-001",
+            Self::ScbDependency002 => "SCB-DEPENDENCY-002",
+            Self::ScbDependency003 => "SCB-DEPENDENCY-003",
+            Self::ScbManifest001 => "SCB-MANIFEST-001",
+            Self::ScbManifest002 => "SCB-MANIFEST-002",
+        }
+    }
+}
 ```
 
 ```rust

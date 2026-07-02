@@ -122,6 +122,28 @@ their governing docs, boundaries, and planned sprint work.
   - `C.8`
   - `C.9`
 
+## Planned Capability Note — sc-lint-boundary Phase D Line
+
+Phase `D` extends the existing `sc-lint-boundary` crate through sprint `D.1`.
+
+- authoritative planning docs:
+  - `docs/phase-D/phase-D-plan.md`
+  - `docs/phase-D/sprint-D1.md`
+  - `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`
+- planned capability:
+  - direct workspace package-edge enforcement from canonical boundary TOML
+  - validated `allowed_dependencies`, `allowed_dependents`, and
+    `forbidden_edges` policy parsing at inventory load
+  - a dedicated package dependency-policy analysis path that stays separate
+    from manifest workspace/version hygiene
+- planned rule family:
+  - `SCB-DEPENDENCY-001`
+  - `SCB-DEPENDENCY-002`
+  - `SCB-DEPENDENCY-003`
+- planned command surface:
+  - `sc-lint-boundary analyze`
+  - `sc-lint lint sc-boundary`
+
 ### `sc-lint-runtime`
 
 - role:
