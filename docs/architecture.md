@@ -313,6 +313,10 @@ Current intended distribution is:
   - planned next boundary rule-family addition:
     - `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and
       `SCB-DEPENDENCY-003` direct workspace package-edge policy
+    - dedicated operator-visible `dependencies` rule filter, separate from
+      both source-graph boundary checks and manifest policy
+    - direct-edge scope includes normal, dev, build, and target-specific
+      workspace dependency sections
 - `sc-lint-portability`
   - OS/platform portability rules
   - current planned moves/imports:

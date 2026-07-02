@@ -120,10 +120,14 @@ current Phase `C` sequence:
     - direct dependency not in owner allowlist
     - direct dependent not in owner allowlist
     - explicit forbidden package edge present
+  - direct-edge scope includes normal, dev, build, and target-specific
+    workspace dependency sections
   - explicit separation between:
     - package-edge architectural policy
     - manifest workspace/version hygiene
     - future planning-aware inventory parity
+  - dedicated operator-visible `dependencies` rule filter for package-edge
+    policy, separate from boundary source-graph checks and manifest policy
 
 Current status:
 

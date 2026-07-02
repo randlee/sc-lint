@@ -136,12 +136,15 @@ Phase `D` extends the existing `sc-lint-boundary` crate through sprint `D.1`.
     `forbidden_edges` policy parsing at inventory load
   - a dedicated package dependency-policy analysis path that stays separate
     from manifest workspace/version hygiene
+  - direct-edge scope includes normal, dev, build, and target-specific
+    workspace dependency sections
 - planned rule family:
   - `SCB-DEPENDENCY-001`
   - `SCB-DEPENDENCY-002`
   - `SCB-DEPENDENCY-003`
 - planned command surface:
   - `sc-lint-boundary analyze`
+  - `sc-lint-boundary analyze --rule-filter dependencies`
   - `sc-lint lint sc-boundary`
 
 ### `sc-lint-runtime`

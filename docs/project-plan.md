@@ -218,6 +218,10 @@ The currently scheduled sprint plans are:
 - `D.1`
   - boundary inventory dependency policy enforcement
   - direct workspace package-edge allowlist and forbidden-edge rule family
+  - dedicated `dependencies` rule filter for package-edge policy, separate
+    from source-graph boundary checks and manifest policy
+  - in-scope direct edges include normal, dev, build, and target-specific
+    workspace dependency sections
   - `docs/phase-D/sprint-D1.md`
 
 ## Recent Sprint Deltas
