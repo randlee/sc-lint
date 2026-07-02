@@ -115,8 +115,8 @@ Canonical example:
 allowed_dependents = ["sc-lint"]
 allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
 forbidden_edges = [
-  "sc-lint-boundary -> sc-lint-attributes",
-  "sc-lint-boundary -> sc-observability",
+  { from = "sc-lint-boundary", to = "sc-lint-attributes" },
+  { from = "sc-lint-boundary", to = "sc-observability" },
 ]
 ```
 
@@ -132,10 +132,10 @@ Operational rules:
   workspace member
 - `allowed_dependents = []` means no external workspace package may directly
   depend on that owner package
-- each `forbidden_edges` row is one exact denied direct edge in
-  `package-a -> package-b` form
-- malformed edge strings, duplicate edges, duplicate package names, and unknown
-  fields fail inventory loading immediately
+- each `forbidden_edges` row is one exact denied direct edge expressed as one
+  structured inline table with `from` and `to` fields
+- malformed `forbidden_edges` inline tables, duplicate edges, duplicate package
+  names, and unknown fields fail inventory loading immediately
 - `SCB-DEPENDENCY-001` reports direct outgoing workspace edges not present in
   `allowed_dependencies`
 - `SCB-DEPENDENCY-002` reports direct incoming workspace edges not present in
@@ -262,6 +262,14 @@ An item becomes overdue only when:
 Repositories that want a harder interpretation must advance
 `[planning].current_sprint` when the sprint closes rather than reusing the
 closed sprint label for post-closeout validation.
+
+Sprint-closeout checklist note:
+
+- advance `boundaries/planning.toml` `[planning].current_sprint` to the next
+  active sprint before post-closeout validation runs
+- keep that field synchronized with `docs/project-plan.md` and the
+  follow-up-gate expectation documented in
+  `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`
 
 ## Structured Planning Mapping
 

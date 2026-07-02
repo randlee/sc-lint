@@ -72,7 +72,7 @@ silently dropped or partially deferred.
   instances enter any package-policy analysis
 - malformed dependency-policy records fail inventory loading immediately,
   including:
-  - malformed `package-a -> package-b` forbidden-edge strings
+  - malformed `forbidden_edges` inline-table records
   - duplicate forbidden-edge rows
   - duplicate dependency/dependent package names within one record
   - unknown fields under `[dependencies]`
@@ -128,21 +128,40 @@ explicit code samples or signatures showing the intended end state.
 allowed_dependents = ["sc-lint"]
 allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
 forbidden_edges = [
-  "sc-lint-boundary -> sc-lint-attributes",
-  "sc-lint-boundary -> sc-observability",
+  { from = "sc-lint-boundary", to = "sc-lint-attributes" },
+  { from = "sc-lint-boundary", to = "sc-observability" },
 ]
 ```
 
 ```rust
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct WorkspacePackageName(String);
+
+impl AsRef<str> for WorkspacePackageName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for WorkspacePackageName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_ref())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawForbiddenPackageEdge {
+    pub(crate) from: String,
+    pub(crate) to: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawDependenciesSection {
     pub(crate) allowed_dependents: Vec<String>,
     pub(crate) allowed_dependencies: Vec<String>,
-    pub(crate) forbidden_edges: Vec<String>,
+    pub(crate) forbidden_edges: Vec<RawForbiddenPackageEdge>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -158,10 +177,41 @@ pub(crate) struct PackageDependencyPolicy {
     pub(crate) forbidden_edges: Vec<ForbiddenPackageEdge>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum DependencyPolicyError {
+    #[error("invalid dependency edge format in boundary `{boundary_id}`")]
+    InvalidFormat { boundary_id: BoundaryId },
+    #[error("duplicate forbidden edge `{from} -> {to}` in boundary `{boundary_id}`")]
+    DuplicateEdge {
+        boundary_id: BoundaryId,
+        from: WorkspacePackageName,
+        to: WorkspacePackageName,
+    },
+    #[error("unknown workspace package `{package}` in boundary `{boundary_id}`")]
+    UnknownPackage {
+        boundary_id: BoundaryId,
+        package: WorkspacePackageName,
+    },
+    #[error("duplicate package `{package}` in `{field}` for boundary `{boundary_id}`")]
+    DuplicatePackage {
+        boundary_id: BoundaryId,
+        field: &'static str,
+        package: WorkspacePackageName,
+    },
+}
+
 impl RawDependenciesSection {
-    pub(crate) fn validate(self, boundary_id: &BoundaryId) -> Result<PackageDependencyPolicy>;
+    pub(crate) fn validate(
+        self,
+        boundary_id: &BoundaryId,
+    ) -> Result<PackageDependencyPolicy, DependencyPolicyError>;
 }
 ```
+
+All `DependencyPolicyError` variants map into the existing
+`CLI.CONFIG_ERROR` family from `docs/sc-lint/cli-contract.md` because invalid
+`[dependencies]` metadata is a repository-configuration failure discovered
+during inventory loading, not a backend-protocol or internal-error path.
 
 ```rust
 #[non_exhaustive]

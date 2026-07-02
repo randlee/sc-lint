@@ -137,7 +137,9 @@ See [docs/phase-B/phase-B-plan.md](../phase-B/phase-B-plan.md),
 
 ### Phase C
 
-Phase `C` is the queued planning line after the current Phase `B` sequence.
+Phase `C` was the planning line that followed the Phase `B` sequence and is
+now complete. Phase `D`, starting with `D.1`, is the current active planning
+line.
 
 Initial Phase-C scope is:
 
