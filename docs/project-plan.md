@@ -309,14 +309,13 @@ Release `0.2.x` should establish:
   - one document per tool named after the lint tool and linked from the
     repository-root `README.md`
 
-Phase `A` completed the release-1 foundation implementation line. Phase `B` is
-the current planning and hardening line for post-Phase-A defect prevention,
-follow-on feature work, and release/distribution planning. That does not imply
-that every release-1 follow-on item is already complete.
+Phase `A` completed the release-1 foundation implementation line. Phase `B`
+and Phase `C` are both complete.
 
-Phase `C` is now the next queued planning line after the current Phase `B`
-sequence. It covers `sc-lint-version`, the shared reporting pipeline it
-consumes, and multi-surface breaking-change detection.
+Phase `D` is the current planning and hardening line, beginning with `D.1`.
+It covers boundary inventory dependency-policy enforcement and the remaining
+requirements/architecture hardening needed to keep the active planning surface
+aligned with the structured boundary roadmap.
 
 ## Planning Conventions
 
