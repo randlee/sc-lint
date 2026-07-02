@@ -2,7 +2,7 @@
 
 All notable changes to sc-lint are documented here.
 
-## [0.2.0] — unreleased
+## [0.4.0] — unreleased
 
 ### Features
 
@@ -14,13 +14,15 @@ All notable changes to sc-lint are documented here.
 
 ### Changes
 
+- **Security dependency update** — bumped `anyhow` from `1.0.102` to
+  `1.0.103` to clear `RUSTSEC-2026-0190` in the `cargo-deny` advisories gate
 - **Workspace version inheritance** — all seven crates converted from `version = "..."` to `version.workspace = true`; `[workspace.package] version` is the single source of truth
 - **Standalone binary dispatch** — `run_delegated_backend()` now resolves tool binaries as a sibling to `current_exe()` with PATH fallback; removes build-time `env!("CARGO_MANIFEST_DIR")` dependency that prevented Homebrew installs from running `sc-lint lint sc-portability` and `sc-lint lint sc-runtime`
 - **Release gate version check** — `scripts/release_gate.sh` now verifies the release version input matches `[workspace.package].version` in `Cargo.toml` via `tomllib`; `gate-and-tag` CI job pins Python 3.11 via `setup-python`
 
 ### Version
 
-Workspace bumped from `0.1.0` → `0.2.0`.
+Workspace bumped from `0.3.0` → `0.4.0`.
 
 ---
 
