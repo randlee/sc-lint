@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F001>
+  a triage:Finding ;
+  triage:findingId "RBP-F001" ;
+  triage:title "sprint-D1.md dependency-policy validation errors lack structured error type/stable code" ;
+  triage:description "docs/phase-D/sprint-D1.md:162 -- RawDependenciesSection::validate() return type is specified only as Result<PackageDependencyPolicy> without an error variant. No structured validation-error type or stable error code is defined, nor is it mapped to the CliError taxonomy in docs/sc-lint/cli-contract.md:231-244. Remediation: define explicit validation-error variants (e.g., ParseError, DuplicateEdge, UnknownPackage, etc.) and map them into the existing CONFIG_ERROR family for actionable error reporting." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "Important" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/phase-D/" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/D1/1> ;
+  triage:openOn <urn:atm:triage:worktree/D-planning/b6043b19> ;
+  triage:promoteTo <urn:atm:triage:worktree/D-planning/b6043b19> .
+
+<urn:atm:triage:occurrence/RBP-F001/D1/1>
+  a triage:Occurrence ;
+  triage:file "docs/phase-D/sprint-D1.md" ;
+  triage:line 162 ;
+  triage:snippet "impl RawDependenciesSection { pub(crate) fn validate(self, boundary_id: &BoundaryId) -> Result<PackageDependencyPolicy>; }" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/D-planning/b6043b19> .
+
+<urn:atm:triage:worktree/D-planning/b6043b19>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:orderIndex 0 .

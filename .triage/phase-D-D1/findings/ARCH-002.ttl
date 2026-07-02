@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/ARCH-002>
+  a triage:Finding ;
+  triage:findingId "ARCH-002" ;
+  triage:title "RULE-003 file-size violation: inventory.rs" ;
+  triage:description "crates/sc-lint-boundary/src/inventory.rs exceeds the 1000-line ceiling under RULE-003; grown by this sprint's own new dependency-policy validation logic. Remediation: extract into a dedicated module (e.g. inventory/dependency_policy.rs), mirroring the package_policy.rs split already used this sprint." ;
+  triage:category "ARCH" ;
+  triage:severity "Blocking" ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "crates/sc-lint-boundary/src/" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/ARCH-002/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/ARCH-002/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/inventory.rs" ;
+  triage:lineCount 1943 ;
+  triage:snippet "File exceeds 1000-line limit (actual: 1943 lines)" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

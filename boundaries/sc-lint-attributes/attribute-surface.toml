@@ -18,7 +18,7 @@ roots = []
 [dependencies]
 allowed_dependents = []
 allowed_dependencies = ["sc-lint-directives"]
-forbidden_edges = ["sc-lint-attributes -> sc-lint-boundary"]
+forbidden_edges = [{ from = "sc-lint-attributes", to = "sc-lint-boundary" }]
 
 [references]
 scope = "outside_owner_crate"

@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-019>
+  a triage:Finding ;
+  triage:findingId "SC-QA-019" ;
+  triage:title "Documentation references incomplete" ;
+  triage:description "Detailed Architecture References phase-execution-plan list only links Phase A, omitting Phase B/C/D plan links that docs/project-plan.md provides." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "req-qa" ;
+  triage:severity "minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-019/phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/a27c880> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/a27c880> ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime .
+
+<urn:atm:triage:occurrence/SC-QA-019/phase-D/1>
+  a triage:Occurrence ;
+  triage:file "docs/architecture.md" ;
+  triage:line 640 ;
+  triage:snippet "- see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "a27c880" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/a27c880> .
+
+<urn:atm:triage:worktree/phase-D-planning/a27c880>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "a27c880" ;
+  triage:orderIndex 0 .

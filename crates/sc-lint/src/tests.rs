@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -31,50 +32,50 @@ use crate::workflow;
 fn command_surface_parses_the_initial_grouped_shape() {
     let cli = Cli::parse_from(["sc-lint", "lint", "sc-boundary"]);
     assert!(matches!(
-        cli.command,
-        Command::Lint {
+        cli.command.as_ref(),
+        Some(Command::Lint {
             target: LintTarget::ScBoundary
-        }
+        })
     ));
 
     let cli = Cli::parse_from(["sc-lint", "view", "graph"]);
     assert!(matches!(
-        cli.command,
-        Command::View {
+        cli.command.as_ref(),
+        Some(Command::View {
             target: ViewTarget::Graph
-        }
+        })
     ));
 
     let cli = Cli::parse_from(["sc-lint", "lint", "line-counts"]);
     assert!(matches!(
-        cli.command,
-        Command::Lint {
+        cli.command.as_ref(),
+        Some(Command::Lint {
             target: LintTarget::LineCounts
-        }
+        })
     ));
 
     let cli = Cli::parse_from(["sc-lint", "view", "findings"]);
     assert!(matches!(
-        cli.command,
-        Command::View {
+        cli.command.as_ref(),
+        Some(Command::View {
             target: ViewTarget::Findings
-        }
+        })
     ));
 
     let cli = Cli::parse_from(["sc-lint", "check", "xwin"]);
     assert!(matches!(
-        cli.command,
-        Command::Check {
+        cli.command.as_ref(),
+        Some(Command::Check {
             target: CheckTarget::Xwin
-        }
+        })
     ));
 
     let cli = Cli::parse_from(["sc-lint", "clippy", "native"]);
     assert!(matches!(
-        cli.command,
-        Command::Clippy {
+        cli.command.as_ref(),
+        Some(Command::Clippy {
             target: ClippyTarget::Native
-        }
+        })
     ));
 }
 
@@ -148,6 +149,57 @@ fn version_failure_uses_the_canonical_top_level_envelope() {
     assert_eq!(json["ok"], false);
     assert_eq!(json["command"], "version");
     assert_eq!(json["error"]["code"], "CLI.INTERNAL_ERROR");
+}
+
+#[test]
+fn version_flag_routes_through_version_command_context() {
+    let ParsedInvocation::Ready(cli) = crate::parse_args(["sc-lint", "--version"]) else {
+        panic!("--version should parse into the standard execution path");
+    };
+
+    assert!(cli.version);
+    assert!(cli.command.is_none());
+
+    let context = CommandContext::from_cli(&cli).expect("version-flag context");
+    assert_eq!(context.command_id(), "version");
+}
+
+#[test]
+fn version_flag_json_uses_the_canonical_top_level_envelope() {
+    let ParsedInvocation::Ready(cli) = crate::parse_args(["sc-lint", "--json", "--version"]) else {
+        panic!("--version --json should parse into the standard execution path");
+    };
+
+    let context = CommandContext::from_cli(&cli).expect("version-flag json context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let success = crate::command::execute(&context, &loaded).expect("version command succeeds");
+    let envelope = CommandEnvelope::success(context.command_id(), success.data);
+    let rendered = crate::render::render_success_json(&envelope);
+    let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
+
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["command"], "version");
+    assert_eq!(json["data"]["crate_name"], "sc-lint");
+    assert_eq!(json["data"]["crate_version"], env!("CARGO_PKG_VERSION"));
+}
+
+#[test]
+fn missing_command_without_version_is_a_usage_error() {
+    let cli = Cli::parse_from(["sc-lint", "--json"]);
+    let error = CommandContext::from_cli(&cli).expect_err("missing command should fail");
+
+    assert_eq!(error.kind, CliErrorKind::Usage);
+}
+
+#[test]
+fn version_flag_conflicts_with_subcommand_as_a_usage_error() {
+    let cli = Cli::parse_from(["sc-lint", "--json", "--version", "lint", "sc-boundary"]);
+    let error = CommandContext::from_cli(&cli).expect_err("version flag conflict should fail");
+    let rendered = crate::render::render_error_json("cli.parse_error", &error);
+    let json: Value = serde_json::from_str(&rendered).expect("rendered envelope is json");
+
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert_eq!(json["error"]["code"], "CLI.USAGE_ERROR");
 }
 
 #[test]
@@ -280,6 +332,42 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
     assert_eq!(json["command"], "lint.sc-boundary");
     assert_eq!(json["data"]["tool"], crate::consts::TOOL_BOUNDARY);
     assert!(json["data"]["findings"].is_array());
+}
+
+#[test]
+fn lint_sc_boundary_reports_dependency_policy_failures_through_dispatch() {
+    for (rule_id, configure_fixture) in [
+        (
+            "SCB-DEPENDENCY-001",
+            AnalysisFixture::configure_disallowed_dependency as fn(&AnalysisFixture),
+        ),
+        (
+            "SCB-DEPENDENCY-002",
+            AnalysisFixture::configure_disallowed_dependent as fn(&AnalysisFixture),
+        ),
+        (
+            "SCB-DEPENDENCY-003",
+            AnalysisFixture::configure_forbidden_edge as fn(&AnalysisFixture),
+        ),
+    ] {
+        let fixture = AnalysisFixture::new();
+        configure_fixture(&fixture);
+
+        let data = run_sc_boundary_json(fixture.root());
+        assert_eq!(data["status"], "fail", "expected fail status for {rule_id}");
+        assert!(
+            data["findings"].as_array().is_some(),
+            "missing findings for {rule_id}"
+        );
+        assert!(
+            data["findings"]
+                .as_array()
+                .expect("findings array")
+                .iter()
+                .any(|finding| finding["rule_id"] == rule_id),
+            "missing {rule_id} in top-level dispatch payload"
+        );
+    }
 }
 
 #[test]
@@ -432,8 +520,8 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let error = crate::command::execute(&context, &loaded).expect_err("dispatch should fail");
 
-    assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_eq!(error.code(), "CLI.BACKEND_EXEC_FAILURE");
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert_eq!(error.code(), "CLI.CONFIG_ERROR");
     assert!(error.cause.is_some());
     assert!(std::error::Error::source(&error).is_some());
 }
@@ -749,12 +837,70 @@ fn render_success_json_falls_back_to_internal_error_envelope_on_serialize_failur
     );
 }
 
+#[test]
+fn workspace_version_is_the_single_source_of_truth_for_published_crates() {
+    let workspace_root = repo_backed_workspace_root();
+    let workspace_manifest: toml::Value = toml::from_str(
+        &fs::read_to_string(workspace_root.join("Cargo.toml")).expect("read workspace Cargo.toml"),
+    )
+    .expect("parse workspace Cargo.toml");
+
+    let workspace_version = workspace_manifest["workspace"]["package"]["version"]
+        .as_str()
+        .expect("workspace.package.version")
+        .to_string();
+    assert_eq!(workspace_version, env!("CARGO_PKG_VERSION"));
+
+    let members = workspace_manifest["workspace"]["members"]
+        .as_array()
+        .expect("workspace members");
+    for member in members {
+        let member_manifest_path =
+            workspace_root.join(member.as_str().expect("workspace member path"));
+        let member_manifest: toml::Value = toml::from_str(
+            &fs::read_to_string(member_manifest_path.join("Cargo.toml"))
+                .expect("read member Cargo.toml"),
+        )
+        .expect("parse member Cargo.toml");
+        assert_eq!(
+            member_manifest["package"]["version"]["workspace"].as_bool(),
+            Some(true),
+            "expected {} to inherit workspace.package.version",
+            member_manifest_path.display()
+        );
+    }
+
+    for dependency_name in ["sc-lint-boundary", "sc-lint-directives", "sc-lint-schema"] {
+        assert_eq!(
+            workspace_manifest["workspace"]["dependencies"][dependency_name]["version"].as_str(),
+            Some(workspace_version.as_str()),
+            "expected workspace dependency {dependency_name} to track workspace.package.version",
+        );
+    }
+}
+
 fn repo_backed_workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
         .expect("workspace root")
         .to_path_buf()
+}
+
+fn run_sc_boundary_json(repo_root: &Path) -> Value {
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    crate::command::execute(&context, &loaded)
+        .expect("dispatch succeeds")
+        .data
 }
 
 struct AnalysisFixture {
@@ -773,10 +919,20 @@ impl AnalysisFixture {
     }
 
     fn write_workspace_root(&self) {
+        self.write_workspace_root_with_members(&["crates/example"]);
+    }
+
+    fn write_workspace_root_with_members(&self, members: &[&str]) {
+        let members = members
+            .iter()
+            .map(|member| format!("\"{member}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
         std::fs::write(
             self.root().join("Cargo.toml"),
-            r#"[workspace]
-members = ["crates/example"]
+            format!(
+                r#"[workspace]
+members = [{members}]
 resolver = "2"
 
 [workspace.package]
@@ -787,7 +943,8 @@ authors = ["sc-lint contributors"]
 license = "MIT OR Apache-2.0"
 repository = "https://example.invalid/sc-lint"
 homepage = "https://example.invalid/sc-lint"
-"#,
+"#
+            ),
         )
         .expect("workspace root");
         std::fs::create_dir_all(self.root().join("boundaries")).expect("boundaries");
@@ -799,10 +956,14 @@ homepage = "https://example.invalid/sc-lint"
     }
 
     fn write_package_manifest(&self, package_name: &str) {
+        self.write_package_manifest_with_dependencies(package_name, "");
+    }
+
+    fn write_package_manifest_with_dependencies(&self, package_name: &str, dependencies: &str) {
         self.write(
             &format!("crates/{package_name}/Cargo.toml"),
             &format!(
-                "[package]\nname = \"{package_name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n"
+                "[package]\nname = \"{package_name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n{dependencies}"
             ),
         );
     }
@@ -820,6 +981,87 @@ homepage = "https://example.invalid/sc-lint"
             std::fs::create_dir_all(parent).expect("parent dirs");
         }
         std::fs::write(path, contents).expect("write fixture file");
+    }
+
+    fn write_member_boundary_record(
+        &self,
+        owner_package: &str,
+        allowed_dependencies: &[&str],
+        allowed_dependents: &[&str],
+        forbidden_edges: &[(&str, &str)],
+    ) {
+        let boundary_id = owner_package
+            .split('-')
+            .map(|segment| {
+                let mut chars = segment.chars();
+                match chars.next() {
+                    Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
+                    None => String::new(),
+                }
+            })
+            .collect::<String>();
+        let allowed_dependencies = allowed_dependencies
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let allowed_dependents = allowed_dependents
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges = forbidden_edges
+            .iter()
+            .map(|(from, to)| format!("{{ from = \"{from}\", to = \"{to}\" }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges_block = if forbidden_edges.is_empty() {
+            "[]".to_string()
+        } else {
+            format!("[{forbidden_edges}]")
+        };
+
+        self.write(
+            "boundaries/planning.toml",
+            "[planning]\ncurrent_sprint = \"D.1\"\n",
+        );
+        self.write(
+            &format!("boundaries/{owner_package}/boundary.toml"),
+            &format!(
+                "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
+                owner_package.replace('-', "_"),
+                owner_package.replace('-', "_"),
+            ),
+        );
+    }
+
+    fn configure_dependency_policy_fixture(&self) {
+        self.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+        self.write_package_manifest_with_dependencies(
+            "app",
+            "[dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n",
+        );
+        self.write_package_manifest("api");
+        self.write_source("app", "lib.rs", "pub struct App;\n");
+        self.write_source("api", "lib.rs", "pub struct Api;\n");
+    }
+
+    fn configure_disallowed_dependency(&self) {
+        self.configure_dependency_policy_fixture();
+        self.write_member_boundary_record("app", &[], &[], &[]);
+        self.write_member_boundary_record("api", &[], &["app"], &[]);
+    }
+
+    fn configure_disallowed_dependent(&self) {
+        self.configure_dependency_policy_fixture();
+        self.write_member_boundary_record("app", &["api"], &[], &[]);
+        self.write_member_boundary_record("api", &[], &[], &[]);
+    }
+
+    fn configure_forbidden_edge(&self) {
+        self.configure_dependency_policy_fixture();
+        self.write_member_boundary_record("app", &["api"], &[], &[("app", "api")]);
+        self.write_member_boundary_record("api", &[], &["app"], &[]);
     }
 }
 

@@ -10,6 +10,7 @@ Use `sc-boundary` to check:
 - architectural cycles
 - source-level boundary declarations such as `boundary.internal_only`
 - external impl restrictions such as `boundary.forbid_external_impls`
+- direct workspace package dependency policy from boundary inventory
 - Rust-native manifest-policy checks added in A.7
 
 Current rule families include:
@@ -21,6 +22,9 @@ Current rule families include:
 - `SCB-BOUNDARY-002`
 - `SCB-BOUNDARY-003`
 - `SCB-CALLER-001`
+- `SCB-DEPENDENCY-001`
+- `SCB-DEPENDENCY-002`
+- `SCB-DEPENDENCY-003`
 - `SCB-MANIFEST-001`
 - `SCB-MANIFEST-002`
 
@@ -49,8 +53,9 @@ cargo run -p sc-lint-boundary -- analyze --root . --format json
 Backend-local filtered analysis:
 
 ```bash
-cargo run -p sc-lint-boundary -- analyze --root . --rule cycles --format text
-cargo run -p sc-lint-boundary -- analyze --root . --rule boundaries --format text
+cargo run -p sc-lint-boundary -- analyze --root . --rule-filter cycles --format text
+cargo run -p sc-lint-boundary -- analyze --root . --rule-filter boundaries --format text
+cargo run -p sc-lint-boundary -- analyze --root . --rule-filter dependencies --format text
 ```
 
 Graph export stays backend-local and is adjacent to, but not part of, the
@@ -142,6 +147,34 @@ Operator guidance:
   edge entirely rather than allow a curated caller set
 - `references.scope = "outside_owner_crate"` still exempts owner-crate callers
   for `SCB-CALLER-001`; the allowlist only governs external callers
+
+Package dependency policy also uses boundary inventory rather than source
+annotations:
+
+```toml
+[dependencies]
+allowed_dependents = ["sc-lint"]
+allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
+forbidden_edges = [
+  { from = "sc-lint-boundary", to = "sc-lint-attributes" },
+  { from = "sc-lint-boundary", to = "sc-observability" },
+]
+```
+
+That entry drives direct-workspace-edge findings through the same command path:
+
+```text
+SCB-DEPENDENCY-001 package dependency not allowed:
+workspace package `sc-lint-boundary` directly depends on `sc-lint-attributes` but `sc-lint-attributes` is not listed in `BOUNDARY-ScLintBoundaryAnalyzer` allowed_dependencies
+```
+
+Operator guidance:
+
+- use `[dependencies]` for package-level architectural dependency seams
+- use `references.forbidden` for source-level reference bans inside otherwise
+  valid package edges
+- use manifest policy for workspace metadata hygiene and internal path-version
+  alignment rather than architectural package ownership
 
 ## Disable Model
 

@@ -1,0 +1,43 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-003-ARCH-003>
+  a triage:Finding ;
+  triage:findingId "SC-QA-003-ARCH-003" ;
+  triage:title "manifest_policy.rs change not listed in sprint-D1.md Exact Targets" ;
+  triage:description "manifest_policy.rs was modified (root-canonicalization fix needed for just lint to pass) but is not listed in sprint-D1.md's Exact Targets section. Both req-qa and arch-qa independently corroborated this as a traceability gap only -- the change itself was already confirmed legitimate/non-scope-creep/non-boundary-relaxing by 3 reviewers in QA-1. This is a documentation-traceability fix (add manifest_policy.rs to sprint-D1.md Exact Targets, or note the change in the sprint doc), not a code-behavior fix." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/phase-D/sprint-D1.md, crates/sc-lint-boundary/src/manifest_policy.rs" ;
+  triage:category "documentation-traceability" ;
+  triage:severity "Important" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003-ARCH-003/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:reviewSource "req-qa + arch-qa (corroborating)" ;
+  triage:originalQATask "task phase-D-sprint-D1-qa-1" ;
+  triage:codeChangeFile "crates/sc-lint-boundary/src/manifest_policy.rs" ;
+  triage:documentationGapFile "docs/phase-D/sprint-D1.md" .
+
+<urn:atm:triage:occurrence/SC-QA-003-ARCH-003/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "docs/phase-D/sprint-D1.md" ;
+  triage:issueType "missing-entry-in-exact-targets" ;
+  triage:snippet "Exact Targets section missing manifest_policy.rs" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:relatedCodeFile "crates/sc-lint-boundary/src/manifest_policy.rs" .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

@@ -37,7 +37,7 @@ fn findings_report_text_renders_failure_status_and_count() {
         scanned_crates: 4,
         findings: vec![Finding {
             rule_id: RuleId::Port004,
-            kind: "ungated_std_os_unix_import".to_string(),
+            kind: "ungated_std_os_unix_import".into(),
             message: "ungated import".to_string(),
             owner_ids: vec![OwnerId::new("crate::example::example")],
             node_ids: vec![NodeId::new("crate::example::example::portability")],

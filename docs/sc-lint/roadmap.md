@@ -105,7 +105,9 @@ release-foundation work for:
 
 ### Phase B
 
-Phase `B` is now the next planned line of work.
+Phase `B` was the planning line that followed Phase `A` and is now complete.
+Phase `C` followed that line and is also complete. Phase `D`, starting with
+`D.1`, is the current active planning line.
 
 Initial Phase-B scope is split into focused planning sprints:
 
@@ -137,7 +139,9 @@ See [docs/phase-B/phase-B-plan.md](../phase-B/phase-B-plan.md),
 
 ### Phase C
 
-Phase `C` is the queued planning line after the current Phase `B` sequence.
+Phase `C` was the planning line that followed the Phase `B` sequence and is
+now complete. Phase `D`, starting with `D.1`, is the current active planning
+line.
 
 Initial Phase-C scope is:
 
@@ -378,7 +382,7 @@ Current implemented local/CI profile split:
 - top-level `ci`
   - lint plus tests
 
-Current wrapper mapping:
+Implemented wrapper mapping:
 
 - `just lint`
   - defaults to `sc-lint lint full`

@@ -1,0 +1,39 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F001>
+  a triage:Finding ;
+  triage:findingId "RBP-F001" ;
+  triage:title "DependencyPolicyError::InvalidFormat drops context" ;
+  triage:description "DependencyPolicyError::InvalidFormat variant returns error with only boundary_id, dropping the offending value context. Violates RBP-001 (actionable error text) as users cannot see what format was invalid." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "RBP" ;
+  triage:severity "Important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:pattern "RBP-001-missing-error-context" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F001/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F001/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/inventory.rs" ;
+  triage:line 644 ;
+  triage:snippet "return Err(DependencyPolicyError::InvalidFormat { boundary_id: boundary_id.clone(), });" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

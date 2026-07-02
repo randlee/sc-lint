@@ -1,0 +1,135 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-SWEEP-FINAL>
+  a triage:Finding ;
+  triage:findingId "SC-QA-SWEEP-FINAL" ;
+  triage:title "Comprehensive full-tree stale-phase-framing sweep (post SC-QA-001/003 incremental misses)" ;
+  triage:description "Exhaustive full-tree sweep across docs/ and boundaries/ using comprehensive stale-phase-framing pattern variants to identify any unknown 14th+ occurrences beyond SC-QA-001 through SC-QA-013." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable true ;
+  triage:sweepScope "workspace" ;
+  triage:severity "Blocking" ;
+  triage:category "SC-QA" ;
+  triage:pattern "stale-phase-framing" ;
+  triage:status "open_partial" ;
+  triage:dispatchReady false ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/UNKNOWN-14-architecture-43> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/UNKNOWN-15-architecture-63> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/UNKNOWN-16-architecture-639> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-001-requirements> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-002-roadmap> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-003-project-plan> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-004-013-multi> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/29afdb3> ;
+  triage:sweepCompletionSummary true ;
+  triage:knownFindingsConfirmed 13 ;
+  triage:unknownFindingsDiscovered 3 ;
+  triage:totalHitsFound 27 ;
+  triage:triagedAt "2026-07-02T02:15:00Z" .
+
+<urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/UNKNOWN-14-architecture-43>
+  a triage:Occurrence ;
+  triage:file "docs/architecture.md" ;
+  triage:line 43 ;
+  triage:snippet "The next planned product capability after the current Phase `B` line is" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occurrenceClass "UNKNOWN-14" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/UNKNOWN-15-architecture-63>
+  a triage:Occurrence ;
+  triage:file "docs/architecture.md" ;
+  triage:line 63 ;
+  triage:snippet "The current Phase `C` planning decision is that `sc-lint-version` is a" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occurrenceClass "UNKNOWN-15" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/UNKNOWN-16-architecture-639>
+  a triage:Occurrence ;
+  triage:file "docs/architecture.md" ;
+  triage:line 639 ;
+  triage:snippet "- current phase execution plan" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occurrenceClass "UNKNOWN-16" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-001-requirements>
+  a triage:Occurrence ;
+  triage:file "docs/requirements.md" ;
+  triage:referenceId "SC-QA-001" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occurrenceClass "KNOWN-SC-QA-001" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-002-roadmap>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/roadmap.md" ;
+  triage:referenceId "SC-QA-001" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occurrenceClass "KNOWN-SC-QA-001" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-003-project-plan>
+  a triage:Occurrence ;
+  triage:file "docs/project-plan.md" ;
+  triage:referenceId "SC-QA-003" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occurrenceClass "KNOWN-SC-QA-003" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-SWEEP-FINAL/KNOWN-004-013-multi>
+  a triage:Occurrence ;
+  triage:files "docs/issues-inventory.md, docs/sc-lint/README.md, docs/sc-lint/crate-architecture.md, docs/phase-B/phase-B-plan.md, docs/phase-C/phase-C-plan.md, docs/phase-B/sprint-B1.md" ;
+  triage:referenceIds "SC-QA-004, SC-QA-005, SC-QA-006, SC-QA-007, SC-QA-008, SC-QA-009, SC-QA-010, SC-QA-011, SC-QA-012, SC-QA-013" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occurrenceClass "KNOWN-SC-QA-004-013" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 ;
+  triage:sweepScope "workspace" ;
+  triage:sweepPattern "phase.*is.*(current|active|queued|planned|execution)" .
+
+<urn:atm:triage:sweepMetadata/SC-QA-SWEEP-FINAL>
+  a triage:SweepMetadata ;
+  triage:findingId "SC-QA-SWEEP-FINAL" ;
+  triage:sweepType "comprehensive_full_tree" ;
+  triage:searchScope "docs/, boundaries/" ;
+  triage:patternVariants "current phase, active phase, current execution, currently planned, next queued, current planning line, current active planning, is the current, is the active" ;
+  triage:filesScanned 60 ;
+  triage:totalPatternsMatched 27 ;
+  triage:knownPatternsReconfirmed "SC-QA-001 (requirements.md, roadmap.md, boundaries/planning.toml), SC-QA-003 (project-plan.md), SC-QA-004-013 (issues-inventory.md, sc-lint/README.md, sc-lint/crate-architecture.md, phase-B/phase-B-plan.md, phase-C/phase-C-plan.md, phase-B/sprint-B1.md)" ;
+  triage:newPatternsDiscovered "docs/architecture.md:43 (Phase B reference), docs/architecture.md:63 (Phase C reference), docs/architecture.md:639 (current phase execution plan)" ;
+  triage:additionalContextFiles "phase-A historical documents (foundation-phase-plan.md, sprint-A1.md) - assessed as context-appropriate for Phase A documents" ;
+  triage:dispatchBlockedBy "Three new unknown stale-phase-framing occurrences in docs/architecture.md must be triaged and fixed before fix-3 dispatch to clint" ;
+  triage:completionNotes "Exhaustive sweep using ripgrep with multiple pattern passes across entire docs/ and boundaries/ trees. All 13 known SC-QA findings reconfirmed present. Three new findings (SC-QA-014, SC-QA-015, SC-QA-016 candidate) identified in architecture.md requiring triage and fix." ;
+  triage:triagedAt "2026-07-02T02:15:00Z" .

@@ -6,7 +6,8 @@ This document records the crate-local architecture summary for
 ## Role
 
 `sc-lint-boundary` owns boundary inventory loading, ownership-policy analysis,
-manifest-policy analysis, and the boundary-rule machine contract.
+manifest-policy analysis, the Phase `D` package dependency-policy analysis
+line, and the boundary-rule machine contract.
 
 ## Authoritative Architecture Sources
 
@@ -20,8 +21,35 @@ manifest-policy analysis, and the boundary-rule machine contract.
 - canonical boundary definitions live in TOML under `boundaries/`
 - boundary inventory parity is crate-owned here, not in the top-level CLI
 - named-caller policy remains boundary metadata interpreted by this crate
+- package dependency policy remains boundary metadata interpreted by this crate
+- manifest workspace/version hygiene remains a separate rule family from
+  package dependency policy even when both use Cargo metadata
 - shared schema types may come from `sc-lint-schema`, but other analyzer crates
   must not be direct dependencies
+
+## Analysis Surfaces
+
+`sc-lint-boundary` owns or queues three distinct analysis surfaces:
+
+- source-graph boundary rules
+  - cycles
+  - `boundary.internal_only`
+  - `boundary.forbid_external_impls`
+  - named-caller allowlists
+- package dependency policy
+  - direct workspace package-edge allowlist and forbidden-edge enforcement from
+    boundary inventory plus Cargo metadata
+  - dedicated operator-visible `RuleFilter::Dependencies` surface, separate
+    from both source-graph boundary rules and `RuleFilter::Manifests`
+- manifest policy
+  - workspace-field inheritance
+  - internal path dependency version alignment
+
+These surfaces share one CLI/reporting contract but they do not collapse into
+one implementation bucket. Package dependency policy belongs with
+boundary-inventory enforcement, not with manifest-hygiene checks. That
+separation must remain visible both in implementation modules and in the
+operator-selectable rule-filter surface.
 
 ## Related Docs
 

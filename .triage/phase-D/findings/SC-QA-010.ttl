@@ -1,0 +1,39 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-010>
+  a triage:Finding ;
+  triage:findingId "SC-QA-010" ;
+  triage:title "crate-architecture.md Current Plan Coverage omits Phase D" ;
+  triage:description "docs/sc-lint/crate-architecture.md:265-269 -- \"Current Plan Coverage\" section omits Phase D and calls completed Phase B/C \"currently planned.\" Remediation: update summary to state A/B/C implemented/complete and reference Phase D's D.1 scope (doc already references Phase D at lines 125-127, but this summary section was not updated to match)." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:category "documentation" ;
+  triage:severity "Minor" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-010/feature-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-D-planning/29afdb3> ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime .
+
+<urn:atm:triage:occurrence/SC-QA-010/feature-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/crate-architecture.md" ;
+  triage:line 265 ;
+  triage:lineEnd 269 ;
+  triage:snippet "## Current Plan Coverage\n\nThis document keeps crate-level ownership, responsibility, and governing\nreferences explicit for every crate touched by the implemented Phase A line and\nthe currently planned Phase B and Phase C follow-ons." ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/feature-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

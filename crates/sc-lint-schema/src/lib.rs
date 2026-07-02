@@ -257,12 +257,56 @@ impl ReportStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct FindingKind(String);
+
+impl FindingKind {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for FindingKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl From<&str> for FindingKind {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<String> for FindingKind {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
+impl fmt::Display for FindingKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for FindingKind {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Finding<R>
 where
     R: Serialize,
 {
     pub rule_id: R,
-    pub kind: String,
+    pub kind: FindingKind,
     pub message: String,
     pub owner_ids: Vec<OwnerId>,
     pub node_ids: Vec<NodeId>,

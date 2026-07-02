@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-005>
+  a triage:Finding ;
+  triage:findingId "SC-QA-005" ;
+  triage:title "Missing dispatch-level regression test for SCB-DEPENDENCY-00x" ;
+  triage:description "crates/sc-lint/src/tests.rs is missing a dispatch-level regression test confirming SCB-DEPENDENCY-001/002/003 findings surface correctly through the top-level sc-lint lint sc-boundary command path, not just at the sc-lint-boundary crate level." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "QA" ;
+  triage:severity "Minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T13:36:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-005/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/SC-QA-005/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint/src/tests.rs" ;
+  triage:line 296 ;
+  triage:snippet "dispatch-level test confirming SCB-DEPENDENCY findings" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

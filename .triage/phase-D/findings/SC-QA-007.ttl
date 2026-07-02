@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-007>
+  a triage:Finding ;
+  triage:findingId "SC-QA-007" ;
+  triage:title "docs/sc-lint/README.md doc index labels completed phase-B-plan.md as current" ;
+  triage:description "docs/sc-lint/README.md:20 -- doc index explicitly labels the completed phase-B-plan.md as \"current Phase B execution plan\". Remediation: update the index description to reflect Phase B as complete; point readers to the actually-current Phase D plan." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "documentation" ;
+  triage:severity "Blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-007/phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-007/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/README.md" ;
+  triage:line 20 ;
+  triage:snippet "current Phase B execution plan" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

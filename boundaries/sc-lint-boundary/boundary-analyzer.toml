@@ -41,8 +41,8 @@ roots = [
 allowed_dependents = ["sc-lint"]
 allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
 forbidden_edges = [
-  "sc-lint-boundary -> sc-lint-attributes",
-  "sc-lint-boundary -> sc-observability",
+  { from = "sc-lint-boundary", to = "sc-lint-attributes" },
+  { from = "sc-lint-boundary", to = "sc-observability" },
 ]
 
 [references]

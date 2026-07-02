@@ -1,0 +1,63 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-001>
+  a triage:Finding ;
+  triage:findingId "SC-QA-001" ;
+  triage:title "requirements.md / roadmap.md stale Current Phase framing (Phase C/B.3 instead of Phase D/D.1)" ;
+  triage:description "docs/requirements.md:472-528 (esp. lines 474, 510) \"Current Phase Requirements\" section still says \"The current execution phase, Phase C, requires...\" and \"Phase C is the queued next planning line after the current Phase B sequence,\" never mentioning Phase D/D.1. This conflicts with docs/project-plan.md (D.1 scheduled, C.1-C.10 complete), docs/architecture.md (Phase D Line planned-capability note), and docs/phase-D/phase-D-plan.md + sprint-D1.md (both list requirements.md as a Hard Dependency). A prior repeatable-pattern sweep already found the same stale framing at docs/sc-lint/roadmap.md:140 (\"Phase C is the queued planning line after the current Phase B sequence.\")." ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC-QA" ;
+  triage:phaseId "phase-D" ;
+  triage:severity "Blocking" ;
+  triage:repeatable true ;
+  triage:sweepScope "docs/" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:pattern "stale-phase-framing" ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-001/D0/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-001/D0/2> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-001/D0/3> ;
+  triage:openOn <urn:atm:triage:worktree/D0/b6043b19> ;
+  triage:promoteTo <urn:atm:triage:worktree/D0/b6043b19> .
+
+<urn:atm:triage:occurrence/SC-QA-001/D0/1>
+  a triage:Occurrence ;
+  triage:file "docs/requirements.md" ;
+  triage:line 474 ;
+  triage:snippet "The current execution phase, Phase `C`, requires:" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/D0/b6043b19> .
+
+<urn:atm:triage:occurrence/SC-QA-001/D0/2>
+  a triage:Occurrence ;
+  triage:file "docs/requirements.md" ;
+  triage:line 510 ;
+  triage:snippet "Phase `C` is the queued next planning line after the current Phase `B`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/D0/b6043b19> .
+
+<urn:atm:triage:occurrence/SC-QA-001/D0/3>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/roadmap.md" ;
+  triage:line 140 ;
+  triage:snippet "Phase `C` is the queued planning line after the current Phase `B` sequence." ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:occursIn <urn:atm:triage:worktree/D0/b6043b19> .
+
+<urn:atm:triage:worktree/D0/b6043b19>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "b6043b19434f9d37e9f2d1afb71065670e01c72b" ;
+  triage:orderIndex 0 .

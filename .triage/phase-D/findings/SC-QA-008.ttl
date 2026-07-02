@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-008>
+  a triage:Finding ;
+  triage:findingId "SC-QA-008" ;
+  triage:title "docs/sc-lint/README.md labels completed Phase A plan as current" ;
+  triage:description "docs/sc-lint/README.md:17 -- labels the long-completed Phase A plan as \"current detailed execution plan\". Remediation: reword as historical." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "documentation" ;
+  triage:severity "Important" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/sc-lint/README.md" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-008/phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-008/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/sc-lint/README.md" ;
+  triage:line 17 ;
+  triage:snippet "— current detailed execution plan for repo self-hosting, boundaries, CLI introduction, and extraction order" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

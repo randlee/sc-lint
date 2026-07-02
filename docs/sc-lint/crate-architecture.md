@@ -79,8 +79,8 @@ their governing docs, boundaries, and planned sprint work.
 ### `sc-lint-boundary`
 
 - role:
-  - boundary inventory, ownership, manifest-policy, and AST-sensitive boundary
-    analysis
+  - boundary inventory, ownership, manifest-policy, AST-sensitive boundary
+    analysis, and the planned package dependency-policy line
 - governing docs:
   - `docs/sc-lint-boundary/requirements.md`
   - `docs/sc-lint-boundary/architecture.md`
@@ -94,6 +94,7 @@ their governing docs, boundaries, and planned sprint work.
   - `A.6`
   - `A.7`
   - `B.2`
+  - `D.1`
 
 ### `sc-lint-portability`
 
@@ -103,7 +104,7 @@ their governing docs, boundaries, and planned sprint work.
     shell-portability rule families when those checks remain consumer-neutral
   - planned future shared owner for structural cross-platform branch-parity
     rules when those checks remain consumer-neutral
-  - current Phase `B.1` backlog owner and Phase `C.6`-`C.9` sprint owner for
+  - recorded Phase `B.1` backlog owner and Phase `C.6`-`C.9` sprint owner for
     that shared portability follow-on line
 - governing docs:
   - `docs/sc-lint-portability/requirements.md`
@@ -120,6 +121,31 @@ their governing docs, boundaries, and planned sprint work.
   - `C.7`
   - `C.8`
   - `C.9`
+
+## Current Capability Note — sc-lint-boundary Phase D Line
+
+Phase `D` extends the existing `sc-lint-boundary` crate through sprint `D.1`.
+
+- authoritative planning docs:
+  - `docs/phase-D/phase-D-plan.md`
+  - `docs/phase-D/sprint-D1.md`
+  - `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`
+- current capability:
+  - direct workspace package-edge enforcement from canonical boundary TOML
+  - validated `allowed_dependencies`, `allowed_dependents`, and
+    `forbidden_edges` policy parsing at inventory load
+  - a dedicated package dependency-policy analysis path that stays separate
+    from manifest workspace/version hygiene
+  - direct-edge scope includes normal, dev, build, and target-specific
+    workspace dependency sections
+- current rule family:
+  - `SCB-DEPENDENCY-001`
+  - `SCB-DEPENDENCY-002`
+  - `SCB-DEPENDENCY-003`
+- current command surface:
+  - `sc-lint-boundary analyze`
+  - `sc-lint-boundary analyze --rule-filter dependencies`
+  - `sc-lint lint sc-boundary`
 
 ### `sc-lint-runtime`
 
@@ -236,8 +262,9 @@ planned portability follow-on sprints `C.6` through `C.9`.
   - the Phase `C` portability follow-ons stay inside the existing
     `sc-lint-portability` crate rather than creating a separate crate line
 
-## Current Plan Coverage
+## Phase Plan Coverage
 
 This document keeps crate-level ownership, responsibility, and governing
-references explicit for every crate touched by the implemented Phase A line and
-the currently planned Phase B and Phase C follow-ons.
+references explicit for every crate touched by the implemented Phase `A`
+foundation line, the archived Phase `B` and Phase `C` follow-ons, and the
+Phase `D` dependency-policy work.

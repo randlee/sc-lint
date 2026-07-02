@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-014>
+  a triage:Finding ;
+  triage:findingId "SC-QA-014" ;
+  triage:title "docs/architecture.md frames completed Phase B as current" ;
+  triage:description "docs/architecture.md:43 -- \"The next planned product capability after the current Phase B line is...\" Phase B is complete, not current. Discovered by the comprehensive full-tree sweep (SC-QA-SWEEP-FINAL) as an occurrence missed by the original QA-3 report's 10 named findings. Remediation: reword to reflect Phase B as complete and Phase D as current." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "documentation" ;
+  triage:severity "Blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/architecture.md" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-014/phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-014/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/architecture.md" ;
+  triage:line 43 ;
+  triage:snippet "The next planned product capability after the current Phase B line is..." ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

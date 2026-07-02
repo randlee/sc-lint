@@ -10,6 +10,14 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+fn fixture_display_path(relative_path: &str) -> String {
+    std::env::temp_dir()
+        .join("sc-lint-boundary-tests")
+        .join(relative_path)
+        .display()
+        .to_string()
+}
+
 #[test]
 fn findings_report_text_is_stable() {
     let report = super::FindingsReport {
@@ -55,9 +63,9 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
             package: "example".to_string(),
             target: Some("example".to_string()),
             // Ephemeral fixture path, not a real workspace root.
-            manifest_path: "/tmp/example/Cargo.toml".to_string(),
+            manifest_path: fixture_display_path("example/Cargo.toml"),
             // Ephemeral fixture path, not a real workspace source file.
-            source_path: Some("/tmp/example/src/lib.rs".to_string()),
+            source_path: Some(fixture_display_path("example/src/lib.rs")),
             module_path: Some("crate::example".to_string()),
             impl_kind: Some(ImplKind::Inherent),
             impl_trait: Some("crate::Api".to_string()),
@@ -98,7 +106,7 @@ fn render_graph_export_turtle_escapes_special_characters_and_attributes() {
             target: Some("example".to_string()),
             manifest_path: "C:\\repo\\Cargo.toml".to_string(),
             // Ephemeral fixture path, not a real workspace source file.
-            source_path: Some("/tmp/example/src/lib.rs".to_string()),
+            source_path: Some(fixture_display_path("example/src/lib.rs")),
             module_path: Some("crate::example".to_string()),
             impl_kind: Some(ImplKind::Trait),
             impl_trait: Some("crate::Api".to_string()),
@@ -432,8 +440,271 @@ fn rejects_unknown_rule_filter() {
     let error = RuleFilter::try_from("unknown").unwrap_err();
     assert_eq!(
         error.to_string(),
-        "unsupported rule filter `unknown`; supported: cycles, boundaries, internal_only, forbid_external_impls, manifests"
+        "unsupported rule filter `unknown`; supported: cycles, boundaries, internal_only, forbid_external_impls, dependencies, manifests"
     );
+}
+
+#[test]
+fn dependency_policy_allows_direct_workspace_dependency() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &["api"], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn dependency_policy_flags_disallowed_direct_dependency() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+    assert_eq!(
+        report.findings[0].message,
+        "workspace package `app` directly depends on `api` but `api` is not listed in `BOUNDARY-App` allowed_dependencies"
+    );
+}
+
+#[test]
+fn dependency_policy_flags_disallowed_direct_dependent() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &["api"], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &[], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency002);
+    assert_eq!(
+        report.findings[0].message,
+        "workspace package `app` directly depends on `api` but `app` is not listed in `BOUNDARY-Api` allowed_dependents"
+    );
+}
+
+#[test]
+fn dependency_policy_flags_forbidden_direct_edge() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &["api"], &[], &[("app", "api")]);
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency003);
+    assert_eq!(
+        report.findings[0].message,
+        "forbidden workspace dependency edge `app -> api` is present"
+    );
+}
+
+#[test]
+fn dependency_policy_enforces_build_dependency_workspace_edges() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &trim_indentation(
+            r#"
+                [package]
+                name = "app"
+                version.workspace = true
+                edition.workspace = true
+                rust-version.workspace = true
+                authors.workspace = true
+                license.workspace = true
+                repository.workspace = true
+                homepage.workspace = true
+
+                [build-dependencies]
+                api = { path = "../api", version = "0.1.0" }
+            "#,
+        ),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+}
+
+#[test]
+fn dependency_policy_enforces_target_specific_workspace_edges() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &trim_indentation(
+            r#"
+                [package]
+                name = "app"
+                version.workspace = true
+                edition.workspace = true
+                rust-version.workspace = true
+                authors.workspace = true
+                license.workspace = true
+                repository.workspace = true
+                homepage.workspace = true
+
+                [target.'cfg(unix)'.dependencies]
+                api = { path = "../api", version = "0.1.0" }
+            "#,
+        ),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+}
+
+#[test]
+fn dependency_policy_ignores_transitive_only_workspace_edges() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/helper", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "helper", "../helper", "0.1.0"),
+    );
+    fixture.write(
+        "crates/helper/Cargo.toml",
+        &path_dependency_manifest("helper", "api", "../api", "0.1.0"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &["helper"], &[], &[]);
+    fixture.write_member_boundary_record("helper", &["api"], &["app"], &[]);
+    fixture.write_member_boundary_record("api", &[], &["helper"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("helper", "lib.rs", "pub struct Helper;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn dependency_policy_ignores_third_party_dependencies() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &trim_indentation(
+            r#"
+                [package]
+                name = "app"
+                version.workspace = true
+                edition.workspace = true
+                rust-version.workspace = true
+                authors.workspace = true
+                license.workspace = true
+                repository.workspace = true
+                homepage.workspace = true
+
+                [dependencies]
+                serde = "1"
+            "#,
+        ),
+    );
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
 }
 
 #[test]
@@ -2015,6 +2286,98 @@ impl WorkspaceFixture {
         self.write(
             &format!("crates/{package_name}/src/{relative_path}"),
             contents,
+        );
+    }
+
+    fn write_member_boundary_record(
+        &self,
+        owner_package: &str,
+        allowed_dependencies: &[&str],
+        allowed_dependents: &[&str],
+        forbidden_edges: &[(&str, &str)],
+    ) {
+        let boundary_id = owner_package
+            .split('-')
+            .map(|segment| {
+                let mut chars = segment.chars();
+                match chars.next() {
+                    Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
+                    None => String::new(),
+                }
+            })
+            .collect::<String>();
+        let allowed_dependencies = allowed_dependencies
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let allowed_dependents = allowed_dependents
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges = forbidden_edges
+            .iter()
+            .map(|(from, to)| format!("{{ from = \"{from}\", to = \"{to}\" }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges_block = if forbidden_edges.is_empty() {
+            "[]".to_string()
+        } else {
+            format!("[{forbidden_edges}]")
+        };
+
+        self.write(
+            "boundaries/planning.toml",
+            r#"
+                [planning]
+                current_sprint = "D.1"
+            "#,
+        );
+        self.write(
+            &format!("boundaries/{owner_package}/boundary.toml"),
+            &format!(
+                r#"
+                    boundary_id = "BOUNDARY-{boundary_id}"
+                    owner_package = "{owner_package}"
+                    owner_crate_path = "{}"
+                    name = "{owner_package}"
+
+                    [public]
+                    facade = "run"
+
+                    [implementation]
+                    type = "run"
+                    module = "{}"
+                    visibility = "public"
+                    constructor = "none"
+
+                    [composition]
+                    roots = ["run"]
+
+                    [dependencies]
+                    allowed_dependents = [{allowed_dependents}]
+                    allowed_dependencies = [{allowed_dependencies}]
+                    forbidden_edges = {forbidden_edges_block}
+
+                    [references]
+                    scope = "outside_owner_crate"
+                    forbidden = []
+
+                    [testing]
+                    allowed_test_double_paths = []
+                    forbidden_test_bypasses = []
+
+                    [enforcement]
+                    lint_rules = []
+                    review_gates = []
+
+                    [status]
+                    state = "concrete_landed"
+                "#,
+                owner_package.replace('-', "_"),
+                owner_package.replace('-', "_"),
+            ),
         );
     }
 

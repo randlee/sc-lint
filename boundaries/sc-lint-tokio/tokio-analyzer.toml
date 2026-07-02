@@ -19,11 +19,11 @@ roots = []
 allowed_dependents = ["sc-lint"]
 allowed_dependencies = []
 forbidden_edges = [
-  "sc-lint-tokio -> sc-lint-attributes",
-  "sc-lint-tokio -> sc-lint-boundary",
-  "sc-lint-tokio -> sc-lint-portability",
-  "sc-lint-tokio -> sc-lint-runtime",
-  "sc-lint-tokio -> sc-observability",
+  { from = "sc-lint-tokio", to = "sc-lint-attributes" },
+  { from = "sc-lint-tokio", to = "sc-lint-boundary" },
+  { from = "sc-lint-tokio", to = "sc-lint-portability" },
+  { from = "sc-lint-tokio", to = "sc-lint-runtime" },
+  { from = "sc-lint-tokio", to = "sc-observability" },
 ]
 
 [references]
