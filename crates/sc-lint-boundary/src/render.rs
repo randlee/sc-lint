@@ -14,7 +14,7 @@ pub fn render_findings_report(report: &FindingsReport) -> String {
         rendered.push('\n');
         rendered.push_str(finding.rule_id.as_str());
         rendered.push(' ');
-        rendered.push_str(&finding.kind);
+        rendered.push_str(finding.kind.as_str());
         rendered.push_str(": ");
         rendered.push_str(&finding.message);
     }

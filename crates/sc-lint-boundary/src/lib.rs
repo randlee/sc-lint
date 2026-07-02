@@ -9,7 +9,6 @@ use std::sync::OnceLock;
 use anyhow as anyhow_crate;
 use anyhow::Context;
 use anyhow::Result;
-use cargo_metadata::MetadataCommand;
 use quote::ToTokens;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
@@ -35,6 +34,7 @@ mod analysis;
 mod graph;
 mod inventory;
 mod manifest_policy;
+mod package_policy;
 mod render;
 #[cfg(test)]
 mod tests;
@@ -64,6 +64,12 @@ pub enum BoundaryError {
     },
     #[error("failed to analyze manifest policy for root `{}`: {source:#}", root.display())]
     ManifestPolicyAnalysis {
+        root: PathBuf,
+        #[source]
+        source: BoundaryErrorSource,
+    },
+    #[error("failed to analyze package dependency policy for root `{}`: {source:#}", root.display())]
+    PackagePolicyAnalysis {
         root: PathBuf,
         #[source]
         source: BoundaryErrorSource,
@@ -118,6 +124,9 @@ pub enum RuleId {
     ScbBoundary002,
     ScbBoundary003,
     ScbCaller001,
+    ScbDependency001,
+    ScbDependency002,
+    ScbDependency003,
     ScbManifest001,
     ScbManifest002,
 }
@@ -132,6 +141,9 @@ impl RuleId {
             Self::ScbBoundary002 => "SCB-BOUNDARY-002",
             Self::ScbBoundary003 => "SCB-BOUNDARY-003",
             Self::ScbCaller001 => "SCB-CALLER-001",
+            Self::ScbDependency001 => "SCB-DEPENDENCY-001",
+            Self::ScbDependency002 => "SCB-DEPENDENCY-002",
+            Self::ScbDependency003 => "SCB-DEPENDENCY-003",
             Self::ScbManifest001 => "SCB-MANIFEST-001",
             Self::ScbManifest002 => "SCB-MANIFEST-002",
         }
@@ -156,6 +168,7 @@ pub enum RuleFilter {
     Boundaries,
     InternalOnly,
     ForbidExternalImpls,
+    Dependencies,
     Manifests,
 }
 
@@ -166,6 +179,7 @@ impl RuleFilter {
             Self::Boundaries => "boundaries",
             Self::InternalOnly => "internal_only",
             Self::ForbidExternalImpls => "forbid_external_impls",
+            Self::Dependencies => "dependencies",
             Self::Manifests => "manifests",
         }
     }
@@ -194,7 +208,7 @@ impl fmt::Display for RuleFilterParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "unsupported rule filter `{}`; supported: cycles, boundaries, internal_only, forbid_external_impls, manifests",
+            "unsupported rule filter `{}`; supported: cycles, boundaries, internal_only, forbid_external_impls, dependencies, manifests",
             self.invalid_value
         )
     }
@@ -211,6 +225,7 @@ impl TryFrom<&str> for RuleFilter {
             "boundaries" => Ok(Self::Boundaries),
             "internal_only" => Ok(Self::InternalOnly),
             "forbid_external_impls" => Ok(Self::ForbidExternalImpls),
+            "dependencies" => Ok(Self::Dependencies),
             "manifests" => Ok(Self::Manifests),
             other => Err(RuleFilterParseError::new(other)),
         }
@@ -249,6 +264,31 @@ pub struct GraphEdge {
     pub to: NodeId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EdgeKind {
+    Contains,
+    Targets,
+    Implements,
+    Declares,
+    References,
+    ReferencesType,
+    ReferencesExpr,
+}
+
+impl EdgeKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Contains => "contains",
+            Self::Targets => "targets",
+            Self::Implements => "implements",
+            Self::Declares => "declares",
+            Self::References => "references",
+            Self::ReferencesType => "references_type",
+            Self::ReferencesExpr => "references_expr",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ReferenceKind {
     Type,
@@ -256,10 +296,10 @@ enum ReferenceKind {
 }
 
 impl ReferenceKind {
-    fn edge_kind(self) -> &'static str {
+    fn edge_kind(self) -> EdgeKind {
         match self {
-            Self::Type => "references_type",
-            Self::Expr => "references_expr",
+            Self::Type => EdgeKind::ReferencesType,
+            Self::Expr => EdgeKind::ReferencesExpr,
         }
     }
 }
@@ -368,9 +408,9 @@ impl GraphBuilder {
         }
     }
 
-    fn add_edge(&mut self, kind: &'static str, from: impl Into<NodeId>, to: impl Into<NodeId>) {
+    fn add_edge(&mut self, kind: EdgeKind, from: impl Into<NodeId>, to: impl Into<NodeId>) {
         let edge = GraphEdge {
-            kind,
+            kind: kind.as_str(),
             from: from.into(),
             to: to.into(),
         };
@@ -458,6 +498,36 @@ pub fn analyze_workspace(
             source: source.into(),
         }
     })?;
+    if options.rule == Some(RuleFilter::Dependencies) {
+        let metadata = graph::load_metadata(&options.root).map_err(|source| {
+            BoundaryError::PackagePolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
+            }
+        })?;
+        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|source| BoundaryError::PackagePolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
+            })?;
+        let status = if dependency_report
+            .findings
+            .iter()
+            .any(analysis::finding_is_failure)
+        {
+            ReportStatus::Fail
+        } else {
+            ReportStatus::Pass
+        };
+        return Ok(FindingsReport {
+            tool: SC_LINT_BOUNDARY_TOOL,
+            version: SC_LINT_BOUNDARY_VERSION,
+            schema_version: SC_LINT_SCHEMA_VERSION,
+            status,
+            scanned_crates: dependency_report.scanned_crates,
+            findings: dependency_report.findings,
+        });
+    }
     let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
             root: options.root.clone(),
@@ -484,6 +554,22 @@ pub fn analyze_workspace(
     }
     if filter.is_none() || filter == Some(RuleFilter::Boundaries) {
         findings.extend(analysis::analyze_named_callers(&graph, &inventory));
+    }
+    if filter.is_none() {
+        let metadata = graph::load_metadata(&options.root).map_err(|source| {
+            BoundaryError::PackagePolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
+            }
+        })?;
+        findings.extend(
+            package_policy::analyze_package_policy(&metadata, &inventory)
+                .map_err(|source| BoundaryError::PackagePolicyAnalysis {
+                    root: options.root.clone(),
+                    source: source.into(),
+                })?
+                .findings,
+        );
     }
     if filter.is_none() {
         findings.extend(

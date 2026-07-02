@@ -1,0 +1,39 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-002>
+  a triage:Finding ;
+  triage:findingId "SC-QA-002" ;
+  triage:title "Stale issues-inventory Phase D note" ;
+  triage:description "docs/issues-inventory.md:133-140 Phase D Planning Note still says dependency enforcement is not yet shipped, but Sprint D.1 now ships it." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC-QA" ;
+  triage:severity "Important" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:pattern "stale-status-note" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-002/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/SC-QA-002/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "docs/issues-inventory.md" ;
+  triage:line 138 ;
+  triage:snippet "the current shipped analyzer does not yet enforce those fields" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

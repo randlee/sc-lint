@@ -1,9 +1,9 @@
-use std::error::Error;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
 use sc_lint_boundary::AnalyzeOptions;
+use sc_lint_boundary::BoundaryError as BoundaryBackendError;
 use sc_lint_boundary::analyze_workspace;
 use sc_lint_schema::OutputFormat;
 use serde_json::Error as JsonError;
@@ -19,7 +19,7 @@ use crate::consts;
 
 #[derive(Debug)]
 enum BoundaryDispatchError {
-    Analysis(Box<dyn Error + Send + Sync>),
+    Analysis(Box<BoundaryBackendError>),
     Serialize(JsonError),
     Normalize(JsonError),
 }
@@ -27,18 +27,34 @@ enum BoundaryDispatchError {
 impl BoundaryDispatchError {
     fn into_cli_error(self, tool: &str, repo_root: Option<&Path>) -> CliError {
         match self {
-            Self::Analysis(error) => {
-                CliError::backend_failure(format!("{tool} failed to analyze the workspace"))
-                    .with_source(error)
-                    .with_detail(consts::FIELD_TOOL, json!(tool))
-                    .with_detail(
-                        consts::FIELD_ROOT,
-                        json!(repo_root.map(|root| root.display().to_string())),
-                    )
-                    .with_suggested_action(
-                        "Check the boundary inventory and workspace sources, then rerun `sc-lint lint sc-boundary` for a focused failure report.",
-                    )
-            }
+            Self::Analysis(error) => match *error {
+                BoundaryBackendError::InventoryLoad { .. }
+                | BoundaryBackendError::ManifestPolicyAnalysis { .. }
+                | BoundaryBackendError::PackagePolicyAnalysis { .. } => {
+                    CliError::config(format!("{tool} rejected repository configuration"))
+                        .with_source(error)
+                        .with_detail(consts::FIELD_TOOL, json!(tool))
+                        .with_detail(
+                            consts::FIELD_ROOT,
+                            json!(repo_root.map(|root| root.display().to_string())),
+                        )
+                        .with_suggested_action(
+                            "Check the boundary inventory and manifest configuration, then rerun `sc-lint lint sc-boundary` for a focused failure report.",
+                        )
+                }
+                BoundaryBackendError::WorkspaceGraphBuild { .. } => {
+                    CliError::backend_failure(format!("{tool} failed to analyze the workspace"))
+                        .with_source(error)
+                        .with_detail(consts::FIELD_TOOL, json!(tool))
+                        .with_detail(
+                            consts::FIELD_ROOT,
+                            json!(repo_root.map(|root| root.display().to_string())),
+                        )
+                        .with_suggested_action(
+                            "Check the boundary inventory and workspace sources, then rerun `sc-lint lint sc-boundary` for a focused failure report.",
+                        )
+                }
+            },
             Self::Serialize(error) => CliError::backend_protocol(format!(
                 "{tool} produced a report that could not be encoded as machine JSON"
             ))

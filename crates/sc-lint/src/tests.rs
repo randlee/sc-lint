@@ -334,6 +334,42 @@ fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() 
 }
 
 #[test]
+fn lint_sc_boundary_reports_dependency_policy_failures_through_dispatch() {
+    for (rule_id, configure_fixture) in [
+        (
+            "SCB-DEPENDENCY-001",
+            AnalysisFixture::configure_disallowed_dependency as fn(&AnalysisFixture),
+        ),
+        (
+            "SCB-DEPENDENCY-002",
+            AnalysisFixture::configure_disallowed_dependent as fn(&AnalysisFixture),
+        ),
+        (
+            "SCB-DEPENDENCY-003",
+            AnalysisFixture::configure_forbidden_edge as fn(&AnalysisFixture),
+        ),
+    ] {
+        let fixture = AnalysisFixture::new();
+        configure_fixture(&fixture);
+
+        let data = run_sc_boundary_json(fixture.root());
+        assert_eq!(data["status"], "fail", "expected fail status for {rule_id}");
+        assert!(
+            data["findings"].as_array().is_some(),
+            "missing findings for {rule_id}"
+        );
+        assert!(
+            data["findings"]
+                .as_array()
+                .expect("findings array")
+                .iter()
+                .any(|finding| finding["rule_id"] == rule_id),
+            "missing {rule_id} in top-level dispatch payload"
+        );
+    }
+}
+
+#[test]
 #[serial]
 fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope() {
     let fixture = AnalysisFixture::new();
@@ -483,8 +519,8 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let error = crate::command::execute(&context, &loaded).expect_err("dispatch should fail");
 
-    assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_eq!(error.code(), "CLI.BACKEND_EXEC_FAILURE");
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert_eq!(error.code(), "CLI.CONFIG_ERROR");
     assert!(error.cause.is_some());
     assert!(std::error::Error::source(&error).is_some());
 }
@@ -808,6 +844,22 @@ fn repo_backed_workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn run_sc_boundary_json(repo_root: &Path) -> Value {
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    crate::command::execute(&context, &loaded)
+        .expect("dispatch succeeds")
+        .data
+}
+
 struct AnalysisFixture {
     tempdir: TempDir,
 }
@@ -824,10 +876,20 @@ impl AnalysisFixture {
     }
 
     fn write_workspace_root(&self) {
+        self.write_workspace_root_with_members(&["crates/example"]);
+    }
+
+    fn write_workspace_root_with_members(&self, members: &[&str]) {
+        let members = members
+            .iter()
+            .map(|member| format!("\"{member}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
         std::fs::write(
             self.root().join("Cargo.toml"),
-            r#"[workspace]
-members = ["crates/example"]
+            format!(
+                r#"[workspace]
+members = [{members}]
 resolver = "2"
 
 [workspace.package]
@@ -838,7 +900,8 @@ authors = ["sc-lint contributors"]
 license = "MIT OR Apache-2.0"
 repository = "https://example.invalid/sc-lint"
 homepage = "https://example.invalid/sc-lint"
-"#,
+"#
+            ),
         )
         .expect("workspace root");
         std::fs::create_dir_all(self.root().join("boundaries")).expect("boundaries");
@@ -850,10 +913,14 @@ homepage = "https://example.invalid/sc-lint"
     }
 
     fn write_package_manifest(&self, package_name: &str) {
+        self.write_package_manifest_with_dependencies(package_name, "");
+    }
+
+    fn write_package_manifest_with_dependencies(&self, package_name: &str, dependencies: &str) {
         self.write(
             &format!("crates/{package_name}/Cargo.toml"),
             &format!(
-                "[package]\nname = \"{package_name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n"
+                "[package]\nname = \"{package_name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n{dependencies}"
             ),
         );
     }
@@ -871,6 +938,87 @@ homepage = "https://example.invalid/sc-lint"
             std::fs::create_dir_all(parent).expect("parent dirs");
         }
         std::fs::write(path, contents).expect("write fixture file");
+    }
+
+    fn write_member_boundary_record(
+        &self,
+        owner_package: &str,
+        allowed_dependencies: &[&str],
+        allowed_dependents: &[&str],
+        forbidden_edges: &[(&str, &str)],
+    ) {
+        let boundary_id = owner_package
+            .split('-')
+            .map(|segment| {
+                let mut chars = segment.chars();
+                match chars.next() {
+                    Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
+                    None => String::new(),
+                }
+            })
+            .collect::<String>();
+        let allowed_dependencies = allowed_dependencies
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let allowed_dependents = allowed_dependents
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges = forbidden_edges
+            .iter()
+            .map(|(from, to)| format!("{{ from = \"{from}\", to = \"{to}\" }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges_block = if forbidden_edges.is_empty() {
+            "[]".to_string()
+        } else {
+            format!("[{forbidden_edges}]")
+        };
+
+        self.write(
+            "boundaries/planning.toml",
+            "[planning]\ncurrent_sprint = \"D.1\"\n",
+        );
+        self.write(
+            &format!("boundaries/{owner_package}/boundary.toml"),
+            &format!(
+                "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
+                owner_package.replace('-', "_"),
+                owner_package.replace('-', "_"),
+            ),
+        );
+    }
+
+    fn configure_dependency_policy_fixture(&self) {
+        self.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+        self.write_package_manifest_with_dependencies(
+            "app",
+            "[dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n",
+        );
+        self.write_package_manifest("api");
+        self.write_source("app", "lib.rs", "pub struct App;\n");
+        self.write_source("api", "lib.rs", "pub struct Api;\n");
+    }
+
+    fn configure_disallowed_dependency(&self) {
+        self.configure_dependency_policy_fixture();
+        self.write_member_boundary_record("app", &[], &[], &[]);
+        self.write_member_boundary_record("api", &[], &["app"], &[]);
+    }
+
+    fn configure_disallowed_dependent(&self) {
+        self.configure_dependency_policy_fixture();
+        self.write_member_boundary_record("app", &["api"], &[], &[]);
+        self.write_member_boundary_record("api", &[], &[], &[]);
+    }
+
+    fn configure_forbidden_edge(&self) {
+        self.configure_dependency_policy_fixture();
+        self.write_member_boundary_record("app", &["api"], &[], &[("app", "api")]);
+        self.write_member_boundary_record("api", &[], &["app"], &[]);
     }
 }
 

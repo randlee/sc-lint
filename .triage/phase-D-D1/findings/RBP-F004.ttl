@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/RBP-F004>
+  a triage:Finding ;
+  triage:findingId "RBP-F004" ;
+  triage:title "Dead DependencyPolicyError::UnknownPackage variant" ;
+  triage:description "DependencyPolicyError::UnknownPackage is defined but never constructed/used anywhere in the implementation, violating RBP-007 (no dead code)." ;
+  triage:phaseId "phase-D-D1" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:category "RBP" ;
+  triage:severity "Minor" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/RBP-F004/feature-phase-D/1> ;
+  triage:openOn <urn:atm:triage:worktree/feature-phase-D/13cd49e> ;
+  triage:promoteTo <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:occurrence/RBP-F004/feature-phase-D/1>
+  a triage:Occurrence ;
+  triage:file "crates/sc-lint-boundary/src/inventory.rs" ;
+  triage:line 567 ;
+  triage:snippet "UnknownPackage { boundary_id: BoundaryId, package: WorkspacePackageName, }" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:occursIn <urn:atm:triage:worktree/feature-phase-D/13cd49e> .
+
+<urn:atm:triage:worktree/feature-phase-D/13cd49e>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D" ;
+  triage:headSha "13cd49e" ;
+  triage:orderIndex 0 .

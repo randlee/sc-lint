@@ -27,10 +27,10 @@ roots = [
 allowed_dependents = []
 allowed_dependencies = ["sc-lint-schema"]
 forbidden_edges = [
-  "sc-lint-portability -> sc-lint-attributes",
-  "sc-lint-portability -> sc-lint-boundary",
-  "sc-lint-portability -> sc-lint-runtime",
-  "sc-lint-portability -> sc-observability",
+  { from = "sc-lint-portability", to = "sc-lint-attributes" },
+  { from = "sc-lint-portability", to = "sc-lint-boundary" },
+  { from = "sc-lint-portability", to = "sc-lint-runtime" },
+  { from = "sc-lint-portability", to = "sc-observability" },
 ]
 
 [references]

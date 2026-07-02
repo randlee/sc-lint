@@ -134,7 +134,7 @@ pub(crate) fn analyze_portability(root: &Path) -> Result<Vec<Finding>> {
         .into_iter()
         .map(|finding| Finding {
             rule_id: finding.rule_id,
-            kind: finding.kind.to_string(),
+            kind: finding.kind.into(),
             message: format!(
                 "{}:{}: {}",
                 finding.source_path.display(),

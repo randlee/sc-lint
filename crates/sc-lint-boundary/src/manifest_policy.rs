@@ -28,13 +28,15 @@ pub(crate) struct ManifestPolicyReport {
 }
 
 pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyReport> {
-    let workspace_version = workspace_version(root)?;
-    let manifests = member_manifests(root)?;
+    let root = fs::canonicalize(root)
+        .with_context(|| format!("failed to canonicalize repo root `{}`", root.display()))?;
+    let workspace_version = workspace_version(&root)?;
+    let manifests = member_manifests(&root)?;
     let mut expected_versions = BTreeMap::new();
 
     for manifest_path in &manifests {
         let manifest = load_manifest(manifest_path)?;
-        let rel_manifest = relative_manifest_display(root, manifest_path)?;
+        let rel_manifest = relative_manifest_display(&root, manifest_path)?;
         let package_version =
             expected_package_version(&manifest, &workspace_version, &rel_manifest)?;
         expected_versions.insert(canonical_manifest_dir(manifest_path)?, package_version);
@@ -43,7 +45,7 @@ pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyRepor
     let mut findings = Vec::new();
     for manifest_path in &manifests {
         let manifest = load_manifest(manifest_path)?;
-        let rel_manifest = relative_manifest_display(root, manifest_path)?;
+        let rel_manifest = relative_manifest_display(&root, manifest_path)?;
         let package = manifest
             .get("package")
             .and_then(Value::as_table)
@@ -53,7 +55,7 @@ pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyRepor
             if !workspace_inherited(package, field) {
                 findings.push(Finding {
                     rule_id: RuleId::ScbManifest001,
-                    kind: "package_workspace_field_required".to_string(),
+                    kind: "package_workspace_field_required".into(),
                     message: format!("{rel_manifest}: set [package].{field}.workspace = true"),
                     owner_ids: vec![OwnerId::new(rel_manifest.clone())],
                     node_ids: Vec::new(),
@@ -80,7 +82,7 @@ pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyRepor
                 if pinned_version != Some(expected_dependency_version.as_str()) {
                     findings.push(Finding {
                         rule_id: RuleId::ScbManifest002,
-                        kind: "internal_path_dependency_version_mismatch".to_string(),
+                        kind: "internal_path_dependency_version_mismatch".into(),
                         message: format!(
                             "{rel_manifest} [{section_name}.{dependency_name}]: path dependency version must match target crate version \"{expected_dependency_version}\""
                         ),

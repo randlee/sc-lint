@@ -22,8 +22,8 @@ Current implementation note:
 - that work does not replace the inventory-parity model described here
 - manifest policy remains separate from boundary-inventory package dependency
   enforcement
-- package dependency fields already exist in boundary TOML, but direct
-  workspace package-edge enforcement is still the planned `D.1` follow-on
+- package dependency policy now ships as direct workspace package-edge
+  enforcement under `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-003`
 - planning-aware missing-item enforcement remains a later stage built on the
   A.6 loader foundation
 
