@@ -138,6 +138,6 @@ integration:
 
 | Action | Owner | Gate |
 |---|---|---|
-| Keep `docs/sc-lint/logging.md`, `docs/architecture.md`, and machine-readable boundary/planning records aligned with this accepted seam list. | sc-lint implementation owner | Ongoing through Phase B |
+| Keep `docs/sc-lint/logging.md`, `docs/architecture.md`, and machine-readable boundary/planning records aligned with this accepted seam list. | sc-lint implementation owner | Ongoing |
 | Reject backend-local `sc-observability` dependencies in boundary review and arch-qa. | repo owner | Ongoing |
 | Require explicit ADR reconciliation before introducing new observability context wrappers or replacing `CommandEnvelope.command`. | repo owner | Before any observability runtime redesign |
