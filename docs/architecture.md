@@ -40,9 +40,9 @@ The product is organized into five layers:
 
 ## Planned Interface Versioning Layer
 
-The next planned product capability after the current Phase `B` line is
-`sc-lint-version`, which treats stable interfaces as versioned artifacts
-rather than relying on prose release notes alone.
+The product capability planned for Phase `C` is `sc-lint-version`, which
+treats stable interfaces as versioned artifacts rather than relying on prose
+release notes alone.
 
 That planned capability spans three interface families:
 
@@ -60,7 +60,7 @@ The intended interface-artifact model is:
   - built-in per-panel copy actions for canonical JSON payload and canonical
     context text
 
-The current Phase `C` planning decision is that `sc-lint-version` is a
+The recorded Phase `C` planning decision is that `sc-lint-version` is a
 dedicated planned workspace crate invoked from the top-level CLI through
 `sc-lint check interfaces`.
 
@@ -634,9 +634,9 @@ The architecture should not require:
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 - roadmap and split strategy
   - see [docs/sc-lint/roadmap.md](./sc-lint/roadmap.md)
-- current extraction and migration plan
+- extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
-- current phase execution plan
+- phase execution plans
   - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
 - CLI-specific architecture
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)

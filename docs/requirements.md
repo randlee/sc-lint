@@ -469,7 +469,7 @@ The product should support both:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
   - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
 
-## Current Phase Requirements
+## Phase D Requirements
 
 The current execution phase, Phase `D`, requires:
 
@@ -486,8 +486,8 @@ The current execution phase, Phase `D`, requires:
     coverage in the default `analyze_workspace` path
   - in-scope direct workspace edges across normal, dev, build, and
     target-specific dependency sections
-- requirements and architecture baselines that match the current active phase
-  rather than preserving stale Phase-B or Phase-C framing
+- requirements and architecture baselines that match Phase `D` rather than
+  preserving stale Phase-B or Phase-C framing
 - continued preservation of already accepted earlier-phase decisions for:
   - crate-isolated backends
   - the AI-first top-level CLI contract

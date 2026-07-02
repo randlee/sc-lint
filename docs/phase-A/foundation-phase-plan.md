@@ -1,7 +1,7 @@
 # sc-lint Foundation Phase Plan
 
-This document is the detailed execution plan for the current `sc-lint` phase,
-Phase `A`.
+This document is the archived detailed execution plan for Phase `A`, the
+foundation line that established the initial `sc-lint` repo structure.
 
 ## Objective
 
@@ -43,7 +43,7 @@ Required policy intent:
 - future `sc-lint` CLI coordinates backend tools but does not force backend
   crate cross-dependencies
 
-Current phase note:
+Phase `A` note:
 
 - these boundary files are canonical planning inputs now
 - default lint enforcement against them activates when boundary inventory
@@ -253,7 +253,7 @@ Required work:
   - config-driven suppressions
   - tools or rules that intentionally have no disable path
 
-Required outputs for the current release line:
+Required outputs for the Phase `A` release line:
 
 - one guide for `sc-lint-boundary`
 - one guide for `sc-lint-portability`
@@ -265,7 +265,7 @@ Required outputs for the current release line:
 
 ## Sequence
 
-The current phase should execute in this order:
+Phase `A` was planned to execute in this order:
 
 1. define repo boundaries
 2. tighten `just lint` for self-hosting

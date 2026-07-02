@@ -380,7 +380,7 @@ Current implemented local/CI profile split:
 - top-level `ci`
   - lint plus tests
 
-Current wrapper mapping:
+Implemented wrapper mapping:
 
 - `just lint`
   - defaults to `sc-lint lint full`

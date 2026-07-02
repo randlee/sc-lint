@@ -2,7 +2,7 @@
 
 This folder is the home for `sc-lint` design and planning material.
 
-Current contents:
+Contents:
 
 - [`requirements.md`](./requirements.md) — top-level `sc-lint` crate
   requirements summary
@@ -14,16 +14,18 @@ Current contents:
   Python vs what moves to Rust
 - [`extraction-plan.md`](./extraction-plan.md) — extraction plan for remaining
   generic lint/view tooling and the Python-to-Rust boundary migration
-- [`foundation-phase-plan.md`](../phase-A/foundation-phase-plan.md) — current detailed
-  execution plan for repo self-hosting, boundaries, CLI introduction, and
-  extraction order
-- [`phase-B-plan.md`](../phase-B/phase-B-plan.md) — current Phase B execution plan and
-  focused sprint-hardening sequence
-- [`phase-C-plan.md`](../phase-C/phase-C-plan.md) — Phase C interface-versioning,
-  shared-reporting, observability-maintenance, and queued portability planning
-  line
+- [`foundation-phase-plan.md`](../phase-A/foundation-phase-plan.md) — archived
+  Phase A foundation execution plan for repo self-hosting, boundaries, CLI
+  introduction, and extraction order
+- [`phase-B-plan.md`](../phase-B/phase-B-plan.md) — archived Phase B hardening
+  and process-tightening plan
+- [`phase-C-plan.md`](../phase-C/phase-C-plan.md) — archived Phase C
+  interface-versioning, shared-reporting, observability-maintenance, and
+  portability plan
+- [`phase-D-plan.md`](../phase-D/phase-D-plan.md) — Phase D
+  boundary-inventory improvement plan
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
-  ownership, and current plan touchpoint guide
+  ownership, and phase-plan touchpoint guide
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
   repo-local constraints for the shared HTML/XHTML/JSON reporting line
 - [`version-adoption.md`](./version-adoption.md) — authoritative consumer
@@ -33,7 +35,6 @@ Current contents:
 - [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —
   repo-local constraints for minimal marketplace publication of the adoption
   skill
-<<<<<<< HEAD
 - [`../../.claude/skills/sc-lint-version-adoption/SKILL.md`](../../.claude/skills/sc-lint-version-adoption/SKILL.md) —
   repo-local Claude Code skill for `sc-lint-version` consumer adoption
 - [`../../.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json) —
@@ -102,6 +103,8 @@ Current contents:
   sprint
 - [`sprint-C10.md`](../phase-C/sprint-C10.md) — `sc-observability` `1.1.0` adoption
   sprint
+- [`sprint-D1.md`](../phase-D/sprint-D1.md) — direct workspace package-edge
+  enforcement planning sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for
@@ -143,7 +146,7 @@ analyzer binaries from one install path:
 `randlee/tap/sc-lint-boundary` may remain as a legacy compatibility surface
 for boundary-only callers, but it is not the supported default install path.
 
-Current intended crate split:
+Intended crate split:
 
 - `sc-lint`
   - top-level CLI crate
@@ -193,7 +196,7 @@ Current intended crate split:
   - exists early so source-level declarations can be added without late
     packaging churn
 
-Current scaffold status:
+Scaffold status:
 
 - `sc-lint-directives`
   - exists now
@@ -265,7 +268,7 @@ Current scaffold status:
     - [`cli-requirements.md`](./cli-requirements.md)
     - [`cli-architecture.md`](./cli-architecture.md)
 
-Current code moves completed for the current partition:
+Implemented code moves for the completed extraction partition:
 
 - imported std runtime/concurrency rules from the current `atm-core` proving
   surface into `sc-lint-runtime`:
@@ -293,7 +296,7 @@ Kept local to consumer repos for now:
 - fixed-sleep test-hygiene policy
 - TTL triage consistency policy
 
-Current repo integration status:
+Repo integration status:
 
 - `just lint sc-boundary`
   - exists now as a named target
@@ -302,7 +305,7 @@ Current repo integration status:
   - exists now as a named target
   - is part of default `just lint` for this repo
 
-Current implemented profile policy:
+Implemented profile policy:
 
 - `fast`
   - local low-latency lint profile
@@ -316,7 +319,7 @@ Current implemented profile policy:
 - top-level `ci`
   - lint plus tests
 
-Current wrapper mapping:
+Wrapper mapping:
 
 - `just lint`
   - defaults to `sc-lint lint full`
@@ -329,19 +332,19 @@ Current wrapper mapping:
 - `just ci`
   - maps to `sc-lint ci`
 
-Current rule-disable policy:
+Rule-disable policy:
 
 - A.2 does not add top-level `sc-lint` rule-disable flags
 - profile orchestration does not override backend rule configuration
 - current rule-disable behavior stays with the owning backend or delegated tool
 
-Current repo boundary source status:
+Repo boundary source status:
 
 - canonical boundary TOML is expected under `boundaries/`
 - `sc-lint` crate boundaries are now defined there for current planning and
   active inventory-backed linting
 
-Current planned Phase-B follow-ons not implemented yet:
+Phase `B` hardening follow-ons recorded for later implementation:
 
 - recurring shared lint-gate backlog:
   - raw identity string literals without named constants
@@ -359,7 +362,7 @@ Current planned Phase-B follow-ons not implemented yet:
   - structural `cfg(unix)` / `cfg(windows)` parity enforcement for production
     code
 
-Planned rule families not implemented yet:
+Phase `D` planned rule families:
 
 - `SCB-INVENTORY-001`
 - `SCB-INVENTORY-002`

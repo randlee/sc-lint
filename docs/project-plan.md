@@ -2,9 +2,9 @@
 
 This document is the high-level planning index for the `sc-lint` project.
 
-## Current Planning Scope
+## Planning Scope
 
-The current project focus is:
+The project focus is:
 
 - extracting `sc-lint` into a standalone repository
 - stabilizing the initial crate set
@@ -33,7 +33,7 @@ The current project focus is:
   those checks can surface platform drift before a push
 - preserving CI and lint-runner parity during extraction
 
-## Current Detailed Planning References
+## Detailed Planning References
 
 - project roadmap
   - see [docs/sc-lint/roadmap.md](./sc-lint/roadmap.md)
@@ -55,7 +55,7 @@ The current project focus is:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - known issues inventory
   - see [docs/issues-inventory.md](./issues-inventory.md)
-- current phase execution plan
+- phase execution plans
   - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
   - see [docs/phase-B/phase-B-plan.md](./phase-B/phase-B-plan.md)
   - see [docs/phase-C/phase-C-plan.md](./phase-C/phase-C-plan.md)
@@ -72,9 +72,9 @@ The current project focus is:
 - initial analyzer MVP
   - see [docs/sc-lint/mvp.md](./sc-lint/mvp.md)
 
-## Current Phase Priorities
+## Phase A Foundation Priorities
 
-This phase should execute in the following order:
+Phase `A` was planned to execute in the following order:
 
 1. define canonical `sc-lint` boundaries in TOML
 2. make `just lint` self-host the repo's own analyzer checks by default
@@ -96,14 +96,14 @@ This phase should execute in the following order:
 15. publish comprehensive per-tool user guides and rule-disable guidance for
     the release-1 lint surface
 
-Current queued follow-on after the Phase `C` line:
+Active follow-on after the completed Phase `C` line:
 
 16. enforce direct workspace package dependency policy from canonical boundary
     inventory in `sc-lint-boundary`
 
 ## Scheduled Sprint Plans
 
-The currently scheduled sprint plans are:
+The scheduled sprint plans are:
 
 - `A.1a`
   - CLI bootstrap and contract definition

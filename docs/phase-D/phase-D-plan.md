@@ -12,9 +12,9 @@ first sprint closes the current direct-workspace package-edge enforcement gap in
 and locks the first production-ready dependency-rule contract for
 `allowed_dependencies`, `allowed_dependents`, and `forbidden_edges`.
 
-## Current Scope
+## Planned Scope
 
-The currently planned sprints in this phase are:
+The planned sprints in this phase are:
 
 - `D.1`
   - direct workspace package-edge enforcement in `sc-lint-boundary`

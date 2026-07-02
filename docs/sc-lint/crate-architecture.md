@@ -104,7 +104,7 @@ their governing docs, boundaries, and planned sprint work.
     shell-portability rule families when those checks remain consumer-neutral
   - planned future shared owner for structural cross-platform branch-parity
     rules when those checks remain consumer-neutral
-  - current Phase `B.1` backlog owner and Phase `C.6`-`C.9` sprint owner for
+  - recorded Phase `B.1` backlog owner and Phase `C.6`-`C.9` sprint owner for
     that shared portability follow-on line
 - governing docs:
   - `docs/sc-lint-portability/requirements.md`
@@ -262,8 +262,9 @@ planned portability follow-on sprints `C.6` through `C.9`.
   - the Phase `C` portability follow-ons stay inside the existing
     `sc-lint-portability` crate rather than creating a separate crate line
 
-## Current Plan Coverage
+## Phase Plan Coverage
 
 This document keeps crate-level ownership, responsibility, and governing
-references explicit for every crate touched by the implemented Phase A line and
-the currently planned Phase B and Phase C follow-ons.
+references explicit for every crate touched by the implemented Phase `A`
+foundation line, the archived Phase `B` and Phase `C` follow-ons, and the
+Phase `D` dependency-policy work.

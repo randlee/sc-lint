@@ -6,8 +6,8 @@ This document records the crate-local architecture summary for
 ## Role
 
 `sc-lint-boundary` owns boundary inventory loading, ownership-policy analysis,
-manifest-policy analysis, the queued package dependency-policy analysis line,
-and the boundary-rule machine contract.
+manifest-policy analysis, the Phase `D` package dependency-policy analysis
+line, and the boundary-rule machine contract.
 
 ## Authoritative Architecture Sources
 
