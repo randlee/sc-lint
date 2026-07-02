@@ -1,0 +1,50 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-003>
+  a triage:Finding ;
+  triage:findingId "SC-QA-003" ;
+  triage:title "project-plan.md stale Phase B/C current-phase framing (new, missed by fix-1 scope)" ;
+  triage:description "docs/project-plan.md:312-319 still states Phase B is the current planning line and Phase C is the next queued line, even though requirements.md, sc-lint/roadmap.md, and boundaries/planning.toml were all corrected to Phase D. This was missed by fix-1 scope and is the only remaining occurrence of this defect pattern." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable true ;
+  triage:sweepScope "docs/" ;
+  triage:category "stale-phase-framing" ;
+  triage:severity "Blocking" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/phase-D-planning/1> ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-003/phase-D-planning/2> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/7abcf56> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/7abcf56> .
+
+<urn:atm:triage:occurrence/SC-QA-003/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/project-plan.md" ;
+  triage:line 313 ;
+  triage:snippet "Phase `B` is the current planning and hardening line" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "7abcf56" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/7abcf56> .
+
+<urn:atm:triage:occurrence/SC-QA-003/phase-D-planning/2>
+  a triage:Occurrence ;
+  triage:file "docs/project-plan.md" ;
+  triage:line 317 ;
+  triage:snippet "Phase `C` is now the next queued planning line after the current Phase `B`" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "7abcf56" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/7abcf56> .
+
+<urn:atm:triage:worktree/phase-D-planning/7abcf56>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "7abcf56" ;
+  triage:orderIndex 0 .
