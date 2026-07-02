@@ -1,5 +1,6 @@
 use super::*;
 use crate::render::hex_encode;
+use cargo_metadata::MetadataCommand;
 
 mod reference_collector;
 

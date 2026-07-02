@@ -37,7 +37,6 @@ line, and the boundary-rule machine contract.
   - `boundary.forbid_external_impls`
   - named-caller allowlists
 - package dependency policy
-  - planned first implementation sprint: `D.1`
   - direct workspace package-edge allowlist and forbidden-edge enforcement from
     boundary inventory plus Cargo metadata
   - dedicated operator-visible `RuleFilter::Dependencies` surface, separate
@@ -48,8 +47,8 @@ line, and the boundary-rule machine contract.
 
 These surfaces share one CLI/reporting contract but they do not collapse into
 one implementation bucket. Package dependency policy belongs with
-boundary-inventory enforcement, not with manifest-hygiene checks. In `D.1`,
-that separation must remain visible both in implementation modules and in the
+boundary-inventory enforcement, not with manifest-hygiene checks. That
+separation must remain visible both in implementation modules and in the
 operator-selectable rule-filter surface.
 
 ## Related Docs

@@ -28,13 +28,15 @@ pub(crate) struct ManifestPolicyReport {
 }
 
 pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyReport> {
-    let workspace_version = workspace_version(root)?;
-    let manifests = member_manifests(root)?;
+    let root = fs::canonicalize(root)
+        .with_context(|| format!("failed to canonicalize repo root `{}`", root.display()))?;
+    let workspace_version = workspace_version(&root)?;
+    let manifests = member_manifests(&root)?;
     let mut expected_versions = BTreeMap::new();
 
     for manifest_path in &manifests {
         let manifest = load_manifest(manifest_path)?;
-        let rel_manifest = relative_manifest_display(root, manifest_path)?;
+        let rel_manifest = relative_manifest_display(&root, manifest_path)?;
         let package_version =
             expected_package_version(&manifest, &workspace_version, &rel_manifest)?;
         expected_versions.insert(canonical_manifest_dir(manifest_path)?, package_version);
@@ -43,7 +45,7 @@ pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyRepor
     let mut findings = Vec::new();
     for manifest_path in &manifests {
         let manifest = load_manifest(manifest_path)?;
-        let rel_manifest = relative_manifest_display(root, manifest_path)?;
+        let rel_manifest = relative_manifest_display(&root, manifest_path)?;
         let package = manifest
             .get("package")
             .and_then(Value::as_table)

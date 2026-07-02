@@ -308,9 +308,8 @@ Current intended distribution is:
 - `sc-lint-boundary`
   - boundary inventory and ownership rules
   - boundary declarations and attribute-driven boundary policy
-  - current owned extension:
+  - current owned extensions:
     - `SCB-CALLER-001` named-caller allowlist enforcement
-  - planned next boundary rule-family addition:
     - `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and
       `SCB-DEPENDENCY-003` direct workspace package-edge policy
     - dedicated operator-visible `dependencies` rule filter, separate from

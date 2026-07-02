@@ -19,9 +19,9 @@ roots = ["OutputFormat", "NodeId", "OwnerId", "FindingsReport", "ReportStatus", 
 allowed_dependents = ["sc-lint", "sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]
 allowed_dependencies = []
 forbidden_edges = [
-  "sc-lint-schema -> sc-lint",
-  "sc-lint-schema -> sc-lint-boundary",
-  "sc-lint-schema -> sc-lint-portability",
+  { from = "sc-lint-schema", to = "sc-lint" },
+  { from = "sc-lint-schema", to = "sc-lint-boundary" },
+  { from = "sc-lint-schema", to = "sc-lint-portability" },
 ]
 
 [references]

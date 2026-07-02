@@ -29,8 +29,8 @@ enum Command {
         root: PathBuf,
         #[arg(long, default_value = "text")]
         format: FormatArg,
-        #[arg(long)]
-        rule: Option<RuleFilterArg>,
+        #[arg(long = "rule-filter", alias = "rule")]
+        rule_filter: Option<RuleFilterArg>,
     },
     ExportGraph {
         #[arg(long, default_value = ".")]
@@ -58,6 +58,7 @@ enum RuleFilterArg {
     Boundaries,
     InternalOnly,
     ForbidExternalImpls,
+    Dependencies,
     Manifests,
 }
 
@@ -86,6 +87,7 @@ impl From<RuleFilterArg> for RuleFilter {
             RuleFilterArg::Boundaries => RuleFilter::Boundaries,
             RuleFilterArg::InternalOnly => RuleFilter::InternalOnly,
             RuleFilterArg::ForbidExternalImpls => RuleFilter::ForbidExternalImpls,
+            RuleFilterArg::Dependencies => RuleFilter::Dependencies,
             RuleFilterArg::Manifests => RuleFilter::Manifests,
         }
     }
@@ -95,11 +97,15 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Analyze { root, format, rule } => {
+        Command::Analyze {
+            root,
+            format,
+            rule_filter,
+        } => {
             let options = AnalyzeOptions {
                 root,
                 format: format.clone().into(),
-                rule: rule.map(Into::into),
+                rule: rule_filter.map(Into::into),
             };
             let report = analyze_workspace(&options)?;
             match OutputFormat::from(format) {

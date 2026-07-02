@@ -28,12 +28,12 @@ roots = ["CheckTarget", "Cli", "ClippyTarget", "Command", "LintTarget", "ViewTar
 allowed_dependents = []
 allowed_dependencies = ["sc-lint-boundary", "sc-lint-schema", "sc-observability"]
 forbidden_edges = [
-  "sc-lint-attributes -> sc-lint",
-  "sc-lint-boundary -> sc-lint",
-  "sc-lint-boundary -> sc-observability",
-  "sc-lint-portability -> sc-observability",
-  "sc-lint-runtime -> sc-observability",
-  "sc-lint-tokio -> sc-observability",
+  { from = "sc-lint-attributes", to = "sc-lint" },
+  { from = "sc-lint-boundary", to = "sc-lint" },
+  { from = "sc-lint-boundary", to = "sc-observability" },
+  { from = "sc-lint-portability", to = "sc-observability" },
+  { from = "sc-lint-runtime", to = "sc-observability" },
+  { from = "sc-lint-tokio", to = "sc-observability" },
 ]
 
 [references]

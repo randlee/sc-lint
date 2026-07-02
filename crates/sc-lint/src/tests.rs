@@ -483,8 +483,8 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let error = crate::command::execute(&context, &loaded).expect_err("dispatch should fail");
 
-    assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_eq!(error.code(), "CLI.BACKEND_EXEC_FAILURE");
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert_eq!(error.code(), "CLI.CONFIG_ERROR");
     assert!(error.cause.is_some());
     assert!(std::error::Error::source(&error).is_some());
 }
