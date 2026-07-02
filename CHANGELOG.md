@@ -2,7 +2,7 @@
 
 All notable changes to sc-lint are documented here.
 
-## [0.4.0] — unreleased
+## [0.4.0] — 2026-07-02
 
 ### Features
 
