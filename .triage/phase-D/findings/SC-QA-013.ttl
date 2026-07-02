@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-013>
+  a triage:Finding ;
+  triage:findingId "SC-QA-013" ;
+  triage:title "sprint-B1.md historical text asserts Phase B as active execution phase without superseded qualifier" ;
+  triage:description "docs/phase-B/sprint-B1.md:65-67 -- historical sprint-deliverable text asserting Phase B as 'the active execution phase' with no qualifier that this is now superseded. Optional: add parenthetical noting this describes a since-superseded point-in-time state." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "documentation" ;
+  triage:severity "Minor" ;
+  triage:repeatable false ;
+  triage:sweepScope "docs/phase-B/sprint-B1.md" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-013/phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-013/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/phase-B/sprint-B1.md" ;
+  triage:line 65 ;
+  triage:snippet "Phase `B`, not Phase `A`, is the active execution phase and the current baseline traceability reflects the live planning line" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .

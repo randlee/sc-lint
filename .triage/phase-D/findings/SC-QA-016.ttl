@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-016>
+  a triage:Finding ;
+  triage:findingId "SC-QA-016" ;
+  triage:title "docs/architecture.md doc link labels stale Phase A plan as current phase execution plan" ;
+  triage:description "docs/architecture.md:639 -- \"- current phase execution plan\" links to the Phase A foundation-phase-plan.md instead of the actually-current Phase D plan. Discovered by the comprehensive full-tree sweep (SC-QA-SWEEP-FINAL) as an occurrence missed by the original QA-3 report's 10 named findings. Remediation: update the link/label to point to and describe docs/phase-D/phase-D-plan.md as the current phase execution plan; relabel the Phase A link as historical." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:category "SC-QA" ;
+  triage:severity "Blocking" ;
+  triage:repeatable false ;
+  triage:sweepScope "file_only" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T00:00:00Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-016/phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/29afdb3> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:occurrence/SC-QA-016/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/architecture.md" ;
+  triage:line 639 ;
+  triage:snippet "- current phase execution plan (links to Phase A foundation-phase-plan.md, should link to Phase D plan)" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/29afdb3> .
+
+<urn:atm:triage:worktree/phase-D-planning/29afdb3>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "29afdb3" ;
+  triage:orderIndex 0 .
