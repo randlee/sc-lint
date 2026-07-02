@@ -48,12 +48,16 @@ exactly as written. Do not invent alternate publish paths.
 
 ### crates.io
 - `sc-lint-directives`
+- `sc-lint-schema`
 - `sc-lint-attributes`
 - `sc-lint-boundary`
+- `sc-lint-portability`
+- `sc-lint-runtime`
+- `sc-lint`
 
 ### GitHub Releases
-- `sc-lint-boundary` binary archives for the targets listed in
-  `.github/workflows/release.yml`
+- `sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime` binary
+  archives for the targets listed in `.github/workflows/release.yml`
 
 ## Excluded Future Surface
 Do not assume Homebrew, `winget`, or additional installer channels are active
