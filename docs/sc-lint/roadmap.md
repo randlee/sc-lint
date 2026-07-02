@@ -105,7 +105,9 @@ release-foundation work for:
 
 ### Phase B
 
-Phase `B` is now the next planned line of work.
+Phase `B` was the planning line that followed Phase `A` and is now complete.
+Phase `C` followed that line and is also complete. Phase `D`, starting with
+`D.1`, is the current active planning line.
 
 Initial Phase-B scope is split into focused planning sprints:
 

@@ -62,9 +62,9 @@ The completed Phase `B` line consisted of:
 
 ## Phase Structure
 
-Phase `B` currently starts with four focused planning-and-hardening sprints,
-followed by one queued distribution-planning sprint whose numeric slot is still
-open:
+Phase `B` started with four focused planning-and-hardening sprints, followed
+by one distribution-planning sprint whose numeric slot remained intentionally
+unassigned while the numbered implementation order was reviewed:
 
 1. `B.1`
    - encode Phase-A post-mortem findings as planned product/process work
