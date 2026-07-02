@@ -62,9 +62,12 @@ family.
 
 - `REQ-SCB-019`
   The first package dependency policy implementation scope is direct
-  workspace-member edges only. Transitive reachability and non-workspace
-  dependencies are out of scope until a later scheduled sprint adds them
-  explicitly.
+  workspace-member edges only, including direct edges declared under
+  `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]`, and
+  target-specific dependency sections when they name another current workspace
+  member. Transitive reachability and third-party crates.io or git
+  dependencies outside the workspace-member set are out of scope until a later
+  scheduled sprint adds them explicitly.
 
 - `REQ-SCB-020`
   Package dependency policy entries must be validated at inventory load.

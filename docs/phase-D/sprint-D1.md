@@ -49,6 +49,7 @@ target: develop
 - `crates/sc-lint-boundary/src/inventory.rs`
 - `crates/sc-lint-boundary/src/lib.rs`
 - `crates/sc-lint-boundary/src/analysis.rs`
+- `crates/sc-lint-boundary/src/graph.rs`
 - `crates/sc-lint-boundary/src/package_policy.rs`
 - `crates/sc-lint-boundary/src/tests.rs`
 - `crates/sc-lint-boundary/src/main.rs`
@@ -78,9 +79,15 @@ silently dropped or partially deferred.
 - direct workspace package-edge analysis lands in a dedicated
   `crates/sc-lint-boundary/src/package_policy.rs` module rather than being
   folded into `manifest_policy.rs`
+- `package_policy.rs` reuses `graph::load_metadata(root)` or one equivalent
+  shared workspace-metadata loader already owned by `sc-lint-boundary`; `D.1`
+  must not add a third independent `cargo_metadata::MetadataCommand`
+  invocation path for package-edge analysis
 - `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and `SCB-DEPENDENCY-003` land as
-  stable fail-only rules under the existing `boundaries` filter and default
-  `analyze_workspace` path
+  stable fail-only rules under one dedicated `dependencies` rule filter and
+  the default `analyze_workspace` path; this keeps REQ-SCB-021 explicit by
+  separating package dependency policy from both source-graph boundary checks
+  and manifest workspace/version hygiene at the operator-facing filter layer
 - `analysis.rs` remains the authoritative crate-wide fail-status classifier:
   `ScbDependency001`, `ScbDependency002`, and `ScbDependency003` are added to
   `analysis::finding_is_failure` or one equivalent centralized fail-only
@@ -90,12 +97,17 @@ silently dropped or partially deferred.
     workspace package dependencies for the owner package
   - `allowed_dependents` is the complete allowlist of direct incoming
     workspace package dependents for the owner package
+  - direct workspace package edges include `[dependencies]`,
+    `[dev-dependencies]`, `[build-dependencies]`, and target-specific
+    `target.<triple>.*dependencies` sections when they name another current
+    workspace member
   - `allowed_dependents = []` means no external workspace package may directly
     depend on that owner package
   - `forbidden_edges` denies the exact direct edge even when an allowlist would
     otherwise permit it
-- non-workspace dependencies remain out of scope for this sprint and do not
-  produce package-policy findings
+- third-party crates.io or git dependencies outside the current workspace
+  member set remain out of scope for this sprint and do not produce
+  package-policy findings
 - `sc-lint-boundary analyze` and `sc-lint lint sc-boundary` both surface the
   new rule family in stable text and JSON output without inventing a separate
   ad hoc command path
@@ -193,10 +205,23 @@ pub(crate) struct PackagePolicyReport {
     pub(crate) findings: Vec<Finding>,
 }
 
+let metadata = graph::load_metadata(root)?;
 pub(crate) fn analyze_package_policy(
     root: &Path,
+    metadata: &cargo_metadata::Metadata,
     inventory: &BoundaryInventory,
 ) -> Result<PackagePolicyReport>;
+```
+
+```rust
+pub enum RuleFilter {
+    Cycles,
+    Boundaries,
+    InternalOnly,
+    ForbidExternalImpls,
+    Dependencies,
+    Manifests,
+}
 ```
 
 ```rust
@@ -240,6 +265,10 @@ fn dependency_rule_findings_flip_report_status_to_fail() {
 - the sprint doc makes the implementation split explicit before coding starts:
   package dependency policy lands in `package_policy.rs`, not in
   `manifest_policy.rs`
+- `crates/sc-lint-boundary/src/graph.rs` is an explicit sprint target because
+  `package_policy.rs` reuses `graph::load_metadata(root)` or one equivalent
+  shared workspace-metadata loader instead of adding a third independent cargo
+  metadata invocation path
 - `crates/sc-lint-boundary/src/analysis.rs` is an explicit sprint target
   because the crate-wide fail-status classifier lives there and must be updated
   when `ScbDependency001`, `ScbDependency002`, and `ScbDependency003` are
@@ -251,6 +280,10 @@ fn dependency_rule_findings_flip_report_status_to_fail() {
   constructed in a post-deserialization validation pass in `inventory.rs`
 - malformed `forbidden_edges` entries fail inventory loading with actionable
   error text that identifies the offending boundary record and edge string
+- package dependency policy remains structurally distinct from both source-graph
+  boundary checks and manifest policy in the operator-visible filter surface:
+  `RuleFilter::Dependencies` owns `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`,
+  and `SCB-DEPENDENCY-003`, satisfying the REQ-SCB-021 separation requirement
 - `SCB-DEPENDENCY-001` fails when a workspace member directly depends on
   another workspace member not listed in the owner record's
   `allowed_dependencies`
@@ -266,19 +299,27 @@ fn dependency_rule_findings_flip_report_status_to_fail() {
   just the emitted `rule_id` values
 - direct-only scope is explicit and regression-tested: a transitive-only
   workspace path does not produce a package-policy finding
-- non-workspace dependencies are ignored by this rule family and do not produce
-  false positives
+- direct workspace package edges from `[dependencies]`,
+  `[dev-dependencies]`, `[build-dependencies]`, and target-specific dependency
+  sections are in scope for this rule family and are regression-tested with at
+  least one dev- or build-dependency workspace edge
+- third-party crates.io or git dependencies outside the current workspace
+  member set are ignored by this rule family and do not produce false
+  positives
 - `cargo test -p sc-lint-boundary` passes with regression coverage for:
   - allowed direct dependency pass
   - disallowed direct dependency fail with `SCB-DEPENDENCY-001`
   - disallowed direct dependent fail with `SCB-DEPENDENCY-002`
   - forbidden direct edge fail with `SCB-DEPENDENCY-003`
   - empty `allowed_dependents` blocks one incoming workspace edge
+  - dev- or build-dependency workspace edge is enforced by the same rule family
   - transitive-only edge remains clean
-  - non-workspace dependency ignored
+  - third-party crates.io or git dependency outside the workspace-member set
+    ignored
 - `sc-lint-boundary analyze --format text`, `sc-lint-boundary analyze --format json`,
-  and `sc-lint lint sc-boundary` all surface the new dependency findings
-  through the existing command path
+  `sc-lint-boundary analyze --rule-filter dependencies`, and
+  `sc-lint lint sc-boundary` all surface the new dependency findings through
+  the existing command path
 - `crates/sc-lint-boundary/README.md` and
   `docs/sc-lint-boundary/boundary-enforcement-model.md` both include one
   canonical dependency-policy example plus operator guidance on how package-edge

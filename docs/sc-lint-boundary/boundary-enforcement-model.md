@@ -126,6 +126,10 @@ Operational rules:
   workspace-member dependencies for the owner package
 - `allowed_dependents` is the complete allowlist of direct incoming
   workspace-member dependents for the owner package
+- direct workspace package edges include `[dependencies]`,
+  `[dev-dependencies]`, `[build-dependencies]`, and target-specific
+  `target.<triple>.*dependencies` sections when they point at another current
+  workspace member
 - `allowed_dependents = []` means no external workspace package may directly
   depend on that owner package
 - each `forbidden_edges` row is one exact denied direct edge in
@@ -142,8 +146,11 @@ Operational rules:
 Scope limits for the first rule family:
 
 - direct workspace-member edges only
+- dev-dependency, build-dependency, and target-specific direct workspace edges
+  are included in that direct-edge scope
 - no transitive reachability enforcement yet
-- no third-party crates.io or git dependency policy yet
+- no third-party crates.io or git dependency policy outside the current
+  workspace-member set yet
 
 This differs from manifest policy:
 
@@ -152,6 +159,8 @@ This differs from manifest policy:
 - use manifest policy for workspace-field inheritance and internal path
   dependency version alignment
 - do not merge package dependency policy into the manifest-policy rule family
+- keep package dependency policy operator-selectable through its own dedicated
+  rule-filter surface rather than hiding it behind the manifest-policy filter
 
 ## Inventory-Parity Scope
 

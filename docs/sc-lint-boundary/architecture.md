@@ -40,13 +40,17 @@ and the boundary-rule machine contract.
   - planned first implementation sprint: `D.1`
   - direct workspace package-edge allowlist and forbidden-edge enforcement from
     boundary inventory plus Cargo metadata
+  - dedicated operator-visible `RuleFilter::Dependencies` surface, separate
+    from both source-graph boundary rules and `RuleFilter::Manifests`
 - manifest policy
   - workspace-field inheritance
   - internal path dependency version alignment
 
 These surfaces share one CLI/reporting contract but they do not collapse into
 one implementation bucket. Package dependency policy belongs with
-boundary-inventory enforcement, not with manifest-hygiene checks.
+boundary-inventory enforcement, not with manifest-hygiene checks. In `D.1`,
+that separation must remain visible both in implementation modules and in the
+operator-selectable rule-filter surface.
 
 ## Related Docs
 
