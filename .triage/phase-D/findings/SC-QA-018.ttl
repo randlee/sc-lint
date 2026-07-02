@@ -1,0 +1,38 @@
+@prefix triage: <urn:atm:triage:> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:atm:triage:finding/SC-QA-018>
+  a triage:Finding ;
+  triage:findingId "SC-QA-018" ;
+  triage:title "Phase B plan self-contradiction: present tense at lines 65-67 vs past tense closure at 88-89" ;
+  triage:description "docs/phase-B/phase-B-plan.md lines 65-67 self-contradicts the closure statement at lines 88-89. Lines 65-67 use present-tense framing ('currently starts') and state the numeric slot for sprint-B-homebrew is 'still open', but lines 88-89 state Phase B 'closed with' the recorded B.1-B.4 line plus sprint-B-homebrew, with 'no additional Phase B sprint scope remains open'. Remediation: rewrite lines 65-67 to past tense consistent with the closure statement, remove 'still open' framing." ;
+  triage:phaseId "phase-D" ;
+  triage:triageMode "initial_pass" ;
+  triage:repeatable true ;
+  triage:sweepScope "docs/" ;
+  triage:category "req-qa" ;
+  triage:severity "important" ;
+  triage:status "open" ;
+  triage:dispatchReady true ;
+  triage:triagedAt "2026-07-02T10:42:21Z"^^xsd:dateTime ;
+  triage:hasOccurrence <urn:atm:triage:occurrence/SC-QA-018/phase-D-planning/1> ;
+  triage:openOn <urn:atm:triage:worktree/phase-D-planning/a27c880> ;
+  triage:promoteTo <urn:atm:triage:worktree/phase-D-planning/a27c880> .
+
+<urn:atm:triage:occurrence/SC-QA-018/phase-D-planning/1>
+  a triage:Occurrence ;
+  triage:file "docs/phase-B/phase-B-plan.md" ;
+  triage:line 65 ;
+  triage:snippet "Phase `B` currently starts with four focused planning-and-hardening sprints, followed by one queued distribution-planning sprint whose numeric slot is still open:" ;
+  triage:status "open" ;
+  triage:closed false ;
+  triage:headSha "a27c880" ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:occursIn <urn:atm:triage:worktree/phase-D-planning/a27c880> .
+
+<urn:atm:triage:worktree/phase-D-planning/a27c880>
+  a triage:WorktreeSnapshot ;
+  triage:branch "feature/phase-D-planning" ;
+  triage:path "/Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning" ;
+  triage:headSha "a27c880" ;
+  triage:orderIndex 0 .
