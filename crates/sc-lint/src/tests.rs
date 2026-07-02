@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -834,6 +835,48 @@ fn render_success_json_falls_back_to_internal_error_envelope_on_serialize_failur
         json["error"]["message"],
         "failed to serialize success envelope"
     );
+}
+
+#[test]
+fn workspace_version_is_the_single_source_of_truth_for_published_crates() {
+    let workspace_root = repo_backed_workspace_root();
+    let workspace_manifest: toml::Value = toml::from_str(
+        &fs::read_to_string(workspace_root.join("Cargo.toml")).expect("read workspace Cargo.toml"),
+    )
+    .expect("parse workspace Cargo.toml");
+
+    let workspace_version = workspace_manifest["workspace"]["package"]["version"]
+        .as_str()
+        .expect("workspace.package.version")
+        .to_string();
+    assert_eq!(workspace_version, env!("CARGO_PKG_VERSION"));
+
+    let members = workspace_manifest["workspace"]["members"]
+        .as_array()
+        .expect("workspace members");
+    for member in members {
+        let member_manifest_path =
+            workspace_root.join(member.as_str().expect("workspace member path"));
+        let member_manifest: toml::Value = toml::from_str(
+            &fs::read_to_string(member_manifest_path.join("Cargo.toml"))
+                .expect("read member Cargo.toml"),
+        )
+        .expect("parse member Cargo.toml");
+        assert_eq!(
+            member_manifest["package"]["version"]["workspace"].as_bool(),
+            Some(true),
+            "expected {} to inherit workspace.package.version",
+            member_manifest_path.display()
+        );
+    }
+
+    for dependency_name in ["sc-lint-boundary", "sc-lint-directives", "sc-lint-schema"] {
+        assert_eq!(
+            workspace_manifest["workspace"]["dependencies"][dependency_name]["version"].as_str(),
+            Some(workspace_version.as_str()),
+            "expected workspace dependency {dependency_name} to track workspace.package.version",
+        );
+    }
 }
 
 fn repo_backed_workspace_root() -> PathBuf {
