@@ -1,9 +1,9 @@
 ---
 id: D.1
 title: Boundary Inventory Dependency Policy Enforcement
-status: planned
-branch: feature/phase-D-planning
-worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D-planning
+status: implemented
+branch: feature/phase-D
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-D
 target: develop
 ---
 
@@ -46,10 +46,13 @@ target: develop
 - `docs/architecture.md`
 - `docs/project-plan.md`
 - `docs/issues-inventory.md`
-- `crates/sc-lint-boundary/src/inventory.rs`
+- `crates/sc-lint-boundary/src/inventory/mod.rs`
+- `crates/sc-lint-boundary/src/inventory/dependency_policy.rs`
 - `crates/sc-lint-boundary/src/lib.rs`
 - `crates/sc-lint-boundary/src/analysis.rs`
-- `crates/sc-lint-boundary/src/graph.rs`
+- `crates/sc-lint-boundary/src/graph/mod.rs`
+- `crates/sc-lint-boundary/src/graph/build.rs`
+- `crates/sc-lint-boundary/src/manifest_policy.rs`
 - `crates/sc-lint-boundary/src/package_policy.rs`
 - `crates/sc-lint-boundary/src/tests.rs`
 - `crates/sc-lint-boundary/src/main.rs`
@@ -179,18 +182,19 @@ pub(crate) struct PackageDependencyPolicy {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum DependencyPolicyError {
-    #[error("invalid dependency edge format in boundary `{boundary_id}`")]
-    InvalidFormat { boundary_id: BoundaryId },
+    #[error(
+        "invalid workspace package name {value:?} in `{field}` for boundary `{boundary_id}`: package names must not be empty or contain whitespace"
+    )]
+    InvalidFormat {
+        boundary_id: BoundaryId,
+        field: &'static str,
+        value: String,
+    },
     #[error("duplicate forbidden edge `{from} -> {to}` in boundary `{boundary_id}`")]
     DuplicateEdge {
         boundary_id: BoundaryId,
         from: WorkspacePackageName,
         to: WorkspacePackageName,
-    },
-    #[error("unknown workspace package `{package}` in boundary `{boundary_id}`")]
-    UnknownPackage {
-        boundary_id: BoundaryId,
-        package: WorkspacePackageName,
     },
     #[error("duplicate package `{package}` in `{field}` for boundary `{boundary_id}`")]
     DuplicatePackage {
@@ -253,11 +257,11 @@ impl RuleId {
 ```rust
 pub(crate) struct PackagePolicyReport {
     pub(crate) findings: Vec<Finding>,
+    pub(crate) scanned_crates: usize,
 }
 
 let metadata = graph::load_metadata(root)?;
 pub(crate) fn analyze_package_policy(
-    root: &Path,
     metadata: &cargo_metadata::Metadata,
     inventory: &BoundaryInventory,
 ) -> Result<PackagePolicyReport>;
@@ -315,7 +319,7 @@ fn dependency_rule_findings_flip_report_status_to_fail() {
 - the sprint doc makes the implementation split explicit before coding starts:
   package dependency policy lands in `package_policy.rs`, not in
   `manifest_policy.rs`
-- `crates/sc-lint-boundary/src/graph.rs` is an explicit sprint target because
+- `crates/sc-lint-boundary/src/graph/mod.rs` is an explicit sprint target because
   `package_policy.rs` reuses `graph::load_metadata(root)` or one equivalent
   shared workspace-metadata loader instead of adding a third independent cargo
   metadata invocation path

@@ -35,7 +35,7 @@ fn findings_report_text_renders_failure_status_and_count() {
         scanned_crates: 3,
         findings: vec![Finding {
             rule_id: RuleId::ScbRuntime001,
-            kind: "condvar_wait".to_string(),
+            kind: "condvar_wait".into(),
             message: "wait used".to_string(),
             owner_ids: vec![OwnerId::new("crate::example::example")],
             node_ids: vec![NodeId::new("crate::example::example::block")],

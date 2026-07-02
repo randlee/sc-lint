@@ -23,7 +23,7 @@ pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
             owners.sort();
             findings.push(Finding {
                 rule_id: RuleId::ScbCycle001,
-                kind: "multi_owner_architectural_cycle".to_string(),
+                kind: "multi_owner_architectural_cycle".into(),
                 message: format!(
                     "architectural cycle across owners: {}",
                     owners
@@ -118,7 +118,7 @@ pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
         if !inherent_nodes.is_empty() {
             findings.push(Finding {
                 rule_id: RuleId::ScbCycle002,
-                kind: "type_method_self_loop".to_string(),
+                kind: "type_method_self_loop".into(),
                 message: format!("type/method self-loop on owner {owner_id}"),
                 owner_ids: vec![owner_id.clone()],
                 node_ids: inherent_nodes.into_iter().collect(),
@@ -128,7 +128,7 @@ pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
         for (trait_name, node_ids) in trait_nodes {
             findings.push(Finding {
                 rule_id: RuleId::ScbCycle003,
-                kind: "trait_impl_self_loop".to_string(),
+                kind: "trait_impl_self_loop".into(),
                 message: format!("trait-impl self-loop on owner {owner_id} via {trait_name}"),
                 owner_ids: vec![owner_id.clone()],
                 node_ids: node_ids.into_iter().collect(),
@@ -186,7 +186,7 @@ pub(crate) fn analyze_internal_only(graph: &GraphExport) -> Vec<Finding> {
         if node.visibility != Some("private") {
             findings.push(Finding {
                 rule_id: RuleId::ScbBoundary001,
-                kind: "internal_only_visibility_violation".to_string(),
+                kind: "internal_only_visibility_violation".into(),
                 message: format!(
                     "internal_only item {} must not be externally visible (visibility={})",
                     node.id.as_str(),
@@ -218,7 +218,7 @@ pub(crate) fn analyze_internal_only(graph: &GraphExport) -> Vec<Finding> {
             }
             findings.push(Finding {
                 rule_id: RuleId::ScbBoundary002,
-                kind: "internal_only_external_reference".to_string(),
+                kind: "internal_only_external_reference".into(),
                 message: format!(
                     "internal_only item {} referenced from {}",
                     node.id.as_str(),
@@ -268,7 +268,7 @@ pub(crate) fn analyze_forbid_external_impls(graph: &GraphExport) -> Vec<Finding>
             }
             findings.push(Finding {
                 rule_id: RuleId::ScbBoundary003,
-                kind: "forbid_external_impls_violation".to_string(),
+                kind: "forbid_external_impls_violation".into(),
                 message: format!(
                     "trait {} forbids external impls but is implemented from module {}",
                     trait_node.id.as_str(),
@@ -360,7 +360,7 @@ pub(crate) fn analyze_named_callers(
 
                 findings.push(Finding {
                     rule_id: RuleId::ScbCaller001,
-                    kind: "named_caller_allowlist_violation".to_string(),
+                    kind: "named_caller_allowlist_violation".into(),
                     message: format!(
                         "restricted symbol {} called by unapproved external caller {}",
                         approved_entry.symbol.as_str(),

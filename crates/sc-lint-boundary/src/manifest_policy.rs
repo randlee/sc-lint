@@ -55,7 +55,7 @@ pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyRepor
             if !workspace_inherited(package, field) {
                 findings.push(Finding {
                     rule_id: RuleId::ScbManifest001,
-                    kind: "package_workspace_field_required".to_string(),
+                    kind: "package_workspace_field_required".into(),
                     message: format!("{rel_manifest}: set [package].{field}.workspace = true"),
                     owner_ids: vec![OwnerId::new(rel_manifest.clone())],
                     node_ids: Vec::new(),
@@ -82,7 +82,7 @@ pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyRepor
                 if pinned_version != Some(expected_dependency_version.as_str()) {
                     findings.push(Finding {
                         rule_id: RuleId::ScbManifest002,
-                        kind: "internal_path_dependency_version_mismatch".to_string(),
+                        kind: "internal_path_dependency_version_mismatch".into(),
                         message: format!(
                             "{rel_manifest} [{section_name}.{dependency_name}]: path dependency version must match target crate version \"{expected_dependency_version}\""
                         ),

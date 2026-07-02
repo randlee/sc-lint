@@ -1,13 +1,11 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::path::Path;
 
 use anyhow::Result;
 
 use crate::Finding;
 use crate::OwnerId;
 use crate::RuleId;
-use crate::graph;
 use crate::inventory::BoundaryInventory;
 use crate::inventory::BoundaryRecord;
 use crate::inventory::ForbiddenPackageEdge;
@@ -19,10 +17,9 @@ pub(crate) struct PackagePolicyReport {
 }
 
 pub(crate) fn analyze_package_policy(
-    root: &Path,
+    metadata: &cargo_metadata::Metadata,
     inventory: &BoundaryInventory,
 ) -> Result<PackagePolicyReport> {
-    let metadata = graph::load_metadata(root)?;
     let workspace_members = metadata.workspace_members.iter().collect::<BTreeSet<_>>();
     let workspace_packages = metadata
         .packages
@@ -124,7 +121,7 @@ fn index_incoming_edges(
 fn disallowed_dependency_finding(record: &BoundaryRecord, edge: &ForbiddenPackageEdge) -> Finding {
     Finding {
         rule_id: RuleId::ScbDependency001,
-        kind: "package_dependency_not_allowed".to_string(),
+        kind: "package_dependency_not_allowed".into(),
         message: format!(
             "workspace package `{}` directly depends on `{}` but `{}` is not listed in `{}` allowed_dependencies",
             edge.from, edge.to, edge.to, record.boundary_id
@@ -144,7 +141,7 @@ fn disallowed_dependent_finding(
 ) -> Finding {
     Finding {
         rule_id: RuleId::ScbDependency002,
-        kind: "package_dependent_not_allowed".to_string(),
+        kind: "package_dependent_not_allowed".into(),
         message: format!(
             "workspace package `{}` directly depends on `{}` but `{}` is not listed in `{}` allowed_dependents",
             dependent, owner, dependent, record.boundary_id
@@ -160,7 +157,7 @@ fn disallowed_dependent_finding(
 fn forbidden_edge_finding(edge: &ForbiddenPackageEdge) -> Finding {
     Finding {
         rule_id: RuleId::ScbDependency003,
-        kind: "forbidden_package_edge_present".to_string(),
+        kind: "forbidden_package_edge_present".into(),
         message: format!(
             "forbidden workspace dependency edge `{}` is present",
             format_args!("{} -> {}", edge.from, edge.to)

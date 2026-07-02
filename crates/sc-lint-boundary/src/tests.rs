@@ -10,6 +10,14 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+fn fixture_display_path(relative_path: &str) -> String {
+    std::env::temp_dir()
+        .join("sc-lint-boundary-tests")
+        .join(relative_path)
+        .display()
+        .to_string()
+}
+
 #[test]
 fn findings_report_text_is_stable() {
     let report = super::FindingsReport {
@@ -55,9 +63,9 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
             package: "example".to_string(),
             target: Some("example".to_string()),
             // Ephemeral fixture path, not a real workspace root.
-            manifest_path: "/tmp/example/Cargo.toml".to_string(),
+            manifest_path: fixture_display_path("example/Cargo.toml"),
             // Ephemeral fixture path, not a real workspace source file.
-            source_path: Some("/tmp/example/src/lib.rs".to_string()),
+            source_path: Some(fixture_display_path("example/src/lib.rs")),
             module_path: Some("crate::example".to_string()),
             impl_kind: Some(ImplKind::Inherent),
             impl_trait: Some("crate::Api".to_string()),
@@ -98,7 +106,7 @@ fn render_graph_export_turtle_escapes_special_characters_and_attributes() {
             target: Some("example".to_string()),
             manifest_path: "C:\\repo\\Cargo.toml".to_string(),
             // Ephemeral fixture path, not a real workspace source file.
-            source_path: Some("/tmp/example/src/lib.rs".to_string()),
+            source_path: Some(fixture_display_path("example/src/lib.rs")),
             module_path: Some("crate::example".to_string()),
             impl_kind: Some(ImplKind::Trait),
             impl_trait: Some("crate::Api".to_string()),

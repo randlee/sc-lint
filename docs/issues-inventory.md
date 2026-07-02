@@ -132,9 +132,11 @@ completed Phase `C` sequence:
 
 Current status:
 
-- package dependency fields such as `allowed_dependencies`,
-  `allowed_dependents`, and `forbidden_edges` already exist in boundary TOML
-  records
-- the current shipped analyzer does not yet enforce those fields
-- `D.1` is the authoritative planning surface for closing that gap without
-  absorbing transitive reachability or broader inventory-parity work
+- `feature/phase-D` now ships direct workspace package-edge enforcement for
+  `allowed_dependencies`, `allowed_dependents`, and `forbidden_edges`
+- the shipped D.1 rule family is:
+  - `SCB-DEPENDENCY-001` for disallowed direct outgoing workspace dependencies
+  - `SCB-DEPENDENCY-002` for disallowed direct incoming workspace dependents
+  - `SCB-DEPENDENCY-003` for explicit forbidden direct workspace edges
+- D.1 remains intentionally scoped to direct current-workspace edges and does
+  not absorb transitive reachability or broader inventory-parity work

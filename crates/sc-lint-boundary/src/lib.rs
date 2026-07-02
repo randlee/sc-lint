@@ -264,6 +264,31 @@ pub struct GraphEdge {
     pub to: NodeId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EdgeKind {
+    Contains,
+    Targets,
+    Implements,
+    Declares,
+    References,
+    ReferencesType,
+    ReferencesExpr,
+}
+
+impl EdgeKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Contains => "contains",
+            Self::Targets => "targets",
+            Self::Implements => "implements",
+            Self::Declares => "declares",
+            Self::References => "references",
+            Self::ReferencesType => "references_type",
+            Self::ReferencesExpr => "references_expr",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ReferenceKind {
     Type,
@@ -271,10 +296,10 @@ enum ReferenceKind {
 }
 
 impl ReferenceKind {
-    fn edge_kind(self) -> &'static str {
+    fn edge_kind(self) -> EdgeKind {
         match self {
-            Self::Type => "references_type",
-            Self::Expr => "references_expr",
+            Self::Type => EdgeKind::ReferencesType,
+            Self::Expr => EdgeKind::ReferencesExpr,
         }
     }
 }
@@ -383,9 +408,9 @@ impl GraphBuilder {
         }
     }
 
-    fn add_edge(&mut self, kind: &'static str, from: impl Into<NodeId>, to: impl Into<NodeId>) {
+    fn add_edge(&mut self, kind: EdgeKind, from: impl Into<NodeId>, to: impl Into<NodeId>) {
         let edge = GraphEdge {
-            kind,
+            kind: kind.as_str(),
             from: from.into(),
             to: to.into(),
         };
@@ -474,11 +499,17 @@ pub fn analyze_workspace(
         }
     })?;
     if options.rule == Some(RuleFilter::Dependencies) {
-        let dependency_report = package_policy::analyze_package_policy(&options.root, &inventory)
-            .map_err(|source| BoundaryError::PackagePolicyAnalysis {
-            root: options.root.clone(),
-            source: source.into(),
+        let metadata = graph::load_metadata(&options.root).map_err(|source| {
+            BoundaryError::PackagePolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
+            }
         })?;
+        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|source| BoundaryError::PackagePolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
+            })?;
         let status = if dependency_report
             .findings
             .iter()
@@ -525,8 +556,14 @@ pub fn analyze_workspace(
         findings.extend(analysis::analyze_named_callers(&graph, &inventory));
     }
     if filter.is_none() {
+        let metadata = graph::load_metadata(&options.root).map_err(|source| {
+            BoundaryError::PackagePolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
+            }
+        })?;
         findings.extend(
-            package_policy::analyze_package_policy(&options.root, &inventory)
+            package_policy::analyze_package_policy(&metadata, &inventory)
                 .map_err(|source| BoundaryError::PackagePolicyAnalysis {
                     root: options.root.clone(),
                     source: source.into(),
