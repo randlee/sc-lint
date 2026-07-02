@@ -11,18 +11,20 @@ All notable changes to sc-lint are documented here.
 - **Portability scope and parity** (`ADR-010`) — `sc-lint-portability` designated shared owner for Windows-path, env-var, and shell portability lint rules
 - **Full Homebrew toolset** — `sc-lint.rb` primary formula installs all four binaries (`sc-lint`, `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`); legacy `sc-lint-boundary.rb` maintained for tap compatibility
 - **QA process hardening** — triage-first dispatch flow; `scripts/find_todos.py` and `scripts/triage_carry_forward.py` added; oxigraph subprocess mocked in tests
+- **Package-level dependency policy enforcement** (`SCB-DEPENDENCY-001/002/003`, closes #73) — boundary TOML `[dependencies]` sections (`allowed_dependencies`, `allowed_dependents`, `forbidden_edges`) are now parsed into validated types (`RawDependenciesSection`, `ForbiddenPackageEdge`, `PackageDependencyPolicy`) at inventory load and mechanically enforced against direct workspace package edges via a new `sc-lint-boundary::package_policy` analyzer and `RuleFilter::Dependencies`; malformed policy records fail inventory loading with actionable `CLI.CONFIG_ERROR` diagnostics
 
 ### Changes
 
 - **Security dependency update** — bumped `anyhow` from `1.0.102` to
   `1.0.103` to clear `RUSTSEC-2026-0190` in the `cargo-deny` advisories gate
-- **Workspace version inheritance** — all seven crates converted from `version = "..."` to `version.workspace = true`; `[workspace.package] version` is the single source of truth
+- **Workspace version inheritance** — all seven crates converted from `version = "..."` to `version.workspace = true`; `[workspace.package] version` is the single source of truth; the three internal `[workspace.dependencies]` path-dependency version pins (`sc-lint-boundary`, `sc-lint-directives`, `sc-lint-schema`) are kept in sync by hand alongside it
 - **Standalone binary dispatch** — `run_delegated_backend()` now resolves tool binaries as a sibling to `current_exe()` with PATH fallback; removes build-time `env!("CARGO_MANIFEST_DIR")` dependency that prevented Homebrew installs from running `sc-lint lint sc-portability` and `sc-lint lint sc-runtime`
 - **Release gate version check** — `scripts/release_gate.sh` now verifies the release version input matches `[workspace.package].version` in `Cargo.toml` via `tomllib`; `gate-and-tag` CI job pins Python 3.11 via `setup-python`
+- **Version consistency regression test** — `crates/sc-lint/src/tests.rs` now asserts every workspace member crate's resolved version matches `[workspace.package].version`, catching an accidental per-crate version override before publish
 
 ### Version
 
-Workspace bumped from `0.3.0` → `0.4.0`.
+Workspace bumped from `0.3.1` (unreleased, last tagged release `v0.3.0`) → `0.4.0`. `[workspace.package].version`, the three pinned internal `[workspace.dependencies]` versions, and `Cargo.lock` are all synchronized at `0.4.0`.
 
 ---
 
