@@ -48,6 +48,7 @@ target: develop
 - `docs/issues-inventory.md`
 - `crates/sc-lint-boundary/src/inventory.rs`
 - `crates/sc-lint-boundary/src/lib.rs`
+- `crates/sc-lint-boundary/src/analysis.rs`
 - `crates/sc-lint-boundary/src/package_policy.rs`
 - `crates/sc-lint-boundary/src/tests.rs`
 - `crates/sc-lint-boundary/src/main.rs`
@@ -64,6 +65,10 @@ silently dropped or partially deferred.
 - boundary TOML dependency policy is parsed into validated package-policy types
   at inventory load rather than flowing through analysis as unconstrained raw
   `String` values
+- one validated dependency-policy container replaces the current raw
+  `DependenciesSection` string vectors in `inventory.rs`; it is constructed in
+  an explicit post-deserialization validation pass before `BoundaryRecord`
+  instances enter any package-policy analysis
 - malformed dependency-policy records fail inventory loading immediately,
   including:
   - malformed `package-a -> package-b` forbidden-edge strings
@@ -76,6 +81,10 @@ silently dropped or partially deferred.
 - `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and `SCB-DEPENDENCY-003` land as
   stable fail-only rules under the existing `boundaries` filter and default
   `analyze_workspace` path
+- `analysis.rs` remains the authoritative crate-wide fail-status classifier:
+  `ScbDependency001`, `ScbDependency002`, and `ScbDependency003` are added to
+  `analysis::finding_is_failure` or one equivalent centralized fail-only
+  classifier that drives `FindingsReport.status`
 - rule semantics are locked for direct workspace-member edges only:
   - `allowed_dependencies` is the complete allowlist of direct outgoing
     workspace package dependencies for the owner package
@@ -116,10 +125,29 @@ forbidden_edges = [
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct WorkspacePackageName(String);
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawDependenciesSection {
+    pub(crate) allowed_dependents: Vec<String>,
+    pub(crate) allowed_dependencies: Vec<String>,
+    pub(crate) forbidden_edges: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct ForbiddenPackageEdge {
     pub(crate) from: WorkspacePackageName,
     pub(crate) to: WorkspacePackageName,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PackageDependencyPolicy {
+    pub(crate) allowed_dependents: BTreeSet<WorkspacePackageName>,
+    pub(crate) allowed_dependencies: BTreeSet<WorkspacePackageName>,
+    pub(crate) forbidden_edges: Vec<ForbiddenPackageEdge>,
+}
+
+impl RawDependenciesSection {
+    pub(crate) fn validate(self, boundary_id: &BoundaryId) -> Result<PackageDependencyPolicy>;
 }
 ```
 
@@ -152,6 +180,30 @@ pub(crate) fn analyze_package_policy(
 ) -> Result<PackagePolicyReport>;
 ```
 
+```rust
+pub(crate) fn finding_is_failure(finding: &Finding) -> bool {
+    matches!(
+        finding.rule_id,
+        RuleId::ScbCycle001
+            | RuleId::ScbBoundary001
+            | RuleId::ScbBoundary002
+            | RuleId::ScbBoundary003
+            | RuleId::ScbCaller001
+            | RuleId::ScbDependency001
+            | RuleId::ScbDependency002
+            | RuleId::ScbDependency003
+            | RuleId::ScbManifest001
+            | RuleId::ScbManifest002
+    )
+}
+
+#[test]
+fn dependency_rule_findings_flip_report_status_to_fail() {
+    // Assert FindingsReport.status == Fail for SCB-DEPENDENCY-001/002/003,
+    // not just that each finding carries the expected rule id.
+}
+```
+
 ## This Sprint Does Not Close
 
 - transitive package reachability analysis; `D.1` is direct-edge enforcement
@@ -169,8 +221,15 @@ pub(crate) fn analyze_package_policy(
 - the sprint doc makes the implementation split explicit before coding starts:
   package dependency policy lands in `package_policy.rs`, not in
   `manifest_policy.rs`
+- `crates/sc-lint-boundary/src/analysis.rs` is an explicit sprint target
+  because the crate-wide fail-status classifier lives there and must be updated
+  when `ScbDependency001`, `ScbDependency002`, and `ScbDependency003` are
+  introduced
 - dependency policy entries are validated once at inventory load and do not
   propagate through rule analysis as unconstrained raw strings
+- the sprint doc names the validated dependency-policy container that replaces
+  the current raw `Vec<String>` dependency fields and states that it is
+  constructed in a post-deserialization validation pass in `inventory.rs`
 - malformed `forbidden_edges` entries fail inventory loading with actionable
   error text that identifies the offending boundary record and edge string
 - `SCB-DEPENDENCY-001` fails when a workspace member directly depends on
@@ -183,6 +242,9 @@ pub(crate) fn analyze_package_policy(
   allowlists
 - `allowed_dependents = []` is treated as “no external workspace package may
   directly depend on this owner package”
+- `FindingsReport.status == Fail` is regression-tested for
+  `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and `SCB-DEPENDENCY-003`, not
+  just the emitted `rule_id` values
 - direct-only scope is explicit and regression-tested: a transitive-only
   workspace path does not produce a package-policy finding
 - non-workspace dependencies are ignored by this rule family and do not produce
