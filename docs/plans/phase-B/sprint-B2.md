@@ -17,10 +17,10 @@ target: integration/phase-B
 
 ## Hard Dependencies
 
-- [docs/phase-B/sprint-B1.md](./sprint-B1.md)
-- [docs/requirements.md](../requirements.md), especially `REQ-PRODUCT-018`
-- [docs/sc-lint-boundary/requirements.md](../sc-lint-boundary/requirements.md), especially `REQ-SCB-006`, `REQ-SCB-007`, and `REQ-SCB-011`
-- [boundaries/sc-lint-boundary/boundary-analyzer.toml](../../boundaries/sc-lint-boundary/boundary-analyzer.toml)
+- [docs/plans/phase-B/sprint-B1.md](./sprint-B1.md)
+- [docs/requirements.md](../../requirements.md), especially `REQ-PRODUCT-018`
+- [docs/sc-lint-boundary/requirements.md](../../sc-lint-boundary/requirements.md), especially `REQ-SCB-006`, `REQ-SCB-007`, and `REQ-SCB-011`
+- [boundaries/sc-lint-boundary/boundary-analyzer.toml](../../../boundaries/sc-lint-boundary/boundary-analyzer.toml)
 - the landed TOML inventory loader and `syn`-backed reference graph in `sc-lint-boundary`
 
 ## Exact Targets
@@ -32,7 +32,7 @@ target: integration/phase-B
 - `crates/sc-lint-boundary/src/tests.rs`
 - `crates/sc-lint-boundary/README.md`
 - `docs/sc-lint-boundary/boundary-enforcement-model.md`
-- `docs/phase-B/phase-B-plan.md`
+- `docs/plans/phase-B/phase-B-plan.md`
 
 ## Deliverables
 

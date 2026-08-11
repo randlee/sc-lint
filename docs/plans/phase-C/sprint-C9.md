@@ -20,11 +20,11 @@ target: integration/phase-C
 ## Hard Dependencies
 
 - GitHub issue `#56` — cross-platform parity enforcement gap
-- [docs/requirements.md](../requirements.md)
-- [docs/architecture.md](../architecture.md)
-- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](../sc-lint/adr/ADR-010-portability-scope-and-parity.md)
-- [docs/phase-C/sprint-C8.md](./sprint-C8.md)
-- [crates/sc-lint-portability/README.md](../../crates/sc-lint-portability/README.md)
+- [docs/requirements.md](../../requirements.md)
+- [docs/architecture.md](../../architecture.md)
+- [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](../../sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- [docs/plans/phase-C/sprint-C8.md](./sprint-C8.md)
+- [crates/sc-lint-portability/README.md](../../../crates/sc-lint-portability/README.md)
 
 ## Exact Targets
 
@@ -33,8 +33,8 @@ target: integration/phase-C
 - `crates/sc-lint-portability/src/source_scan.rs`
 - `crates/sc-lint-portability/src/tests.rs`
 - `crates/sc-lint-portability/README.md`
-- `docs/phase-C/phase-C-plan.md`
-- `docs/phase-C/sprint-C9.md`
+- `docs/plans/phase-C/phase-C-plan.md`
+- `docs/plans/phase-C/sprint-C9.md`
 
 ## Deliverables
 

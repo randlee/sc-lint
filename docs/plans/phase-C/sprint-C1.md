@@ -17,18 +17,18 @@ target: develop
 
 ## Hard Dependencies
 
-- [docs/requirements.md](../requirements.md)
-- [docs/architecture.md](../architecture.md)
-- [docs/project-plan.md](../project-plan.md)
-- [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
-- [docs/sc-lint-version/requirements.md](../sc-lint-version/requirements.md)
+- [docs/requirements.md](../../requirements.md)
+- [docs/architecture.md](../../architecture.md)
+- [docs/project-plan.md](../../project-plan.md)
+- [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](../../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+- [docs/sc-lint-version/requirements.md](../../sc-lint-version/requirements.md)
 
 ## Exact Targets
 
 - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
 - `docs/sc-lint/adr/README.md`
 - `docs/sc-lint-version/requirements.md`
-- `docs/phase-C/phase-C-plan.md`
+- `docs/plans/phase-C/phase-C-plan.md`
 - `docs/sc-lint/crate-architecture.md`
 - `docs/requirements.md`
 - `docs/architecture.md`

@@ -70,7 +70,7 @@ The current parity window is intentionally narrow:
 - `docs/sc-lint/extraction-plan.md`
 - `docs/sc-lint-boundary/boundary-toml-migration.md`
 - `docs/sc-lint-boundary/boundary-enforcement-model.md`
-- `docs/phase-A/foundation-phase-plan.md`
+- `docs/plans/phase-A/foundation-phase-plan.md`
 - `docs/sc-lint/roadmap.md`
 - `docs/project-plan.md`
 
@@ -141,7 +141,7 @@ leave the product in an ambiguous transition state.
 - `docs/sc-lint/extraction-plan.md`
 - `docs/sc-lint-boundary/boundary-toml-migration.md`
 - `docs/sc-lint-boundary/boundary-enforcement-model.md`
-- `docs/phase-A/foundation-phase-plan.md`
+- `docs/plans/phase-A/foundation-phase-plan.md`
 - `docs/project-plan.md`
 - `docs/sc-lint/roadmap.md`
 

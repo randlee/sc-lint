@@ -31,7 +31,7 @@ The planned sprints in this phase are:
   - dedicated operator-visible `dependencies` rule filter separate from both
     source-graph boundary checks and manifest policy
   - stable text/JSON/top-level CLI surfacing through `sc-lint lint sc-boundary`
-  - see [docs/phase-D/sprint-D1.md](./sprint-D1.md)
+  - see [docs/plans/phase-D/sprint-D1.md](./sprint-D1.md)
 
 Additional Phase `D` sprint scope remains intentionally open until `D.1`
 hardens and any remaining boundary-inventory follow-on work is narrow enough to

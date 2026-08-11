@@ -636,10 +636,10 @@ The architecture should not require:
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - phase execution plans
-  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
-  - see [docs/phase-B/phase-B-plan.md](./phase-B/phase-B-plan.md)
-  - see [docs/phase-C/phase-C-plan.md](./phase-C/phase-C-plan.md)
-  - see [docs/phase-D/phase-D-plan.md](./phase-D/phase-D-plan.md)
+  - see [docs/plans/phase-A/foundation-phase-plan.md](./plans/phase-A/foundation-phase-plan.md)
+  - see [docs/plans/phase-B/phase-B-plan.md](./plans/phase-B/phase-B-plan.md)
+  - see [docs/plans/phase-C/phase-C-plan.md](./plans/phase-C/phase-C-plan.md)
+  - see [docs/plans/phase-D/phase-D-plan.md](./plans/phase-D/phase-D-plan.md)
 - CLI-specific architecture
   - see [docs/sc-lint/cli-architecture.md](./sc-lint/cli-architecture.md)
 - CLI-specific contract

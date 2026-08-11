@@ -19,14 +19,14 @@ target: develop
 
 ## Hard Dependencies
 
-- [docs/phase-C/sprint-C1.md](./sprint-C1.md)
-- [docs/sc-lint-version/requirements.md](../sc-lint-version/requirements.md)
-- [docs/sc-lint/interface-reporting-constraints.md](../sc-lint/interface-reporting-constraints.md)
+- [docs/plans/phase-C/sprint-C1.md](./sprint-C1.md)
+- [docs/sc-lint-version/requirements.md](../../sc-lint-version/requirements.md)
+- [docs/sc-lint/interface-reporting-constraints.md](../../sc-lint/interface-reporting-constraints.md)
 
 ## Exact Targets
 
-- `docs/phase-C/phase-C-plan.md`
-- `docs/phase-C/sprint-C2.md`
+- `docs/plans/phase-C/phase-C-plan.md`
+- `docs/plans/phase-C/sprint-C2.md`
 - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
 - `docs/sc-lint-version/requirements.md`
 - `docs/sc-lint/interface-reporting-constraints.md`
@@ -121,7 +121,7 @@ artifacts/baselines/
 - `docs/sc-lint/interface-reporting-constraints.md` requires separate XHTML
   section fragments/panels and built-in copy actions per panel
 - `docs/sc-lint-version/requirements.md`,
-  `docs/phase-C/phase-C-plan.md`, and
+  `docs/plans/phase-C/phase-C-plan.md`, and
   `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
   all state that `sc-lint-version` does not own a feature-local HTML renderer
   and instead consumes a shared reporting layer whose preferred ownership
