@@ -49,6 +49,8 @@ pub struct CliError {
     pub details: Map<String, Value>,
     pub cause: Option<String>,
     pub suggested_action: Option<String>,
+    pub documentation: Option<String>,
+    code_override: Option<&'static str>,
     source: Option<CliErrorSource>,
 }
 
@@ -71,7 +73,8 @@ impl Serialize for CliError {
         let field_count = 3
             + usize::from(!self.details.is_empty())
             + usize::from(self.cause.is_some())
-            + usize::from(self.suggested_action.is_some());
+            + usize::from(self.suggested_action.is_some())
+            + usize::from(self.documentation.is_some());
         let mut state = serializer.serialize_struct("CliError", field_count)?;
         state.serialize_field(consts::FIELD_KIND, &self.kind)?;
         state.serialize_field(consts::FIELD_CODE, self.code())?;
@@ -84,6 +87,9 @@ impl Serialize for CliError {
         }
         if let Some(suggested_action) = self.suggested_action.as_ref() {
             state.serialize_field(consts::FIELD_SUGGESTED_ACTION, suggested_action)?;
+        }
+        if let Some(documentation) = self.documentation.as_ref() {
+            state.serialize_field(consts::FIELD_DOCS, documentation)?;
         }
         state.end()
     }
@@ -135,6 +141,8 @@ impl CliError {
             details: Map::new(),
             cause: None,
             suggested_action: None,
+            documentation: None,
+            code_override: None,
             source: None,
         }
     }
@@ -146,6 +154,16 @@ impl CliError {
 
     pub fn with_suggested_action(mut self, suggested_action: impl Into<String>) -> Self {
         self.suggested_action = Some(suggested_action.into());
+        self
+    }
+
+    pub fn with_documentation(mut self, documentation: impl Into<String>) -> Self {
+        self.documentation = Some(documentation.into());
+        self
+    }
+
+    pub const fn with_code(mut self, code: &'static str) -> Self {
+        self.code_override = Some(code);
         self
     }
 
@@ -183,6 +201,9 @@ impl CliError {
     }
 
     pub const fn code(&self) -> &'static str {
-        self.kind.code()
+        match self.code_override {
+            Some(code) => code,
+            None => self.kind.code(),
+        }
     }
 }

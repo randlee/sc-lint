@@ -1,7 +1,7 @@
 ---
 id: E.1
 title: Compatibility Contract And Version Preflight
-status: planned
+status: implemented
 branch: feature/phase-E1-compatibility-contract
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E1-compatibility-contract
 target: integrate/phase-E
@@ -87,7 +87,7 @@ commands run.
     "code": "CLI.SC_LINT_VERSION_TOO_OLD",
     "message": "installed sc-lint 0.4.0 does not satisfy minimum version 0.4.1",
     "cause": "repository requires a newer sc-lint capability set",
-    "recovery": "run `just setup` to install or upgrade sc-lint",
+    "suggested_action": "run `just setup` to install or upgrade sc-lint",
     "docs": "sc-lint docs setup"
   }
 }

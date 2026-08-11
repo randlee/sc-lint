@@ -59,7 +59,7 @@ pub(crate) fn render_success_human(
             let version = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get(consts::FIELD_CRATE_VERSION))
+                .and_then(|value| value.get(consts::FIELD_VERSION))
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
             format!("sc-lint {version}")
@@ -121,11 +121,37 @@ pub(crate) fn render_success_human(
 
 pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
     let mut rendered = format!("{command_id}: {} ({})", error.message, error.code());
+    for (label, key) in [
+        ("Required version", "minimum_version"),
+        ("Observed version", "installed_version"),
+        ("Reported version", "reported_version"),
+        ("Binary path", "binary_path"),
+        ("Configuration path", "config_path"),
+        ("Required field", "required_field"),
+    ] {
+        if let Some(value) = error.details.get(key) {
+            rendered.push('\n');
+            rendered.push_str(label);
+            rendered.push_str(": ");
+            rendered.push_str(&render_detail_value(value));
+        }
+    }
     if let Some(suggested_action) = error.suggested_action.as_deref() {
         rendered.push('\n');
         rendered.push_str(suggested_action);
     }
+    if let Some(documentation) = error.documentation.as_deref() {
+        rendered.push('\n');
+        rendered.push_str("Docs: ");
+        rendered.push_str(documentation);
+    }
     rendered
+}
+
+fn render_detail_value(value: &Value) -> String {
+    value
+        .as_str()
+        .map_or_else(|| value.to_string(), ToString::to_string)
 }
 
 fn fallback_render_error(command_id: &str, error: &CliError) -> String {

@@ -44,8 +44,22 @@ pub enum Command {
         #[arg(value_enum)]
         target: ClippyTarget,
     },
+    Compatibility {
+        #[command(subcommand)]
+        command: CompatibilityCommand,
+    },
     Version,
     Ci,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum CompatibilityCommand {
+    /// Verify the installed sc-lint binary satisfies sc-lint.toml.
+    Check {
+        /// Binary to probe. Defaults to `sc-lint` resolved from PATH.
+        #[arg(long, value_name = "path")]
+        binary: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ValueEnum)]
