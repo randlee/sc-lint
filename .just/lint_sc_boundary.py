@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -16,6 +17,21 @@ from lint_common import workspace_crate_section_lines
 
 
 def command(repo_root: Path) -> list[str]:
+    if shutil.which("sc-lint-boundary") is None:
+        return [
+            "cargo",
+            "run",
+            "-q",
+            "-p",
+            "sc-lint-boundary",
+            "--",
+            "analyze",
+            "--root",
+            str(repo_root),
+            "--format",
+            "json",
+        ]
+
     return [
         "sc-lint-boundary",
         "analyze",

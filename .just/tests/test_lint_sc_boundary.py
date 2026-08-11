@@ -33,6 +33,27 @@ class LintScBoundaryTests(unittest.TestCase):
                 ],
             )
 
+    @mock.patch("lint_sc_boundary.shutil.which", return_value="/usr/local/bin/sc-lint-boundary")
+    def test_command_uses_installed_boundary_analyzer_for_consumer_repository(
+        self,
+        which_mock: mock.Mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+
+            self.assertEqual(
+                command(repo_root),
+                [
+                    "sc-lint-boundary",
+                    "analyze",
+                    "--root",
+                    str(repo_root),
+                    "--format",
+                    "json",
+                ],
+            )
+            which_mock.assert_called_once_with("sc-lint-boundary")
+
     @mock.patch("lint_sc_boundary.print_report")
     @mock.patch("lint_sc_boundary.build_report")
     @mock.patch("lint_sc_boundary.subprocess.run")
