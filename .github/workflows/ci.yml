@@ -32,10 +32,14 @@ jobs:
         run: cargo install just --locked
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.20.2
 
       - name: Install cargo-shear
-        uses: taiki-e/install-action@cargo-shear
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-shear@1.13.3
 
       - name: Install cargo-binstall
         uses: taiki-e/install-action@cargo-binstall
