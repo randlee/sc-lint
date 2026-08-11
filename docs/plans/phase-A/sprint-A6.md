@@ -68,7 +68,7 @@ item semantics can stabilize independently.
 - `docs/sc-lint-boundary/boundary-toml-migration.md`
 - `docs/sc-lint-boundary/boundary-enforcement-model.md`
 - `docs/sc-lint/extraction-plan.md`
-- `docs/phase-A/foundation-phase-plan.md`
+- `docs/plans/phase-A/foundation-phase-plan.md`
 - `docs/project-plan.md`
 
 ## Sub-Tasks
@@ -153,7 +153,7 @@ normalization through `CommandEnvelope<T>` or `CliError`.
 - `docs/sc-lint-boundary/boundary-toml-migration.md`
 - `docs/sc-lint-boundary/boundary-enforcement-model.md`
 - `docs/sc-lint/extraction-plan.md`
-- `docs/phase-A/foundation-phase-plan.md`
+- `docs/plans/phase-A/foundation-phase-plan.md`
 - `docs/project-plan.md`
 
 ## Risks And Watchouts

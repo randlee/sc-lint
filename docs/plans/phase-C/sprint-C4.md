@@ -19,16 +19,16 @@ target: develop
 
 ## Hard Dependencies
 
-- [docs/phase-C/sprint-C1.md](./sprint-C1.md)
-- [docs/phase-C/sprint-C2.md](./sprint-C2.md)
-- [docs/phase-C/sprint-C3.md](./sprint-C3.md)
-- [docs/sc-lint-version/requirements.md](../sc-lint-version/requirements.md)
-- [docs/sc-lint/skill-authoring-constraints.md](../sc-lint/skill-authoring-constraints.md)
+- [docs/plans/phase-C/sprint-C1.md](./sprint-C1.md)
+- [docs/plans/phase-C/sprint-C2.md](./sprint-C2.md)
+- [docs/plans/phase-C/sprint-C3.md](./sprint-C3.md)
+- [docs/sc-lint-version/requirements.md](../../sc-lint-version/requirements.md)
+- [docs/sc-lint/skill-authoring-constraints.md](../../sc-lint/skill-authoring-constraints.md)
 
 ## Exact Targets
 
-- `docs/phase-C/phase-C-plan.md`
-- `docs/phase-C/sprint-C4.md`
+- `docs/plans/phase-C/phase-C-plan.md`
+- `docs/plans/phase-C/sprint-C4.md`
 - planned authoritative consumer-adoption document:
   - `docs/sc-lint/version-adoption.md`
 - `docs/project-plan.md`

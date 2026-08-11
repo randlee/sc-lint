@@ -467,7 +467,7 @@ The product should support both:
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - Extraction and phase execution requirements
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
-  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
+  - see [docs/plans/phase-A/foundation-phase-plan.md](./plans/phase-A/foundation-phase-plan.md)
 
 ## Phase D Requirements
 
@@ -475,8 +475,8 @@ The current execution phase, Phase `D`, requires:
 
 - delivery of `D.1`, the boundary inventory dependency-policy enforcement
   sprint currently scheduled in:
-  - `docs/phase-D/phase-D-plan.md`
-  - `docs/phase-D/sprint-D1.md`
+  - `docs/plans/phase-D/phase-D-plan.md`
+  - `docs/plans/phase-D/sprint-D1.md`
 - explicit traceability from top-level requirements into the active
   `REQ-SCB-015` through `REQ-SCB-021` dependency-policy scope, including:
   - TOML-backed package dependency policy in boundary inventory records

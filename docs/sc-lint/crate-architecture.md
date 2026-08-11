@@ -127,8 +127,8 @@ their governing docs, boundaries, and planned sprint work.
 Phase `D` extends the existing `sc-lint-boundary` crate through sprint `D.1`.
 
 - authoritative planning docs:
-  - `docs/phase-D/phase-D-plan.md`
-  - `docs/phase-D/sprint-D1.md`
+  - `docs/plans/phase-D/phase-D-plan.md`
+  - `docs/plans/phase-D/sprint-D1.md`
   - `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`
 - current capability:
   - direct workspace package-edge enforcement from canonical boundary TOML
@@ -184,15 +184,15 @@ Phase `D` extends the existing `sc-lint-boundary` crate through sprint `D.1`.
   - planned consumer of a shared `sc-compose`-orbit reporting layer rather
     than owner of a crate-local HTML renderer
 - governing docs:
-  - `docs/phase-C/phase-C-plan.md`
+  - `docs/plans/phase-C/phase-C-plan.md`
   - `docs/sc-lint-version/requirements.md`
   - `docs/sc-lint-version/architecture.md`
   - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
-  - `docs/phase-C/sprint-C1.md`
-  - `docs/phase-C/sprint-C2.md`
-  - `docs/phase-C/sprint-C3.md`
-  - `docs/phase-C/sprint-C4.md`
-  - `docs/phase-C/sprint-C5.md`
+  - `docs/plans/phase-C/sprint-C1.md`
+  - `docs/plans/phase-C/sprint-C2.md`
+  - `docs/plans/phase-C/sprint-C3.md`
+  - `docs/plans/phase-C/sprint-C4.md`
+  - `docs/plans/phase-C/sprint-C5.md`
 - planned governing boundary:
   - `boundaries/sc-lint-version/version-checker.toml`
 - primary Phase C sprints:
@@ -216,12 +216,12 @@ Phase `D` extends the existing `sc-lint-boundary` crate through sprint `D.1`.
 Phase `C` commits `sc-lint-version` as a planned dedicated workspace crate.
 
 - authoritative planning docs:
-  - `docs/phase-C/phase-C-plan.md`
-  - `docs/phase-C/sprint-C1.md`
-  - `docs/phase-C/sprint-C2.md`
-  - `docs/phase-C/sprint-C3.md`
-  - `docs/phase-C/sprint-C4.md`
-  - `docs/phase-C/sprint-C5.md`
+  - `docs/plans/phase-C/phase-C-plan.md`
+  - `docs/plans/phase-C/sprint-C1.md`
+  - `docs/plans/phase-C/sprint-C2.md`
+  - `docs/plans/phase-C/sprint-C3.md`
+  - `docs/plans/phase-C/sprint-C4.md`
+  - `docs/plans/phase-C/sprint-C5.md`
   - `docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md`
 - planned invocation path:
   - `sc-lint check interfaces`
@@ -243,11 +243,11 @@ Phase `C` also extends the existing `sc-lint-portability` crate through the
 planned portability follow-on sprints `C.6` through `C.9`.
 
 - authoritative planning docs:
-  - `docs/phase-C/phase-C-plan.md`
-  - `docs/phase-C/sprint-C6.md`
-  - `docs/phase-C/sprint-C7.md`
-  - `docs/phase-C/sprint-C8.md`
-  - `docs/phase-C/sprint-C9.md`
+  - `docs/plans/phase-C/phase-C-plan.md`
+  - `docs/plans/phase-C/sprint-C6.md`
+  - `docs/plans/phase-C/sprint-C7.md`
+  - `docs/plans/phase-C/sprint-C8.md`
+  - `docs/plans/phase-C/sprint-C9.md`
   - `docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md`
 - planned rule-family additions:
   - `PORT-006` and `PORT-007`
