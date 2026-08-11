@@ -472,8 +472,15 @@ The product should support both:
 - `REQ-PRODUCT-020`
   The supported consumer installation and upgrade path must select a verified
   release artifact for the host platform, verify its checksum before
-  activation, preserve a working installation if replacement fails, and report
-  deterministic recovery guidance.
+  activation, preserve a working installation if replacement or post-install
+  version verification fails, and report deterministic recovery guidance. The
+  product-owned `sc-lint setup` and `sc-lint upgrade [--check] [--dry-run]`
+  commands use the SemVer floor in `[tool.sc-lint].minimum_version`, never
+  downgrade a newer compatible installation, and install only into the managed
+  product location. Consumer repositories use the product-owned
+  `.sc-lint/bootstrap` asset; it delegates `ensure`, `setup`, and `upgrade` to
+  installed `sc-lint` and never copies source-checkout scripts or overwrites a
+  consumer README.
 
 - `REQ-PRODUCT-021`
   Every primary release distribution, including release archives and Homebrew,

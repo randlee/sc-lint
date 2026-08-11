@@ -48,6 +48,21 @@ pub enum Command {
         #[command(subcommand)]
         command: CompatibilityCommand,
     },
+    /// Install or repair the managed sc-lint release required by sc-lint.toml.
+    Setup {
+        /// Report the selected release and install location without changing either.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Inspect or update the managed sc-lint release required by sc-lint.toml.
+    Upgrade {
+        /// Report whether the configured minimum version requires an update.
+        #[arg(long)]
+        check: bool,
+        /// Report the selected release and install location without changing either.
+        #[arg(long)]
+        dry_run: bool,
+    },
     Version,
     Ci,
 }

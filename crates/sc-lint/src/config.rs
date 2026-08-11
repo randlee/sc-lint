@@ -205,6 +205,21 @@ impl LoadedConfig {
 
     #[expect(
         clippy::result_large_err,
+        reason = "The installer shares the established stable CliError contract at the consumer configuration boundary."
+    )]
+    pub(crate) fn compatibility_requirement(&self) -> Result<(&MinimumVersion, &Path), CliError> {
+        match &self.mode {
+            LoadedConfigMode::Compatibility(requirement) => {
+                Ok((&requirement.minimum_version, &requirement.config_path))
+            }
+            LoadedConfigMode::Standard => Err(CliError::internal(
+                "installation commands require a loaded consumer compatibility configuration",
+            )),
+        }
+    }
+
+    #[expect(
+        clippy::result_large_err,
         reason = "Compatibility configuration errors are deliberately surfaced through CliError."
     )]
     fn load_compatibility(cli: &Cli) -> Result<Self, CliError> {

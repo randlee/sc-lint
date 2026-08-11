@@ -283,6 +283,26 @@ specialized backend tools and mixed Rust/Python implementations.
   the configured minimum version, observed version, binary path, and
   configuration path.
 
+- `REQ-CLI-019`
+  `sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]` must
+  load the canonical consumer SemVer floor, select the matching host release,
+  verify `checksums.txt` before activation, and atomically replace only the
+  managed product binary. A current or newer compatible installation is a
+  no-op. Failed activation or post-install verification must retain the last
+  working managed binary.
+
+- `REQ-CLI-020`
+  Installer failures must retain the standard `CliError` envelope and stable
+  codes for unsupported platform, unavailable release, checksum mismatch,
+  permission failure, and failed post-install version verification. Each must
+  identify a cause, recovery action, and `sc-lint docs installation` reference.
+
+- `REQ-CLI-021`
+  The product bootstrap asset must expose only `ensure`, `setup`, and
+  `upgrade`, require an explicit `--config sc-lint.toml`, and delegate to the
+  installed `sc-lint` command. E.3 owns rendering this asset into consumer
+  repositories and the generated Justfile contract.
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:
