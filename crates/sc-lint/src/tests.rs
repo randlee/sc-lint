@@ -233,6 +233,8 @@ fn compatibility_check_uses_semver_not_lexical_comparison() {
             config_path.to_str().expect("config path"),
             "compatibility",
             "check",
+            "--binary",
+            backend.path().to_str().expect("mock binary path"),
         ]);
         let context = CommandContext::from_cli(&cli).expect("compatibility context");
         let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
@@ -261,7 +263,7 @@ fn compatibility_check_reports_malformed_installed_version_in_human_and_json_for
         "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n",
     )
     .expect("compatibility config");
-    let _backend = MockBackend::install(
+    let backend = MockBackend::install(
         "sc-lint",
         &json!({
             "ok": true,
@@ -281,6 +283,8 @@ fn compatibility_check_reports_malformed_installed_version_in_human_and_json_for
         config_path.to_str().expect("config path"),
         "compatibility",
         "check",
+        "--binary",
+        backend.path().to_str().expect("mock binary path"),
     ]);
     let context = CommandContext::from_cli(&cli).expect("compatibility context");
     let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
@@ -1319,6 +1323,7 @@ homepage = "https://example.invalid/sc-lint"
 
 struct MockBackend {
     _tempdir: TempDir,
+    executable: PathBuf,
     original_path: Option<OsString>,
 }
 
@@ -1357,8 +1362,13 @@ impl MockBackend {
 
         Self {
             _tempdir: tempdir,
+            executable: script_path,
             original_path,
         }
+    }
+
+    fn path(&self) -> &Path {
+        &self.executable
     }
 }
 
