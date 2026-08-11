@@ -17,12 +17,7 @@ from lint_common import workspace_crate_section_lines
 
 def command(repo_root: Path) -> list[str]:
     return [
-        "cargo",
-        "run",
-        "-q",
-        "-p",
         "sc-lint-boundary",
-        "--",
         "analyze",
         "--root",
         str(repo_root),

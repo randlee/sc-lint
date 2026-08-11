@@ -24,12 +24,7 @@ class LintScBoundaryTests(unittest.TestCase):
             self.assertEqual(
                 cmd,
                 [
-                    "cargo",
-                    "run",
-                    "-q",
-                    "-p",
                     "sc-lint-boundary",
-                    "--",
                     "analyze",
                     "--root",
                     str(repo_root),
