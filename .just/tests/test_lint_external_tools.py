@@ -26,17 +26,33 @@ CORE_PACKAGE = "synthetic-lib"
 
 
 class ExternalLintToolTests(unittest.TestCase):
-    def test_build_cargo_deny_command_targets_workspace_manifest(self) -> None:
+    def test_build_cargo_deny_command_uses_pre_020_option_position(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            config_path = repo_root / "deny.runtime.toml"
+            config_path = Path(tempdir) / "deny.runtime.toml"
             self.assertEqual(
-                build_cargo_deny_command(repo_root, config_path),
+                build_cargo_deny_command(config_path, (0, 19)),
                 [
                     "cargo-deny",
                     "check",
                     "--config",
                     str(config_path),
+                    "advisories",
+                    "bans",
+                    "licenses",
+                    "sources",
+                ],
+            )
+
+    def test_build_cargo_deny_command_uses_020_global_option_position(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            config_path = Path(tempdir) / "deny.runtime.toml"
+            self.assertEqual(
+                build_cargo_deny_command(config_path, (0, 20)),
+                [
+                    "cargo-deny",
+                    "--config",
+                    str(config_path),
+                    "check",
                     "advisories",
                     "bans",
                     "licenses",
