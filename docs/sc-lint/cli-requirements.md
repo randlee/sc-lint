@@ -263,6 +263,25 @@ specialized backend tools and mixed Rust/Python implementations.
   `xwin`-backed preflight must not be part of the `ci` lint profile because
   the product relies on real Windows CI runners for authoritative validation.
 
+- `REQ-CLI-016`
+  `sc-lint compatibility check` must load exactly
+  `[tool.sc-lint].minimum_version` from `sc-lint.toml` (or an explicit
+  `--config` file), parse it into a validated SemVer boundary type, and compare
+  the installed `sc-lint --json version` result semantically. It must not
+  require a Cargo workspace or run lint/test work.
+
+- `REQ-CLI-017`
+  `sc-lint --json version` and `sc-lint --version --json` must emit the stable
+  `sc-lint-version-v1` probe with `tool`, SemVer `version`, and `status` fields
+  without initializing repository logging or report output.
+
+- `REQ-CLI-018`
+  Compatibility failures must use stable error codes and include a cause,
+  `just setup`/installer recovery guidance, and the `sc-lint docs setup`
+  reference. When available, the JSON details and human message must identify
+  the configured minimum version, observed version, binary path, and
+  configuration path.
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:

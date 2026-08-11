@@ -644,6 +644,7 @@ dependencies = [
  "sc-lint-boundary",
  "sc-lint-schema",
  "sc-observability",
+ "semver",
  "serde",
  "serde_json",
  "serial_test",

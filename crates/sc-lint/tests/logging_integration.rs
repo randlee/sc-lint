@@ -16,21 +16,6 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     let repo_root = fixture.root();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
 
-    let version = sc_lint_command(binary, repo_root)
-        .args([
-            "--json",
-            "--log-root",
-            temp_root.to_str().expect("utf-8 temp path"),
-            "version",
-        ])
-        .output()
-        .expect("version command runs");
-    assert!(
-        version.status.success(),
-        "version stderr: {}",
-        String::from_utf8_lossy(&version.stderr)
-    );
-
     let dispatch = sc_lint_command(binary, repo_root)
         .args([
             "--json",
@@ -101,6 +86,34 @@ fn logger_bootstrap_writes_entry_completion_dispatch_and_error_records() {
     assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.started");
     assert_log_file_contains_action(&runtime_log_path, "cli.dispatch.normalized");
     assert_log_file_contains_elapsed_ms(&runtime_log_path);
+}
+
+#[test]
+fn version_probe_runs_outside_a_workspace_without_creating_logs() {
+    let consumer_dir = TempDir::new().expect("consumer dir");
+    let log_root = consumer_dir.path().join("logs");
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+
+    let output = sc_lint_command(binary, consumer_dir.path())
+        .args([
+            "--json",
+            "--log-root",
+            log_root.to_str().expect("utf-8 temp path"),
+            "version",
+        ])
+        .output()
+        .expect("version probe runs");
+
+    assert!(
+        output.status.success(),
+        "version stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let rendered: Value = serde_json::from_slice(&output.stdout).expect("version JSON");
+    assert_eq!(rendered["command"], "version");
+    assert_eq!(rendered["data"]["tool"], "sc-lint");
+    assert_eq!(rendered["data"]["contract_schema"], "sc-lint-version-v1");
+    assert!(!log_root.exists(), "version probe must not initialize logs");
 }
 
 #[test]

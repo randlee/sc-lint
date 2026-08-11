@@ -1,5 +1,6 @@
 use serde_json::Value;
 use serde_json::json;
+use std::path::Path;
 
 use crate::Cli;
 use crate::CliError;
@@ -63,6 +64,7 @@ pub(crate) enum CommandId {
     CheckXwin,
     ClippyNative,
     ClippyXwin,
+    CompatibilityCheck,
     LintCi,
     LintFast,
     LintFull,
@@ -101,6 +103,9 @@ impl CommandId {
                 crate::ClippyTarget::Native => Self::ClippyNative,
                 crate::ClippyTarget::Xwin => Self::ClippyXwin,
             },
+            Command::Compatibility { command } => match command {
+                crate::CompatibilityCommand::Check { .. } => Self::CompatibilityCheck,
+            },
             Command::Version => Self::Version,
             Command::Ci => Self::Ci,
         }
@@ -113,6 +118,7 @@ impl CommandId {
             Self::CheckXwin => "check.xwin",
             Self::ClippyNative => "clippy.native",
             Self::ClippyXwin => "clippy.xwin",
+            Self::CompatibilityCheck => "compatibility.check",
             Self::LintCi => "lint.ci",
             Self::LintFast => "lint.fast",
             Self::LintFull => "lint.full",
@@ -137,6 +143,7 @@ impl CommandId {
             | Self::CheckXwin
             | Self::ClippyNative
             | Self::ClippyXwin
+            | Self::CompatibilityCheck
             | Self::LintCi
             | Self::LintFast
             | Self::LintFull
@@ -153,6 +160,7 @@ impl CommandId {
             Self::Ci => "top-level ci orchestration path",
             Self::CheckNative | Self::CheckXwin => "preflight execution path",
             Self::ClippyNative | Self::ClippyXwin => "clippy execution path",
+            Self::CompatibilityCheck => "installed sc-lint compatibility preflight",
             Self::LintCi | Self::LintFast | Self::LintFull => "lint profile orchestration path",
             Self::LintIdentityLiterals => "python-backed identity literal lint path",
             Self::LintLineCounts => "python-backed line-count lint path",
@@ -166,7 +174,7 @@ impl CommandId {
     }
 
     pub const fn requires_repo_root(self) -> bool {
-        !matches!(self, Self::Version)
+        !matches!(self, Self::Version | Self::CompatibilityCheck)
     }
 
     pub const fn dispatch_tool(self) -> Option<&'static str> {
@@ -206,6 +214,7 @@ pub struct CommandContext {
     service_name: ServiceName,
     summary: &'static str,
     requires_repo_root: bool,
+    compatibility_binary: Option<std::path::PathBuf>,
 }
 
 impl CommandContext {
@@ -219,9 +228,17 @@ impl CommandContext {
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
-        let command_id = match (&cli.command, cli.version) {
-            (Some(command), false) => CommandId::from_cli_command(command),
-            (None, true) => CommandId::Version,
+        let (command_id, compatibility_binary) = match (&cli.command, cli.version) {
+            (Some(command), false) => {
+                let compatibility_binary = match command {
+                    Command::Compatibility {
+                        command: crate::CompatibilityCommand::Check { binary },
+                    } => binary.clone(),
+                    _ => None,
+                };
+                (CommandId::from_cli_command(command), compatibility_binary)
+            }
+            (None, true) => (CommandId::Version, None),
             (Some(_), true) => {
                 return Err(CliError::usage(
                     "`--version` cannot be combined with a subcommand",
@@ -245,6 +262,7 @@ impl CommandContext {
             service_name,
             summary: command_id.summary(),
             requires_repo_root: command_id.requires_repo_root(),
+            compatibility_binary,
         })
     }
 
@@ -266,6 +284,18 @@ impl CommandContext {
 
     pub(crate) const fn requires_repo_root(&self) -> bool {
         self.requires_repo_root
+    }
+
+    pub(crate) const fn requires_compatibility_config(&self) -> bool {
+        matches!(self.command_id, CommandId::CompatibilityCheck)
+    }
+
+    pub(crate) fn compatibility_binary(&self) -> Option<&Path> {
+        self.compatibility_binary.as_deref()
+    }
+
+    pub const fn is_version_probe(&self) -> bool {
+        matches!(self.command_id, CommandId::Version)
     }
 
     pub fn dispatch_tool(&self) -> Option<&'static str> {
@@ -299,11 +329,14 @@ pub(crate) fn execute(
 ) -> Result<CommandSuccess, CliError> {
     match context.id() {
         CommandId::Version => Ok(CommandSuccess::direct(json!({
-            consts::FIELD_CRATE_NAME: consts::SERVICE_NAME,
-            consts::FIELD_CRATE_VERSION: env!("CARGO_PKG_VERSION"),
-            "contract_schema": "v1",
-            consts::FIELD_STATUS: "dispatch_ready",
+            consts::FIELD_TOOL: consts::SERVICE_NAME,
+            consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
+            "contract_schema": "sc-lint-version-v1",
+            consts::FIELD_STATUS: "pass",
         }))),
+        CommandId::CompatibilityCheck => Ok(CommandSuccess::direct(
+            loaded_config.evaluate_compatibility(context.compatibility_binary())?,
+        )),
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),

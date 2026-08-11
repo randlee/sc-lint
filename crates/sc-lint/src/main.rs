@@ -43,6 +43,13 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
                 .write(error.exit_code());
         }
     };
+    // The version probe is deliberately usable from fresh consumer checkouts.
+    // Do not initialize observability here: its output is a stable, standalone
+    // machine contract and must not create repository report or log files.
+    if context.is_version_probe() {
+        let outcome = sc_lint::ExecutionOutcome::run(context, &loaded_config, cli.json);
+        return outcome.rendered.write(outcome.exit_code);
+    }
     let observed = logging::ObservedCommand::from_context(&context, &loaded_config);
     let logger = match logging::initialize_logger(&observed, &cli) {
         Ok(logger) => logger,

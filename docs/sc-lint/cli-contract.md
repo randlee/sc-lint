@@ -89,6 +89,8 @@ Initial convention:
   - `version`
 - `sc-lint --version`
   - `version`
+- `sc-lint compatibility check`
+  - `compatibility.check`
 
 When parsing fails before a concrete command path is resolved, the CLI uses the
 fallback identifier:
@@ -103,6 +105,9 @@ Current implementation status:
 
 - `version`
   - direct CLI-owned success path
+- `compatibility.check`
+  - implemented consumer installation preflight; it uses only the canonical
+    `sc-lint.toml` requirement and the installed binary's version probe
 - `lint.sc-boundary`
   - first real backend-normalized success path
 - `lint.fast`
@@ -210,8 +215,9 @@ Illustrative shape:
 - `cause`
 - `details`
 - `suggested_action`
+- `docs`
 
-`cause`, `details`, and `suggested_action` may be omitted when they do not
+`cause`, `details`, `suggested_action`, and `docs` may be omitted when they do not
 apply, but the machine-readable failure family must remain stable.
 
 ## Error Kinds
@@ -260,9 +266,51 @@ the same matrix before code lands:
 | `clippy` | `clippy.<target>` | lint-runner backend | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `version` | `version` | top-level CLI crate | `usage`, `internal` |
+| `compatibility check` | `compatibility.check` | compatibility preflight | `config`, `capability`, `internal` |
 
 This matrix exists to prevent each command family from inventing its own
 response or error pattern at implementation time.
+
+## Compatibility And Version-Probe Contract
+
+The only consumer minimum-version location is:
+
+```toml
+[tool.sc-lint]
+minimum_version = "0.4.1"
+```
+
+`sc-lint --json version` is intentionally independent of a source checkout and
+emits this payload under the standard success envelope's `data` field:
+
+```json
+{
+  "tool": "sc-lint",
+  "version": "0.4.1",
+  "contract_schema": "sc-lint-version-v1",
+  "status": "pass"
+}
+```
+
+`sc-lint compatibility check` loads the requirement once and runs
+`sc-lint --json version` against the PATH installation (or `--binary <path>`).
+It performs no lint or test work. Its success data identifies
+`minimum_version`, `installed_version`, `binary_path`, and `config_path`.
+
+The preflight failure codes are stable:
+
+| Code | Recovery condition |
+| --- | --- |
+| `CLI.SC_LINT_CONFIG_MISSING` | Create or select canonical `sc-lint.toml`. |
+| `CLI.SC_LINT_CONFIG_MALFORMED` | Repair `[tool.sc-lint].minimum_version`. |
+| `CLI.SC_LINT_BINARY_NOT_FOUND` | Run `just setup` or the product installer. |
+| `CLI.SC_LINT_BINARY_EXECUTION_FAILED` | Repair the selected installation, then rerun setup. |
+| `CLI.SC_LINT_VERSION_UNPARSABLE` | Install a release implementing `sc-lint-version-v1`. |
+| `CLI.SC_LINT_VERSION_TOO_OLD` | Run `just setup` to install or upgrade the required version. |
+
+Every one of these errors includes `cause`, `suggested_action`, and
+`docs: "sc-lint docs setup"`; its details include the required version and
+available observed version/path.
 
 ## Backend-to-CLI Normalization
 

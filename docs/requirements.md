@@ -457,12 +457,17 @@ The product should support both:
 ### Phase E consumer adoption and distribution
 
 - `REQ-PRODUCT-019`
-  A consumer repository must be able to declare a minimum compatible
-  `sc-lint` version and invoke product-owned setup, complete lint, complete
-  test, and upgrade entry points without choosing a Cargo package or copying
-  source-repository orchestration. An absent, malformed, or incompatible
-  installation must stop work with a stable recovery diagnostic before lint or
-  test execution begins.
+  A consumer repository must declare its one tracked minimum compatible
+  `sc-lint` version only at `[tool.sc-lint].minimum_version` in
+  `sc-lint.toml`. The product must parse that field once as SemVer and compare
+  versions semantically, never lexically. It must provide a stable,
+  non-repository `sc-lint --json version` probe and a compatibility preflight
+  before consumer work begins. Missing/malformed configuration, unavailable or
+  non-executable binaries, invalid probes, and insufficient versions must stop
+  work with a structured stable code, cause, recovery action, and documentation
+  reference. Consumers must be able to invoke product-owned setup, complete
+  lint, complete test, and upgrade entry points without choosing a Cargo
+  package or copying source-repository orchestration.
 
 - `REQ-PRODUCT-020`
   The supported consumer installation and upgrade path must select a verified

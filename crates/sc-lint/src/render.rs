@@ -59,7 +59,7 @@ pub(crate) fn render_success_human(
             let version = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get(consts::FIELD_CRATE_VERSION))
+                .and_then(|value| value.get(consts::FIELD_VERSION))
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
             format!("sc-lint {version}")
@@ -124,6 +124,11 @@ pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
     if let Some(suggested_action) = error.suggested_action.as_deref() {
         rendered.push('\n');
         rendered.push_str(suggested_action);
+    }
+    if let Some(documentation) = error.documentation.as_deref() {
+        rendered.push('\n');
+        rendered.push_str("Docs: ");
+        rendered.push_str(documentation);
     }
     rendered
 }
