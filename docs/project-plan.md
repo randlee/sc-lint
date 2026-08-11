@@ -60,6 +60,7 @@ The project focus is:
   - see [docs/plans/phase-B/phase-B-plan.md](./plans/phase-B/phase-B-plan.md)
   - see [docs/plans/phase-C/phase-C-plan.md](./plans/phase-C/phase-C-plan.md)
   - see [docs/plans/phase-D/phase-D-plan.md](./plans/phase-D/phase-D-plan.md)
+  - see [docs/phase-E/phase-E-plan.md](./phase-E/phase-E-plan.md)
   - see [docs/plans/phase-A/sprint-A1a.md](./plans/phase-A/sprint-A1a.md)
   - see [docs/plans/phase-A/sprint-A1b.md](./plans/phase-A/sprint-A1b.md)
   - see [docs/plans/phase-A/sprint-A2.md](./plans/phase-A/sprint-A2.md)
@@ -316,6 +317,17 @@ Phase `D` is the current planning and hardening line, beginning with `D.1`.
 It covers boundary inventory dependency-policy enforcement and the remaining
 requirements/architecture hardening needed to keep the active planning surface
 aligned with the structured boundary roadmap.
+
+Phase `E` is the planned follow-on consumer-adoption and distributed-
+documentation line after Phase D. Its authoritative plan is
+[docs/phase-E/phase-E-plan.md](./phase-E/phase-E-plan.md). Exact initial
+targets are:
+
+- E.1: `sc-lint.toml` compatibility configuration, stable preflight command,
+  typed recovery diagnostics, and the associated product/CLI requirements.
+- E.7: the root `Justfile`, root `sc-lint.toml`, CI/release integration,
+  consumer fixtures, `AGENTS.md`, root `README.md`, and installed docs that
+  make this repository the executable reference consumer.
 
 ## Planning Conventions
 
