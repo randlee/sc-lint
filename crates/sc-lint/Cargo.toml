@@ -20,6 +20,7 @@ path = "src/lib.rs"
 
 [dependencies]
 clap.workspace = true
+dirs.workspace = true
 dunce = "1"
 sc-observability.workspace = true
 sc-lint-boundary.workspace = true

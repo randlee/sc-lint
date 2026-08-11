@@ -196,32 +196,26 @@ fn managed_install_dir() -> Result<PathBuf, CliError> {
     if let Some(path) = env::var_os(INSTALL_DIR_ENV) {
         return Ok(PathBuf::from(path));
     }
-    if let Some(data_home) = env::var_os("XDG_DATA_HOME") {
-        return Ok(PathBuf::from(data_home).join("sc-lint").join("bin"));
+    // `dirs` resolves XDG data directories on Unix and LocalAppData on Windows
+    // without coupling this product boundary to platform-specific environment keys.
+    if let Some(data_dir) = dirs::data_dir() {
+        return Ok(data_dir.join("sc-lint").join("bin"));
     }
-    #[cfg(windows)]
-    {
-        if let Some(app_data) = env::var_os("LOCALAPPDATA") {
-            return Ok(PathBuf::from(app_data).join("sc-lint").join("bin"));
-        }
-    }
-    env::var_os("HOME").map_or_else(
-        || {
-            Err(install_error(
-                InstallerErrorCode::PermissionDenied,
-                "could not determine a managed sc-lint install directory",
-                "Neither SC_LINT_INSTALL_DIR, XDG_DATA_HOME, nor HOME was available.",
-                "Set SC_LINT_INSTALL_DIR to a writable directory and rerun `sc-lint setup`.",
-            ))
-        },
-        |home| {
-            Ok(PathBuf::from(home)
-                .join(".local")
+    dirs::home_dir()
+        .map(|home| {
+            home.join(".local")
                 .join("share")
                 .join("sc-lint")
-                .join("bin"))
-        },
-    )
+                .join("bin")
+        })
+        .ok_or_else(|| {
+            install_error(
+                InstallerErrorCode::PermissionDenied,
+                "could not determine a managed sc-lint install directory",
+                "Neither SC_LINT_INSTALL_DIR nor a platform data or home directory was available.",
+                "Set SC_LINT_INSTALL_DIR to a writable directory and rerun `sc-lint setup`.",
+            )
+        })
 }
 
 fn release_url(version: &MinimumVersion, filename: &str) -> String {
@@ -399,18 +393,19 @@ fn sha256(path: &Path) -> Result<String, CliError> {
     } else {
         ("sha256sum", Vec::new())
     };
-    let output = Command::new(program)
-        .args(args)
-        .arg(path)
-        .output()
-        .map_err(|error| {
-            install_error(
-                InstallerErrorCode::ReleaseUnavailable,
-                format!("could not start `{program}` to verify the release checksum"),
-                error.to_string(),
-                "Install a SHA-256 utility and rerun `sc-lint setup`.",
-            )
-        })?;
+    let mut command = Command::new(program);
+    command.args(args).arg(path);
+    if cfg!(windows) {
+        command.arg("SHA256");
+    }
+    let output = command.output().map_err(|error| {
+        install_error(
+            InstallerErrorCode::ReleaseUnavailable,
+            format!("could not start `{program}` to verify the release checksum"),
+            error.to_string(),
+            "Install a SHA-256 utility and rerun `sc-lint setup`.",
+        )
+    })?;
     if !output.status.success() {
         return Err(install_error(
             InstallerErrorCode::ReleaseUnavailable,
@@ -608,6 +603,7 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use std::io::Write;
+    #[cfg(unix)]
     use std::str::FromStr;
 
     use tempfile::TempDir;
