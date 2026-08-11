@@ -454,6 +454,36 @@ The product should support both:
   boundary metadata. Detailed schema and inventory-loading behavior for that
   feature lives in [docs/sc-lint-boundary/requirements.md](./sc-lint-boundary/requirements.md).
 
+### Phase E consumer adoption and distribution
+
+- `REQ-PRODUCT-019`
+  A consumer repository must be able to declare a minimum compatible
+  `sc-lint` version and invoke product-owned setup, complete lint, complete
+  test, and upgrade entry points without choosing a Cargo package or copying
+  source-repository orchestration. An absent, malformed, or incompatible
+  installation must stop work with a stable recovery diagnostic before lint or
+  test execution begins.
+
+- `REQ-PRODUCT-020`
+  The supported consumer installation and upgrade path must select a verified
+  release artifact for the host platform, verify its checksum before
+  activation, preserve a working installation if replacement fails, and report
+  deterministic recovery guidance.
+
+- `REQ-PRODUCT-021`
+  Every primary release distribution, including release archives and Homebrew,
+  must install a version-matched offline documentation bundle containing the
+  overview, canonical Just guide, and one guide per published package. The
+  installed help/docs surface must discover those files without a source
+  checkout or network access.
+
+- `REQ-PRODUCT-022`
+  The project must provide a versioned reusable GitHub Action that obtains a
+  verified release artifact and enforces the same consumer compatibility,
+  setup, lint, and test contract as local installation. Its inputs, outputs,
+  pinning guidance, and recoverable failure behavior must be specified in the
+  Action requirements and architecture records before Action release.
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements

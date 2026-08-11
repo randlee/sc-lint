@@ -34,7 +34,7 @@ for the recommended `just` setup.
 - root documentation source, operator guides, and package guide sources
 - `crates/sc-lint/src/cli.rs`, `command.rs`, `lib.rs`, and tests as required
   for `docs`/help discovery
-- `docs/requirements.md`
+- `docs/requirements.md` (`REQ-PRODUCT-021`)
 - `docs/sc-lint/cli-requirements.md`
 - `README.md` and `docs/sc-lint/README.md` indexes
 - `docs/phase-E/sprint-E4.md`
@@ -108,7 +108,7 @@ written to a consumer repository root.
   synchronized or are generated from one source.
 - operator-manual coverage test fails if any mandatory guide is missing, or if
   a stable installation/compatibility error lacks a troubleshooting entry.
-- requirements and CLI requirements explicitly require installed
+- `REQ-PRODUCT-021` and CLI requirements explicitly require installed
   documentation, the operator manual, package-guide completeness, and
   offline help discovery.
 

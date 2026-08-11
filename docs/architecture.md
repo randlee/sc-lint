@@ -510,6 +510,17 @@ Architecture consequences:
   explicitly documented as a legacy compatibility surface rather than the
   normal user install path
 
+Phase E adds two release-distribution consumers to that same manifest-led
+model: the installed documentation bundle and a reusable GitHub Action. The
+Action must resolve only verified release artifacts, expose the resulting
+binary/documentation locations, and invoke the same compatibility and command
+contract as local installation. It must not use `cargo run`, a source checkout,
+or an analyzer package name as a fallback. This architecture realizes
+`REQ-PRODUCT-022`; E.6 will record the detailed Action contract in
+`docs/sc-lint/github-action-requirements.md` and publish an ADR only if the
+Action introduces a distribution decision not covered by this manifest-led
+model.
+
 ## Consumer-Proven Rule Promotion
 
 `sc-lint` should treat some rule families as consumer-proven first and

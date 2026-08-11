@@ -42,6 +42,19 @@ its documentation and exposes it from its help menu.
   version concept, but no documented machine contract is available for a
   bootstrapper to compare against a repository requirement
 
+## Relationship To Parked PR #87
+
+PR #87 is not a Phase E dependency or an acceptance oracle. Its cargo-deny CI
+repair proceeds separately as PR #92. Its source-versus-consumer Python-runner
+rework is parked, has no committed timeline, and is superseded by E.3's
+explicit product-owned bootstrap and installed `sc-lint` command contract.
+Phase E must neither merge nor copy that runner rework.
+
+The historical failure is retained only as an in-repo consumer-fixture case:
+an absent installed `sc-lint` must produce the E.1 structured recovery result,
+not an executable-launch exception. E.7 defines and verifies that case without
+depending on any external pull request.
+
 ## Product Decisions Locked By This Phase
 
 ### Consumer configuration
@@ -89,11 +102,21 @@ must never become an uncaught Python traceback.
 ### Requirements and architecture records
 
 Phase E changes product behavior rather than only implementation detail. E.1
-must add the normative product/CLI requirements for version compatibility and
-structured recovery. E.3 must add an ADR for the consumer adoption/Just
-contract and update the product and CLI architecture documents. E.4 must add
-the documentation/discoverability requirements. No implementation sprint may
-close before its assigned requirements and ADR/documentation updates land.
+must implement `REQ-PRODUCT-019` for version compatibility and structured
+recovery. E.2 must implement `REQ-PRODUCT-020` for safe installation and
+upgrade. E.3 must add an ADR for the consumer adoption/Just contract and
+update the product and CLI architecture documents. E.4/E.5 must implement
+`REQ-PRODUCT-021` for installed documentation/discovery and release delivery.
+E.6 must implement `REQ-PRODUCT-022` for the reusable GitHub Action. No
+implementation sprint may close before its assigned requirements and
+ADR/documentation updates land.
+
+| Requirement | Authorized scope | Owning sprint(s) | Closure evidence |
+| --- | --- | --- | --- |
+| `REQ-PRODUCT-019` | minimum-version configuration, compatibility preflight, and complete consumer Just entry points | E.1, E.3, E.7 | CLI contract, ADR-012, generated-template and root-model fixtures |
+| `REQ-PRODUCT-020` | checksum-verified installation, atomic replacement, and recoverable upgrade | E.2, E.7 | installer rollback/version tests and upgrade fixture lane |
+| `REQ-PRODUCT-021` | offline documentation bundle, help discovery, release archive, and Homebrew layout | E.4, E.5, E.7 | bundle manifest/link validation and staged archive/Homebrew tests |
+| `REQ-PRODUCT-022` | versioned reusable GitHub Action over verified release artifacts | E.6, E.7 | Action requirements, metadata validation, and cross-platform Action fixtures |
 
 ## Phase Entry Criteria
 

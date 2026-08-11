@@ -19,6 +19,14 @@ knowledge.
 
 - [Phase E plan](./phase-E-plan.md)
 
+## Relationship To Parked PR #87
+
+E.3 supersedes the parked Python source-versus-consumer runner rework in
+PR #87. It neither depends on that PR nor permits copying its runner changes.
+The separate cargo-deny CI repair is outside this sprint. E.3 closes the
+consumer path only through the explicit product-owned bootstrap and installed
+`sc-lint` contract defined here.
+
 ## Hard Dependencies
 
 - [Sprint E.1](./sprint-E1.md) compatibility preflight contract
@@ -64,8 +72,9 @@ knowledge.
   templates/command selection, never guessed from file paths.
 - remove consumer reliance on `cargo run -p sc-lint-boundary`, copied Python
   runner scripts, and the `crates/sc-lint-boundary/Cargo.toml` mode heuristic.
-- a missing backend or external tool returns the shared structured diagnostic,
-  including install/recovery guidance, rather than an exception/traceback.
+- a missing installed `sc-lint` or required backend returns the E.1 shared
+  structured recovery diagnostic, including install/recovery guidance, rather
+  than an exception or traceback.
 - ADR-012 records the durable consumer contract: Just is a thin interface,
   public recipes always preflight the tracked floor, installed `sc-lint` owns
   consumer orchestration, source and consumer modes are explicit, and product

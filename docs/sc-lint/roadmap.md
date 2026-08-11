@@ -181,6 +181,19 @@ Initial Phase-C scope is:
   - `sc-observability` `1.1.0` adoption, retained-log policy decision, and
     `emit` -> `log` / `try_log` migration
 
+### Phase E
+
+Phase `E` is planned after the current Phase D line and governs consumer
+adoption plus distributed documentation. See
+[docs/phase-E/phase-E-plan.md](../phase-E/phase-E-plan.md). Its exact initial
+targets are:
+
+- E.1: `sc-lint.toml` minimum-version configuration, stable compatibility
+  preflight, and structured recovery diagnostics.
+- E.7: root `Justfile`/`sc-lint.toml`, CI and release/Action integration,
+  cross-platform consumer fixtures, `AGENTS.md`, root `README.md`, and
+  installed documentation as the maintained executable reference model.
+
 ### Current code moves required
 
 The current implementation now places the shared portability rule family in

@@ -95,8 +95,11 @@ upgrade:
 - the root Justfile passes a golden-template parity test against the canonical
   Just document and an end-to-end `sc-lint init --just` consumer fixture;
   drift is a failing gate, not a documentation-only observation.
-- the PR #87 missing-installed-analyzer case emits a controlled failure rather
-  than `FileNotFoundError`.
+- an in-repo `missing-installed-sc-lint` consumer-fixture lane removes the
+  installed binary from `PATH`, invokes `just lint` and `just test`, and proves
+  both stop before work with the E.1 structured recovery result (including
+  required version and recovery action), not `FileNotFoundError` or a Python
+  traceback.
 
 ## Required Validation
 

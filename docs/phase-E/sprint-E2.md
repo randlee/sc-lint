@@ -29,7 +29,8 @@ consumer contract usable from a fresh local checkout.
 - `sc-lint setup` and `sc-lint upgrade` command implementation
 - product-owned bootstrap/template asset and tests
 - configuration/template migration implementation and tests
-- `docs/requirements.md`, `docs/sc-lint/cli-requirements.md`, and
+- `docs/requirements.md` (`REQ-PRODUCT-020`),
+  `docs/sc-lint/cli-requirements.md`, and
   `docs/sc-lint/cli-contract.md`
 - `docs/phase-E/sprint-E2.md`
 
@@ -54,7 +55,7 @@ consumer contract usable from a fresh local checkout.
   Every public Just recipe calls `ensure` before its own work; `setup` may
   install or upgrade, while `lint` and `test` never proceed after an
   incompatible/missing-install verdict.
-- requirements and CLI docs define the managed bootstrap path, its ownership,
+- `REQ-PRODUCT-020` and CLI docs define the managed bootstrap path, its ownership,
   its SemVer/atomic-install guarantees, and its offline recovery behavior.
 
 ## Canonical Bootstrap Contract
@@ -95,7 +96,7 @@ consumer contract usable from a fresh local checkout.
 - bootstrapper behavior is independently usable by the subsequent E.3
   generated template and needs no source checkout or manually copied `.just`
   implementation files.
-- requirements and CLI contract updates land with the bootstrap engine; no
+- `REQ-PRODUCT-020` and CLI contract updates land with the bootstrap engine; no
   installer/upgrade behavior is documented only in implementation notes.
 
 ## Required Validation

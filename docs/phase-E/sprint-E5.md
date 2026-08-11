@@ -37,7 +37,8 @@ release layout for release archives and Homebrew.
 - generated Homebrew formula/template and tests
 - documentation-bundle staging source and package manifest
 - root `README.md` and installed docs as required
-- `docs/requirements.md` release-distribution requirements and release docs
+- `docs/requirements.md` (`REQ-PRODUCT-021`) release-distribution requirements
+  and release docs
 - `docs/phase-E/sprint-E5.md`
 
 ## Deliverables
@@ -52,7 +53,7 @@ release layout for release archives and Homebrew.
   archive contents, and Homebrew installation deterministic and testable.
 - installed `sc-lint docs --path` resolves the actual archive/Homebrew bundle
   path; no network fetch is required after installation.
-- requirements and release documentation explicitly record the documentation
+- `REQ-PRODUCT-021` and release documentation explicitly record the documentation
   package as a required artifact of the primary `sc-lint` distribution.
 
 ## This Sprint Does Not Close

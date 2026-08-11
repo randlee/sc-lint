@@ -32,6 +32,8 @@ consumer contract without exposing Cargo/package-manager details to adopters.
 - release publication wiring for the Action version/tag
 - `docs-bundle/ci.md` and `docs-bundle/troubleshooting.md` (or their final
   E.4 bundle paths)
+- `docs/requirements.md` (`REQ-PRODUCT-022`) and `docs/architecture.md`
+- `docs/sc-lint/github-action-requirements.md` (created by this sprint)
 - `docs/phase-E/sprint-E6.md`
 
 ## Deliverables
@@ -49,6 +51,9 @@ consumer contract without exposing Cargo/package-manager details to adopters.
 - `ci.md` documents the complete consumer workflow, version pinning policy,
   permissions, cache/offline behavior, outputs, and failure recovery; the
   troubleshooting guide contains the Action-specific stable error codes.
+- `REQ-PRODUCT-022` and the new action requirements record define artifact
+  provenance, compatibility preflight, supported inputs, output contract,
+  pinning policy, and recovery behavior in the same change as implementation.
 
 ## This Sprint Does Not Close
 
@@ -63,6 +68,8 @@ consumer contract without exposing Cargo/package-manager details to adopters.
   analyzer package name.
 - documentation discovery resolves after Action installation without network
   access.
+- every action requirement has a direct metadata, fixture, workflow-example,
+  or documentation validation reference.
 
 ## Required Validation
 
