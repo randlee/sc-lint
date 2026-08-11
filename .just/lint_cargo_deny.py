@@ -21,6 +21,9 @@ DEPRECATED_CONFIG_LINES = (
 
 def build_command(config_path: Path, version: tuple[int, int]) -> list[str]:
     checks = ["advisories", "bans", "licenses", "sources"]
+    # cargo-deny 0.20 promoted --config to a global option; older supported
+    # releases require it after `check`. Keep the lint wrapper usable both in
+    # developer environments and CI while the install action tracks latest.
     if version >= (0, 20):
         return ["cargo-deny", "--config", str(config_path), "check", *checks]
     return ["cargo-deny", "check", "--config", str(config_path), *checks]
