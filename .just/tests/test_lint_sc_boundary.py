@@ -17,14 +17,25 @@ from lint_sc_boundary import run
 
 
 class LintScBoundaryTests(unittest.TestCase):
-    def test_command_runs_sc_lint_boundary_analyze_json(self) -> None:
+    def test_command_uses_cargo_for_sc_lint_source_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
+            crate_dir = repo_root / "crates" / "sc-lint-boundary"
+            crate_dir.mkdir(parents=True)
+            (crate_dir / "Cargo.toml").write_text(
+                '[package]\nname="sc-lint-boundary"\nversion="0.4.1"\n',
+                encoding="utf-8",
+            )
             cmd = command(repo_root)
             self.assertEqual(
                 cmd,
                 [
+                    "cargo",
+                    "run",
+                    "-q",
+                    "-p",
                     "sc-lint-boundary",
+                    "--",
                     "analyze",
                     "--root",
                     str(repo_root),
@@ -33,10 +44,8 @@ class LintScBoundaryTests(unittest.TestCase):
                 ],
             )
 
-    @mock.patch("lint_sc_boundary.shutil.which", return_value="/usr/local/bin/sc-lint-boundary")
     def test_command_uses_installed_boundary_analyzer_for_consumer_repository(
         self,
-        which_mock: mock.Mock,
     ) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
@@ -52,7 +61,6 @@ class LintScBoundaryTests(unittest.TestCase):
                     "json",
                 ],
             )
-            which_mock.assert_called_once_with("sc-lint-boundary")
 
     @mock.patch("lint_sc_boundary.print_report")
     @mock.patch("lint_sc_boundary.build_report")

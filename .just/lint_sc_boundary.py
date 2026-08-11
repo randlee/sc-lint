@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 import argparse
 import json
-import shutil
 import subprocess
 import sys
 import time
@@ -17,7 +16,7 @@ from lint_common import workspace_crate_section_lines
 
 
 def command(repo_root: Path) -> list[str]:
-    if shutil.which("sc-lint-boundary") is None:
+    if (repo_root / "crates" / "sc-lint-boundary" / "Cargo.toml").is_file():
         return [
             "cargo",
             "run",
