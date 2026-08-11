@@ -130,12 +130,12 @@ Initial Phase-B scope is split into focused planning sprints:
 - `sprint-B-homebrew`
   - full Homebrew toolset distribution planning
 
-See [docs/phase-B/phase-B-plan.md](../phase-B/phase-B-plan.md),
-[docs/phase-B/sprint-B1.md](../phase-B/sprint-B1.md),
-[docs/phase-B/sprint-B2.md](../phase-B/sprint-B2.md),
-[docs/phase-B/sprint-B3.md](../phase-B/sprint-B3.md), and
-[docs/phase-B/sprint-B4.md](../phase-B/sprint-B4.md), and
-[docs/phase-B/sprint-B-homebrew.md](../phase-B/sprint-B-homebrew.md).
+See [docs/plans/phase-B/phase-B-plan.md](../plans/phase-B/phase-B-plan.md),
+[docs/plans/phase-B/sprint-B1.md](../plans/phase-B/sprint-B1.md),
+[docs/plans/phase-B/sprint-B2.md](../plans/phase-B/sprint-B2.md),
+[docs/plans/phase-B/sprint-B3.md](../plans/phase-B/sprint-B3.md), and
+[docs/plans/phase-B/sprint-B4.md](../plans/phase-B/sprint-B4.md), and
+[docs/plans/phase-B/sprint-B-homebrew.md](../plans/phase-B/sprint-B-homebrew.md).
 
 ### Phase C
 

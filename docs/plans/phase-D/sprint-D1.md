@@ -20,25 +20,25 @@ target: develop
 
 ## Hard Dependencies
 
-- [docs/requirements.md](../requirements.md), especially `REQ-PRODUCT-007`,
+- [docs/requirements.md](../../requirements.md), especially `REQ-PRODUCT-007`,
   `REQ-PRODUCT-008`, and `REQ-PRODUCT-009A`
-- [docs/sc-lint-boundary/requirements.md](../sc-lint-boundary/requirements.md),
+- [docs/sc-lint-boundary/requirements.md](../../sc-lint-boundary/requirements.md),
   especially `REQ-SCB-001`, `REQ-SCB-006`, and `REQ-SCB-015` through
   `REQ-SCB-021`
-- [docs/sc-lint-boundary/architecture.md](../sc-lint-boundary/architecture.md)
-- [docs/sc-lint-boundary/boundary-enforcement-model.md](../sc-lint-boundary/boundary-enforcement-model.md)
-- [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](../sc-lint/adr/ADR-004-structured-boundary-definitions.md)
-- [docs/sc-lint/crate-architecture.md](../sc-lint/crate-architecture.md)
-- [docs/architecture.md](../architecture.md)
-- [docs/project-plan.md](../project-plan.md)
-- [boundaries/sc-lint-boundary/boundary-analyzer.toml](../../boundaries/sc-lint-boundary/boundary-analyzer.toml)
+- [docs/sc-lint-boundary/architecture.md](../../sc-lint-boundary/architecture.md)
+- [docs/sc-lint-boundary/boundary-enforcement-model.md](../../sc-lint-boundary/boundary-enforcement-model.md)
+- [docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md](../../sc-lint/adr/ADR-004-structured-boundary-definitions.md)
+- [docs/sc-lint/crate-architecture.md](../../sc-lint/crate-architecture.md)
+- [docs/architecture.md](../../architecture.md)
+- [docs/project-plan.md](../../project-plan.md)
+- [boundaries/sc-lint-boundary/boundary-analyzer.toml](../../../boundaries/sc-lint-boundary/boundary-analyzer.toml)
 - the landed TOML inventory loader, rule-filter wiring, and Cargo-manifest
   analysis path in `sc-lint-boundary`
 
 ## Exact Targets
 
-- `docs/phase-D/phase-D-plan.md`
-- `docs/phase-D/sprint-D1.md`
+- `docs/plans/phase-D/phase-D-plan.md`
+- `docs/plans/phase-D/sprint-D1.md`
 - `docs/sc-lint-boundary/requirements.md`
 - `docs/sc-lint-boundary/architecture.md`
 - `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`

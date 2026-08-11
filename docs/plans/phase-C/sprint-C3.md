@@ -17,14 +17,14 @@ target: develop
 
 ## Hard Dependencies
 
-- [docs/phase-C/sprint-C1.md](./sprint-C1.md)
-- [docs/phase-C/sprint-C2.md](./sprint-C2.md)
-- [docs/sc-lint-version/requirements.md](../sc-lint-version/requirements.md)
+- [docs/plans/phase-C/sprint-C1.md](./sprint-C1.md)
+- [docs/plans/phase-C/sprint-C2.md](./sprint-C2.md)
+- [docs/sc-lint-version/requirements.md](../../sc-lint-version/requirements.md)
 
 ## Exact Targets
 
-- `docs/phase-C/phase-C-plan.md`
-- `docs/phase-C/sprint-C3.md`
+- `docs/plans/phase-C/phase-C-plan.md`
+- `docs/plans/phase-C/sprint-C3.md`
 - `docs/sc-lint-version/requirements.md`
 - `docs/requirements.md`
 - `docs/architecture.md`

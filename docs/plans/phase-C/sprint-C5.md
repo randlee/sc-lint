@@ -17,13 +17,13 @@ target: develop
 
 ## Hard Dependencies
 
-- [docs/phase-C/sprint-C4.md](./sprint-C4.md)
-- [docs/sc-lint/minimal-marketplace-constraints.md](../sc-lint/minimal-marketplace-constraints.md)
+- [docs/plans/phase-C/sprint-C4.md](./sprint-C4.md)
+- [docs/sc-lint/minimal-marketplace-constraints.md](../../sc-lint/minimal-marketplace-constraints.md)
 
 ## Exact Targets
 
-- `docs/phase-C/phase-C-plan.md`
-- `docs/phase-C/sprint-C5.md`
+- `docs/plans/phase-C/phase-C-plan.md`
+- `docs/plans/phase-C/sprint-C5.md`
 - `docs/project-plan.md`
 - `docs/sc-lint/README.md`
 - `docs/sc-lint/roadmap.md`

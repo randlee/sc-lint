@@ -21,12 +21,12 @@ target: integration/phase-B
 
 ## Hard Dependencies
 
-- [docs/phase-B/phase-B-plan.md](./phase-B-plan.md)
-- [docs/requirements.md](../requirements.md)
-- [docs/architecture.md](../architecture.md)
-- [release/publish-artifacts.toml](../../release/publish-artifacts.toml)
-- [.github/workflows/release.yml](../../.github/workflows/release.yml)
-- [docs/release-inventory-schema.json](../release-inventory-schema.json)
+- [docs/plans/phase-B/phase-B-plan.md](./phase-B-plan.md)
+- [docs/requirements.md](../../requirements.md)
+- [docs/architecture.md](../../architecture.md)
+- [release/publish-artifacts.toml](../../../release/publish-artifacts.toml)
+- [.github/workflows/release.yml](../../../.github/workflows/release.yml)
+- [docs/release-inventory-schema.json](../../release-inventory-schema.json)
 - the existing `update-homebrew` workflow checkout rooted at `homebrew-tap/`
 
 ## Exact Targets

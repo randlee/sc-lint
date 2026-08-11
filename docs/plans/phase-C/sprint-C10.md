@@ -25,12 +25,12 @@ Issue driver:
 
 ## Hard Dependencies
 
-- [docs/requirements.md](../requirements.md)
-- [docs/architecture.md](../architecture.md)
-- [docs/project-plan.md](../project-plan.md)
-- [docs/sc-lint/logging.md](../sc-lint/logging.md)
-- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](../sc-lint/adr/ADR-008-sc-observability-logging.md)
-- [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](../sc-lint/adr/ADR-009-observability-boundary-policy.md)
+- [docs/requirements.md](../../requirements.md)
+- [docs/architecture.md](../../architecture.md)
+- [docs/project-plan.md](../../project-plan.md)
+- [docs/sc-lint/logging.md](../../sc-lint/logging.md)
+- [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](../../sc-lint/adr/ADR-008-sc-observability-logging.md)
+- [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](../../sc-lint/adr/ADR-009-observability-boundary-policy.md)
 
 ## Exact Targets
 
