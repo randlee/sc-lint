@@ -2,16 +2,6 @@
 
 All notable changes to sc-lint are documented here.
 
-## [0.4.1] — 2026-08-10
-
-### Fixes
-
-- **Consumer-repository boundary runner** — the released
-  `.just/lint_sc_boundary.py` utility now invokes the installed
-  `sc-lint-boundary` sibling binary instead of attempting to run that package
-  from the consumer workspace. This restores the pinned setup action contract
-  for repositories that correctly do not contain the analyzer crate.
-
 ## [0.4.0] — 2026-07-02
 
 ### Features

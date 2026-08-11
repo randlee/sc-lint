@@ -16,13 +16,23 @@ from lint_common import workspace_crate_section_lines
 
 
 def command(repo_root: Path) -> list[str]:
+    if (repo_root / "crates" / "sc-lint-portability" / "Cargo.toml").is_file():
+        return [
+            "cargo",
+            "run",
+            "-q",
+            "-p",
+            "sc-lint-portability",
+            "--",
+            "analyze",
+            "--root",
+            str(repo_root),
+            "--format",
+            "json",
+        ]
+
     return [
-        "cargo",
-        "run",
-        "-q",
-        "-p",
         "sc-lint-portability",
-        "--",
         "analyze",
         "--root",
         str(repo_root),
@@ -71,7 +81,22 @@ def run(repo_root: Path) -> int:
         print_report(report, repo_root=repo_root, preview_limit=4, direct_threshold=4)
         return 1
 
-    payload = json.loads(result.stdout)
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        report = build_report(
+            lint_name="sc-portability",
+            repo_root=repo_root,
+            passed=False,
+            summary="sc-lint-portability returned invalid JSON",
+            findings=[str(error)],
+            transcript_lines=transcript,
+            started_at=started_at,
+            duration_seconds=duration_seconds,
+        )
+        print_report(report, repo_root=repo_root, preview_limit=4, direct_threshold=4)
+        return 1
+
     findings = [finding["message"] for finding in payload.get("findings", [])]
     status = payload.get("status")
     passed = status == "pass"

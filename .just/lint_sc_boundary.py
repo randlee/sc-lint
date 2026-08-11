@@ -81,7 +81,22 @@ def run(repo_root: Path) -> int:
         print_report(report, repo_root=repo_root, preview_limit=3, direct_threshold=3)
         return 1
 
-    payload = json.loads(result.stdout)
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        report = build_report(
+            lint_name="sc-boundary",
+            repo_root=repo_root,
+            passed=False,
+            summary="sc-lint-boundary returned invalid JSON",
+            findings=[str(error)],
+            transcript_lines=transcript,
+            started_at=started_at,
+            duration_seconds=duration_seconds,
+        )
+        print_report(report, repo_root=repo_root, preview_limit=3, direct_threshold=3)
+        return 1
+
     findings = [finding["message"] for finding in payload.get("findings", [])]
     status = payload.get("status")
     passed = status == "pass"

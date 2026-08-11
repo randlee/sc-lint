@@ -17,9 +17,15 @@ from lint_sc_portability import run
 
 
 class LintScPortabilityTests(unittest.TestCase):
-    def test_command_runs_sc_lint_portability_json(self) -> None:
+    def test_command_uses_cargo_for_sc_lint_source_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
+            crate_dir = repo_root / "crates" / "sc-lint-portability"
+            crate_dir.mkdir(parents=True)
+            (crate_dir / "Cargo.toml").write_text(
+                '[package]\nname="sc-lint-portability"\nversion="0.4.0"\n',
+                encoding="utf-8",
+            )
             cmd = command(repo_root)
             self.assertEqual(
                 cmd,
@@ -30,6 +36,24 @@ class LintScPortabilityTests(unittest.TestCase):
                     "-p",
                     "sc-lint-portability",
                     "--",
+                    "analyze",
+                    "--root",
+                    str(repo_root),
+                    "--format",
+                    "json",
+                ],
+            )
+
+    def test_command_uses_installed_portability_analyzer_for_consumer_repository(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+
+            self.assertEqual(
+                command(repo_root),
+                [
+                    "sc-lint-portability",
                     "analyze",
                     "--root",
                     str(repo_root),
@@ -90,6 +114,25 @@ class LintScPortabilityTests(unittest.TestCase):
 
             self.assertEqual(run(repo_root), 1)
             self.assertTrue(build_report_mock.called)
+            print_report_mock.assert_called_once()
+
+    @mock.patch("lint_sc_portability.print_report")
+    @mock.patch("lint_sc_portability.build_report")
+    @mock.patch("lint_sc_portability.subprocess.run")
+    def test_run_reports_invalid_json_as_failure(
+        self,
+        subprocess_run_mock: mock.Mock,
+        build_report_mock: mock.Mock,
+        print_report_mock: mock.Mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+            subprocess_run_mock.return_value = mock.Mock(returncode=0, stdout="not json", stderr="")
+            build_report_mock.return_value = mock.Mock(log_path=repo_root / ".just/logs/example.log")
+
+            self.assertEqual(run(repo_root), 1)
+            self.assertEqual(build_report_mock.call_args.kwargs["summary"], "sc-lint-portability returned invalid JSON")
             print_report_mock.assert_called_once()
 
 
