@@ -117,6 +117,47 @@ fn version_probe_runs_outside_a_workspace_without_creating_logs() {
 }
 
 #[test]
+fn compatibility_check_runs_outside_a_workspace_without_creating_logs() {
+    let consumer_dir = TempDir::new().expect("consumer dir");
+    let config_path = consumer_dir.path().join("sc-lint.toml");
+    let log_root = consumer_dir.path().join("logs");
+    let binary = env!("CARGO_BIN_EXE_sc-lint");
+    std::fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n",
+    )
+    .expect("compatibility config");
+
+    let output = sc_lint_command(binary, consumer_dir.path())
+        .args([
+            "--json",
+            "--config",
+            config_path.to_str().expect("utf-8 config path"),
+            "--log-root",
+            log_root.to_str().expect("utf-8 temp path"),
+            "compatibility",
+            "check",
+            "--binary",
+            binary,
+        ])
+        .output()
+        .expect("compatibility check runs");
+
+    assert!(
+        output.status.success(),
+        "compatibility stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let rendered: Value = serde_json::from_slice(&output.stdout).expect("compatibility JSON");
+    assert_eq!(rendered["command"], "compatibility.check");
+    assert_eq!(rendered["data"]["status"], "pass");
+    assert!(
+        !log_root.exists(),
+        "compatibility check must not initialize logs"
+    );
+}
+
+#[test]
 #[serial]
 #[cfg_attr(windows, ignore = "cargo.cmd not resolved by CreateProcessW")]
 fn xwin_logging_records_target_metadata_for_success_and_error_paths() {

@@ -13,13 +13,49 @@ use crate::Cli;
 use crate::CliError;
 use crate::command::CommandContext;
 
+pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
+pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedConfig {
     repo_root: Option<RepoRoot>,
     config_path: Option<PathBuf>,
     logging_root: Option<PathBuf>,
     logging_console: bool,
-    compatibility_requirement: Option<CompatibilityRequirement>,
+    mode: LoadedConfigMode,
+}
+
+/// `LoadedConfig` has one of these two valid modes; an ordinary command can
+/// never accidentally carry a consumer compatibility requirement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LoadedConfigMode {
+    Standard,
+    Compatibility(CompatibilityRequirement),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CompatibilityErrorCode {
+    ConfigMissing,
+    ConfigMalformed,
+    BinaryNotFound,
+    BinaryExecutionFailed,
+    ProbeMalformed,
+    VersionUnparsable,
+    VersionTooOld,
+}
+
+impl CompatibilityErrorCode {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::ConfigMissing => "CLI.SC_LINT_CONFIG_MISSING",
+            Self::ConfigMalformed => "CLI.SC_LINT_CONFIG_MALFORMED",
+            Self::BinaryNotFound => "CLI.SC_LINT_BINARY_NOT_FOUND",
+            Self::BinaryExecutionFailed => "CLI.SC_LINT_BINARY_EXECUTION_FAILED",
+            Self::ProbeMalformed => "CLI.SC_LINT_VERSION_PROBE_MALFORMED",
+            Self::VersionUnparsable => "CLI.SC_LINT_VERSION_UNPARSABLE",
+            Self::VersionTooOld => "CLI.SC_LINT_VERSION_TOO_OLD",
+        }
+    }
 }
 
 /// A validated semantic-version floor for a repository's sc-lint installation.
@@ -122,7 +158,7 @@ impl LoadedConfig {
                 config_path: None,
                 logging_root: cli.log_root.clone(),
                 logging_console: cli.log_console,
-                compatibility_requirement: None,
+                mode: LoadedConfigMode::Standard,
             });
         }
 
@@ -163,7 +199,7 @@ impl LoadedConfig {
             config_path,
             logging_root,
             logging_console,
-            compatibility_requirement: None,
+            mode: LoadedConfigMode::Standard,
         })
     }
 
@@ -174,15 +210,15 @@ impl LoadedConfig {
     fn load_compatibility(cli: &Cli) -> Result<Self, CliError> {
         let current_dir = std::env::current_dir().map_err(|error| {
             compatibility_config_error(
-                "CLI.SC_LINT_CONFIG_MISSING",
-                "failed to read the current directory while locating `sc-lint.toml`",
+                CompatibilityErrorCode::ConfigMissing,
+                format!("failed to read the current directory while locating `{CONFIG_FILENAME}`"),
                 None,
                 None,
             )
             .with_source(error)
         })?;
         let config_path = cli.config.as_ref().map_or_else(
-            || current_dir.join("sc-lint.toml"),
+            || current_dir.join(CONFIG_FILENAME),
             |path| resolve_current_dir_relative_path(&current_dir, path),
         );
         let requirement = load_compatibility_requirement(&config_path)?;
@@ -192,7 +228,7 @@ impl LoadedConfig {
             config_path: Some(config_path),
             logging_root: cli.log_root.clone(),
             logging_console: cli.log_console,
-            compatibility_requirement: Some(requirement),
+            mode: LoadedConfigMode::Compatibility(requirement),
         })
     }
 
@@ -233,25 +269,35 @@ impl LoadedConfig {
         &self,
         binary_override: Option<&Path>,
     ) -> Result<Value, CliError> {
-        let requirement = self.compatibility_requirement.as_ref().ok_or_else(|| {
-            CliError::internal(
-                "compatibility requirement required but configuration did not resolve one",
-            )
-        })?;
-        let binary = binary_override.unwrap_or_else(|| Path::new("sc-lint"));
+        let LoadedConfigMode::Compatibility(requirement) = &self.mode else {
+            return Err(CliError::internal(
+                "compatibility evaluation requires a compatibility configuration",
+            ));
+        };
+        let binary = binary_override.unwrap_or_else(|| Path::new(crate::consts::SERVICE_NAME));
         let output = Command::new(binary)
             .args(["--json", "version"])
             .output()
             .map_err(|error| {
                 let (code, message) = if error.kind() == std::io::ErrorKind::NotFound {
                     (
-                        "CLI.SC_LINT_BINARY_NOT_FOUND",
-                        format!("could not find sc-lint binary `{}`", binary.display()),
+                        CompatibilityErrorCode::BinaryNotFound,
+                        format!(
+                            "could not find sc-lint binary `{}` required at least `{}` by `{}`",
+                            binary.display(),
+                            requirement.minimum_version,
+                            requirement.config_path.display()
+                        ),
                     )
                 } else {
                     (
-                        "CLI.SC_LINT_BINARY_EXECUTION_FAILED",
-                        format!("could not execute sc-lint binary `{}`", binary.display()),
+                        CompatibilityErrorCode::BinaryExecutionFailed,
+                        format!(
+                            "could not execute sc-lint binary `{}` required at least `{}` by `{}`",
+                            binary.display(),
+                            requirement.minimum_version,
+                            requirement.config_path.display()
+                        ),
                     )
                 };
                 compatibility_runtime_error(
@@ -266,10 +312,12 @@ impl LoadedConfig {
 
         if !output.status.success() {
             return Err(compatibility_runtime_error(
-                "CLI.SC_LINT_BINARY_EXECUTION_FAILED",
+                CompatibilityErrorCode::BinaryExecutionFailed,
                 format!(
-                    "sc-lint binary `{}` exited unsuccessfully",
-                    binary.display()
+                    "sc-lint binary `{}` required at least `{}` by `{}` exited unsuccessfully",
+                    binary.display(),
+                    requirement.minimum_version,
+                    requirement.config_path.display()
                 ),
                 requirement,
                 binary,
@@ -281,10 +329,10 @@ impl LoadedConfig {
         let probe =
             serde_json::from_slice::<VersionProbeEnvelope>(&output.stdout).map_err(|error| {
                 compatibility_runtime_error(
-                    "CLI.SC_LINT_VERSION_UNPARSABLE",
+                    CompatibilityErrorCode::ProbeMalformed,
                     format!(
-                        "sc-lint binary `{}` did not emit a valid version probe",
-                        binary.display()
+                        "sc-lint binary `{}` required at least `{}` by `{}` did not emit a valid version probe",
+                        binary.display(), requirement.minimum_version, requirement.config_path.display()
                     ),
                     requirement,
                     binary,
@@ -295,11 +343,12 @@ impl LoadedConfig {
         let observed = validate_version_probe(probe, requirement, binary)?;
         if observed < *requirement.minimum_version.as_semver() {
             return Err(compatibility_runtime_error(
-                "CLI.SC_LINT_VERSION_TOO_OLD",
+                CompatibilityErrorCode::VersionTooOld,
                 format!(
-                    "installed sc-lint version `{observed}` at `{}` does not satisfy required minimum `{}`",
+                    "installed sc-lint version `{observed}` at `{}` does not satisfy required minimum `{}` from `{}`",
                     binary.display(),
-                    requirement.minimum_version
+                    requirement.minimum_version,
+                    requirement.config_path.display()
                 ),
                 requirement,
                 binary,
@@ -345,7 +394,7 @@ fn find_repo_config(repo_root: &Path, override_path: Option<&Path>) -> Option<Pa
     if let Some(path) = override_path {
         return Some(resolve_repo_relative_path(repo_root, path));
     }
-    ["sc-lint.toml", ".just/lint-config.toml"]
+    [CONFIG_FILENAME, ".just/lint-config.toml"]
         .into_iter()
         .map(|relative| repo_root.join(relative))
         .find(|path| path.exists())
@@ -390,7 +439,7 @@ fn resolve_current_dir_relative_path(current_dir: &Path, candidate: &Path) -> Pa
 fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequirement, CliError> {
     if !path.is_file() {
         return Err(compatibility_config_error(
-            "CLI.SC_LINT_CONFIG_MISSING",
+            CompatibilityErrorCode::ConfigMissing,
             format!(
                 "required sc-lint configuration `{}` was not found",
                 path.display()
@@ -401,7 +450,7 @@ fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequiremen
     }
     let file_config = parse_repo_config(path).map_err(|error| {
         compatibility_config_error(
-            "CLI.SC_LINT_CONFIG_MALFORMED",
+            CompatibilityErrorCode::ConfigMalformed,
             format!("failed to parse sc-lint configuration `{}`", path.display()),
             Some(path),
             Some(error.to_string()),
@@ -413,7 +462,7 @@ fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequiremen
         .and_then(|sc_lint| sc_lint.minimum_version)
         .ok_or_else(|| {
             compatibility_config_error(
-                "CLI.SC_LINT_CONFIG_MALFORMED",
+                CompatibilityErrorCode::ConfigMalformed,
                 format!(
                     "configuration `{}` is missing required field `{}`",
                     path.display(),
@@ -425,7 +474,7 @@ fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequiremen
         })?;
     let minimum_version = MinimumVersion::from_str(&raw_minimum).map_err(|error| {
         compatibility_config_error(
-            "CLI.SC_LINT_CONFIG_MALFORMED",
+            CompatibilityErrorCode::ConfigMalformed,
             format!(
                 "configuration `{}` has malformed `{}` value `{raw_minimum}`",
                 path.display(),
@@ -442,13 +491,13 @@ fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequiremen
 }
 
 fn compatibility_config_error(
-    code: &'static str,
+    code: CompatibilityErrorCode,
     message: impl Into<String>,
     path: Option<&Path>,
     cause: Option<String>,
 ) -> CliError {
     let mut error = CliError::config(message)
-        .with_code(code)
+        .with_code(code.as_str())
         .with_suggested_action(
             "Run `just setup` (or your repository's sc-lint installer) to create or repair the compatible installation.",
         )
@@ -464,15 +513,15 @@ fn compatibility_config_error(
 }
 
 fn compatibility_runtime_error(
-    code: &'static str,
+    code: CompatibilityErrorCode,
     message: impl Into<String>,
     requirement: &CompatibilityRequirement,
     binary: &Path,
     observed: Option<&Version>,
     cause: String,
 ) -> CliError {
-    let mut error = CliError::capability(message)
-        .with_code(code)
+    let mut error = CliError::backend_failure(message)
+        .with_code(code.as_str())
         .with_cause(cause)
         .with_suggested_action(
             "Run `just setup` (or your repository's sc-lint installer) to install or upgrade sc-lint, then retry.",
@@ -512,10 +561,12 @@ fn validate_version_probe(
 ) -> Result<Version, CliError> {
     let invalid_probe = |cause: String| {
         compatibility_runtime_error(
-            "CLI.SC_LINT_VERSION_UNPARSABLE",
+            CompatibilityErrorCode::ProbeMalformed,
             format!(
-                "sc-lint binary `{}` emitted an unsupported version probe",
-                binary.display()
+                "sc-lint binary `{}` emitted an unsupported version probe for required minimum `{}` from `{}`",
+                binary.display(),
+                requirement.minimum_version,
+                requirement.config_path.display()
             ),
             requirement,
             binary,
@@ -531,24 +582,27 @@ fn validate_version_probe(
     let data = probe.data.ok_or_else(|| {
         invalid_probe("the version probe envelope did not include data".to_string())
     })?;
-    if data.tool != crate::consts::SERVICE_NAME || data.contract_schema != "sc-lint-version-v1" {
+    if data.tool != crate::consts::SERVICE_NAME || data.contract_schema != VERSION_PROBE_SCHEMA {
         return Err(invalid_probe(
             "the version probe contract schema or tool name was unsupported".to_string(),
         ));
     }
     Version::parse(&data.version).map_err(|error| {
         compatibility_runtime_error(
-            "CLI.SC_LINT_VERSION_UNPARSABLE",
+            CompatibilityErrorCode::VersionUnparsable,
             format!(
-                "sc-lint binary `{}` reported unparsable version `{}`",
+                "sc-lint binary `{}` reported unparsable version `{}`; required minimum `{}` comes from `{}`",
                 binary.display(),
-                data.version
+                data.version,
+                requirement.minimum_version,
+                requirement.config_path.display()
             ),
             requirement,
             binary,
             None,
             error.to_string(),
         )
+        .with_detail("reported_version", json!(data.version))
     })
 }
 

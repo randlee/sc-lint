@@ -294,8 +294,12 @@ impl CommandContext {
         self.compatibility_binary.as_deref()
     }
 
-    pub const fn is_version_probe(&self) -> bool {
-        matches!(self.command_id, CommandId::Version)
+    /// Standalone consumer probes must never initialize repository logging.
+    pub const fn skips_logging(&self) -> bool {
+        matches!(
+            self.command_id,
+            CommandId::Version | CommandId::CompatibilityCheck
+        )
     }
 
     pub fn dispatch_tool(&self) -> Option<&'static str> {
@@ -331,7 +335,7 @@ pub(crate) fn execute(
         CommandId::Version => Ok(CommandSuccess::direct(json!({
             consts::FIELD_TOOL: consts::SERVICE_NAME,
             consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
-            "contract_schema": "sc-lint-version-v1",
+            "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
             consts::FIELD_STATUS: "pass",
         }))),
         CommandId::CompatibilityCheck => Ok(CommandSuccess::direct(

@@ -266,7 +266,7 @@ the same matrix before code lands:
 | `clippy` | `clippy.<target>` | lint-runner backend | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `version` | `version` | top-level CLI crate | `usage`, `internal` |
-| `compatibility check` | `compatibility.check` | compatibility preflight | `config`, `capability`, `internal` |
+| `compatibility check` | `compatibility.check` | compatibility preflight | `config`, `backend_failure`, `internal` |
 
 This matrix exists to prevent each command family from inventing its own
 response or error pattern at implementation time.
@@ -294,7 +294,7 @@ emits this payload under the standard success envelope's `data` field:
 
 `sc-lint compatibility check` loads the requirement once and runs
 `sc-lint --json version` against the PATH installation (or `--binary <path>`).
-It performs no lint or test work. Its success data identifies
+It performs no lint/test work and creates no logs or reports. Its success data identifies
 `minimum_version`, `installed_version`, `binary_path`, and `config_path`.
 
 The preflight failure codes are stable:
@@ -305,12 +305,18 @@ The preflight failure codes are stable:
 | `CLI.SC_LINT_CONFIG_MALFORMED` | Repair `[tool.sc-lint].minimum_version`. |
 | `CLI.SC_LINT_BINARY_NOT_FOUND` | Run `just setup` or the product installer. |
 | `CLI.SC_LINT_BINARY_EXECUTION_FAILED` | Repair the selected installation, then rerun setup. |
+| `CLI.SC_LINT_VERSION_PROBE_MALFORMED` | Install a release implementing `sc-lint-version-v1`. |
 | `CLI.SC_LINT_VERSION_UNPARSABLE` | Install a release implementing `sc-lint-version-v1`. |
 | `CLI.SC_LINT_VERSION_TOO_OLD` | Run `just setup` to install or upgrade the required version. |
 
 Every one of these errors includes `cause`, `suggested_action`, and
 `docs: "sc-lint docs setup"`; its details include the required version and
 available observed version/path.
+
+Compatibility preflight uses `config` only for the repository requirement.
+Failures while locating, executing, or validating the external installed binary
+use `backend_failure`, not `capability`: that category records a concrete
+subprocess/install failure rather than the absence of an optional feature.
 
 ## Backend-to-CLI Normalization
 

@@ -298,9 +298,11 @@ fn compatibility_check_reports_malformed_installed_version_in_human_and_json_for
     .expect("json error");
     assert_eq!(json["error"]["docs"], "sc-lint docs setup");
     assert_eq!(json["error"]["details"]["minimum_version"], "0.4.1");
+    assert_eq!(json["error"]["details"]["reported_version"], "not-semver");
     let human = crate::render::render_error_human(context.command_id(), &error);
     assert!(human.contains("just setup"));
     assert!(human.contains("Docs: sc-lint docs setup"));
+    assert!(human.contains("Reported version: not-semver"));
 }
 
 #[test]
@@ -326,6 +328,9 @@ fn compatibility_config_failures_identify_the_canonical_file_and_field() {
         "[tool.sc-lint].minimum_version"
     );
     assert!(missing_error.cause.is_some());
+    let missing_human = crate::render::render_error_human("compatibility.check", &missing_error);
+    assert!(missing_human.contains(&missing.display().to_string()));
+    assert!(missing_human.contains("[tool.sc-lint].minimum_version"));
 
     let malformed = fixture.path().join("malformed.toml");
     fs::write(
@@ -403,6 +408,55 @@ fn compatibility_check_reports_missing_binary_with_recovery_contract() {
     );
     assert!(error.cause.is_some());
     assert_eq!(error.documentation.as_deref(), Some("sc-lint docs setup"));
+}
+
+#[test]
+#[serial]
+fn compatibility_check_human_error_includes_all_available_identity_details() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n",
+    )
+    .expect("compatibility config");
+    let backend = MockBackend::install(
+        "sc-lint",
+        &json!({
+            "ok": true,
+            "command": "version",
+            "data": {
+                "tool": "sc-lint",
+                "version": "0.4.0",
+                "contract_schema": "sc-lint-version-v1"
+            },
+            "diagnostics": []
+        }),
+    );
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "compatibility",
+        "check",
+        "--binary",
+        backend.path().to_str().expect("mock binary path"),
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("compatibility context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
+    let error = crate::command::execute(&context, &loaded).expect_err("old version fails");
+    let human = crate::render::render_error_human(context.command_id(), &error);
+    for required in [
+        "0.4.1",
+        "0.4.0",
+        config_path.to_str().expect("config path"),
+        backend.path().to_str().expect("mock binary path"),
+    ] {
+        assert!(
+            human.contains(required),
+            "missing `{required}` from {human}"
+        );
+    }
 }
 
 #[cfg(unix)]

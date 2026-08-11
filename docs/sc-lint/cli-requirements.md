@@ -268,7 +268,8 @@ specialized backend tools and mixed Rust/Python implementations.
   `[tool.sc-lint].minimum_version` from `sc-lint.toml` (or an explicit
   `--config` file), parse it into a validated SemVer boundary type, and compare
   the installed `sc-lint --json version` result semantically. It must not
-  require a Cargo workspace or run lint/test work.
+  require a Cargo workspace, initialize repository logs/reports, or run
+  lint/test work.
 
 - `REQ-CLI-017`
   `sc-lint --json version` and `sc-lint --version --json` must emit the stable
