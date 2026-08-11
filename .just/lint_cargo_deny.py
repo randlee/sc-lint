@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -18,17 +19,29 @@ DEPRECATED_CONFIG_LINES = (
 )
 
 
-def build_command(repo_root: Path, config_path: Path) -> list[str]:
-    return [
-        "cargo-deny",
-        "check",
-        "--config",
-        str(config_path),
-        "advisories",
-        "bans",
-        "licenses",
-        "sources",
-    ]
+def build_command(config_path: Path, version: tuple[int, int]) -> list[str]:
+    checks = ["advisories", "bans", "licenses", "sources"]
+    if version >= (0, 20):
+        return ["cargo-deny", "--config", str(config_path), "check", *checks]
+    return ["cargo-deny", "check", "--config", str(config_path), *checks]
+
+
+def detect_version() -> tuple[int, int]:
+    completed = subprocess.run(
+        ["cargo-deny", "--version"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise RuntimeError(f"could not determine cargo-deny version: {detail}")
+
+    match = re.search(r"cargo-deny\s+(\d+)\.(\d+)", completed.stdout)
+    if match is None:
+        raise RuntimeError(f"unrecognized cargo-deny version output: {completed.stdout.strip()}")
+    return int(match.group(1)), int(match.group(2))
 
 
 def build_runtime_config(repo_root: Path) -> Path:
@@ -59,8 +72,13 @@ def main(argv: list[str]) -> int:
         print(line)
 
     runtime_config = build_runtime_config(repo_root)
+    try:
+        version = detect_version()
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
+        return 2
     completed = subprocess.run(
-        build_command(repo_root, runtime_config),
+        build_command(runtime_config, version),
         cwd=repo_root,
         capture_output=True,
         text=True,
