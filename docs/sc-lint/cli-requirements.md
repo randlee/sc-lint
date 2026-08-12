@@ -325,6 +325,17 @@ specialized backend tools and mixed Rust/Python implementations.
   `name` and a non-empty argv `command` array. These commands do not discover
   a source checkout or execute `.just` scripts.
 
+- `REQ-CLI-024`
+  `sc-lint docs` must discover the installed offline documentation bundle
+  without network access or repository-root discovery. The command must list
+  the overview, operator guides, and every package guide; named guides print
+  their contents, while `--path` prints the installed bundle (or guide) path
+  without mutating the current repository. Bundle and package completeness are
+  validated against the release manifest and relative links before packaging.
+  A missing or incomplete bundle must return `CLI.SC_LINT_DOCS_UNAVAILABLE`
+  with the searched bundle path, recovery action, and `sc-lint docs
+  installation` reference.
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:

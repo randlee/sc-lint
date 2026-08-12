@@ -5,6 +5,7 @@ use std::path::Path;
 use crate::Cli;
 use crate::CliError;
 use crate::Command;
+use crate::DocsGuide;
 use crate::config::LoadedConfig;
 use crate::consts;
 use crate::contract::ServiceName;
@@ -66,6 +67,7 @@ pub(crate) enum CommandId {
     ClippyNative,
     ClippyXwin,
     CompatibilityCheck,
+    Docs,
     Init,
     ConsumerTest,
     Setup,
@@ -101,6 +103,12 @@ pub(crate) struct ConsumerInitRequest {
     pub(crate) dry_run: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DocsRequest {
+    pub(crate) guide: Option<DocsGuide>,
+    pub(crate) path: bool,
+}
+
 impl CommandId {
     pub fn from_cli_command(command: &Command) -> Self {
         match command {
@@ -130,6 +138,7 @@ impl CommandId {
             Command::Compatibility { command } => match command {
                 crate::CompatibilityCommand::Check { .. } => Self::CompatibilityCheck,
             },
+            Command::Docs { .. } => Self::Docs,
             Command::Setup { .. } => Self::Setup,
             Command::Upgrade { .. } => Self::Upgrade,
             Command::Init { .. } => Self::Init,
@@ -147,6 +156,7 @@ impl CommandId {
             Self::ClippyNative => "clippy.native",
             Self::ClippyXwin => "clippy.xwin",
             Self::CompatibilityCheck => "compatibility.check",
+            Self::Docs => "docs",
             Self::Init => "init",
             Self::ConsumerTest => "test",
             Self::Setup => "setup",
@@ -177,6 +187,7 @@ impl CommandId {
             | Self::ClippyNative
             | Self::ClippyXwin
             | Self::CompatibilityCheck
+            | Self::Docs
             | Self::Init
             | Self::ConsumerTest
             | Self::Setup
@@ -199,6 +210,7 @@ impl CommandId {
             Self::CheckNative | Self::CheckXwin => "preflight execution path",
             Self::ClippyNative | Self::ClippyXwin => "clippy execution path",
             Self::CompatibilityCheck => "installed sc-lint compatibility preflight",
+            Self::Docs => "offline documentation discovery",
             Self::Init => "consumer integration generation",
             Self::ConsumerTest => "consumer test profile orchestration",
             Self::Setup => "managed sc-lint installation and repair",
@@ -221,6 +233,7 @@ impl CommandId {
             self,
             Self::Version
                 | Self::CompatibilityCheck
+                | Self::Docs
                 | Self::Setup
                 | Self::Upgrade
                 | Self::Init
@@ -269,6 +282,7 @@ pub struct CommandContext {
     compatibility_binary: Option<std::path::PathBuf>,
     installation_request: Option<InstallationRequest>,
     consumer_init_request: Option<ConsumerInitRequest>,
+    docs_request: Option<DocsRequest>,
 }
 
 impl CommandContext {
@@ -282,10 +296,13 @@ impl CommandContext {
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
-        let (command_id, compatibility_binary, installation_request, consumer_init_request) = match (
-            &cli.command,
-            cli.version,
-        ) {
+        let (
+            command_id,
+            compatibility_binary,
+            installation_request,
+            consumer_init_request,
+            docs_request,
+        ) = match (&cli.command, cli.version) {
             (Some(command), false) => {
                 if matches!(command, Command::Init { .. })
                     && (cli.config.is_some() || cli.root.is_some())
@@ -334,14 +351,22 @@ impl CommandContext {
                     }),
                     _ => None,
                 };
+                let docs_request = match command {
+                    Command::Docs { guide, path } => Some(DocsRequest {
+                        guide: *guide,
+                        path: *path,
+                    }),
+                    _ => None,
+                };
                 (
                     CommandId::from_cli_command(command),
                     compatibility_binary,
                     installation_request,
                     consumer_init_request,
+                    docs_request,
                 )
             }
-            (None, true) => (CommandId::Version, None, None, None),
+            (None, true) => (CommandId::Version, None, None, None, None),
             (Some(_), true) => {
                 return Err(CliError::usage(
                         "`--version` cannot be combined with a subcommand",
@@ -368,6 +393,7 @@ impl CommandContext {
             compatibility_binary,
             installation_request,
             consumer_init_request,
+            docs_request,
         })
     }
 
@@ -439,6 +465,16 @@ impl CommandContext {
         })
     }
 
+    #[expect(
+        clippy::result_large_err,
+        reason = "Documentation discovery uses the shared top-level CliError contract."
+    )]
+    pub(crate) fn docs_request(&self) -> Result<DocsRequest, CliError> {
+        self.docs_request.ok_or_else(|| {
+            CliError::internal("documentation discovery was selected without a docs request")
+        })
+    }
+
     /// Standalone consumer probes must never initialize repository logging.
     pub const fn skips_logging(&self) -> bool {
         matches!(
@@ -448,6 +484,7 @@ impl CommandContext {
                 | CommandId::Setup
                 | CommandId::Upgrade
                 | CommandId::Init
+                | CommandId::Docs
                 | CommandId::ConsumerLintCi
                 | CommandId::ConsumerTest
         )
@@ -492,6 +529,9 @@ pub(crate) fn execute(
         CommandId::CompatibilityCheck => Ok(CommandSuccess::direct(
             loaded_config.evaluate_compatibility(context.compatibility_binary())?,
         )),
+        CommandId::Docs => Ok(CommandSuccess::direct(crate::docs::run(
+            context.docs_request()?,
+        )?)),
         CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
             loaded_config,
             context.setup_dry_run(),

@@ -1,7 +1,7 @@
 ---
 id: E.4
 title: Documentation Bundle, Package Guides, And Help Discovery
-status: planned
+status: implemented
 branch: feature/phase-E4-distributed-documentation
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E4-distributed-documentation
 target: integrate/phase-E
@@ -119,3 +119,15 @@ written to a consumer repository root.
 - `sc-lint --help`, `sc-lint docs`, `sc-lint docs just-setup`, and each package
   lookup tested from an installation-style fixture
 - `cargo test -p sc-lint`
+
+## Implementation Record
+
+- `docs-bundle/` is the versioned operator manual source with a manifest,
+  relative-link gate, and one guide for every publishable workspace package.
+- `sc-lint docs [guide] [--path]` discovers the physical bundle beside the
+  executable, in Homebrew-style `share/sc-lint`, or in the source checkout;
+  it performs no network access or repository mutation and reports
+  `CLI.SC_LINT_DOCS_UNAVAILABLE` when the bundle is absent.
+- Top-level help names the overview, Just guide, operator guides, and package
+  guides. `sc-lint docs` prints the overview; named guides and path mode are
+  covered by the CLI and bundle tests.

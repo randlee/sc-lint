@@ -22,6 +22,7 @@ use crate::CliErrorKind;
 use crate::ClippyTarget;
 use crate::Command;
 use crate::CommandEnvelope;
+use crate::DocsGuide;
 use crate::LintTarget;
 use crate::ParsedInvocation;
 use crate::ViewTarget;
@@ -122,6 +123,7 @@ fn help_text_exposes_the_initial_grouped_surface() {
         "setup",
         "upgrade",
         "init",
+        "docs",
         "test",
         "version",
         "ci",
@@ -129,6 +131,36 @@ fn help_text_exposes_the_initial_grouped_surface() {
     ] {
         assert!(help.contains(command), "missing `{command}` in help output");
     }
+    for guide in ["just-setup", "sc-lint-attributes", "sc-lint-schema"] {
+        assert!(
+            help.contains(guide),
+            "missing documentation guide `{guide}`"
+        );
+    }
+}
+
+#[test]
+fn docs_command_parses_named_guides_and_path_mode() {
+    let cli = Cli::parse_from(["sc-lint", "docs", "sc-lint-schema", "--path"]);
+    assert!(matches!(
+        cli.command,
+        Some(Command::Docs {
+            guide: Some(DocsGuide::ScLintSchema),
+            path: true,
+        })
+    ));
+}
+
+#[test]
+fn docs_setup_alias_resolves_the_installation_guide() {
+    let cli = Cli::parse_from(["sc-lint", "docs", "setup"]);
+    assert!(matches!(
+        cli.command,
+        Some(Command::Docs {
+            guide: Some(crate::DocsGuide::Installation),
+            path: false,
+        })
+    ));
 }
 
 #[test]
