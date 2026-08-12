@@ -23,6 +23,9 @@ current planning surface.
 - [`ADR-011-interface-versioning-and-published-artifacts.md`](./ADR-011-interface-versioning-and-published-artifacts.md)
   - accepted `sc-lint-version` form-factor, interface-family configuration
     surface, and shared HTML/XHTML/JSON interface-report artifact policy
+- [`ADR-012-consumer-adoption-and-just-contract.md`](./ADR-012-consumer-adoption-and-just-contract.md)
+  - installed-product consumer orchestration, generated Just integration, and
+    explicit source-maintainer versus consumer ownership
 
 ## Draft ADRs
 

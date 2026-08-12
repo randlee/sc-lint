@@ -28,6 +28,29 @@ use crate::command::CommandContext;
 use crate::config::LoadedConfig;
 use crate::workflow;
 
+const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
+
+#[test]
+fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
+    for recipe in ["setup", "lint", "test", "upgrade"] {
+        assert!(
+            CANONICAL_CONSUMER_JUSTFILE.contains(&format!("{recipe}: _ensure-sc-lint")),
+            "consumer template omits shared preflight from `{recipe}`"
+        );
+    }
+    assert!(CANONICAL_CONSUMER_JUSTFILE.contains("[private]\n_ensure-sc-lint:"));
+    assert!(CANONICAL_CONSUMER_JUSTFILE.contains("compatibility") == false);
+    assert!(CANONICAL_CONSUMER_JUSTFILE.contains(".sc-lint/bootstrap ensure"));
+    assert!(CANONICAL_CONSUMER_JUSTFILE.contains("sc-lint lint ci --config sc-lint.toml"));
+    assert!(CANONICAL_CONSUMER_JUSTFILE.contains("sc-lint test --config sc-lint.toml"));
+    for forbidden in ["cargo run", "sc-lint-boundary", ".just/"] {
+        assert!(
+            !CANONICAL_CONSUMER_JUSTFILE.contains(forbidden),
+            "consumer template leaks source-maintainer implementation `{forbidden}`"
+        );
+    }
+}
+
 #[test]
 fn command_surface_parses_the_initial_grouped_shape() {
     let cli = Cli::parse_from(["sc-lint", "lint", "sc-boundary"]);

@@ -1,0 +1,17 @@
+default: lint
+
+[private]
+_ensure-sc-lint:
+    .sc-lint/bootstrap ensure --config sc-lint.toml
+
+setup: _ensure-sc-lint
+    .sc-lint/bootstrap setup --config sc-lint.toml
+
+lint: _ensure-sc-lint
+    sc-lint lint ci --config sc-lint.toml
+
+test: _ensure-sc-lint
+    sc-lint test --config sc-lint.toml
+
+upgrade: _ensure-sc-lint
+    .sc-lint/bootstrap upgrade --config sc-lint.toml
