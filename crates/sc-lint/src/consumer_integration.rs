@@ -73,21 +73,20 @@ pub(crate) fn run_consumer_init_at(
     let files = consumer_integration_files(root);
     let mut current = Vec::new();
     let mut missing = Vec::new();
-    let mut refreshable = Vec::new();
+    let mut version_only_stale = Vec::new();
     let mut conflicts = Vec::new();
     for file in &files {
         match classify_file(file)? {
             ManagedFileState::Current => current.push(file.path.clone()),
             ManagedFileState::Missing => missing.push(file.path.clone()),
-            ManagedFileState::RefreshableGenerated => refreshable.push(file.path.clone()),
+            ManagedFileState::RefreshableGenerated => {
+                current.push(file.path.clone());
+                version_only_stale.push(file.path.clone());
+            }
             ManagedFileState::UserModified => conflicts.push(file.path.clone()),
         }
     }
-    let write_needed = missing
-        .iter()
-        .chain(&refreshable)
-        .cloned()
-        .collect::<Vec<_>>();
+    let write_needed = missing;
     if !conflicts.is_empty() {
         return Err(CliError::config("consumer integration contains user-owned file conflicts")
             .with_code("CLI.SC_LINT_INTEGRATION_CONFLICT")
@@ -139,10 +138,11 @@ pub(crate) fn run_consumer_init_at(
     }
 
     Ok(json!({
-        "status": if write_needed.is_empty() { "current" } else if request.dry_run && refreshable.is_empty() { "would_create" } else if request.dry_run { "would_update" } else if refreshable.is_empty() { "created" } else { "updated" },
+        "status": if write_needed.is_empty() { "current" } else if request.dry_run { "would_create" } else { "created" },
         "managed_files": files.iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(),
         "current_files": paths_to_strings(&current),
-        "created_or_updated_files": paths_to_strings(&write_needed),
+        "created_files": paths_to_strings(&write_needed),
+        "version_only_stale_files": paths_to_strings(&version_only_stale),
         "check": request.check,
         "dry_run": request.dry_run,
         "summary": "consumer Just integration is managed by sc-lint",
@@ -296,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn version_bumped_generated_config_is_refreshed_not_reported_as_user_conflict() {
+    fn version_bumped_generated_config_is_current_but_never_overwritten() {
         let fixture = tempfile::TempDir::new().expect("fixture");
         let request = ConsumerInitRequest {
             just: true,
@@ -310,12 +310,43 @@ mod tests {
             .replace(env!("CARGO_PKG_VERSION"), "0.0.0");
         fs::write(&config_path, old).expect("old generated config");
 
-        let result =
-            run_consumer_init_at(fixture.path(), request).expect("refresh generated config");
-        assert_eq!(result["status"], "updated");
-        assert_eq!(
-            fs::read_to_string(config_path).expect("refreshed config"),
-            canonical_consumer_config()
-        );
+        let expected_bytes = fs::read(&config_path).expect("old generated config bytes");
+        let expected_modified = fs::metadata(&config_path)
+            .expect("old generated config metadata")
+            .modified()
+            .expect("old generated config modification time");
+
+        for request in [
+            ConsumerInitRequest {
+                just: true,
+                check: true,
+                dry_run: false,
+            },
+            ConsumerInitRequest {
+                just: true,
+                check: false,
+                dry_run: true,
+            },
+            request,
+        ] {
+            let result = run_consumer_init_at(fixture.path(), request)
+                .expect("version-only generated config remains current");
+            assert_eq!(result["status"], "current");
+            assert_eq!(
+                result["version_only_stale_files"].as_array().map(Vec::len),
+                Some(1)
+            );
+            assert_eq!(
+                fs::read(&config_path).expect("unchanged config bytes"),
+                expected_bytes
+            );
+            assert_eq!(
+                fs::metadata(&config_path)
+                    .expect("unchanged config metadata")
+                    .modified()
+                    .expect("unchanged config modification time"),
+                expected_modified
+            );
+        }
     }
 }
