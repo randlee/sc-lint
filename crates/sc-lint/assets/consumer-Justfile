@@ -8,7 +8,7 @@ setup: _ensure-sc-lint
     .sc-lint/bootstrap setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
-    sc-lint lint ci --config sc-lint.toml
+    sc-lint lint ci --consumer --config sc-lint.toml
 
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml

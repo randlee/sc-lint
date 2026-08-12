@@ -308,6 +308,23 @@ specialized backend tools and mixed Rust/Python implementations.
   installed `sc-lint` command. E.3 owns rendering this asset into consumer
   repositories and the generated Justfile contract.
 
+- `REQ-CLI-022`
+  `sc-lint init --just [--check|--dry-run]` must materialize only the
+  product-owned `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap` files.
+  A current integration is idempotent; `--check` and `--dry-run` do not mutate
+  it. A differing existing managed-path file is a structured conflict, never
+  an overwrite, and a consumer README is outside the command's write set.
+  E.6 owns optional CI workflow generation because it depends on the reusable
+  release-verified Action rather than a source-checkout fallback.
+
+- `REQ-CLI-023`
+  Consumer execution is explicit: `sc-lint lint ci --consumer --config
+  sc-lint.toml` runs the complete configured `[[tool.sc-lint.lint]]` profile,
+  and `sc-lint test --config sc-lint.toml` runs the complete configured
+  `[[tool.sc-lint.test]]` profile. Each profile item has a unique non-empty
+  `name` and a non-empty argv `command` array. These commands do not discover
+  a source checkout or execute `.just` scripts.
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:

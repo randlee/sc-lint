@@ -10,6 +10,7 @@ use crate::CliError;
 use crate::ClippyTarget;
 use crate::cli::LintProfile;
 use crate::command::CommandSuccess;
+use crate::config::ConsumerProfile;
 use crate::config::LoadedConfig;
 use crate::consts;
 
@@ -17,33 +18,33 @@ pub const WINDOWS_XWIN_TARGET: &str = "x86_64-pc-windows-msvc";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StepPlan {
-    name: &'static str,
-    kind: &'static str,
+    name: String,
+    kind: String,
     command: OsString,
     args: Vec<OsString>,
 }
 
 impl StepPlan {
     fn new(
-        name: &'static str,
-        kind: &'static str,
+        name: impl Into<String>,
+        kind: impl Into<String>,
         command: impl Into<OsString>,
         args: impl IntoIterator<Item = impl Into<OsString>>,
     ) -> Self {
         Self {
-            name,
-            kind,
+            name: name.into(),
+            kind: kind.into(),
             command: command.into(),
             args: args.into_iter().map(Into::into).collect(),
         }
     }
 
-    pub(crate) const fn name(&self) -> &'static str {
-        self.name
+    pub(crate) fn name(&self) -> &str {
+        &self.name
     }
 
-    pub(crate) const fn kind(&self) -> &'static str {
-        self.kind
+    pub(crate) fn kind(&self) -> &str {
+        &self.kind
     }
 
     pub(crate) fn display_command(&self) -> String {
@@ -60,16 +61,16 @@ impl StepPlan {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StepReport {
-    name: &'static str,
-    kind: &'static str,
+    name: String,
+    kind: String,
     command: String,
 }
 
 impl StepReport {
     pub(crate) fn success(step: &StepPlan) -> Self {
         Self {
-            name: step.name(),
-            kind: step.kind(),
+            name: step.name().to_string(),
+            kind: step.kind().to_string(),
             command: step.display_command(),
         }
     }
@@ -113,11 +114,21 @@ impl SystemAdapter for HostSystemAdapter {
             .args(&step.args)
             .output()
             .map_err(|error| {
-                CliError::backend_failure(format!("{} failed to start", step.name))
+                let missing = error.kind() == std::io::ErrorKind::NotFound;
+                let mut diagnostic = CliError::backend_failure(format!("{} failed to start", step.name()))
                     .with_source(error)
-                    .with_detail("step", json!(step.name))
+                    .with_detail("step", json!(step.name()))
                     .with_detail("command", json!(step.display_command()))
-                    .with_detail("root", json!(repo_root.display().to_string()))
+                    .with_detail("root", json!(repo_root.display().to_string()));
+                if missing {
+                    diagnostic = diagnostic
+                        .with_code("CLI.SC_LINT_BACKEND_NOT_FOUND")
+                        .with_suggested_action(
+                            "Install the backend named by the configured profile command, then rerun the profile.",
+                        )
+                        .with_documentation("sc-lint docs setup");
+                }
+                diagnostic
             })?;
 
         if !output.status.success() {
@@ -128,8 +139,8 @@ impl SystemAdapter for HostSystemAdapter {
             } else {
                 stderr.clone()
             };
-            let mut error = CliError::backend_failure(format!("{} failed", step.name))
-                .with_detail("step", json!(step.name))
+            let mut error = CliError::backend_failure(format!("{} failed", step.name()))
+                .with_detail("step", json!(step.name()))
                 .with_detail("command", json!(step.display_command()))
                 .with_detail("root", json!(repo_root.display().to_string()))
                 .with_detail("exit_code", json!(output.status.code()))
@@ -154,6 +165,22 @@ pub fn run_lint_profile(
     profile: LintProfile,
 ) -> Result<CommandSuccess, CliError> {
     run_lint_profile_with(loaded_config, profile, &HostSystemAdapter)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer lint profiles retain the shared top-level CliError contract."
+)]
+pub fn run_consumer_lint_profile(loaded_config: &LoadedConfig) -> Result<CommandSuccess, CliError> {
+    run_consumer_profile_with(loaded_config, ConsumerProfile::Lint, &HostSystemAdapter)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer test profiles retain the shared top-level CliError contract."
+)]
+pub fn run_consumer_test_profile(loaded_config: &LoadedConfig) -> Result<CommandSuccess, CliError> {
+    run_consumer_profile_with(loaded_config, ConsumerProfile::Test, &HostSystemAdapter)
 }
 
 #[expect(
@@ -210,6 +237,35 @@ pub(crate) fn run_lint_profile_with(
             "included": matches!(profile, LintProfile::Full) && xwin_available,
             "target": WINDOWS_XWIN_TARGET,
         },
+    })))
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Tests and production share the same explicit consumer profile execution path."
+)]
+pub(crate) fn run_consumer_profile_with(
+    loaded_config: &LoadedConfig,
+    profile: ConsumerProfile,
+    adapter: &dyn SystemAdapter,
+) -> Result<CommandSuccess, CliError> {
+    let (root, configured_steps) = loaded_config.consumer_profile(profile)?;
+    let plans = configured_steps
+        .iter()
+        .map(|step| {
+            let (command, args) = step
+                .command()
+                .split_first()
+                .expect("validated command argv");
+            StepPlan::new(step.name(), profile.as_str(), command, args)
+        })
+        .collect::<Vec<_>>();
+    let steps = run_steps(root, adapter, &plans)?;
+    Ok(CommandSuccess::direct(json!({
+        "status": "pass",
+        "profile": profile.as_str(),
+        "step_count": steps.len(),
+        "steps": steps.into_iter().map(|step| step.to_json()).collect::<Vec<_>>(),
     })))
 }
 

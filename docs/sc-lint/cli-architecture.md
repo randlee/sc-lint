@@ -76,8 +76,12 @@ ADR-012 defines a separate, explicit consumer integration path. `sc-lint init
 --just` materializes only the canonical config, thin Justfile, and managed
 bootstrap asset. Public consumer recipes preflight compatibility before lint or
 test work and delegate to installed `sc-lint`; they do not call Cargo,
-analyzer-package binaries, or copied source-local Python wrappers. The root
-repository's maintenance Justfile remains a distinct source-maintainer surface.
+analyzer-package binaries, or copied source-local Python wrappers. Consumer
+profile membership is data in `sc-lint.toml`: named argv steps are validated at
+the configuration boundary and run in the config directory. `lint ci
+--consumer` is the explicit consumer selection, while `lint ci` retains the
+source-maintainer profile path. The root repository's maintenance Justfile
+remains a distinct source-maintainer surface.
 
 ## Initial Command Families
 

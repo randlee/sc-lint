@@ -36,6 +36,9 @@ contract and is not an input to this decision.
    retain all development gates. Source versus consumer behavior is selected
    by explicit generated integration, never inferred from a directory name,
    Cargo manifest, or a backend package.
+7. E.3 does not generate a consumer CI workflow. E.6 owns that optional
+   surface because only its reusable Action can install a verified release and
+   make the generated local compatibility contract viable in CI.
 
 ## Canonical Generated Template
 
@@ -50,7 +53,7 @@ setup: _ensure-sc-lint
     .sc-lint/bootstrap setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
-    sc-lint lint ci --config sc-lint.toml
+    sc-lint lint ci --consumer --config sc-lint.toml
 
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
@@ -69,3 +72,6 @@ upgrade: _ensure-sc-lint
   distribution. This decision only records their discovery references.
 - `just lint` and `just test` in consumer repositories always mean complete
   configured profiles, never an advisory subset.
+- Consumer mode is encoded in the generated command path: `lint ci --consumer`
+  and `test` read named argv profiles from `sc-lint.toml`; source-maintainer
+  `lint ci` remains a separate source-checkout command path.

@@ -73,6 +73,12 @@ Initial convention:
   - `lint.identity-literals`
 - `sc-lint lint fast`
   - `lint.fast`
+- `sc-lint lint ci --consumer`
+  - `lint.ci.consumer`
+- `sc-lint test`
+  - `test`
+- `sc-lint init --just`
+  - `init`
 - `sc-lint view findings`
   - `view.findings`
 - `sc-lint view graph`
@@ -116,6 +122,14 @@ Current implementation status:
   - implemented profile orchestration path with conditional `xwin` preflight
 - `lint.ci`
   - implemented lint-only CI-parity profile path
+- `lint.ci.consumer`
+  - implemented explicit consumer lint profile path; its configured argv steps
+    run from `sc-lint.toml` without source-checkout discovery
+- `test`
+  - implemented explicit consumer test profile path
+- `init`
+  - implemented product-owned consumer integration renderer with check,
+    dry-run, idempotency, and conflict behavior
 - `check.native`
   - implemented native preflight path
 - `check.xwin`
@@ -272,6 +286,34 @@ This matrix exists to prevent each command family from inventing its own
 response or error pattern at implementation time.
 
 ## Compatibility And Version-Probe Contract
+
+## Consumer Integration And Profile Contract
+
+Consumer mode is selected by command shape, never by a repository name,
+Cargo manifest, or analyzer package:
+
+- `sc-lint init --just` writes the generated config, Justfile, and bootstrap
+  helper only when each path is missing or already exactly product-managed.
+- `sc-lint lint ci --consumer --config sc-lint.toml` and `sc-lint test
+  --config sc-lint.toml` load the configuration beside the consumer project.
+- profile commands are argv arrays, not shell strings. Each command runs in
+  the configuration directory and any required member failure fails the
+  aggregate command with a structured `CliError`.
+- missing configured executables use
+  `CLI.SC_LINT_BACKEND_NOT_FOUND` with installation recovery and the setup
+  documentation reference.
+
+The generated default configuration uses this shape:
+
+```toml
+[[tool.sc-lint.lint]]
+name = "fmt"
+command = ["cargo", "fmt", "--all", "--check"]
+
+[[tool.sc-lint.test]]
+name = "workspace"
+command = ["cargo", "test", "--workspace"]
+```
 
 The only consumer minimum-version location is:
 

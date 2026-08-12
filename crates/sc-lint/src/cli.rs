@@ -31,6 +31,9 @@ pub enum Command {
     Lint {
         #[arg(value_enum)]
         target: LintTarget,
+        /// Run the explicitly configured consumer profile instead of the source-maintainer profile.
+        #[arg(long)]
+        consumer: bool,
     },
     View {
         #[arg(value_enum)]
@@ -63,6 +66,20 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Materialize the product-owned consumer integration files.
+    Init {
+        /// Generate the canonical thin Just integration.
+        #[arg(long)]
+        just: bool,
+        /// Verify that the generated integration is current without changing files.
+        #[arg(long)]
+        check: bool,
+        /// Report the changes that would be made without changing files.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Run the complete explicitly configured consumer test profile.
+    Test,
     Version,
     Ci,
 }
