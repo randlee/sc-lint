@@ -30,7 +30,7 @@ verify its published checksum, and put `sc-lint` on `PATH`. The archive's
 instead places it in the formula-owned `pkgshare` path shown above.
 
 ```sh
-tar -xzf sc-lint_0.4.0_x86_64-unknown-linux-gnu.tar.gz
+tar -xzf sc-lint_0.5.0_x86_64-unknown-linux-gnu.tar.gz
 install -m 0755 sc-lint /usr/local/bin/sc-lint
 sc-lint docs --path
 ```
