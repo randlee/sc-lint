@@ -4,6 +4,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::process::Command as ProcessCommand;
 
 use clap::Parser;
@@ -36,22 +37,21 @@ const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justf
 
 #[test]
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
+    let canonical = CANONICAL_CONSUMER_JUSTFILE.replace("\r\n", "\n");
     for recipe in ["setup", "lint", "test", "upgrade"] {
         assert!(
-            CANONICAL_CONSUMER_JUSTFILE.contains(&format!("{recipe}: _ensure-sc-lint")),
+            canonical.contains(&format!("{recipe}: _ensure-sc-lint")),
             "consumer template omits shared preflight from `{recipe}`"
         );
     }
-    assert!(CANONICAL_CONSUMER_JUSTFILE.contains("[private]\n_ensure-sc-lint:"));
-    assert!(!CANONICAL_CONSUMER_JUSTFILE.contains("compatibility"));
-    assert!(CANONICAL_CONSUMER_JUSTFILE.contains(".sc-lint/bootstrap ensure"));
-    assert!(
-        CANONICAL_CONSUMER_JUSTFILE.contains("sc-lint lint ci --consumer --config sc-lint.toml")
-    );
-    assert!(CANONICAL_CONSUMER_JUSTFILE.contains("sc-lint test --config sc-lint.toml"));
+    assert!(canonical.contains("[private]\n_ensure-sc-lint:"));
+    assert!(!canonical.contains("compatibility"));
+    assert!(canonical.contains(".sc-lint/bootstrap ensure"));
+    assert!(canonical.contains("sc-lint lint ci --consumer --config sc-lint.toml"));
+    assert!(canonical.contains("sc-lint test --config sc-lint.toml"));
     for forbidden in ["cargo run", "sc-lint-boundary", ".just/"] {
         assert!(
-            !CANONICAL_CONSUMER_JUSTFILE.contains(forbidden),
+            !canonical.contains(forbidden),
             "consumer template leaks source-maintainer implementation `{forbidden}`"
         );
     }
@@ -275,6 +275,12 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     assert!(root.join("sc-lint.toml").is_file());
     assert!(root.join("Justfile").is_file());
     assert!(root.join(".sc-lint/bootstrap").is_file());
+    assert_eq!(
+        fs::read(root.join(".sc-lint/bootstrap"))
+            .expect("bootstrap")
+            .get(..9),
+        Some(&b"#!/bin/sh"[..])
+    );
     assert_eq!(
         fs::read_to_string(&readme).expect("README"),
         "consumer-owned README\n"
@@ -1486,6 +1492,28 @@ fn render_error_human_includes_suggested_action_when_present() {
 
     assert!(rendered.contains("lint.sc-boundary: bad config (CLI.CONFIG_ERROR)"));
     assert!(rendered.contains("Run `sc-lint lint sc-boundary --json` to inspect the failure."));
+}
+
+#[test]
+fn render_error_human_includes_backend_cause_and_process_diagnostics() {
+    let error = CliError::backend_failure("clippy failed")
+        .with_cause("process exited unsuccessfully")
+        .with_detail("exit_code", json!(101))
+        .with_detail("stdout", json!("compiler output"))
+        .with_detail("stderr", json!("compiler error"));
+    let rendered = crate::render::render_error_human("lint.full", &error);
+
+    for expected in [
+        "Cause: process exited unsuccessfully",
+        "Exit code: 101",
+        "Standard output: compiler output",
+        "Standard error: compiler error",
+    ] {
+        assert!(
+            rendered.contains(expected),
+            "missing {expected}: {rendered}"
+        );
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

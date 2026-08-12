@@ -260,6 +260,7 @@ mod tests {
         let documented = collect_sc_lint_codes(&troubleshooting);
         let implemented = [
             include_str!("config.rs"),
+            include_str!("consumer_integration.rs"),
             include_str!("installer.rs"),
             include_str!("workflow.rs"),
             include_str!("docs.rs"),
