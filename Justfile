@@ -2,6 +2,7 @@ set windows-shell := ["pwsh", "-NoLogo", "-Command"]
 
 python_cmd := if os_family() == "windows" { "python" } else { "python3" }
 sc_lint_binary := if os_family() == "windows" { ".\\target\\debug\\sc-lint.exe" } else { "./target/debug/sc-lint" }
+export SC_LINT_BIN := sc_lint_binary
 
 # Show the curated repo task help.
 default: help
@@ -101,11 +102,11 @@ _source-lint target='full':
 # installed release binary through the same command and configuration shape.
 [private]
 _ensure-sc-lint: _source-build
-    SC_LINT_BIN={{sc_lint_binary}} .sc-lint/bootstrap ensure --config sc-lint.toml
+    .sc-lint/bootstrap ensure --config sc-lint.toml
 
 # Verify the root model's compatible product binary and report setup state.
 setup: _ensure-sc-lint
-    SC_LINT_BIN={{sc_lint_binary}} .sc-lint/bootstrap setup --config sc-lint.toml --dry-run
+    .sc-lint/bootstrap setup --config sc-lint.toml --dry-run
 
 # Run every required source lint gate through the consumer contract.
 lint: _ensure-sc-lint
@@ -117,4 +118,4 @@ test: _ensure-sc-lint
 
 # Inspect the managed upgrade path without changing the source checkout.
 upgrade: _ensure-sc-lint
-    SC_LINT_BIN={{sc_lint_binary}} .sc-lint/bootstrap upgrade --config sc-lint.toml --check --dry-run
+    .sc-lint/bootstrap upgrade --config sc-lint.toml --check --dry-run

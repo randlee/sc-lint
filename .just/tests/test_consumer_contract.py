@@ -22,6 +22,14 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn("lint --consumer --config sc-lint.toml ci", self.justfile)
         self.assertIn("--config sc-lint.toml test", self.justfile)
 
+    def test_root_model_exports_the_product_binary_without_shell_specific_assignments(self) -> None:
+        self.assertIn("export SC_LINT_BIN := sc_lint_binary", self.justfile)
+        for line in self.justfile.splitlines():
+            self.assertFalse(
+                line.lstrip().startswith("SC_LINT_BIN="),
+                f"shell-specific inline environment assignment: {line}",
+            )
+
     def test_root_profiles_retain_complete_source_gates(self) -> None:
         self.assertIn('command = ["just", "_source-lint", "full"]', self.config)
         self.assertIn('command = ["just", "_source-test"]', self.config)
