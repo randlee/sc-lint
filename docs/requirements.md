@@ -495,7 +495,13 @@ The product should support both:
   must install a version-matched offline documentation bundle containing the
   overview, canonical Just guide, and one guide per published package. The
   installed help/docs surface must discover those files without a source
-  checkout or network access.
+  checkout or network access. The release manifest is the authoritative
+  inventory for the exact bundle paths: an archive contains the top-level
+  `sc-lint-docs/` directory beside the declared binaries, while the primary
+  Homebrew formula installs that directory only under its formula-owned
+  `pkgshare`. Packaging validation must reject missing, unexpected, or
+  unrecorded bundle files; it must never write the bundle overview into a
+  consumer repository.
 
 - `REQ-PRODUCT-022`
   The project must provide a versioned reusable GitHub Action that obtains a
