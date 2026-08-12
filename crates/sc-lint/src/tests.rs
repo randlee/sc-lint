@@ -1462,6 +1462,28 @@ fn render_error_human_includes_suggested_action_when_present() {
     assert!(rendered.contains("Run `sc-lint lint sc-boundary --json` to inspect the failure."));
 }
 
+#[test]
+fn render_error_human_includes_backend_cause_and_process_diagnostics() {
+    let error = CliError::backend_failure("clippy failed")
+        .with_cause("process exited unsuccessfully")
+        .with_detail("exit_code", json!(101))
+        .with_detail("stdout", json!("compiler output"))
+        .with_detail("stderr", json!("compiler error"));
+    let rendered = crate::render::render_error_human("lint.full", &error);
+
+    for expected in [
+        "Cause: process exited unsuccessfully",
+        "Exit code: 101",
+        "Standard output: compiler output",
+        "Standard error: compiler error",
+    ] {
+        assert!(
+            rendered.contains(expected),
+            "missing {expected}: {rendered}"
+        );
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct BrokenSerialize;
 

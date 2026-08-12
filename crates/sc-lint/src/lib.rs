@@ -2,6 +2,7 @@ mod cli;
 mod command;
 mod config;
 pub mod consts;
+mod consumer_integration;
 mod contract;
 mod dispatch;
 mod error;
