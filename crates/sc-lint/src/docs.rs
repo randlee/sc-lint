@@ -176,6 +176,18 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
+    const REQUIRED_OPERATOR_GUIDES: &[&str] = &[
+        "README.md",
+        "installation.md",
+        "using-sc-lint.md",
+        "configuration.md",
+        "just-setup.md",
+        "ci.md",
+        "upgrade.md",
+        "troubleshooting.md",
+        "best-practices.md",
+    ];
+
     fn source_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs-bundle")
     }
@@ -235,6 +247,63 @@ mod tests {
                 assert!(link_path.is_file(), "broken link {path} -> {target}");
             }
         }
+    }
+
+    #[test]
+    fn bundle_manifest_lists_every_required_operator_guide() {
+        let bundle: toml::Value = toml::from_str(
+            &fs::read_to_string(source_root().join("manifest.toml")).expect("bundle manifest"),
+        )
+        .expect("valid bundle manifest");
+        let operator_guides: BTreeSet<_> = bundle["guides"]
+            .as_array()
+            .expect("guides")
+            .iter()
+            .filter(|guide| matches!(guide["kind"].as_str(), Some("overview" | "operator")))
+            .filter_map(|guide| guide["path"].as_str())
+            .collect();
+        let required: BTreeSet<_> = REQUIRED_OPERATOR_GUIDES.iter().copied().collect();
+        assert_eq!(operator_guides, required);
+    }
+
+    #[test]
+    fn troubleshooting_documents_every_stable_sc_lint_error_code() {
+        let troubleshooting = fs::read_to_string(source_root().join("troubleshooting.md"))
+            .expect("troubleshooting guide");
+        let documented = collect_sc_lint_codes(&troubleshooting);
+        let implemented = [
+            include_str!("config.rs"),
+            include_str!("consumer_integration.rs"),
+            include_str!("installer.rs"),
+            include_str!("workflow.rs"),
+            include_str!("docs.rs"),
+        ]
+        .into_iter()
+        .flat_map(collect_sc_lint_codes)
+        .collect::<BTreeSet<_>>();
+        assert!(
+            implemented.is_subset(&documented),
+            "troubleshooting.md omits stable codes: {:?}",
+            implemented.difference(&documented).collect::<Vec<_>>()
+        );
+    }
+
+    fn collect_sc_lint_codes(text: &str) -> BTreeSet<&str> {
+        text.match_indices("CLI.SC_LINT_")
+            .filter_map(|(offset, _)| {
+                let candidate = &text[offset..];
+                let end = candidate
+                    .find(|character: char| {
+                        !(character.is_ascii_uppercase()
+                            || character.is_ascii_digit()
+                            || character == '_'
+                            || character == '.')
+                    })
+                    .unwrap_or(candidate.len());
+                let code = &candidate[..end];
+                (code.len() > "CLI.SC_LINT_".len()).then_some(code)
+            })
+            .collect()
     }
 
     #[test]
