@@ -1,7 +1,7 @@
 ---
 id: E.3
 title: Consumer CLI And Canonical Just Integration
-status: planned
+status: implemented
 branch: feature/phase-E3-consumer-cli-just
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E3-consumer-cli-just
 target: integrate/phase-E
@@ -59,7 +59,9 @@ consumer path only through the explicit product-owned bootstrap and installed
   complete lint, complete test, and compatibility checking. Product commands
   must not depend on a source checkout's `.just` directory.
 - `sc-lint init` creates/updates only product-owned integration files:
-  `sc-lint.toml`, thin Just integration, and optional CI workflow. It never
+  `sc-lint.toml` and thin Just integration. The optional consumer CI workflow
+  is an E.6 delivery concern because it depends on that sprint's reusable
+  release-verified Action contract. It never
   overwrites a repository README. `sc-lint init --just` is the one-command
   consumer setup path; it is idempotent, reports its managed files, and offers
   `--check`/`--dry-run` before modifying an existing repository.
@@ -90,16 +92,16 @@ default: lint
 _ensure-sc-lint:
     .sc-lint/bootstrap ensure --config sc-lint.toml
 
-setup:
+setup: _ensure-sc-lint
     .sc-lint/bootstrap setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
-    sc-lint lint ci --config sc-lint.toml
+    sc-lint lint ci --consumer --config sc-lint.toml
 
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
 
-upgrade:
+upgrade: _ensure-sc-lint
     .sc-lint/bootstrap upgrade --config sc-lint.toml
 ```
 
@@ -115,6 +117,8 @@ contract are mandatory.
   and release packaging
 - replacement of every repository-specific policy script that has not yet been
   productized; such scripts must remain explicitly source-local until migrated
+- consumer CI workflow generation and installation logic; E.6 owns the
+  reusable release-verified Action that makes that workflow viable
 
 ## Paths To Delete
 
@@ -147,3 +151,18 @@ contract are mandatory.
 - generated consumer fixture: `just lint` and `just test`
 - regression test: missing installed backend reports a structured failure, not
   `FileNotFoundError` or a Python traceback
+
+## Implementation Record
+
+- `sc-lint init --just [--check|--dry-run]` owns only `sc-lint.toml`,
+  `Justfile`, and `.sc-lint/bootstrap`; it reports managed paths, is
+  idempotent, and rejects a conflicting user-owned path without touching a
+  README.
+- Consumer lint uses the explicit `sc-lint lint ci --consumer` command path;
+  consumer test uses `sc-lint test`. Both validate named argv profiles in
+  `sc-lint.toml` and run from that file's directory without source checkout
+  discovery.
+- The generated Just fixture verifies that every public recipe preflights first,
+  then calls the installed product command. Missing product/backend commands
+  return a stable recovery code and documentation reference without a
+  traceback.

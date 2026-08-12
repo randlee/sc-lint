@@ -4,6 +4,8 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+#[cfg(unix)]
+use std::process::Command as ProcessCommand;
 
 use clap::Parser;
 use serde::Serialize;
@@ -25,8 +27,34 @@ use crate::ParsedInvocation;
 use crate::ViewTarget;
 use crate::cli::OutputMode;
 use crate::command::CommandContext;
+use crate::command::ConsumerInitRequest;
+use crate::config::ConsumerProfile;
 use crate::config::LoadedConfig;
 use crate::workflow;
+
+const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
+
+#[test]
+fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
+    let canonical = CANONICAL_CONSUMER_JUSTFILE.replace("\r\n", "\n");
+    for recipe in ["setup", "lint", "test", "upgrade"] {
+        assert!(
+            canonical.contains(&format!("{recipe}: _ensure-sc-lint")),
+            "consumer template omits shared preflight from `{recipe}`"
+        );
+    }
+    assert!(canonical.contains("[private]\n_ensure-sc-lint:"));
+    assert!(!canonical.contains("compatibility"));
+    assert!(canonical.contains(".sc-lint/bootstrap ensure"));
+    assert!(canonical.contains("sc-lint lint ci --consumer --config sc-lint.toml"));
+    assert!(canonical.contains("sc-lint test --config sc-lint.toml"));
+    for forbidden in ["cargo run", "sc-lint-boundary", ".just/"] {
+        assert!(
+            !canonical.contains(forbidden),
+            "consumer template leaks source-maintainer implementation `{forbidden}`"
+        );
+    }
+}
 
 #[test]
 fn command_surface_parses_the_initial_grouped_shape() {
@@ -34,7 +62,8 @@ fn command_surface_parses_the_initial_grouped_shape() {
     assert!(matches!(
         cli.command.as_ref(),
         Some(Command::Lint {
-            target: LintTarget::ScBoundary
+            target: LintTarget::ScBoundary,
+            ..
         })
     ));
 
@@ -50,7 +79,8 @@ fn command_surface_parses_the_initial_grouped_shape() {
     assert!(matches!(
         cli.command.as_ref(),
         Some(Command::Lint {
-            target: LintTarget::LineCounts
+            target: LintTarget::LineCounts,
+            ..
         })
     ));
 
@@ -91,6 +121,8 @@ fn help_text_exposes_the_initial_grouped_surface() {
         "compatibility",
         "setup",
         "upgrade",
+        "init",
+        "test",
         "version",
         "ci",
         "--json",
@@ -114,6 +146,297 @@ fn setup_and_upgrade_parse_the_stable_consumer_flags() {
             dry_run: true
         })
     ));
+}
+
+#[test]
+fn consumer_commands_require_an_explicit_consumer_mode() {
+    let lint = Cli::parse_from(["sc-lint", "lint", "ci", "--consumer"]);
+    assert!(matches!(
+        lint.command,
+        Some(Command::Lint {
+            target: LintTarget::Ci,
+            consumer: true,
+        })
+    ));
+    let test = Cli::parse_from(["sc-lint", "test"]);
+    assert!(matches!(test.command, Some(Command::Test)));
+    let init = Cli::parse_from(["sc-lint", "init", "--just", "--check"]);
+    assert!(matches!(
+        init.command,
+        Some(Command::Init {
+            just: true,
+            check: true,
+            dry_run: false,
+        })
+    ));
+    let invalid = Cli::parse_from(["sc-lint", "lint", "fast", "--consumer"]);
+    let error = CommandContext::from_cli(&invalid).expect_err("only CI profile is consumer-owned");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    let init_with_config = Cli::parse_from(["sc-lint", "--config", "other.toml", "init", "--just"]);
+    let error = CommandContext::from_cli(&init_with_config).expect_err("init owns its config path");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+}
+
+#[test]
+fn source_and_consumer_lint_paths_are_distinct_without_path_heuristics() {
+    let source = Cli::parse_from(["sc-lint", "lint", "ci"]);
+    let source_context = CommandContext::from_cli(&source).expect("source context");
+    let consumer = Cli::parse_from(["sc-lint", "lint", "ci", "--consumer"]);
+    let consumer_context = CommandContext::from_cli(&consumer).expect("consumer context");
+
+    assert_eq!(source_context.command_id(), "lint.ci");
+    assert!(source_context.requires_repo_root());
+    assert_eq!(consumer_context.command_id(), "lint.ci.consumer");
+    assert!(!consumer_context.requires_repo_root());
+}
+
+#[test]
+fn consumer_profile_schema_is_rejected_before_any_profile_step_runs() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n",
+    )
+    .expect("config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "lint",
+        "ci",
+        "--consumer",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("context");
+    let error =
+        LoadedConfig::load(&cli, &context).expect_err("empty lint profile fails before execution");
+    assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED");
+    assert_eq!(error.details["profile"], "lint");
+}
+
+#[test]
+fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_files() {
+    let fixture = TempDir::new().expect("fixture");
+    let root = fixture.path();
+    let readme = root.join("README.md");
+    fs::write(&readme, "consumer-owned README\n").expect("README");
+    let request = ConsumerInitRequest {
+        just: true,
+        check: false,
+        dry_run: false,
+    };
+
+    let dry_run = crate::config::run_consumer_init_at(
+        root,
+        ConsumerInitRequest {
+            just: true,
+            check: false,
+            dry_run: true,
+        },
+    )
+    .expect("dry run");
+    assert_eq!(dry_run["status"], "would_create");
+    assert!(!root.join("sc-lint.toml").exists());
+
+    let created = crate::config::run_consumer_init_at(root, request).expect("initializes");
+    assert_eq!(created["status"], "created");
+    assert!(root.join("sc-lint.toml").is_file());
+    assert!(root.join("Justfile").is_file());
+    assert!(root.join(".sc-lint/bootstrap").is_file());
+    assert_eq!(
+        fs::read(root.join(".sc-lint/bootstrap"))
+            .expect("bootstrap")
+            .get(..9),
+        Some(&b"#!/bin/sh"[..])
+    );
+    assert_eq!(
+        fs::read_to_string(&readme).expect("README"),
+        "consumer-owned README\n"
+    );
+
+    let current = crate::config::run_consumer_init_at(root, request).expect("idempotent");
+    assert_eq!(current["status"], "current");
+    let checked = crate::config::run_consumer_init_at(
+        root,
+        ConsumerInitRequest {
+            just: true,
+            check: true,
+            dry_run: false,
+        },
+    )
+    .expect("check current integration");
+    assert_eq!(checked["status"], "current");
+
+    fs::write(root.join("Justfile"), "consumer-owned\n").expect("conflict");
+    let error = crate::config::run_consumer_init_at(root, request)
+        .expect_err("conflict is not overwritten");
+    assert_eq!(error.code(), "CLI.SC_LINT_INTEGRATION_CONFLICT");
+    assert_eq!(
+        fs::read_to_string(root.join("Justfile")).expect("Justfile"),
+        "consumer-owned\n"
+    );
+}
+
+#[test]
+fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    write_consumer_profile_config(&config_path);
+    let lint_cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "lint",
+        "ci",
+        "--consumer",
+    ]);
+    let lint_context = CommandContext::from_cli(&lint_cli).expect("consumer lint context");
+    let loaded = LoadedConfig::load(&lint_cli, &lint_context).expect("consumer config");
+    let passing = FakeSystemAdapter::new(false);
+    let lint = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Lint, &passing)
+        .expect("all lint members run");
+    assert_eq!(
+        step_names(lint.data["steps"].as_array().expect("steps")),
+        vec!["lint-fmt", "lint-clippy"]
+    );
+    assert_eq!(
+        *passing.invocations.borrow(),
+        vec!["lint-fmt", "lint-clippy"]
+    );
+
+    let test_cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "test",
+    ]);
+    let test_context = CommandContext::from_cli(&test_cli).expect("consumer test context");
+    let loaded = LoadedConfig::load(&test_cli, &test_context).expect("consumer config");
+    let mut failing = FakeSystemAdapter::new(false);
+    failing
+        .failures
+        .insert("test-workspace", "configured test failed");
+    let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, &failing)
+        .expect_err("a required test member fails the aggregate");
+    assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    assert_eq!(*failing.invocations.borrow(), vec!["test-workspace"]);
+}
+
+#[test]
+fn consumer_missing_backend_is_a_structured_recovery_error() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"missing\"\ncommand = [\"sc-lint-definitely-missing-backend\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n",
+    )
+    .expect("config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "lint",
+        "ci",
+        "--consumer",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("consumer config");
+    let error = workflow::run_consumer_lint_profile(&loaded).expect_err("missing backend fails");
+    assert_eq!(error.code(), "CLI.SC_LINT_BACKEND_NOT_FOUND");
+    assert_eq!(error.documentation.as_deref(), Some("sc-lint docs setup"));
+    assert!(!error.to_string().to_ascii_lowercase().contains("traceback"));
+}
+
+#[cfg(unix)]
+#[test]
+#[serial]
+fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight() {
+    let fixture = TempDir::new().expect("fixture");
+    let root = fixture.path();
+    crate::config::run_consumer_init_at(
+        root,
+        ConsumerInitRequest {
+            just: true,
+            check: false,
+            dry_run: false,
+        },
+    )
+    .expect("generate fixture");
+    let bin_dir = root.join("bin");
+    fs::create_dir_all(&bin_dir).expect("bin dir");
+    let record = root.join("calls.txt");
+    let binary = bin_dir.join("sc-lint");
+    fs::write(
+        &binary,
+        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$SC_LINT_RECORD\"\n",
+    )
+    .expect("fake sc-lint");
+    set_mock_backend_permissions(&binary);
+    let path = std::env::join_paths(
+        std::iter::once(bin_dir.clone()).chain(
+            std::env::var_os("PATH")
+                .as_ref()
+                .into_iter()
+                .flat_map(std::env::split_paths),
+        ),
+    )
+    .expect("PATH");
+
+    for recipe in ["lint", "test"] {
+        let output = ProcessCommand::new("just")
+            .current_dir(root)
+            .arg(recipe)
+            .env("PATH", &path)
+            .env("SC_LINT_BIN", &binary)
+            .env("SC_LINT_RECORD", &record)
+            .output()
+            .expect("run just fixture");
+        assert!(
+            output.status.success(),
+            "just {recipe} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let calls = fs::read_to_string(&record)
+        .expect("calls")
+        .lines()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        calls,
+        vec![
+            "--config sc-lint.toml compatibility check",
+            "lint ci --consumer --config sc-lint.toml",
+            "--config sc-lint.toml compatibility check",
+            "test --config sc-lint.toml",
+        ]
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn generated_bootstrap_reports_a_missing_sc_lint_binary_without_a_traceback() {
+    let fixture = TempDir::new().expect("fixture");
+    crate::config::run_consumer_init_at(
+        fixture.path(),
+        ConsumerInitRequest {
+            just: true,
+            check: false,
+            dry_run: false,
+        },
+    )
+    .expect("generate fixture");
+    let output = ProcessCommand::new(fixture.path().join(".sc-lint/bootstrap"))
+        .current_dir(fixture.path())
+        .args(["ensure", "--config", "sc-lint.toml"])
+        .env("SC_LINT_BIN", "sc-lint-definitely-missing")
+        .output()
+        .expect("run bootstrap");
+    assert_eq!(output.status.code(), Some(5));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI.SC_LINT_BINARY_NOT_FOUND"));
+    assert!(stderr.contains("Docs: sc-lint docs setup"));
+    assert!(!stderr.to_ascii_lowercase().contains("traceback"));
 }
 
 #[test]
@@ -1139,6 +1462,28 @@ fn render_error_human_includes_suggested_action_when_present() {
     assert!(rendered.contains("Run `sc-lint lint sc-boundary --json` to inspect the failure."));
 }
 
+#[test]
+fn render_error_human_includes_backend_cause_and_process_diagnostics() {
+    let error = CliError::backend_failure("clippy failed")
+        .with_cause("process exited unsuccessfully")
+        .with_detail("exit_code", json!(101))
+        .with_detail("stdout", json!("compiler output"))
+        .with_detail("stderr", json!("compiler error"));
+    let rendered = crate::render::render_error_human("lint.full", &error);
+
+    for expected in [
+        "Cause: process exited unsuccessfully",
+        "Exit code: 101",
+        "Standard output: compiler output",
+        "Standard error: compiler error",
+    ] {
+        assert!(
+            rendered.contains(expected),
+            "missing {expected}: {rendered}"
+        );
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct BrokenSerialize;
 
@@ -1214,6 +1559,14 @@ fn repo_backed_workspace_root() -> PathBuf {
         .and_then(Path::parent)
         .expect("workspace root")
         .to_path_buf()
+}
+
+fn write_consumer_profile_config(path: &Path) {
+    fs::write(
+        path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"lint-fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n\n[[tool.sc-lint.lint]]\nname = \"lint-clippy\"\ncommand = [\"cargo\", \"clippy\", \"--workspace\"]\n\n[[tool.sc-lint.test]]\nname = \"test-workspace\"\ncommand = [\"cargo\", \"test\", \"--workspace\"]\n",
+    )
+    .expect("consumer config");
 }
 
 fn run_sc_boundary_json(repo_root: &Path) -> Value {

@@ -12,10 +12,30 @@ use serde_json::json;
 use crate::Cli;
 use crate::CliError;
 use crate::command::CommandContext;
+use crate::consumer_integration::BINARY_NOT_FOUND_RECOVERY;
+use crate::consumer_integration::DOCS_SETUP_REFERENCE;
+pub(crate) use crate::consumer_integration::run_consumer_init;
+#[cfg(test)]
+pub(crate) use crate::consumer_integration::run_consumer_init_at;
 use crate::error::ErrorCode;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConsumerProfile {
+    Lint,
+    Test,
+}
+
+impl ConsumerProfile {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lint => "lint",
+            Self::Test => "test",
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedConfig {
@@ -32,10 +52,37 @@ pub struct LoadedConfig {
 enum LoadedConfigMode {
     Standard,
     Compatibility(CompatibilityRequirement),
+    Consumer(ConsumerRequirement),
+}
+
+/// A command is decoded and validated at the TOML boundary, so profile
+/// orchestration never needs to split shell strings or infer consumer policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ConsumerProfileStep {
+    name: String,
+    command: Vec<String>,
+}
+
+impl ConsumerProfileStep {
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn command(&self) -> &[String] {
+        &self.command
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ConsumerRequirement {
+    compatibility: CompatibilityRequirement,
+    root: PathBuf,
+    lint: Vec<ConsumerProfileStep>,
+    test: Vec<ConsumerProfileStep>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CompatibilityErrorCode {
+pub(crate) enum CompatibilityErrorCode {
     ConfigMissing,
     ConfigMalformed,
     BinaryNotFound,
@@ -150,6 +197,12 @@ impl LoadedConfig {
         reason = "Config loading failures are part of the stable top-level CliError contract."
     )]
     pub fn load(cli: &Cli, context: &CommandContext) -> Result<Self, CliError> {
+        if matches!(
+            context.id(),
+            crate::command::CommandId::ConsumerLintCi | crate::command::CommandId::ConsumerTest
+        ) {
+            return Self::load_consumer(cli);
+        }
         if context.requires_compatibility_config() {
             return Self::load_compatibility(cli);
         }
@@ -213,10 +266,34 @@ impl LoadedConfig {
             LoadedConfigMode::Compatibility(requirement) => {
                 Ok((&requirement.minimum_version, &requirement.config_path))
             }
+            LoadedConfigMode::Consumer(requirement) => Ok((
+                &requirement.compatibility.minimum_version,
+                &requirement.compatibility.config_path,
+            )),
             LoadedConfigMode::Standard => Err(CliError::internal(
                 "installation commands require a loaded consumer compatibility configuration",
             )),
         }
+    }
+
+    #[expect(
+        clippy::result_large_err,
+        reason = "Consumer profile lookup retains the shared top-level CliError contract."
+    )]
+    pub(crate) fn consumer_profile(
+        &self,
+        profile: ConsumerProfile,
+    ) -> Result<(&Path, &[ConsumerProfileStep]), CliError> {
+        let LoadedConfigMode::Consumer(requirement) = &self.mode else {
+            return Err(CliError::internal(
+                "consumer profile execution requires a consumer configuration",
+            ));
+        };
+        let steps = match profile {
+            ConsumerProfile::Lint => &requirement.lint,
+            ConsumerProfile::Test => &requirement.test,
+        };
+        Ok((&requirement.root, steps))
     }
 
     #[expect(
@@ -245,6 +322,52 @@ impl LoadedConfig {
             logging_root: cli.log_root.clone(),
             logging_console: cli.log_console,
             mode: LoadedConfigMode::Compatibility(requirement),
+        })
+    }
+
+    #[expect(
+        clippy::result_large_err,
+        reason = "Consumer profiles are validated before a product command can launch any configured backend."
+    )]
+    fn load_consumer(cli: &Cli) -> Result<Self, CliError> {
+        let current_dir = std::env::current_dir().map_err(|error| {
+            compatibility_config_error(
+                CompatibilityErrorCode::ConfigMissing,
+                format!("failed to read the current directory while locating `{CONFIG_FILENAME}`"),
+                None,
+                None,
+            )
+            .with_source(error)
+        })?;
+        let config_path = cli.config.as_ref().map_or_else(
+            || current_dir.join(CONFIG_FILENAME),
+            |path| resolve_current_dir_relative_path(&current_dir, path),
+        );
+        let file_config = load_consumer_config_file(&config_path)?;
+        let sc_lint = file_config
+            .tool
+            .as_ref()
+            .and_then(|tool| tool.sc_lint.as_ref())
+            .ok_or_else(|| missing_consumer_field(&config_path, "[tool.sc-lint]"))?;
+        let compatibility = compatibility_requirement_from_file(sc_lint, &config_path)?;
+        let lint = validate_consumer_profile("lint", &sc_lint.lint, &config_path)?;
+        let test = validate_consumer_profile("test", &sc_lint.test, &config_path)?;
+        let root = config_path
+            .parent()
+            .ok_or_else(|| CliError::internal("consumer configuration has no parent directory"))?
+            .to_path_buf();
+
+        Ok(Self {
+            repo_root: None,
+            config_path: Some(config_path),
+            logging_root: cli.log_root.clone(),
+            logging_console: cli.log_console,
+            mode: LoadedConfigMode::Consumer(ConsumerRequirement {
+                compatibility,
+                root,
+                lint,
+                test,
+            }),
         })
     }
 
@@ -398,6 +521,16 @@ struct ToolConfigFile {
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ScLintConfigFile {
     minimum_version: Option<String>,
+    #[serde(default)]
+    lint: Vec<ConsumerProfileStepFile>,
+    #[serde(default)]
+    test: Vec<ConsumerProfileStepFile>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ConsumerProfileStepFile {
+    name: Option<String>,
+    command: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -472,23 +605,27 @@ fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequiremen
             Some(error.to_string()),
         )
     })?;
-    let raw_minimum = file_config
+    let sc_lint = file_config
         .tool
-        .and_then(|tool| tool.sc_lint)
-        .and_then(|sc_lint| sc_lint.minimum_version)
-        .ok_or_else(|| {
-            compatibility_config_error(
-                CompatibilityErrorCode::ConfigMalformed,
-                format!(
-                    "configuration `{}` is missing required field `{}`",
-                    path.display(),
-                    MinimumVersion::FIELD_PATH
-                ),
-                Some(path),
-                None,
-            )
-        })?;
-    let minimum_version = MinimumVersion::from_str(&raw_minimum).map_err(|error| {
+        .as_ref()
+        .and_then(|tool| tool.sc_lint.as_ref())
+        .ok_or_else(|| missing_consumer_field(path, "[tool.sc-lint]"))?;
+    compatibility_requirement_from_file(sc_lint, path)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer configuration validation returns the shared top-level CliError contract."
+)]
+fn compatibility_requirement_from_file(
+    sc_lint: &ScLintConfigFile,
+    path: &Path,
+) -> Result<CompatibilityRequirement, CliError> {
+    let raw_minimum = sc_lint
+        .minimum_version
+        .as_ref()
+        .ok_or_else(|| missing_consumer_field(path, MinimumVersion::FIELD_PATH))?;
+    let minimum_version = MinimumVersion::from_str(raw_minimum).map_err(|error| {
         compatibility_config_error(
             CompatibilityErrorCode::ConfigMalformed,
             format!(
@@ -506,6 +643,122 @@ fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequiremen
     })
 }
 
+fn missing_consumer_field(path: &Path, field: &str) -> CliError {
+    compatibility_config_error(
+        CompatibilityErrorCode::ConfigMalformed,
+        format!(
+            "configuration `{}` is missing required field `{field}`",
+            path.display()
+        ),
+        Some(path),
+        None,
+    )
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer configuration loading returns the shared top-level CliError contract."
+)]
+fn load_consumer_config_file(path: &Path) -> Result<RepoConfigFile, CliError> {
+    if !path.is_file() {
+        return Err(compatibility_config_error(
+            CompatibilityErrorCode::ConfigMissing,
+            format!(
+                "required sc-lint configuration `{}` was not found",
+                path.display()
+            ),
+            Some(path),
+            None,
+        ));
+    }
+    parse_repo_config(path).map_err(|error| {
+        compatibility_config_error(
+            CompatibilityErrorCode::ConfigMalformed,
+            format!("failed to parse sc-lint configuration `{}`", path.display()),
+            Some(path),
+            Some(error.to_string()),
+        )
+    })
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer profile validation returns the shared top-level CliError contract."
+)]
+fn validate_consumer_profile(
+    profile: &str,
+    raw_steps: &[ConsumerProfileStepFile],
+    path: &Path,
+) -> Result<Vec<ConsumerProfileStep>, CliError> {
+    if raw_steps.is_empty() {
+        return Err(consumer_profile_error(
+            path,
+            profile,
+            format!("consumer `{profile}` profile must contain at least one command"),
+        ));
+    }
+    let mut names = std::collections::BTreeSet::new();
+    let mut steps = Vec::with_capacity(raw_steps.len());
+    for (index, step) in raw_steps.iter().enumerate() {
+        let name = step
+            .name
+            .as_deref()
+            .filter(|name| !name.trim().is_empty())
+            .ok_or_else(|| {
+                consumer_profile_error(
+                    path,
+                    profile,
+                    format!(
+                        "consumer `{profile}` profile step {} is missing a non-empty `name`",
+                        index + 1
+                    ),
+                )
+            })?;
+        if !names.insert(name.to_string()) {
+            return Err(consumer_profile_error(
+                path,
+                profile,
+                format!("consumer `{profile}` profile repeats step name `{name}`"),
+            ));
+        }
+        let command = step
+            .command
+            .as_ref()
+            .filter(|command| !command.is_empty())
+            .ok_or_else(|| {
+                consumer_profile_error(
+                    path,
+                    profile,
+                    format!(
+                        "consumer `{profile}` profile step `{name}` is missing a command argv array"
+                    ),
+                )
+            })?;
+        if command.iter().any(|argument| argument.is_empty()) {
+            return Err(consumer_profile_error(
+                path,
+                profile,
+                format!("consumer `{profile}` profile step `{name}` has an empty command argument"),
+            ));
+        }
+        steps.push(ConsumerProfileStep {
+            name: name.to_string(),
+            command: command.clone(),
+        });
+    }
+    Ok(steps)
+}
+
+fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {
+    compatibility_config_error(
+        CompatibilityErrorCode::ConfigMalformed,
+        message,
+        Some(path),
+        None,
+    )
+    .with_detail("profile", json!(profile))
+}
+
 fn compatibility_config_error(
     code: CompatibilityErrorCode,
     message: impl Into<String>,
@@ -514,10 +767,8 @@ fn compatibility_config_error(
 ) -> CliError {
     let mut error = CliError::config(message)
         .with_code(code.as_str())
-        .with_suggested_action(
-            "Run `just setup` (or your repository's sc-lint installer) to create or repair the compatible installation.",
-        )
-        .with_documentation("sc-lint docs setup")
+        .with_suggested_action(BINARY_NOT_FOUND_RECOVERY)
+        .with_documentation(DOCS_SETUP_REFERENCE)
         .with_detail("required_field", json!(MinimumVersion::FIELD_PATH));
     if let Some(path) = path {
         error = error.with_detail("config_path", json!(path.display().to_string()));
@@ -542,7 +793,7 @@ fn compatibility_runtime_error(
         .with_suggested_action(
             "Run `just setup` (or your repository's sc-lint installer) to install or upgrade sc-lint, then retry.",
         )
-        .with_documentation("sc-lint docs setup")
+        .with_documentation(DOCS_SETUP_REFERENCE)
         .with_detail("minimum_version", json!(requirement.minimum_version.to_string()))
         .with_detail("binary_path", json!(binary.display().to_string()))
         .with_detail("config_path", json!(requirement.config_path.display().to_string()));

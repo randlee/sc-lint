@@ -467,7 +467,13 @@ The product should support both:
   work with a structured stable code, cause, recovery action, and documentation
   reference. Consumers must be able to invoke product-owned setup, complete
   lint, complete test, and upgrade entry points without choosing a Cargo
-  package or copying source-repository orchestration.
+  package or copying source-repository orchestration. `sc-lint init --just`
+  must create an idempotent, product-owned `sc-lint.toml`, thin Just
+  integration, and `.sc-lint/bootstrap` helper with non-mutating
+  `--check`/`--dry-run` modes; it must never overwrite a consumer README or
+  user-owned integration file. Consumer `just setup`, `just lint`, `just
+  test`, and `just upgrade` all depend on the same compatibility preflight;
+  lint and test execute complete configured profiles.
 
 - `REQ-PRODUCT-020`
   The supported consumer installation and upgrade path must select a verified

@@ -29,6 +29,13 @@ done
 [ -n "$config" ] || usage
 binary="${SC_LINT_BIN:-sc-lint}"
 
+if ! command -v "$binary" >/dev/null 2>&1; then
+    printf '%s\n' "compatibility.check: could not find sc-lint binary \`$binary\` (CLI.SC_LINT_BINARY_NOT_FOUND)" >&2
+    printf '%s\n' "Run \`just setup\` (or your repository's sc-lint installer) to create or repair a compatible installation." >&2
+    printf '%s\n' 'Docs: sc-lint docs setup' >&2
+    exit 5
+fi
+
 case "$command_name" in
     ensure)
         exec "$binary" --config "$config" compatibility check

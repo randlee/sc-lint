@@ -7,6 +7,7 @@ Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
+- [`./adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
 
 ## Role
 
@@ -68,6 +69,19 @@ Planned Phase `C` note:
 - backend crates do not call each other directly
 - backend replacement should not require changing the CLI command contract
 - backend-specific machine flags must stay behind the CLI contract boundary
+
+## Consumer Integration Boundary
+
+ADR-012 defines a separate, explicit consumer integration path. `sc-lint init
+--just` materializes only the canonical config, thin Justfile, and managed
+bootstrap asset. Public consumer recipes preflight compatibility before lint or
+test work and delegate to installed `sc-lint`; they do not call Cargo,
+analyzer-package binaries, or copied source-local Python wrappers. Consumer
+profile membership is data in `sc-lint.toml`: named argv steps are validated at
+the configuration boundary and run in the config directory. `lint ci
+--consumer` is the explicit consumer selection, while `lint ci` retains the
+source-maintainer profile path. The root repository's maintenance Justfile
+remains a distinct source-maintainer surface.
 
 ## Initial Command Families
 

@@ -111,6 +111,8 @@ Contents:
   the planned top-level `sc-lint` CLI
 - [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
   envelope and backend-to-CLI normalization contract
+- [`adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
+  — installed-product consumer commands and generated Just integration
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
 - [`../../README.md`](../../README.md) — top-level CLI crate and workspace guide

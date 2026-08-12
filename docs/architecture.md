@@ -11,6 +11,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+- [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 
 For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -178,6 +179,17 @@ The top-level CLI should standardize on:
   - `fast`
   - `full`
   - `ci`
+
+For consumer repositories, ADR-012 additionally fixes command ownership:
+
+- installed `sc-lint` owns setup, compatibility, complete lint, complete test,
+  and upgrade behavior
+- `sc-lint init --just` writes only product-owned integration files and never
+  a consumer README
+- a generated `Justfile` is a thin interface with four public recipes and a
+  shared private compatibility preflight
+- this repository's root `Justfile` remains the explicit source-maintainer
+  path; no command guesses its mode from a directory or Cargo package
 
 The primary `lint` target surface should preserve backend-crate ownership
 explicitly. Planned primary mappings are:
@@ -480,6 +492,10 @@ For release `0.2.x`, these repo-local automation/profile surfaces remain
 documented product surfaces but are intentionally out of boundary inventory
 enforcement scope unless later modeled as explicit boundary records.
 
+Consumer repositories do not copy these Python utilities. Their generated
+integration delegates exclusively to installed `sc-lint` and the product-owned
+`.sc-lint/bootstrap` asset as defined by ADR-012.
+
 ## Release Distribution
 
 For release `0.2.x`, release packaging and distributor updates should remain
@@ -667,6 +683,8 @@ The architecture should not require:
   - see [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - interface versioning and published artifacts ADR
   - see [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+- consumer adoption and Just contract ADR
+  - see [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 
 ## Architecture Management
 

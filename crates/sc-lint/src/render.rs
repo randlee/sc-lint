@@ -137,6 +137,9 @@ pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
         ("Binary path", "binary_path"),
         ("Configuration path", "config_path"),
         ("Required field", "required_field"),
+        ("Exit code", "exit_code"),
+        ("Standard output", "stdout"),
+        ("Standard error", "stderr"),
     ] {
         if let Some(value) = error.details.get(key) {
             rendered.push('\n');
@@ -144,6 +147,11 @@ pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
             rendered.push_str(": ");
             rendered.push_str(&render_detail_value(value));
         }
+    }
+    if let Some(cause) = error.cause.as_deref() {
+        rendered.push('\n');
+        rendered.push_str("Cause: ");
+        rendered.push_str(cause);
     }
     if let Some(suggested_action) = error.suggested_action.as_deref() {
         rendered.push('\n');
