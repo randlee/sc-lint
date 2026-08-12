@@ -24,6 +24,7 @@ use serde_json::{Value, json};
 use crate::CliError;
 use crate::MinimumVersion;
 use crate::config::{LoadedConfig, VERSION_PROBE_SCHEMA};
+use crate::error::ErrorCode;
 
 const DEFAULT_RELEASE_BASE_URL: &str = "https://github.com/randlee/sc-lint/releases/download";
 const RELEASE_BASE_URL_ENV: &str = "SC_LINT_RELEASE_BASE_URL";
@@ -46,8 +47,8 @@ enum InstallerErrorCode {
     ActivationFailed,
 }
 
-impl InstallerErrorCode {
-    const fn as_str(self) -> &'static str {
+impl ErrorCode for InstallerErrorCode {
+    fn as_str(&self) -> &'static str {
         match self {
             Self::UnsupportedPlatform => "CLI.SC_LINT_INSTALL_UNSUPPORTED_PLATFORM",
             Self::ReleaseUnavailable => "CLI.SC_LINT_RELEASE_UNAVAILABLE",
