@@ -23,7 +23,7 @@ rust-version = "1.94.1"
 anyhow = "1"
 cargo_metadata = "0.20"
 clap = { version = "4", features = ["derive"] }
-dirs = "6"
+etcetera = "0.11"
 sc-observability = "1.1.0"
 sc-lint-boundary = { version = "0.4.0", path = "crates/sc-lint-boundary" }
 sc-lint-directives = { version = "0.4.0", path = "crates/sc-lint-directives" }

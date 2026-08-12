@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use etcetera::{BaseStrategy, choose_base_strategy};
 use semver::Version;
 use serde_json::{Value, json};
 
@@ -224,12 +225,14 @@ fn managed_install_dir() -> Result<PathBuf, CliError> {
     if let Some(path) = env::var_os(INSTALL_DIR_ENV) {
         return Ok(PathBuf::from(path));
     }
-    // `dirs` resolves XDG data directories on Unix and LocalAppData on Windows
-    // without coupling this product boundary to platform-specific environment keys.
-    if let Some(data_dir) = dirs::data_dir() {
-        return Ok(data_dir.join("sc-lint").join("bin"));
+    // The platform strategy resolves XDG data directories on Unix and
+    // LocalAppData on Windows without coupling this product boundary to
+    // platform-specific environment keys.
+    if let Ok(strategy) = choose_base_strategy() {
+        return Ok(strategy.data_dir().join("sc-lint").join("bin"));
     }
-    dirs::home_dir()
+    etcetera::home_dir()
+        .ok()
         .map(|home| {
             home.join(".local")
                 .join("share")
