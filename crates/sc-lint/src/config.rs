@@ -12,6 +12,7 @@ use serde_json::json;
 use crate::Cli;
 use crate::CliError;
 use crate::command::CommandContext;
+use crate::error::ErrorCode;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
@@ -44,8 +45,8 @@ enum CompatibilityErrorCode {
     VersionTooOld,
 }
 
-impl CompatibilityErrorCode {
-    const fn as_str(self) -> &'static str {
+impl ErrorCode for CompatibilityErrorCode {
+    fn as_str(&self) -> &'static str {
         match self {
             Self::ConfigMissing => "CLI.SC_LINT_CONFIG_MISSING",
             Self::ConfigMalformed => "CLI.SC_LINT_CONFIG_MALFORMED",
@@ -201,6 +202,21 @@ impl LoadedConfig {
             logging_console,
             mode: LoadedConfigMode::Standard,
         })
+    }
+
+    #[expect(
+        clippy::result_large_err,
+        reason = "The installer shares the established stable CliError contract at the consumer configuration boundary."
+    )]
+    pub(crate) fn compatibility_requirement(&self) -> Result<(&MinimumVersion, &Path), CliError> {
+        match &self.mode {
+            LoadedConfigMode::Compatibility(requirement) => {
+                Ok((&requirement.minimum_version, &requirement.config_path))
+            }
+            LoadedConfigMode::Standard => Err(CliError::internal(
+                "installation commands require a loaded consumer compatibility configuration",
+            )),
+        }
     }
 
     #[expect(

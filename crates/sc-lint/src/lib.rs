@@ -5,6 +5,7 @@ pub mod consts;
 mod contract;
 mod dispatch;
 mod error;
+mod installer;
 pub(crate) mod python_adapter;
 mod render;
 mod workflow;

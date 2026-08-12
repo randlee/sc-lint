@@ -104,6 +104,15 @@ pub(crate) fn render_success_human(
                 .map_or(0, std::vec::Vec::len);
             format!("{}: {status} ({step_count} steps)", context.command_id())
         }
+        CommandId::Setup | CommandId::Upgrade => envelope
+            .data
+            .as_ref()
+            .and_then(|value| value.get("summary"))
+            .and_then(Value::as_str)
+            .map_or_else(
+                || format!("{}: ok", context.command_id()),
+                ToString::to_string,
+            ),
         CommandId::LintLineCounts | CommandId::LintIdentityLiterals | CommandId::ViewFindings => {
             envelope
                 .data
