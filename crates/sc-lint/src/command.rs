@@ -315,7 +315,7 @@ impl CommandContext {
                             "`--consumer` is only supported by `sc-lint lint ci`",
                         )
                         .with_suggested_action(
-                            "Use `sc-lint lint ci --consumer --config sc-lint.toml` for a consumer repository.",
+                            "Use `sc-lint lint --consumer --config sc-lint.toml ci` for a consumer repository.",
                         ));
                 }
                 let compatibility_binary = match command {

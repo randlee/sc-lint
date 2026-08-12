@@ -24,12 +24,13 @@ contract and is not an input to this decision.
    exactly four public recipes: `setup`, `lint`, `test`, and `upgrade`; each
    depends on the same private `_ensure-sc-lint` preflight.
 3. The generated preflight calls the product-owned
-   `.sc-lint/bootstrap ensure --config sc-lint.toml`. The bootstrap asset is
-   the only generated executable helper and delegates to installed `sc-lint`.
+   `.sc-lint/bootstrap ensure --config sc-lint.toml` on POSIX and the
+   product-owned `.sc-lint/bootstrap.ps1` companion on Windows. These are the
+   only generated executable helpers and delegate to installed `sc-lint`.
 4. `sc-lint init --just` is the one-command consumer integration path. It
-   creates or updates only `sc-lint.toml`, `Justfile`, and
-   `.sc-lint/bootstrap`; it never writes a consumer `README.md` and reports a
-   conflict rather than overwriting a user-owned integration file.
+   creates or updates only `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`,
+   and `.sc-lint/bootstrap.ps1`; it never writes a consumer `README.md` and
+   reports a conflict rather than overwriting a user-owned integration file.
 5. `--check` and `--dry-run` are non-mutating. Re-running a current generated
    integration is idempotent and reports the managed files.
 6. Source-maintainer recipes remain in this repository's root `Justfile` and
@@ -45,21 +46,23 @@ contract and is not an input to this decision.
 ```just
 default: lint
 
+bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
+
 [private]
 _ensure-sc-lint:
-    .sc-lint/bootstrap ensure --config sc-lint.toml
+    {{bootstrap_command}} ensure --config sc-lint.toml
 
 setup: _ensure-sc-lint
-    .sc-lint/bootstrap setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
-    sc-lint lint ci --consumer --config sc-lint.toml
+    sc-lint lint --consumer --config sc-lint.toml ci
 
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
 
 upgrade: _ensure-sc-lint
-    .sc-lint/bootstrap upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 
 ## Consequences
@@ -72,6 +75,6 @@ upgrade: _ensure-sc-lint
   distribution. This decision only records their discovery references.
 - `just lint` and `just test` in consumer repositories always mean complete
   configured profiles, never an advisory subset.
-- Consumer mode is encoded in the generated command path: `lint ci --consumer`
+- Consumer mode is encoded in the generated command path: `lint --consumer --config sc-lint.toml ci`
   and `test` read named argv profiles from `sc-lint.toml`; source-maintainer
   `lint ci` remains a separate source-checkout command path.

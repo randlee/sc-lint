@@ -12,7 +12,8 @@ sc-lint init --just
 just setup
 ```
 
-This creates only `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap`.
+This creates only `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and the
+Windows companion `.sc-lint/bootstrap.ps1`.
 
 ## Daily commands
 
@@ -29,7 +30,7 @@ command runs.
 Direct product equivalents are useful in automation:
 
 ```sh
-sc-lint lint ci --consumer --config sc-lint.toml
+sc-lint lint --consumer --config sc-lint.toml ci
 sc-lint test --config sc-lint.toml
 ```
 

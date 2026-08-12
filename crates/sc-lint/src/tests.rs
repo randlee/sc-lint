@@ -45,9 +45,10 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
         );
     }
     assert!(canonical.contains("[private]\n_ensure-sc-lint:"));
+    assert!(canonical.contains("bootstrap_command := if os_family() == \"windows\""));
     assert!(!canonical.contains("compatibility"));
-    assert!(canonical.contains(".sc-lint/bootstrap ensure"));
-    assert!(canonical.contains("sc-lint lint ci --consumer --config sc-lint.toml"));
+    assert!(canonical.contains("{{bootstrap_command}} ensure"));
+    assert!(canonical.contains("sc-lint lint --consumer --config sc-lint.toml ci"));
     assert!(canonical.contains("sc-lint test --config sc-lint.toml"));
     for forbidden in ["cargo run", "sc-lint-boundary", ".just/"] {
         assert!(
@@ -275,6 +276,7 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     assert!(root.join("sc-lint.toml").is_file());
     assert!(root.join("Justfile").is_file());
     assert!(root.join(".sc-lint/bootstrap").is_file());
+    assert!(root.join(".sc-lint/bootstrap.ps1").is_file());
     assert_eq!(
         fs::read(root.join(".sc-lint/bootstrap"))
             .expect("bootstrap")
@@ -437,10 +439,16 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
     assert_eq!(
         calls,
         vec![
-            "--config sc-lint.toml compatibility check",
-            "lint ci --consumer --config sc-lint.toml",
-            "--config sc-lint.toml compatibility check",
-            "test --config sc-lint.toml",
+            format!(
+                "--config sc-lint.toml compatibility check --binary {}",
+                binary.display()
+            ),
+            "lint --consumer --config sc-lint.toml ci".to_string(),
+            format!(
+                "--config sc-lint.toml compatibility check --binary {}",
+                binary.display()
+            ),
+            "test --config sc-lint.toml".to_string(),
         ]
     );
 }

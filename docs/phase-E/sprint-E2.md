@@ -48,10 +48,11 @@ consumer contract usable from a fresh local checkout.
 - all installer failures have stable codes and recovery guidance (`RBP-001`),
   including unsupported platform, unavailable release, checksum mismatch,
   permission failure, and failed post-install version verification.
-- `sc-lint init --just` has one product-owned managed bootstrap asset at
-  `.sc-lint/bootstrap`; it is the only generated executable implementation in
-  a consumer repository. The asset exposes `ensure`, `setup`, and `upgrade`,
-  reads `sc-lint.toml`, and is regenerated/updated only by product commands.
+- `sc-lint init --just` has product-owned managed bootstrap assets at
+  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1`; they are the only
+  generated executable implementations in a consumer repository. The helpers
+  expose `ensure`, `setup`, and `upgrade`, read `sc-lint.toml`, and are
+  regenerated/updated only by product commands.
   Every public Just recipe calls `ensure` before its own work; `setup` may
   install or upgrade, while `lint` and `test` never proceed after an
   incompatible/missing-install verdict.
@@ -120,8 +121,8 @@ consumer contract usable from a fresh local checkout.
   before moving files and directs the operator to rerun from a separate release
   executable. The normal Windows replacement path is verified-release staging,
   retained backup rename, replacement, and post-install probe.
-- the product-owned bootstrap source is
-  `crates/sc-lint/assets/bootstrap`; E.3 renders that source into the managed
-  consumer `.sc-lint/bootstrap` path and owns the Just template.
+- the product-owned bootstrap sources are `crates/sc-lint/assets/bootstrap`
+  and `crates/sc-lint/assets/bootstrap.ps1`; E.3 renders them into the managed
+  consumer paths and owns the Just template.
 - installer failures use the documented `CLI.SC_LINT_*` recovery codes and
   link to the forthcoming E.4 offline installation guide.

@@ -9,6 +9,7 @@ use crate::CliError;
 use crate::command::ConsumerInitRequest;
 use crate::config::CONFIG_FILENAME;
 use crate::installer::CONSUMER_BOOTSTRAP_ASSET;
+use crate::installer::CONSUMER_BOOTSTRAP_POWERSHELL_ASSET;
 
 const GENERATED_FILE_HEADER: &str =
     "# Managed by sc-lint; regenerate with `sc-lint init --just`.\n";
@@ -178,6 +179,11 @@ fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
         ConsumerIntegrationFile {
             path: root.join(".sc-lint/bootstrap"),
             contents: generated_bootstrap_asset(),
+            kind: ManagedFileKind::Static,
+        },
+        ConsumerIntegrationFile {
+            path: root.join(".sc-lint/bootstrap.ps1"),
+            contents: format!("{GENERATED_FILE_HEADER}{CONSUMER_BOOTSTRAP_POWERSHELL_ASSET}"),
             kind: ManagedFileKind::Static,
         },
     ]

@@ -25,3 +25,15 @@ For Rust design and review work, also read:
 
 Use it as the baseline for state machines, newtypes, sealed traits, structured
 error design, and crate-boundary review.
+
+## Completion Contract
+
+For repository changes, agents finish with exactly:
+
+```sh
+just lint
+just test
+```
+
+These are complete aggregate gates, not advisory shortcuts. Use `just setup`
+when the product compatibility preflight needs to be checked or repaired.

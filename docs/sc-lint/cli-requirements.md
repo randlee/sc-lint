@@ -310,7 +310,8 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-022`
   `sc-lint init --just [--check|--dry-run]` must materialize only the
-  product-owned `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap` files.
+  product-owned `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and Windows
+  `.sc-lint/bootstrap.ps1` files.
   A current integration is idempotent; `--check` and `--dry-run` do not mutate
   it. A differing existing managed-path file is a structured conflict, never
   an overwrite, and a consumer README is outside the command's write set.
@@ -318,8 +319,8 @@ specialized backend tools and mixed Rust/Python implementations.
   release-verified Action rather than a source-checkout fallback.
 
 - `REQ-CLI-023`
-  Consumer execution is explicit: `sc-lint lint ci --consumer --config
-  sc-lint.toml` runs the complete configured `[[tool.sc-lint.lint]]` profile,
+  Consumer execution is explicit: `sc-lint lint --consumer --config
+  sc-lint.toml ci` runs the complete configured `[[tool.sc-lint.lint]]` profile,
   and `sc-lint test --config sc-lint.toml` runs the complete configured
   `[[tool.sc-lint.test]]` profile. Each profile item has a unique non-empty
   `name` and a non-empty argv `command` array. These commands do not discover

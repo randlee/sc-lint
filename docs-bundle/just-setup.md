@@ -12,7 +12,8 @@ sc-lint init --just --dry-run # show managed paths without writing
 sc-lint init --just           # create or update managed files
 ```
 
-The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap` only.
+The command manages `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and the
+Windows companion `.sc-lint/bootstrap.ps1` only.
 Conflicting user-owned files produce a structured error instead of an
 overwrite.
 
@@ -23,33 +24,43 @@ The generated file has exactly these public entry points:
 ```just
 default: lint
 
+bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
+
 [private]
 _ensure-sc-lint:
-    .sc-lint/bootstrap ensure --config sc-lint.toml
+    {{bootstrap_command}} ensure --config sc-lint.toml
 
 setup: _ensure-sc-lint
-    .sc-lint/bootstrap setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
-    sc-lint lint ci --consumer --config sc-lint.toml
+    sc-lint lint --consumer --config sc-lint.toml ci
 
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
 
 upgrade: _ensure-sc-lint
-    .sc-lint/bootstrap upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
+
+The `bootstrap_command` expression dispatches to the product-owned PowerShell
+companion on Windows and to the POSIX helper elsewhere.
 
 `setup` installs the configured floor, `lint` and `test` preflight before
 running complete profiles, and `upgrade` safely moves the managed installation
-forward. The private preflight is shared by every work recipe.
+forward. The private preflight is shared by every work recipe. When a binary is
+too old, `ensure` delegates to `sc-lint setup`; if no compatible release is
+available it preserves the structured installer recovery instead of running a
+profile.
 
 ## Consumer and source-maintainer modes
 
 Consumers run the generated file from their repository root. Source maintainers
-may retain repository-specific checks in the root project's Justfile, but the
-consumer template must remain product-owned and must not invoke Cargo analyzer
-packages directly.
+use this repository's root `Justfile` as the executable reference model: its
+public `setup`, `lint`, `test`, and `upgrade` recipes use the same private
+product compatibility preflight, while its complete source-maintainer profiles
+stay behind the product command boundary. The consumer template remains
+product-owned and must not invoke Cargo analyzer packages directly.
 
 ## One-command path
 

@@ -469,7 +469,8 @@ The product should support both:
   lint, complete test, and upgrade entry points without choosing a Cargo
   package or copying source-repository orchestration. `sc-lint init --just`
   must create an idempotent, product-owned `sc-lint.toml`, thin Just
-  integration, and `.sc-lint/bootstrap` helper with non-mutating
+  integration, `.sc-lint/bootstrap`, and Windows `.sc-lint/bootstrap.ps1`
+  helpers with non-mutating
   `--check`/`--dry-run` modes; it must never overwrite a consumer README or
   user-owned integration file. Consumer `just setup`, `just lint`, `just
   test`, and `just upgrade` all depend on the same compatibility preflight;
@@ -486,7 +487,8 @@ The product should support both:
   product location. The selected immutable release artifact is reported
   separately from that floor, which remains the installed-version comparison
   policy. Consumer repositories use the product-owned
-  `.sc-lint/bootstrap` asset; it delegates `ensure`, `setup`, and `upgrade` to
+  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` assets; they delegate
+  `ensure`, `setup`, and `upgrade` to
   installed `sc-lint` and never copies source-checkout scripts or overwrites a
   consumer README.
 
