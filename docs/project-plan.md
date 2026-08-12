@@ -313,13 +313,13 @@ Release `0.2.x` should establish:
 Phase `A` completed the release-1 foundation implementation line. Phase `B`
 and Phase `C` are both complete.
 
-Phase `D` is the current planning and hardening line, beginning with `D.1`.
-It covers boundary inventory dependency-policy enforcement and the remaining
-requirements/architecture hardening needed to keep the active planning surface
-aligned with the structured boundary roadmap.
+Phase `D` completed the planning and hardening line, including boundary
+inventory dependency-policy enforcement and the requirements/architecture
+hardening needed to align the planning surface with the structured boundary
+roadmap.
 
-Phase `E` is the planned follow-on consumer-adoption and distributed-
-documentation line after Phase D. Its authoritative plan is
+Phase `E` is the current consumer-adoption and distributed-documentation line.
+Its authoritative plan is
 [docs/phase-E/phase-E-plan.md](./phase-E/phase-E-plan.md). Exact initial
 targets are:
 

@@ -92,4 +92,7 @@ release layout for release archives and Homebrew.
   this layout and the archive layout without a source-checkout fallback.
 - Tests cover exact staging, Windows executable names, compressed archive
   contents, package-manifest drift, generated formula syntax, Homebrew layout,
-  and actual compiled-binary guide resolution for every published package.
+  and source-level path/content assertions for every published package. The
+  compiled binary is exercised only through the CLI's bundle-resolution tests;
+  these sprint tests do not constitute a separate compiled-binary integration
+  suite.
