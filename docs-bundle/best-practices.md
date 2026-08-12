@@ -3,9 +3,9 @@
 ## One contract for people and agents
 
 Keep `sc-lint.toml`, the generated Just integration, and the product version
-floor in version control. Agents should begin with `just setup`, make changes,
-and finish with `just lint` and `just test`. They do not need to learn Cargo
-package topology.
+floor in version control. Agents should begin with `just setup` when needed,
+make changes, and finish with exactly `just lint` and `just test`. They do not
+need to learn Cargo package topology.
 
 ## Make failures early and actionable
 

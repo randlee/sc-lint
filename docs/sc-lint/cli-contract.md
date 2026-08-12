@@ -73,7 +73,7 @@ Initial convention:
   - `lint.identity-literals`
 - `sc-lint lint fast`
   - `lint.fast`
-- `sc-lint lint ci --consumer`
+- `sc-lint lint --consumer --config sc-lint.toml ci`
   - `lint.ci.consumer`
 - `sc-lint test`
   - `test`
@@ -297,7 +297,7 @@ Cargo manifest, or analyzer package:
   result uses the standard command envelope; the generated POSIX bootstrap is
   intentionally a plain-text, exit-code-oriented preflight helper and is not a
   JSON-envelope producer.
-- `sc-lint lint ci --consumer --config sc-lint.toml` and `sc-lint test
+- `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in
   the configuration directory and any required member failure fails the

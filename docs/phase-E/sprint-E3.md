@@ -86,23 +86,27 @@ consumer path only through the explicit product-owned bootstrap and installed
 ## Canonical Generated Template
 
 ```just
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+
 default: lint
+
+bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
 [private]
 _ensure-sc-lint:
-    .sc-lint/bootstrap ensure --config sc-lint.toml
+    {{bootstrap_command}} ensure --config sc-lint.toml
 
 setup: _ensure-sc-lint
-    .sc-lint/bootstrap setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
-    sc-lint lint ci --consumer --config sc-lint.toml
+    sc-lint lint --consumer --config sc-lint.toml ci
 
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
 
 upgrade: _ensure-sc-lint
-    .sc-lint/bootstrap upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 
 The exact command spelling may be refined during implementation, but the four
@@ -132,7 +136,8 @@ contract.
 - None from this source repository unless a script becomes fully product-owned
   and its source-maintainer replacement lands in the same change.
 - `sc-lint init --just` must never create `.just/lint_*.py` copies in consumer
-  repositories; the generated `.sc-lint/bootstrap` is the sole managed helper.
+  repositories; the generated `.sc-lint/bootstrap` POSIX helper and
+  `.sc-lint/bootstrap.ps1` Windows companion are the sole managed helpers.
 
 ## Acceptance Criteria
 
@@ -162,10 +167,10 @@ contract.
 ## Implementation Record
 
 - `sc-lint init --just [--check|--dry-run]` owns only `sc-lint.toml`,
-  `Justfile`, and `.sc-lint/bootstrap`; it reports managed paths, is
+  `Justfile`, `.sc-lint/bootstrap`, and `.sc-lint/bootstrap.ps1`; it reports managed paths, is
   idempotent, and rejects a conflicting user-owned path without touching a
   README.
-- Consumer lint uses the explicit `sc-lint lint ci --consumer` command path;
+- Consumer lint uses the explicit `sc-lint lint --consumer --config sc-lint.toml ci` command path;
   consumer test uses `sc-lint test`. Both validate named argv profiles in
   `sc-lint.toml` and run from that file's directory without source checkout
   discovery.

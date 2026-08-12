@@ -1,6 +1,8 @@
 set windows-shell := ["pwsh", "-NoLogo", "-Command"]
 
 python_cmd := if os_family() == "windows" { "python" } else { "python3" }
+sc_lint_binary := if os_family() == "windows" { ".\\target\\debug\\sc-lint.exe" } else { "./target/debug/sc-lint" }
+export SC_LINT_BIN := sc_lint_binary
 
 # Show the curated repo task help.
 default: help
@@ -74,20 +76,46 @@ _lint-pytests:
 build:
     cargo build --workspace
 
-# Run the full workspace test suite.
-test:
+# Build the product binary used by this repository's consumer-model recipes.
+[private]
+_source-build:
+    cargo build --bin sc-lint
+
+# Run the complete source-maintainer test suite behind the consumer profile.
+[private]
+_source-test:
     cargo build --workspace
     cargo test --workspace
+    {{python_cmd}} .just/run_pytests.py
     node --test action/test/action.test.cjs
 
 # Remove workspace build artifacts.
 clean:
     cargo clean
 
-# Run the repo lint suite.
-lint target='full':
+# Run the complete source-maintainer lint suite behind the consumer profile.
+[private]
+_source-lint target='full':
     {{python_cmd}} .just/run_lint.py {{target}}
 
-# Run the local CI-equivalent command set.
-ci:
-    cargo run --quiet --bin sc-lint -- ci
+# The root model uses a built product binary; generated consumers use their
+# installed release binary through the same command and configuration shape.
+[private]
+_ensure-sc-lint: _source-build
+    .sc-lint/bootstrap ensure --config sc-lint.toml
+
+# Verify the root model's compatible product binary and report setup state.
+setup: _ensure-sc-lint
+    .sc-lint/bootstrap setup --config sc-lint.toml --dry-run
+
+# Run every required source lint gate through the consumer contract.
+lint: _ensure-sc-lint
+    {{sc_lint_binary}} lint --consumer --config sc-lint.toml ci
+
+# Run every required source test gate through the consumer contract.
+test: _ensure-sc-lint
+    {{sc_lint_binary}} --config sc-lint.toml test
+
+# Inspect the managed upgrade path without changing the source checkout.
+upgrade: _ensure-sc-lint
+    .sc-lint/bootstrap upgrade --config sc-lint.toml --check --dry-run

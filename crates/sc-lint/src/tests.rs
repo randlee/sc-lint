@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 use std::process::Command as ProcessCommand;
 
 use clap::Parser;
@@ -38,6 +38,7 @@ const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justf
 #[test]
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
     let canonical = CANONICAL_CONSUMER_JUSTFILE.replace("\r\n", "\n");
+    assert!(canonical.starts_with("set windows-shell := [\"pwsh\", \"-NoLogo\", \"-Command\"]\n"));
     for recipe in ["setup", "lint", "test", "upgrade"] {
         assert!(
             canonical.contains(&format!("{recipe}: _ensure-sc-lint")),
@@ -45,9 +46,10 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
         );
     }
     assert!(canonical.contains("[private]\n_ensure-sc-lint:"));
+    assert!(canonical.contains("bootstrap_command := if os_family() == \"windows\""));
     assert!(!canonical.contains("compatibility"));
-    assert!(canonical.contains(".sc-lint/bootstrap ensure"));
-    assert!(canonical.contains("sc-lint lint ci --consumer --config sc-lint.toml"));
+    assert!(canonical.contains("{{bootstrap_command}} ensure"));
+    assert!(canonical.contains("sc-lint lint --consumer --config sc-lint.toml ci"));
     assert!(canonical.contains("sc-lint test --config sc-lint.toml"));
     for forbidden in ["cargo run", "sc-lint-boundary", ".just/"] {
         assert!(
@@ -275,6 +277,7 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     assert!(root.join("sc-lint.toml").is_file());
     assert!(root.join("Justfile").is_file());
     assert!(root.join(".sc-lint/bootstrap").is_file());
+    assert!(root.join(".sc-lint/bootstrap.ps1").is_file());
     assert_eq!(
         fs::read(root.join(".sc-lint/bootstrap"))
             .expect("bootstrap")
@@ -437,10 +440,82 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
     assert_eq!(
         calls,
         vec![
-            "--config sc-lint.toml compatibility check",
-            "lint ci --consumer --config sc-lint.toml",
-            "--config sc-lint.toml compatibility check",
-            "test --config sc-lint.toml",
+            format!(
+                "--config sc-lint.toml compatibility check --binary {}",
+                binary.display()
+            ),
+            "lint --consumer --config sc-lint.toml ci".to_string(),
+            format!(
+                "--config sc-lint.toml compatibility check --binary {}",
+                binary.display()
+            ),
+            "test --config sc-lint.toml".to_string(),
+        ]
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_preflight() {
+    let fixture = TempDir::new().expect("fixture");
+    let root = fixture.path();
+    crate::config::run_consumer_init_at(
+        root,
+        ConsumerInitRequest {
+            just: true,
+            check: false,
+            dry_run: false,
+        },
+    )
+    .expect("generate fixture");
+    let bin_dir = root.join("bin");
+    fs::create_dir_all(&bin_dir).expect("bin dir");
+    let record = root.join("calls.txt");
+    let binary = bin_dir.join("sc-lint.cmd");
+    fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
+    let path = std::env::join_paths(
+        std::iter::once(bin_dir.clone()).chain(
+            std::env::var_os("PATH")
+                .as_ref()
+                .into_iter()
+                .flat_map(std::env::split_paths),
+        ),
+    )
+    .expect("PATH");
+
+    for recipe in ["lint", "test"] {
+        let output = ProcessCommand::new("just")
+            .current_dir(root)
+            .arg(recipe)
+            .env("PATH", &path)
+            .env("SC_LINT_BIN", &binary)
+            .env("SC_LINT_RECORD", &record)
+            .output()
+            .expect("run just fixture");
+        assert!(
+            output.status.success(),
+            "just {recipe} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let calls = fs::read_to_string(&record)
+        .expect("calls")
+        .lines()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        calls,
+        vec![
+            format!(
+                "--config sc-lint.toml compatibility check --binary {}",
+                binary.display()
+            ),
+            "lint --consumer --config sc-lint.toml ci".to_string(),
+            format!(
+                "--config sc-lint.toml compatibility check --binary {}",
+                binary.display()
+            ),
+            "test --config sc-lint.toml".to_string(),
         ]
     );
 }
@@ -469,6 +544,41 @@ fn generated_bootstrap_reports_a_missing_sc_lint_binary_without_a_traceback() {
     assert!(stderr.contains("CLI.SC_LINT_BINARY_NOT_FOUND"));
     assert!(stderr.contains("Docs: sc-lint docs setup"));
     assert!(!stderr.to_ascii_lowercase().contains("traceback"));
+}
+
+#[cfg(windows)]
+#[test]
+fn generated_windows_bootstrap_accepts_gnu_style_flags_and_returns_structured_recovery() {
+    let fixture = TempDir::new().expect("fixture");
+    crate::config::run_consumer_init_at(
+        fixture.path(),
+        ConsumerInitRequest {
+            just: true,
+            check: false,
+            dry_run: false,
+        },
+    )
+    .expect("generate fixture");
+    let bootstrap = fixture.path().join(".sc-lint/bootstrap.ps1");
+    let output = ProcessCommand::new("pwsh")
+        .args([
+            "-NoLogo",
+            "-NonInteractive",
+            "-File",
+            bootstrap.to_str().expect("UTF-8 bootstrap path"),
+            "ensure",
+            "--config",
+            "sc-lint.toml",
+        ])
+        .current_dir(fixture.path())
+        .env("SC_LINT_BIN", "sc-lint-definitely-missing")
+        .output()
+        .expect("run Windows bootstrap");
+    assert_eq!(output.status.code(), Some(5));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("CLI.SC_LINT_BINARY_NOT_FOUND"));
+    assert!(stderr.contains("Docs: sc-lint docs setup"));
+    assert!(!stderr.to_ascii_lowercase().contains("positional parameter"));
 }
 
 #[test]

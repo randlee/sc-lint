@@ -35,6 +35,9 @@ const INSTALL_DIR_ENV: &str = "SC_LINT_INSTALL_DIR";
 /// It delegates behavior to the installed product instead of copying source
 /// checkout scripts; E.3 owns rendering it into `.sc-lint/bootstrap`.
 pub(crate) const CONSUMER_BOOTSTRAP_ASSET: &str = include_str!("../assets/bootstrap");
+/// Windows companion for the product-owned consumer bootstrap.
+pub(crate) const CONSUMER_BOOTSTRAP_POWERSHELL_ASSET: &str =
+    include_str!("../assets/bootstrap.ps1");
 
 #[derive(Debug, Clone, Copy)]
 enum InstallerErrorCode {
@@ -947,6 +950,14 @@ mod tests {
         assert!(CONSUMER_BOOTSTRAP_ASSET.contains("compatibility check"));
         assert!(CONSUMER_BOOTSTRAP_ASSET.contains("--config"));
         assert!(!CONSUMER_BOOTSTRAP_ASSET.contains("cargo run"));
+        for operation in ["ensure", "setup", "upgrade"] {
+            assert!(
+                CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(operation),
+                "Windows bootstrap does not expose {operation}"
+            );
+        }
+        assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("CLI.SC_LINT_BINARY_NOT_FOUND"));
+        assert!(!CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("cargo run"));
     }
 
     #[cfg(unix)]

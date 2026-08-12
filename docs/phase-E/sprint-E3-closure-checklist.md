@@ -34,13 +34,13 @@ sprint plan.
 ## Pass 2 — 2026-08-11
 
 - [x] The embedded sprint/ADR template had stale source-style `lint ci`
-  spelling. Updated it to explicit `lint ci --consumer` and retained the
+  spelling. Updated it to explicit `lint --consumer --config sc-lint.toml ci` and retained the
   shared preflight for every public recipe.
 - [x] `init` accepted global `--config`/`--root` even though it always owns the
   canonical paths in the current consumer root. It now rejects those flags
   with a structured usage error; a regression test covers the boundary.
 - [x] Added a direct command-context test proving source `lint ci` and
-  consumer `lint ci --consumer` take distinct paths without directory-name
+  consumer `lint --consumer --config sc-lint.toml ci` take distinct paths without directory-name
   detection.
 - [x] Added a configuration test proving an empty consumer profile fails
   before any command can run.

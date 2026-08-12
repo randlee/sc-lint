@@ -23,7 +23,7 @@ logging controls. Consumer profiles require explicit `--config sc-lint.toml`.
 ```sh
 sc-lint init --just
 sc-lint setup
-sc-lint lint ci --consumer --config sc-lint.toml
+sc-lint lint --consumer --config sc-lint.toml ci
 sc-lint test --config sc-lint.toml
 sc-lint upgrade --check --config sc-lint.toml
 sc-lint docs

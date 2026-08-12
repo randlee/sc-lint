@@ -53,58 +53,8 @@ jobs:
       - name: Run just lint
         run: just lint
 
-  fmt:
-    name: Format check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.94.1"
-          components: clippy, rustfmt
-
-      - name: Check formatting
-        run: cargo fmt --check --all
-
-  clippy:
-    name: Clippy
-    needs: [fmt]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.94.1"
-          components: clippy, rustfmt
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ubuntu-clippy-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ubuntu-clippy-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ubuntu-clippy-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Run clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
   test:
     name: Test (${{ matrix.os }})
-    needs: [clippy]
     strategy:
       fail-fast: false
       matrix:
@@ -121,6 +71,11 @@ jobs:
 
       - name: Install just
         run: cargo install just --locked
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -140,8 +95,8 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build workspace
-        run: cargo build --verbose
+      - name: Run just setup
+        run: just setup
 
-      - name: Run tests
-        run: cargo test --verbose
+      - name: Run just test
+        run: just test
