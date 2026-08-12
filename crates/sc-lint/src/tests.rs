@@ -39,7 +39,7 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
         );
     }
     assert!(CANONICAL_CONSUMER_JUSTFILE.contains("[private]\n_ensure-sc-lint:"));
-    assert!(CANONICAL_CONSUMER_JUSTFILE.contains("compatibility") == false);
+    assert!(!CANONICAL_CONSUMER_JUSTFILE.contains("compatibility"));
     assert!(CANONICAL_CONSUMER_JUSTFILE.contains(".sc-lint/bootstrap ensure"));
     assert!(CANONICAL_CONSUMER_JUSTFILE.contains("sc-lint lint ci --config sc-lint.toml"));
     assert!(CANONICAL_CONSUMER_JUSTFILE.contains("sc-lint test --config sc-lint.toml"));
