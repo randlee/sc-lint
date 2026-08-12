@@ -501,7 +501,13 @@ The product should support both:
   network access; `sc-lint docs --path` must expose the installed root for
   release automation. Missing documentation is a structured
   `CLI.SC_LINT_DOCS_UNAVAILABLE` failure with bundle path, recovery action, and
-  the `sc-lint docs installation` reference.
+  the `sc-lint docs installation` reference. The release manifest is the
+  authoritative inventory for exact bundle paths: an archive contains the
+  top-level `sc-lint-docs/` directory beside declared binaries, while the
+  primary Homebrew formula installs that directory only under its
+  formula-owned `pkgshare`. Packaging validation rejects missing, unexpected,
+  or unrecorded bundle files; it never writes the bundle overview into a
+  consumer repository.
 
 - `REQ-PRODUCT-022`
   The project must provide a versioned reusable GitHub Action that obtains a

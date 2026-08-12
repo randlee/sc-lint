@@ -1,5 +1,32 @@
 schema_version = 1
 
+[documentation_bundle]
+# E.4 owns this source directory and its contents. E.5 validates and packages
+# this logical layout as a release artifact; it is never copied into consumers.
+source_directory = "docs-bundle"
+package_directory = "sc-lint-docs"
+required_files = [
+  "manifest.toml",
+  "README.md",
+  "installation.md",
+  "using-sc-lint.md",
+  "configuration.md",
+  "just-setup.md",
+  "ci.md",
+  "upgrade.md",
+  "troubleshooting.md",
+  "best-practices.md",
+]
+package_guides = [
+  "sc-lint.md",
+  "sc-lint-attributes.md",
+  "sc-lint-boundary.md",
+  "sc-lint-directives.md",
+  "sc-lint-portability.md",
+  "sc-lint-runtime.md",
+  "sc-lint-schema.md",
+]
+
 [[crates]]
 artifact = "sc-lint-directives"
 package = "sc-lint-directives"
