@@ -4,19 +4,21 @@
 param(
     [Parameter(Position = 0, Mandatory = $true)]
     [ValidateSet("ensure", "setup", "upgrade")]
-    [string]$Operation
+    [string]$Operation,
+    [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
+    [string[]]$Rest
 )
 
-$configIndex = [Array]::IndexOf($args, "--config")
-if ($configIndex -lt 0 -or $configIndex -eq ($args.Count - 1)) {
+$configIndex = [Array]::IndexOf($Rest, "--config")
+if ($configIndex -lt 0 -or $configIndex -eq ($Rest.Count - 1)) {
     [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <ensure|setup|upgrade> --config sc-lint.toml [--check] [--dry-run]")
     exit 2
 }
-$Config = $args[$configIndex + 1]
+$Config = $Rest[$configIndex + 1]
 $remaining = @()
-for ($argumentIndex = 0; $argumentIndex -lt $args.Count; $argumentIndex++) {
+for ($argumentIndex = 0; $argumentIndex -lt $Rest.Count; $argumentIndex++) {
     if ($argumentIndex -ne $configIndex -and $argumentIndex -ne ($configIndex + 1)) {
-        $remaining += $args[$argumentIndex]
+        $remaining += $Rest[$argumentIndex]
     }
 }
 if ($remaining | Where-Object { $_ -notin @("--check", "--dry-run") }) {

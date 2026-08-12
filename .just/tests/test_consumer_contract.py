@@ -72,8 +72,17 @@ class ConsumerContractTests(unittest.TestCase):
         ):
             contents = path.read_text(encoding="utf-8")
             self.assertIn('"--config"', contents)
+            self.assertIn("ValueFromRemainingArguments = $true", contents)
             self.assertIn("CLI.SC_LINT_BINARY_NOT_FOUND", contents)
             self.assertIn("compatibility check", contents)
+
+    def test_windows_bootstrap_consumes_gnu_style_flags_from_remaining_arguments(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('[string[]]$Rest', contents)
+        self.assertIn('[Array]::IndexOf($Rest, "--config")', contents)
+        self.assertNotIn('[Array]::IndexOf($args, "--config")', contents)
 
     def test_root_helpers_match_the_generated_product_assets(self) -> None:
         generated_posix = (
