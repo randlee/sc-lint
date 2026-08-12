@@ -647,7 +647,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "clap",
  "dunce",
@@ -665,7 +665,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-attributes"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -675,7 +675,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-boundary"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -693,7 +693,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-directives"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "quote",
  "syn",
@@ -701,7 +701,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-portability"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -718,7 +718,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-runtime"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -734,7 +734,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-schema"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "serde",
 ]
