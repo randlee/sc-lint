@@ -62,7 +62,10 @@ use this repository's root `Justfile` as the executable reference model: its
 public `setup`, `lint`, `test`, and `upgrade` recipes use the same private
 product compatibility preflight, while its complete source-maintainer profiles
 stay behind the product command boundary. The consumer template remains
-product-owned and must not invoke Cargo analyzer packages directly.
+product-owned and must not invoke Cargo analyzer packages directly. The root
+model adds `--dry-run` to `just setup` and `just upgrade` so source maintenance
+can inspect product installation behavior without mutating a local managed
+installation; generated consumer recipes perform the real operation.
 
 ## One-command path
 

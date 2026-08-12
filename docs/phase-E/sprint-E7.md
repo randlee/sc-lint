@@ -1,13 +1,22 @@
 ---
 id: E.7
 title: Dogfooding, Consumer Fixtures, And Cross-Platform Acceptance
-status: planned
+status: complete
 branch: feature/phase-E7-dogfood-consumer-contract
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E7-dogfood-consumer-contract
 target: integrate/phase-E
 ---
 
 # Sprint E.7 — Dogfooding, Consumer Fixtures, And Cross-Platform Acceptance
+
+## Implementation Record
+
+Completed with root Justfile dogfooding, three-platform aggregate CI, staged
+release-binary consumer lifecycle fixtures, and generated Windows bootstrap
+coverage. Root `setup` and `upgrade` intentionally use `--dry-run` so the
+source checkout exercises installation selection and compatibility without
+mutating a developer's managed installation; consumer generated recipes do not
+add that source-only safeguard.
 
 ## Goal
 

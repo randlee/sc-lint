@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import subprocess
 import sys
 import unittest
@@ -113,7 +114,12 @@ class ConsumerContractTests(unittest.TestCase):
             ROOT / "docs/phase-E/sprint-E7.md",
             ROOT / "docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md",
         ):
-            self.assertIn(template, path.read_text(encoding="utf-8"), path)
+            document = path.read_text(encoding="utf-8")
+            just_blocks = re.findall(r"```just\n(.*?)\n```", document, flags=re.DOTALL)
+            consumer_blocks = [
+                block.strip() for block in just_blocks if "default: lint" in block
+            ]
+            self.assertEqual(consumer_blocks, [template], path)
 
     def test_agent_and_installed_guidance_use_the_two_completion_commands(self) -> None:
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")

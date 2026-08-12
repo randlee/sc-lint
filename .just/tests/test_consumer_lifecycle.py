@@ -5,7 +5,10 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import hashlib
+import tarfile
 import unittest
+import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -90,6 +93,43 @@ class ConsumerLifecycleTests(unittest.TestCase):
         )
         return environment
 
+    def write_release_archive(self, root: Path, binary: Path) -> Path:
+        binary_name = self.product_binary.name
+        release_dir = root / "published" / f"v{VERSION}"
+        release_dir.mkdir(parents=True)
+        if os.name == "nt":
+            triple, extension = "x86_64-pc-windows-msvc", "zip"
+        elif os.uname().sysname == "Darwin":
+            triple = "aarch64-apple-darwin" if os.uname().machine == "arm64" else "x86_64-apple-darwin"
+            extension = "tar.gz"
+        else:
+            triple, extension = "x86_64-unknown-linux-gnu", "tar.gz"
+        archive = release_dir / f"sc-lint_{VERSION}_{triple}.{extension}"
+        if extension == "zip":
+            with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
+                package.write(binary, arcname=binary_name)
+        else:
+            with tarfile.open(archive, "w:gz") as package:
+                package.add(binary, arcname=binary_name)
+        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+        (release_dir / "checksums.txt").write_text(
+            f"{digest} {archive.name}\n", encoding="utf-8"
+        )
+        return root / "published"
+
+    def write_old_probe(self, binary: Path) -> None:
+        source = binary.with_suffix(".rs")
+        source.write_text(
+            'fn main() { print!("{}", r#"{\"ok\":true,\"command\":\"version\",\"data\":{\"contract_schema\":\"sc-lint-version-v1\",\"tool\":\"sc-lint\",\"version\":\"0.3.0\"}}"#); }\n',
+            encoding="utf-8",
+        )
+        result = self.run_command(
+            ["rustc", str(source), "-o", str(binary)],
+            cwd=binary.parent,
+            environment=os.environ.copy(),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_fresh_release_binary_fixture_runs_full_consumer_lifecycle(self) -> None:
         temporary, release, consumer = self.make_release_fixture()
         with temporary:
@@ -147,6 +187,36 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertIn("CLI.SC_LINT_VERSION_TOO_OLD", combined)
             self.assertRegex(combined, r"CLI\.SC_LINT_(RELEASE_UNAVAILABLE|POST_INSTALL_VERSION_FAILED)")
             self.assertNotIn("traceback", combined.lower())
+
+    def test_upgrade_migrates_a_real_old_binary_and_preserves_consumer_files(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            environment = self.initialize_rust_consumer(release, consumer)
+            readme = consumer / "README.md"
+            source = consumer / "src/lib.rs"
+            readme.write_text("consumer-owned README\n", encoding="utf-8")
+            source_before = source.read_text(encoding="utf-8")
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            old_binary = managed / self.product_binary.name
+            self.write_old_probe(old_binary)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            environment["SC_LINT_RELEASE_BASE_URL"] = self.write_release_archive(
+                Path(temporary.name), release / self.product_binary.name
+            ).as_uri()
+
+            result = self.run_command(["just", "upgrade"], cwd=consumer, environment=environment)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("verified sc-lint release upgraded", result.stdout)
+            self.assertEqual(readme.read_text(encoding="utf-8"), "consumer-owned README\n")
+            self.assertEqual(source.read_text(encoding="utf-8"), source_before)
+            installed = self.run_command(
+                [str(managed / self.product_binary.name), "--json", "version"],
+                cwd=consumer,
+                environment=environment,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            self.assertIn(f'"version": "{VERSION}"', installed.stdout)
 
     def test_fixture_matrix_declares_each_supported_release_platform(self) -> None:
         mappings = {
