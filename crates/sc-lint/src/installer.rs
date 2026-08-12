@@ -860,7 +860,9 @@ fn install_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use clap::Parser;
+    #[cfg(unix)]
     use serial_test::serial;
     #[cfg(unix)]
     use std::ffi::OsString;
