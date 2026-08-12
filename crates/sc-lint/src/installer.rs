@@ -267,10 +267,22 @@ fn find_compatible_binary(
     minimum: &MinimumVersion,
     use_path_candidates: bool,
 ) -> Option<(PathBuf, Version)> {
+    find_compatible_binary_with(managed_binary, minimum, use_path_candidates, probe_version)
+}
+
+fn find_compatible_binary_with<F>(
+    managed_binary: &Path,
+    minimum: &MinimumVersion,
+    use_path_candidates: bool,
+    probe: F,
+) -> Option<(PathBuf, Version)>
+where
+    F: Fn(&Path) -> Result<Version, String>,
+{
     std::iter::once(managed_binary.to_path_buf())
         .chain(path_binary_candidates_if(use_path_candidates))
         .find_map(|binary| {
-            let version = probe_version(&binary).ok()?;
+            let version = probe(&binary).ok()?;
             (version >= *minimum.as_semver()).then_some((binary, version))
         })
 }
@@ -1106,6 +1118,30 @@ mod tests {
             fs::read_to_string(&consumer_readme).expect("readme"),
             "consumer-owned README\n"
         );
+    }
+
+    #[test]
+    fn version_comparison_fixture_runs_on_every_supported_platform() {
+        let fixture = TempDir::new().expect("fixture");
+        let managed = fixture.path().join(ReleaseTarget::binary_name());
+        let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
+        let probe = |path: &Path| {
+            let version = fs::read_to_string(path).map_err(|error| error.to_string())?;
+            Version::parse(version.trim()).map_err(|error| error.to_string())
+        };
+
+        for (version, expected) in [
+            ("0.4.0", None),
+            ("0.4.1", Some("0.4.1")),
+            ("0.5.0", Some("0.5.0")),
+        ] {
+            fs::write(&managed, version).expect("version fixture");
+            let found = find_compatible_binary_with(&managed, &minimum, false, probe);
+            assert_eq!(
+                found.map(|(_, version)| version.to_string()),
+                expected.map(str::to_owned)
+            );
+        }
     }
 
     struct FailRollbackRemove {
