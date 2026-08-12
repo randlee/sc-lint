@@ -97,6 +97,10 @@ Initial convention:
   - `version`
 - `sc-lint compatibility check`
   - `compatibility.check`
+- `sc-lint setup`
+  - `setup`
+- `sc-lint upgrade`
+  - `upgrade`
 
 When parsing fails before a concrete command path is resolved, the CLI uses the
 fallback identifier:

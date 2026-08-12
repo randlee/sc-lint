@@ -270,10 +270,22 @@ fn find_compatible_binary(
     minimum: &MinimumVersion,
     use_path_candidates: bool,
 ) -> Option<(PathBuf, Version)> {
+    find_compatible_binary_with(managed_binary, minimum, use_path_candidates, probe_version)
+}
+
+fn find_compatible_binary_with<F>(
+    managed_binary: &Path,
+    minimum: &MinimumVersion,
+    use_path_candidates: bool,
+    probe: F,
+) -> Option<(PathBuf, Version)>
+where
+    F: Fn(&Path) -> Result<Version, String>,
+{
     std::iter::once(managed_binary.to_path_buf())
         .chain(path_binary_candidates_if(use_path_candidates))
         .find_map(|binary| {
-            let version = probe_version(&binary).ok()?;
+            let version = probe(&binary).ok()?;
             (version >= *minimum.as_semver()).then_some((binary, version))
         })
 }
@@ -864,11 +876,8 @@ fn install_error(
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(unix)]
     use clap::Parser;
-    #[cfg(unix)]
     use serial_test::serial;
-    #[cfg(unix)]
     use std::ffi::OsString;
     #[cfg(unix)]
     use std::io::Write;
@@ -1070,6 +1079,58 @@ mod tests {
         );
     }
 
+    #[test]
+    #[serial]
+    fn setup_and_upgrade_command_dispatch_covers_all_installation_states_on_every_platform() {
+        let fixture = TempDir::new().expect("fixture");
+        let config_path = fixture.path().join("sc-lint.toml");
+        let install_dir = fixture.path().join("managed");
+        fs::create_dir_all(&install_dir).expect("managed directory");
+        let _environment = InstallerEnvironment::set(&[(INSTALL_DIR_ENV, install_dir.as_os_str())]);
+        let current = Version::parse(env!("CARGO_PKG_VERSION")).expect("package version");
+
+        // No managed binary: setup's dry-run follows the real dispatch path,
+        // and compatibility check proves the structured missing-binary path.
+        write_consumer_config(&config_path, &current);
+        let missing = execute_install_command(&config_path, &["setup", "--dry-run"]);
+        assert_eq!(missing["status"], "dry_run");
+        let missing_path = fixture.path().join(ReleaseTarget::binary_name());
+        let missing_error = execute_command(
+            &config_path,
+            &[
+                "compatibility",
+                "check",
+                "--binary",
+                missing_path.to_str().unwrap(),
+            ],
+        )
+        .expect_err("missing binary must use command dispatch");
+        assert_eq!(missing_error.code(), "CLI.SC_LINT_BINARY_NOT_FOUND");
+
+        // The built CLI is a native executable on each CI host, so all three
+        // version states exercise the actual installer command path without a
+        // Unix shell fixture or platform-specific permission assumptions.
+        let built_binary = built_cli_binary();
+        let managed_binary = install_dir.join(ReleaseTarget::binary_name());
+        fs::copy(&built_binary, &managed_binary).expect("copy native CLI probe");
+
+        let mut old_floor = current.clone();
+        old_floor.patch += 1;
+        write_consumer_config(&config_path, &old_floor);
+        let old = execute_install_command(&config_path, &["upgrade", "--check"]);
+        assert_eq!(old["status"], "update_required");
+
+        write_consumer_config(&config_path, &current);
+        let current_result = execute_install_command(&config_path, &["setup"]);
+        assert_eq!(current_result["status"], "current");
+        assert_eq!(current_result["installed_version"], current.to_string());
+
+        write_consumer_config(&config_path, &Version::new(0, 0, 0));
+        let newer = execute_install_command(&config_path, &["upgrade", "--check"]);
+        assert_eq!(newer["status"], "current");
+        assert_eq!(newer["installed_version"], current.to_string());
+    }
+
     #[cfg(unix)]
     #[test]
     #[serial]
@@ -1092,7 +1153,7 @@ mod tests {
             (RELEASE_BASE_URL_ENV, release_base.as_os_str()),
         ]);
 
-        let missing = execute_install_command(&config_path, "setup");
+        let missing = execute_install_command(&config_path, &["setup"]);
         assert_eq!(missing["status"], "installed");
         assert_eq!(missing["selected_release_version"], "0.4.1");
         assert_eq!(
@@ -1101,22 +1162,46 @@ mod tests {
         );
 
         write_probe(&install_dir.join(ReleaseTarget::binary_name()), "0.4.0");
-        let old = execute_install_command(&config_path, "upgrade");
+        let old = execute_install_command(&config_path, &["upgrade"]);
         assert_eq!(old["status"], "upgraded");
         assert_eq!(old["installed_version"], "0.4.1");
 
-        let current = execute_install_command(&config_path, "setup");
+        let current = execute_install_command(&config_path, &["setup"]);
         assert_eq!(current["status"], "current");
         assert_eq!(current["installed_version"], "0.4.1");
 
         write_probe(&install_dir.join(ReleaseTarget::binary_name()), "0.5.0");
-        let newer = execute_install_command(&config_path, "upgrade");
+        let newer = execute_install_command(&config_path, &["upgrade"]);
         assert_eq!(newer["status"], "current");
         assert_eq!(newer["installed_version"], "0.5.0");
         assert_eq!(
             fs::read_to_string(&consumer_readme).expect("readme"),
             "consumer-owned README\n"
         );
+    }
+
+    #[test]
+    fn version_comparison_fixture_runs_on_every_supported_platform() {
+        let fixture = TempDir::new().expect("fixture");
+        let managed = fixture.path().join(ReleaseTarget::binary_name());
+        let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
+        let probe = |path: &Path| {
+            let version = fs::read_to_string(path).map_err(|error| error.to_string())?;
+            Version::parse(version.trim()).map_err(|error| error.to_string())
+        };
+
+        for (version, expected) in [
+            ("0.4.0", None),
+            ("0.4.1", Some("0.4.1")),
+            ("0.5.0", Some("0.5.0")),
+        ] {
+            fs::write(&managed, version).expect("version fixture");
+            let found = find_compatible_binary_with(&managed, &minimum, false, probe);
+            assert_eq!(
+                found.map(|(_, version)| version.to_string()),
+                expected.map(str::to_owned)
+            );
+        }
     }
 
     struct FailRollbackRemove {
@@ -1139,12 +1224,10 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     struct InstallerEnvironment {
         original: Vec<(&'static str, Option<OsString>)>,
     }
 
-    #[cfg(unix)]
     impl InstallerEnvironment {
         fn set(values: &[(&'static str, &std::ffi::OsStr)]) -> Self {
             let original = values
@@ -1159,7 +1242,6 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
     impl Drop for InstallerEnvironment {
         fn drop(&mut self) {
             for (name, value) in &self.original {
@@ -1171,19 +1253,38 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
-    fn execute_install_command(config_path: &Path, command: &str) -> Value {
-        let cli = crate::Cli::parse_from([
+    fn execute_command(config_path: &Path, command_args: &[&str]) -> Result<Value, CliError> {
+        let mut args = vec![
             "sc-lint",
             "--config",
             config_path.to_str().expect("UTF-8 config path"),
-            command,
-        ]);
+        ];
+        args.extend_from_slice(command_args);
+        let cli = crate::Cli::parse_from(args);
         let context = crate::CommandContext::from_cli(&cli).expect("command context");
         let loaded = crate::LoadedConfig::load(&cli, &context).expect("consumer config");
-        crate::command::execute(&context, &loaded)
-            .expect("installer command")
-            .data
+        crate::command::execute(&context, &loaded).map(|success| success.data)
+    }
+
+    fn execute_install_command(config_path: &Path, command_args: &[&str]) -> Value {
+        execute_command(config_path, command_args).expect("installer command")
+    }
+
+    fn write_consumer_config(path: &Path, minimum: &Version) {
+        fs::write(
+            path,
+            format!("[tool.sc-lint]\nminimum_version = \"{minimum}\"\n"),
+        )
+        .expect("consumer config");
+    }
+
+    fn built_cli_binary() -> PathBuf {
+        let test_binary = env::current_exe().expect("test executable");
+        let debug_dir = test_binary
+            .parent()
+            .and_then(Path::parent)
+            .expect("target debug directory");
+        debug_dir.join(ReleaseTarget::binary_name())
     }
 
     #[cfg(unix)]

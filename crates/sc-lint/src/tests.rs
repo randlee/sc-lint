@@ -183,6 +183,57 @@ fn setup_and_upgrade_parse_the_stable_consumer_flags() {
 }
 
 #[test]
+fn setup_and_upgrade_json_use_the_canonical_top_level_envelope() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n",
+    )
+    .expect("consumer config");
+    let config = config_path.to_str().expect("UTF-8 config path");
+
+    for (args, command_id) in [
+        (
+            vec![
+                "sc-lint",
+                "--json",
+                "--config",
+                config,
+                "setup",
+                "--dry-run",
+            ],
+            "setup",
+        ),
+        (
+            vec![
+                "sc-lint",
+                "--json",
+                "--config",
+                config,
+                "upgrade",
+                "--check",
+                "--dry-run",
+            ],
+            "upgrade",
+        ),
+    ] {
+        let cli = Cli::parse_from(args);
+        let context = CommandContext::from_cli(&cli).expect("installer context");
+        let loaded = LoadedConfig::load(&cli, &context).expect("consumer config loads");
+        let success = crate::command::execute(&context, &loaded).expect("dry-run succeeds");
+        let envelope = CommandEnvelope::success(context.command_id(), success.data);
+        let rendered = crate::render::render_success_json(&envelope);
+        let json: Value = serde_json::from_str(&rendered).expect("envelope json");
+
+        assert_eq!(json["ok"], true);
+        assert_eq!(json["command"], command_id);
+        assert!(json["data"].is_object());
+        assert!(json["diagnostics"].is_array());
+    }
+}
+
+#[test]
 fn consumer_commands_require_an_explicit_consumer_mode() {
     let lint = Cli::parse_from(["sc-lint", "lint", "ci", "--consumer"]);
     assert!(matches!(
