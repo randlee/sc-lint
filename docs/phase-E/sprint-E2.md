@@ -113,7 +113,13 @@ consumer contract usable from a fresh local checkout.
   installation, and otherwise select the release workflow's host archive.
 - release download and `checksums.txt` are staged before extraction; activation
   is an atomic rename with a retained backup until the activated binary passes
-  the stable `sc-lint --json version` probe.
+  the stable `sc-lint --json version` probe. If rollback itself fails, the
+  installer reports `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` with the backup path
+  rather than claiming the prior installation was restored.
+- Windows does not self-replace a running managed `sc-lint.exe`; setup stops
+  before moving files and directs the operator to rerun from a separate release
+  executable. The normal Windows replacement path is verified-release staging,
+  retained backup rename, replacement, and post-install probe.
 - the product-owned bootstrap source is
   `crates/sc-lint/assets/bootstrap`; E.3 renders that source into the managed
   consumer `.sc-lint/bootstrap` path and owns the Just template.

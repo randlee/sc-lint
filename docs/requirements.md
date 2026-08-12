@@ -477,7 +477,9 @@ The product should support both:
   product-owned `sc-lint setup` and `sc-lint upgrade [--check] [--dry-run]`
   commands use the SemVer floor in `[tool.sc-lint].minimum_version`, never
   downgrade a newer compatible installation, and install only into the managed
-  product location. Consumer repositories use the product-owned
+  product location. The selected immutable release artifact is reported
+  separately from that floor, which remains the installed-version comparison
+  policy. Consumer repositories use the product-owned
   `.sc-lint/bootstrap` asset; it delegates `ensure`, `setup`, and `upgrade` to
   installed `sc-lint` and never copies source-checkout scripts or overwrites a
   consumer README.
