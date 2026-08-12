@@ -14,6 +14,7 @@ use crate::CliError;
 use crate::command::CommandContext;
 use crate::command::ConsumerInitRequest;
 use crate::installer::CONSUMER_BOOTSTRAP_ASSET;
+use crate::error::ErrorCode;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
@@ -92,8 +93,8 @@ enum CompatibilityErrorCode {
     VersionTooOld,
 }
 
-impl CompatibilityErrorCode {
-    const fn as_str(self) -> &'static str {
+impl ErrorCode for CompatibilityErrorCode {
+    fn as_str(&self) -> &'static str {
         match self {
             Self::ConfigMissing => "CLI.SC_LINT_CONFIG_MISSING",
             Self::ConfigMalformed => "CLI.SC_LINT_CONFIG_MALFORMED",
