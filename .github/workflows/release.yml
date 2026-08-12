@@ -332,6 +332,9 @@ jobs:
             --documentation-directory "${docs_source}" \
             --staging-directory "${STAGING_DIR}"
           tar czf "${ARCHIVE}" -C "${STAGING_DIR}" .
+          python3 scripts/release_artifacts.py validate-release-archive \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+            --archive "${ARCHIVE}"
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
 
       - name: Package (windows)
@@ -350,6 +353,10 @@ jobs:
             --staging-directory "${STAGING_DIR}" `
             --windows
           Compress-Archive -Path (Join-Path $STAGING_DIR '*') -DestinationPath $ARCHIVE
+          python3 scripts/release_artifacts.py validate-release-archive `
+            --manifest "${env:RELEASE_ARTIFACT_MANIFEST}" `
+            --archive "${ARCHIVE}" `
+            --windows
           echo "ARCHIVE=$ARCHIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact

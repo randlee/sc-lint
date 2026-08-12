@@ -8,7 +8,9 @@ import json
 import shutil
 import subprocess
 import sys
+import tarfile
 import tomllib
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
@@ -462,10 +464,44 @@ def stage_release_archive(args: argparse.Namespace) -> int:
     return 0
 
 
+def release_archive_expected_files(manifest: dict, *, windows: bool) -> set[Path]:
+    binaries = {
+        Path(f"{name}.exe" if windows else name)
+        for name in release_binary_names(manifest)
+    }
+    documentation_root = Path(documentation_bundle_directory(manifest))
+    documentation = {documentation_root / path for path in documentation_bundle_files(manifest)}
+    return binaries | documentation
+
+
+def release_archive_files(archive: Path) -> set[Path]:
+    if archive.suffix == ".zip":
+        with zipfile.ZipFile(archive) as zipped:
+            return {
+                Path(info.filename)
+                for info in zipped.infolist()
+                if not info.is_dir()
+            }
+    if archive.suffixes[-2:] == [".tar", ".gz"]:
+        with tarfile.open(archive, mode="r:gz") as tarred:
+            return {Path(member.name) for member in tarred.getmembers() if member.isfile()}
+    raise SystemExit(f"unsupported release archive format: {archive}")
+
+
 def validate_release_archive(args: argparse.Namespace) -> int:
     manifest = load_manifest(Path(args.manifest))
-    validate_staged_release_layout(manifest, Path(args.staging_directory), windows=bool(args.windows))
-    print("ok: staged release layout contains exactly the declared binaries and documentation bundle")
+    actual = release_archive_files(Path(args.archive))
+    expected = release_archive_expected_files(manifest, windows=bool(args.windows))
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    if missing or unexpected:
+        parts = []
+        if missing:
+            parts.append("missing archive files: " + ", ".join(str(path) for path in missing))
+        if unexpected:
+            parts.append("unexpected archive files: " + ", ".join(str(path) for path in unexpected))
+        raise SystemExit("; ".join(parts))
+    print("ok: release archive contains exactly the declared binaries and documentation bundle")
     return 0
 
 
@@ -757,7 +793,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate_archive = subparsers.add_parser("validate-release-archive")
     validate_archive.add_argument("--manifest", required=True)
-    validate_archive.add_argument("--staging-directory", required=True)
+    validate_archive.add_argument("--archive", required=True)
     validate_archive.add_argument("--windows", action="store_true")
     validate_archive.set_defaults(func=validate_release_archive)
 

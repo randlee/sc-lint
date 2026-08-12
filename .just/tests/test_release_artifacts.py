@@ -85,6 +85,24 @@ class ReleaseArtifactsTests(unittest.TestCase):
         self.assertTrue((staging / "sc-lint.exe").is_file())
         release_artifacts.validate_staged_release_layout(self.manifest, staging, windows=True)
 
+    def test_compressed_tar_and_zip_archives_reject_unexpected_content(self) -> None:
+        archive = self.stage_archive()
+        tar_path = Path(shutil.make_archive(str(self.root / "release"), "gztar", archive))
+        release_artifacts.validate_release_archive(
+            argparse.Namespace(manifest=str(MANIFEST_PATH), archive=str(tar_path), windows=False)
+        )
+
+        zip_path = Path(shutil.make_archive(str(self.root / "release"), "zip", archive))
+        release_artifacts.validate_release_archive(
+            argparse.Namespace(manifest=str(MANIFEST_PATH), archive=str(zip_path), windows=False)
+        )
+        (archive / "surprise.txt").write_text("unexpected\n", encoding="utf-8")
+        unexpected_tar = Path(shutil.make_archive(str(self.root / "unexpected"), "gztar", archive))
+        with self.assertRaisesRegex(SystemExit, "unexpected archive files"):
+            release_artifacts.validate_release_archive(
+                argparse.Namespace(manifest=str(MANIFEST_PATH), archive=str(unexpected_tar), windows=False)
+            )
+
     def test_primary_formula_installs_docs_to_pkgshare_and_passes_ruby_syntax(self) -> None:
         sha_map = {target: "a" * 64 for target in release_artifacts.HOMEBREW_TARGETS}
         formula = release_artifacts.render_homebrew_formula_text(
