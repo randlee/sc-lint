@@ -13,7 +13,7 @@ use crate::installer::CONSUMER_BOOTSTRAP_ASSET;
 const GENERATED_FILE_HEADER: &str =
     "# Managed by sc-lint; regenerate with `sc-lint init --just`.\n";
 const CONSUMER_JUSTFILE_ASSET: &str = include_str!("../assets/consumer-Justfile");
-const CONSUMER_CONFIG_ASSET: &str = include_str!("../assets/consumer-config.toml");
+const CANONICAL_CONSUMER_CONFIG_ASSET: &str = include_str!("../assets/consumer-config.toml");
 const CONFIG_VERSION_TOKEN: &str = "{{SC_LINT_VERSION}}";
 pub(crate) const BINARY_NOT_FOUND_RECOVERY: &str = "Run `just setup` (or your repository's sc-lint installer) to create or repair a compatible installation.";
 pub(crate) const DOCS_SETUP_REFERENCE: &str = "sc-lint docs setup";
@@ -71,16 +71,16 @@ pub(crate) fn run_consumer_init_at(
     }
 
     let files = consumer_integration_files(root);
-    let mut current = Vec::new();
+    let mut preserved = Vec::new();
     let mut missing = Vec::new();
     let mut version_only_stale = Vec::new();
     let mut conflicts = Vec::new();
     for file in &files {
         match classify_file(file)? {
-            ManagedFileState::Current => current.push(file.path.clone()),
+            ManagedFileState::Current => preserved.push(file.path.clone()),
             ManagedFileState::Missing => missing.push(file.path.clone()),
             ManagedFileState::RefreshableGenerated => {
-                current.push(file.path.clone());
+                preserved.push(file.path.clone());
                 version_only_stale.push(file.path.clone());
             }
             ManagedFileState::UserModified => conflicts.push(file.path.clone()),
@@ -91,6 +91,7 @@ pub(crate) fn run_consumer_init_at(
         return Err(CliError::config("consumer integration contains user-owned file conflicts")
             .with_code("CLI.SC_LINT_INTEGRATION_CONFLICT")
             .with_detail("conflicts", paths_to_json(&conflicts))
+            .with_cause("one or more product-managed paths differ from the canonical integration" )
             .with_suggested_action(
                 "Move or remove the conflicting file, then rerun `sc-lint init --just`; sc-lint will not overwrite it.",
             )
@@ -100,6 +101,7 @@ pub(crate) fn run_consumer_init_at(
         return Err(CliError::config("consumer integration is not current")
             .with_code("CLI.SC_LINT_INTEGRATION_OUTDATED")
             .with_detail("outdated", paths_to_json(&write_needed))
+            .with_cause("one or more product-managed integration files are missing")
             .with_suggested_action(
                 "Run `sc-lint init --just` to create or refresh the managed files.",
             )
@@ -140,7 +142,7 @@ pub(crate) fn run_consumer_init_at(
     Ok(json!({
         "status": if write_needed.is_empty() { "current" } else if request.dry_run { "would_create" } else { "created" },
         "managed_files": files.iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(),
-        "current_files": paths_to_strings(&current),
+        "preserved_files": paths_to_strings(&preserved),
         "created_files": paths_to_strings(&write_needed),
         "version_only_stale_files": paths_to_strings(&version_only_stale),
         "check": request.check,
@@ -206,7 +208,7 @@ fn classify_file(file: &ConsumerIntegrationFile) -> Result<ManagedFileState, Cli
 }
 
 fn is_refreshable_generated_config(actual: &str) -> bool {
-    let (prefix, suffix) = CONSUMER_CONFIG_ASSET
+    let (prefix, suffix) = CANONICAL_CONSUMER_CONFIG_ASSET
         .split_once(CONFIG_VERSION_TOKEN)
         .expect("consumer config asset must contain its version token");
     let body = actual
@@ -226,7 +228,7 @@ fn generated_bootstrap_asset() -> String {
 fn canonical_consumer_config() -> String {
     format!(
         "{GENERATED_FILE_HEADER}{}",
-        CONSUMER_CONFIG_ASSET.replace(CONFIG_VERSION_TOKEN, env!("CARGO_PKG_VERSION"))
+        CANONICAL_CONSUMER_CONFIG_ASSET.replace(CONFIG_VERSION_TOKEN, env!("CARGO_PKG_VERSION"))
     )
 }
 
@@ -284,6 +286,17 @@ mod tests {
                 .contains(BINARY_NOT_FOUND_RECOVERY)
         );
         assert!(CONSUMER_BOOTSTRAP_ASSET.contains(DOCS_SETUP_REFERENCE));
+    }
+
+    #[test]
+    fn generated_config_uses_the_single_canonical_asset() {
+        let generated = canonical_consumer_config();
+        assert!(generated.starts_with(GENERATED_FILE_HEADER));
+        assert_eq!(
+            generated.trim_start_matches(GENERATED_FILE_HEADER),
+            CANONICAL_CONSUMER_CONFIG_ASSET
+                .replace(CONFIG_VERSION_TOKEN, env!("CARGO_PKG_VERSION"))
+        );
     }
 
     #[test]
