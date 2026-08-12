@@ -51,17 +51,22 @@ fn guide_name(guide: DocsGuide) -> &'static str {
     }
 }
 
-fn candidate_roots() -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    if let Ok(executable) = std::env::current_exe()
-        && let Some(bin_dir) = executable.parent()
-    {
-        candidates.push(bin_dir.join("docs-bundle"));
-        candidates.push(bin_dir.join("sc-lint-docs"));
-        if let Some(prefix) = bin_dir.parent() {
-            candidates.push(prefix.join("share/sc-lint/docs-bundle"));
-        }
+fn candidate_roots_for_executable(executable: &Path) -> Vec<PathBuf> {
+    let Some(bin_dir) = executable.parent() else {
+        return Vec::new();
+    };
+    let mut candidates = vec![bin_dir.join("docs-bundle"), bin_dir.join("sc-lint-docs")];
+    if let Some(prefix) = bin_dir.parent() {
+        candidates.push(prefix.join("share/sc-lint/sc-lint-docs"));
+        candidates.push(prefix.join("share/sc-lint/docs-bundle"));
     }
+    candidates
+}
+
+fn candidate_roots() -> Vec<PathBuf> {
+    let mut candidates = std::env::current_exe()
+        .map(|executable| candidate_roots_for_executable(&executable))
+        .unwrap_or_default();
     // This keeps `cargo run` and source-checkout tests offline while allowing
     // release/Homebrew layouts to win when a physical installed bundle exists.
     candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs-bundle"));
@@ -88,7 +93,15 @@ fn unavailable(path: &Path, cause: impl Into<String>) -> CliError {
 )]
 fn bundle_root() -> Result<PathBuf, CliError> {
     let candidates = candidate_roots();
-    for candidate in &candidates {
+    bundle_root_from_candidates(&candidates)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Documentation discovery retains the shared top-level CliError contract."
+)]
+fn bundle_root_from_candidates(candidates: &[PathBuf]) -> Result<PathBuf, CliError> {
+    for candidate in candidates {
         if candidate.join("manifest.toml").is_file() && candidate.join("README.md").is_file() {
             return dunce::canonicalize(candidate).map_err(|error| {
                 unavailable(
@@ -239,6 +252,29 @@ mod tests {
                 .ends_with("just-setup.md")
         );
         assert!(root.join("just-setup.md").is_file());
+    }
+
+    #[test]
+    fn installed_layout_candidates_cover_archive_and_homebrew_pkgshare() {
+        let archive_binary = Path::new("/release/sc-lint");
+        assert!(
+            candidate_roots_for_executable(archive_binary)
+                .contains(&PathBuf::from("/release/sc-lint-docs"))
+        );
+
+        let homebrew_binary = Path::new("/opt/homebrew/bin/sc-lint");
+        assert!(
+            candidate_roots_for_executable(homebrew_binary)
+                .contains(&PathBuf::from("/opt/homebrew/share/sc-lint/sc-lint-docs"))
+        );
+
+        let root = source_root();
+        let discovered =
+            bundle_root_from_candidates(std::slice::from_ref(&root)).expect("bundle discovery");
+        assert_eq!(
+            discovered,
+            dunce::canonicalize(root).expect("canonical source bundle")
+        );
     }
 
     #[test]

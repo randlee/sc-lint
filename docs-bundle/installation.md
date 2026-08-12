@@ -14,15 +14,16 @@ sc-lint --version
 sc-lint docs
 ```
 
-The formula installs the executable in `bin` and this bundle in its formula
-`pkgshare`; documentation remains local and offline.
+The formula installs executables in `bin` and this bundle as
+`<prefix>/share/sc-lint/sc-lint-docs` (the formula-owned `pkgshare`);
+documentation remains local and offline.
 
 ## Release archive
 
 Download the archive matching the host triple from the project release page,
 verify its published checksum, and put `sc-lint` on `PATH`. The archive's
-`sc-lint-docs/` directory must stay beside the executable (or be installed in
-the platform's `share/sc-lint/docs-bundle` directory).
+`sc-lint-docs/` directory must stay beside the executable. The Homebrew layout
+instead places it in the formula-owned `pkgshare` path shown above.
 
 ```sh
 tar -xzf sc-lint_0.4.0_x86_64-unknown-linux-gnu.tar.gz

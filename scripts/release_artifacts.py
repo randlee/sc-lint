@@ -157,7 +157,68 @@ def validate_documentation_bundle(manifest: dict, source_directory: Path) -> lis
         if unexpected:
             parts.append("unexpected documentation files: " + ", ".join(str(path) for path in unexpected))
         raise SystemExit("; ".join(parts))
+    validate_documentation_bundle_package_manifest(manifest, source_directory, expected_set)
     return expected
+
+
+def validate_documentation_bundle_package_manifest(
+    manifest: dict, source_directory: Path, expected_files: set[Path]
+) -> None:
+    """Keep the bundle's own guide inventory aligned with release packaging."""
+    package_manifest = source_directory / "manifest.toml"
+    try:
+        data = tomllib.loads(package_manifest.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise SystemExit(f"invalid documentation package manifest: {error}") from error
+    if data.get("schema_version") != 1:
+        raise SystemExit("unsupported documentation package manifest schema_version")
+    if data.get("bundle_name") != documentation_bundle_directory(manifest):
+        raise SystemExit("documentation package manifest bundle_name does not match release manifest")
+    guides = data.get("guides")
+    if not isinstance(guides, list) or not guides:
+        raise SystemExit("documentation package manifest must define non-empty [[guides]]")
+    guide_paths: set[Path] = set()
+    documented_packages: set[str] = set()
+    for index, guide in enumerate(guides):
+        if not isinstance(guide, dict):
+            raise SystemExit(f"documentation package manifest guides[{index}] must be a table")
+        path = guide.get("path")
+        if not isinstance(path, str) or not path.strip():
+            raise SystemExit(f"documentation package manifest guides[{index}].path must be a non-empty string")
+        guide_paths.add(Path(path))
+        if guide.get("kind") == "package":
+            package = guide.get("package")
+            if not isinstance(package, str) or not package.strip():
+                raise SystemExit(
+                    f"documentation package manifest guides[{index}].package must be a non-empty string"
+                )
+            documented_packages.add(package)
+    expected_guides = expected_files - {Path("manifest.toml")}
+    if guide_paths != expected_guides:
+        missing = sorted(expected_guides - guide_paths)
+        unexpected = sorted(guide_paths - expected_guides)
+        parts = []
+        if missing:
+            parts.append("missing package-manifest guides: " + ", ".join(str(path) for path in missing))
+        if unexpected:
+            parts.append("unexpected package-manifest guides: " + ", ".join(str(path) for path in unexpected))
+        raise SystemExit("; ".join(parts))
+    publishable_packages = {crate["package"] for crate in manifest["crates"] if crate["publish"]}
+    if documented_packages != publishable_packages:
+        raise SystemExit(
+            "documentation package manifest package guides do not match publishable release packages"
+        )
+    for guide_path in guide_paths:
+        content = (source_directory / guide_path).read_text(encoding="utf-8")
+        for link in content.split("](")[1:]:
+            target = link.split(")", maxsplit=1)[0].split("#", maxsplit=1)[0]
+            if not target or target.startswith(("http://", "https://", "mailto:")):
+                continue
+            linked_path = (source_directory / guide_path).parent / target
+            if not linked_path.is_file():
+                raise SystemExit(
+                    f"broken documentation link: {guide_path} -> {target}"
+                )
 
 
 def validate_documentation_bundle_command(args: argparse.Namespace) -> int:
@@ -517,8 +578,8 @@ def stage_homebrew_layout(args: argparse.Namespace) -> int:
         if not source.is_file():
             raise SystemExit(f"missing archive binary for Homebrew layout: {source}")
         shutil.copy2(source, bin_directory / name)
-    pkgshare = prefix / "pkgshare"
-    pkgshare.mkdir()
+    pkgshare = prefix / "share" / HOMEBREW_PRIMARY_FORMULA
+    pkgshare.mkdir(parents=True)
     docs_source = archive_directory / documentation_bundle_directory(manifest)
     copy_documentation_bundle(manifest, docs_source, pkgshare)
     expected_bins = set(release_binary_names(manifest))

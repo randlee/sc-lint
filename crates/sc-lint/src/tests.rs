@@ -4,6 +4,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::process::Command as ProcessCommand;
 
 use clap::Parser;

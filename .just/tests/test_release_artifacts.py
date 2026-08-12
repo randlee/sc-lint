@@ -30,6 +30,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
             path = self.docs / relative_path
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(f"# {relative_path.name}\n", encoding="utf-8")
+        shutil.copy2(REPO_ROOT / "docs-bundle" / "manifest.toml", self.docs / "manifest.toml")
         self.binaries = self.root / "binaries"
         self.binaries.mkdir()
         for name in release_artifacts.release_binary_names(self.manifest):
@@ -66,6 +67,25 @@ class ReleaseArtifactsTests(unittest.TestCase):
         (self.docs / "surprise.md").write_text("# surprise\n", encoding="utf-8")
         with self.assertRaisesRegex(SystemExit, "unexpected documentation files"):
             self.stage_archive("archive-unexpected")
+
+    def test_archive_validation_rejects_guides_not_recorded_in_package_manifest(self) -> None:
+        package_manifest = self.docs / "manifest.toml"
+        content = package_manifest.read_text(encoding="utf-8")
+        package_manifest.write_text(
+            content.replace(
+                '[[guides]]\npath = "packages/sc-lint.md"\nkind = "package"\npackage = "sc-lint"\n\n',
+                "",
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(SystemExit, "missing package-manifest guides"):
+            self.stage_archive("archive-package-manifest")
+
+    def test_archive_validation_rejects_broken_relative_documentation_links(self) -> None:
+        overview = self.docs / "README.md"
+        overview.write_text("[missing](missing.md)\n", encoding="utf-8")
+        with self.assertRaisesRegex(SystemExit, "broken documentation link"):
+            self.stage_archive("archive-broken-link")
 
     def test_windows_archive_layout_requires_executables_with_the_expected_suffix(self) -> None:
         windows_binaries = self.root / "windows-binaries"
@@ -135,7 +155,9 @@ class ReleaseArtifactsTests(unittest.TestCase):
             {path.name for path in (prefix / "bin").iterdir()},
             set(release_artifacts.release_binary_names(self.manifest)),
         )
-        self.assertTrue((prefix / "pkgshare" / "sc-lint-docs" / "just-setup.md").is_file())
+        self.assertTrue(
+            (prefix / "share" / "sc-lint" / "sc-lint-docs" / "just-setup.md").is_file()
+        )
 
 
 if __name__ == "__main__":

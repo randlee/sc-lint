@@ -331,7 +331,9 @@ jobs:
             --binaries-directory "target/${{ matrix.target }}/release" \
             --documentation-directory "${docs_source}" \
             --staging-directory "${STAGING_DIR}"
-          tar czf "${ARCHIVE}" -C "${STAGING_DIR}" .
+          # BSD tar on macOS otherwise emits AppleDouble `._*` metadata files;
+          # the archive contract intentionally rejects every undeclared file.
+          COPYFILE_DISABLE=1 tar czf "${ARCHIVE}" -C "${STAGING_DIR}" .
           python3 scripts/release_artifacts.py validate-release-archive \
             --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
             --archive "${ARCHIVE}"
