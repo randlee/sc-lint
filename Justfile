@@ -78,6 +78,7 @@ build:
 test:
     cargo build --workspace
     cargo test --workspace
+    node --test action/test/action.test.cjs
 
 # Remove workspace build artifacts.
 clean:

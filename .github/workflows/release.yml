@@ -403,6 +403,24 @@ jobs:
           files: |
             release/*
 
+  publish-action-major-tag:
+    needs: [gate-and-tag, release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
+          fetch-depth: 0
+      - name: Move the stable Action major tag after release publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_commit="$(git rev-parse HEAD)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag --force -a v1 "$release_commit" -m "sc-lint GitHub Action v1"
+          git push --force origin refs/tags/v1
+
   update-homebrew:
     needs: [gate-and-tag, release]
     runs-on: ubuntu-latest

@@ -514,7 +514,13 @@ The product should support both:
   verified release artifact and enforces the same consumer compatibility,
   setup, lint, and test contract as local installation. Its inputs, outputs,
   pinning guidance, and recoverable failure behavior must be specified in the
-  Action requirements and architecture records before Action release.
+  [Action requirements](./sc-lint/github-action-requirements.md) and
+  architecture records before Action release. The Action downloads only the
+  selected release archive plus its checksum manifest, verifies the archive
+  before extraction, preflights the configured minimum version, and exposes
+  the installed binary and offline documentation paths. Its stable adoption
+  form, exact-pin recommendation, and recoverable error contract are part of
+  the released product interface.
 
 ## Current Detailed Requirement Areas
 
