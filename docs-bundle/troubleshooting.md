@@ -25,6 +25,10 @@ machine-readable error. The human form includes the same recovery guidance.
 | `CLI.SC_LINT_INTEGRATION_CONFLICT` | A product-managed integration path contains user-owned changes | Reconcile or move the named file, then rerun `sc-lint init --just`; it will not overwrite consumer-owned content. |
 | `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more required product-managed integration files are absent | Run `sc-lint init --just` to create the named managed files, then rerun the check. |
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
+| `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE` | The Action could not obtain the selected release archive or checksum manifest | Check the exact `version` and release/mirror URLs; make the verified release reachable, then retry. |
+| `ACTION.SC_LINT_CHECKSUM_MISMATCH` | The Action archive digest differs from the selected `checksums.txt` entry | Discard the archive and retry from the trusted release or mirror; do not bypass verification. |
+| `ACTION.SC_LINT_COMPATIBILITY_FAILED` | The extracted release fails the configured E.1 minimum-version preflight | Select a release meeting `minimum_version` or intentionally reconcile `sc-lint.toml`. |
+| `ACTION.SC_LINT_COMMAND_FAILED` | The selected consumer setup, lint, test, or offline-documentation command failed | Inspect the preserved command output, repair the named consumer profile or bundle, then retry. |
 
 ## Initialization conflicts
 

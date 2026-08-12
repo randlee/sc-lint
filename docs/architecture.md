@@ -528,14 +528,20 @@ Architecture consequences:
 
 Phase E adds two release-distribution consumers to that same manifest-led
 model: the installed documentation bundle and a reusable GitHub Action. The
-Action must resolve only verified release artifacts, expose the resulting
-binary/documentation locations, and invoke the same compatibility and command
-contract as local installation. It must not use `cargo run`, a source checkout,
-or an analyzer package name as a fallback. This architecture realizes
-`REQ-PRODUCT-022`; E.6 will record the detailed Action contract in
-`docs/sc-lint/github-action-requirements.md` and publish an ADR only if the
-Action introduces a distribution decision not covered by this manifest-led
-model.
+root Action is a Node runtime so archive verification and extraction use the
+same implementation on Linux, macOS, and Windows. It resolves only the exact
+versioned release archive and sibling checksum manifest, verifies SHA-256
+before extraction, exposes the binary and `sc-lint-docs` paths, then invokes
+the E.1 compatibility preflight before E.3 consumer setup/lint/test. It must
+not use `cargo run`, a source checkout, a package manager, or an analyzer
+package name as a fallback. Its `v1` major tag identifies the Action interface;
+the explicit product-version input selects the immutable release artifact.
+
+This architecture realizes `REQ-PRODUCT-022`; the detailed input, output,
+provenance, pinning, and recovery contract is in
+`docs/sc-lint/github-action-requirements.md`. No additional ADR is needed:
+the Action is another manifest-led release consumer and introduces no new
+distribution authority.
 
 ## Consumer-Proven Rule Promotion
 

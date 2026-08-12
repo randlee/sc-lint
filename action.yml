@@ -1,0 +1,42 @@
+name: sc-lint
+description: Install a verified sc-lint release and run the consumer setup, lint, or test contract.
+author: sc-lint maintainers
+inputs:
+  operation:
+    description: Consumer operation: setup, lint, or test.
+    required: false
+    default: lint
+  version:
+    description: Exact released sc-lint SemVer without a leading v.
+    required: true
+  config-path:
+    description: Consumer configuration path relative to working-directory.
+    required: false
+    default: sc-lint.toml
+  artifact-url:
+    description: Exact release archive URL; overrides derived release URL for a verified mirror.
+    required: false
+  checksums-url:
+    description: Exact matching checksums.txt URL; overrides derived release URL for a verified mirror.
+    required: false
+  release-base-url:
+    description: Trusted sc-lint release download root.
+    required: false
+    default: https://github.com/randlee/sc-lint/releases/download
+  working-directory:
+    description: Consumer working directory containing sc-lint.toml.
+    required: false
+    default: .
+outputs:
+  binary-path:
+    description: Absolute path of the verified sc-lint binary.
+  docs-path:
+    description: Absolute path of the shipped offline sc-lint-docs bundle.
+  version:
+    description: Verified release version selected by this Action.
+runs:
+  using: node20
+  main: action/index.js
+branding:
+  icon: check-circle
+  color: purple
