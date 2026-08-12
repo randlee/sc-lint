@@ -318,6 +318,49 @@ Failures while locating, executing, or validating the external installed binary
 use `backend_failure`, not `capability`: that category records a concrete
 subprocess/install failure rather than the absence of an optional feature.
 
+## Installation And Upgrade Contract
+
+`sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]` load
+the same `[tool.sc-lint].minimum_version` requirement as compatibility check.
+That field remains an installed-version floor; the installer reports the exact
+`selected_release_version` separately for the immutable release artifact it
+downloads. They select the release workflow's host archive
+`sc-lint_<version>_<target>.<tar.gz|zip>` and its sibling `checksums.txt` from
+the `v<version>` release. The installer stages download and extraction, checks
+SHA-256 before activation, and verifies `sc-lint --json version` after an
+atomic activation. It rolls back the prior managed binary when activation or
+post-install verification fails. If rollback cannot be verified, the command
+does not claim recovery succeeded: it returns the backup path and manual
+recovery instructions instead.
+
+`upgrade --check` never changes disk and reports `current` or
+`update_required`; `--dry-run` reports the archive, checksum manifest, and
+managed target that would be used. A compatible newer binary is never
+downgraded. The managed directory is platform-local by default and may be set
+explicitly with `SC_LINT_INSTALL_DIR`; `SC_LINT_RELEASE_BASE_URL` is a release
+fixture/enterprise mirror override.
+
+| Code | Recovery condition |
+| --- | --- |
+| `CLI.SC_LINT_INSTALL_UNSUPPORTED_PLATFORM` | Use a published target or install manually. |
+| `CLI.SC_LINT_RELEASE_UNAVAILABLE` | Restore network/release access and retry setup. |
+| `CLI.SC_LINT_RELEASE_CHECKSUM_MISMATCH` | Do not activate the artifact; redownload from the official release. |
+| `CLI.SC_LINT_INSTALL_PERMISSION_DENIED` | Choose a writable managed install directory. |
+| `CLI.SC_LINT_POST_INSTALL_VERSION_FAILED` | A prior managed binary, if one existed, was restored; otherwise the failed candidate was removed. Repair the release and rerun setup. |
+| `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` | Inspect the reported target and backup path; restore the known-good backup manually before retrying. |
+| `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | The previous managed binary was retained; repair the target directory and retry. |
+
+Every installer failure uses `backend_failure`, a stable code, a cause,
+recovery guidance, and `docs: "sc-lint docs installation"`. The E.4 bundle
+will provide that offline guide; E.2 does not implement documentation delivery.
+
+On Windows, an executable cannot reliably replace itself while still running.
+When the managed binary is the active `sc-lint.exe`, setup fails before moving
+any files and directs the operator to run setup from a separately downloaded
+executable. The normal activation sequence remains rename target to retained
+backup, replace from the verified staging directory, then post-install probe;
+CI exercises the Windows checksum path independently.
+
 ## Backend-to-CLI Normalization
 
 The top-level CLI must normalize backend-native results into the canonical

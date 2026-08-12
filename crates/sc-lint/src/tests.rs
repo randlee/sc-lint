@@ -112,12 +112,31 @@ fn help_text_exposes_the_initial_grouped_surface() {
         "check",
         "clippy",
         "compatibility",
+        "setup",
+        "upgrade",
         "version",
         "ci",
         "--json",
     ] {
         assert!(help.contains(command), "missing `{command}` in help output");
     }
+}
+
+#[test]
+fn setup_and_upgrade_parse_the_stable_consumer_flags() {
+    let setup = Cli::parse_from(["sc-lint", "setup", "--dry-run"]);
+    assert!(matches!(
+        setup.command,
+        Some(Command::Setup { dry_run: true })
+    ));
+    let upgrade = Cli::parse_from(["sc-lint", "upgrade", "--check", "--dry-run"]);
+    assert!(matches!(
+        upgrade.command,
+        Some(Command::Upgrade {
+            check: true,
+            dry_run: true
+        })
+    ));
 }
 
 #[test]

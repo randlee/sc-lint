@@ -9,6 +9,7 @@ use crate::config::LoadedConfig;
 use crate::consts;
 use crate::contract::ServiceName;
 use crate::dispatch;
+use crate::installer;
 use crate::python_adapter;
 use crate::workflow;
 
@@ -65,6 +66,8 @@ pub(crate) enum CommandId {
     ClippyNative,
     ClippyXwin,
     CompatibilityCheck,
+    Setup,
+    Upgrade,
     LintCi,
     LintFast,
     LintFull,
@@ -76,6 +79,14 @@ pub(crate) enum CommandId {
     Version,
     ViewFindings,
     ViewGraph,
+}
+
+/// Parsed installer flags stay coupled to their command family instead of
+/// becoming unrelated booleans in `CommandContext`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstallationRequest {
+    Setup { dry_run: bool },
+    Upgrade { check: bool, dry_run: bool },
 }
 
 impl CommandId {
@@ -106,6 +117,8 @@ impl CommandId {
             Command::Compatibility { command } => match command {
                 crate::CompatibilityCommand::Check { .. } => Self::CompatibilityCheck,
             },
+            Command::Setup { .. } => Self::Setup,
+            Command::Upgrade { .. } => Self::Upgrade,
             Command::Version => Self::Version,
             Command::Ci => Self::Ci,
         }
@@ -119,6 +132,8 @@ impl CommandId {
             Self::ClippyNative => "clippy.native",
             Self::ClippyXwin => "clippy.xwin",
             Self::CompatibilityCheck => "compatibility.check",
+            Self::Setup => "setup",
+            Self::Upgrade => "upgrade",
             Self::LintCi => "lint.ci",
             Self::LintFast => "lint.fast",
             Self::LintFull => "lint.full",
@@ -144,6 +159,8 @@ impl CommandId {
             | Self::ClippyNative
             | Self::ClippyXwin
             | Self::CompatibilityCheck
+            | Self::Setup
+            | Self::Upgrade
             | Self::LintCi
             | Self::LintFast
             | Self::LintFull
@@ -161,6 +178,8 @@ impl CommandId {
             Self::CheckNative | Self::CheckXwin => "preflight execution path",
             Self::ClippyNative | Self::ClippyXwin => "clippy execution path",
             Self::CompatibilityCheck => "installed sc-lint compatibility preflight",
+            Self::Setup => "managed sc-lint installation and repair",
+            Self::Upgrade => "managed sc-lint upgrade inspection and activation",
             Self::LintCi | Self::LintFast | Self::LintFull => "lint profile orchestration path",
             Self::LintIdentityLiterals => "python-backed identity literal lint path",
             Self::LintLineCounts => "python-backed line-count lint path",
@@ -174,7 +193,10 @@ impl CommandId {
     }
 
     pub const fn requires_repo_root(self) -> bool {
-        !matches!(self, Self::Version | Self::CompatibilityCheck)
+        !matches!(
+            self,
+            Self::Version | Self::CompatibilityCheck | Self::Setup | Self::Upgrade
+        )
     }
 
     pub const fn dispatch_tool(self) -> Option<&'static str> {
@@ -215,6 +237,7 @@ pub struct CommandContext {
     summary: &'static str,
     requires_repo_root: bool,
     compatibility_binary: Option<std::path::PathBuf>,
+    installation_request: Option<InstallationRequest>,
 }
 
 impl CommandContext {
@@ -228,33 +251,48 @@ impl CommandContext {
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
-        let (command_id, compatibility_binary) = match (&cli.command, cli.version) {
-            (Some(command), false) => {
-                let compatibility_binary = match command {
-                    Command::Compatibility {
-                        command: crate::CompatibilityCommand::Check { binary },
-                    } => binary.clone(),
-                    _ => None,
-                };
-                (CommandId::from_cli_command(command), compatibility_binary)
-            }
-            (None, true) => (CommandId::Version, None),
-            (Some(_), true) => {
-                return Err(CliError::usage(
-                    "`--version` cannot be combined with a subcommand",
-                )
-                .with_suggested_action(
-                    "Use either `sc-lint --version` or a subcommand such as `sc-lint version`.",
-                ));
-            }
-            (None, false) => {
-                return Err(
-                    CliError::usage("a command is required").with_suggested_action(
-                        "Run `sc-lint --help` to inspect the supported command surface.",
-                    ),
-                );
-            }
-        };
+        let (command_id, compatibility_binary, installation_request) =
+            match (&cli.command, cli.version) {
+                (Some(command), false) => {
+                    let compatibility_binary = match command {
+                        Command::Compatibility {
+                            command: crate::CompatibilityCommand::Check { binary },
+                        } => binary.clone(),
+                        _ => None,
+                    };
+                    let installation_request = match command {
+                        Command::Setup { dry_run } => {
+                            Some(InstallationRequest::Setup { dry_run: *dry_run })
+                        }
+                        Command::Upgrade { check, dry_run } => Some(InstallationRequest::Upgrade {
+                            check: *check,
+                            dry_run: *dry_run,
+                        }),
+                        _ => None,
+                    };
+                    (
+                        CommandId::from_cli_command(command),
+                        compatibility_binary,
+                        installation_request,
+                    )
+                }
+                (None, true) => (CommandId::Version, None, None),
+                (Some(_), true) => {
+                    return Err(CliError::usage(
+                        "`--version` cannot be combined with a subcommand",
+                    )
+                    .with_suggested_action(
+                        "Use either `sc-lint --version` or a subcommand such as `sc-lint version`.",
+                    ));
+                }
+                (None, false) => {
+                    return Err(
+                        CliError::usage("a command is required").with_suggested_action(
+                            "Run `sc-lint --help` to inspect the supported command surface.",
+                        ),
+                    );
+                }
+            };
         let service_name = ServiceName::new(command_id.service_name());
 
         Ok(Self {
@@ -263,6 +301,7 @@ impl CommandContext {
             summary: command_id.summary(),
             requires_repo_root: command_id.requires_repo_root(),
             compatibility_binary,
+            installation_request,
         })
     }
 
@@ -287,18 +326,45 @@ impl CommandContext {
     }
 
     pub(crate) const fn requires_compatibility_config(&self) -> bool {
-        matches!(self.command_id, CommandId::CompatibilityCheck)
+        matches!(
+            self.command_id,
+            CommandId::CompatibilityCheck | CommandId::Setup | CommandId::Upgrade
+        )
     }
 
     pub(crate) fn compatibility_binary(&self) -> Option<&Path> {
         self.compatibility_binary.as_deref()
     }
 
+    pub(crate) const fn setup_dry_run(&self) -> bool {
+        matches!(
+            self.installation_request,
+            Some(InstallationRequest::Setup { dry_run: true })
+        )
+    }
+
+    pub(crate) const fn upgrade_check(&self) -> bool {
+        matches!(
+            self.installation_request,
+            Some(InstallationRequest::Upgrade { check: true, .. })
+        )
+    }
+
+    pub(crate) const fn upgrade_dry_run(&self) -> bool {
+        matches!(
+            self.installation_request,
+            Some(InstallationRequest::Upgrade { dry_run: true, .. })
+        )
+    }
+
     /// Standalone consumer probes must never initialize repository logging.
     pub const fn skips_logging(&self) -> bool {
         matches!(
             self.command_id,
-            CommandId::Version | CommandId::CompatibilityCheck
+            CommandId::Version
+                | CommandId::CompatibilityCheck
+                | CommandId::Setup
+                | CommandId::Upgrade
         )
     }
 
@@ -341,6 +407,15 @@ pub(crate) fn execute(
         CommandId::CompatibilityCheck => Ok(CommandSuccess::direct(
             loaded_config.evaluate_compatibility(context.compatibility_binary())?,
         )),
+        CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
+            loaded_config,
+            context.setup_dry_run(),
+        )?)),
+        CommandId::Upgrade => Ok(CommandSuccess::direct(installer::run_upgrade(
+            loaded_config,
+            context.upgrade_check(),
+            context.upgrade_dry_run(),
+        )?)),
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),

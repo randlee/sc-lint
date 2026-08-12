@@ -1,7 +1,7 @@
 ---
 id: E.2
 title: Installation And Upgrade Engine
-status: planned
+status: implemented
 branch: feature/phase-E2-install-upgrade-engine
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E2-install-upgrade-engine
 target: integrate/phase-E
@@ -105,3 +105,23 @@ consumer contract usable from a fresh local checkout.
 - unit/integration tests using a local release-artifact fixture
 - `cargo fmt --all --check`
 - `cargo clippy --workspace --all-targets -- -D warnings`
+
+## Implementation Record
+
+- `sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]`
+  resolve the canonical minimum version, short-circuit for a compatible newer
+  installation, and otherwise select the release workflow's host archive.
+- release download and `checksums.txt` are staged before extraction; activation
+  is an atomic rename with a retained backup until the activated binary passes
+  the stable `sc-lint --json version` probe. If rollback itself fails, the
+  installer reports `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` with the backup path
+  rather than claiming the prior installation was restored.
+- Windows does not self-replace a running managed `sc-lint.exe`; setup stops
+  before moving files and directs the operator to rerun from a separate release
+  executable. The normal Windows replacement path is verified-release staging,
+  retained backup rename, replacement, and post-install probe.
+- the product-owned bootstrap source is
+  `crates/sc-lint/assets/bootstrap`; E.3 renders that source into the managed
+  consumer `.sc-lint/bootstrap` path and owns the Just template.
+- installer failures use the documented `CLI.SC_LINT_*` recovery codes and
+  link to the forthcoming E.4 offline installation guide.
