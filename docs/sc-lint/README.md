@@ -2,6 +2,12 @@
 
 This folder is the home for `sc-lint` design and planning material.
 
+The versioned end-user operator manual is maintained in the repository root at
+[`../../docs-bundle/README.md`](../../docs-bundle/README.md) and is discoverable
+offline with `sc-lint docs`. It includes the canonical
+[`just-setup.md`](../../docs-bundle/just-setup.md) guide and one guide for each
+published package.
+
 Contents:
 
 - [`requirements.md`](./requirements.md) — top-level `sc-lint` crate

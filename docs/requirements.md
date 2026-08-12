@@ -493,9 +493,15 @@ The product should support both:
 - `REQ-PRODUCT-021`
   Every primary release distribution, including release archives and Homebrew,
   must install a version-matched offline documentation bundle containing the
-  overview, canonical Just guide, and one guide per published package. The
-  installed help/docs surface must discover those files without a source
-  checkout or network access.
+  overview, operator manual, canonical Just guide, and one guide per published
+  package, including library-only packages. The bundle manifest must be checked
+  against the release publish manifest and all relative Markdown links must
+  resolve before packaging. The installed help/docs surface must discover the
+  overview, operator guides, and package guides without a source checkout or
+  network access; `sc-lint docs --path` must expose the installed root for
+  release automation. Missing documentation is a structured
+  `CLI.SC_LINT_DOCS_UNAVAILABLE` failure with bundle path, recovery action, and
+  the `sc-lint docs installation` reference.
 
 - `REQ-PRODUCT-022`
   The project must provide a versioned reusable GitHub Action that obtains a

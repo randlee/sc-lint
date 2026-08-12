@@ -13,8 +13,8 @@ use crate::Cli;
 use crate::CliError;
 use crate::command::CommandContext;
 use crate::command::ConsumerInitRequest;
-use crate::installer::CONSUMER_BOOTSTRAP_ASSET;
 use crate::error::ErrorCode;
+use crate::installer::CONSUMER_BOOTSTRAP_ASSET;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
