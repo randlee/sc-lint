@@ -19,6 +19,10 @@ The formula installs the executable in `bin` and this bundle in its formula
 
 ## Release archive
 
+> Release-archive and Homebrew documentation packaging are delivered by Sprint
+> E.5. Until that release lands, use the source bundle or the package path
+> documented by the installed release.
+
 Download the archive matching the host triple from the project release page,
 verify its published checksum, and put `sc-lint` on `PATH`. The archive's
 `sc-lint-docs/` directory must stay beside the executable (or be installed in

@@ -22,13 +22,18 @@ machine-readable error. The human form includes the same recovery guidance.
 | `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` | Previous binary could not be verified after failure | Use the reported backup path and restore it manually before retrying. |
 | `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | Atomic activation failed | Choose a writable install directory and retry. |
 | `CLI.SC_LINT_BACKEND_NOT_FOUND` | A configured lint/test command is missing | Install the named backend, then rerun the profile. |
+| `CLI.SC_LINT_INTEGRATION_CONFLICT` | A product-managed integration path contains user-owned changes | Reconcile or move the named file, then rerun `sc-lint init --just`; it will not overwrite consumer-owned content. |
+| `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more required product-managed integration files are absent | Run `sc-lint init --just` to create the named managed files, then rerun the check. |
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
 
 ## Initialization conflicts
 
-`sc-lint init --just` never overwrites a differing user-owned `Justfile`,
-`sc-lint.toml`, or `.sc-lint/bootstrap`. Move the conflicting file or reconcile
-it with [the canonical guide](./just-setup.md), then rerun initialization.
+`sc-lint init --just` reports
+`CLI.SC_LINT_INTEGRATION_CONFLICT` rather than overwriting a differing
+user-owned `Justfile`, `sc-lint.toml`, or `.sc-lint/bootstrap`. Missing managed
+files produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
+conflicting file or reconcile it with [the canonical guide](./just-setup.md),
+then rerun initialization.
 
 ## Getting a diagnostic
 
