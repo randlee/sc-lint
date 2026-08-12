@@ -493,14 +493,20 @@ The product should support both:
 - `REQ-PRODUCT-021`
   Every primary release distribution, including release archives and Homebrew,
   must install a version-matched offline documentation bundle containing the
-  overview, canonical Just guide, and one guide per published package. The
-  installed help/docs surface must discover those files without a source
-  checkout or network access. The release manifest is the authoritative
-  inventory for the exact bundle paths: an archive contains the top-level
-  `sc-lint-docs/` directory beside the declared binaries, while the primary
-  Homebrew formula installs that directory only under its formula-owned
-  `pkgshare`. Packaging validation must reject missing, unexpected, or
-  unrecorded bundle files; it must never write the bundle overview into a
+  overview, operator manual, canonical Just guide, and one guide per published
+  package, including library-only packages. The bundle manifest must be checked
+  against the release publish manifest and all relative Markdown links must
+  resolve before packaging. The installed help/docs surface must discover the
+  overview, operator guides, and package guides without a source checkout or
+  network access; `sc-lint docs --path` must expose the installed root for
+  release automation. Missing documentation is a structured
+  `CLI.SC_LINT_DOCS_UNAVAILABLE` failure with bundle path, recovery action, and
+  the `sc-lint docs installation` reference. The release manifest is the
+  authoritative inventory for exact bundle paths: an archive contains the
+  top-level `sc-lint-docs/` directory beside declared binaries, while the
+  primary Homebrew formula installs that directory only under its
+  formula-owned `pkgshare`. Packaging validation rejects missing, unexpected,
+  or unrecorded bundle files; it never writes the bundle overview into a
   consumer repository.
 
 - `REQ-PRODUCT-022`

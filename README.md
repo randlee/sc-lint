@@ -186,6 +186,10 @@ The current GitHub Actions sequence mirrors the local workflow:
 
 ## Docs
 
+The installed operator manual is available offline through `sc-lint docs` and
+is sourced from [`docs-bundle/`](docs-bundle/README.md). The canonical consumer
+setup is [`docs-bundle/just-setup.md`](docs-bundle/just-setup.md).
+
 Detailed design and planning material lives under:
 
 - [`docs/sc-lint/README.md`](docs/sc-lint/README.md)

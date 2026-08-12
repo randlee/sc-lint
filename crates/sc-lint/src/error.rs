@@ -7,6 +7,10 @@ use serde::ser::SerializeStruct;
 use serde_json::Map;
 use serde_json::Value;
 
+pub(crate) trait ErrorCode {
+    fn as_str(&self) -> &'static str;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CliErrorKind {

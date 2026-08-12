@@ -6,6 +6,7 @@ schema_version = 1
 source_directory = "docs-bundle"
 package_directory = "sc-lint-docs"
 required_files = [
+  "manifest.toml",
   "README.md",
   "installation.md",
   "using-sc-lint.md",

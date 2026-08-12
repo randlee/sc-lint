@@ -8,6 +8,9 @@ use serde::Serialize;
 #[derive(Debug, Clone, Parser)]
 #[command(name = "sc-lint")]
 #[command(about = "Stable top-level CLI for the sc-lint tool family")]
+#[command(
+    after_long_help = "Documentation guides: `sc-lint docs` (overview), `installation`, `using-sc-lint`, `configuration`, `just-setup`, `ci`, `upgrade`, `troubleshooting`, `best-practices`, and one guide for each `sc-lint-*` package: `sc-lint`, `sc-lint-attributes`, `sc-lint-boundary`, `sc-lint-directives`, `sc-lint-portability`, `sc-lint-runtime`, and `sc-lint-schema`. Use `sc-lint docs --path` for the installed bundle path."
+)]
 #[command(disable_version_flag = true)]
 pub struct Cli {
     #[arg(long, global = true)]
@@ -78,10 +81,51 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Discover and print the installed offline documentation bundle.
+    Docs {
+        /// Guide to print or resolve. Without a guide, print the overview.
+        #[arg(value_enum)]
+        guide: Option<DocsGuide>,
+        /// Print the installed filesystem path instead of guide contents.
+        #[arg(long)]
+        path: bool,
+    },
     /// Run the complete explicitly configured consumer test profile.
     Test,
     Version,
     Ci,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum DocsGuide {
+    #[value(name = "README.md")]
+    Overview,
+    #[value(name = "installation", alias = "setup")]
+    Installation,
+    #[value(name = "using-sc-lint")]
+    UsingScLint,
+    Configuration,
+    #[value(name = "just-setup")]
+    JustSetup,
+    Ci,
+    Upgrade,
+    Troubleshooting,
+    #[value(name = "best-practices")]
+    BestPractices,
+    #[value(name = "sc-lint")]
+    ScLint,
+    #[value(name = "sc-lint-attributes")]
+    ScLintAttributes,
+    #[value(name = "sc-lint-boundary")]
+    ScLintBoundary,
+    #[value(name = "sc-lint-directives")]
+    ScLintDirectives,
+    #[value(name = "sc-lint-portability")]
+    ScLintPortability,
+    #[value(name = "sc-lint-runtime")]
+    ScLintRuntime,
+    #[value(name = "sc-lint-schema")]
+    ScLintSchema,
 }
 
 #[derive(Debug, Clone, Subcommand)]

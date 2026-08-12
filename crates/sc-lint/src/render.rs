@@ -113,6 +113,21 @@ pub(crate) fn render_success_human(
                 || format!("{}: ok", context.command_id()),
                 ToString::to_string,
             ),
+        CommandId::Docs => {
+            let data = envelope.data.as_ref();
+            let path = data
+                .and_then(|value| value.get("path"))
+                .and_then(Value::as_str);
+            let content = data
+                .and_then(|value| value.get("content"))
+                .and_then(Value::as_str);
+            match (path, content) {
+                (Some(path), Some(content)) => format!("Documentation root: {path}\n\n{content}"),
+                (Some(path), None) => format!("Documentation root: {path}"),
+                (None, Some(content)) => content.to_string(),
+                (None, None) => format!("{}: ok", context.command_id()),
+            }
+        }
         CommandId::LintLineCounts | CommandId::LintIdentityLiterals | CommandId::ViewFindings => {
             envelope
                 .data
@@ -136,6 +151,7 @@ pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
         ("Reported version", "reported_version"),
         ("Binary path", "binary_path"),
         ("Configuration path", "config_path"),
+        ("Bundle path", "bundle_path"),
         ("Required field", "required_field"),
     ] {
         if let Some(value) = error.details.get(key) {
