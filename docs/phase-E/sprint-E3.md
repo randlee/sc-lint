@@ -109,6 +109,13 @@ The exact command spelling may be refined during implementation, but the four
 public recipe names, preflight dependency, and no-Cargo-package consumer
 contract are mandatory.
 
+The generated `.sc-lint/bootstrap` helper is a shell-facing compatibility
+adapter. It delegates to the installed CLI in its default human-readable mode
+and emits the standard recovery message and non-zero status when setup cannot
+proceed, so a shell recipe receives actionable text rather than a raw JSON
+envelope. Direct `sc-lint --json` invocations remain the canonical automation
+contract.
+
 ## This Sprint Does Not Close
 
 - installer/bootstrap download, atomic replacement, or upgrade policy; E.2
