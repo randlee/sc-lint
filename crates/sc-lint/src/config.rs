@@ -883,9 +883,17 @@ fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
         },
         ConsumerIntegrationFile {
             path: root.join(".sc-lint/bootstrap"),
-            contents: format!("{GENERATED_FILE_HEADER}{CONSUMER_BOOTSTRAP_ASSET}"),
+            contents: generated_bootstrap_asset(),
         },
     ]
+}
+
+fn generated_bootstrap_asset() -> String {
+    const SHEBANG: &str = "#!/bin/sh\n";
+    let asset = CONSUMER_BOOTSTRAP_ASSET
+        .strip_prefix(SHEBANG)
+        .expect("consumer bootstrap asset must start with a POSIX shell shebang");
+    format!("{SHEBANG}{GENERATED_FILE_HEADER}{asset}")
 }
 
 fn canonical_consumer_config() -> String {
