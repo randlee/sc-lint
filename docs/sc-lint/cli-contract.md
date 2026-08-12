@@ -293,7 +293,10 @@ Consumer mode is selected by command shape, never by a repository name,
 Cargo manifest, or analyzer package:
 
 - `sc-lint init --just` writes the generated config, Justfile, and bootstrap
-  helper only when each path is missing or already exactly product-managed.
+  helper only when each path is missing or product-managed. Its CLI `--json`
+  result uses the standard command envelope; the generated POSIX bootstrap is
+  intentionally a plain-text, exit-code-oriented preflight helper and is not a
+  JSON-envelope producer.
 - `sc-lint lint ci --consumer --config sc-lint.toml` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in

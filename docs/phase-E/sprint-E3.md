@@ -92,7 +92,7 @@ default: lint
 _ensure-sc-lint:
     .sc-lint/bootstrap ensure --config sc-lint.toml
 
-setup:
+setup: _ensure-sc-lint
     .sc-lint/bootstrap setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
@@ -101,7 +101,7 @@ lint: _ensure-sc-lint
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
 
-upgrade:
+upgrade: _ensure-sc-lint
     .sc-lint/bootstrap upgrade --config sc-lint.toml
 ```
 
@@ -162,7 +162,7 @@ contract are mandatory.
   consumer test uses `sc-lint test`. Both validate named argv profiles in
   `sc-lint.toml` and run from that file's directory without source checkout
   discovery.
-- The generated Just fixture verifies that lint and test each preflight first,
-  then call the installed product command. Missing product/backend commands
+- The generated Just fixture verifies that every public recipe preflights first,
+  then calls the installed product command. Missing product/backend commands
   return a stable recovery code and documentation reference without a
   traceback.

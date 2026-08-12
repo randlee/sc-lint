@@ -12,9 +12,12 @@ use serde_json::json;
 use crate::Cli;
 use crate::CliError;
 use crate::command::CommandContext;
-use crate::command::ConsumerInitRequest;
+use crate::consumer_integration::BINARY_NOT_FOUND_RECOVERY;
+use crate::consumer_integration::DOCS_SETUP_REFERENCE;
+pub(crate) use crate::consumer_integration::run_consumer_init;
+#[cfg(test)]
+pub(crate) use crate::consumer_integration::run_consumer_init_at;
 use crate::error::ErrorCode;
-use crate::installer::CONSUMER_BOOTSTRAP_ASSET;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
@@ -78,12 +81,8 @@ struct ConsumerRequirement {
     test: Vec<ConsumerProfileStep>,
 }
 
-const GENERATED_FILE_HEADER: &str =
-    "# Managed by sc-lint; regenerate with `sc-lint init --just`.\n";
-const CONSUMER_JUSTFILE_ASSET: &str = include_str!("../assets/consumer-Justfile");
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CompatibilityErrorCode {
+pub(crate) enum CompatibilityErrorCode {
     ConfigMissing,
     ConfigMalformed,
     BinaryNotFound,
@@ -760,176 +759,6 @@ fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliErr
     .with_detail("profile", json!(profile))
 }
 
-/// Render the canonical consumer integration into the current directory. The
-/// caller deliberately has no source-repository root: consumer mode is an
-/// explicit command contract rather than a directory-name heuristic.
-#[expect(
-    clippy::result_large_err,
-    reason = "Consumer initialization preserves the shared top-level CliError contract."
-)]
-pub(crate) fn run_consumer_init(request: ConsumerInitRequest) -> Result<Value, CliError> {
-    let root = std::env::current_dir().map_err(|error| {
-        CliError::config("failed to read current directory for consumer initialization")
-            .with_source(error)
-    })?;
-    run_consumer_init_at(&root, request)
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Consumer integration file ownership errors use the shared top-level CliError contract."
-)]
-pub(crate) fn run_consumer_init_at(
-    root: &Path,
-    request: ConsumerInitRequest,
-) -> Result<Value, CliError> {
-    if !request.just {
-        return Err(
-            CliError::usage("`sc-lint init` requires `--just`").with_suggested_action(
-                "Run `sc-lint init --just` to create the canonical consumer integration.",
-            ),
-        );
-    }
-    if request.check && request.dry_run {
-        return Err(CliError::usage(
-            "`--check` and `--dry-run` cannot be combined",
-        ));
-    }
-
-    let files = consumer_integration_files(root);
-    let mut missing = Vec::new();
-    let mut conflicts = Vec::new();
-    let mut current = Vec::new();
-    for file in &files {
-        match fs::read_to_string(&file.path) {
-            Ok(actual) if actual == file.contents => current.push(file.path.clone()),
-            Ok(_) => conflicts.push(file.path.clone()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                missing.push(file.path.clone());
-            }
-            Err(error) => {
-                return Err(CliError::config(format!(
-                    "failed to inspect consumer integration file `{}`",
-                    file.path.display()
-                ))
-                .with_source(error));
-            }
-        }
-    }
-    if !conflicts.is_empty() {
-        return Err(CliError::config("consumer integration contains user-owned file conflicts")
-            .with_code("CLI.SC_LINT_INTEGRATION_CONFLICT")
-            .with_detail("conflicts", paths_to_json(&conflicts))
-            .with_suggested_action(
-                "Move or remove the conflicting file, then rerun `sc-lint init --just`; sc-lint will not overwrite it.",
-            )
-            .with_documentation("sc-lint docs setup"));
-    }
-    if request.check && !missing.is_empty() {
-        return Err(CliError::config("consumer integration is not current")
-            .with_code("CLI.SC_LINT_INTEGRATION_OUTDATED")
-            .with_detail("missing", paths_to_json(&missing))
-            .with_suggested_action("Run `sc-lint init --just` to create the missing managed files.")
-            .with_documentation("sc-lint docs setup"));
-    }
-    if !request.check && !request.dry_run {
-        for file in &files {
-            if !file.path.exists() {
-                if let Some(parent) = file.path.parent() {
-                    fs::create_dir_all(parent).map_err(|error| {
-                        CliError::config(format!(
-                            "failed to create consumer integration directory `{}`",
-                            parent.display()
-                        ))
-                        .with_source(error)
-                    })?;
-                }
-                fs::write(&file.path, &file.contents).map_err(|error| {
-                    CliError::config(format!(
-                        "failed to write consumer integration file `{}`",
-                        file.path.display()
-                    ))
-                    .with_source(error)
-                })?;
-                set_bootstrap_permissions(&file.path)?;
-            }
-        }
-    }
-
-    Ok(json!({
-        "status": if missing.is_empty() { "current" } else if request.dry_run { "would_create" } else { "created" },
-        "managed_files": files.iter().map(|file| file.path.display().to_string()).collect::<Vec<_>>(),
-        "current_files": paths_to_strings(&current),
-        "changed_files": paths_to_strings(&missing),
-        "check": request.check,
-        "dry_run": request.dry_run,
-        "summary": "consumer Just integration is managed by sc-lint",
-    }))
-}
-
-struct ConsumerIntegrationFile {
-    path: PathBuf,
-    contents: String,
-}
-
-fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
-    vec![
-        ConsumerIntegrationFile {
-            path: root.join(CONFIG_FILENAME),
-            contents: canonical_consumer_config(),
-        },
-        ConsumerIntegrationFile {
-            path: root.join("Justfile"),
-            contents: format!("{GENERATED_FILE_HEADER}{CONSUMER_JUSTFILE_ASSET}"),
-        },
-        ConsumerIntegrationFile {
-            path: root.join(".sc-lint/bootstrap"),
-            contents: format!("{GENERATED_FILE_HEADER}{CONSUMER_BOOTSTRAP_ASSET}"),
-        },
-    ]
-}
-
-fn canonical_consumer_config() -> String {
-    format!(
-        "{GENERATED_FILE_HEADER}\n[tool.sc-lint]\nminimum_version = \"{}\"\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--all\", \"--check\"]\n\n[[tool.sc-lint.lint]]\nname = \"clippy\"\ncommand = [\"cargo\", \"clippy\", \"--workspace\", \"--all-targets\", \"--\", \"-D\", \"warnings\"]\n\n[[tool.sc-lint.test]]\nname = \"workspace\"\ncommand = [\"cargo\", \"test\", \"--workspace\"]\n",
-        env!("CARGO_PKG_VERSION")
-    )
-}
-
-fn paths_to_strings(paths: &[PathBuf]) -> Vec<String> {
-    paths
-        .iter()
-        .map(|path| path.display().to_string())
-        .collect()
-}
-
-fn paths_to_json(paths: &[PathBuf]) -> Value {
-    json!(paths_to_strings(paths))
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Generated bootstrap permission errors use the shared top-level CliError contract."
-)]
-fn set_bootstrap_permissions(path: &Path) -> Result<(), CliError> {
-    if path.file_name().is_some_and(|name| name == "bootstrap") {
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions = fs::metadata(path)
-                .map_err(|error| {
-                    CliError::config("failed to inspect generated bootstrap").with_source(error)
-                })?
-                .permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(path, permissions).map_err(|error| {
-                CliError::config("failed to make generated bootstrap executable").with_source(error)
-            })?;
-        }
-    }
-    Ok(())
-}
-
 fn compatibility_config_error(
     code: CompatibilityErrorCode,
     message: impl Into<String>,
@@ -938,10 +767,8 @@ fn compatibility_config_error(
 ) -> CliError {
     let mut error = CliError::config(message)
         .with_code(code.as_str())
-        .with_suggested_action(
-            "Run `just setup` (or your repository's sc-lint installer) to create or repair the compatible installation.",
-        )
-        .with_documentation("sc-lint docs setup")
+        .with_suggested_action(BINARY_NOT_FOUND_RECOVERY)
+        .with_documentation(DOCS_SETUP_REFERENCE)
         .with_detail("required_field", json!(MinimumVersion::FIELD_PATH));
     if let Some(path) = path {
         error = error.with_detail("config_path", json!(path.display().to_string()));
@@ -966,7 +793,7 @@ fn compatibility_runtime_error(
         .with_suggested_action(
             "Run `just setup` (or your repository's sc-lint installer) to install or upgrade sc-lint, then retry.",
         )
-        .with_documentation("sc-lint docs setup")
+        .with_documentation(DOCS_SETUP_REFERENCE)
         .with_detail("minimum_version", json!(requirement.minimum_version.to_string()))
         .with_detail("binary_path", json!(binary.display().to_string()))
         .with_detail("config_path", json!(requirement.config_path.display().to_string()));
