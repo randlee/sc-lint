@@ -86,14 +86,6 @@ pub(crate) enum CommandId {
     ViewGraph,
 }
 
-/// Parsed installer flags stay coupled to their command family instead of
-/// becoming unrelated booleans in `CommandContext`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum InstallationRequest {
-    Setup { dry_run: bool },
-    Upgrade { check: bool, dry_run: bool },
-}
-
 /// Parsed consumer-integration flags remain a single validated request rather
 /// than three unrelated booleans at the execution boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +99,17 @@ pub(crate) struct ConsumerInitRequest {
 pub(crate) struct DocsRequest {
     pub(crate) guide: Option<DocsGuide>,
     pub(crate) path: bool,
+}
+
+/// Command-specific payloads stay coupled to the command variant that owns
+/// them. This prevents an unrelated command context from carrying an
+/// impossible `None` payload that would only fail during dispatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommandRequest {
+    Setup { dry_run: bool },
+    Upgrade { check: bool, dry_run: bool },
+    Init(ConsumerInitRequest),
+    Docs(DocsRequest),
 }
 
 impl CommandId {
@@ -280,9 +283,7 @@ pub struct CommandContext {
     summary: &'static str,
     requires_repo_root: bool,
     compatibility_binary: Option<std::path::PathBuf>,
-    installation_request: Option<InstallationRequest>,
-    consumer_init_request: Option<ConsumerInitRequest>,
-    docs_request: Option<DocsRequest>,
+    request: Option<CommandRequest>,
 }
 
 impl CommandContext {
@@ -296,13 +297,7 @@ impl CommandContext {
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
-        let (
-            command_id,
-            compatibility_binary,
-            installation_request,
-            consumer_init_request,
-            docs_request,
-        ) = match (&cli.command, cli.version) {
+        let (command_id, compatibility_binary, request) = match (&cli.command, cli.version) {
             (Some(command), false) => {
                 if matches!(command, Command::Init { .. })
                     && (cli.config.is_some() || cli.root.is_some())
@@ -329,44 +324,34 @@ impl CommandContext {
                     } => binary.clone(),
                     _ => None,
                 };
-                let installation_request = match command {
-                    Command::Setup { dry_run } => {
-                        Some(InstallationRequest::Setup { dry_run: *dry_run })
-                    }
-                    Command::Upgrade { check, dry_run } => Some(InstallationRequest::Upgrade {
+                let request = match command {
+                    Command::Setup { dry_run } => Some(CommandRequest::Setup { dry_run: *dry_run }),
+                    Command::Upgrade { check, dry_run } => Some(CommandRequest::Upgrade {
                         check: *check,
                         dry_run: *dry_run,
                     }),
-                    _ => None,
-                };
-                let consumer_init_request = match command {
                     Command::Init {
                         just,
                         check,
                         dry_run,
-                    } => Some(ConsumerInitRequest {
+                    } => Some(CommandRequest::Init(ConsumerInitRequest {
                         just: *just,
                         check: *check,
                         dry_run: *dry_run,
-                    }),
-                    _ => None,
-                };
-                let docs_request = match command {
-                    Command::Docs { guide, path } => Some(DocsRequest {
+                    })),
+                    Command::Docs { guide, path } => Some(CommandRequest::Docs(DocsRequest {
                         guide: *guide,
                         path: *path,
-                    }),
+                    })),
                     _ => None,
                 };
                 (
                     CommandId::from_cli_command(command),
                     compatibility_binary,
-                    installation_request,
-                    consumer_init_request,
-                    docs_request,
+                    request,
                 )
             }
-            (None, true) => (CommandId::Version, None, None, None, None),
+            (None, true) => (CommandId::Version, None, None),
             (Some(_), true) => {
                 return Err(CliError::usage(
                         "`--version` cannot be combined with a subcommand",
@@ -391,9 +376,7 @@ impl CommandContext {
             summary: command_id.summary(),
             requires_repo_root: command_id.requires_repo_root(),
             compatibility_binary,
-            installation_request,
-            consumer_init_request,
-            docs_request,
+            request,
         })
     }
 
@@ -433,46 +416,35 @@ impl CommandContext {
     }
 
     pub(crate) const fn setup_dry_run(&self) -> bool {
-        matches!(
-            self.installation_request,
-            Some(InstallationRequest::Setup { dry_run: true })
-        )
+        matches!(self.request, Some(CommandRequest::Setup { dry_run: true }))
     }
 
     pub(crate) const fn upgrade_check(&self) -> bool {
         matches!(
-            self.installation_request,
-            Some(InstallationRequest::Upgrade { check: true, .. })
+            self.request,
+            Some(CommandRequest::Upgrade { check: true, .. })
         )
     }
 
     pub(crate) const fn upgrade_dry_run(&self) -> bool {
         matches!(
-            self.installation_request,
-            Some(InstallationRequest::Upgrade { dry_run: true, .. })
+            self.request,
+            Some(CommandRequest::Upgrade { dry_run: true, .. })
         )
     }
 
-    #[expect(
-        clippy::result_large_err,
-        reason = "The shared top-level CliError contract is retained at the consumer initialization boundary."
-    )]
-    pub(crate) fn consumer_init_request(&self) -> Result<ConsumerInitRequest, CliError> {
-        self.consumer_init_request.ok_or_else(|| {
-            CliError::internal(
-                "consumer initialization was selected without an initialization request",
-            )
-        })
+    pub(crate) fn consumer_init_request(&self) -> ConsumerInitRequest {
+        match self.request {
+            Some(CommandRequest::Init(request)) => request,
+            _ => unreachable!("consumer initialization request is tied to the init command"),
+        }
     }
 
-    #[expect(
-        clippy::result_large_err,
-        reason = "Documentation discovery uses the shared top-level CliError contract."
-    )]
-    pub(crate) fn docs_request(&self) -> Result<DocsRequest, CliError> {
-        self.docs_request.ok_or_else(|| {
-            CliError::internal("documentation discovery was selected without a docs request")
-        })
+    pub(crate) fn docs_request(&self) -> DocsRequest {
+        match self.request {
+            Some(CommandRequest::Docs(request)) => request,
+            _ => unreachable!("documentation request is tied to the docs command"),
+        }
     }
 
     /// Standalone consumer probes must never initialize repository logging.
@@ -530,7 +502,7 @@ pub(crate) fn execute(
             loaded_config.evaluate_compatibility(context.compatibility_binary())?,
         )),
         CommandId::Docs => Ok(CommandSuccess::direct(crate::docs::run(
-            context.docs_request()?,
+            context.docs_request(),
         )?)),
         CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
             loaded_config,
@@ -542,7 +514,7 @@ pub(crate) fn execute(
             context.upgrade_dry_run(),
         )?)),
         CommandId::Init => Ok(CommandSuccess::direct(crate::config::run_consumer_init(
-            context.consumer_init_request()?,
+            context.consumer_init_request(),
         )?)),
         CommandId::ConsumerLintCi => workflow::run_consumer_lint_profile(loaded_config),
         CommandId::ConsumerTest => workflow::run_consumer_test_profile(loaded_config),

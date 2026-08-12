@@ -9,48 +9,6 @@ use crate::command::DocsRequest;
 
 const DOCS_UNAVAILABLE_CODE: &str = "CLI.SC_LINT_DOCS_UNAVAILABLE";
 
-fn guide_path(guide: DocsGuide) -> &'static str {
-    match guide {
-        DocsGuide::Overview => "README.md",
-        DocsGuide::Installation => "installation.md",
-        DocsGuide::UsingScLint => "using-sc-lint.md",
-        DocsGuide::Configuration => "configuration.md",
-        DocsGuide::JustSetup => "just-setup.md",
-        DocsGuide::Ci => "ci.md",
-        DocsGuide::Upgrade => "upgrade.md",
-        DocsGuide::Troubleshooting => "troubleshooting.md",
-        DocsGuide::BestPractices => "best-practices.md",
-        DocsGuide::ScLint => "packages/sc-lint.md",
-        DocsGuide::ScLintAttributes => "packages/sc-lint-attributes.md",
-        DocsGuide::ScLintBoundary => "packages/sc-lint-boundary.md",
-        DocsGuide::ScLintDirectives => "packages/sc-lint-directives.md",
-        DocsGuide::ScLintPortability => "packages/sc-lint-portability.md",
-        DocsGuide::ScLintRuntime => "packages/sc-lint-runtime.md",
-        DocsGuide::ScLintSchema => "packages/sc-lint-schema.md",
-    }
-}
-
-fn guide_name(guide: DocsGuide) -> &'static str {
-    match guide {
-        DocsGuide::Overview => "README.md",
-        DocsGuide::Installation => "installation",
-        DocsGuide::UsingScLint => "using-sc-lint",
-        DocsGuide::Configuration => "configuration",
-        DocsGuide::JustSetup => "just-setup",
-        DocsGuide::Ci => "ci",
-        DocsGuide::Upgrade => "upgrade",
-        DocsGuide::Troubleshooting => "troubleshooting",
-        DocsGuide::BestPractices => "best-practices",
-        DocsGuide::ScLint => "sc-lint",
-        DocsGuide::ScLintAttributes => "sc-lint-attributes",
-        DocsGuide::ScLintBoundary => "sc-lint-boundary",
-        DocsGuide::ScLintDirectives => "sc-lint-directives",
-        DocsGuide::ScLintPortability => "sc-lint-portability",
-        DocsGuide::ScLintRuntime => "sc-lint-runtime",
-        DocsGuide::ScLintSchema => "sc-lint-schema",
-    }
-}
-
 fn candidate_roots_for_executable(executable: &Path) -> Vec<PathBuf> {
     let Some(bin_dir) = executable.parent() else {
         return Vec::new();
@@ -126,11 +84,11 @@ fn bundle_root_from_candidates(candidates: &[PathBuf]) -> Result<PathBuf, CliErr
     reason = "Documentation read failures retain the shared top-level CliError contract."
 )]
 fn read_guide(root: &Path, guide: DocsGuide) -> Result<(PathBuf, String), CliError> {
-    let path = root.join(guide_path(guide));
+    let path = root.join(guide.metadata().path);
     let content = fs::read_to_string(&path).map_err(|error| {
         unavailable(
             root,
-            format!("could not read guide `{}`: {error}", guide_path(guide)),
+            format!("could not read guide `{}`: {error}", guide.metadata().path),
         )
     })?;
     Ok((path, content))
@@ -145,7 +103,7 @@ pub(crate) fn run(request: DocsRequest) -> Result<Value, CliError> {
     if request.path {
         let path = request
             .guide
-            .map_or_else(|| root.clone(), |guide| root.join(guide_path(guide)));
+            .map_or_else(|| root.clone(), |guide| root.join(guide.metadata().path));
         if !path.is_file() && request.guide.is_some() {
             return Err(unavailable(
                 &root,
@@ -154,7 +112,7 @@ pub(crate) fn run(request: DocsRequest) -> Result<Value, CliError> {
         }
         return Ok(json!({
             "status": "pass",
-            "guide": request.guide.map(guide_name),
+            "guide": request.guide.map(|guide| guide.metadata().name),
             "path": path.display().to_string(),
             "bundle_path": root.display().to_string(),
         }));
@@ -164,7 +122,7 @@ pub(crate) fn run(request: DocsRequest) -> Result<Value, CliError> {
     let (path, content) = read_guide(&root, guide)?;
     Ok(json!({
         "status": "pass",
-        "guide": guide_name(guide),
+        "guide": guide.metadata().name,
         "path": if request.guide.is_some() { path.display().to_string() } else { root.display().to_string() },
         "bundle_path": root.display().to_string(),
         "content": content,

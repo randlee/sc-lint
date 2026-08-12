@@ -537,9 +537,9 @@ The product should support both:
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
   - see [docs/plans/phase-A/foundation-phase-plan.md](./plans/phase-A/foundation-phase-plan.md)
 
-## Phase D Requirements
+## Phase D Requirements (completed; retained for traceability)
 
-The current execution phase, Phase `D`, requires:
+The completed Phase `D` execution line required:
 
 - delivery of `D.1`, the boundary inventory dependency-policy enforcement
   sprint currently scheduled in:

@@ -128,6 +128,83 @@ pub enum DocsGuide {
     ScLintSchema,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DocsGuideMetadata {
+    pub(crate) name: &'static str,
+    pub(crate) path: &'static str,
+}
+
+impl DocsGuide {
+    pub(crate) const fn metadata(self) -> DocsGuideMetadata {
+        match self {
+            Self::Overview => DocsGuideMetadata {
+                name: "README.md",
+                path: "README.md",
+            },
+            Self::Installation => DocsGuideMetadata {
+                name: "installation",
+                path: "installation.md",
+            },
+            Self::UsingScLint => DocsGuideMetadata {
+                name: "using-sc-lint",
+                path: "using-sc-lint.md",
+            },
+            Self::Configuration => DocsGuideMetadata {
+                name: "configuration",
+                path: "configuration.md",
+            },
+            Self::JustSetup => DocsGuideMetadata {
+                name: "just-setup",
+                path: "just-setup.md",
+            },
+            Self::Ci => DocsGuideMetadata {
+                name: "ci",
+                path: "ci.md",
+            },
+            Self::Upgrade => DocsGuideMetadata {
+                name: "upgrade",
+                path: "upgrade.md",
+            },
+            Self::Troubleshooting => DocsGuideMetadata {
+                name: "troubleshooting",
+                path: "troubleshooting.md",
+            },
+            Self::BestPractices => DocsGuideMetadata {
+                name: "best-practices",
+                path: "best-practices.md",
+            },
+            Self::ScLint => DocsGuideMetadata {
+                name: "sc-lint",
+                path: "packages/sc-lint.md",
+            },
+            Self::ScLintAttributes => DocsGuideMetadata {
+                name: "sc-lint-attributes",
+                path: "packages/sc-lint-attributes.md",
+            },
+            Self::ScLintBoundary => DocsGuideMetadata {
+                name: "sc-lint-boundary",
+                path: "packages/sc-lint-boundary.md",
+            },
+            Self::ScLintDirectives => DocsGuideMetadata {
+                name: "sc-lint-directives",
+                path: "packages/sc-lint-directives.md",
+            },
+            Self::ScLintPortability => DocsGuideMetadata {
+                name: "sc-lint-portability",
+                path: "packages/sc-lint-portability.md",
+            },
+            Self::ScLintRuntime => DocsGuideMetadata {
+                name: "sc-lint-runtime",
+                path: "packages/sc-lint-runtime.md",
+            },
+            Self::ScLintSchema => DocsGuideMetadata {
+                name: "sc-lint-schema",
+                path: "packages/sc-lint-schema.md",
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Subcommand)]
 pub enum CompatibilityCommand {
     /// Verify the installed sc-lint binary satisfies sc-lint.toml.
