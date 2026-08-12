@@ -103,6 +103,18 @@ class ConsumerContractTests(unittest.TestCase):
             generated_windows,
         )
 
+    def test_embedded_consumer_templates_match_the_shipped_template(self) -> None:
+        template = (ROOT / "crates/sc-lint/assets/consumer-Justfile").read_text(
+            encoding="utf-8"
+        ).strip()
+        for path in (
+            ROOT / "docs-bundle/just-setup.md",
+            ROOT / "docs/phase-E/sprint-E3.md",
+            ROOT / "docs/phase-E/sprint-E7.md",
+            ROOT / "docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md",
+        ):
+            self.assertIn(template, path.read_text(encoding="utf-8"), path)
+
     def test_agent_and_installed_guidance_use_the_two_completion_commands(self) -> None:
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

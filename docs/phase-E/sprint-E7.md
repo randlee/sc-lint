@@ -62,13 +62,17 @@ The root `Justfile` is the maintained executable model. The exact source-only
 profile command may differ, but its public consumer-facing shape must remain:
 
 ```just
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+
+default: lint
+
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
 [private]
 _ensure-sc-lint:
     {{bootstrap_command}} ensure --config sc-lint.toml
 
-setup:
+setup: _ensure-sc-lint
     {{bootstrap_command}} setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
@@ -77,7 +81,7 @@ lint: _ensure-sc-lint
 test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
 
-upgrade:
+upgrade: _ensure-sc-lint
     {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 

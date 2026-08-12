@@ -38,6 +38,7 @@ const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justf
 #[test]
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
     let canonical = CANONICAL_CONSUMER_JUSTFILE.replace("\r\n", "\n");
+    assert!(canonical.starts_with("set windows-shell := [\"pwsh\", \"-NoLogo\", \"-Command\"]\n"));
     for recipe in ["setup", "lint", "test", "upgrade"] {
         assert!(
             canonical.contains(&format!("{recipe}: _ensure-sc-lint")),

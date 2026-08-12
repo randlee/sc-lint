@@ -44,6 +44,8 @@ contract and is not an input to this decision.
 ## Canonical Generated Template
 
 ```just
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+
 default: lint
 
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }

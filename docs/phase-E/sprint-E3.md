@@ -86,14 +86,18 @@ consumer path only through the explicit product-owned bootstrap and installed
 ## Canonical Generated Template
 
 ```just
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+
 default: lint
+
+bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
 [private]
 _ensure-sc-lint:
-    .sc-lint/bootstrap ensure --config sc-lint.toml
+    {{bootstrap_command}} ensure --config sc-lint.toml
 
 setup: _ensure-sc-lint
-    .sc-lint/bootstrap setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml
 
 lint: _ensure-sc-lint
     sc-lint lint --consumer --config sc-lint.toml ci
@@ -102,7 +106,7 @@ test: _ensure-sc-lint
     sc-lint test --config sc-lint.toml
 
 upgrade: _ensure-sc-lint
-    .sc-lint/bootstrap upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 
 The exact command spelling may be refined during implementation, but the four
