@@ -2,6 +2,45 @@
 
 All notable changes to sc-lint are documented here.
 
+## [0.5.0] — 2026-08-12
+
+### Features
+
+- **Compatibility contract and recovery** (E.1) — consumer repositories declare
+  a SemVer minimum in `sc-lint.toml`; `sc-lint` exposes a structured version
+  probe and compatibility preflight with documented recovery diagnostics.
+- **Safe install and upgrade engine** (E.2) — checksum-verified release
+  installation, atomic replacement, rollback, and idempotent setup/upgrade
+  operations let consumers recover missing or old installations.
+- **Consumer CLI and Just integration** (E.3) — `sc-lint init --just` creates
+  the product-owned bootstrap and canonical `just setup`, `just lint`,
+  `just test`, and `just upgrade` interface.
+- **Distributed operator documentation** (E.4/E.5) — the installed release
+  includes an offline documentation bundle, package guides, help discovery,
+  and release/Homebrew distribution support.
+- **Reusable GitHub Action** (E.6) — a versioned Action installs verified
+  release artifacts and runs the consumer contract in CI.
+- **Dogfood consumer contract fixtures** (E.7) — the root repository is the
+  executable model, with cross-platform release-binary fixtures covering
+  setup, lint, test, docs discovery, and safe upgrade migration.
+
+### Changes
+
+- **Consumer adoption boundary** — `just` is the memorable consumer interface;
+  installed `sc-lint` owns consumer behavior, diagnostics, and documentation,
+  while `cargo run` remains source-checkout development machinery.
+- **Release and CI delivery** — Phase E validates consumer delivery across
+  Ubuntu, macOS, and Windows, including archive, Homebrew, and GitHub Action
+  distribution paths where supported.
+
+### Version
+
+Workspace bumped from `0.4.0` → `0.5.0`. `[workspace.package].version`, the
+three pinned internal `[workspace.dependencies]` versions, and `Cargo.lock`
+are all synchronized at `0.5.0`.
+
+---
+
 ## [0.4.0] — 2026-07-02
 
 ### Features
