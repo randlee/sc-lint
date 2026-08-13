@@ -271,6 +271,43 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
 
+    @unittest.skipUnless(os.name == "nt", "Windows managed-binary replacement contract")
+    def test_windows_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            managed_binary = managed / self.product_binary.name
+            self.write_old_probe(managed_binary)
+            published = self.write_release_archive(
+                Path(temporary.name), release / self.product_binary.name
+            )
+
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            command_dirs = []
+            for command in ("just", "pwsh"):
+                resolved = shutil.which(command)
+                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
+                command_dirs.append(str(Path(resolved).parent))
+            environment["PATH"] = os.pathsep.join(command_dirs)
+
+            with self.release_server(Path(temporary.name)) as release_base:
+                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
+                result = self.run_command(["just", "setup"], cwd=consumer, environment=environment)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("verified sc-lint", result.stdout)
+            installed = self.run_command(
+                [str(managed_binary), "--json", "version"],
+                cwd=consumer,
+                environment=environment,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+
     def test_fixture_matrix_declares_each_supported_release_platform(self) -> None:
         mappings = {
             "Ubuntu": ("x86_64-unknown-linux-gnu", ".tar.gz", "sc-lint"),

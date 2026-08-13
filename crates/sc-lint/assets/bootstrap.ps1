@@ -37,6 +37,14 @@ function Resolve-ProductBinary {
     return $null
 }
 
+function Test-ManagedBinary {
+    param([string]$Binary)
+    if (-not $Binary -or -not (Test-Path -LiteralPath $Binary -PathType Leaf)) { return $false }
+    $resolvedBinary = (Resolve-Path -LiteralPath $Binary).Path
+    $resolvedManaged = [System.IO.Path]::GetFullPath($managedBinary)
+    return $resolvedBinary -ieq $resolvedManaged
+}
+
 function Install-ProductBinary {
     $minimumLine = Select-String -Path $Config -Pattern '^\s*minimum_version\s*=\s*"([^"]+)"' | Select-Object -First 1
     if (-not $minimumLine) {
@@ -85,9 +93,16 @@ function Ensure-Product {
     if (-not $script:productBinary) { $script:productBinary = Install-ProductBinary }
     & $script:productBinary --config $Config compatibility check --binary $script:productBinary
     if ($LASTEXITCODE -ne 0) {
-        & $script:productBinary --config $Config setup
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        $script:productBinary = $managedBinary
+        if (Test-ManagedBinary $script:productBinary) {
+            # The compatibility process has exited, so PowerShell can safely
+            # replace the stale managed executable without weakening the Rust
+            # installer's running-binary guard.
+            $script:productBinary = Install-ProductBinary
+        } else {
+            & $script:productBinary --config $Config setup
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $script:productBinary = $managedBinary
+        }
     }
 }
 
@@ -107,7 +122,15 @@ switch ($Operation) {
     "upgrade" {
         $productBinary = Resolve-ProductBinary
         if (-not $productBinary) { $productBinary = Install-ProductBinary }
-        & $productBinary --config $Config upgrade @remaining
+        & $productBinary --config $Config compatibility check --binary $productBinary
+        if ($LASTEXITCODE -ne 0 -and (Test-ManagedBinary $productBinary) -and $remaining -notcontains "--check") {
+            # The managed executable is stale but no longer running after the
+            # compatibility probe. Install the verified replacement here; the
+            # Rust installer continues to reject replacing its own live image.
+            $productBinary = Install-ProductBinary
+        } else {
+            & $productBinary --config $Config upgrade @remaining
+        }
     }
 }
 exit $LASTEXITCODE
