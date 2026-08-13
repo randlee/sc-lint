@@ -41,8 +41,8 @@ function Test-ManagedBinary {
     param([string]$Binary)
     if (-not $Binary -or -not (Test-Path -LiteralPath $Binary -PathType Leaf)) { return $false }
     $resolvedBinary = (Resolve-Path -LiteralPath $Binary).Path
-    $resolvedManaged = [System.IO.Path]::GetFullPath($managedBinary)
-    return $resolvedBinary -ieq $resolvedManaged
+    $resolvedManaged = (Resolve-Path -LiteralPath $managedBinary).Path
+    return [string]::Equals($resolvedBinary, $resolvedManaged, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Install-ProductBinary {
