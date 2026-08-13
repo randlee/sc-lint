@@ -144,7 +144,12 @@ class ConsumerLifecycleTests(unittest.TestCase):
     def write_old_probe(self, binary: Path) -> None:
         source = binary.with_suffix(".rs")
         source.write_text(
-            'fn main() { print!("{}", r#"{\"ok\":true,\"command\":\"version\",\"data\":{\"contract_schema\":\"sc-lint-version-v1\",\"tool\":\"sc-lint\",\"version\":\"0.3.0\"}}"#); }\n',
+            'fn main() {\n'
+            '    if std::env::args().any(|argument| argument == "compatibility") {\n'
+            '        std::process::exit(1);\n'
+            '    }\n'
+            '    print!("{}", r#"{\"ok\":true,\"command\":\"version\",\"data\":{\"contract_schema\":\"sc-lint-version-v1\",\"tool\":\"sc-lint\",\"version\":\"0.3.0\"}}"#);\n'
+            '}\n',
             encoding="utf-8",
         )
         result = self.run_command(
