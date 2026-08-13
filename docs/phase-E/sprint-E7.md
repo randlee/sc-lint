@@ -77,20 +77,16 @@ default: lint
 
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
-[private]
-_ensure-sc-lint:
-    {{bootstrap_command}} ensure --config sc-lint.toml
-
-setup: _ensure-sc-lint
+setup:
     {{bootstrap_command}} setup --config sc-lint.toml
 
-lint: _ensure-sc-lint
-    sc-lint lint --consumer --config sc-lint.toml ci
+lint:
+    {{bootstrap_command}} lint --config sc-lint.toml
 
-test: _ensure-sc-lint
-    sc-lint test --config sc-lint.toml
+test:
+    {{bootstrap_command}} test --config sc-lint.toml
 
-upgrade: _ensure-sc-lint
+upgrade:
     {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 

@@ -3,56 +3,143 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0, Mandatory = $true)]
-    [ValidateSet("ensure", "setup", "upgrade")]
+    [ValidateSet("setup", "lint", "test", "upgrade")]
     [string]$Operation,
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
     [string[]]$Rest
 )
 
-$configIndex = [Array]::IndexOf($Rest, "--config")
-if ($configIndex -lt 0 -or $configIndex -eq ($Rest.Count - 1)) {
-    [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <ensure|setup|upgrade> --config sc-lint.toml [--check] [--dry-run]")
+function Stop-Usage {
+    [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]")
     exit 2
 }
+
+$configIndex = [Array]::IndexOf($Rest, "--config")
+if ($configIndex -lt 0 -or $configIndex -eq ($Rest.Count - 1)) { Stop-Usage }
 $Config = $Rest[$configIndex + 1]
 $remaining = @()
-for ($argumentIndex = 0; $argumentIndex -lt $Rest.Count; $argumentIndex++) {
-    if ($argumentIndex -ne $configIndex -and $argumentIndex -ne ($configIndex + 1)) {
-        $remaining += $Rest[$argumentIndex]
+for ($index = 0; $index -lt $Rest.Count; $index++) {
+    if ($index -ne $configIndex -and $index -ne ($configIndex + 1)) { $remaining += $Rest[$index] }
+}
+if ($remaining | Where-Object { $_ -notin @("--check", "--dry-run") }) { Stop-Usage }
+
+$installDirectory = if ($env:SC_LINT_INSTALL_DIR) { $env:SC_LINT_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "sc-lint\\bin" }
+$managedBinary = Join-Path $installDirectory "sc-lint.exe"
+$productBinary = $null
+
+function Resolve-ProductBinary {
+    if ($env:SC_LINT_BIN) {
+        $resolved = Get-Command $env:SC_LINT_BIN -ErrorAction SilentlyContinue
+        if ($resolved) { return $resolved.Source }
+    }
+    if (Test-Path -Path $managedBinary -PathType Leaf) { return $managedBinary }
+    $resolved = Get-Command "sc-lint" -ErrorAction SilentlyContinue
+    if ($resolved) { return $resolved.Source }
+    return $null
+}
+
+function Test-ManagedBinary {
+    param([string]$Binary)
+    if (-not $Binary -or -not (Test-Path -LiteralPath $Binary -PathType Leaf)) { return $false }
+    $resolvedBinary = (Resolve-Path -LiteralPath $Binary).Path
+    $resolvedManaged = (Resolve-Path -LiteralPath $managedBinary).Path
+    return [string]::Equals($resolvedBinary, $resolvedManaged, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Invoke-VerifiedReleaseLauncher {
+    param([string]$Command, [string[]]$Arguments)
+    $minimumLine = Select-String -Path $Config -Pattern '^\s*minimum_version\s*=\s*"([^"]+)"' | Select-Object -First 1
+    if (-not $minimumLine) {
+        [Console]::Error.WriteLine("setup: could not read minimum_version from $Config (CLI.SC_LINT_CONFIG_MALFORMED)")
+        exit 3
+    }
+    $version = $minimumLine.Matches[0].Groups[1].Value
+    if ($env:PROCESSOR_ARCHITECTURE -notin @("AMD64", "x86_64")) {
+        [Console]::Error.WriteLine("setup: no verified sc-lint release for Windows/$env:PROCESSOR_ARCHITECTURE (CLI.SC_LINT_INSTALL_UNSUPPORTED_PLATFORM)")
+        exit 4
+    }
+    $archive = "sc-lint_${version}_x86_64-pc-windows-msvc.zip"
+    $base = if ($env:SC_LINT_RELEASE_BASE_URL) { $env:SC_LINT_RELEASE_BASE_URL.TrimEnd('/') } else { "https://github.com/randlee/sc-lint/releases/download" }
+    $releaseUrl = "$base/v$version"
+    $staging = Join-Path ([System.IO.Path]::GetTempPath()) ("sc-lint-bootstrap-" + [System.Guid]::NewGuid().ToString("N"))
+    try {
+        New-Item -ItemType Directory -Path $staging -Force | Out-Null
+        $checksums = Join-Path $staging "checksums.txt"
+        $archivePath = Join-Path $staging $archive
+        Invoke-WebRequest -UseBasicParsing -Uri "$releaseUrl/checksums.txt" -OutFile $checksums
+        Invoke-WebRequest -UseBasicParsing -Uri "$releaseUrl/$archive" -OutFile $archivePath
+        $expectedLine = Get-Content $checksums | Where-Object { $_ -match ("\s\*?" + [regex]::Escape($archive) + "$") } | Select-Object -First 1
+        if (-not $expectedLine) { throw "checksum manifest did not contain $archive" }
+        $expected = ($expectedLine -split '\s+')[0]
+        $actual = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash
+        if ($actual -ne $expected) { throw "SHA-256 verification failed for $archive" }
+        $extract = Join-Path $staging "extract"
+        Expand-Archive -Path $archivePath -DestinationPath $extract -Force
+        $candidate = Join-Path $extract "sc-lint.exe"
+        if (-not (Test-Path -Path $candidate -PathType Leaf)) { throw "release archive did not contain sc-lint.exe" }
+        New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
+        # The extracted release is only a launcher. It delegates managed-target
+        # activation to its Rust installer, which preserves backup, rollback,
+        # and post-install version verification.
+        & $candidate --config $Config $Command @Arguments
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } catch {
+        [Console]::Error.WriteLine("setup: $($_.Exception.Message) (CLI.SC_LINT_RELEASE_UNAVAILABLE)")
+        exit 4
+    } finally {
+        if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
     }
 }
-if ($remaining | Where-Object { $_ -notin @("--check", "--dry-run") }) {
-    [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <ensure|setup|upgrade> --config sc-lint.toml [--check] [--dry-run]")
-    exit 2
-}
-$Check = $remaining -contains "--check"
-$DryRun = $remaining -contains "--dry-run"
 
-$binary = if ($env:SC_LINT_BIN) { $env:SC_LINT_BIN } else { "sc-lint" }
-$resolved = Get-Command $binary -ErrorAction SilentlyContinue
-if (-not $resolved) {
-    [Console]::Error.WriteLine("compatibility.check: could not find sc-lint binary ``$binary`` (CLI.SC_LINT_BINARY_NOT_FOUND)")
-    [Console]::Error.WriteLine("Run ``just setup`` (or your repository's sc-lint installer) to create or repair a compatible installation.")
-    [Console]::Error.WriteLine("Docs: sc-lint docs setup")
-    exit 5
+function Ensure-Product {
+    $script:productBinary = Resolve-ProductBinary
+    if (-not $script:productBinary) {
+        Invoke-VerifiedReleaseLauncher "setup" $remaining
+        $script:productBinary = $managedBinary
+    }
+    & $script:productBinary --config $Config compatibility check --binary $script:productBinary
+    if ($LASTEXITCODE -ne 0) {
+        if (Test-ManagedBinary $script:productBinary) {
+            if ($remaining -contains "--dry-run") {
+                & $script:productBinary --config $Config setup @remaining
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            } else {
+                Invoke-VerifiedReleaseLauncher "setup" $remaining
+            }
+            $script:productBinary = $managedBinary
+        } else {
+            & $script:productBinary --config $Config setup
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $script:productBinary = $managedBinary
+        }
+    }
 }
 
 switch ($Operation) {
-    "ensure" {
-        & $binary --config $Config compatibility check --binary $binary
-        if ($LASTEXITCODE -eq 0) { exit 0 }
-        & $binary --config $Config setup
-    }
     "setup" {
-        $arguments = @("--config", $Config, "setup")
-        if ($DryRun) { $arguments += "--dry-run" }
-        & $binary @arguments
+        Ensure-Product
+        & $productBinary --config $Config setup @remaining
+    }
+    "lint" {
+        Ensure-Product
+        & $productBinary lint --consumer --config $Config ci
+    }
+    "test" {
+        Ensure-Product
+        & $productBinary test --config $Config
     }
     "upgrade" {
-        $arguments = @("--config", $Config, "upgrade")
-        if ($Check) { $arguments += "--check" }
-        if ($DryRun) { $arguments += "--dry-run" }
-        & $binary @arguments
+        $productBinary = Resolve-ProductBinary
+        if (-not $productBinary) {
+            Invoke-VerifiedReleaseLauncher "upgrade" $remaining
+            exit $LASTEXITCODE
+        }
+        & $productBinary --config $Config compatibility check --binary $productBinary
+        if ($LASTEXITCODE -ne 0 -and (Test-ManagedBinary $productBinary) -and $remaining -notcontains "--check" -and $remaining -notcontains "--dry-run") {
+            Invoke-VerifiedReleaseLauncher "upgrade" $remaining
+        } else {
+            & $productBinary --config $Config upgrade @remaining
+        }
     }
 }
 exit $LASTEXITCODE

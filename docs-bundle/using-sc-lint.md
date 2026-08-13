@@ -5,7 +5,9 @@ behavior. `just` is a thin memorable interface over these commands.
 
 ## First use
 
-From a consumer repository, generate the managed integration once:
+For the first consumer repository, install the product from the supported
+package or verified release archive, then generate and commit the managed
+integration:
 
 ```sh
 sc-lint init --just
@@ -14,6 +16,13 @@ just setup
 
 This creates only `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and the
 Windows companion `.sc-lint/bootstrap.ps1`.
+
+On every later clean checkout, including a machine with no `sc-lint` binary on
+`PATH`, run `just setup`. The bootstrap helper downloads the release selected
+by `minimum_version`, verifies its SHA-256 checksum from the matching release
+manifest, and installs it in the managed location before invoking the product.
+Set `SC_LINT_INSTALL_DIR` to choose that location or `SC_LINT_BIN` to use one
+specific compatible binary for all four recipes.
 
 ## Daily commands
 
@@ -24,8 +33,8 @@ just test
 
 `just lint` runs the complete configured lint profile and `just test` runs the
 complete configured test profile. Both perform the same minimum-version
-preflight before starting work. A preflight failure stops before any backend
-command runs.
+preflight and, when necessary, the same verified bootstrap before starting
+work. A bootstrap or preflight failure stops before any backend command runs.
 
 Direct product equivalents are useful in automation:
 

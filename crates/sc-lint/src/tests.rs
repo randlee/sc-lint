@@ -41,16 +41,15 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
     assert!(canonical.starts_with("set windows-shell := [\"pwsh\", \"-NoLogo\", \"-Command\"]\n"));
     for recipe in ["setup", "lint", "test", "upgrade"] {
         assert!(
-            canonical.contains(&format!("{recipe}: _ensure-sc-lint")),
-            "consumer template omits shared preflight from `{recipe}`"
+            canonical.contains(&format!(
+                "{recipe}:\n    {{{{bootstrap_command}}}} {recipe} --config sc-lint.toml"
+            )),
+            "consumer template does not delegate `{recipe}` to the product bootstrap"
         );
     }
-    assert!(canonical.contains("[private]\n_ensure-sc-lint:"));
     assert!(canonical.contains("bootstrap_command := if os_family() == \"windows\""));
     assert!(!canonical.contains("compatibility"));
-    assert!(canonical.contains("{{bootstrap_command}} ensure"));
-    assert!(canonical.contains("sc-lint lint --consumer --config sc-lint.toml ci"));
-    assert!(canonical.contains("sc-lint test --config sc-lint.toml"));
+    assert!(!canonical.contains("_ensure-sc-lint"));
     for forbidden in ["cargo run", "sc-lint-boundary", ".just/"] {
         assert!(
             !canonical.contains(forbidden),
@@ -576,35 +575,9 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
     );
 }
 
-#[cfg(unix)]
-#[test]
-fn generated_bootstrap_reports_a_missing_sc_lint_binary_without_a_traceback() {
-    let fixture = TempDir::new().expect("fixture");
-    crate::config::run_consumer_init_at(
-        fixture.path(),
-        ConsumerInitRequest {
-            just: true,
-            check: false,
-            dry_run: false,
-        },
-    )
-    .expect("generate fixture");
-    let output = ProcessCommand::new(fixture.path().join(".sc-lint/bootstrap"))
-        .current_dir(fixture.path())
-        .args(["ensure", "--config", "sc-lint.toml"])
-        .env("SC_LINT_BIN", "sc-lint-definitely-missing")
-        .output()
-        .expect("run bootstrap");
-    assert_eq!(output.status.code(), Some(5));
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI.SC_LINT_BINARY_NOT_FOUND"));
-    assert!(stderr.contains("Docs: sc-lint docs setup"));
-    assert!(!stderr.to_ascii_lowercase().contains("traceback"));
-}
-
 #[cfg(windows)]
 #[test]
-fn generated_windows_bootstrap_accepts_gnu_style_flags_and_returns_structured_recovery() {
+fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors() {
     let fixture = TempDir::new().expect("fixture");
     crate::config::run_consumer_init_at(
         fixture.path(),
@@ -616,25 +589,34 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_and_returns_structured_re
     )
     .expect("generate fixture");
     let bootstrap = fixture.path().join(".sc-lint/bootstrap.ps1");
+    let record = fixture.path().join("calls.txt");
+    let binary = fixture.path().join("sc-lint.cmd");
+    fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
     let output = ProcessCommand::new("pwsh")
         .args([
             "-NoLogo",
             "-NonInteractive",
             "-File",
             bootstrap.to_str().expect("UTF-8 bootstrap path"),
-            "ensure",
+            "setup",
             "--config",
             "sc-lint.toml",
         ])
         .current_dir(fixture.path())
-        .env("SC_LINT_BIN", "sc-lint-definitely-missing")
+        .env("SC_LINT_BIN", &binary)
+        .env("SC_LINT_RECORD", &record)
         .output()
         .expect("run Windows bootstrap");
-    assert_eq!(output.status.code(), Some(5));
+    assert!(
+        output.status.success(),
+        "bootstrap failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI.SC_LINT_BINARY_NOT_FOUND"));
-    assert!(stderr.contains("Docs: sc-lint docs setup"));
     assert!(!stderr.to_ascii_lowercase().contains("positional parameter"));
+    let calls = fs::read_to_string(&record).expect("calls");
+    assert!(calls.contains("--config sc-lint.toml compatibility check"));
+    assert!(calls.contains("--config sc-lint.toml setup"));
 }
 
 #[test]

@@ -280,20 +280,6 @@ fn set_bootstrap_permissions(path: &Path) -> Result<(), CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::CompatibilityErrorCode;
-    use crate::error::ErrorCode;
-
-    #[test]
-    fn bootstrap_missing_binary_contract_tracks_the_structured_error_contract() {
-        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(CompatibilityErrorCode::BinaryNotFound.as_str()));
-        assert!(
-            CONSUMER_BOOTSTRAP_ASSET
-                .replace("\\`", "`")
-                .contains(BINARY_NOT_FOUND_RECOVERY)
-        );
-        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(DOCS_SETUP_REFERENCE));
-    }
-
     #[test]
     fn generated_config_uses_the_single_canonical_asset() {
         let generated = canonical_consumer_config();

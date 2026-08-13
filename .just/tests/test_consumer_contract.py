@@ -17,11 +17,9 @@ class ConsumerContractTests(unittest.TestCase):
 
     def test_root_model_has_four_public_product_recipes(self) -> None:
         for recipe in ("setup", "lint", "test", "upgrade"):
-            self.assertIn(f"{recipe}: _ensure-sc-lint", self.justfile)
-        self.assertIn("[private]\n_ensure-sc-lint: _source-build", self.justfile)
-        self.assertIn(".sc-lint/bootstrap ensure --config sc-lint.toml", self.justfile)
-        self.assertIn("lint --consumer --config sc-lint.toml ci", self.justfile)
-        self.assertIn("--config sc-lint.toml test", self.justfile)
+            self.assertIn(f"{recipe}: _source-build", self.justfile)
+            self.assertIn(f".sc-lint/bootstrap {recipe} --config sc-lint.toml", self.justfile)
+        self.assertNotIn("_ensure-sc-lint", self.justfile)
 
     def test_root_model_exports_the_product_binary_without_shell_specific_assignments(self) -> None:
         self.assertIn("export SC_LINT_BIN := sc_lint_binary", self.justfile)
@@ -40,8 +38,8 @@ class ConsumerContractTests(unittest.TestCase):
 
     def test_public_recipe_dry_runs_use_only_product_commands_after_build(self) -> None:
         for recipe, required in {
-            "lint": "lint --consumer --config sc-lint.toml ci",
-            "test": " test",
+            "lint": "bootstrap lint --config sc-lint.toml",
+            "test": "bootstrap test --config sc-lint.toml",
             "setup": "bootstrap setup --config sc-lint.toml --dry-run",
             "upgrade": "bootstrap upgrade --config sc-lint.toml --check --dry-run",
         }.items():
@@ -74,7 +72,8 @@ class ConsumerContractTests(unittest.TestCase):
             contents = path.read_text(encoding="utf-8")
             self.assertIn('"--config"', contents)
             self.assertIn("ValueFromRemainingArguments = $true", contents)
-            self.assertIn("CLI.SC_LINT_BINARY_NOT_FOUND", contents)
+            self.assertIn("Invoke-VerifiedReleaseLauncher", contents)
+            self.assertIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", contents)
             self.assertIn("compatibility check", contents)
 
     def test_windows_bootstrap_consumes_gnu_style_flags_from_remaining_arguments(self) -> None:
@@ -84,6 +83,11 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn('[string[]]$Rest', contents)
         self.assertIn('[Array]::IndexOf($Rest, "--config")', contents)
         self.assertNotIn('[Array]::IndexOf($args, "--config")', contents)
+
+    def test_posix_bootstrap_leaves_managed_activation_to_the_rust_installer(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
+        self.assertIn('"$staging/extract/sc-lint" --config "$config" "$command" "$@"', contents)
+        self.assertNotIn('mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new"', contents)
 
     def test_root_helpers_match_the_generated_product_assets(self) -> None:
         generated_posix = (

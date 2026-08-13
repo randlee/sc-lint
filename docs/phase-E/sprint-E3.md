@@ -92,25 +92,21 @@ default: lint
 
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
-[private]
-_ensure-sc-lint:
-    {{bootstrap_command}} ensure --config sc-lint.toml
-
-setup: _ensure-sc-lint
+setup:
     {{bootstrap_command}} setup --config sc-lint.toml
 
-lint: _ensure-sc-lint
-    sc-lint lint --consumer --config sc-lint.toml ci
+lint:
+    {{bootstrap_command}} lint --config sc-lint.toml
 
-test: _ensure-sc-lint
-    sc-lint test --config sc-lint.toml
+test:
+    {{bootstrap_command}} test --config sc-lint.toml
 
-upgrade: _ensure-sc-lint
+upgrade:
     {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 
 The exact command spelling may be refined during implementation, but the four
-public recipe names, preflight dependency, and no-Cargo-package consumer
+public recipe names, product-owned preflight, and no-Cargo-package consumer
 contract are mandatory.
 
 The generated `.sc-lint/bootstrap` helper is a shell-facing compatibility
@@ -170,11 +166,10 @@ contract.
   `Justfile`, `.sc-lint/bootstrap`, and `.sc-lint/bootstrap.ps1`; it reports managed paths, is
   idempotent, and rejects a conflicting user-owned path without touching a
   README.
-- Consumer lint uses the explicit `sc-lint lint --consumer --config sc-lint.toml ci` command path;
-  consumer test uses `sc-lint test`. Both validate named argv profiles in
-  `sc-lint.toml` and run from that file's directory without source checkout
-  discovery.
-- The generated Just fixture verifies that every public recipe preflights first,
-  then calls the installed product command. Missing product/backend commands
-  return a stable recovery code and documentation reference without a
-  traceback.
+- Consumer lint and test use the product-owned bootstrap command path, which
+  resolves one compatible product binary before invoking the configured
+  complete profile. Both validate named argv profiles in `sc-lint.toml` and run
+  from that file's directory without source-checkout discovery.
+- The generated Just fixture verifies that every public recipe bootstraps and
+  preflights before profile work. Bootstrap/backend failures return stable
+  recovery codes without a traceback.
