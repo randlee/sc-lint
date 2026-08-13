@@ -20,13 +20,12 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow.workspace = true
-cargo_metadata.workspace = true
 clap.workspace = true
 sc-lint-schema.workspace = true
+sc-lint-analyzer-support.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 syn = { version = "2", features = ["full", "parsing", "visit"] }
-proc-macro2 = { version = "1", features = ["span-locations"] }
 thiserror = "1"
 
 [dev-dependencies]

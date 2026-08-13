@@ -2,6 +2,12 @@
 
 This folder is the home for `sc-lint` design and planning material.
 
+The versioned end-user operator manual is maintained in the repository root at
+[`../../docs-bundle/README.md`](../../docs-bundle/README.md) and is discoverable
+offline with `sc-lint docs`. It includes the canonical
+[`just-setup.md`](../../docs-bundle/just-setup.md) guide and one guide for each
+published package.
+
 Contents:
 
 - [`requirements.md`](./requirements.md) — top-level `sc-lint` crate
@@ -14,15 +20,15 @@ Contents:
   Python vs what moves to Rust
 - [`extraction-plan.md`](./extraction-plan.md) — extraction plan for remaining
   generic lint/view tooling and the Python-to-Rust boundary migration
-- [`foundation-phase-plan.md`](../phase-A/foundation-phase-plan.md) — archived
+- [`foundation-phase-plan.md`](../plans/phase-A/foundation-phase-plan.md) — archived
   Phase A foundation execution plan for repo self-hosting, boundaries, CLI
   introduction, and extraction order
-- [`phase-B-plan.md`](../phase-B/phase-B-plan.md) — archived Phase B hardening
+- [`phase-B-plan.md`](../plans/phase-B/phase-B-plan.md) — archived Phase B hardening
   and process-tightening plan
-- [`phase-C-plan.md`](../phase-C/phase-C-plan.md) — archived Phase C
+- [`phase-C-plan.md`](../plans/phase-C/phase-C-plan.md) — archived Phase C
   interface-versioning, shared-reporting, observability-maintenance, and
   portability plan
-- [`phase-D-plan.md`](../phase-D/phase-D-plan.md) — Phase D
+- [`phase-D-plan.md`](../plans/phase-D/phase-D-plan.md) — Phase D
   boundary-inventory improvement plan
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and phase-plan touchpoint guide
@@ -66,44 +72,44 @@ Contents:
   planned `sc-lint-version` crate requirements
 - [`../sc-lint-version/architecture.md`](../sc-lint-version/architecture.md) —
   planned `sc-lint-version` crate architecture
-- [`sprint-A1a.md`](../phase-A/sprint-A1a.md) — top-level CLI bootstrap and contract
+- [`sprint-A1a.md`](../plans/phase-A/sprint-A1a.md) — top-level CLI bootstrap and contract
   definition sprint
-- [`sprint-A1b.md`](../phase-A/sprint-A1b.md) — top-level config loading and first
+- [`sprint-A1b.md`](../plans/phase-A/sprint-A1b.md) — top-level config loading and first
   backend integration sprint
-- [`sprint-A2.md`](../phase-A/sprint-A2.md) — profiles and `xwin` sprint
-- [`sprint-A3.md`](../phase-A/sprint-A3.md) — generic utility extraction sprint
-- [`sprint-A4.md`](../phase-A/sprint-A4.md) — portability crate extraction sprint
-- [`sprint-A5.md`](../phase-A/sprint-A5.md) — runtime crate extraction sprint
-- [`sprint-A6.md`](../phase-A/sprint-A6.md) — Rust boundary inventory loader sprint
-- [`sprint-A7.md`](../phase-A/sprint-A7.md) — manifest-policy and parity sprint
-- [`sprint-A8.md`](../phase-A/sprint-A8.md) — per-tool user-guide sprint
-- [`sprint-B1.md`](../phase-B/sprint-B1.md) — carry-forward lint-gate backlog and
+- [`sprint-A2.md`](../plans/phase-A/sprint-A2.md) — profiles and `xwin` sprint
+- [`sprint-A3.md`](../plans/phase-A/sprint-A3.md) — generic utility extraction sprint
+- [`sprint-A4.md`](../plans/phase-A/sprint-A4.md) — portability crate extraction sprint
+- [`sprint-A5.md`](../plans/phase-A/sprint-A5.md) — runtime crate extraction sprint
+- [`sprint-A6.md`](../plans/phase-A/sprint-A6.md) — Rust boundary inventory loader sprint
+- [`sprint-A7.md`](../plans/phase-A/sprint-A7.md) — manifest-policy and parity sprint
+- [`sprint-A8.md`](../plans/phase-A/sprint-A8.md) — per-tool user-guide sprint
+- [`sprint-B1.md`](../plans/phase-B/sprint-B1.md) — carry-forward lint-gate backlog and
   portability-scope hardening sprint
-- [`sprint-B2.md`](../phase-B/sprint-B2.md) — named-caller allowlist enforcement sprint
-- [`sprint-B3.md`](../phase-B/sprint-B3.md) — observability boundary-policy ADR sprint
-- [`sprint-B4.md`](../phase-B/sprint-B4.md) — QA-process hardening sprint
-- [`sprint-B-homebrew.md`](../phase-B/sprint-B-homebrew.md) — full Homebrew toolset
+- [`sprint-B2.md`](../plans/phase-B/sprint-B2.md) — named-caller allowlist enforcement sprint
+- [`sprint-B3.md`](../plans/phase-B/sprint-B3.md) — observability boundary-policy ADR sprint
+- [`sprint-B4.md`](../plans/phase-B/sprint-B4.md) — QA-process hardening sprint
+- [`sprint-B-homebrew.md`](../plans/phase-B/sprint-B-homebrew.md) — full Homebrew toolset
   distribution planning sprint
-- [`sprint-C1.md`](../phase-C/sprint-C1.md) — `sc-lint-version` policy and baseline
+- [`sprint-C1.md`](../plans/phase-C/sprint-C1.md) — `sc-lint-version` policy and baseline
   planning sprint
-- [`sprint-C2.md`](../phase-C/sprint-C2.md) — shared report-template pipeline planning
+- [`sprint-C2.md`](../plans/phase-C/sprint-C2.md) — shared report-template pipeline planning
   sprint
-- [`sprint-C3.md`](../phase-C/sprint-C3.md) — hard-fail version gate integration
+- [`sprint-C3.md`](../plans/phase-C/sprint-C3.md) — hard-fail version gate integration
   planning sprint
-- [`sprint-C4.md`](../phase-C/sprint-C4.md) — consumer integration and skill design
+- [`sprint-C4.md`](../plans/phase-C/sprint-C4.md) — consumer integration and skill design
   planning sprint
-- [`sprint-C5.md`](../phase-C/sprint-C5.md) — minimal marketplace publication planning
+- [`sprint-C5.md`](../plans/phase-C/sprint-C5.md) — minimal marketplace publication planning
   for the adoption skill
-- [`sprint-C6.md`](../phase-C/sprint-C6.md) — production path-literal portability
+- [`sprint-C6.md`](../plans/phase-C/sprint-C6.md) — production path-literal portability
   parity sprint
-- [`sprint-C7.md`](../phase-C/sprint-C7.md) — broad environment-variable portability
+- [`sprint-C7.md`](../plans/phase-C/sprint-C7.md) — broad environment-variable portability
   sprint
-- [`sprint-C8.md`](../phase-C/sprint-C8.md) — shell invocation portability sprint
-- [`sprint-C9.md`](../phase-C/sprint-C9.md) — cross-platform `cfg` parity enforcement
+- [`sprint-C8.md`](../plans/phase-C/sprint-C8.md) — shell invocation portability sprint
+- [`sprint-C9.md`](../plans/phase-C/sprint-C9.md) — cross-platform `cfg` parity enforcement
   sprint
-- [`sprint-C10.md`](../phase-C/sprint-C10.md) — `sc-observability` `1.1.0` adoption
+- [`sprint-C10.md`](../plans/phase-C/sprint-C10.md) — `sc-observability` `1.1.0` adoption
   sprint
-- [`sprint-D1.md`](../phase-D/sprint-D1.md) — direct workspace package-edge
+- [`sprint-D1.md`](../plans/phase-D/sprint-D1.md) — direct workspace package-edge
   enforcement planning sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
@@ -111,6 +117,10 @@ Contents:
   the planned top-level `sc-lint` CLI
 - [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
   envelope and backend-to-CLI normalization contract
+- [`adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
+  — installed-product consumer commands and generated Just integration
+- [`adr/ADR-013-analyzer-shared-support.md`](./adr/ADR-013-analyzer-shared-support.md)
+  — shared rule-neutral AST support without analyzer-to-analyzer dependencies
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
 - [`../../README.md`](../../README.md) — top-level CLI crate and workspace guide
@@ -122,6 +132,8 @@ Contents:
   user guide for `sc-lint lint sc-runtime`
 - [`../../crates/sc-lint-schema/README.md`](../../crates/sc-lint-schema/README.md) —
   shared schema crate guide
+- [`../../crates/sc-lint-analyzer-support/README.md`](../../crates/sc-lint-analyzer-support/README.md) —
+  shared analyzer support crate guide
 - [`../../crates/sc-lint-directives/README.md`](../../crates/sc-lint-directives/README.md) —
   shared directives crate guide
 - [`../../crates/sc-lint-attributes/README.md`](../../crates/sc-lint-attributes/README.md) —

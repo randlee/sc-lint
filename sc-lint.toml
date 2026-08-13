@@ -1,0 +1,13 @@
+[tool.sc-lint]
+minimum_version = "0.4.0"
+
+# The root repository is the executable model for consumers: public recipes
+# call installed-product command shapes, while these profiles retain every
+# source-maintainer gate behind that product boundary.
+[[tool.sc-lint.lint]]
+name = "source-full"
+command = ["just", "_source-lint", "full"]
+
+[[tool.sc-lint.test]]
+name = "source-workspace"
+command = ["just", "_source-test"]

@@ -18,7 +18,7 @@ It owns:
 ## Authoritative Architecture Sources
 
 - [requirements.md](./requirements.md)
-- [../phase-C/phase-C-plan.md](../phase-C/phase-C-plan.md)
+- [../plans/phase-C/phase-C-plan.md](../plans/phase-C/phase-C-plan.md)
 - [../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [../architecture.md](../architecture.md)
 

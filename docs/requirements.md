@@ -141,6 +141,11 @@ The product should support both:
   they should move into `sc-lint-tokio` when Tokio-specific dependencies or
   semantics justify a dedicated crate.
 
+- `REQ-PRODUCT-004D`
+  `sc-lint-analyzer-support` owns only shared rule-neutral AST source
+  discovery, scope classification, and report rendering. Analyzer rule ids and
+  CLI ownership remain in their dedicated analyzer crates (ADR-013).
+
 - `REQ-PRODUCT-005`
   Generic, non-AST-sensitive utilities may remain Python-based when Rust does
   not materially improve correctness or noise characteristics.
@@ -454,6 +459,76 @@ The product should support both:
   boundary metadata. Detailed schema and inventory-loading behavior for that
   feature lives in [docs/sc-lint-boundary/requirements.md](./sc-lint-boundary/requirements.md).
 
+### Phase E consumer adoption and distribution
+
+- `REQ-PRODUCT-019`
+  A consumer repository must declare its one tracked minimum compatible
+  `sc-lint` version only at `[tool.sc-lint].minimum_version` in
+  `sc-lint.toml`. The product must parse that field once as SemVer and compare
+  versions semantically, never lexically. It must provide a stable,
+  non-repository `sc-lint --json version` probe and a compatibility preflight
+  before consumer work begins. Missing/malformed configuration, unavailable or
+  non-executable binaries, invalid probes, and insufficient versions must stop
+  work with a structured stable code, cause, recovery action, and documentation
+  reference. Consumers must be able to invoke product-owned setup, complete
+  lint, complete test, and upgrade entry points without choosing a Cargo
+  package or copying source-repository orchestration. `sc-lint init --just`
+  must create an idempotent, product-owned `sc-lint.toml`, thin Just
+  integration, `.sc-lint/bootstrap`, and Windows `.sc-lint/bootstrap.ps1`
+  helpers with non-mutating
+  `--check`/`--dry-run` modes; it must never overwrite a consumer README or
+  user-owned integration file. Consumer `just setup`, `just lint`, `just
+  test`, and `just upgrade` all depend on the same compatibility preflight;
+  lint and test execute complete configured profiles.
+
+- `REQ-PRODUCT-020`
+  The supported consumer installation and upgrade path must select a verified
+  release artifact for the host platform, verify its checksum before
+  activation, preserve a working installation if replacement or post-install
+  version verification fails, and report deterministic recovery guidance. The
+  product-owned `sc-lint setup` and `sc-lint upgrade [--check] [--dry-run]`
+  commands use the SemVer floor in `[tool.sc-lint].minimum_version`, never
+  downgrade a newer compatible installation, and install only into the managed
+  product location. The selected immutable release artifact is reported
+  separately from that floor, which remains the installed-version comparison
+  policy. Consumer repositories use the product-owned
+  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` assets; they delegate
+  `ensure`, `setup`, and `upgrade` to
+  installed `sc-lint` and never copies source-checkout scripts or overwrites a
+  consumer README.
+
+- `REQ-PRODUCT-021`
+  Every primary release distribution, including release archives and Homebrew,
+  must install a version-matched offline documentation bundle containing the
+  overview, operator manual, canonical Just guide, and one guide per published
+  package, including library-only packages. The bundle manifest must be checked
+  against the release publish manifest and all relative Markdown links must
+  resolve before packaging. The installed help/docs surface must discover the
+  overview, operator guides, and package guides without a source checkout or
+  network access; `sc-lint docs --path` must expose the installed root for
+  release automation. Missing documentation is a structured
+  `CLI.SC_LINT_DOCS_UNAVAILABLE` failure with bundle path, recovery action, and
+  the `sc-lint docs installation` reference. The release manifest is the
+  authoritative inventory for exact bundle paths: an archive contains the
+  top-level `sc-lint-docs/` directory beside declared binaries, while the
+  primary Homebrew formula installs that directory only under its
+  formula-owned `pkgshare`. Packaging validation rejects missing, unexpected,
+  or unrecorded bundle files; it never writes the bundle overview into a
+  consumer repository.
+
+- `REQ-PRODUCT-022`
+  The project must provide a versioned reusable GitHub Action that obtains a
+  verified release artifact and enforces the same consumer compatibility,
+  setup, lint, and test contract as local installation. Its inputs, outputs,
+  pinning guidance, and recoverable failure behavior must be specified in the
+  [Action requirements](./sc-lint/github-action-requirements.md) and
+  architecture records before Action release. The Action downloads only the
+  selected release archive plus its checksum manifest, verifies the archive
+  before extraction, preflights the configured minimum version, and exposes
+  the installed binary and offline documentation paths. Its stable adoption
+  form, exact-pin recommendation, and recoverable error contract are part of
+  the released product interface.
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
@@ -467,16 +542,16 @@ The product should support both:
   - see [docs/sc-lint/cli-contract.md](./sc-lint/cli-contract.md)
 - Extraction and phase execution requirements
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
-  - see [docs/phase-A/foundation-phase-plan.md](./phase-A/foundation-phase-plan.md)
+  - see [docs/plans/phase-A/foundation-phase-plan.md](./plans/phase-A/foundation-phase-plan.md)
 
-## Phase D Requirements
+## Phase D Requirements (completed; retained for traceability)
 
-The current execution phase, Phase `D`, requires:
+The completed Phase `D` execution line required:
 
 - delivery of `D.1`, the boundary inventory dependency-policy enforcement
   sprint currently scheduled in:
-  - `docs/phase-D/phase-D-plan.md`
-  - `docs/phase-D/sprint-D1.md`
+  - `docs/plans/phase-D/phase-D-plan.md`
+  - `docs/plans/phase-D/sprint-D1.md`
 - explicit traceability from top-level requirements into the active
   `REQ-SCB-015` through `REQ-SCB-021` dependency-policy scope, including:
   - TOML-backed package dependency policy in boundary inventory records

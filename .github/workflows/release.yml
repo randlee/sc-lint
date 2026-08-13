@@ -307,6 +307,15 @@ jobs:
           bin_args="$(python3 scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
           cargo build --release --target ${{ matrix.target }} ${bin_args}
 
+      - name: Validate static documentation bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          docs_source="$(python3 scripts/release_artifacts.py documentation-source-directory --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          python3 scripts/release_artifacts.py validate-documentation-bundle \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+            --documentation-directory "${docs_source}"
+
       - name: Package (unix)
         if: matrix.archive == 'tar.gz'
         shell: bash
@@ -316,16 +325,18 @@ jobs:
           ARCHIVE_PREFIX="$(python3 scripts/release_artifacts.py primary-release-binary --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
           ARCHIVE="${ARCHIVE_PREFIX}_${VERSION}_${{ matrix.target }}.tar.gz"
           STAGING_DIR="${RUNNER_TEMP}/release-${{ matrix.target }}"
-          rm -rf "${STAGING_DIR}"
-          mkdir -p "${STAGING_DIR}"
-          while IFS= read -r binary; do
-            [[ -n "${binary}" ]] || continue
-            cp "target/${{ matrix.target }}/release/${binary}" "${STAGING_DIR}/${binary}"
-          done < <(
-            python3 scripts/release_artifacts.py list-release-binaries \
-              --manifest "${RELEASE_ARTIFACT_MANIFEST}"
-          )
-          tar czf "${ARCHIVE}" -C "${STAGING_DIR}" .
+          docs_source="$(python3 scripts/release_artifacts.py documentation-source-directory --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          python3 scripts/release_artifacts.py stage-release-archive \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+            --binaries-directory "target/${{ matrix.target }}/release" \
+            --documentation-directory "${docs_source}" \
+            --staging-directory "${STAGING_DIR}"
+          # BSD tar on macOS otherwise emits AppleDouble `._*` metadata files;
+          # the archive contract intentionally rejects every undeclared file.
+          COPYFILE_DISABLE=1 tar czf "${ARCHIVE}" -C "${STAGING_DIR}" .
+          python3 scripts/release_artifacts.py validate-release-archive \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+            --archive "${ARCHIVE}"
           echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
 
       - name: Package (windows)
@@ -336,17 +347,18 @@ jobs:
           $ARCHIVE_PREFIX = python3 scripts/release_artifacts.py primary-release-binary --manifest "${env:RELEASE_ARTIFACT_MANIFEST}"
           $ARCHIVE = "${ARCHIVE_PREFIX}_${VERSION}_${{ matrix.target }}.zip"
           $STAGING_DIR = Join-Path $env:RUNNER_TEMP "release-${{ matrix.target }}"
-          if (Test-Path $STAGING_DIR) {
-            Remove-Item -Recurse -Force $STAGING_DIR
-          }
-          New-Item -ItemType Directory -Path $STAGING_DIR | Out-Null
-          $Binaries = python3 scripts/release_artifacts.py list-release-binaries --manifest "${env:RELEASE_ARTIFACT_MANIFEST}"
-          foreach ($Binary in $Binaries) {
-            if (-not [string]::IsNullOrWhiteSpace($Binary)) {
-              Copy-Item "target/${{ matrix.target }}/release/$Binary.exe" -Destination (Join-Path $STAGING_DIR "$Binary.exe")
-            }
-          }
+          $DocsSource = python3 scripts/release_artifacts.py documentation-source-directory --manifest "${env:RELEASE_ARTIFACT_MANIFEST}"
+          python3 scripts/release_artifacts.py stage-release-archive `
+            --manifest "${env:RELEASE_ARTIFACT_MANIFEST}" `
+            --binaries-directory "target/${{ matrix.target }}/release" `
+            --documentation-directory "${DocsSource}" `
+            --staging-directory "${STAGING_DIR}" `
+            --windows
           Compress-Archive -Path (Join-Path $STAGING_DIR '*') -DestinationPath $ARCHIVE
+          python3 scripts/release_artifacts.py validate-release-archive `
+            --manifest "${env:RELEASE_ARTIFACT_MANIFEST}" `
+            --archive "${ARCHIVE}" `
+            --windows
           echo "ARCHIVE=$ARCHIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Upload artifact
@@ -390,6 +402,24 @@ jobs:
           generate_release_notes: true
           files: |
             release/*
+
+  publish-action-major-tag:
+    needs: [gate-and-tag, release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
+          fetch-depth: 0
+      - name: Move the stable Action major tag after release publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_commit="$(git rev-parse HEAD)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag --force -a v1 "$release_commit" -m "sc-lint GitHub Action v1"
+          git push --force origin refs/tags/v1
 
   update-homebrew:
     needs: [gate-and-tag, release]

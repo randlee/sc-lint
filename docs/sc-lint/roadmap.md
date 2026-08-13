@@ -130,12 +130,12 @@ Initial Phase-B scope is split into focused planning sprints:
 - `sprint-B-homebrew`
   - full Homebrew toolset distribution planning
 
-See [docs/phase-B/phase-B-plan.md](../phase-B/phase-B-plan.md),
-[docs/phase-B/sprint-B1.md](../phase-B/sprint-B1.md),
-[docs/phase-B/sprint-B2.md](../phase-B/sprint-B2.md),
-[docs/phase-B/sprint-B3.md](../phase-B/sprint-B3.md), and
-[docs/phase-B/sprint-B4.md](../phase-B/sprint-B4.md), and
-[docs/phase-B/sprint-B-homebrew.md](../phase-B/sprint-B-homebrew.md).
+See [docs/plans/phase-B/phase-B-plan.md](../plans/phase-B/phase-B-plan.md),
+[docs/plans/phase-B/sprint-B1.md](../plans/phase-B/sprint-B1.md),
+[docs/plans/phase-B/sprint-B2.md](../plans/phase-B/sprint-B2.md),
+[docs/plans/phase-B/sprint-B3.md](../plans/phase-B/sprint-B3.md), and
+[docs/plans/phase-B/sprint-B4.md](../plans/phase-B/sprint-B4.md), and
+[docs/plans/phase-B/sprint-B-homebrew.md](../plans/phase-B/sprint-B-homebrew.md).
 
 ### Phase C
 
@@ -180,6 +180,19 @@ Initial Phase-C scope is:
 - `C.10`
   - `sc-observability` `1.1.0` adoption, retained-log policy decision, and
     `emit` -> `log` / `try_log` migration
+
+### Phase E
+
+Phase `E` is planned after the current Phase D line and governs consumer
+adoption plus distributed documentation. See
+[docs/phase-E/phase-E-plan.md](../phase-E/phase-E-plan.md). Its exact initial
+targets are:
+
+- E.1: `sc-lint.toml` minimum-version configuration, stable compatibility
+  preflight, and structured recovery diagnostics.
+- E.7: root `Justfile`/`sc-lint.toml`, CI and release/Action integration,
+  cross-platform consumer fixtures, `AGENTS.md`, root `README.md`, and
+  installed documentation as the maintained executable reference model.
 
 ### Current code moves required
 

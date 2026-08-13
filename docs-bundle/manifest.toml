@@ -1,0 +1,78 @@
+schema_version = 1
+bundle_name = "sc-lint-docs"
+
+[[guides]]
+path = "README.md"
+kind = "overview"
+
+[[guides]]
+path = "installation.md"
+kind = "operator"
+
+[[guides]]
+path = "using-sc-lint.md"
+kind = "operator"
+
+[[guides]]
+path = "configuration.md"
+kind = "operator"
+
+[[guides]]
+path = "just-setup.md"
+kind = "operator"
+
+[[guides]]
+path = "ci.md"
+kind = "operator"
+
+[[guides]]
+path = "upgrade.md"
+kind = "operator"
+
+[[guides]]
+path = "troubleshooting.md"
+kind = "operator"
+
+[[guides]]
+path = "best-practices.md"
+kind = "operator"
+
+[[guides]]
+path = "packages/sc-lint.md"
+kind = "package"
+package = "sc-lint"
+
+[[guides]]
+path = "packages/sc-lint-attributes.md"
+kind = "package"
+package = "sc-lint-attributes"
+
+[[guides]]
+path = "packages/sc-lint-analyzer-support.md"
+kind = "package"
+package = "sc-lint-analyzer-support"
+
+[[guides]]
+path = "packages/sc-lint-boundary.md"
+kind = "package"
+package = "sc-lint-boundary"
+
+[[guides]]
+path = "packages/sc-lint-directives.md"
+kind = "package"
+package = "sc-lint-directives"
+
+[[guides]]
+path = "packages/sc-lint-portability.md"
+kind = "package"
+package = "sc-lint-portability"
+
+[[guides]]
+path = "packages/sc-lint-runtime.md"
+kind = "package"
+package = "sc-lint-runtime"
+
+[[guides]]
+path = "packages/sc-lint-schema.md"
+kind = "package"
+package = "sc-lint-schema"

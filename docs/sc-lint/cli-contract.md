@@ -73,6 +73,12 @@ Initial convention:
   - `lint.identity-literals`
 - `sc-lint lint fast`
   - `lint.fast`
+- `sc-lint lint --consumer --config sc-lint.toml ci`
+  - `lint.ci.consumer`
+- `sc-lint test`
+  - `test`
+- `sc-lint init --just`
+  - `init`
 - `sc-lint view findings`
   - `view.findings`
 - `sc-lint view graph`
@@ -89,6 +95,12 @@ Initial convention:
   - `version`
 - `sc-lint --version`
   - `version`
+- `sc-lint compatibility check`
+  - `compatibility.check`
+- `sc-lint setup`
+  - `setup`
+- `sc-lint upgrade`
+  - `upgrade`
 
 When parsing fails before a concrete command path is resolved, the CLI uses the
 fallback identifier:
@@ -103,6 +115,9 @@ Current implementation status:
 
 - `version`
   - direct CLI-owned success path
+- `compatibility.check`
+  - implemented consumer installation preflight; it uses only the canonical
+    `sc-lint.toml` requirement and the installed binary's version probe
 - `lint.sc-boundary`
   - first real backend-normalized success path
 - `lint.fast`
@@ -111,6 +126,14 @@ Current implementation status:
   - implemented profile orchestration path with conditional `xwin` preflight
 - `lint.ci`
   - implemented lint-only CI-parity profile path
+- `lint.ci.consumer`
+  - implemented explicit consumer lint profile path; its configured argv steps
+    run from `sc-lint.toml` without source-checkout discovery
+- `test`
+  - implemented explicit consumer test profile path
+- `init`
+  - implemented product-owned consumer integration renderer with check,
+    dry-run, idempotency, and conflict behavior
 - `check.native`
   - implemented native preflight path
 - `check.xwin`
@@ -210,8 +233,9 @@ Illustrative shape:
 - `cause`
 - `details`
 - `suggested_action`
+- `docs`
 
-`cause`, `details`, and `suggested_action` may be omitted when they do not
+`cause`, `details`, `suggested_action`, and `docs` may be omitted when they do not
 apply, but the machine-readable failure family must remain stable.
 
 ## Error Kinds
@@ -260,9 +284,131 @@ the same matrix before code lands:
 | `clippy` | `clippy.<target>` | lint-runner backend | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `version` | `version` | top-level CLI crate | `usage`, `internal` |
+| `compatibility check` | `compatibility.check` | compatibility preflight | `config`, `backend_failure`, `internal` |
 
 This matrix exists to prevent each command family from inventing its own
 response or error pattern at implementation time.
+
+## Compatibility And Version-Probe Contract
+
+## Consumer Integration And Profile Contract
+
+Consumer mode is selected by command shape, never by a repository name,
+Cargo manifest, or analyzer package:
+
+- `sc-lint init --just` writes the generated config, Justfile, and bootstrap
+  helper only when each path is missing or product-managed. Its CLI `--json`
+  result uses the standard command envelope; the generated POSIX bootstrap is
+  intentionally a plain-text, exit-code-oriented preflight helper and is not a
+  JSON-envelope producer.
+- `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
+  --config sc-lint.toml` load the configuration beside the consumer project.
+- profile commands are argv arrays, not shell strings. Each command runs in
+  the configuration directory and any required member failure fails the
+  aggregate command with a structured `CliError`.
+- missing configured executables use
+  `CLI.SC_LINT_BACKEND_NOT_FOUND` with installation recovery and the setup
+  documentation reference.
+
+The generated default configuration uses this shape:
+
+```toml
+[[tool.sc-lint.lint]]
+name = "fmt"
+command = ["cargo", "fmt", "--all", "--check"]
+
+[[tool.sc-lint.test]]
+name = "workspace"
+command = ["cargo", "test", "--workspace"]
+```
+
+The only consumer minimum-version location is:
+
+```toml
+[tool.sc-lint]
+minimum_version = "0.4.1"
+```
+
+`sc-lint --json version` is intentionally independent of a source checkout and
+emits this payload under the standard success envelope's `data` field:
+
+```json
+{
+  "tool": "sc-lint",
+  "version": "0.4.1",
+  "contract_schema": "sc-lint-version-v1",
+  "status": "pass"
+}
+```
+
+`sc-lint compatibility check` loads the requirement once and runs
+`sc-lint --json version` against the PATH installation (or `--binary <path>`).
+It performs no lint/test work and creates no logs or reports. Its success data identifies
+`minimum_version`, `installed_version`, `binary_path`, and `config_path`.
+
+The preflight failure codes are stable:
+
+| Code | Recovery condition |
+| --- | --- |
+| `CLI.SC_LINT_CONFIG_MISSING` | Create or select canonical `sc-lint.toml`. |
+| `CLI.SC_LINT_CONFIG_MALFORMED` | Repair `[tool.sc-lint].minimum_version`. |
+| `CLI.SC_LINT_BINARY_NOT_FOUND` | Run `just setup` or the product installer. |
+| `CLI.SC_LINT_BINARY_EXECUTION_FAILED` | Repair the selected installation, then rerun setup. |
+| `CLI.SC_LINT_VERSION_PROBE_MALFORMED` | Install a release implementing `sc-lint-version-v1`. |
+| `CLI.SC_LINT_VERSION_UNPARSABLE` | Install a release implementing `sc-lint-version-v1`. |
+| `CLI.SC_LINT_VERSION_TOO_OLD` | Run `just setup` to install or upgrade the required version. |
+
+Every one of these errors includes `cause`, `suggested_action`, and
+`docs: "sc-lint docs setup"`; its details include the required version and
+available observed version/path.
+
+Compatibility preflight uses `config` only for the repository requirement.
+Failures while locating, executing, or validating the external installed binary
+use `backend_failure`, not `capability`: that category records a concrete
+subprocess/install failure rather than the absence of an optional feature.
+
+## Installation And Upgrade Contract
+
+`sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]` load
+the same `[tool.sc-lint].minimum_version` requirement as compatibility check.
+That field remains an installed-version floor; the installer reports the exact
+`selected_release_version` separately for the immutable release artifact it
+downloads. They select the release workflow's host archive
+`sc-lint_<version>_<target>.<tar.gz|zip>` and its sibling `checksums.txt` from
+the `v<version>` release. The installer stages download and extraction, checks
+SHA-256 before activation, and verifies `sc-lint --json version` after an
+atomic activation. It rolls back the prior managed binary when activation or
+post-install verification fails. If rollback cannot be verified, the command
+does not claim recovery succeeded: it returns the backup path and manual
+recovery instructions instead.
+
+`upgrade --check` never changes disk and reports `current` or
+`update_required`; `--dry-run` reports the archive, checksum manifest, and
+managed target that would be used. A compatible newer binary is never
+downgraded. The managed directory is platform-local by default and may be set
+explicitly with `SC_LINT_INSTALL_DIR`; `SC_LINT_RELEASE_BASE_URL` is a release
+fixture/enterprise mirror override.
+
+| Code | Recovery condition |
+| --- | --- |
+| `CLI.SC_LINT_INSTALL_UNSUPPORTED_PLATFORM` | Use a published target or install manually. |
+| `CLI.SC_LINT_RELEASE_UNAVAILABLE` | Restore network/release access and retry setup. |
+| `CLI.SC_LINT_RELEASE_CHECKSUM_MISMATCH` | Do not activate the artifact; redownload from the official release. |
+| `CLI.SC_LINT_INSTALL_PERMISSION_DENIED` | Choose a writable managed install directory. |
+| `CLI.SC_LINT_POST_INSTALL_VERSION_FAILED` | A prior managed binary, if one existed, was restored; otherwise the failed candidate was removed. Repair the release and rerun setup. |
+| `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` | Inspect the reported target and backup path; restore the known-good backup manually before retrying. |
+| `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | The previous managed binary was retained; repair the target directory and retry. |
+
+Every installer failure uses `backend_failure`, a stable code, a cause,
+recovery guidance, and `docs: "sc-lint docs installation"`. The E.4 bundle
+will provide that offline guide; E.2 does not implement documentation delivery.
+
+On Windows, an executable cannot reliably replace itself while still running.
+When the managed binary is the active `sc-lint.exe`, setup fails before moving
+any files and directs the operator to run setup from a separately downloaded
+executable. The normal activation sequence remains rename target to retained
+backup, replace from the verified staging directory, then post-install probe;
+CI exercises the Windows checksum path independently.
 
 ## Backend-to-CLI Normalization
 

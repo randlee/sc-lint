@@ -167,24 +167,22 @@ Startup prompt injection for `team-lead` is configured in:
 
 ## Development
 
-Core local commands:
+For a repository change, the complete agent/developer contract is exactly:
 
 ```bash
-just help
 just lint
 just test
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-The current GitHub Actions sequence mirrors the local workflow:
-
-- format
-- clippy
-- `just lint`
-- workspace tests
+`just lint` and `just test` are complete aggregate gates. `just setup` checks
+the root model's product compatibility before a manual setup/repair flow.
+GitHub Actions invokes these same commands on Linux, macOS, and Windows.
 
 ## Docs
+
+The installed operator manual is available offline through `sc-lint docs` and
+is sourced from [`docs-bundle/`](docs-bundle/README.md). The canonical consumer
+setup is [`docs-bundle/just-setup.md`](docs-bundle/just-setup.md).
 
 Detailed design and planning material lives under:
 

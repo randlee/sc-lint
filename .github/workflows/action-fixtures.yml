@@ -1,0 +1,29 @@
+name: Action fixtures
+
+on:
+  pull_request:
+    branches: [develop, main, "integrate/*", "integration/*"]
+    paths: [action.yml, action/**, .github/workflows/action-fixtures.yml]
+  push:
+    branches: [develop, main]
+    paths: [action.yml, action/**, .github/workflows/action-fixtures.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  published-layout-fixtures:
+    name: Action fixtures (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate Action metadata and published-layout fixtures
+        run: node --test action/test/action.test.cjs

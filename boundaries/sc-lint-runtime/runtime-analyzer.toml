@@ -25,7 +25,7 @@ roots = [
 
 [dependencies]
 allowed_dependents = []
-allowed_dependencies = ["sc-lint-schema"]
+allowed_dependencies = ["sc-lint-analyzer-support", "sc-lint-schema"]
 forbidden_edges = [
   { from = "sc-lint-runtime", to = "sc-lint-attributes" },
   { from = "sc-lint-runtime", to = "sc-lint-boundary" },
