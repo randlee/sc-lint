@@ -132,7 +132,12 @@ fn help_text_exposes_the_initial_grouped_surface() {
     ] {
         assert!(help.contains(command), "missing `{command}` in help output");
     }
-    for guide in ["just-setup", "sc-lint-attributes", "sc-lint-schema"] {
+    for guide in [
+        "just-setup",
+        "sc-lint-analyzer-support",
+        "sc-lint-attributes",
+        "sc-lint-schema",
+    ] {
         assert!(
             help.contains(guide),
             "missing documentation guide `{guide}`"

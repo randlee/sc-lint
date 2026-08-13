@@ -63,6 +63,18 @@ their governing docs, boundaries, and planned sprint work.
   - updated whenever shared machine contracts expand across analyzer or
     interface-versioning surfaces
 
+### `sc-lint-analyzer-support`
+
+- role:
+  - shared rule-neutral AST source discovery, scope classification, and
+    text-report rendering support for analyzer crates
+  - has no rule family, binary, or user-facing lint target
+- governing docs:
+  - `docs/architecture.md`
+  - `docs/sc-lint/adr/ADR-013-analyzer-shared-support.md`
+- primary implementation and planning sprints:
+  - Phase E closeout ARCH-001
+
 ### `sc-lint-attributes`
 
 - role:
@@ -205,6 +217,8 @@ Phase `D` extends the existing `sc-lint-boundary` crate through sprint `D.1`.
 ## Ownership Rules
 
 - backend crates remain self-contained and do not depend on each other directly
+- portability and runtime may depend on `sc-lint-analyzer-support` for the
+  ADR-013 rule-neutral scanner/rendering implementation
 - the top-level `sc-lint` CLI coordinates backend execution
 - primary lint targets map to crate ownership boundaries:
   - `sc-boundary`

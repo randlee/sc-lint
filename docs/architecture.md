@@ -249,12 +249,15 @@ Allowed shared support:
 
 - `sc-lint-directives`
 - `sc-lint-schema`
+- `sc-lint-analyzer-support` for rule-neutral AST scanning and report rendering
 - future shared support crates only after explicit design approval
 
 For release `0.2.x`, this means:
 
 - `sc-lint-portability` and `sc-lint-runtime` may depend on
-  `sc-lint-directives` when shared directive parsing/types are needed
+  `sc-lint-directives` when shared directive parsing/types are needed, and on
+  `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
+  implementation
 - `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`, and the
   top-level `sc-lint` CLI may depend on `sc-lint-schema` for the canonical
   machine-schema types

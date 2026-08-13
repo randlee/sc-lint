@@ -12,9 +12,7 @@ use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
 
-mod render;
 mod runtime;
-mod source_scan;
 #[cfg(test)]
 mod tests;
 
@@ -91,12 +89,13 @@ pub fn analyze_workspace(
             source: source.into(),
         }
     })?;
-    let scanned_crates = source_scan::count_scanned_crates(&options.root).map_err(|source| {
-        RuntimeError::CountScannedCrates {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
+    let scanned_crates =
+        sc_lint_analyzer_support::count_scanned_crates(&options.root).map_err(|source| {
+            RuntimeError::CountScannedCrates {
+                root: options.root.clone(),
+                source: source.into(),
+            }
+        })?;
     let status = if findings.is_empty() {
         ReportStatus::Pass
     } else {
@@ -113,5 +112,5 @@ pub fn analyze_workspace(
 }
 
 pub fn render_findings_report(report: &FindingsReport) -> String {
-    render::render_findings_report(report)
+    sc_lint_analyzer_support::render_findings_report(report)
 }

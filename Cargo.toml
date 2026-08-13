@@ -7,6 +7,7 @@ members = [
   "crates/sc-lint-portability",
   "crates/sc-lint-runtime",
   "crates/sc-lint-schema",
+  "crates/sc-lint-analyzer-support",
 ]
 resolver = "2"
 
@@ -28,6 +29,7 @@ sc-observability = "1.1.0"
 sc-lint-boundary = { version = "0.5.0", path = "crates/sc-lint-boundary" }
 sc-lint-directives = { version = "0.5.0", path = "crates/sc-lint-directives" }
 sc-lint-schema = { version = "0.5.0", path = "crates/sc-lint-schema" }
+sc-lint-analyzer-support = { version = "0.5.0", path = "crates/sc-lint-analyzer-support" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 semver = "1"

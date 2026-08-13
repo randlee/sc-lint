@@ -9,7 +9,7 @@ use serde::Serialize;
 #[command(name = "sc-lint")]
 #[command(about = "Stable top-level CLI for the sc-lint tool family")]
 #[command(
-    after_long_help = "Documentation guides: `sc-lint docs` (overview), `installation`, `using-sc-lint`, `configuration`, `just-setup`, `ci`, `upgrade`, `troubleshooting`, `best-practices`, and one guide for each `sc-lint-*` package: `sc-lint`, `sc-lint-attributes`, `sc-lint-boundary`, `sc-lint-directives`, `sc-lint-portability`, `sc-lint-runtime`, and `sc-lint-schema`. Use `sc-lint docs --path` for the installed bundle path."
+    after_long_help = "Documentation guides: `sc-lint docs` (overview), `installation`, `using-sc-lint`, `configuration`, `just-setup`, `ci`, `upgrade`, `troubleshooting`, `best-practices`, and one guide for each `sc-lint-*` package: `sc-lint`, `sc-lint-analyzer-support`, `sc-lint-attributes`, `sc-lint-boundary`, `sc-lint-directives`, `sc-lint-portability`, `sc-lint-runtime`, and `sc-lint-schema`. Use `sc-lint docs --path` for the installed bundle path."
 )]
 #[command(disable_version_flag = true)]
 pub struct Cli {
@@ -116,6 +116,8 @@ pub enum DocsGuide {
     ScLint,
     #[value(name = "sc-lint-attributes")]
     ScLintAttributes,
+    #[value(name = "sc-lint-analyzer-support")]
+    ScLintAnalyzerSupport,
     #[value(name = "sc-lint-boundary")]
     ScLintBoundary,
     #[value(name = "sc-lint-directives")]
@@ -180,6 +182,10 @@ impl DocsGuide {
             Self::ScLintAttributes => DocsGuideMetadata {
                 name: "sc-lint-attributes",
                 path: "packages/sc-lint-attributes.md",
+            },
+            Self::ScLintAnalyzerSupport => DocsGuideMetadata {
+                name: "sc-lint-analyzer-support",
+                path: "packages/sc-lint-analyzer-support.md",
             },
             Self::ScLintBoundary => DocsGuideMetadata {
                 name: "sc-lint-boundary",

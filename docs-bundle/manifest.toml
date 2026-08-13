@@ -48,6 +48,11 @@ kind = "package"
 package = "sc-lint-attributes"
 
 [[guides]]
+path = "packages/sc-lint-analyzer-support.md"
+kind = "package"
+package = "sc-lint-analyzer-support"
+
+[[guides]]
 path = "packages/sc-lint-boundary.md"
 kind = "package"
 package = "sc-lint-boundary"

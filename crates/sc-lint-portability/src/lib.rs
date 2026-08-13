@@ -12,8 +12,6 @@ use thiserror::Error;
 
 mod portability;
 mod predicates;
-mod render;
-mod source_scan;
 #[cfg(test)]
 mod tests;
 
@@ -127,5 +125,5 @@ pub fn analyze_workspace(
 }
 
 pub fn render_findings_report(report: &FindingsReport) -> String {
-    render::render_findings_report(report)
+    sc_lint_analyzer_support::render_findings_report(report)
 }
