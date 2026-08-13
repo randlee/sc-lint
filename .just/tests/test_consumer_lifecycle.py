@@ -293,7 +293,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
             command_dirs = []
-            for command in ("just", "pwsh"):
+            for command in ("just", "pwsh", "curl"):
                 resolved = shutil.which(command)
                 self.assertIsNotNone(resolved, f"{command} is required for this fixture")
                 command_dirs.append(str(Path(resolved).parent))
@@ -312,6 +312,48 @@ class ConsumerLifecycleTests(unittest.TestCase):
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+
+    @unittest.skipUnless(os.name == "nt", "Windows managed-binary dry-run contract")
+    def test_windows_stale_managed_upgrade_dry_run_does_not_replace_or_download(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            managed_binary = managed / self.product_binary.name
+            self.write_old_probe(managed_binary)
+            before = hashlib.sha256(managed_binary.read_bytes()).hexdigest()
+
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            command_dirs = []
+            for command in ("just", "pwsh"):
+                resolved = shutil.which(command)
+                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
+                command_dirs.append(str(Path(resolved).parent))
+            environment["PATH"] = os.pathsep.join(command_dirs)
+            environment["SC_LINT_RELEASE_BASE_URL"] = "http://127.0.0.1:9/unreachable"
+
+            result = self.run_command(
+                [
+                    "pwsh",
+                    "-NoLogo",
+                    "-NonInteractive",
+                    "-File",
+                    str(consumer / ".sc-lint/bootstrap.ps1"),
+                    "upgrade",
+                    "--config",
+                    "sc-lint.toml",
+                    "--dry-run",
+                ],
+                cwd=consumer,
+                environment=environment,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", result.stdout + result.stderr)
+            self.assertEqual(before, hashlib.sha256(managed_binary.read_bytes()).hexdigest())
 
     def test_fixture_matrix_declares_each_supported_release_platform(self) -> None:
         mappings = {

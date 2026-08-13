@@ -45,7 +45,8 @@ function Test-ManagedBinary {
     return [string]::Equals($resolvedBinary, $resolvedManaged, [System.StringComparison]::OrdinalIgnoreCase)
 }
 
-function Install-ProductBinary {
+function Invoke-VerifiedReleaseLauncher {
+    param([string]$Command, [string[]]$Arguments)
     $minimumLine = Select-String -Path $Config -Pattern '^\s*minimum_version\s*=\s*"([^"]+)"' | Select-Object -First 1
     if (-not $minimumLine) {
         [Console]::Error.WriteLine("setup: could not read minimum_version from $Config (CLI.SC_LINT_CONFIG_MALFORMED)")
@@ -76,10 +77,11 @@ function Install-ProductBinary {
         $candidate = Join-Path $extract "sc-lint.exe"
         if (-not (Test-Path -Path $candidate -PathType Leaf)) { throw "release archive did not contain sc-lint.exe" }
         New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
-        Move-Item -Path $candidate -Destination (Join-Path $installDirectory ".sc-lint-new.exe") -Force
-        Move-Item -Path (Join-Path $installDirectory ".sc-lint-new.exe") -Destination $managedBinary -Force
-        [Console]::WriteLine("setup: verified sc-lint $version installed at $managedBinary")
-        return $managedBinary
+        # The extracted release is only a launcher. It delegates managed-target
+        # activation to its Rust installer, which preserves backup, rollback,
+        # and post-install version verification.
+        & $candidate --config $Config $Command @Arguments
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } catch {
         [Console]::Error.WriteLine("setup: $($_.Exception.Message) (CLI.SC_LINT_RELEASE_UNAVAILABLE)")
         exit 4
@@ -90,14 +92,20 @@ function Install-ProductBinary {
 
 function Ensure-Product {
     $script:productBinary = Resolve-ProductBinary
-    if (-not $script:productBinary) { $script:productBinary = Install-ProductBinary }
+    if (-not $script:productBinary) {
+        Invoke-VerifiedReleaseLauncher "setup" $remaining
+        $script:productBinary = $managedBinary
+    }
     & $script:productBinary --config $Config compatibility check --binary $script:productBinary
     if ($LASTEXITCODE -ne 0) {
         if (Test-ManagedBinary $script:productBinary) {
-            # The compatibility process has exited, so PowerShell can safely
-            # replace the stale managed executable without weakening the Rust
-            # installer's running-binary guard.
-            $script:productBinary = Install-ProductBinary
+            if ($remaining -contains "--dry-run") {
+                & $script:productBinary --config $Config setup @remaining
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            } else {
+                Invoke-VerifiedReleaseLauncher "setup" $remaining
+            }
+            $script:productBinary = $managedBinary
         } else {
             & $script:productBinary --config $Config setup
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -121,13 +129,13 @@ switch ($Operation) {
     }
     "upgrade" {
         $productBinary = Resolve-ProductBinary
-        if (-not $productBinary) { $productBinary = Install-ProductBinary }
+        if (-not $productBinary) {
+            Invoke-VerifiedReleaseLauncher "upgrade" $remaining
+            exit $LASTEXITCODE
+        }
         & $productBinary --config $Config compatibility check --binary $productBinary
-        if ($LASTEXITCODE -ne 0 -and (Test-ManagedBinary $productBinary) -and $remaining -notcontains "--check") {
-            # The managed executable is stale but no longer running after the
-            # compatibility probe. Install the verified replacement here; the
-            # Rust installer continues to reject replacing its own live image.
-            $productBinary = Install-ProductBinary
+        if ($LASTEXITCODE -ne 0 -and (Test-ManagedBinary $productBinary) -and $remaining -notcontains "--check" -and $remaining -notcontains "--dry-run") {
+            Invoke-VerifiedReleaseLauncher "upgrade" $remaining
         } else {
             & $productBinary --config $Config upgrade @remaining
         }

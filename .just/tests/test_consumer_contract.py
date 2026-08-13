@@ -72,7 +72,7 @@ class ConsumerContractTests(unittest.TestCase):
             contents = path.read_text(encoding="utf-8")
             self.assertIn('"--config"', contents)
             self.assertIn("ValueFromRemainingArguments = $true", contents)
-            self.assertIn("Install-ProductBinary", contents)
+            self.assertIn("Invoke-VerifiedReleaseLauncher", contents)
             self.assertIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", contents)
             self.assertIn("compatibility check", contents)
 
