@@ -1,13 +1,16 @@
 use serde_json::Value;
 use serde_json::json;
+use std::path::Path;
 
 use crate::Cli;
 use crate::CliError;
 use crate::Command;
+use crate::DocsGuide;
 use crate::config::LoadedConfig;
 use crate::consts;
 use crate::contract::ServiceName;
 use crate::dispatch;
+use crate::installer;
 use crate::python_adapter;
 use crate::workflow;
 
@@ -63,7 +66,14 @@ pub(crate) enum CommandId {
     CheckXwin,
     ClippyNative,
     ClippyXwin,
+    CompatibilityCheck,
+    Docs,
+    Init,
+    ConsumerTest,
+    Setup,
+    Upgrade,
     LintCi,
+    ConsumerLintCi,
     LintFast,
     LintFull,
     LintIdentityLiterals,
@@ -76,10 +86,36 @@ pub(crate) enum CommandId {
     ViewGraph,
 }
 
+/// Parsed consumer-integration flags remain a single validated request rather
+/// than three unrelated booleans at the execution boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ConsumerInitRequest {
+    pub(crate) just: bool,
+    pub(crate) check: bool,
+    pub(crate) dry_run: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DocsRequest {
+    pub(crate) guide: Option<DocsGuide>,
+    pub(crate) path: bool,
+}
+
+/// Command-specific payloads stay coupled to the command variant that owns
+/// them. This prevents an unrelated command context from carrying an
+/// impossible `None` payload that would only fail during dispatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommandRequest {
+    Setup { dry_run: bool },
+    Upgrade { check: bool, dry_run: bool },
+    Init(ConsumerInitRequest),
+    Docs(DocsRequest),
+}
+
 impl CommandId {
     pub fn from_cli_command(command: &Command) -> Self {
         match command {
-            Command::Lint { target } => match target {
+            Command::Lint { target, consumer } => match target {
                 crate::LintTarget::ScBoundary => Self::LintScBoundary,
                 crate::LintTarget::ScPortability => Self::LintScPortability,
                 crate::LintTarget::ScRuntime => Self::LintScRuntime,
@@ -87,6 +123,7 @@ impl CommandId {
                 crate::LintTarget::IdentityLiterals => Self::LintIdentityLiterals,
                 crate::LintTarget::Fast => Self::LintFast,
                 crate::LintTarget::Full => Self::LintFull,
+                crate::LintTarget::Ci if *consumer => Self::ConsumerLintCi,
                 crate::LintTarget::Ci => Self::LintCi,
             },
             Command::View { target } => match target {
@@ -101,6 +138,14 @@ impl CommandId {
                 crate::ClippyTarget::Native => Self::ClippyNative,
                 crate::ClippyTarget::Xwin => Self::ClippyXwin,
             },
+            Command::Compatibility { command } => match command {
+                crate::CompatibilityCommand::Check { .. } => Self::CompatibilityCheck,
+            },
+            Command::Docs { .. } => Self::Docs,
+            Command::Setup { .. } => Self::Setup,
+            Command::Upgrade { .. } => Self::Upgrade,
+            Command::Init { .. } => Self::Init,
+            Command::Test => Self::ConsumerTest,
             Command::Version => Self::Version,
             Command::Ci => Self::Ci,
         }
@@ -113,7 +158,14 @@ impl CommandId {
             Self::CheckXwin => "check.xwin",
             Self::ClippyNative => "clippy.native",
             Self::ClippyXwin => "clippy.xwin",
+            Self::CompatibilityCheck => "compatibility.check",
+            Self::Docs => "docs",
+            Self::Init => "init",
+            Self::ConsumerTest => "test",
+            Self::Setup => "setup",
+            Self::Upgrade => "upgrade",
             Self::LintCi => "lint.ci",
+            Self::ConsumerLintCi => "lint.ci.consumer",
             Self::LintFast => "lint.fast",
             Self::LintFull => "lint.full",
             Self::LintIdentityLiterals => "lint.identity-literals",
@@ -137,7 +189,14 @@ impl CommandId {
             | Self::CheckXwin
             | Self::ClippyNative
             | Self::ClippyXwin
+            | Self::CompatibilityCheck
+            | Self::Docs
+            | Self::Init
+            | Self::ConsumerTest
+            | Self::Setup
+            | Self::Upgrade
             | Self::LintCi
+            | Self::ConsumerLintCi
             | Self::LintFast
             | Self::LintFull
             | Self::LintIdentityLiterals
@@ -153,7 +212,14 @@ impl CommandId {
             Self::Ci => "top-level ci orchestration path",
             Self::CheckNative | Self::CheckXwin => "preflight execution path",
             Self::ClippyNative | Self::ClippyXwin => "clippy execution path",
+            Self::CompatibilityCheck => "installed sc-lint compatibility preflight",
+            Self::Docs => "offline documentation discovery",
+            Self::Init => "consumer integration generation",
+            Self::ConsumerTest => "consumer test profile orchestration",
+            Self::Setup => "managed sc-lint installation and repair",
+            Self::Upgrade => "managed sc-lint upgrade inspection and activation",
             Self::LintCi | Self::LintFast | Self::LintFull => "lint profile orchestration path",
+            Self::ConsumerLintCi => "consumer lint profile orchestration",
             Self::LintIdentityLiterals => "python-backed identity literal lint path",
             Self::LintLineCounts => "python-backed line-count lint path",
             Self::LintScBoundary => "boundary analyzer command path",
@@ -166,7 +232,17 @@ impl CommandId {
     }
 
     pub const fn requires_repo_root(self) -> bool {
-        !matches!(self, Self::Version)
+        !matches!(
+            self,
+            Self::Version
+                | Self::CompatibilityCheck
+                | Self::Docs
+                | Self::Setup
+                | Self::Upgrade
+                | Self::Init
+                | Self::ConsumerTest
+                | Self::ConsumerLintCi
+        )
     }
 
     pub const fn dispatch_tool(self) -> Option<&'static str> {
@@ -206,29 +282,83 @@ pub struct CommandContext {
     service_name: ServiceName,
     summary: &'static str,
     requires_repo_root: bool,
+    compatibility_binary: Option<std::path::PathBuf>,
+    request: Option<CommandRequest>,
 }
 
 impl CommandContext {
-    /// This constructor is intentionally infallible today.
-    /// The `Result` is reserved so future command-surface validation can fail
-    /// before config loading without changing the public bootstrap seam, for
-    /// example if future CLI evolution adds conflicting flags, unsupported
-    /// command combinations, or other pre-dispatch validation failures.
+    /// Constructs a command context from parsed CLI arguments.
+    ///
+    /// This constructor is fallible: it returns a usage error when `--version`
+    /// is combined with a subcommand or when neither a subcommand nor
+    /// `--version` was provided.
     #[expect(
         clippy::result_large_err,
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
-        let command_id = match (&cli.command, cli.version) {
-            (Some(command), false) => CommandId::from_cli_command(command),
-            (None, true) => CommandId::Version,
+        let (command_id, compatibility_binary, request) = match (&cli.command, cli.version) {
+            (Some(command), false) => {
+                if matches!(command, Command::Init { .. })
+                    && (cli.config.is_some() || cli.root.is_some())
+                {
+                    return Err(CliError::usage(
+                        "`sc-lint init --just` does not accept `--config` or `--root`",
+                    )
+                    .with_suggested_action(
+                        "Run it from the consumer repository root; it always manages `sc-lint.toml` there.",
+                    ));
+                }
+                if matches!(command, Command::Lint { consumer: true, target } if !matches!(target, crate::LintTarget::Ci))
+                {
+                    return Err(CliError::usage(
+                            "`--consumer` is only supported by `sc-lint lint ci`",
+                        )
+                        .with_suggested_action(
+                            "Use `sc-lint lint --consumer --config sc-lint.toml ci` for a consumer repository.",
+                        ));
+                }
+                let compatibility_binary = match command {
+                    Command::Compatibility {
+                        command: crate::CompatibilityCommand::Check { binary },
+                    } => binary.clone(),
+                    _ => None,
+                };
+                let request = match command {
+                    Command::Setup { dry_run } => Some(CommandRequest::Setup { dry_run: *dry_run }),
+                    Command::Upgrade { check, dry_run } => Some(CommandRequest::Upgrade {
+                        check: *check,
+                        dry_run: *dry_run,
+                    }),
+                    Command::Init {
+                        just,
+                        check,
+                        dry_run,
+                    } => Some(CommandRequest::Init(ConsumerInitRequest {
+                        just: *just,
+                        check: *check,
+                        dry_run: *dry_run,
+                    })),
+                    Command::Docs { guide, path } => Some(CommandRequest::Docs(DocsRequest {
+                        guide: *guide,
+                        path: *path,
+                    })),
+                    _ => None,
+                };
+                (
+                    CommandId::from_cli_command(command),
+                    compatibility_binary,
+                    request,
+                )
+            }
+            (None, true) => (CommandId::Version, None, None),
             (Some(_), true) => {
                 return Err(CliError::usage(
-                    "`--version` cannot be combined with a subcommand",
-                )
-                .with_suggested_action(
-                    "Use either `sc-lint --version` or a subcommand such as `sc-lint version`.",
-                ));
+                        "`--version` cannot be combined with a subcommand",
+                    )
+                    .with_suggested_action(
+                        "Use either `sc-lint --version` or a subcommand such as `sc-lint version`.",
+                    ));
             }
             (None, false) => {
                 return Err(
@@ -245,6 +375,8 @@ impl CommandContext {
             service_name,
             summary: command_id.summary(),
             requires_repo_root: command_id.requires_repo_root(),
+            compatibility_binary,
+            request,
         })
     }
 
@@ -266,6 +398,68 @@ impl CommandContext {
 
     pub(crate) const fn requires_repo_root(&self) -> bool {
         self.requires_repo_root
+    }
+
+    pub(crate) const fn requires_compatibility_config(&self) -> bool {
+        matches!(
+            self.command_id,
+            CommandId::CompatibilityCheck
+                | CommandId::Setup
+                | CommandId::Upgrade
+                | CommandId::ConsumerLintCi
+                | CommandId::ConsumerTest
+        )
+    }
+
+    pub(crate) fn compatibility_binary(&self) -> Option<&Path> {
+        self.compatibility_binary.as_deref()
+    }
+
+    pub(crate) const fn setup_dry_run(&self) -> bool {
+        matches!(self.request, Some(CommandRequest::Setup { dry_run: true }))
+    }
+
+    pub(crate) const fn upgrade_check(&self) -> bool {
+        matches!(
+            self.request,
+            Some(CommandRequest::Upgrade { check: true, .. })
+        )
+    }
+
+    pub(crate) const fn upgrade_dry_run(&self) -> bool {
+        matches!(
+            self.request,
+            Some(CommandRequest::Upgrade { dry_run: true, .. })
+        )
+    }
+
+    pub(crate) fn consumer_init_request(&self) -> ConsumerInitRequest {
+        match self.request {
+            Some(CommandRequest::Init(request)) => request,
+            _ => unreachable!("consumer initialization request is tied to the init command"),
+        }
+    }
+
+    pub(crate) fn docs_request(&self) -> DocsRequest {
+        match self.request {
+            Some(CommandRequest::Docs(request)) => request,
+            _ => unreachable!("documentation request is tied to the docs command"),
+        }
+    }
+
+    /// Standalone consumer probes must never initialize repository logging.
+    pub const fn skips_logging(&self) -> bool {
+        matches!(
+            self.command_id,
+            CommandId::Version
+                | CommandId::CompatibilityCheck
+                | CommandId::Setup
+                | CommandId::Upgrade
+                | CommandId::Init
+                | CommandId::Docs
+                | CommandId::ConsumerLintCi
+                | CommandId::ConsumerTest
+        )
     }
 
     pub fn dispatch_tool(&self) -> Option<&'static str> {
@@ -299,11 +493,31 @@ pub(crate) fn execute(
 ) -> Result<CommandSuccess, CliError> {
     match context.id() {
         CommandId::Version => Ok(CommandSuccess::direct(json!({
-            consts::FIELD_CRATE_NAME: consts::SERVICE_NAME,
-            consts::FIELD_CRATE_VERSION: env!("CARGO_PKG_VERSION"),
-            "contract_schema": "v1",
-            consts::FIELD_STATUS: "dispatch_ready",
+            consts::FIELD_TOOL: consts::SERVICE_NAME,
+            consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
+            "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
+            consts::FIELD_STATUS: "pass",
         }))),
+        CommandId::CompatibilityCheck => Ok(CommandSuccess::direct(
+            loaded_config.evaluate_compatibility(context.compatibility_binary())?,
+        )),
+        CommandId::Docs => Ok(CommandSuccess::direct(crate::docs::run(
+            context.docs_request(),
+        )?)),
+        CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
+            loaded_config,
+            context.setup_dry_run(),
+        )?)),
+        CommandId::Upgrade => Ok(CommandSuccess::direct(installer::run_upgrade(
+            loaded_config,
+            context.upgrade_check(),
+            context.upgrade_dry_run(),
+        )?)),
+        CommandId::Init => Ok(CommandSuccess::direct(crate::config::run_consumer_init(
+            context.consumer_init_request(),
+        )?)),
+        CommandId::ConsumerLintCi => workflow::run_consumer_lint_profile(loaded_config),
+        CommandId::ConsumerTest => workflow::run_consumer_test_profile(loaded_config),
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),

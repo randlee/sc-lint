@@ -263,6 +263,80 @@ specialized backend tools and mixed Rust/Python implementations.
   `xwin`-backed preflight must not be part of the `ci` lint profile because
   the product relies on real Windows CI runners for authoritative validation.
 
+- `REQ-CLI-016`
+  `sc-lint compatibility check` must load exactly
+  `[tool.sc-lint].minimum_version` from `sc-lint.toml` (or an explicit
+  `--config` file), parse it into a validated SemVer boundary type, and compare
+  the installed `sc-lint --json version` result semantically. It must not
+  require a Cargo workspace, initialize repository logs/reports, or run
+  lint/test work.
+
+- `REQ-CLI-017`
+  `sc-lint --json version` and `sc-lint --version --json` must emit the stable
+  `sc-lint-version-v1` probe with `tool`, SemVer `version`, and `status` fields
+  without initializing repository logging or report output.
+
+- `REQ-CLI-018`
+  Compatibility failures must use stable error codes and include a cause,
+  `just setup`/installer recovery guidance, and the `sc-lint docs setup`
+  reference. When available, the JSON details and human message must identify
+  the configured minimum version, observed version, binary path, and
+  configuration path.
+
+- `REQ-CLI-019`
+  `sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]` must
+  load the canonical consumer SemVer floor, select the matching host release,
+  verify `checksums.txt` before activation, and atomically replace only the
+  managed product binary. A current or newer compatible installation is a
+  no-op. The selected immutable release version and the configured SemVer floor
+  are distinct values in machine output. Failed activation or post-install
+  verification must retain the last working managed binary; if restoration
+  itself cannot be verified, the command must report a distinct recovery error
+  identifying the manual backup location.
+
+- `REQ-CLI-020`
+  Installer failures must retain the standard `CliError` envelope and stable
+  codes for unsupported platform, unavailable release, checksum mismatch,
+  permission failure, and failed post-install version verification. Each must
+  identify a cause, recovery action, and `sc-lint docs installation` reference.
+  A failed rollback is a separate stable failure because it cannot honestly
+  promise that the previous managed installation was restored.
+
+- `REQ-CLI-021`
+  The product bootstrap asset must expose only `ensure`, `setup`, and
+  `upgrade`, require an explicit `--config sc-lint.toml`, and delegate to the
+  installed `sc-lint` command. E.3 owns rendering this asset into consumer
+  repositories and the generated Justfile contract.
+
+- `REQ-CLI-022`
+  `sc-lint init --just [--check|--dry-run]` must materialize only the
+  product-owned `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and Windows
+  `.sc-lint/bootstrap.ps1` files.
+  A current integration is idempotent; `--check` and `--dry-run` do not mutate
+  it. A differing existing managed-path file is a structured conflict, never
+  an overwrite, and a consumer README is outside the command's write set.
+  E.6 owns optional CI workflow generation because it depends on the reusable
+  release-verified Action rather than a source-checkout fallback.
+
+- `REQ-CLI-023`
+  Consumer execution is explicit: `sc-lint lint --consumer --config
+  sc-lint.toml ci` runs the complete configured `[[tool.sc-lint.lint]]` profile,
+  and `sc-lint test --config sc-lint.toml` runs the complete configured
+  `[[tool.sc-lint.test]]` profile. Each profile item has a unique non-empty
+  `name` and a non-empty argv `command` array. These commands do not discover
+  a source checkout or execute `.just` scripts.
+
+- `REQ-CLI-024`
+  `sc-lint docs` must discover the installed offline documentation bundle
+  without network access or repository-root discovery. The command must list
+  the overview, operator guides, and every package guide; named guides print
+  their contents, while `--path` prints the installed bundle (or guide) path
+  without mutating the current repository. Bundle and package completeness are
+  validated against the release manifest and relative links before packaging.
+  A missing or incomplete bundle must return `CLI.SC_LINT_DOCS_UNAVAILABLE`
+  with the searched bundle path, recovery action, and `sc-lint docs
+  installation` reference.
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:

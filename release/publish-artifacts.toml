@@ -1,5 +1,33 @@
 schema_version = 1
 
+[documentation_bundle]
+# E.4 owns this source directory and its contents. E.5 validates and packages
+# this logical layout as a release artifact; it is never copied into consumers.
+source_directory = "docs-bundle"
+package_directory = "sc-lint-docs"
+required_files = [
+  "manifest.toml",
+  "README.md",
+  "installation.md",
+  "using-sc-lint.md",
+  "configuration.md",
+  "just-setup.md",
+  "ci.md",
+  "upgrade.md",
+  "troubleshooting.md",
+  "best-practices.md",
+]
+package_guides = [
+  "sc-lint.md",
+  "sc-lint-attributes.md",
+  "sc-lint-analyzer-support.md",
+  "sc-lint-boundary.md",
+  "sc-lint-directives.md",
+  "sc-lint-portability.md",
+  "sc-lint-runtime.md",
+  "sc-lint-schema.md",
+]
+
 [[crates]]
 artifact = "sc-lint-directives"
 package = "sc-lint-directives"
@@ -23,12 +51,23 @@ wait_after_publish_seconds = 15
 verify_install = false
 
 [[crates]]
+artifact = "sc-lint-analyzer-support"
+package = "sc-lint-analyzer-support"
+cargo_toml = "crates/sc-lint-analyzer-support/Cargo.toml"
+required = true
+publish = true
+publish_order = 3
+preflight_check = "locked"
+wait_after_publish_seconds = 0
+verify_install = false
+
+[[crates]]
 artifact = "sc-lint-attributes"
 package = "sc-lint-attributes"
 cargo_toml = "crates/sc-lint-attributes/Cargo.toml"
 required = true
 publish = true
-publish_order = 3
+publish_order = 4
 preflight_check = "locked"
 wait_after_publish_seconds = 0
 verify_install = false
@@ -39,7 +78,7 @@ package = "sc-lint-boundary"
 cargo_toml = "crates/sc-lint-boundary/Cargo.toml"
 required = true
 publish = true
-publish_order = 4
+publish_order = 5
 preflight_check = "locked"
 wait_after_publish_seconds = 15
 verify_install = true
@@ -50,7 +89,7 @@ package = "sc-lint-portability"
 cargo_toml = "crates/sc-lint-portability/Cargo.toml"
 required = true
 publish = true
-publish_order = 5
+publish_order = 6
 preflight_check = "locked"
 wait_after_publish_seconds = 0
 verify_install = true
@@ -61,7 +100,7 @@ package = "sc-lint-runtime"
 cargo_toml = "crates/sc-lint-runtime/Cargo.toml"
 required = true
 publish = true
-publish_order = 6
+publish_order = 7
 preflight_check = "locked"
 wait_after_publish_seconds = 0
 verify_install = true
@@ -72,7 +111,7 @@ package = "sc-lint"
 cargo_toml = "crates/sc-lint/Cargo.toml"
 required = true
 publish = true
-publish_order = 7
+publish_order = 8
 preflight_check = "locked"
 wait_after_publish_seconds = 0
 verify_install = true

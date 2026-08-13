@@ -8,6 +8,9 @@ use serde::Serialize;
 #[derive(Debug, Clone, Parser)]
 #[command(name = "sc-lint")]
 #[command(about = "Stable top-level CLI for the sc-lint tool family")]
+#[command(
+    after_long_help = "Documentation guides: `sc-lint docs` (overview), `installation`, `using-sc-lint`, `configuration`, `just-setup`, `ci`, `upgrade`, `troubleshooting`, `best-practices`, and one guide for each `sc-lint-*` package: `sc-lint`, `sc-lint-analyzer-support`, `sc-lint-attributes`, `sc-lint-boundary`, `sc-lint-directives`, `sc-lint-portability`, `sc-lint-runtime`, and `sc-lint-schema`. Use `sc-lint docs --path` for the installed bundle path."
+)]
 #[command(disable_version_flag = true)]
 pub struct Cli {
     #[arg(long, global = true)]
@@ -31,6 +34,9 @@ pub enum Command {
     Lint {
         #[arg(value_enum)]
         target: LintTarget,
+        /// Run the explicitly configured consumer profile instead of the source-maintainer profile.
+        #[arg(long)]
+        consumer: bool,
     },
     View {
         #[arg(value_enum)]
@@ -44,8 +50,175 @@ pub enum Command {
         #[arg(value_enum)]
         target: ClippyTarget,
     },
+    Compatibility {
+        #[command(subcommand)]
+        command: CompatibilityCommand,
+    },
+    /// Install or repair the managed sc-lint release required by sc-lint.toml.
+    Setup {
+        /// Report the selected release and install location without changing either.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Inspect or update the managed sc-lint release required by sc-lint.toml.
+    Upgrade {
+        /// Report whether the configured minimum version requires an update.
+        #[arg(long)]
+        check: bool,
+        /// Report the selected release and install location without changing either.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Materialize the product-owned consumer integration files.
+    Init {
+        /// Generate the canonical thin Just integration.
+        #[arg(long)]
+        just: bool,
+        /// Verify that the generated integration is current without changing files.
+        #[arg(long)]
+        check: bool,
+        /// Report the changes that would be made without changing files.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Discover and print the installed offline documentation bundle.
+    Docs {
+        /// Guide to print or resolve. Without a guide, print the overview.
+        #[arg(value_enum)]
+        guide: Option<DocsGuide>,
+        /// Print the installed filesystem path instead of guide contents.
+        #[arg(long)]
+        path: bool,
+    },
+    /// Run the complete explicitly configured consumer test profile.
+    Test,
     Version,
     Ci,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum DocsGuide {
+    #[value(name = "README.md")]
+    Overview,
+    #[value(name = "installation", alias = "setup")]
+    Installation,
+    #[value(name = "using-sc-lint")]
+    UsingScLint,
+    Configuration,
+    #[value(name = "just-setup")]
+    JustSetup,
+    Ci,
+    Upgrade,
+    Troubleshooting,
+    #[value(name = "best-practices")]
+    BestPractices,
+    #[value(name = "sc-lint")]
+    ScLint,
+    #[value(name = "sc-lint-attributes")]
+    ScLintAttributes,
+    #[value(name = "sc-lint-analyzer-support")]
+    ScLintAnalyzerSupport,
+    #[value(name = "sc-lint-boundary")]
+    ScLintBoundary,
+    #[value(name = "sc-lint-directives")]
+    ScLintDirectives,
+    #[value(name = "sc-lint-portability")]
+    ScLintPortability,
+    #[value(name = "sc-lint-runtime")]
+    ScLintRuntime,
+    #[value(name = "sc-lint-schema")]
+    ScLintSchema,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DocsGuideMetadata {
+    pub(crate) name: &'static str,
+    pub(crate) path: &'static str,
+}
+
+impl DocsGuide {
+    pub(crate) const fn metadata(self) -> DocsGuideMetadata {
+        match self {
+            Self::Overview => DocsGuideMetadata {
+                name: "README.md",
+                path: "README.md",
+            },
+            Self::Installation => DocsGuideMetadata {
+                name: "installation",
+                path: "installation.md",
+            },
+            Self::UsingScLint => DocsGuideMetadata {
+                name: "using-sc-lint",
+                path: "using-sc-lint.md",
+            },
+            Self::Configuration => DocsGuideMetadata {
+                name: "configuration",
+                path: "configuration.md",
+            },
+            Self::JustSetup => DocsGuideMetadata {
+                name: "just-setup",
+                path: "just-setup.md",
+            },
+            Self::Ci => DocsGuideMetadata {
+                name: "ci",
+                path: "ci.md",
+            },
+            Self::Upgrade => DocsGuideMetadata {
+                name: "upgrade",
+                path: "upgrade.md",
+            },
+            Self::Troubleshooting => DocsGuideMetadata {
+                name: "troubleshooting",
+                path: "troubleshooting.md",
+            },
+            Self::BestPractices => DocsGuideMetadata {
+                name: "best-practices",
+                path: "best-practices.md",
+            },
+            Self::ScLint => DocsGuideMetadata {
+                name: "sc-lint",
+                path: "packages/sc-lint.md",
+            },
+            Self::ScLintAttributes => DocsGuideMetadata {
+                name: "sc-lint-attributes",
+                path: "packages/sc-lint-attributes.md",
+            },
+            Self::ScLintAnalyzerSupport => DocsGuideMetadata {
+                name: "sc-lint-analyzer-support",
+                path: "packages/sc-lint-analyzer-support.md",
+            },
+            Self::ScLintBoundary => DocsGuideMetadata {
+                name: "sc-lint-boundary",
+                path: "packages/sc-lint-boundary.md",
+            },
+            Self::ScLintDirectives => DocsGuideMetadata {
+                name: "sc-lint-directives",
+                path: "packages/sc-lint-directives.md",
+            },
+            Self::ScLintPortability => DocsGuideMetadata {
+                name: "sc-lint-portability",
+                path: "packages/sc-lint-portability.md",
+            },
+            Self::ScLintRuntime => DocsGuideMetadata {
+                name: "sc-lint-runtime",
+                path: "packages/sc-lint-runtime.md",
+            },
+            Self::ScLintSchema => DocsGuideMetadata {
+                name: "sc-lint-schema",
+                path: "packages/sc-lint-schema.md",
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum CompatibilityCommand {
+    /// Verify the installed sc-lint binary satisfies sc-lint.toml.
+    Check {
+        /// Binary to probe. Defaults to `sc-lint` resolved from PATH.
+        #[arg(long, value_name = "path")]
+        binary: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ValueEnum)]

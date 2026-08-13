@@ -2,6 +2,12 @@
 
 This folder is the home for `sc-lint` design and planning material.
 
+The versioned end-user operator manual is maintained in the repository root at
+[`../../docs-bundle/README.md`](../../docs-bundle/README.md) and is discoverable
+offline with `sc-lint docs`. It includes the canonical
+[`just-setup.md`](../../docs-bundle/just-setup.md) guide and one guide for each
+published package.
+
 Contents:
 
 - [`requirements.md`](./requirements.md) — top-level `sc-lint` crate
@@ -111,6 +117,10 @@ Contents:
   the planned top-level `sc-lint` CLI
 - [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
   envelope and backend-to-CLI normalization contract
+- [`adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
+  — installed-product consumer commands and generated Just integration
+- [`adr/ADR-013-analyzer-shared-support.md`](./adr/ADR-013-analyzer-shared-support.md)
+  — shared rule-neutral AST support without analyzer-to-analyzer dependencies
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
 - [`../../README.md`](../../README.md) — top-level CLI crate and workspace guide
@@ -122,6 +132,8 @@ Contents:
   user guide for `sc-lint lint sc-runtime`
 - [`../../crates/sc-lint-schema/README.md`](../../crates/sc-lint-schema/README.md) —
   shared schema crate guide
+- [`../../crates/sc-lint-analyzer-support/README.md`](../../crates/sc-lint-analyzer-support/README.md) —
+  shared analyzer support crate guide
 - [`../../crates/sc-lint-directives/README.md`](../../crates/sc-lint-directives/README.md) —
   shared directives crate guide
 - [`../../crates/sc-lint-attributes/README.md`](../../crates/sc-lint-attributes/README.md) —

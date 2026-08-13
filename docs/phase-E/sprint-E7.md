@@ -1,13 +1,22 @@
 ---
 id: E.7
 title: Dogfooding, Consumer Fixtures, And Cross-Platform Acceptance
-status: planned
+status: complete
 branch: feature/phase-E7-dogfood-consumer-contract
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E7-dogfood-consumer-contract
 target: integrate/phase-E
 ---
 
 # Sprint E.7 — Dogfooding, Consumer Fixtures, And Cross-Platform Acceptance
+
+## Implementation Record
+
+Completed with root Justfile dogfooding, three-platform aggregate CI, staged
+release-binary consumer lifecycle fixtures, and generated Windows bootstrap
+coverage. Root `setup` and `upgrade` intentionally use `--dry-run` so the
+source checkout exercises installation selection and compatibility without
+mutating a developer's managed installation; consumer generated recipes do not
+add that source-only safeguard.
 
 ## Goal
 
@@ -31,7 +40,7 @@ complete consumer lifecycle from a clean fixture across supported platforms.
 ## Exact Targets
 
 - root `Justfile`
-- root `sc-lint.toml`
+- root `sc-lint.toml` and `.sc-lint/bootstrap` / `.sc-lint/bootstrap.ps1`
 - `.github/workflows/ci.yml`
 - release/action integration workflow(s)
 - disposable consumer fixture(s) and test harness
@@ -62,21 +71,23 @@ The root `Justfile` is the maintained executable model. The exact source-only
 profile command may differ, but its public consumer-facing shape must remain:
 
 ```just
-[private]
-_ensure-sc-lint:
-    .sc-lint/bootstrap ensure --config sc-lint.toml
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+
+default: lint
+
+bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
 setup:
-    .sc-lint/bootstrap setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml
 
-lint: _ensure-sc-lint
-    sc-lint lint ci --config sc-lint.toml
+lint:
+    {{bootstrap_command}} lint --config sc-lint.toml
 
-test: _ensure-sc-lint
-    sc-lint test --config sc-lint.toml
+test:
+    {{bootstrap_command}} test --config sc-lint.toml
 
 upgrade:
-    .sc-lint/bootstrap upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 
 ## Acceptance Criteria

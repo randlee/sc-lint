@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
+import tarfile
 import tomllib
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from textwrap import dedent
@@ -21,6 +24,12 @@ HOMEBREW_TARGETS = (
     "aarch64-apple-darwin",
     "x86_64-unknown-linux-gnu",
 )
+DOCUMENTATION_BUNDLE_REQUIRED_FIELDS = {
+    "source_directory",
+    "package_directory",
+    "required_files",
+    "package_guides",
+}
 
 
 def load_manifest(path: Path) -> dict:
@@ -34,6 +43,24 @@ def load_manifest(path: Path) -> dict:
     binaries = data.get("release_binaries")
     if not isinstance(binaries, list) or not binaries:
         raise SystemExit("manifest must define non-empty [[release_binaries]]")
+    documentation_bundle = data.get("documentation_bundle")
+    if not isinstance(documentation_bundle, dict):
+        raise SystemExit("manifest must define [documentation_bundle]")
+    missing_bundle_fields = sorted(DOCUMENTATION_BUNDLE_REQUIRED_FIELDS - set(documentation_bundle))
+    if missing_bundle_fields:
+        raise SystemExit(
+            "documentation_bundle missing fields: " + ", ".join(missing_bundle_fields)
+        )
+    require_str(documentation_bundle, "source_directory", "documentation_bundle")
+    require_str(documentation_bundle, "package_directory", "documentation_bundle")
+    for key in ("required_files", "package_guides"):
+        values = documentation_bundle[key]
+        if not isinstance(values, list) or not values:
+            raise SystemExit(f"documentation_bundle.{key} must be a non-empty list")
+        if any(not isinstance(value, str) or not value.strip() for value in values):
+            raise SystemExit(f"documentation_bundle.{key} must contain non-empty strings")
+        if len(values) != len(set(values)):
+            raise SystemExit(f"documentation_bundle.{key} contains duplicates")
 
     required = {
         "artifact",
@@ -77,7 +104,11 @@ def load_manifest(path: Path) -> dict:
         seen_bins.add(name)
 
     crates.sort(key=lambda item: (item["publish_order"], item["artifact"]))
-    return {"crates": crates, "release_binaries": binaries}
+    return {
+        "crates": crates,
+        "release_binaries": binaries,
+        "documentation_bundle": documentation_bundle,
+    }
 
 
 def require_str(obj: dict, key: str, label: str) -> str:
@@ -92,6 +123,114 @@ def release_binary_names(manifest: dict) -> list[str]:
     for idx, entry in enumerate(manifest["release_binaries"]):
         names.append(require_str(entry, "name", f"release_binaries[{idx}]"))
     return names
+
+
+def documentation_bundle_files(manifest: dict) -> list[Path]:
+    bundle = manifest["documentation_bundle"]
+    required = [Path(name) for name in bundle["required_files"]]
+    guides = [Path("packages") / name for name in bundle["package_guides"]]
+    return required + guides
+
+
+def documentation_bundle_directory(manifest: dict) -> str:
+    return require_str(manifest["documentation_bundle"], "package_directory", "documentation_bundle")
+
+
+def documentation_bundle_source_directory(manifest: dict) -> str:
+    return require_str(manifest["documentation_bundle"], "source_directory", "documentation_bundle")
+
+
+def validate_documentation_bundle(manifest: dict, source_directory: Path) -> list[Path]:
+    expected = documentation_bundle_files(manifest)
+    expected_set = set(expected)
+    actual = {
+        path.relative_to(source_directory)
+        for path in source_directory.rglob("*")
+        if path.is_file()
+    } if source_directory.is_dir() else set()
+    missing = sorted(expected_set - actual)
+    unexpected = sorted(actual - expected_set)
+    if missing or unexpected:
+        parts = []
+        if missing:
+            parts.append("missing documentation files: " + ", ".join(str(path) for path in missing))
+        if unexpected:
+            parts.append("unexpected documentation files: " + ", ".join(str(path) for path in unexpected))
+        raise SystemExit("; ".join(parts))
+    validate_documentation_bundle_package_manifest(manifest, source_directory, expected_set)
+    return expected
+
+
+def validate_documentation_bundle_package_manifest(
+    manifest: dict, source_directory: Path, expected_files: set[Path]
+) -> None:
+    """Keep the bundle's own guide inventory aligned with release packaging."""
+    package_manifest = source_directory / "manifest.toml"
+    try:
+        data = tomllib.loads(package_manifest.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise SystemExit(f"invalid documentation package manifest: {error}") from error
+    if data.get("schema_version") != 1:
+        raise SystemExit("unsupported documentation package manifest schema_version")
+    if data.get("bundle_name") != documentation_bundle_directory(manifest):
+        raise SystemExit("documentation package manifest bundle_name does not match release manifest")
+    guides = data.get("guides")
+    if not isinstance(guides, list) or not guides:
+        raise SystemExit("documentation package manifest must define non-empty [[guides]]")
+    guide_paths: set[Path] = set()
+    documented_packages: set[str] = set()
+    for index, guide in enumerate(guides):
+        if not isinstance(guide, dict):
+            raise SystemExit(f"documentation package manifest guides[{index}] must be a table")
+        path = guide.get("path")
+        if not isinstance(path, str) or not path.strip():
+            raise SystemExit(f"documentation package manifest guides[{index}].path must be a non-empty string")
+        guide_paths.add(Path(path))
+        if guide.get("kind") == "package":
+            package = guide.get("package")
+            if not isinstance(package, str) or not package.strip():
+                raise SystemExit(
+                    f"documentation package manifest guides[{index}].package must be a non-empty string"
+                )
+            documented_packages.add(package)
+    expected_guides = expected_files - {Path("manifest.toml")}
+    if guide_paths != expected_guides:
+        missing = sorted(expected_guides - guide_paths)
+        unexpected = sorted(guide_paths - expected_guides)
+        parts = []
+        if missing:
+            parts.append("missing package-manifest guides: " + ", ".join(str(path) for path in missing))
+        if unexpected:
+            parts.append("unexpected package-manifest guides: " + ", ".join(str(path) for path in unexpected))
+        raise SystemExit("; ".join(parts))
+    publishable_packages = {crate["package"] for crate in manifest["crates"] if crate["publish"]}
+    if documented_packages != publishable_packages:
+        raise SystemExit(
+            "documentation package manifest package guides do not match publishable release packages"
+        )
+    for guide_path in guide_paths:
+        content = (source_directory / guide_path).read_text(encoding="utf-8")
+        for link in content.split("](")[1:]:
+            target = link.split(")", maxsplit=1)[0].split("#", maxsplit=1)[0]
+            if not target or target.startswith(("http://", "https://", "mailto:")):
+                continue
+            linked_path = (source_directory / guide_path).parent / target
+            if not linked_path.is_file():
+                raise SystemExit(
+                    f"broken documentation link: {guide_path} -> {target}"
+                )
+
+
+def validate_documentation_bundle_command(args: argparse.Namespace) -> int:
+    manifest = load_manifest(Path(args.manifest))
+    validate_documentation_bundle(manifest, Path(args.documentation_directory))
+    print("ok: documentation bundle contains exactly the release manifest files")
+    return 0
+
+
+def print_documentation_source_directory(args: argparse.Namespace) -> int:
+    print(documentation_bundle_source_directory(load_manifest(Path(args.manifest))))
+    return 0
 
 
 def primary_release_binary(manifest: dict) -> str:
@@ -126,10 +265,12 @@ def homebrew_sha_map(args: argparse.Namespace) -> dict[str, str]:
     return mapping
 
 
-def install_block(binary_names: list[str], indent: str) -> str:
+def install_block(binary_names: list[str], indent: str, documentation_directory: str | None) -> str:
     lines = [f'{indent}def install']
     for binary in binary_names:
         lines.append(f'{indent}  bin.install "{binary}"')
+    if documentation_directory:
+        lines.append(f'{indent}  pkgshare.install "{documentation_directory}"')
     lines.append(f"{indent}end")
     return "\n".join(lines)
 
@@ -153,6 +294,7 @@ def render_homebrew_formula_text(
     if formula_name == HOMEBREW_PRIMARY_FORMULA:
         desc = "Top-level sc-lint CLI and analyzer toolset for Rust workspaces"
         installed_binaries = release_binary_names(manifest)
+        documentation_directory = documentation_bundle_directory(manifest)
     elif formula_name == HOMEBREW_LEGACY_BOUNDARY_FORMULA:
         desc = "Legacy compatibility formula for the sc-lint boundary analyzer"
         if HOMEBREW_LEGACY_BOUNDARY_FORMULA not in release_binary_names(manifest):
@@ -160,6 +302,7 @@ def render_homebrew_formula_text(
                 f"release_binaries must include {HOMEBREW_LEGACY_BOUNDARY_FORMULA!r} to render its legacy formula"
             )
         installed_binaries = [HOMEBREW_LEGACY_BOUNDARY_FORMULA]
+        documentation_directory = None
     else:
         raise SystemExit(f"unsupported formula {formula_name!r}")
 
@@ -194,13 +337,13 @@ def render_homebrew_formula_text(
               url "{macos_intel_url}"
               sha256 "{sha_map['x86_64-apple-darwin']}"
 
-        {install_block(installed_binaries, "      ")}
+        {install_block(installed_binaries, "      ", documentation_directory)}
             end
             on_arm do
               url "{macos_arm_url}"
               sha256 "{sha_map['aarch64-apple-darwin']}"
 
-        {install_block(installed_binaries, "      ")}
+        {install_block(installed_binaries, "      ", documentation_directory)}
             end
           end
 
@@ -210,7 +353,7 @@ def render_homebrew_formula_text(
                 url "{linux_intel_url}"
                 sha256 "{sha_map['x86_64-unknown-linux-gnu']}"
 
-        {install_block(installed_binaries, "        ")}
+        {install_block(installed_binaries, "        ", documentation_directory)}
               end
             end
           end
@@ -326,6 +469,124 @@ def render_homebrew_formula(args: argparse.Namespace) -> int:
         ),
         encoding="utf-8",
     )
+    return 0
+
+
+def create_empty_directory(path: Path) -> None:
+    if path.exists():
+        raise SystemExit(f"staging destination already exists: {path}")
+    path.mkdir(parents=True, exist_ok=False)
+
+
+def copy_documentation_bundle(manifest: dict, source_directory: Path, destination_root: Path) -> Path:
+    validate_documentation_bundle(manifest, source_directory)
+    destination = destination_root / documentation_bundle_directory(manifest)
+    shutil.copytree(source_directory, destination)
+    return destination
+
+
+def validate_staged_release_layout(manifest: dict, staging_directory: Path, *, windows: bool) -> None:
+    expected = {
+        Path(f"{name}.exe" if windows else name)
+        for name in release_binary_names(manifest)
+    }
+    expected.add(Path(documentation_bundle_directory(manifest)))
+    actual = {path.relative_to(staging_directory) for path in staging_directory.iterdir()}
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    if missing or unexpected:
+        parts = []
+        if missing:
+            parts.append("missing release entries: " + ", ".join(str(path) for path in missing))
+        if unexpected:
+            parts.append("unexpected release entries: " + ", ".join(str(path) for path in unexpected))
+        raise SystemExit("; ".join(parts))
+    validate_documentation_bundle(
+        manifest,
+        staging_directory / documentation_bundle_directory(manifest),
+    )
+
+
+def stage_release_archive(args: argparse.Namespace) -> int:
+    manifest = load_manifest(Path(args.manifest))
+    binaries_directory = Path(args.binaries_directory)
+    documentation_directory = Path(args.documentation_directory)
+    staging_directory = Path(args.staging_directory)
+    windows = bool(args.windows)
+    create_empty_directory(staging_directory)
+    for name in release_binary_names(manifest):
+        binary_name = f"{name}.exe" if windows else name
+        source = binaries_directory / binary_name
+        if not source.is_file():
+            raise SystemExit(f"missing release binary: {source}")
+        shutil.copy2(source, staging_directory / binary_name)
+    copy_documentation_bundle(manifest, documentation_directory, staging_directory)
+    validate_staged_release_layout(manifest, staging_directory, windows=windows)
+    return 0
+
+
+def release_archive_expected_files(manifest: dict, *, windows: bool) -> set[Path]:
+    binaries = {
+        Path(f"{name}.exe" if windows else name)
+        for name in release_binary_names(manifest)
+    }
+    documentation_root = Path(documentation_bundle_directory(manifest))
+    documentation = {documentation_root / path for path in documentation_bundle_files(manifest)}
+    return binaries | documentation
+
+
+def release_archive_files(archive: Path) -> set[Path]:
+    if archive.suffix == ".zip":
+        with zipfile.ZipFile(archive) as zipped:
+            return {
+                Path(info.filename)
+                for info in zipped.infolist()
+                if not info.is_dir()
+            }
+    if archive.suffixes[-2:] == [".tar", ".gz"]:
+        with tarfile.open(archive, mode="r:gz") as tarred:
+            return {Path(member.name) for member in tarred.getmembers() if member.isfile()}
+    raise SystemExit(f"unsupported release archive format: {archive}")
+
+
+def validate_release_archive(args: argparse.Namespace) -> int:
+    manifest = load_manifest(Path(args.manifest))
+    actual = release_archive_files(Path(args.archive))
+    expected = release_archive_expected_files(manifest, windows=bool(args.windows))
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    if missing or unexpected:
+        parts = []
+        if missing:
+            parts.append("missing archive files: " + ", ".join(str(path) for path in missing))
+        if unexpected:
+            parts.append("unexpected archive files: " + ", ".join(str(path) for path in unexpected))
+        raise SystemExit("; ".join(parts))
+    print("ok: release archive contains exactly the declared binaries and documentation bundle")
+    return 0
+
+
+def stage_homebrew_layout(args: argparse.Namespace) -> int:
+    manifest = load_manifest(Path(args.manifest))
+    archive_directory = Path(args.archive_directory)
+    prefix = Path(args.prefix)
+    create_empty_directory(prefix)
+    bin_directory = prefix / "bin"
+    bin_directory.mkdir()
+    for name in release_binary_names(manifest):
+        source = archive_directory / name
+        if not source.is_file():
+            raise SystemExit(f"missing archive binary for Homebrew layout: {source}")
+        shutil.copy2(source, bin_directory / name)
+    pkgshare = prefix / "share" / HOMEBREW_PRIMARY_FORMULA
+    pkgshare.mkdir(parents=True)
+    docs_source = archive_directory / documentation_bundle_directory(manifest)
+    copy_documentation_bundle(manifest, docs_source, pkgshare)
+    expected_bins = set(release_binary_names(manifest))
+    actual_bins = {path.name for path in bin_directory.iterdir() if path.is_file()}
+    if actual_bins != expected_bins:
+        raise SystemExit("Homebrew bin layout does not match release manifest")
+    validate_documentation_bundle(manifest, pkgshare / documentation_bundle_directory(manifest))
     return 0
 
 
@@ -559,6 +820,15 @@ def build_parser() -> argparse.ArgumentParser:
     primary_bin.add_argument("--manifest", required=True)
     primary_bin.set_defaults(func=print_primary_release_binary)
 
+    docs_source = subparsers.add_parser("documentation-source-directory")
+    docs_source.add_argument("--manifest", required=True)
+    docs_source.set_defaults(func=print_documentation_source_directory)
+
+    validate_docs = subparsers.add_parser("validate-documentation-bundle")
+    validate_docs.add_argument("--manifest", required=True)
+    validate_docs.add_argument("--documentation-directory", required=True)
+    validate_docs.set_defaults(func=validate_documentation_bundle_command)
+
     render_formula = subparsers.add_parser("render-homebrew-formula")
     render_formula.add_argument("--manifest", required=True)
     render_formula.add_argument(
@@ -573,6 +843,26 @@ def build_parser() -> argparse.ArgumentParser:
     render_formula.add_argument("--sha256-aarch64-apple-darwin", required=True)
     render_formula.add_argument("--sha256-x86_64-unknown-linux-gnu", required=True)
     render_formula.set_defaults(func=render_homebrew_formula)
+
+    stage_archive = subparsers.add_parser("stage-release-archive")
+    stage_archive.add_argument("--manifest", required=True)
+    stage_archive.add_argument("--binaries-directory", required=True)
+    stage_archive.add_argument("--documentation-directory", required=True)
+    stage_archive.add_argument("--staging-directory", required=True)
+    stage_archive.add_argument("--windows", action="store_true")
+    stage_archive.set_defaults(func=stage_release_archive)
+
+    validate_archive = subparsers.add_parser("validate-release-archive")
+    validate_archive.add_argument("--manifest", required=True)
+    validate_archive.add_argument("--archive", required=True)
+    validate_archive.add_argument("--windows", action="store_true")
+    validate_archive.set_defaults(func=validate_release_archive)
+
+    stage_homebrew = subparsers.add_parser("stage-homebrew-layout")
+    stage_homebrew.add_argument("--manifest", required=True)
+    stage_homebrew.add_argument("--archive-directory", required=True)
+    stage_homebrew.add_argument("--prefix", required=True)
+    stage_homebrew.set_defaults(func=stage_homebrew_layout)
 
     unpublished = subparsers.add_parser("check-version-unpublished")
     unpublished.add_argument("--manifest", required=True)

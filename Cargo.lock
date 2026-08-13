@@ -226,6 +226,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "etcetera"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de48cc4d1c1d97a20fd819def54b890cadde72ed3ad0c614822a0a433361be96"
+dependencies = [
+ "cfg-if",
+ "windows-sys",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -637,13 +647,15 @@ dependencies = [
 
 [[package]]
 name = "sc-lint"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "clap",
  "dunce",
+ "etcetera",
  "sc-lint-boundary",
  "sc-lint-schema",
  "sc-observability",
+ "semver",
  "serde",
  "serde_json",
  "serial_test",
@@ -652,8 +664,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-lint-analyzer-support"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "proc-macro2",
+ "sc-lint-schema",
+ "serde",
+ "syn",
+]
+
+[[package]]
 name = "sc-lint-attributes"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -663,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-boundary"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -681,7 +705,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-directives"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "quote",
  "syn",
@@ -689,12 +713,11 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-portability"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
- "cargo_metadata",
  "clap",
- "proc-macro2",
+ "sc-lint-analyzer-support",
  "sc-lint-schema",
  "serde",
  "serde_json",
@@ -706,12 +729,11 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-runtime"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
- "cargo_metadata",
  "clap",
- "proc-macro2",
+ "sc-lint-analyzer-support",
  "sc-lint-schema",
  "serde",
  "serde_json",
@@ -722,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "sc-lint-schema"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "serde",
 ]

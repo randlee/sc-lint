@@ -1,7 +1,7 @@
 ---
 id: E.2
 title: Installation And Upgrade Engine
-status: planned
+status: implemented
 branch: feature/phase-E2-install-upgrade-engine
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E2-install-upgrade-engine
 target: integrate/phase-E
@@ -48,21 +48,23 @@ consumer contract usable from a fresh local checkout.
 - all installer failures have stable codes and recovery guidance (`RBP-001`),
   including unsupported platform, unavailable release, checksum mismatch,
   permission failure, and failed post-install version verification.
-- `sc-lint init --just` has one product-owned managed bootstrap asset at
-  `.sc-lint/bootstrap`; it is the only generated executable implementation in
-  a consumer repository. The asset exposes `ensure`, `setup`, and `upgrade`,
-  reads `sc-lint.toml`, and is regenerated/updated only by product commands.
-  Every public Just recipe calls `ensure` before its own work; `setup` may
-  install or upgrade, while `lint` and `test` never proceed after an
-  incompatible/missing-install verdict.
+- `sc-lint init --just` has product-owned managed bootstrap assets at
+  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1`; they are the only
+  generated executable implementations in a consumer repository. The helpers
+  expose `setup`, `lint`, `test`, and `upgrade`, read `sc-lint.toml`, resolve
+  one product binary for every operation, and bootstrap a checksum-verified
+  configured release when none is present. They are regenerated/updated only
+  by product commands. Every public Just recipe delegates to this resolver;
+  `lint` and `test` never proceed after a bootstrap or compatibility failure.
 - `REQ-PRODUCT-020` and CLI docs define the managed bootstrap path, its ownership,
   its SemVer/atomic-install guarantees, and its offline recovery behavior.
 
 ## Canonical Bootstrap Contract
 
 ```text
-.sc-lint/bootstrap ensure  --config sc-lint.toml
 .sc-lint/bootstrap setup   --config sc-lint.toml
+.sc-lint/bootstrap lint    --config sc-lint.toml
+.sc-lint/bootstrap test    --config sc-lint.toml
 .sc-lint/bootstrap upgrade --config sc-lint.toml --check
 ```
 
@@ -105,3 +107,23 @@ consumer contract usable from a fresh local checkout.
 - unit/integration tests using a local release-artifact fixture
 - `cargo fmt --all --check`
 - `cargo clippy --workspace --all-targets -- -D warnings`
+
+## Implementation Record
+
+- `sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]`
+  resolve the canonical minimum version, short-circuit for a compatible newer
+  installation, and otherwise select the release workflow's host archive.
+- release download and `checksums.txt` are staged before extraction; activation
+  is an atomic rename with a retained backup until the activated binary passes
+  the stable `sc-lint --json version` probe. If rollback itself fails, the
+  installer reports `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` with the backup path
+  rather than claiming the prior installation was restored.
+- Windows does not self-replace a running managed `sc-lint.exe`; setup stops
+  before moving files and directs the operator to rerun from a separate release
+  executable. The normal Windows replacement path is verified-release staging,
+  retained backup rename, replacement, and post-install probe.
+- the product-owned bootstrap sources are `crates/sc-lint/assets/bootstrap`
+  and `crates/sc-lint/assets/bootstrap.ps1`; E.3 renders them into the managed
+  consumer paths and owns the Just template.
+- installer failures use the documented `CLI.SC_LINT_*` recovery codes and
+  link to the forthcoming E.4 offline installation guide.

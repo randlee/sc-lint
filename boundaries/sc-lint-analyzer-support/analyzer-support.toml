@@ -1,0 +1,49 @@
+boundary_id = "BOUNDARY-ScLintAnalyzerSupport"
+owner_package = "sc-lint-analyzer-support"
+owner_crate_path = "sc_lint_analyzer_support"
+name = "ScLintAnalyzerSupport"
+
+[public]
+facade = "discover_source_files"
+
+[implementation]
+type = "FileContext"
+module = "sc_lint_analyzer_support"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = [
+  "FileContext",
+  "PackageName",
+  "TargetName",
+  "ScopeKind",
+  "discover_source_files",
+  "count_scanned_crates",
+  "render_findings_report",
+]
+
+[dependencies]
+allowed_dependents = ["sc-lint-portability", "sc-lint-runtime"]
+allowed_dependencies = ["sc-lint-schema"]
+forbidden_edges = [
+  { from = "sc-lint-analyzer-support", to = "sc-lint" },
+  { from = "sc-lint-analyzer-support", to = "sc-lint-boundary" },
+  { from = "sc-lint-analyzer-support", to = "sc-lint-portability" },
+  { from = "sc-lint-analyzer-support", to = "sc-lint-runtime" },
+]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = ["LINT-SC-ANALYZER-SUPPORT-ISOLATION"]
+review_gates = ["rule_neutral_support_only", "no_cross_analyzer_dependencies"]
+
+[status]
+state = "concrete_landed"

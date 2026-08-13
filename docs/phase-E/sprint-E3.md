@@ -1,7 +1,7 @@
 ---
 id: E.3
 title: Consumer CLI And Canonical Just Integration
-status: planned
+status: implemented
 branch: feature/phase-E3-consumer-cli-just
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E3-consumer-cli-just
 target: integrate/phase-E
@@ -59,7 +59,9 @@ consumer path only through the explicit product-owned bootstrap and installed
   complete lint, complete test, and compatibility checking. Product commands
   must not depend on a source checkout's `.just` directory.
 - `sc-lint init` creates/updates only product-owned integration files:
-  `sc-lint.toml`, thin Just integration, and optional CI workflow. It never
+  `sc-lint.toml` and thin Just integration. The optional consumer CI workflow
+  is an E.6 delivery concern because it depends on that sprint's reusable
+  release-verified Action contract. It never
   overwrites a repository README. `sc-lint init --just` is the one-command
   consumer setup path; it is idempotent, reports its managed files, and offers
   `--check`/`--dry-run` before modifying an existing repository.
@@ -84,28 +86,35 @@ consumer path only through the explicit product-owned bootstrap and installed
 ## Canonical Generated Template
 
 ```just
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+
 default: lint
 
-[private]
-_ensure-sc-lint:
-    .sc-lint/bootstrap ensure --config sc-lint.toml
+bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
 setup:
-    .sc-lint/bootstrap setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml
 
-lint: _ensure-sc-lint
-    sc-lint lint ci --config sc-lint.toml
+lint:
+    {{bootstrap_command}} lint --config sc-lint.toml
 
-test: _ensure-sc-lint
-    sc-lint test --config sc-lint.toml
+test:
+    {{bootstrap_command}} test --config sc-lint.toml
 
 upgrade:
-    .sc-lint/bootstrap upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 
 The exact command spelling may be refined during implementation, but the four
-public recipe names, preflight dependency, and no-Cargo-package consumer
+public recipe names, product-owned preflight, and no-Cargo-package consumer
 contract are mandatory.
+
+The generated `.sc-lint/bootstrap` helper is a shell-facing compatibility
+adapter. It delegates to the installed CLI in its default human-readable mode
+and emits the standard recovery message and non-zero status when setup cannot
+proceed, so a shell recipe receives actionable text rather than a raw JSON
+envelope. Direct `sc-lint --json` invocations remain the canonical automation
+contract.
 
 ## This Sprint Does Not Close
 
@@ -115,13 +124,16 @@ contract are mandatory.
   and release packaging
 - replacement of every repository-specific policy script that has not yet been
   productized; such scripts must remain explicitly source-local until migrated
+- consumer CI workflow generation and installation logic; E.6 owns the
+  reusable release-verified Action that makes that workflow viable
 
 ## Paths To Delete
 
 - None from this source repository unless a script becomes fully product-owned
   and its source-maintainer replacement lands in the same change.
 - `sc-lint init --just` must never create `.just/lint_*.py` copies in consumer
-  repositories; the generated `.sc-lint/bootstrap` is the sole managed helper.
+  repositories; the generated `.sc-lint/bootstrap` POSIX helper and
+  `.sc-lint/bootstrap.ps1` Windows companion are the sole managed helpers.
 
 ## Acceptance Criteria
 
@@ -147,3 +159,17 @@ contract are mandatory.
 - generated consumer fixture: `just lint` and `just test`
 - regression test: missing installed backend reports a structured failure, not
   `FileNotFoundError` or a Python traceback
+
+## Implementation Record
+
+- `sc-lint init --just [--check|--dry-run]` owns only `sc-lint.toml`,
+  `Justfile`, `.sc-lint/bootstrap`, and `.sc-lint/bootstrap.ps1`; it reports managed paths, is
+  idempotent, and rejects a conflicting user-owned path without touching a
+  README.
+- Consumer lint and test use the product-owned bootstrap command path, which
+  resolves one compatible product binary before invoking the configured
+  complete profile. Both validate named argv profiles in `sc-lint.toml` and run
+  from that file's directory without source-checkout discovery.
+- The generated Just fixture verifies that every public recipe bootstraps and
+  preflights before profile work. Bootstrap/backend failures return stable
+  recovery codes without a traceback.

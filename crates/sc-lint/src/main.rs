@@ -43,6 +43,12 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
                 .write(error.exit_code());
         }
     };
+    // Standalone consumer probes are deliberately usable from fresh checkouts.
+    // Do not initialize observability: they must not create logs or reports.
+    if context.skips_logging() {
+        let outcome = sc_lint::ExecutionOutcome::run(context, &loaded_config, cli.json);
+        return outcome.rendered.write(outcome.exit_code);
+    }
     let observed = logging::ObservedCommand::from_context(&context, &loaded_config);
     let logger = match logging::initialize_logger(&observed, &cli) {
         Ok(logger) => logger,

@@ -1,7 +1,7 @@
 ---
 id: E.5
 title: Release Distribution And Documentation Package
-status: planned
+status: implemented
 branch: feature/phase-E5-release-documentation-package
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/feature/phase-E5-release-documentation-package
 target: integrate/phase-E
@@ -76,3 +76,23 @@ release layout for release archives and Homebrew.
 - release manifest and archive-content validation
 - generated Homebrew formula syntax and installation-layout test
 - `sc-lint docs --path` and every package lookup against each staged layout
+
+## Implementation Record
+
+- `release/publish-artifacts.toml` now declares the exact `sc-lint-docs`
+  inventory, including the bundle manifest and every operator and package
+  guide. Release tooling rejects files that are missing, unexpected, or absent
+  from the bundle's own manifest.
+- Release archives stage `sc-lint-docs/` beside every declared binary and are
+  validated after compression. Unix packaging disables macOS AppleDouble
+  metadata so the strict declared-file contract is portable.
+- The primary Homebrew formula installs `sc-lint-docs` through its
+  formula-owned `pkgshare`, which resolves at
+  `<prefix>/share/sc-lint/sc-lint-docs`; `sc-lint docs --path` discovers both
+  this layout and the archive layout without a source-checkout fallback.
+- Tests cover exact staging, Windows executable names, compressed archive
+  contents, package-manifest drift, generated formula syntax, Homebrew layout,
+  and source-level path/content assertions for every published package. The
+  compiled binary is exercised only through the CLI's bundle-resolution tests;
+  these sprint tests do not constitute a separate compiled-binary integration
+  suite.

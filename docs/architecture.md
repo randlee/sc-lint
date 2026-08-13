@@ -11,6 +11,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+- [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 
 For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -179,6 +180,17 @@ The top-level CLI should standardize on:
   - `full`
   - `ci`
 
+For consumer repositories, ADR-012 additionally fixes command ownership:
+
+- installed `sc-lint` owns setup, compatibility, complete lint, complete test,
+  and upgrade behavior
+- `sc-lint init --just` writes only product-owned integration files and never
+  a consumer README
+- a generated `Justfile` is a thin interface with four public recipes and a
+  shared private compatibility preflight
+- this repository's root `Justfile` remains the explicit source-maintainer
+  path; no command guesses its mode from a directory or Cargo package
+
 The primary `lint` target surface should preserve backend-crate ownership
 explicitly. Planned primary mappings are:
 
@@ -237,12 +249,15 @@ Allowed shared support:
 
 - `sc-lint-directives`
 - `sc-lint-schema`
+- `sc-lint-analyzer-support` for rule-neutral AST scanning and report rendering
 - future shared support crates only after explicit design approval
 
 For release `0.2.x`, this means:
 
 - `sc-lint-portability` and `sc-lint-runtime` may depend on
-  `sc-lint-directives` when shared directive parsing/types are needed
+  `sc-lint-directives` when shared directive parsing/types are needed, and on
+  `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
+  implementation
 - `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`, and the
   top-level `sc-lint` CLI may depend on `sc-lint-schema` for the canonical
   machine-schema types
@@ -480,6 +495,10 @@ For release `0.2.x`, these repo-local automation/profile surfaces remain
 documented product surfaces but are intentionally out of boundary inventory
 enforcement scope unless later modeled as explicit boundary records.
 
+Consumer repositories do not copy these Python utilities. Their generated
+integration delegates exclusively to installed `sc-lint` and the product-owned
+`.sc-lint/bootstrap` asset as defined by ADR-012.
+
 ## Release Distribution
 
 For release `0.2.x`, release packaging and distributor updates should remain
@@ -512,14 +531,20 @@ Architecture consequences:
 
 Phase E adds two release-distribution consumers to that same manifest-led
 model: the installed documentation bundle and a reusable GitHub Action. The
-Action must resolve only verified release artifacts, expose the resulting
-binary/documentation locations, and invoke the same compatibility and command
-contract as local installation. It must not use `cargo run`, a source checkout,
-or an analyzer package name as a fallback. This architecture realizes
-`REQ-PRODUCT-022`; E.6 will record the detailed Action contract in
-`docs/sc-lint/github-action-requirements.md` and publish an ADR only if the
-Action introduces a distribution decision not covered by this manifest-led
-model.
+root Action is a Node runtime so archive verification and extraction use the
+same implementation on Linux, macOS, and Windows. It resolves only the exact
+versioned release archive and sibling checksum manifest, verifies SHA-256
+before extraction, exposes the binary and `sc-lint-docs` paths, then invokes
+the E.1 compatibility preflight before E.3 consumer setup/lint/test. It must
+not use `cargo run`, a source checkout, a package manager, or an analyzer
+package name as a fallback. Its `v1` major tag identifies the Action interface;
+the explicit product-version input selects the immutable release artifact.
+
+This architecture realizes `REQ-PRODUCT-022`; the detailed input, output,
+provenance, pinning, and recovery contract is in
+`docs/sc-lint/github-action-requirements.md`. No additional ADR is needed:
+the Action is another manifest-led release consumer and introduces no new
+distribution authority.
 
 ## Consumer-Proven Rule Promotion
 
@@ -667,6 +692,8 @@ The architecture should not require:
   - see [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - interface versioning and published artifacts ADR
   - see [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+- consumer adoption and Just contract ADR
+  - see [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 
 ## Architecture Management
 
