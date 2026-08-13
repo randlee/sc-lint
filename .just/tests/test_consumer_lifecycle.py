@@ -276,6 +276,41 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
 
+    @unittest.skipIf(os.name == "nt", "POSIX managed-binary replacement contract")
+    def test_posix_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            managed_binary = managed / self.product_binary.name
+            self.write_old_probe(managed_binary)
+            self.write_release_archive(Path(temporary.name), release / self.product_binary.name)
+            just = shutil.which("just")
+            self.assertIsNotNone(just, "just is required for this fixture")
+
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            command_dirs = [Path("/usr/bin"), Path("/bin"), Path(just).parent]
+            environment["PATH"] = os.pathsep.join(
+                str(path) for path in command_dirs if path.is_dir()
+            )
+
+            with self.release_server(Path(temporary.name)) as release_base:
+                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
+                result = self.run_command([just, "setup"], cwd=consumer, environment=environment)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("verified sc-lint release upgraded", result.stdout)
+            installed = self.run_command(
+                [str(managed_binary), "--json", "version"],
+                cwd=consumer,
+                environment=environment,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+
     @unittest.skipUnless(os.name == "nt", "Windows managed-binary replacement contract")
     def test_windows_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
         temporary, release, consumer = self.make_release_fixture()

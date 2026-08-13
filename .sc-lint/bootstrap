@@ -51,6 +51,8 @@ resolve_product_binary() {
 }
 
 bootstrap_install() {
+    command="$1"
+    shift
     version="$(minimum_version)"
     [ -n "$version" ] || {
         printf '%s\n' "setup: could not read minimum_version from $config (CLI.SC_LINT_CONFIG_MALFORMED)" >&2
@@ -89,8 +91,8 @@ bootstrap_install() {
         printf '%s\n' "setup: SHA-256 verification failed for $archive (CLI.SC_LINT_RELEASE_CHECKSUM_MISMATCH)" >&2
         exit 4
     }
-    if ! mkdir -p "$staging/extract" "$install_dir"; then
-        printf '%s\n' "setup: could not create managed install directory (CLI.SC_LINT_INSTALL_PERMISSION_DENIED)" >&2
+    if ! mkdir -p "$staging/extract"; then
+        printf '%s\n' "setup: could not create release launcher directory (CLI.SC_LINT_INSTALL_PERMISSION_DENIED)" >&2
         exit 4
     fi
     if ! tar -xzf "$staging/$archive" -C "$staging/extract"; then
@@ -101,19 +103,29 @@ bootstrap_install() {
         printf '%s\n' "setup: release archive did not contain sc-lint (CLI.SC_LINT_RELEASE_UNAVAILABLE)" >&2
         exit 4
     }
-    if ! mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new" || ! chmod +x "$install_dir/.sc-lint-new" || ! mv "$install_dir/.sc-lint-new" "$managed_binary"; then
-        printf '%s\n' "setup: could not activate verified release (CLI.SC_LINT_INSTALL_ACTIVATION_FAILED)" >&2
-        exit 4
-    fi
-    product_binary="$managed_binary"
-    printf '%s\n' "setup: verified sc-lint $version installed at $managed_binary"
+    # The extracted release is only a launcher. Its Rust installer owns the
+    # managed-target backup, activation, rollback, and version verification.
+    "$staging/extract/sc-lint" --config "$config" "$command" "$@"
 }
 
 ensure_product() {
     resolve_product_binary
-    [ -n "$product_binary" ] || bootstrap_install
+    if [ -z "$product_binary" ]; then
+        bootstrap_install setup "$@"
+        product_binary="$managed_binary"
+    fi
     if "$product_binary" --config "$config" compatibility check --binary "$product_binary"; then return; fi
-    "$product_binary" --config "$config" setup
+    if [ "$product_binary" = "$managed_binary" ]; then
+        for argument in "$@"; do
+            if [ "$argument" = "--dry-run" ]; then
+                "$product_binary" --config "$config" setup "$@"
+                return
+            fi
+        done
+        bootstrap_install setup "$@"
+    else
+        "$product_binary" --config "$config" setup
+    fi
     [ -x "$managed_binary" ] && product_binary="$managed_binary"
 }
 
@@ -132,7 +144,19 @@ case "$operation" in
         ;;
     upgrade)
         resolve_product_binary
-        [ -n "$product_binary" ] || bootstrap_install
+        if [ -z "$product_binary" ]; then
+            bootstrap_install upgrade "$@"
+            exit $?
+        fi
+        if ! "$product_binary" --config "$config" compatibility check --binary "$product_binary" && [ "$product_binary" = "$managed_binary" ]; then
+            for argument in "$@"; do
+                if [ "$argument" = "--check" ] || [ "$argument" = "--dry-run" ]; then
+                    exec "$product_binary" --config "$config" upgrade "$@"
+                fi
+            done
+            bootstrap_install upgrade "$@"
+            exit $?
+        fi
         exec "$product_binary" --config "$config" upgrade "$@"
         ;;
 esac

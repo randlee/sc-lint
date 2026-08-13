@@ -84,6 +84,11 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn('[Array]::IndexOf($Rest, "--config")', contents)
         self.assertNotIn('[Array]::IndexOf($args, "--config")', contents)
 
+    def test_posix_bootstrap_leaves_managed_activation_to_the_rust_installer(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
+        self.assertIn('"$staging/extract/sc-lint" --config "$config" "$command" "$@"', contents)
+        self.assertNotIn('mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new"', contents)
+
     def test_root_helpers_match_the_generated_product_assets(self) -> None:
         generated_posix = (
             "#!/bin/sh\n"
