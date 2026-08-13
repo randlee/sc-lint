@@ -58,7 +58,7 @@ required = true
 publish = true
 publish_order = 3
 preflight_check = "locked"
-wait_after_publish_seconds = 0
+wait_after_publish_seconds = 15
 verify_install = false
 
 [[crates]]
