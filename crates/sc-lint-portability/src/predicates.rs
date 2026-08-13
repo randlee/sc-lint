@@ -13,11 +13,11 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 
 use crate::RuleId;
-use crate::source_scan::ScopeKind;
-use crate::source_scan::classify_scope;
-use crate::source_scan::item_attrs;
-use crate::source_scan::item_identifier;
-use crate::source_scan::item_name_hint_is_tests;
+use sc_lint_analyzer_support::ScopeKind;
+use sc_lint_analyzer_support::classify_scope;
+use sc_lint_analyzer_support::item_attrs;
+use sc_lint_analyzer_support::item_identifier;
+use sc_lint_analyzer_support::item_name_hint_is_tests;
 
 /// Shell command names intentionally covered by PORT-009.
 pub(crate) const UNIX_SHELL_COMMANDS: &[&str] = &["sh", "bash"];
