@@ -23,6 +23,10 @@ All notable changes to sc-lint are documented here.
 - **Dogfood consumer contract fixtures** (E.7) — the root repository is the
   executable model, with cross-platform release-binary fixtures covering
   setup, lint, test, docs discovery, and safe upgrade migration.
+- **New shared analyzer support crate** — `sc-lint-analyzer-support` is
+  published for the first time in this release, providing the shared
+  `source_scan.rs` and `render.rs` implementation extracted to close the
+  Phase E `ARCH-001` duplication finding.
 
 ### Changes
 
@@ -36,7 +40,8 @@ All notable changes to sc-lint are documented here.
 ### Version
 
 Workspace bumped from `0.4.0` → `0.5.0`. `[workspace.package].version`, the
-three pinned internal `[workspace.dependencies]` versions, and `Cargo.lock`
+four pinned internal `[workspace.dependencies]` versions (`sc-lint-boundary`,
+`sc-lint-directives`, `sc-lint-schema`, and `sc-lint-analyzer-support`), and `Cargo.lock`
 are all synchronized at `0.5.0`.
 
 ---
