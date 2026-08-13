@@ -92,6 +92,28 @@ class LintScBoundaryTests(unittest.TestCase):
             self.assertTrue(build_report_mock.called)
             print_report_mock.assert_called_once()
 
+    @mock.patch("lint_sc_boundary.print_report")
+    @mock.patch("lint_sc_boundary.build_report")
+    @mock.patch("lint_sc_boundary.subprocess.run")
+    def test_run_reports_invalid_json_as_failure(
+        self,
+        subprocess_run_mock: mock.Mock,
+        build_report_mock: mock.Mock,
+        print_report_mock: mock.Mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+            subprocess_run_mock.return_value = mock.Mock(returncode=0, stdout="not json", stderr="")
+            build_report_mock.return_value = mock.Mock(log_path=repo_root / ".just/logs/example.log")
+
+            self.assertEqual(run(repo_root), 1)
+            self.assertEqual(
+                build_report_mock.call_args.kwargs["summary"],
+                "sc-lint-boundary returned invalid JSON",
+            )
+            print_report_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
