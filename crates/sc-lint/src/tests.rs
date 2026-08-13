@@ -584,6 +584,7 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
     )
     .expect("generate fixture");
     let bootstrap = fixture.path().join(".sc-lint/bootstrap.ps1");
+    let missing_binary = fixture.path().join("sc-lint-definitely-missing.exe");
     let output = ProcessCommand::new("pwsh")
         .args([
             "-NoLogo",
@@ -595,7 +596,7 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
             "sc-lint.toml",
         ])
         .current_dir(fixture.path())
-        .env("SC_LINT_BIN", "sc-lint-definitely-missing")
+        .env("SC_LINT_BIN", &missing_binary)
         .env("SC_LINT_RELEASE_BASE_URL", "http://127.0.0.1:9/unavailable")
         .output()
         .expect("run Windows bootstrap");

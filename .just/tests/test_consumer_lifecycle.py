@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import hashlib
 import http.server
+import json
 import tarfile
 import threading
 import unittest
@@ -189,10 +190,10 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 f'minimum_version = "{VERSION}"\n\n'
                 "[[tool.sc-lint.lint]]\n"
                 'name = "release-version-probe"\n'
-                f'command = ["{self.product_binary}", "--json", "version"]\n\n'
+                f"command = {json.dumps([str(self.product_binary), '--json', 'version'])}\n\n"
                 "[[tool.sc-lint.test]]\n"
                 'name = "release-version-probe"\n'
-                f'command = ["{self.product_binary}", "--json", "version"]\n',
+                f"command = {json.dumps([str(self.product_binary), '--json', 'version'])}\n",
                 encoding="utf-8",
             )
             published = self.write_release_archive(Path(temporary.name), self.product_binary)
