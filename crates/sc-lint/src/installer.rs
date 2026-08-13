@@ -1087,11 +1087,10 @@ mod tests {
         let install_dir = fixture.path().join("managed");
         fs::create_dir_all(&install_dir).expect("managed directory");
         let _environment = InstallerEnvironment::set(&[(INSTALL_DIR_ENV, install_dir.as_os_str())]);
-        let current = Version::parse(env!("CARGO_PKG_VERSION")).expect("package version");
-
+        let package_version = Version::parse(env!("CARGO_PKG_VERSION")).expect("package version");
         // No managed binary: setup's dry-run follows the real dispatch path,
         // and compatibility check proves the structured missing-binary path.
-        write_consumer_config(&config_path, &current);
+        write_consumer_config(&config_path, &package_version);
         let missing = execute_install_command(&config_path, &["setup", "--dry-run"]);
         assert_eq!(missing["status"], "dry_run");
         let missing_path = fixture.path().join(ReleaseTarget::binary_name());
@@ -1109,10 +1108,14 @@ mod tests {
 
         // The built CLI is a native executable on each CI host, so all three
         // version states exercise the actual installer command path without a
-        // Unix shell fixture or platform-specific permission assumptions.
+        // Unix shell fixture or platform-specific permission assumptions. CI
+        // may reuse a cached executable from a preceding workspace build, so
+        // derive the compatible floor from the binary we actually copied
+        // rather than assuming it is this test crate's package version.
         let built_binary = built_cli_binary();
         let managed_binary = install_dir.join(ReleaseTarget::binary_name());
         fs::copy(&built_binary, &managed_binary).expect("copy native CLI probe");
+        let current = probe_version(&managed_binary).expect("probe copied native CLI");
 
         let mut old_floor = current.clone();
         old_floor.patch += 1;
