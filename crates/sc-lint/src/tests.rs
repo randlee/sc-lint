@@ -584,7 +584,9 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
     )
     .expect("generate fixture");
     let bootstrap = fixture.path().join(".sc-lint/bootstrap.ps1");
-    let missing_binary = fixture.path().join("sc-lint-definitely-missing.exe");
+    let record = fixture.path().join("calls.txt");
+    let binary = fixture.path().join("sc-lint.cmd");
+    fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
     let output = ProcessCommand::new("pwsh")
         .args([
             "-NoLogo",
@@ -596,14 +598,20 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
             "sc-lint.toml",
         ])
         .current_dir(fixture.path())
-        .env("SC_LINT_BIN", &missing_binary)
-        .env("SC_LINT_RELEASE_BASE_URL", "http://127.0.0.1:9/unavailable")
+        .env("SC_LINT_BIN", &binary)
+        .env("SC_LINT_RECORD", &record)
         .output()
         .expect("run Windows bootstrap");
-    assert!(!output.status.success());
+    assert!(
+        output.status.success(),
+        "bootstrap failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("CLI.SC_LINT_RELEASE_UNAVAILABLE"));
     assert!(!stderr.to_ascii_lowercase().contains("positional parameter"));
+    let calls = fs::read_to_string(&record).expect("calls");
+    assert!(calls.contains("--config sc-lint.toml compatibility check"));
+    assert!(calls.contains("--config sc-lint.toml setup"));
 }
 
 #[test]
