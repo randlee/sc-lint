@@ -28,32 +28,29 @@ default: lint
 
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
-[private]
-_ensure-sc-lint:
-    {{bootstrap_command}} ensure --config sc-lint.toml
-
-setup: _ensure-sc-lint
+setup:
     {{bootstrap_command}} setup --config sc-lint.toml
 
-lint: _ensure-sc-lint
-    sc-lint lint --consumer --config sc-lint.toml ci
+lint:
+    {{bootstrap_command}} lint --config sc-lint.toml
 
-test: _ensure-sc-lint
-    sc-lint test --config sc-lint.toml
+test:
+    {{bootstrap_command}} test --config sc-lint.toml
 
-upgrade: _ensure-sc-lint
+upgrade:
     {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 
 The `bootstrap_command` expression dispatches to the product-owned PowerShell
 companion on Windows and to the POSIX helper elsewhere.
 
-`setup` installs the configured floor, `lint` and `test` preflight before
-running complete profiles, and `upgrade` safely moves the managed installation
-forward. The private preflight is shared by every work recipe. When a binary is
-too old, `ensure` delegates to `sc-lint setup`; if no compatible release is
-available it preserves the structured installer recovery instead of running a
-profile.
+`setup` installs the configured floor when no product binary is present, then
+preflights it. `lint` and `test` use the same resolver before running complete
+profiles, and `upgrade` safely moves the managed installation forward. A
+configured `SC_LINT_BIN`, managed installation, or `PATH` binary is always
+used consistently for every operation. When none is available, the helper
+downloads the configured release archive and verifies its SHA-256 manifest
+entry before activation; it never runs a profile before that succeeds.
 
 ## Consumer and source-maintainer modes
 
@@ -69,6 +66,8 @@ installation; generated consumer recipes perform the real operation.
 
 ## One-command path
 
-For a new consumer repository, run `sc-lint init --just` and then `just setup`.
-The bootstrap helper delegates to the installed product and supports only
-`ensure`, `setup`, and `upgrade`.
+For a new consumer repository, install the product once using the supported
+package or release archive, run `sc-lint init --just`, and commit the generated
+files. On every later clean checkout, `just setup` is the no-prior-binary path:
+it downloads and verifies the configured release automatically. The bootstrap
+helper supports `setup`, `lint`, `test`, and `upgrade`.

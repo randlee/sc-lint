@@ -9,7 +9,7 @@ machine-readable error. The human form includes the same recovery guidance.
 | --- | --- | --- |
 | `CLI.SC_LINT_CONFIG_MISSING` | `sc-lint.toml` or its tool section is absent | Run `sc-lint init --just`, then edit the minimum version. |
 | `CLI.SC_LINT_CONFIG_MALFORMED` | The minimum version or profile shape is invalid | Fix the named field and rerun `sc-lint compatibility check`. |
-| `CLI.SC_LINT_BINARY_NOT_FOUND` | The configured product binary is unavailable | Run `just setup` or install a verified release. |
+| `CLI.SC_LINT_BINARY_NOT_FOUND` | A direct product command could not resolve the configured binary | Use `just setup` to install the configured verified release, or set `SC_LINT_BIN` to a compatible executable. |
 | `CLI.SC_LINT_BINARY_EXECUTION_FAILED` | The binary could not execute | Check permissions/platform and reinstall with `just setup`. |
 | `CLI.SC_LINT_VERSION_PROBE_MALFORMED` | The version probe was not the stable schema | Replace the binary with a matching release. |
 | `CLI.SC_LINT_VERSION_UNPARSABLE` | The observed version is not SemVer | Reinstall a supported release. |
@@ -39,6 +39,23 @@ user-owned `Justfile`, `sc-lint.toml`, `.sc-lint/bootstrap`, or
 files produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
 conflicting file or reconcile it with [the canonical guide](./just-setup.md),
 then rerun initialization.
+
+## Clean-machine bootstrap
+
+After a repository has committed its generated `sc-lint.toml`, `Justfile`, and
+`.sc-lint` helpers, a fresh machine needs only:
+
+```sh
+just setup
+just lint
+```
+
+The helpers resolve `SC_LINT_BIN`, the managed install, and `PATH` in that
+order. If none exists, `just setup` downloads the exact configured release and
+verifies its SHA-256 checksum before activation. A failed download or checksum
+does not run lint/test; follow the reported release code above. Set
+`SC_LINT_INSTALL_DIR` to a writable directory when the default managed
+location is unsuitable.
 
 ## Getting a diagnostic
 

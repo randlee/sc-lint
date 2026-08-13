@@ -22,11 +22,13 @@ contract and is not an input to this decision.
    `cargo run -p`, an analyzer package name, or copied `.just/*.py` scripts.
 2. `just` is the thin consumer interface. A generated consumer `Justfile` has
    exactly four public recipes: `setup`, `lint`, `test`, and `upgrade`; each
-   depends on the same private `_ensure-sc-lint` preflight.
-3. The generated preflight calls the product-owned
-   `.sc-lint/bootstrap ensure --config sc-lint.toml` on POSIX and the
+   delegates to one product-owned bootstrap resolver.
+3. The generated resolver calls the product-owned
+   `.sc-lint/bootstrap <operation> --config sc-lint.toml` on POSIX and the
    product-owned `.sc-lint/bootstrap.ps1` companion on Windows. These are the
-   only generated executable helpers and delegate to installed `sc-lint`.
+   only generated executable helpers. They resolve `SC_LINT_BIN`, the managed
+   binary, and `PATH` consistently; when none exists, `setup` installs the
+   verified configured release before product work starts.
 4. `sc-lint init --just` is the one-command consumer integration path. It
    creates or updates only `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`,
    and `.sc-lint/bootstrap.ps1`; it never writes a consumer `README.md` and
@@ -50,20 +52,16 @@ default: lint
 
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
-[private]
-_ensure-sc-lint:
-    {{bootstrap_command}} ensure --config sc-lint.toml
-
-setup: _ensure-sc-lint
+setup:
     {{bootstrap_command}} setup --config sc-lint.toml
 
-lint: _ensure-sc-lint
-    sc-lint lint --consumer --config sc-lint.toml ci
+lint:
+    {{bootstrap_command}} lint --config sc-lint.toml
 
-test: _ensure-sc-lint
-    sc-lint test --config sc-lint.toml
+test:
+    {{bootstrap_command}} test --config sc-lint.toml
 
-upgrade: _ensure-sc-lint
+upgrade:
     {{bootstrap_command}} upgrade --config sc-lint.toml
 ```
 

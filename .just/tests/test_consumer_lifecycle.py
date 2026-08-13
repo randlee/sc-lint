@@ -6,9 +6,13 @@ import shutil
 import subprocess
 import tempfile
 import hashlib
+import http.server
 import tarfile
+import threading
 import unittest
 import zipfile
+from contextlib import contextmanager
+from functools import partial
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -73,6 +77,25 @@ class ConsumerLifecycleTests(unittest.TestCase):
             capture_output=True,
             check=False,
         )
+
+    @staticmethod
+    @contextmanager
+    def release_server(root: Path):
+        class QuietHandler(http.server.SimpleHTTPRequestHandler):
+            def log_message(self, format: str, *args: object) -> None:
+                return
+
+        server = http.server.ThreadingHTTPServer(
+            ("127.0.0.1", 0), partial(QuietHandler, directory=str(root))
+        )
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}"
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
 
     def initialize_rust_consumer(self, release: Path, consumer: Path) -> dict[str, str]:
         environment = self.fixture_environment(release)
@@ -156,20 +179,49 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 self.assertEqual(resolved.returncode, 0, f"{guide}: {resolved.stderr}")
                 self.assertIn("sc-lint-docs", resolved.stdout)
 
-    def test_missing_binary_stops_lint_and_test_before_profiles(self) -> None:
+    def test_cold_start_bootstrap_installs_a_verified_release_then_lints(self) -> None:
         temporary, release, consumer = self.make_release_fixture()
         with temporary:
-            environment = self.initialize_rust_consumer(release, consumer)
-            environment["SC_LINT_BIN"] = str(consumer / "missing-sc-lint")
-            marker = consumer / "profile-ran"
-            for recipe in ("lint", "test"):
-                result = self.run_command(["just", recipe], cwd=consumer, environment=environment)
-                combined = result.stdout + result.stderr
-                self.assertNotEqual(result.returncode, 0, recipe)
-                self.assertIn("CLI.SC_LINT_BINARY_NOT_FOUND", combined)
-                self.assertIn("Run `just setup`", combined)
-                self.assertNotIn("traceback", combined.lower())
-                self.assertFalse(marker.exists(), f"{recipe} profile ran despite failed preflight")
+            self.initialize_rust_consumer(release, consumer)
+            config = consumer / "sc-lint.toml"
+            config.write_text(
+                "[tool.sc-lint]\n"
+                f'minimum_version = "{VERSION}"\n\n'
+                "[[tool.sc-lint.lint]]\n"
+                'name = "release-version-probe"\n'
+                f'command = ["{self.product_binary}", "--json", "version"]\n\n'
+                "[[tool.sc-lint.test]]\n"
+                'name = "release-version-probe"\n'
+                f'command = ["{self.product_binary}", "--json", "version"]\n',
+                encoding="utf-8",
+            )
+            published = self.write_release_archive(Path(temporary.name), self.product_binary)
+            just = shutil.which("just")
+            self.assertIsNotNone(just, "just is required for the consumer fixture")
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment.pop("SC_LINT_RELEASE_BASE_URL", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(Path(temporary.name) / "clean-install")
+            # Keep only OS command directories: this fixture intentionally leaves
+            # every directory containing a preinstalled sc-lint off PATH.
+            command_dirs = [Path("/usr/bin"), Path("/bin")]
+            if os.name == "nt":
+                for command in ("pwsh", "curl"):
+                    resolved = shutil.which(command)
+                    if resolved:
+                        command_dirs.append(Path(resolved).parent)
+            environment["PATH"] = os.pathsep.join(
+                str(path) for path in command_dirs if path.is_dir()
+            )
+            with self.release_server(Path(temporary.name)) as release_base:
+                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
+                setup = self.run_command([just, "setup"], cwd=consumer, environment=environment)
+                self.assertEqual(setup.returncode, 0, setup.stderr)
+                lint = self.run_command([just, "lint"], cwd=consumer, environment=environment)
+                self.assertEqual(lint.returncode, 0, lint.stderr)
+            self.assertTrue(
+                (Path(environment["SC_LINT_INSTALL_DIR"]) / self.product_binary.name).is_file()
+            )
 
     def test_too_old_binary_produces_structured_release_recovery(self) -> None:
         temporary, release, consumer = self.make_release_fixture()

@@ -98,24 +98,18 @@ clean:
 _source-lint target='full':
     {{python_cmd}} .just/run_lint.py {{target}}
 
-# The root model uses a built product binary; generated consumers use their
-# installed release binary through the same command and configuration shape.
-[private]
-_ensure-sc-lint: _source-build
-    .sc-lint/bootstrap ensure --config sc-lint.toml
-
 # Verify the root model's compatible product binary and report setup state.
-setup: _ensure-sc-lint
+setup: _source-build
     .sc-lint/bootstrap setup --config sc-lint.toml --dry-run
 
 # Run every required source lint gate through the consumer contract.
-lint: _ensure-sc-lint
-    {{sc_lint_binary}} lint --consumer --config sc-lint.toml ci
+lint: _source-build
+    .sc-lint/bootstrap lint --config sc-lint.toml
 
 # Run every required source test gate through the consumer contract.
-test: _ensure-sc-lint
-    {{sc_lint_binary}} --config sc-lint.toml test
+test: _source-build
+    .sc-lint/bootstrap test --config sc-lint.toml
 
 # Inspect the managed upgrade path without changing the source checkout.
-upgrade: _ensure-sc-lint
+upgrade: _source-build
     .sc-lint/bootstrap upgrade --config sc-lint.toml --check --dry-run

@@ -51,19 +51,20 @@ consumer contract usable from a fresh local checkout.
 - `sc-lint init --just` has product-owned managed bootstrap assets at
   `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1`; they are the only
   generated executable implementations in a consumer repository. The helpers
-  expose `ensure`, `setup`, and `upgrade`, read `sc-lint.toml`, and are
-  regenerated/updated only by product commands.
-  Every public Just recipe calls `ensure` before its own work; `setup` may
-  install or upgrade, while `lint` and `test` never proceed after an
-  incompatible/missing-install verdict.
+  expose `setup`, `lint`, `test`, and `upgrade`, read `sc-lint.toml`, resolve
+  one product binary for every operation, and bootstrap a checksum-verified
+  configured release when none is present. They are regenerated/updated only
+  by product commands. Every public Just recipe delegates to this resolver;
+  `lint` and `test` never proceed after a bootstrap or compatibility failure.
 - `REQ-PRODUCT-020` and CLI docs define the managed bootstrap path, its ownership,
   its SemVer/atomic-install guarantees, and its offline recovery behavior.
 
 ## Canonical Bootstrap Contract
 
 ```text
-.sc-lint/bootstrap ensure  --config sc-lint.toml
 .sc-lint/bootstrap setup   --config sc-lint.toml
+.sc-lint/bootstrap lint    --config sc-lint.toml
+.sc-lint/bootstrap test    --config sc-lint.toml
 .sc-lint/bootstrap upgrade --config sc-lint.toml --check
 ```
 

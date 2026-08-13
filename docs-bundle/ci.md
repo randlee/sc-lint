@@ -1,17 +1,8 @@
 # Continuous integration
 
-CI should execute the same aggregate contract used locally. A minimal job is:
-
-```yaml
-- run: sc-lint init --just
-- run: just setup
-- run: just lint
-- run: just test
-```
-
-Most repositories generate the integration during onboarding and commit the
-managed files; CI then starts with `just setup`. Pin the release version or
-enforce it with `sc-lint.toml`'s `minimum_version`.
+CI should use the reusable GitHub Action below as its primary integration. It
+uses the same consumer product contract as local `just lint` and `just test`,
+but avoids relying on a previously installed binary.
 
 ## Machine-readable checks
 
@@ -65,6 +56,21 @@ jobs:
 the release without running a profile. It exposes `binary-path`, `docs-path`,
 and `version` outputs, and adds the binary directory to `PATH` for a later
 step.
+
+## Manual Just alternative
+
+Generate and commit the managed files during onboarding. A clean CI runner can
+then use the same documented local sequence without a preinstalled binary:
+
+```yaml
+- run: just setup
+- run: just lint
+- run: just test
+```
+
+`just setup` downloads the configured `minimum_version` release, verifies its
+checksum manifest entry, and activates it before the profile commands run.
+This path is covered by the consumer lifecycle fixture on POSIX and Windows.
 
 ## Pinning, cache, and offline runners
 
