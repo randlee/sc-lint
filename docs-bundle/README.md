@@ -22,6 +22,7 @@ Every published package has a guide, including library-only packages:
 
 - [sc-lint](./packages/sc-lint.md)
 - [sc-lint-attributes](./packages/sc-lint-attributes.md)
+- [sc-lint-analyzer-support](./packages/sc-lint-analyzer-support.md)
 - [sc-lint-boundary](./packages/sc-lint-boundary.md)
 - [sc-lint-directives](./packages/sc-lint-directives.md)
 - [sc-lint-portability](./packages/sc-lint-portability.md)

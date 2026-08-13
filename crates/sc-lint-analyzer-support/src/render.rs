@@ -1,6 +1,11 @@
-use crate::FindingsReport;
+use serde::Serialize;
 
-pub fn render_findings_report(report: &FindingsReport) -> String {
+use sc_lint_schema::FindingsReport;
+
+pub fn render_findings_report<R>(report: &FindingsReport<R>) -> String
+where
+    R: Serialize,
+{
     format!(
         "{} {} status={} scanned_crates={} findings={}",
         report.tool,

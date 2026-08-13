@@ -22,13 +22,13 @@ use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
-use crate::source_scan::FileContext;
-use crate::source_scan::PackageName;
-use crate::source_scan::ScopeKind;
-use crate::source_scan::TargetName;
-use crate::source_scan::classify_scope;
-use crate::source_scan::discover_source_files;
-use crate::source_scan::span_start_line;
+use sc_lint_analyzer_support::FileContext;
+use sc_lint_analyzer_support::PackageName;
+use sc_lint_analyzer_support::ScopeKind;
+use sc_lint_analyzer_support::TargetName;
+use sc_lint_analyzer_support::classify_scope;
+use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::span_start_line;
 
 #[derive(Debug, Clone)]
 struct RuntimeFinding {

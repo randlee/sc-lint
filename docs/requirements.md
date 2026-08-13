@@ -141,6 +141,11 @@ The product should support both:
   they should move into `sc-lint-tokio` when Tokio-specific dependencies or
   semantics justify a dedicated crate.
 
+- `REQ-PRODUCT-004D`
+  `sc-lint-analyzer-support` owns only shared rule-neutral AST source
+  discovery, scope classification, and report rendering. Analyzer rule ids and
+  CLI ownership remain in their dedicated analyzer crates (ADR-013).
+
 - `REQ-PRODUCT-005`
   Generic, non-AST-sensitive utilities may remain Python-based when Rust does
   not materially improve correctness or noise characteristics.

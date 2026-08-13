@@ -664,6 +664,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-lint-analyzer-support"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "proc-macro2",
+ "sc-lint-schema",
+ "serde",
+ "syn",
+]
+
+[[package]]
 name = "sc-lint-attributes"
 version = "0.5.0"
 dependencies = [
@@ -704,9 +716,8 @@ name = "sc-lint-portability"
 version = "0.5.0"
 dependencies = [
  "anyhow",
- "cargo_metadata",
  "clap",
- "proc-macro2",
+ "sc-lint-analyzer-support",
  "sc-lint-schema",
  "serde",
  "serde_json",
@@ -721,9 +732,8 @@ name = "sc-lint-runtime"
 version = "0.5.0"
 dependencies = [
  "anyhow",
- "cargo_metadata",
  "clap",
- "proc-macro2",
+ "sc-lint-analyzer-support",
  "sc-lint-schema",
  "serde",
  "serde_json",
