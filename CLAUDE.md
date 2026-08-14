@@ -51,6 +51,7 @@ Repo-local coordination and review skills:
 - Key teammates:
   - `team-lead`
   - `clint`
+  - `cfast` — Codex development pane; uses the same team identity and task-list routing configuration as `clint`.
   - `quality-mgr`
   - `publisher`
 
