@@ -2,14 +2,6 @@
 identity = "team-lead"
 default_team = "sc-lint"
 
-[[atm.post_send_hooks]]
-recipient = "clint"
-command = ["/Users/randlee/.atm/scripts/atm-nudge-xml-1.py", "clint"]
-
-[[atm.post_send_hooks]]
-recipient = "cfast"
-command = ["/Users/randlee/.atm/scripts/atm-nudge-xml-1.py", "cfast"]
-
 [rmux]
 session = "sc-lint"
 
