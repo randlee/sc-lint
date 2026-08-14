@@ -125,5 +125,6 @@ field and is retained solely for migration diagnostics, not selection.
 
 ## This Sprint Does Not Close
 
-- final conversion of the live `sc-compose` repository; F.5 owns that
-  consumer acceptance proof and any newly exposed product defect.
+- final conversion of either reference consumer; Phase P owns that
+  dual-consumer acceptance proof and returns any newly exposed product defect
+  to F.2/F.4.

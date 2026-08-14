@@ -98,5 +98,6 @@ repository change on its own.
 ## This Sprint Does Not Close
 
 - application of the final plan;
-- supported legacy deletion or sc-compose conversion;
+- supported legacy deletion or reference-consumer conversion; Phase P owns the
+  sc-compose and atm-core qualification/conversion evidence;
 - generated Action workflow validation.

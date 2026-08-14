@@ -156,4 +156,6 @@ until a separate shipped executable/profile contract exists.
 ## This Sprint Does Not Close
 
 - implementation of discovery, the wizard, file mutation, Action changes, or
-  sc-compose conversion; those belong to F.2 through F.5.
+  a reference-consumer conversion; discovery, wizard, mutation, and Action
+  work belong to F.2 through F.5, while Phase P owns sc-compose and atm-core
+  qualification/conversion.

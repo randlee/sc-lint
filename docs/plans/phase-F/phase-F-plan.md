@@ -11,10 +11,12 @@ target: develop
 
 Make adoption of the released `sc-lint` product a guided, reversible product
 operation rather than a consumer-maintained integration project. A new Rust
-repository and an established repository such as `sc-compose` must be able to
-reach the same committed end state without copying `.just` Python utilities,
-writing an installer, selecting analyzer binaries, reconstructing a profile, or
-hand-editing a CI workflow.
+repository and established repositories such as `sc-compose` and `atm-core`
+must be able to reach the same committed end state without copying `.just`
+Python utilities, writing an installer, selecting analyzer binaries,
+reconstructing a profile, or hand-editing a CI workflow. The product is not
+considered proven merely because its own fixtures pass: Phase P owns proof
+against those two real consumer layouts before either adoption PR may merge.
 
 The user-facing entry point is `sc-lint configure`. The MVP is deliberately a
 small, transparent setup assistant: it reads a handful of conventional Rust
@@ -47,8 +49,10 @@ result: it has a release pin in two places, a private installer, copied
 product-adoption defects, not complexity a consumer team should own.
 
 Phase F does **not** add setup code to `sc-compose`. It moves the missing
-conversion capability into `sc-lint`, then proves it by converting
-`sc-compose` as the acceptance consumer.
+conversion capability into `sc-lint`, publishes the released artifact and its
+contract, then hands the artifact to Phase P for dual-reference qualification
+and consumer-owned conversions. A sc-compose-only conversion is not sufficient
+product proof.
 
 ## Locked Product Decisions
 
@@ -149,6 +153,24 @@ The generated recipes call only the installed product. They never invoke a
 source checkout, `cargo run -p sc-lint-*`, an analyzer sibling binary, copied
 Python, or a consumer-local installer.
 
+## Phase F And Phase P Ownership
+
+Phase F owns the product contract, schemas, configuration engine, bounded
+transformers, release artifact, product fixtures, and installed documentation.
+It does not own a production change in either reference consumer.
+
+Phase P owns qualification of that exact released artifact in disposable copies
+of **both** `sc-compose` and `atm-core`, followed by separate consumer-owned
+PRs. P.1 must prove preview, apply, reapply, the four public `just` commands,
+and the operating-system CI matrix for both layouts before P.2 or P.3 begins.
+An unsupported reserved-recipe shape is a product defect returned to Phase F;
+it is never solved by a consumer-local script, manual Justfile edit, or a
+sc-compose-only exception.
+
+Consequently, F.5 prepares the release/documentation handoff and may validate
+product fixtures, but it cannot claim a reference-consumer conversion or close
+the real-consumer proof. The Phase P plan is the authority for that evidence.
+
 ## Sprint Sequence And Dependency Graph
 
 ```text
@@ -156,7 +178,10 @@ F.1 contracts / ADR / requirements
  └─ F.2 shallow context + deterministic JSON plan
      └─ F.3 Python/Wyvern explanatory wizard + Claude Code skill
          └─ F.4 safe Just/config/Action transformers
-             └─ F.5 sc-compose acceptance conversion and release/docs closure
+             └─ F.5 release, documentation, and Phase P qualification handoff
+                 └─ P.1 dual-reference released-artifact qualification
+                     ├─ P.2 sc-compose consumer PR
+                     └─ P.3 atm-core consumer PR
 ```
 
 ### F.1 — Contract And Architecture Foundation
@@ -181,12 +206,13 @@ Implement staged apply/rollback, marked Justfile integration, generated
 config/bootstrap/Action workflow, and only explicitly supported legacy
 migrations.
 
-### F.5 — sc-compose Reference Conversion And Product Closure
+### F.5 — Release, Documentation, And Phase P Qualification Handoff
 
-Use the released product to convert `sc-compose`, delete its obsolete
-0.4-era setup/copy workaround, and prove local/CI behavior across the required
-platforms. Any step that cannot be automated is a Phase F blocker, not a
-sc-compose manual task.
+Publish the product contract and its complete supporting documentation, then
+hand its exact release artifact to Phase P. Phase P—not this phase—uses that
+artifact to qualify and convert `sc-compose` and `atm-core`. Any step that
+cannot be automated in Phase P is a Phase F product defect, not a consumer
+manual task.
 
 ## Required Validation Lanes
 
@@ -218,8 +244,10 @@ sc-compose manual task.
 - an agent can send the equivalent versioned JSON request and receive the same
   stable plan/result schema;
 - fresh and established repository paths are safe, deterministic, and tested;
-- `sc-compose` consumes a released sc-lint path with one version authority and
-  has no copied sc-lint Python/source archive/custom installer workaround;
+- the exact released artifact, schemas, offline documentation, and product
+  fixture evidence are available to Phase P; Phase P must still prove the
+  dual-consumer adoption outcome before a reference-consumer conversion can be
+  claimed;
 - all user/developer/agent/CI instructions describe only the public commands;
 - `just lint` and `just test` are complete configured gates on all supported
   platforms.
