@@ -194,6 +194,18 @@ targets are:
   cross-platform consumer fixtures, `AGENTS.md`, root `README.md`, and
   installed documentation as the maintained executable reference model.
 
+### Phase F
+
+Phase `F` makes consumer adoption a product-owned configuration/replacement
+operation. Its small MVP checks only conventional Rust-repository paths and
+uses a versioned JSON interface for agents plus a Python-launched, schema-driven
+Wyvern wizard for people. The wizard first explains what will be set up,
+including all proposed files and uninspected existing integration. It does not
+perform a deep repository analysis. Later fixture-proven steps preserve
+existing Justfiles through a bounded managed import rather than a whole-file
+replacement, unify config and Action version authority, and use `sc-compose`
+as the reference consumer conversion. See [Phase F plan](../plans/phase-F/phase-F-plan.md).
+
 ### Current code moves required
 
 The current implementation now places the shared portability rule family in

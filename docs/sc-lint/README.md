@@ -30,6 +30,10 @@ Contents:
   portability plan
 - [`phase-D-plan.md`](../plans/phase-D/phase-D-plan.md) — Phase D
   boundary-inventory improvement plan
+- [`phase-F-plan.md`](../plans/phase-F/phase-F-plan.md) — consumer setup
+  automation plan: shallow conventional-path context, JSON-driven and
+  Python/Wyvern-guided explanatory configuration, safe established-repository
+  replacement, and sc-compose reference conversion
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and phase-plan touchpoint guide
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
@@ -111,6 +115,16 @@ Contents:
   sprint
 - [`sprint-D1.md`](../plans/phase-D/sprint-D1.md) — direct workspace package-edge
   enforcement planning sprint
+- [`sprint-F1.md`](../plans/phase-F/sprint-F1.md) — configuration contract,
+  requirements, and ADR sprint
+- [`sprint-F2.md`](../plans/phase-F/sprint-F2.md) — bounded conventional-path
+  context and deterministic configuration-plan sprint
+- [`sprint-F3.md`](../plans/phase-F/sprint-F3.md) — agent JSON, explanatory
+  Python/Wyvern wizard, and Claude Code setup-skill sprint
+- [`sprint-F4.md`](../plans/phase-F/sprint-F4.md) — transactional Just/config/
+  Action transformer sprint
+- [`sprint-F5.md`](../plans/phase-F/sprint-F5.md) — sc-compose reference
+  conversion and product-closure sprint
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for

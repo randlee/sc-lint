@@ -329,6 +329,15 @@ targets are:
   consumer fixtures, `AGENTS.md`, root `README.md`, and installed docs that
   make this repository the executable reference consumer.
 
+Phase `F` is the planned consumer setup-automation line. It turns Phase E's
+empty-repository initializer into a safe replacement/onboarding product for
+both new and established repositories. Its authoritative plan is
+[docs/plans/phase-F/phase-F-plan.md](./plans/phase-F/phase-F-plan.md). The
+planned sequence is F.1 contract/ADR, F.2 bounded conventional-path context
+and deterministic planning, F.3 agent JSON plus the explanatory Python/Wyvern
+wizard and Claude Code skill, F.4 safe Just/config/Action transformation, and
+F.5 `sc-compose` reference conversion.
+
 ## Planning Conventions
 
 - This file tracks project-level phases and priorities.

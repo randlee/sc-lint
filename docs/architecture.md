@@ -12,6 +12,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
+- [docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md](./sc-lint/adr/ADR-014-consumer-configuration-automation.md) (proposed)
 
 For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -190,6 +191,16 @@ For consumer repositories, ADR-012 additionally fixes command ownership:
   shared private compatibility preflight
 - this repository's root `Justfile` remains the explicit source-maintainer
   path; no command guesses its mode from a directory or Cargo package
+
+Phase F's proposed ADR-014 adds an adoption boundary for established consumer
+repositories. Its MVP is a sc-lint-owned Python/Wyvern configuration assistant
+with versioned JSON context/request/plan schemas, not a new Rust repository
+analysis engine. It checks only conventional path presence and explicitly
+labels existing Just/CI content uninspected. Agent JSON and the optional web
+UI produce the same plan. A later bounded, fixture-proven apply path may manage
+an import in an existing Justfile but never replaces consumer-owned content.
+The same configuration's `minimum_version` becomes the single release-
+selection authority for bootstrap and the reusable Action.
 
 The primary `lint` target surface should preserve backend-crate ownership
 explicitly. Planned primary mappings are:

@@ -30,7 +30,11 @@ current planning surface.
   - rule-neutral shared AST scanning/rendering support without analyzer-to-
     analyzer dependencies
 
-## Draft ADRs
+## Proposed ADRs
+
+- [`ADR-014-consumer-configuration-automation.md`](./ADR-014-consumer-configuration-automation.md)
+  - product-owned, JSON-driven and optionally Wyvern-guided configuration and
+    safe established-repository replacement
 
 ## Index Rules
 
