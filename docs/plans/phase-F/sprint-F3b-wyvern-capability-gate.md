@@ -16,9 +16,12 @@ dependency gate, not a request to recreate wizard behavior in sc-lint.
 ## Hard Dependencies
 
 - F.3a accepted UX contract and capability matrix;
-- a Wyvern release that advertises multi-page wizard support. Wyvern 0.1.0 is
-  known insufficient because it ships only blocking `message`, `input`,
-  `markdown`, `question`, and `chrome` dialogs.
+- Wyvern `v0.2.1` (the first published release after the `v0.2.0` tag) is the
+  initial qualification candidate. Its macOS arm64 archive has published SHA-256
+  `5cfbc9d67232976036c7406d04486aaf98811821a78b4c93a0b953761404f510` and
+  contains `wizard` assets plus the wizard HTTP routes. Wyvern 0.1.0 is known
+  insufficient because it ships only blocking `message`, `input`, `markdown`,
+  `question`, and `chrome` dialogs.
 
 ## Exact Targets
 
@@ -29,7 +32,8 @@ dependency gate, not a request to recreate wizard behavior in sc-lint.
 ## Deliverables
 
 - Recorded Wyvern version, release checksum, platform artifact, launch command,
-  and protocol version for Linux, macOS, and Windows.
+  and protocol version for Linux, macOS, and Windows. The starting record is
+  `v0.2.1`; a later release may replace it only by rerunning the full matrix.
 - Automated headless evidence for forward, back, restored data, changed-branch
   forward-history truncation, first-page back disabled, finish, cancel,
   dismiss, timeout, and full-stack result delivery.
