@@ -334,9 +334,11 @@ empty-repository initializer into a safe replacement/onboarding product for
 both new and established repositories. Its authoritative plan is
 [docs/plans/phase-F/phase-F-plan.md](./plans/phase-F/phase-F-plan.md). The
 planned sequence is F.1 contract/ADR, F.2 bounded conventional-path context
-and deterministic planning, F.3 agent JSON plus the explanatory Python/Wyvern
-wizard and Claude Code skill, F.4 safe Just/config/Action transformation, and
-F.5 `sc-compose` reference conversion.
+and deterministic planning, F.3a field-level wizard UX specification, F.3b
+released-Wyvern capability qualification, F.3c agent JSON/skill, F.3d thin
+launcher and pages, F.3e wizard acceptance/docs, F.4 safe Just/config/Action
+transformation, and F.5 release/documentation handoff to Phase P. Phase P—not
+Phase F—qualifies the released artifact on both sc-compose and atm-core.
 
 ## Planning Conventions
 

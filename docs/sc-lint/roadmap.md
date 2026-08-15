@@ -199,12 +199,14 @@ targets are:
 Phase `F` makes consumer adoption a product-owned configuration/replacement
 operation. Its small MVP checks only conventional Rust-repository paths and
 uses a versioned JSON interface for agents plus a Python-launched, schema-driven
-Wyvern wizard for people. The wizard first explains what will be set up,
-including all proposed files and uninspected existing integration. It does not
-perform a deep repository analysis. Later fixture-proven steps preserve
-existing Justfiles through a bounded managed import rather than a whole-file
-replacement, unify config and Action version authority, and use `sc-compose`
-as the reference consumer conversion. See [Phase F plan](../plans/phase-F/phase-F-plan.md).
+Wyvern wizard for people. The wizard begins only after a field-level UX contract
+and a released Wyvern multi-page capability are qualified; Wyvern 0.1's
+single-dialog API is not sufficient. It first explains what will be set up,
+including all proposed files and uninspected existing integration, and does not
+perform a deep repository analysis. Later fixture-proven steps preserve existing
+Justfiles through a bounded managed import rather than a whole-file replacement
+and unify config and Action version authority. Phase P owns qualification and
+conversion of both sc-compose and atm-core. See [Phase F plan](../plans/phase-F/phase-F-plan.md).
 
 ### Current code moves required
 

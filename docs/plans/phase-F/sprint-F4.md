@@ -17,7 +17,8 @@ where safety is enforced, not delegated to the wizard.
 
 - F.1 contracts/ADR-014
 - F.2 typed plan/digest/conflict engine
-- F.3 normalized requests and final-confirmation front end
+- F.3e normalized requests, qualified wizard final-confirmation front end, and
+  cross-adapter equivalence evidence
 - existing Phase E bootstrap, installer, config, documentation, and Action
 
 ## Exact Targets

@@ -1,103 +1,159 @@
 ---
-id: F.3
-title: Agent JSON And Explanatory Wyvern Configuration Wizard
+id: F.3a
+title: Configure Wizard UX Contract And Wyvern Handoff Package
 status: planned
 target: develop
 ---
 
-# Sprint F.3 — Agent JSON And Explanatory Wyvern Configuration Wizard
+# Sprint F.3a — Configure Wizard UX Contract And Wyvern Handoff Package
 
 ## Goal
 
-Expose the F.2 plan through a first-class agent JSON contract and a Wyvern web
-UI that tells a human what sc-lint is about to set up before asking for choices.
-Both routes produce the same schema-valid request JSON; neither can make a
-repository change on its own.
+Write the authoritative, implementation-neutral UX specification that the
+Wyvern team and the sc-lint adapter implement without rediscovering product
+policy. This is specification work only: it creates no launcher, web page, or
+target-repository mutation.
 
 ## Hard Dependencies
 
-- F.1 request/plan/UI contract and ADR-014
-- F.2 bounded context and deterministic plan
-- verified Wyvern 0.1.0 `wyvern-wizard`/`wyvern-host` protocol at the supported
-  pinned interface
+- F.1 accepted configure request/plan/error schemas and ADR-014;
+- F.2 accepted bounded-context and deterministic-plan contract;
+- current reference inputs at `/Users/randlee/Documents/github/sc-compose`
+  and `/Users/randlee/Documents/github/atm-core`, each recorded by commit and
+  copied into disposable fixture/worktree locations before inspection.
 
 ## Exact Targets
 
-- `scripts/sc_lint_configure.py`
-- `scripts/sc_lint_configure_wyvern.py` (new)
-- `schemas/sc-lint-configure-context.schema.json` (new)
-- `schemas/sc-lint-configure-request.schema.json` (new)
-- `.claude/skills/sc-lint-consumer-setup/SKILL.md` (new)
-- `.claude/skills/sc-lint-consumer-setup/references/agent-json.md` (new)
-- configure front-end fixtures/tests
-- `docs-bundle/configuration.md`
-- `docs-bundle/using-sc-lint.md`
-- `docs-bundle/best-practices.md`
-- `docs-bundle/troubleshooting.md`
+- `docs/sc-lint/configure-wizard-ux.md` (new, authoritative handoff)
+- `docs/sc-lint/configure-wizard-fixtures/empty-rust-context.json` (new)
+- `docs/sc-lint/configure-wizard-fixtures/sc-compose-context.json` (new)
+- `docs/sc-lint/configure-wizard-fixtures/atm-core-context.json` (new)
+- `docs/sc-lint/configure-wizard-fixtures/request-recommended.json` (new)
+- `docs/sc-lint/configure-wizard-fixtures/request-existing-conflict.json` (new)
+- `docs/sc-lint/configure-wizard-fixtures/plan-no-write-conflict.json` (new)
+- `docs/sc-lint/configure-wizard-fixtures/README.md` (new)
+- `docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md`
 
 ## Deliverables
 
-- `sc-lint configure --request <path|-> --root <path> --dry-run --json` is the
-  canonical agent path. It accepts a JSON document or stdin, never starts a UI,
-  returns its normalized request and F.2 plan, and has no mutation capability
-  in this MVP.
-- the sc-lint-owned Python launcher starts the verified Wyvern 0.1.0 host/wizard
-  protocol for `--ui wyvern` and waits for its JSON POST result. It remains
-  thin: it passes validated context to the schema-driven dialog and normalizes
-  the submitted JSON; it does not duplicate product planning policy or directly
-  link a Rust Wyvern library. No new Rust wizard binary is introduced.
-- the first wizard page is “What sc-lint will set up.” It shows conventional
-  facts found, the developer commands it will standardize, all proposed files,
-  changes it intentionally will not inspect, and the reasons for each
-  recommendation. Subsequent pages are baseline, boundary, portability,
-  runtime, attributes/directives, consumer command groups, Just integration,
-  CI integration, and final review. Every page shows the current selection,
-  recommendation, rationale, and accept/modify/disable choice.
-- the attributes/directives page describes attribute availability and
-  declarative boundary intent separately from lint execution; it does not
-  fabricate an `sc-lint-attributes` executable profile.
-- the final review renders the F.2 advisory plan, affected paths, uninspected
-  integration, conflicts, version authority, profile commands, and CI choice.
-  It records explicit confirmation for the later F.4 apply operation;
-  cancellation/close/error returns `cancelled` and has no file effects.
-- Wyvern input/output is mapped through a narrow Python adapter with a pinned
-  protocol version, timeout/error handling, and schema validation. The product
-  remains functional when Wyvern is not installed.
-- the Claude Code skill tells an agent how to run bounded context collection,
-  construct/validate the request JSON from repository knowledge, use dry-run,
-  interpret `manual_conflict`, and require an explicit user confirmation before
-  a future apply operation. It never screen-scrapes the UI or invents a probe.
+- A ten-page UX contract: overview, baseline, boundary, portability, runtime,
+  attributes/directives, command groups, Just integration, CI integration, and
+  final review. For every page it names visible fields, default/recommended
+  value, help text, JSON pointer, validation rule, enabled/disabled condition,
+  `Back`/`Next`/`Cancel` label, and the exact next-page branch.
+- A stable layout contract: progress indicator, page title, explanation panel,
+  selection controls, immutable discovered-facts panel, validation/error panel,
+  and a compact pending-change summary. The overview and final review have
+  their own specified layouts; no product copy or interaction is left to a page
+  implementer to invent.
+- State rules: all selected values survive back/forward restoration; a changed
+  branch truncates stale forward pages; cancellation/dismissal returns
+  `cancelled` without writes; final confirmation produces a request/plan only,
+  not apply; unresolved conflict makes the apply confirmation unavailable.
+- A handoff fixture pack with schema-valid, sanitized context/request/plan JSON
+  for an empty Rust repo and for the current sc-compose and atm-core shapes.
+  The README records source checkout paths, baseline commits, fixture-generation
+  command, redaction rules, and expected screenshot/test scenarios.
+- An explicit Wyvern capability matrix that distinguishes required host
+  features from sc-lint-owned domain behavior. Required host features are
+  multi-page page descriptors, browser-history back/forward restoration,
+  conditional next-page branching, opaque per-page data, cancel/dismiss,
+  finish with full stack, local-only serving, and headless deterministic tests.
+  The plan records that released Wyvern 0.1.0 has only single-dialog commands
+  and therefore does not meet this contract.
+
+## Required Contract Samples
+
+The fixture pack must retain these normalized shapes (with actual observed
+facts, not hand-authored guesses). These examples give the Wyvern team stable
+data to render while F.1 finalizes the published schemas:
+
+```json
+{
+  "schema_version": "v1",
+  "context": {
+    "cargo_toml": {"present": true, "kind": "workspace"},
+    "sc_lint_toml": {"present": true},
+    "justfile": {"present": true, "inspected": false},
+    "github_workflows": {"present": true, "inspected": false},
+    "sc_lint_directory": {"present": false}
+  },
+  "source": {
+    "repository": "sc-compose",
+    "root": "/Users/randlee/Documents/github/sc-compose",
+    "baseline_commit": "38cf63a5e1fe68f93be39fbed30315de4e3b620f"
+  }
+}
+```
+
+```json
+{
+  "schema_version": "v1",
+  "context": {
+    "cargo_toml": {"present": true, "kind": "workspace"},
+    "sc_lint_toml": {"present": false},
+    "justfile": {"present": true, "inspected": false},
+    "github_workflows": {"present": true, "inspected": false},
+    "sc_lint_directory": {"present": false}
+  },
+  "source": {
+    "repository": "atm-core",
+    "root": "/Users/randlee/Documents/github/atm-core",
+    "baseline_commit": "b3475b397c544bd43a43fb97f855b6ddb68f01b1"
+  }
+}
+```
+
+```json
+{
+  "schema_version": "v1",
+  "request": {
+    "minimum_version": "0.5.0",
+    "lint_families": {
+      "baseline": {"state": "recommended"},
+      "boundary": {"state": "enabled", "settings": {"inventory": "detect"}},
+      "portability": {"state": "enabled"},
+      "runtime": {"state": "disabled"},
+      "attributes": {"state": "recommended"}
+    },
+    "just": {"mode": "keep_existing"},
+    "ci": {"mode": "keep_existing"}
+  }
+}
+```
+
+The committed fixture JSON redacts local `root` values; the path is retained in
+the fixture README and generation record only. The source paths above are
+planning inputs, never data sent to or rendered by a consumer wizard.
 
 ## Acceptance Criteria
 
-- JSON request and Wyvern answers for the same selections normalize
-  to equal schema-valid request JSON and equal `configure.plan` JSON.
-- each page can be accepted with the recommended value, explicitly modified,
-  or explicitly disabled; an agent can express every equivalent choice in JSON.
-- no family page exposes an analyzer binary name, Cargo package selection,
-  copied script, or shell command string as a consumer-facing requirement.
-- malformed/unknown Wyvern response and unavailable Wyvern produce stable
-  errors with a JSON recovery path.
-- context/request schemas make every UI field and response unambiguous; tests
-  assert the first-page explanation includes detected facts, proposed files,
-  no-write scope, and the standard developer command contract.
-- cancellation and timeout are tested without invoking a real browser; a
-  protocol fixture validates the optional real-Wyvern adapter separately.
-- offline docs explain agent JSON, the page model, each input field, preview,
-  cancellation, and recovery.
+- A Wyvern engineer can implement the wizard without asking what appears on a
+  page, what a choice means, where it is stored, how it is validated, or which
+  navigation result follows it.
+- Every human-visible choice has one JSON representation; every JSON field has
+  a named page and validation/recovery copy. No UI-only policy exists.
+- The fixture pack contains no executable shell text, credentials, local home
+  path, source archive, or copied utility, and reproduces the current consumer
+  facts from the recorded baseline commits.
+- The capability matrix has a testable acceptance case for every required
+  Wyvern feature and labels missing capability as blocking—not a reason for an
+  sc-lint Python state-machine workaround.
+- ADR-014 records that the wizard is capability-gated and that the UX handoff
+  package is the source of page behavior; it does not claim Wyvern 0.1.0 has a
+  released wizard API.
 
 ## Required Validation
 
-- JSON schema/golden-envelope tests
-- Wyvern adapter protocol fixtures, unavailable/exited/timed-out cases
-- cross-adapter request/plan equivalence tests
-- Claude Code skill example/contract validation
+- JSON Schema validation for every fixture and pointer referenced by the UX
+  contract
+- fixture redaction review and deterministic regeneration check
+- Markdown-link validation and a page/field/pointer completeness check
 - `just lint`
 - `just test`
 
 ## This Sprint Does Not Close
 
-- application of the final plan;
-- supported legacy deletion or reference-consumer conversion; Phase P owns the
-  sc-compose and atm-core qualification/conversion evidence;
-- generated Action workflow validation.
+- release qualification or implementation of a Wyvern multi-page host;
+- an sc-lint launcher, HTML/CSS/JS page, or target-repository write;
+- consumer conversion, which remains Phase P work.

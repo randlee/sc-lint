@@ -125,7 +125,7 @@ Phase F extends, rather than reopens, Phase E requirements:
 | `REQ-PRODUCT-020` | configured output uses existing verified setup/upgrade | F.2, F.5 | clean-machine lifecycle fixtures |
 | `REQ-PRODUCT-022` | Action version derives from config; optional workflow patch is safe | F.4, F.5 | Action and workflow fixtures |
 | `REQ-PRODUCT-023` (new) | deterministic configuration/adoption planning and transaction | F.1-F.5 | JSON, conflict, rollback, cross-platform fixtures |
-| `REQ-CLI-025`–`028` (new) | configure command, request schema, plan schema, stable errors | F.1-F.3 | CLI contract and schema tests |
+| `REQ-CLI-025`–`028` (new) | configure command, request schema, plan schema, stable errors | F.1-F.3e | CLI contract and schema tests |
 
 ## Consumer End State
 
@@ -176,12 +176,16 @@ the real-consumer proof. The Phase P plan is the authority for that evidence.
 ```text
 F.1 contracts / ADR / requirements
  └─ F.2 shallow context + deterministic JSON plan
-     └─ F.3 Python/Wyvern explanatory wizard + Claude Code skill
-         └─ F.4 safe Just/config/Action transformers
-             └─ F.5 release, documentation, and Phase P qualification handoff
-                 └─ P.1 dual-reference released-artifact qualification
-                     ├─ P.2 sc-compose consumer PR
-                     └─ P.3 atm-core consumer PR
+     └─ F.3a wizard UX/specification contract
+         └─ F.3b released Wyvern wizard capability gate
+             └─ F.3c agent JSON and setup skill
+                 └─ F.3d thin launcher and page implementation
+                     └─ F.3e wizard acceptance, accessibility, and docs
+                         └─ F.4 safe Just/config/Action transformers
+                             └─ F.5 release, documentation, and Phase P qualification handoff
+                                 └─ P.1 dual-reference released-artifact qualification
+                                     ├─ P.2 sc-compose consumer PR
+                                     └─ P.3 atm-core consumer PR
 ```
 
 ### F.1 — Contract And Architecture Foundation
@@ -194,11 +198,23 @@ ADR-014, and testable mutation semantics before implementation.
 Build the bounded conventional-path observation and no-write JSON plan that
 the wizard presents. It deliberately does not become a repository parser.
 
-### F.3 — JSON And Guided Wyvern Wizard
+### F.3a–F.3e — Fully Specified, Capability-Gated Wyvern Wizard
 
-Expose the plan to agents through JSON and to people through the explanatory,
-schema-driven Wyvern web UI. Add the Claude Code skill that lets an agent run
-the same context-to-JSON-to-preview flow without screen scraping.
+The original overloaded F.3 is split before implementation. F.3a writes the
+field-level UX contract and handoff package; F.3b proves a **released** Wyvern
+wizard capability; F.3c delivers the equivalent agent JSON contract; F.3d
+implements only a thin adapter and static pages; and F.3e validates the human
+experience. Wyvern 0.1.0's single-dialog API is not sufficient evidence for
+this flow. `next`/`back` are adequate only when the released dependency also
+provides browser-history data restoration, branching, cancel/dismiss, finish,
+and headless-test behavior. sc-lint must not replace missing capability with a
+Python state machine or an ad-hoc browser application.
+
+- [F.3a UX contract and Wyvern handoff](sprint-F3.md)
+- [F.3b released Wyvern capability gate](sprint-F3b-wyvern-capability-gate.md)
+- [F.3c agent JSON and setup skill](sprint-F3c-agent-json-and-skill.md)
+- [F.3d thin launcher and page implementation](sprint-F3d-wizard-adapter-and-pages.md)
+- [F.3e wizard acceptance and documentation](sprint-F3e-wizard-acceptance-and-docs.md)
 
 ### F.4 — Safe Integration And CI Replacement Transformers
 
@@ -222,7 +238,9 @@ manual task.
 | Existing Justfile | marked import is idempotent; unrelated recipes and comments are byte-preserved. |
 | Collision/conflict | unknown user-owned `lint`/`test` or CI shapes cause no write and emit typed remediation/patch data. |
 | Agent JSON | valid request, malformed request, unsupported schema, and explicit choices are deterministic without a TTY. |
-| Wizard | the Python/Wyvern dialog and agent JSON yield the same request/plan; every page explains proposed setup and cancellation produces no write. |
+| Wizard UX contract | every page has exact fields, defaults, schema mappings, validation, navigation, copy, and no-write/error states before implementation. |
+| Wizard capability | the pinned released Wyvern artifact proves browser-history restoration, branching, cancel/dismiss, finish, and headless execution; its v0.1 single-dialog mode is not a substitute. |
+| Wizard | the thin Python/Wyvern dialog and agent JSON yield the same request/plan; every page explains proposed setup and cancellation produces no write. |
 | CI | generated Action workflow has exactly one product-version authority and no source/cargo/Python fallback. |
 | sc-compose | supported legacy shape converts without manual edits; old copied scripts and custom source installer are absent afterward. |
 | Safety | injected write/validation failures roll back; no README, arbitrary Justfile text, or unrelated workflow is overwritten. |
@@ -236,6 +254,8 @@ manual task.
 - migration of arbitrary third-party Justfile semantics by destructive rewrite;
 - changing analyzer rule behavior merely because a page exposes it;
 - retaining copied 0.4 source utilities as a fallback after acceptance.
+- implementing a multi-page UI on top of Wyvern 0.1's single-dialog API or
+  recreating Wyvern's history/state management in Python.
 
 ## Phase Exit Criteria
 
