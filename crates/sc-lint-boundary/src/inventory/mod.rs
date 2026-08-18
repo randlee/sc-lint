@@ -59,8 +59,18 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
     }
 
     let planning_path = boundaries_root.join("planning.toml");
-    let planning: types::PlanningMetadata = parse_toml_file(&planning_path)?;
-    validate_planning_metadata(&planning, &planning_path)?;
+    let planning = if planning_path.exists() {
+        let planning: types::PlanningMetadata = parse_toml_file(&planning_path)?;
+        validate_planning_metadata(&planning, &planning_path)?;
+        planning
+    } else {
+        types::PlanningMetadata {
+            planning: types::PlanningHeader {
+                current_sprint: types::SprintId::placeholder_empty_inventory(),
+            },
+            planned_items: BTreeMap::new(),
+        }
+    };
 
     Ok(BoundaryInventory { records, planning })
 }
@@ -128,16 +138,6 @@ fn validate_boundary_path(
         );
     }
 
-    let expected_owner_crate_path = record.owner_package.replace('-', "_");
-    if record.owner_crate_path.as_str() != expected_owner_crate_path {
-        anyhow::bail!(
-            "boundary `{}` declares owner_crate_path `{}` but expected `{expected_owner_crate_path}` from owner_package `{}`",
-            record.boundary_id,
-            record.owner_crate_path,
-            record.owner_package
-        );
-    }
-
     let relative = path.strip_prefix(boundaries_root).with_context(|| {
         format!(
             "boundary file `{}` is outside boundaries root",
@@ -155,16 +155,36 @@ fn validate_boundary_path(
 }
 
 fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> {
-    if record.public.facade.trim().is_empty() {
+    let has_public_surface = [
+        ("public.facade", record.public.facade.as_deref()),
+        ("public.trait", record.public.trait_name.as_deref()),
+    ]
+    .into_iter()
+    .map(|(field, value)| {
+        let value = value.map(str::trim);
+        if value.is_some_and(str::is_empty) {
+            anyhow::bail!(
+                "boundary `{}` in `{}` defines an empty {field}",
+                record.boundary_id,
+                path.display()
+            );
+        }
+        Ok(value.is_some())
+    })
+    .collect::<Result<Vec<_>>>()?
+    .into_iter()
+    .any(|present| present);
+
+    if !has_public_surface {
         anyhow::bail!(
-            "boundary `{}` in `{}` must define a non-empty public.facade",
+            "boundary `{}` in `{}` must define a non-empty public.facade or public.trait",
             record.boundary_id,
             path.display()
         );
     }
 
     match record.implementation.visibility {
-        types::Visibility::Public => {
+        types::Visibility::Public | types::Visibility::Private | types::Visibility::PubCrate => {
             if record
                 .implementation
                 .implementation_type
