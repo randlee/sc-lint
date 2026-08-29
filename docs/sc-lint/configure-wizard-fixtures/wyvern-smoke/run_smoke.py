@@ -27,6 +27,18 @@ EXPECTED_VERSION = "wyvern 0.6.0"
 TIMEOUT_SECONDS = 30
 ROOT = Path(__file__).resolve().parent
 WIZARD = ROOT / "wizard.json"
+PAGE_IDS = (
+    "overview",
+    "baseline",
+    "boundary",
+    "portability",
+    "runtime",
+    "attributes-directives",
+    "command-groups",
+    "just-integration",
+    "ci-integration",
+    "final-review",
+)
 
 
 class SmokeFailure(RuntimeError):
@@ -108,7 +120,11 @@ def stop_process(process: subprocess.Popen[str]) -> None:
 
 
 def descriptor(page_id: str) -> dict[str, str]:
-    return {"id": page_id, "title": page_id.title(), "html": f"pages/{page_id}.html"}
+    return {
+        "id": page_id,
+        "title": page_id.replace("-", " ").title(),
+        "html": f"pages/{page_id}.html",
+    }
 
 
 def state(base: str) -> dict[str, Any]:
@@ -156,35 +172,75 @@ def run_case(binary: Path, name: str, callback: Any) -> dict[str, Any]:
         raise
 
 
+def visible_page_ids(snapshot: dict[str, Any]) -> list[str]:
+    stack = snapshot.get("stack")
+    page = snapshot.get("page")
+    if not isinstance(stack, list) or not isinstance(page, dict):
+        raise SmokeFailure(f"state did not contain a stack and current descriptor: {snapshot}")
+    try:
+        return [frame["page"]["id"] for frame in stack] + [page["id"]]
+    except (KeyError, TypeError) as error:
+        raise SmokeFailure(f"state stack did not preserve page descriptors: {snapshot}") from error
+
+
+def drive_full_journey(base: str) -> dict[str, Any]:
+    """Submit all ten F.3a descriptors using Wyvern's client-driven protocol."""
+    initial = state(base)
+    if visible_page_ids(initial) != [PAGE_IDS[0]]:
+        raise SmokeFailure(f"unexpected initial state: {initial}")
+
+    for position, page_id in enumerate(PAGE_IDS[1:], start=2):
+        data = {"page": page_id, "step": position}
+        status, payload = navigate(
+            base,
+            "next",
+            page_id=page_id,
+            data=data,
+            next_page=page_id,
+        )
+        if status != 200:
+            raise SmokeFailure(f"forward to {page_id} returned HTTP {status}: {payload}")
+
+    completed = state(base)
+    if visible_page_ids(completed) != list(PAGE_IDS):
+        raise SmokeFailure(f"full ten-page descriptor journey was not preserved: {completed}")
+    return completed
+
+
 def case_navigation(binary: Path) -> dict[str, Any]:
     process, base = spawn(binary)
     try:
-        initial = state(base)
-        if initial["page"]["id"] != "overview" or initial["stack"] != []:
-            raise SmokeFailure(f"unexpected initial state: {initial}")
-        status, _ = navigate(base, "next", page_id="baseline", data={"minimum_version": "0.5.0"}, next_page="baseline")
-        if status != 200:
-            raise SmokeFailure(f"forward returned HTTP {status}")
-        status, _ = navigate(base, "next", page_id="review", data={"profile": "recommended"}, next_page="review")
-        if status != 200:
-            raise SmokeFailure(f"second forward returned HTTP {status}")
-        after_forward = state(base)
+        completed = drive_full_journey(base)
         status, _ = navigate(base, "back", data={})
         if status != 200:
-            raise SmokeFailure(f"back to baseline returned HTTP {status}")
+            raise SmokeFailure(f"back to CI integration returned HTTP {status}")
         restored = state(base)
-        if restored["page"]["id"] != "baseline" or restored["page_data"] != {"profile": "recommended"}:
+        if restored["page"]["id"] != "ci-integration" or restored["page_data"] != {
+            "page": "final-review",
+            "step": 10,
+        }:
             raise SmokeFailure(f"back did not restore opaque page data: {restored}")
-        status, _ = navigate(base, "back", data={})
+
+        for _ in range(8):
+            status, _ = navigate(base, "back", data={})
+            if status != 200:
+                raise SmokeFailure(f"branch setup back to overview returned HTTP {status}")
+        if visible_page_ids(state(base)) != [PAGE_IDS[0]]:
+            raise SmokeFailure("back navigation did not return to the initial page")
+
+        status, _ = navigate(
+            base,
+            "next",
+            page_id="final-review",
+            data={"branch": "changed"},
+            next_page="final-review",
+        )
         if status != 200:
-            raise SmokeFailure(f"branch setup back to overview returned HTTP {status}")
-        status, _ = navigate(base, "next", page_id="review", data={"branch": "new"}, next_page="review")
-        if status != 200:
-            raise SmokeFailure(f"branch forward returned HTTP {status}")
+            raise SmokeFailure(f"changed-branch forward returned HTTP {status}")
         branched = state(base)
-        if len(branched["stack"]) != 1 or branched["page"]["id"] != "review":
+        if visible_page_ids(branched) != ["overview", "final-review"]:
             raise SmokeFailure(f"stale forward history was not truncated: {branched}")
-        return {"initial": initial, "forward": after_forward, "restored": restored, "branch": branched}
+        return {"full_journey": completed, "restored": restored, "branch": branched}
     finally:
         stop_process(process)
 
@@ -206,16 +262,18 @@ def case_first_page_back(binary: Path) -> dict[str, Any]:
 
 def case_finish(binary: Path) -> dict[str, Any]:
     def drive(base: str, _: dict[str, Any]) -> None:
-        status, _ = navigate(base, "next", page_id="baseline", data={"minimum_version": "0.5.0"}, next_page="baseline")
-        if status != 200:
-            raise SmokeFailure(f"finish setup returned HTTP {status}")
-        status, _ = navigate(base, "next", page_id="review", data={"profile": "recommended"}, next_page="review")
-        if status != 200:
-            raise SmokeFailure(f"finish second page returned HTTP {status}")
+        drive_full_journey(base)
 
     result = terminal(binary, "finish", {"confirmed": True}, drive)
-    if len(result.get("stack", [])) != 3 or result.get("data") != {"confirmed": True}:
+    stack = result.get("stack", [])
+    if len(stack) != len(PAGE_IDS) or result.get("data") != {"confirmed": True}:
         raise SmokeFailure(f"finish did not deliver full stack: {result}")
+    try:
+        delivered_ids = [frame["page"]["id"] for frame in stack]
+    except (KeyError, TypeError) as error:
+        raise SmokeFailure(f"finish stack did not contain page descriptors: {result}") from error
+    if delivered_ids != list(PAGE_IDS):
+        raise SmokeFailure(f"finish stack did not preserve all ten page IDs: {result}")
     return result
 
 

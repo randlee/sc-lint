@@ -35,22 +35,27 @@ fixture starts the released binary from its extracted archive and talks only
 to that loopback URL. It does not require a browser, network access after the
 asset download, or a Wyvern source checkout.
 
-The F.3a host sample is represented directly as data in `wizard.json` and the
-navigation descriptors sent by the runner:
+`wizard.json` supplies the single initial descriptor. Every subsequent
+descriptor is supplied by the client in `navigate.next`; the v0.6.0 protocol
+has no `pages` array and no declarative `when`/`pointer`/`equals` branch
+conditions:
 
 ```json
 {
-  "pages": [
-    {"id": "overview", "data": {"minimum_version": "0.5.0"}},
-    {"id": "baseline", "when": {"pointer": "/start", "equals": "configure"}}
-  ],
-  "initial_page": "overview"
+  "action": "next",
+  "page_id": "baseline",
+  "data": {"page": "baseline", "step": 2},
+  "next": {
+    "id": "baseline",
+    "title": "Baseline",
+    "html": "pages/baseline.html"
+  }
 }
 ```
 
 Wyvern v0.6.0's wire schema uses one initial `page` descriptor and accepts
-subsequent descriptors in `navigate.next`; the runner uses that published
-schema rather than pretending that the sample is a different wire format.
+subsequent descriptors in `navigate.next`; page sequencing is client-supplied
+while the host preserves history/stack bookkeeping and terminal semantics.
 
 Run one platform qualification locally with:
 
@@ -69,12 +74,12 @@ released 30-second idle timeout and records the non-zero exit plus
 
 | F.3a requirement | Fixture assertion | Verdict |
 | --- | --- | --- |
-| Multi-page descriptors and forward navigation | `forward_back_restore_branch`: overview → baseline → review, with HTTP 200 and the expected page IDs | PASS |
-| Browser-history back navigation | The same case sends `action: back` and the host returns to baseline, then overview | PASS |
-| Opaque page-data restoration | Back to baseline restores `page_data: {"profile":"recommended"}` exactly | PASS |
-| Conditional/changed-branch navigation | A new overview → review branch leaves a one-entry stack; stale baseline history is removed | PASS |
+| Multi-page descriptors and forward navigation | `forward_back_restore_branch` submits all ten stable F.3a descriptors (overview through final-review) and asserts their ordered IDs | PASS |
+| Browser-history back navigation | The same case returns from final-review through the full stack to overview | PASS |
+| Opaque page-data restoration | Back from final-review to CI integration restores the submitted final-review `page_data` exactly | PASS |
+| Changed-branch navigation | A new overview → final-review branch leaves only overview in history; all stale forward frames are removed | PASS |
 | First-page back disabled | `action: back` on the initial page returns HTTP 400 and `WIZARD_AT_FIRST_PAGE` | PASS |
-| Finish result delivery | `finish_full_stack` returns `button: finish`, confirmation data, and all three visited pages | PASS |
+| Finish result delivery | `finish_full_stack` returns `button: finish`, confirmation data, and all ten ordered F.3a frames | PASS |
 | Cancel result delivery | `cancel` returns `button: cancel`, empty data, and an empty stack | PASS |
 | Dismiss result delivery | `dismissed` returns `button: dismissed`, empty data, and the visited stack | PASS |
 | Idle timeout | An undriven session exits non-zero after 30 seconds with stable `SESSION_TIMEOUT_ERROR` evidence | PASS |

@@ -14,6 +14,7 @@ jobs:
             archive: wyvern_0.6.0_x86_64-unknown-linux-gnu.tar.gz
           - os: macos-14
             archive: wyvern_0.6.0_aarch64-apple-darwin.tar.gz
+          # macos-13 was retired; macos-15-intel preserves x86_64 release-artifact coverage.
           - os: macos-15-intel
             archive: wyvern_0.6.0_x86_64-apple-darwin.tar.gz
           - os: windows-latest

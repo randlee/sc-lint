@@ -86,6 +86,15 @@ and agents while still protecting user-owned repository content.
    are not a released wizard API for this purpose; missing host capability is a
    blocker, never permission for a Python state machine workaround.
 
+### Clarification — released Wyvern navigation boundary
+
+F.3b qualifies the released `wizard-http-v1` protocol as one initial page
+descriptor followed by client-supplied descriptors on each navigation request.
+The launcher/client selects the next page ID and builds that descriptor;
+Wyvern preserves the resulting history/stack and terminal semantics. This is a
+clarification of the capability gate only: it does not change this ADR's
+status, the JSON contract authority, or product-policy ownership.
+
 ## CLI Boundary Registration
 
 `configure` is a new public `sc-lint` CLI command family, not an internal

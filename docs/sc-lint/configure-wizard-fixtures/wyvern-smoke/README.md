@@ -1,10 +1,17 @@
 # Wyvern release-artifact smoke fixture
 
 This fixture drives only the public `wyvern-host` HTTP protocol. It does not
-implement wizard navigation in Python: the release artifact owns history,
-branching, terminal semantics, and the session timeout. The harness sends the
-same JSON that a page would send with `fetch` and asserts the release's HTTP
-responses and stdout result.
+implement wizard navigation in Python: the release artifact owns only
+history/stack bookkeeping, terminal semantics, and the session timeout. The
+client supplies page sequencing by choosing each next page ID and constructing
+its descriptor on every `navigate` call; this harness does that explicitly for
+the authoritative ten-page F.3a journey. The harness sends the same JSON that
+a page would send with `fetch` and asserts the release's HTTP responses and
+stdout result.
+
+This division of responsibility is a launcher-design finding for F.3d: its
+client adapter must own page sequencing and descriptor construction; it must
+not assume that the released host selects the next page.
 
 ## Run
 

@@ -49,16 +49,24 @@ listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
 ## Required Host-Protocol Sample
 
 The smoke harness must make the host boundary reviewable as data rather than
-by manually clicking a browser. The qualified release must accept a page
-descriptor equivalent to this and return the documented terminal state:
+by manually clicking a browser. The qualified `wizard-http-v1` release starts
+from one initial `page` descriptor. On every `navigate` call, the **client**
+supplies the descriptor for the next page. The host owns only history/stack
+bookkeeping and terminal semantics; it does not accept a `pages` array or
+select declarative branches through `when`/`pointer`/`equals` conditions. The
+smoke harness therefore submits the ten F.3a page descriptors in order and
+the qualified release must return the documented terminal state:
 
 ```json
 {
-  "pages": [
-    {"id": "overview", "data": {"minimum_version": "0.5.0"}},
-    {"id": "baseline", "when": {"pointer": "/start", "equals": "configure"}}
-  ],
-  "initial_page": "overview"
+  "action": "next",
+  "page_id": "baseline",
+  "data": {"page": "baseline", "step": 2},
+  "next": {
+    "id": "baseline",
+    "title": "Baseline",
+    "html": "pages/baseline.html"
+  }
 }
 ```
 
@@ -66,6 +74,14 @@ The matrix records a result equivalent to `{"status":"finished","stack":[...]}`
 and separate stable `cancelled`, `dismissed`, and `timeout` results. It proves
 back restores opaque data and a changed branch removes stale forward state; the
 harness never compensates for an absent host behavior.
+
+### ADR-014 clarification (non-status)
+
+This qualifies the capability-gated Wyvern boundary described by ADR-014: the
+F.3d launcher/client is responsible for selecting page IDs and constructing
+outgoing descriptors, while Wyvern preserves the submitted navigation stack
+and returns terminal data. This clarification changes no ADR status, public
+schema, or product-policy authority.
 
 ## Acceptance Criteria
 
