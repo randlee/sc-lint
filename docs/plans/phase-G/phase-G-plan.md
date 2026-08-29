@@ -150,7 +150,7 @@ develop (trunk)
  │        └── sprint/G.0-abandon-phase-F   ADR-015, archive F
  │             └── sprint/G.1-adoption-kit
  │                  └── sprint/G.2-adoption-skill
- └─ Stack B — product (owner: cfast)
+ └─ Stack B — product (owner: flint)
      └── sprint/G.3a-python-bindings
           └── sprint/G.3b-self-contained-release
                └── sprint/G.3c-identity-literals-unicode-fix
