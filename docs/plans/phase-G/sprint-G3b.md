@@ -1,6 +1,6 @@
 ---
 id: G.3b
-title: Self-Contained Release And Consumer-Blocking Lint Fixes
+title: Self-Contained Release
 status: planned
 branch: sprint/G.3b-self-contained-release
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.3b-self-contained-release
@@ -11,12 +11,12 @@ owner: flint
 # Owner assignment: clint owns most sprints; cfast takes easy closure/fix work; flint takes the harder parallel Stack B track.
 ---
 
-# Sprint G.3b — Self-Contained Release And Consumer-Blocking Lint Fixes
+# Sprint G.3b — Self-Contained Release
 
 ## Goal
 
 - guarantee the released `sc-lint` archive runs every kit recipe with no
-  source-tree helper, and fix the lint defects consumers currently work around
+  source-tree helper
 
 ## Hard Dependencies
 
@@ -35,7 +35,6 @@ owner: flint
 - `crates/sc-lint/src/dispatch.rs`
 - `crates/sc-lint/src/python_adapter.rs`
 - `crates/sc-lint/src/config.rs`
-- `crates/sc-lint-attributes/src/` (identity-literals unicode-escape parser)
 - `scripts/release_artifacts.py`
 - `.github/workflows/release.yml`
 - `packages/sc-lint-adoption/.sc-lint/bootstrap`, `bootstrap.ps1` (re-sync verbatim from product after G.3a)
@@ -60,10 +59,8 @@ A, and G.3b merges `develop` forward only after G.1 has landed.
   helpers imported from the `sc_lint` wheel (`#84`); no profile entry
   references a source-tree path.
 - No Rust added for configuration: changes under `crates/` are limited to
-  dispatch paths, the parser fix, and `version --json`; a diff adding any
+  dispatch paths and `version --json`; a diff adding any
   module named `configure`, `install`, `setup`, or `template` fails review.
-- identity-literals accepts valid Rust unicode escapes (regression test with
-  `"\u{1F600}"` and `'\u{7}'`).
 - `sc-lint version --json` reports the archive layout (`self_contained: true`).
 - Kit copies of `.sc-lint/bootstrap*` are byte-identical to the product files (`cmp` in CI).
 
@@ -74,6 +71,12 @@ A, and G.3b merges `develop` forward only after G.1 has landed.
 - `grep -rn "\.just/" crates/sc-lint/src` returns nothing outside tests.
 - `git diff --stat develop -- crates/` touches no new module.
 - `#84` closed by the PR.
+
+## Unblock Milestone
+
+Commit the self-contained archive smoke path, including the release artifact
+layout and wheel-only helper invocation. Report that commit immediately; G.3c
+starts from it while G.3b completes release publication, CI, QA, and review.
 
 ## Required Validation
 

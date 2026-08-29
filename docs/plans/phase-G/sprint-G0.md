@@ -15,7 +15,8 @@ owner: cfast
 
 ## Goal
 
-- archive the rejected Phase F line without merging any of its code
+- cfast executes the archival closure for the rejected Phase F line without
+  merging any of its code
 
 ## Hard Dependencies
 
