@@ -83,7 +83,7 @@ logic beyond the G.1 kit.
   layers, and both the skill and adoption guide include a “How to extend”
   section for analyzers, test layers, lint profiles, and consumer-owned recipes
   using `tests/fixtures/adoption/analyzer-worked-example/`.
-- `grep -rEn "command arrays must name a shipped binary or `sc_lint` module only" docs/sc-lint/adoption.md packages/sc-lint-adoption/.claude` finds the required boundary guidance, and no example step argv in those files names a repository-relative path.
+- ``grep -rEn "command arrays must name a shipped binary or `sc_lint` module only" docs/sc-lint/adoption.md packages/sc-lint-adoption/.claude`` finds the required boundary guidance, and no example step argv in those files names a repository-relative path.
 
 ## How To Extend
 
