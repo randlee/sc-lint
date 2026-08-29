@@ -19,7 +19,8 @@ owner: clint
 
 ## Hard Dependencies
 
-- G.1 merged
+- G.1 committed on `sprint/G.1-adoption-kit`; this sprint's PR base is that
+  branch, so implementation may begin before G.1 lands on `develop`.
 - reference form: `../sc-publish/plugins/sc-publish/.claude/skills/publishing/SKILL.md`
   and `.claude/agents/publisher.md`
 - [docs/sc-lint/skill-authoring-constraints.md](../../sc-lint/skill-authoring-constraints.md)
@@ -35,6 +36,13 @@ owner: clint
 - `docs/sc-lint/adoption.md` (new; authoritative consumer guide)
 - `docs/sc-lint/README.md`
 - `README.md` (adoption pointer only)
+
+## Governing Contract
+
+This sprint documents and evaluates the G.1 implementation of
+REQ-PRODUCT-019, REQ-PRODUCT-021, and REQ-PRODUCT-023. It may orchestrate an
+external consumer PR, but it does not add deletion, configuration, or policy
+logic beyond the G.1 kit.
 
 ## Deliverables
 
@@ -70,4 +78,4 @@ owner: clint
 
 ## Out Of Scope
 
-- running the skill against a real consumer (G.4)
+- running the skill against a real consumer (G.4a–G.4c)

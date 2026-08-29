@@ -37,11 +37,12 @@ drift reported as a defect. It is not a Rust engine.
 6. Greenfield and adoption produce an identical end state: the new-repo
    template **is** the kits applied to an empty Cargo workspace.
 7. **No Rust is written for configuration of the tools or for anything
-   repo-specific.** Rust in this repository implements lint analysis and the
-   `sc-lint` CLI only. Installation, templating, repo facts, CI wiring, and
+   repo-specific.** Installation, templating, repo facts, CI wiring, and
    consumer scaffolding are Python, TOML/YAML/Justfile assets, skills, and
-   prompts. A sprint that adds a `configure`-style module to any crate is a
-   Phase G violation. (ADR-016)
+   prompts. The thin maturin bridge in G.3a may expose existing CLI behavior,
+   but it adds no configuration policy or repository logic. A sprint that
+   adds a `configure`-style module to any crate is a Phase G violation.
+   (ADR-016)
 8. Python helpers that consumers run (`.just` recipes, lint runners, version
    sync) ship as a **maturin-built `sc-lint` wheel** pinned by
    `minimum_version`, provisioned by `.sc-lint/bootstrap` — the same
@@ -82,10 +83,28 @@ README.sc-lint.md                     # kit README, renamed on install
 | G.2 | Adoption skill, agent prompts, marketplace entry, docs | skill / docs |
 | G.3a | `sc-lint` Python bindings via maturin, published wheel, bootstrap provisioning | packaging / PyPI |
 | G.3b | Self-contained release: recipes run from wheel + binary only; fix consumer-blocking lint bugs | Rust crates + release |
-| G.4 | First-wave consumer PRs + sc-publish delegation | consumer repos |
+| G.4a | sc-publish delegation | external consumer repository |
+| G.4b | First-wave greenfield qualification (`wyvern`, `atm-core`) | external consumer repositories |
+| G.4c | `sc-compose` migration qualification | external consumer repository |
 | G.5 | Ecosystem rollout | consumer repos (skill only) |
 
-G.4 is the qualification gate; there is no separate proof phase.
+G.4a–G.4c are the qualification gate; there is no separate proof phase. The
+split keeps the sc-publish delegation, low-risk greenfield proof, and the
+existing-scaffolding migration independently reviewable and independently
+closable.
+
+## Requirements And Decision Traceability
+
+| Authority | Phase G application | Owning sprint(s) |
+| --- | --- | --- |
+| REQ-PRODUCT-019 | One SemVer floor, product-owned four-recipe consumer interface, idempotent/non-mutating integration | G.1, G.2, G.4b, G.4c |
+| REQ-PRODUCT-020 | Verified artifact activation, managed bootstrap, and no source-checkout helper copying | G.1, G.3a, G.3b, G.4b, G.4c |
+| REQ-PRODUCT-021 | Offline documentation remains product-owned and discoverable after kit adoption | G.2, G.3b, G.4b, G.4c |
+| REQ-PRODUCT-022 | Reusable verified setup Action is the CI surface installed by the kit | G.1, G.4a, G.4b, G.4c |
+| REQ-PRODUCT-023 (added by G.0) | Versioned adoption kit installs and checks one reusable, drift-detectable consumer end state | G.1–G.2, G.4a–G.5 |
+| REQ-PRODUCT-024 (added by G.0) | Version-matched wheel delivers all consumer-run Python helpers without a source-tree dependency | G.3a–G.3b, G.4b–G.4c |
+| ADR-012 | Four public `just` recipes and product-owned bootstrap ownership | G.0–G.5 |
+| ADR-015 / ADR-016 (created by G.0) | Kit ownership and no-Rust-configuration/wheel-runtime design | G.1–G.5 |
 
 ## Branch Stacks And Parallelism
 
@@ -103,23 +122,33 @@ develop (trunk)
  └─ Stack B — product (owner: cfast)
      └── sprint/G.3a-python-bindings
           └── sprint/G.3b-self-contained-release
+
+External, non-branch delivery closures (not `gh stack` layers):
+  G.4a sc-publish delegation  ─┐
+  G.4b wyvern + atm-core      ─┼─ after the published G.2/G.3b release
+  G.4c sc-compose migration  ─┘  after G.4b qualification merges
+  G.5 remaining-repository rollout after G.4a–G.4c and the approved inventory
 ```
 
-| Runs in parallel | Must be sequential | Why |
-| --- | --- | --- |
-| Stack A and Stack B, from day one | — | disjoint paths: A touches `packages/`, `docs/`, `.claude-plugin/`; B touches `bindings/`, `crates/`, `.just/`, `.sc-lint/bootstrap*`, release workflows |
-| G.1 implementation may start once G.0 is *committed* (not merged) | G.0 → G.1 → G.2 within Stack A | each layer's PR base is the layer below; the reviewer sees only that layer's diff |
-| G.3b may start once G.3a is committed | G.3a → G.3b within Stack B | G.3b runs recipes through the G.3a wheel |
-| G.4 sc-publish delegation PR, as soon as G.1 is committed | — | it only needs the kit action's name and input contract |
-| G.4 `wyvern` and `atm-core` consumer PRs, together | after a `sc-lint` release containing both stacks | greenfield repos, no interaction |
-| — | G.4 `sc-compose` after `wyvern`/`atm-core` prove the kit | it is the only consumer with existing scaffolding to remove (D1) |
-| G.5 all remaining repositories, together | after G.4 merges | skill-only, no product change permitted |
+| Sprint | May run alongside | Must wait for | Exact event that unblocks it |
+| --- | --- | --- | --- |
+| G.0 | G.3a | Phase G planning branch committed | `feature/phase-G-planning` is committed and linked as Stack A's bottom planning layer |
+| G.1 | G.3a | G.0 in Stack A | G.0 is committed on `sprint/G.0-abandon-phase-F`; G.1's PR base is that branch |
+| G.2 | G.3a / independent G.3b work | G.1 in Stack A | G.1 is committed on `sprint/G.1-adoption-kit`; G.2's PR base is that branch |
+| G.3a | G.0–G.2 | none from Stack A | Stack B branch is created from `develop` and committed work may begin immediately |
+| G.3b | G.2 and all non-reconciliation Stack A work | G.3a in Stack B; bootstrap-copy closeout also waits for G.1 to land | G.3a is committed on `sprint/G.3a-python-bindings`; before the G.3b release closes, G.1 has merged to `develop` and that `develop` merge-forward is present in G.3b |
+| G.4a | G.4b | released kit Action and self-contained release | G.2 and G.3b are merged and the versioned release containing both is published |
+| G.4b | G.4a | released adopter skill and self-contained release | G.2 and G.3b are merged and the versioned release containing both is published |
+| G.4c | no product work; G.4a may finish independently | G.4b greenfield qualification | both G.4b consumer PRs merge with their required CI and drift checks green |
+| G.5 | external consumer PRs may run together | all first-wave closures and approved inventory | G.4a, G.4b, and G.4c merge; product owner records the remaining-repository inventory in the rollout table |
 
 Cross-stack touch point: G.1 vendors `.sc-lint/bootstrap*` verbatim from
-`develop`; G.3a modifies those product files. G.3b (above G.3a, and started
-only after Stack A has merged) re-syncs the kit's copy and is the single place
-that reconciles the two. G.3a's acceptance therefore uses `sc-lint init --just`
-on a fresh workspace, not the G.1 fixture.
+`develop`; G.3a modifies those product files. G.3b is the sole reconciliation
+layer: it may begin all product-only work once G.3a is committed, but it may
+not claim release closure until G.1 has merged to `develop`, that merge is
+merged forward into Stack B, and the kit copy is re-synced byte-for-byte. No
+Stack B branch is based on a Stack A branch. G.3a's acceptance therefore uses
+`sc-lint init --just` on a fresh workspace, not the G.1 fixture.
 
 ### Stack protocol
 
@@ -142,8 +171,9 @@ The repository rule is merge-forward, never rebase; `gh stack sync` and
    user's explicit approval per layer; never `gh pr merge`.
 5. After a layer lands, `develop` is merged forward into the remaining
    worktrees of both stacks.
-6. Sprint docs for G.4 and G.5 have no stack: they are PRs in other
-   repositories.
+6. Sprint docs for G.4a–G.5 are explicitly external, non-branch closures:
+   each consumer PR follows its target repository's branch policy and may not
+   change this repository except through a separately planned release fix.
 
 Sprint docs:
 - [sprint-G0.md](./sprint-G0.md)
@@ -151,16 +181,19 @@ Sprint docs:
 - [sprint-G2.md](./sprint-G2.md)
 - [sprint-G3a.md](./sprint-G3a.md)
 - [sprint-G3b.md](./sprint-G3b.md)
-- [sprint-G4.md](./sprint-G4.md)
+- [sprint-G4a.md](./sprint-G4a.md)
+- [sprint-G4b.md](./sprint-G4b.md)
+- [sprint-G4c.md](./sprint-G4c.md)
 - [sprint-G5.md](./sprint-G5.md)
 
 ## Decisions Required Before G.1 Dispatch
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
-| D1 | Uniform `just lint` vs sc-compose's `sc-compose lint` wrapper | `just lint` calls `.sc-lint/bootstrap lint` directly. `sc-compose lint` keeps only its native `template-contracts` target; the sc-lint-forwarding targets in `.sc/sc-lint/targets/*.toml` are removed in the sc-compose consumer PR (G.4). |
+| D1 | Uniform `just lint` vs sc-compose's `sc-compose lint` wrapper | `just lint` calls `.sc-lint/bootstrap lint` directly. `sc-compose lint` keeps only its native `template-contracts` target; the sc-lint-forwarding targets in `.sc/sc-lint/targets/*.toml` are removed in the sc-compose consumer PR (G.4c). |
 | D2 | Kit location | `packages/sc-lint-adoption/` in this repository (sibling of `packages/sc-lint-version-adoption`), vendored into consumers as `plugins/sc-lint/`. |
 | D3 | New-repo template home | Out of scope for Phase G; G.1's empty-repo fixture is built so it can be promoted to the template unchanged. |
+| D4 | Remaining-repository inventory | Before G.5 dispatch, product owner records the exact Rust-repository list and exclusions in `docs/sc-lint/adoption.md`; G.5 does not infer membership from local directories or GitHub search. |
 
 ## Exit Criteria
 

@@ -28,21 +28,24 @@ owner: clint
 - `docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md` (new)
 - `docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md` (new)
 - `docs/sc-lint/adr/README.md`
+- `docs/requirements.md`
+- `docs/architecture.md`
 - `docs/project-plan.md`
 - `docs/phase-E/phase-E-plan.md` (status only)
 - `docs/plans/phase-G/*` (this plan set, merged to develop)
 
 ## Deliverables
 
-- ADR-015 with Status `Accepted`, recording: the six locked principles from
+- ADR-015 with Status `Accepted`, recording: the eight locked principles from
   the phase plan; that ADR-014 is rejected and never merged; the kit form
   (`packages/sc-lint-adoption` → consumer `plugins/sc-lint`); the sc-publish
   delegation rule for sc-lint setup.
 - ADR-016 with Status `Accepted`, recording three linked decisions and their
-  consequences: (a) **no Rust for configuration** — Rust in this repository
-  implements lint analysis and the `sc-lint` CLI only; installation,
-  templating, repo facts, CI wiring, and consumer scaffolding are Python,
-  declarative assets, skills, and prompts; (b) **the `sc-lint` Python wheel is
+  consequences: (a) **no Rust for configuration** — installation, templating,
+  repo facts, CI wiring, and consumer scaffolding are Python, declarative
+  assets, skills, and prompts. A thin maturin bridge may expose existing CLI
+  behavior but adds no configuration policy or repository logic; (b) **the
+  `sc-lint` Python wheel is
   the runtime delivery for every consumer helper** — built with maturin, pinned
   by `sc-lint.toml` `minimum_version`, provisioned into `.sc-lint/venv` by
   `.sc-lint/bootstrap setup`, replacing every copied `.just/*.py`; (c) **the
@@ -53,6 +56,12 @@ owner: clint
   reference only a shipped binary or a `sc_lint` module.
 - `docs/project-plan.md` links Phase G and marks Phase F abandoned with a
   one-line reason and the archive tag name.
+- `docs/requirements.md` adds REQ-PRODUCT-023 (versioned reusable adoption
+  kit with idempotent install and non-mutating drift detection) and
+  REQ-PRODUCT-024 (version-matched wheel delivery for every consumer-run
+  Python helper, with no source-tree helper dependency).
+- `docs/architecture.md` links ADR-015 and ADR-016 from its consumer-adoption
+  and repo-local-automation sections; the ADRs remain the detailed authority.
 - `docs/phase-E/phase-E-plan.md` frontmatter status changed to `implemented`
   (PR #104 merged).
 - Git housekeeping performed by team-lead, recorded in the PR description:
@@ -66,6 +75,8 @@ owner: clint
   both and each Status table row is `Accepted`.
 - ADR-016 contains a fenced code block showing the resolution sequence and
   the four one-line recipes; `docs/sc-lint/adr/README.md` lists both ADRs.
+- `rg -n "REQ-PRODUCT-023|REQ-PRODUCT-024" docs/requirements.md` returns the
+  two new requirement records, and `docs/architecture.md` links both ADRs.
 - `grep -c "phase-F" docs/project-plan.md` ≥ 1 and the line contains
   `abandoned`.
 - `git tag -l archive/phase-F` prints the tag; `git worktree list` shows no

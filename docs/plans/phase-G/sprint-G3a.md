@@ -21,7 +21,9 @@ owner: cfast
 ## Hard Dependencies
 
 - none from Stack A; runs in parallel with G.0–G.2 (Stack B, base `develop`)
-- [ADR-016](../../sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md) (G.0)
+- Phase G's ADR-016 design decision as recorded in the phase plan. G.0
+  formalizes that ADR independently on Stack A; G.3a has no Stack A branch
+  dependency and must not wait for its commit or merge.
 - reference: `../sc-publish/plugins/sc-publish/.github/scripts/bootstrap_sc_compose.py`
   and `../sc-compose/bindings/` (existing maturin layout in the ecosystem)
 - `sc-publish` PyPI channel (`pypi-publish.yml`) already vendored here
@@ -43,6 +45,28 @@ owner: cfast
 - `.github/workflows/release.yml` (wheel matrix: Linux x86_64, macOS x86_64/arm64, Windows x86_64; abi3)
 - `docs/sc-lint/python-bindings.md` (new)
 - `Cargo.toml` (workspace member)
+
+## Binding Boundary
+
+The pyo3 layer is a packaging bridge, not a configuration engine. Its public
+shape is limited to the existing CLI behavior:
+
+```rust
+#[pyfunction]
+fn version_json() -> PyResult<String>;
+
+#[pyfunction]
+fn run(argv: Vec<String>) -> PyResult<i32>;
+```
+
+```python
+def binary_path() -> str: ...
+```
+
+`run` accepts argv tokens only; it must not accept shell text, inspect a
+consumer repository, render templates, or write configuration. This realizes
+REQ-PRODUCT-020 and REQ-PRODUCT-024 while retaining ADR-016's no-Rust-
+configuration boundary.
 
 ## Deliverables
 

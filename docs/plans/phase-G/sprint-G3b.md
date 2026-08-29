@@ -19,7 +19,10 @@ owner: cfast
 
 ## Hard Dependencies
 
-- G.3a committed (same stack); Stack A merged to `develop` and merged forward into this worktree before start
+- G.3a committed on `sprint/G.3a-python-bindings` (same stack). G.3b may begin
+  product-only work then. Before its release-closure and bootstrap-copy
+  acceptance criteria run, G.1 must have merged to `develop` and that
+  `develop` commit must be merge-forwarded into this worktree.
 - issue `#84` (full/ci profile runs source-tree Cargo wrappers)
 - `scripts/release_artifacts.py`, `.github/workflows/release*.yml`
 
@@ -35,6 +38,13 @@ owner: cfast
 - `docs/sc-lint/cli-contract.md`
 - `docs/issues-inventory.md`
 - `CHANGELOG.md`
+
+## Governing Contract
+
+This sprint closes REQ-PRODUCT-019, REQ-PRODUCT-020, REQ-PRODUCT-021, and
+REQ-PRODUCT-024 for the released artifact. The G.1 bootstrap-copy re-sync is
+the one explicit cross-stack reconciliation: Stack B is never based on Stack
+A, and G.3b merges `develop` forward only after G.1 has landed.
 
 ## Deliverables
 

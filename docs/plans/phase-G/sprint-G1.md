@@ -20,8 +20,9 @@ owner: clint
 
 ## Hard Dependencies
 
-- G.0 merged
-- [ADR-015](../../sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
+- G.0 committed on `sprint/G.0-abandon-phase-F`; this sprint's PR base is that
+  branch, so implementation may begin before G.0 lands on `develop`.
+- ADR-015 (created by G.0 on this stack)
 - [ADR-012](../../sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 - reference contract: `../sc-publish/plugins/sc-publish/install.py`
   (`--input`, `--dry-run`, positional repo, byte-for-byte copy set,
@@ -48,6 +49,13 @@ owner: clint
 - `tests/fixtures/adoption/install.json` (new)
 - `.github/workflows/ci.yml` (add the adoption matrix job)
 - `Justfile` (source-maintainer recipe `test-adoption`)
+
+## Governing Contract
+
+This sprint implements REQ-PRODUCT-019, REQ-PRODUCT-020,
+REQ-PRODUCT-022, and REQ-PRODUCT-023. ADR-012 fixes the four-recipe consumer
+surface; ADR-015 fixes kit ownership. `install.py` must not invent a second
+consumer command contract or a source-checkout fallback.
 
 ## Recovered From Phase F
 
@@ -122,4 +130,4 @@ Explicitly discarded: `configure/{apply,artifact,legacy,reviewed_removals}.rs`,
 
 - the adoption skill and agent prompts (G.2)
 - changes to `crates/*` (G.3)
-- any consumer repository change (G.4)
+- any consumer repository change (G.4a–G.4c)
