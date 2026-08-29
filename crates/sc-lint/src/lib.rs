@@ -227,6 +227,11 @@ fn render_error(
     error: &CliError,
 ) -> render::RenderedOutput {
     if output_mode.is_json() {
+        if command_id == "configure.plan" && error.code().starts_with("CLI.CONFIGURE_") {
+            return render::RenderedOutput::stderr(render::render_configure_error_json(
+                command_id, error,
+            ));
+        }
         render::RenderedOutput::stderr(render::render_error_json(command_id, error))
     } else {
         render::RenderedOutput::stderr(render::render_error_human(command_id, error))

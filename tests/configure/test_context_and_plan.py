@@ -60,7 +60,7 @@ class ContextAndPlanTests(unittest.TestCase):
         uninspected = [
             operation
             for operation in plan["operations"]
-            if operation["reason"] == "existing_integration_not_inspected"
+            if operation["reason"] == "existing_integration_uninspected"
         ]
         self.assertEqual([operation["path"] for operation in uninspected], ["Justfile", ".github/workflows/sc-lint.yml"])
         self.assertNotIn("manual_conflict", [operation["kind"] for operation in plan["operations"]])
@@ -139,6 +139,52 @@ class ContextAndPlanTests(unittest.TestCase):
         with patch.object(subprocess, "Popen") as process:
             plan_result(FIXTURES / "empty-rust", self.request)
         process.assert_not_called()
+
+    def test_actual_rust_dispatcher_errors_validate_against_the_f1_result_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = Path(temporary_directory)
+            malformed = temporary / "malformed.json"
+            malformed.write_text("{", encoding="utf-8")
+            unsupported = temporary / "unsupported.json"
+            unsupported_request = json.loads(json.dumps(self.request))
+            unsupported_request["schema_version"] = "v999"
+            unsupported.write_text(json.dumps(unsupported_request), encoding="utf-8")
+            invalid_family = temporary / "invalid-family.json"
+            invalid_request = json.loads(json.dumps(self.request))
+            invalid_request["request"]["lint_families"]["boundary"] = {
+                "state": "enabled",
+                "decision": "modify",
+            }
+            invalid_family.write_text(json.dumps(invalid_request), encoding="utf-8")
+
+            for request in (malformed, unsupported, invalid_family):
+                with self.subTest(request=request.name):
+                    completed = subprocess.run(
+                        [
+                            "cargo",
+                            "run",
+                            "-q",
+                            "-p",
+                            "sc-lint",
+                            "--",
+                            "--json",
+                            "--root",
+                            str(FIXTURES / "empty-rust"),
+                            "configure",
+                            "--request",
+                            str(request),
+                            "--dry-run",
+                        ],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(completed.returncode, 3)
+                    failure = json.loads(completed.stderr)
+                    self.assertEqual(validate("result", failure), [])
+                    self.assertEqual(failure["command"], "configure.plan")
+                    self.assertNotIn("kind", failure["error"])
+                    self.assertNotIn("details", failure["error"])
 
 
 if __name__ == "__main__":

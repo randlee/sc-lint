@@ -604,11 +604,7 @@ pub(crate) fn execute(
     reason = "The thin configure dispatcher must retain stable recovery data while it normalizes the Python planner result."
 )]
 fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError> {
-    let script_path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("sc-lint crate has a workspace root")
-        .join("scripts/sc_lint_configure.py");
+    let script_path = configure_script_path()?;
     let mut command = ProcessCommand::new(python_command());
     command
         .arg(&script_path)
@@ -654,6 +650,71 @@ fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError>
     }
 }
 
+fn configure_script_candidates_for_executable(executable: &Path) -> Vec<PathBuf> {
+    let Some(bin_dir) = executable.parent() else {
+        return Vec::new();
+    };
+    let mut candidates = vec![
+        bin_dir.join("sc_lint_configure.py"),
+        bin_dir.join("scripts/sc_lint_configure.py"),
+    ];
+    if let Some(prefix) = bin_dir.parent() {
+        candidates.push(prefix.join("scripts/sc_lint_configure.py"));
+        candidates.push(prefix.join("share/sc-lint/scripts/sc_lint_configure.py"));
+    }
+    candidates
+}
+
+fn configure_script_candidates() -> Vec<PathBuf> {
+    let mut candidates = std::env::current_exe()
+        .map(|executable| configure_script_candidates_for_executable(&executable))
+        .unwrap_or_default();
+    // Keep source-checkout tests and `cargo run` usable only after every
+    // installed/release/Homebrew layout has had priority.
+    candidates.push(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("sc-lint crate has a workspace root")
+            .join("scripts/sc_lint_configure.py"),
+    );
+    candidates
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Missing configure assets must retain the shared CLI recovery contract."
+)]
+fn configure_script_path() -> Result<PathBuf, CliError> {
+    configure_script_path_from_candidates(&configure_script_candidates())
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Installed-layout resolution reports a structured failure when neither planner asset is present."
+)]
+fn configure_script_path_from_candidates(candidates: &[PathBuf]) -> Result<PathBuf, CliError> {
+    if let Some(path) = candidates.iter().find(|candidate| {
+        candidate.is_file()
+            && candidate
+                .parent()
+                .is_some_and(|directory| directory.join("sc_lint_configure_schema.py").is_file())
+    }) {
+        return Ok(path.clone());
+    }
+    let searched = candidates
+        .first()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("scripts/sc_lint_configure.py"));
+    Err(CliError::backend_failure("sc-lint configure planner asset is unavailable")
+        .with_cause("the planner script or its schema helper was not found in a supported install layout")
+        .with_detail(consts::FIELD_SCRIPT, json!(searched.display().to_string()))
+        .with_suggested_action(
+            "Install a matching sc-lint release that includes the configure planner assets, then retry.",
+        )
+        .with_documentation("sc-lint docs installation"))
+}
+
 #[expect(
     clippy::result_large_err,
     reason = "Protocol validation must return the fully structured CliError that explains malformed configure planner output."
@@ -692,25 +753,56 @@ fn normalize_configure_failure(
             .with_detail("reported_code", json!(code)));
         }
     };
-    let mut normalized = CliError::config(message)
+    let cause = required_configure_string(error, "cause")?;
+    let pointer = required_configure_pointer(error)?;
+    let recovery = required_configure_string(error, "recovery")?;
+    let recovery_description = required_configure_string(error, "recovery_description")?;
+    let docs_ref = required_configure_string(error, "docs_ref")?;
+    let normalized = CliError::config(message)
         .with_code(stable_code)
-        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"));
-    if let Some(cause) = error.get("cause").and_then(Value::as_str) {
-        normalized = normalized.with_cause(cause);
-    }
-    if let Some(pointer) = error.get("pointer") {
-        normalized = normalized.with_detail("pointer", pointer.clone());
-    }
-    if let Some(recovery) = error.get("recovery").and_then(Value::as_str) {
-        normalized = normalized.with_detail("recovery", json!(recovery));
-    }
-    if let Some(description) = error.get("recovery_description").and_then(Value::as_str) {
-        normalized = normalized.with_suggested_action(description);
-    }
-    if let Some(docs) = error.get("docs_ref").and_then(Value::as_str) {
-        normalized = normalized.with_documentation(docs);
-    }
+        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        .with_cause(cause)
+        .with_detail("pointer", pointer)
+        .with_detail("recovery", json!(recovery))
+        .with_suggested_action(recovery_description)
+        .with_documentation(docs_ref);
     Ok(normalized)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "A malformed configure error payload must report a structured protocol failure."
+)]
+fn required_configure_string(
+    error: &serde_json::Map<String, Value>,
+    field: &'static str,
+) -> Result<String, CliError> {
+    error
+        .get(field)
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            CliError::backend_protocol(format!("sc-lint configure planner error omitted {field}"))
+                .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        })
+        .map(ToOwned::to_owned)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "A malformed configure error payload must report a structured protocol failure."
+)]
+fn required_configure_pointer(error: &serde_json::Map<String, Value>) -> Result<Value, CliError> {
+    let pointer = error.get("pointer").ok_or_else(|| {
+        CliError::backend_protocol("sc-lint configure planner error omitted pointer")
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    })?;
+    if pointer.is_null() || pointer.is_string() {
+        return Ok(pointer.clone());
+    }
+    Err(
+        CliError::backend_protocol("sc-lint configure planner error returned a non-string pointer")
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py")),
+    )
 }
 
 fn python_command() -> OsString {
@@ -718,6 +810,36 @@ fn python_command() -> OsString {
         OsString::from("python")
     } else {
         OsString::from("python3")
+    }
+}
+
+#[cfg(test)]
+mod configure_script_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn installed_layout_script_candidate_wins_over_source_fallback() {
+        let fixture = TempDir::new().expect("fixture");
+        let bin = fixture.path().join("bin");
+        let scripts = fixture.path().join("share/sc-lint/scripts");
+        fs::create_dir_all(&bin).expect("bin directory");
+        fs::create_dir_all(&scripts).expect("installed scripts directory");
+        let executable = bin.join("sc-lint");
+        let planner = scripts.join("sc_lint_configure.py");
+        fs::write(&planner, "# planner\n").expect("planner asset");
+        fs::write(
+            scripts.join("sc_lint_configure_schema.py"),
+            "# schema helper\n",
+        )
+        .expect("schema helper asset");
+
+        let resolved = configure_script_path_from_candidates(
+            &configure_script_candidates_for_executable(&executable),
+        )
+        .expect("installed candidate resolves");
+        assert_eq!(resolved, planner);
     }
 }
 

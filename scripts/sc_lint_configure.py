@@ -215,7 +215,7 @@ def _append_just_operations(
 ) -> None:
     if observations["justfile"]["present"]:
         operations.append(
-            _confirmation("root-justfile", "Justfile", "existing_integration_not_inspected")
+            _confirmation("root-justfile", "Justfile", "existing_integration_uninspected")
         )
         return
     if mode == "disabled":
@@ -239,7 +239,7 @@ def _append_workflow_operations(
     if observations["github_workflows"]["present"]:
         operations.append(
             _confirmation(
-                "github-workflow", ".github/workflows/sc-lint.yml", "existing_integration_not_inspected"
+                "github-workflow", ".github/workflows/sc-lint.yml", "existing_integration_uninspected"
             )
         )
         return
