@@ -47,6 +47,7 @@ owner: clint
 - `tests/adoption/test_install.py` (new)
 - `tests/fixtures/adoption/empty-workspace/` (new)
 - `tests/fixtures/adoption/established-workspace/` (new, synthetic)
+- `tests/fixtures/adoption/analyzer-worked-example/` (new; non-tokio Linux workspace)
 - `tests/fixtures/adoption/install.json` (new)
 - `.github/workflows/ci.yml` (add the adoption matrix job)
 - `Justfile` (source-maintainer recipe `test-adoption`)
@@ -131,10 +132,10 @@ G.1 completes conflict cases, the established fixture, CI matrix, and review.
 - CI job `adoption` passes on `ubuntu-latest`, `macos-latest`, `windows-latest`.
 - `jq -e '.name == "sc-lint-adoption" and .version != "" and .description != "" and .author != ""' packages/sc-lint-adoption/.claude-plugin/plugin.json` exits 0.
 - `install.schema.json` accepts declarative `analyzers`, named test layers, and
-  lint profiles; `sc-lint.toml.j2` renders analyzers plus derived steps. One
-  non-tokio, single-platform fixture disables runtime, selects one portability
-  target, declares `unit` and `integrate`, and exercises `just test`, `just
-  test all`, and `just test integrate`.
+  lint profiles; `sc-lint.toml.j2` renders analyzers plus derived steps. In
+  `tests/fixtures/adoption/analyzer-worked-example/`, runtime is disabled and
+  portability targets `linux`; `unit` and `integrate` are declared. `just test`,
+  `just test all`, and `just test integrate` each exit 0 in that fixture.
 
 ## Required Validation
 

@@ -64,6 +64,18 @@ test:     .sc-lint/bootstrap test    --config sc-lint.toml
 upgrade:  .sc-lint/bootstrap upgrade --config sc-lint.toml
 ```
 
+## How To Extend
+
+Use declarative `sc-lint.toml` lint profiles, test layers, per-analyzer tables,
+step argv/exclusions, platform conditionals, and per-step/per-layer `env`.
+Pre/post work is an ordinary extra layer step, not a hook DSL. The kit pins only
+`sc-lint`; other toolchain pins remain consumer-owned. Validate/view/bench/fuzz
+dispatchers are consumer-owned Justfile recipes outside the managed import
+block. Patterns observed independently in 2+ consumer repositories may be
+promoted into the kit under Locked Principle 9. Profile entries remain limited
+to shipped binaries or `sc_lint` modules; no domain-lint script extension is
+authorized here.
+
 ## Consequences
 
 - Helper and binary versions can never diverge: both derive from one pin.

@@ -100,7 +100,7 @@ README.sc-lint.md                     # kit README, renamed on install
 | G.3b | Self-contained release: recipes run from wheel + binary only | Rust crates + release |
 | G.3c | Identity-literals unicode-escape parser defect fix | targeted lint fix |
 | G.4a | sc-publish delegation | external consumer repository |
-| G.4b | First-wave greenfield qualification (`wyvern`, `atm-core`) | external consumer repositories |
+| G.4b | `wyvern` greenfield qualification plus `atm-core` migration | external consumer repositories |
 | G.4c | `sc-compose` migration qualification | external consumer repository |
 | G.5 | Ecosystem rollout | consumer repos (skill only) |
 
@@ -138,7 +138,7 @@ documents were written:
 | A — adoption kit | Governance and traceability under `docs/`; generic kit, fixtures, and CI under `packages/sc-lint-adoption/`, `tests/adoption/`, and `.github/workflows/ci.yml`; then the adoption skill, marketplace, and consumer guide under `packages/sc-lint-adoption/.claude/`, `.claude-plugin/`, and `docs/sc-lint/` | G.0 archives Phase F; G.1 supplies the generic kit contract; G.2 consumes that contract in agent-facing guidance. These are one coherent kit path set. | cfast (G.0); clint (G.1–G.2) |
 | B — product runtime | Wheel binding and bootstrap/release paths under `bindings/sc-lint-py/`, `.sc-lint/`, `.just/`, `crates/`, `scripts/`, and release workflows | G.3a establishes wheel entry points; G.3b closes the self-contained archive. This path set is independent of Stack A until the named reconciliation below. | flint |
 | C — targeted parser fix | Isolated identity-literals parser and regression tests under `crates/sc-lint-attributes/` | G.3c is a disjoint, independently closable consumer-blocking defect fix rooted directly on `develop`. | cfast |
-| External qualification | Consumer-only paths in `../sc-publish`, `../wyvern`, `../atm-core`, and `../sc-compose` | G.4a is the independently closable sc-publish delegation; G.4b qualifies the two greenfield consumers as one coupled release gate; G.4c consumes that proven greenfield artifact for the established-workspace migration. G.5 is the separately authorized remaining-repository rollout. | clint (G.4a–G.5) |
+| External qualification | Consumer-only paths in `../sc-publish`, `../wyvern`, `../atm-core`, and `../sc-compose` | G.4a is the independently closable sc-publish delegation; G.4b qualifies greenfield `wyvern` while migrating `atm-core` as one coupled release gate; G.4c consumes wyvern's proven greenfield artifact for the established-workspace migration. G.5 is the separately authorized remaining-repository rollout. | clint (G.4a–G.5) |
 
 The only overlapping product/kit path is `.sc-lint/bootstrap*`: G.1 vendors
 the product snapshot and G.3a changes the product implementation. G.3b is

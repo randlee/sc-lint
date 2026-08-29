@@ -1,6 +1,6 @@
 ---
 id: G.4b
-title: Greenfield Consumer Qualification
+title: Wyvern Greenfield Qualification And atm-core Migration
 status: planned
 branch: n/a (external wyvern and atm-core consumer PRs)
 worktree: n/a (target repository worktrees)
@@ -10,7 +10,7 @@ target: ../wyvern develop and ../atm-core develop (external PRs)
 owner: clint
 ---
 
-# Sprint G.4b — Greenfield Consumer Qualification
+# Sprint G.4b — Wyvern Greenfield Qualification And atm-core Migration
 
 ## Goal
 

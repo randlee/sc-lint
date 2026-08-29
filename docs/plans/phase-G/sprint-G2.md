@@ -81,7 +81,25 @@ logic beyond the G.1 kit.
   target-platform facts, migrates existing `just test-*` recipes into declared
   layers, and both the skill and adoption guide include a “How to extend”
   section for analyzers, test layers, lint profiles, and consumer-owned recipes
-  using the G.1 worked fixture.
+  using `tests/fixtures/adoption/analyzer-worked-example/`.
+
+## How To Extend
+
+- **Lint profiles:** declare ordered `[tool.sc-lint.lint.<profile>]` step lists.
+- **Test layers:** declare `[tool.sc-lint.test.<layer>]`; `unit` is default,
+  `just test <layer> *args` passes through, and `just test all` follows order.
+- **Analyzer config:** use `[tool.sc-lint.analyzers.<crate>]` with `enabled`,
+  `reason`, `targets`, and crate-specific keys.
+- **Step argv/exclusions:** express flags as command arrays in a step list.
+- **Platform conditionals:** use `platforms = [...]` on a step.
+- **Environment:** use per-step or per-layer `env` tables.
+- **Pre/post work:** model it as ordinary extra steps in the layer list.
+- **Tool pins:** only `sc-lint` is kit-pinned; all other pins are consumer-owned.
+- **Non-test dispatchers:** add consumer-owned Justfile recipes outside the
+  managed import block.
+
+Patterns independently observed in 2+ consumer repositories are candidates for
+promotion into the kit as a new default under Locked Principle 9.
 
 ## Required Validation
 
