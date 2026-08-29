@@ -1,6 +1,6 @@
 ---
 id: G.0
-title: Abandon Phase F And Record ADR-015
+title: Abandon Phase F And Record ADR-015 / ADR-016
 status: planned
 branch: sprint/G.0-abandon-phase-F
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.0-abandon-phase-F
@@ -10,7 +10,7 @@ target: develop (via stack A, PR base feature/phase-G-planning)
 owner: clint
 ---
 
-# Sprint G.0 — Abandon Phase F And Record ADR-015
+# Sprint G.0 — Abandon Phase F And Record ADR-015 / ADR-016
 
 ## Goal
 
@@ -26,6 +26,7 @@ owner: clint
 ## Exact Targets
 
 - `docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md` (new)
+- `docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md` (new)
 - `docs/sc-lint/adr/README.md`
 - `docs/project-plan.md`
 - `docs/phase-E/phase-E-plan.md` (status only)
@@ -37,6 +38,19 @@ owner: clint
   the phase plan; that ADR-014 is rejected and never merged; the kit form
   (`packages/sc-lint-adoption` → consumer `plugins/sc-lint`); the sc-publish
   delegation rule for sc-lint setup.
+- ADR-016 with Status `Accepted`, recording three linked decisions and their
+  consequences: (a) **no Rust for configuration** — Rust in this repository
+  implements lint analysis and the `sc-lint` CLI only; installation,
+  templating, repo facts, CI wiring, and consumer scaffolding are Python,
+  declarative assets, skills, and prompts; (b) **the `sc-lint` Python wheel is
+  the runtime delivery for every consumer helper** — built with maturin, pinned
+  by `sc-lint.toml` `minimum_version`, provisioned into `.sc-lint/venv` by
+  `.sc-lint/bootstrap setup`, replacing every copied `.just/*.py`; (c) **the
+  `just` interface is exactly ADR-012's four recipes** and each is one line
+  delegating to bootstrap, so a consumer's `Justfile` never encodes tool
+  knowledge. ADR-016 must include the bootstrap → venv → wheel → binary
+  resolution sequence as a code block and the rule that a profile entry may
+  reference only a shipped binary or a `sc_lint` module.
 - `docs/project-plan.md` links Phase G and marks Phase F abandoned with a
   one-line reason and the archive tag name.
 - `docs/phase-E/phase-E-plan.md` frontmatter status changed to `implemented`
@@ -48,8 +62,10 @@ owner: clint
 
 ## Acceptance Criteria
 
-- `ls docs/sc-lint/adr/ADR-015-*.md` exists and its Status table row is
-  `Accepted`.
+- `ls docs/sc-lint/adr/ADR-015-*.md docs/sc-lint/adr/ADR-016-*.md` lists
+  both and each Status table row is `Accepted`.
+- ADR-016 contains a fenced code block showing the resolution sequence and
+  the four one-line recipes; `docs/sc-lint/adr/README.md` lists both ADRs.
 - `grep -c "phase-F" docs/project-plan.md` ≥ 1 and the line contains
   `abandoned`.
 - `git tag -l archive/phase-F` prints the tag; `git worktree list` shows no

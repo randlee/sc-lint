@@ -41,12 +41,12 @@ drift reported as a defect. It is not a Rust engine.
    `sc-lint` CLI only. Installation, templating, repo facts, CI wiring, and
    consumer scaffolding are Python, TOML/YAML/Justfile assets, skills, and
    prompts. A sprint that adds a `configure`-style module to any crate is a
-   Phase G violation.
+   Phase G violation. (ADR-016)
 8. Python helpers that consumers run (`.just` recipes, lint runners, version
    sync) ship as a **maturin-built `sc-lint` wheel** pinned by
    `minimum_version`, provisioned by `.sc-lint/bootstrap` — the same
    mechanism `sc-publish` uses for the `sc-compose` wheel. Nothing is copied
-   from a source archive.
+   from a source archive. (ADR-016)
 
 ## Why Phase F Is Abandoned
 
@@ -77,7 +77,7 @@ README.sc-lint.md                     # kit README, renamed on install
 
 | Sprint | Title | Closure type |
 | --- | --- | --- |
-| G.0 | Abandon Phase F, ADR-015 | governance / docs |
+| G.0 | Abandon Phase F; ADR-015 (adoption kit), ADR-016 (Python wheel runtime, no Rust for configuration, four-recipe just interface) | governance / docs |
 | G.1 | Adoption kit: installer, verbatim assets, templates, fixtures | product code (Python + assets) |
 | G.2 | Adoption skill, agent prompts, marketplace entry, docs | skill / docs |
 | G.3a | `sc-lint` Python bindings via maturin, published wheel, bootstrap provisioning | packaging / PyPI |

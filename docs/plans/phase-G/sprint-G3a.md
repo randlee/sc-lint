@@ -21,6 +21,7 @@ owner: cfast
 ## Hard Dependencies
 
 - none from Stack A; runs in parallel with G.0–G.2 (Stack B, base `develop`)
+- [ADR-016](../../sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md) (G.0)
 - reference: `../sc-publish/plugins/sc-publish/.github/scripts/bootstrap_sc_compose.py`
   and `../sc-compose/bindings/` (existing maturin layout in the ecosystem)
 - `sc-publish` PyPI channel (`pypi-publish.yml`) already vendored here
