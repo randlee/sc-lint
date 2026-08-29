@@ -32,6 +32,7 @@ not wait for optional Wyvern qualification or page implementation.
 - `crates/sc-lint/assets/consumer-config.toml`
 - `tests/configure/test_apply_and_just.py` (new)
 - `tests/fixtures/configure/apply-and-just/` (new)
+- `boundaries/sc-lint/top-level-cli.toml`
 - `docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md`
 - `docs/sc-lint/crate-architecture.md`
 - `docs-bundle/just-setup.md`
@@ -147,6 +148,8 @@ or plugin surface is created.
 - transaction fault-injection tests at each write/rename/validation stage
 - `ManagedArtifact` extension fixture with a test-only synthetic second type
 - TOML, Just, and JSON syntax validation fixtures
+- `LINT-SC-CLI-DISPATCH` against the registered `ConfigureCommand` and
+  `ConfigureError` `BOUNDARY-ScLintCli` roots
 - empty/existing/marker-conflict/stale-plan/legacy-near-miss fixtures
 - `just lint`
 - `just test`

@@ -33,7 +33,8 @@ Contents:
 - [`phase-F-plan.md`](../plans/phase-F/phase-F-plan.md) — consumer setup
   automation plan: shallow conventional-path context, JSON-driven and
   Python/Wyvern-guided explanatory configuration, safe established-repository
-  replacement, and sc-compose reference conversion
+  replacement; Phase P separately qualifies and converts both sc-compose and
+  atm-core with the released artifact
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and phase-plan touchpoint guide
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
