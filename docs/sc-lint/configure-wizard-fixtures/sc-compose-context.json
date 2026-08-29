@@ -7,9 +7,8 @@
     "github_workflows": {"present": true, "inspected": false},
     "sc_lint_directory": {"present": false}
   },
-  "source": {
-    "repository": "sc-compose",
-    "repository_url": "https://github.com/randlee/sc-compose.git",
-    "baseline_commit": "38cf63a5e1fe68f93be39fbed30315de4e3b620f"
+  "explanation": {
+    "developer_contract": ["just setup", "just lint", "just test", "just upgrade"],
+    "uninspected_existing_integration": ["Justfile", ".github/workflows/"]
   }
 }

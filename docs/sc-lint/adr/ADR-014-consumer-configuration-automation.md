@@ -89,14 +89,16 @@ and agents while still protecting user-owned repository content.
 ## CLI Boundary Registration
 
 `configure` is a new public `sc-lint` CLI command family, not an internal
-adapter. Its public parser root is `ConfigureCommand`; its structured failure
-family is `ConfigureError`. Both are `BOUNDARY-ScLintCli` composition roots in
+adapter. Its public request root is `command::ConfigureRequest`; configure
+failures use the existing structured failure root `CliError`. These are
+`BOUNDARY-ScLintCli` composition roots in
 `boundaries/sc-lint/top-level-cli.toml`, alongside the existing top-level
-`Command` and `CliError` roots. They retain the common machine envelope,
-stable codes, path/cause context, recovery actions, and documentation links;
-`ConfigureError` does not create a second unstructured error channel. The
-private `ManagedArtifact` and `WorkflowYamlArtifact` transaction mechanism is
-separate from those public roots and remains governed by this same ADR.
+`Command` root. They retain the common machine envelope, stable codes,
+path/cause context, recovery actions, and documentation links; configure
+failures do not create a second unstructured error channel. The private
+`ManagedArtifact` and `WorkflowYamlArtifact`
+transaction mechanism is separate from those public roots and remains governed
+by this same ADR.
 
 ## Consequences
 
