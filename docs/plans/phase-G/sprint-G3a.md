@@ -38,6 +38,7 @@ owner: flint
 - `bindings/sc-lint-py/src/lib.rs` (new; thin pyo3 surface over existing crate APIs — **no new logic**)
 - `bindings/sc-lint-py/python/sc_lint/__init__.py` (new)
 - `bindings/sc-lint-py/python/sc_lint/{run_lint,lint_common,check_version_sync,view}.py` (moved from `.just/`)
+- `boundaries/sc-lint-py/python-bindings.toml` (new)
 - `.just/*.py` (source-maintainer copies replaced by imports from `sc_lint`)
 - `Justfile` (source recipes use the wheel from a local venv)
 - `.sc-lint/bootstrap`, `.sc-lint/bootstrap.ps1` (`setup` provisions
@@ -94,6 +95,11 @@ helper migration, bootstrap provisioning, CI, and review.
   ≤ 5 lines delegating to `sc_lint`.
 - Wheels published to PyPI/TestPyPI through the existing `sc-publish` channel
   using the `PYPI_TOKEN` / `TEST_PYPI_TOKEN` environments.
+- `boundaries/sc-lint-py/python-bindings.toml` (new): structured boundary
+  record for the `bindings/sc-lint-py` workspace member — `allowed_dependencies`
+  limited to `sc-lint` crate APIs it binds, `forbidden_edges` to every analyzer
+  crate, `state = "concrete_landed"`; `docs/architecture.md` crate list already
+  names it.
 
 ## Acceptance Criteria
 
@@ -103,7 +109,9 @@ helper migration, bootstrap provisioning, CI, and review.
 - The `sc_lint` package dispatches optional test-layer and lint-profile
   positional arguments to bootstrap only; it adds no plugin registry or
   selection policy.
-- Fresh temp workspace after `sc-lint init --just`: `just setup` creates
+- Fresh temp workspace after the product generator `sc-lint init --just`
+  (retained per the REQ-PRODUCT-019 supersession note; consumers install via
+  the G.1 kit): `just setup` creates
   `.sc-lint/venv` with `sc_lint` importable; `just lint` runs with no `.just/`
   directory present.
 - `find .just -name '*.py' -size +1k` returns nothing.

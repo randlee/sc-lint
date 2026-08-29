@@ -105,6 +105,13 @@ logic beyond the G.1 kit.
 Patterns independently observed in 2+ consumer repositories are candidates for
 promotion into the kit as a new default under Locked Principle 9.
 
+## Unblock Milestone
+
+None. G.2 is the top layer of Stack A; no sprint starts on a G.2 commit. The
+external sprints G.4a and G.4b start on a released artifact (the versioned
+`sc-lint` release containing G.2 and G.3b), as recorded in the phase plan's
+parallel-vs-sequential table.
+
 ## Required Validation
 
 - `python3 -m pytest tests/adoption -q`

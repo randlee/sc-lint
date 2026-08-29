@@ -12,6 +12,8 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
+- [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
+- [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
 
 For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -135,6 +137,11 @@ Current primary crates:
   - analyzer CLI and library for platform/OS portability rules
 - `sc-lint-runtime`
   - analyzer CLI and library for std runtime/concurrency correctness rules
+- `sc-lint-py` (`bindings/sc-lint-py`, Phase G, ADR-016)
+  - maturin/pyo3 wheel crate exposing a thin binding surface (`version_json`,
+    `run(argv)`) over the existing crates and carrying the `sc_lint` Python
+    helper package; contains no lint logic and no configuration policy
+  - boundary record: `boundaries/sc-lint-py/python-bindings.toml`
 
 Planned later crate:
 

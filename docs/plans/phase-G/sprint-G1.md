@@ -29,7 +29,8 @@ owner: clint
   (`--input`, `--dry-run`, positional repo, byte-for-byte copy set,
   `RENAMED_FILES`, `TEMPLATES`, unified-diff drift, exit 1 on drift)
 - existing product files on `develop`: `.sc-lint/bootstrap`,
-  `.sc-lint/bootstrap.ps1`, the `sc-lint init --just` output
+  `.sc-lint/bootstrap.ps1`, the `sc-lint init --just` generator output the kit
+  vendors verbatim (REQ-PRODUCT-019 supersession note)
 
 ## Exact Targets
 

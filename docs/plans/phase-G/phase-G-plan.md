@@ -113,7 +113,7 @@ closable.
 
 | Authority | Phase G application | Owning sprint(s) |
 | --- | --- | --- |
-| REQ-PRODUCT-019 | One SemVer floor, product-owned four-recipe consumer interface, idempotent/non-mutating integration | G.1, G.2, G.4b, G.4c |
+| REQ-PRODUCT-019 (as superseded by ADR-015 for the installation mechanism) | One SemVer floor, product-owned four-recipe consumer interface, idempotent/non-mutating kit integration (`--dry-run` drift exit 1, user-owned conflict exit 2) | G.1, G.2, G.4b, G.4c |
 | REQ-PRODUCT-020 | Verified artifact activation, managed bootstrap, and no source-checkout helper copying | G.1, G.3a, G.3b, G.4b, G.4c |
 | REQ-PRODUCT-021 | Offline documentation remains product-owned and discoverable after kit adoption | G.2, G.3b, G.4b, G.4c |
 | REQ-PRODUCT-022 | Reusable verified setup Action is the CI surface installed by the kit | G.1, G.4a, G.4b, G.4c |

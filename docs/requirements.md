@@ -9,6 +9,8 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
+- [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
@@ -16,6 +18,14 @@ Related design docs:
 
 For release `0.2.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
+
+For Phase G, ADR-015 supersedes the `sc-lint init --just` consumer installation
+mechanism in `REQ-PRODUCT-019`: the versioned adoption kit
+(`packages/sc-lint-adoption`, `install.py` driven by `install.json`) is the sole
+generic adoption path, and ADR-016 fixes its runtime delivery as a Python wheel
+with no Rust configuration logic. `REQ-PRODUCT-019` obligations on the
+installed end state are unchanged; see the supersession note under that
+requirement.
 
 ## Product Purpose
 
@@ -472,14 +482,24 @@ The product should support both:
   work with a structured stable code, cause, recovery action, and documentation
   reference. Consumers must be able to invoke product-owned setup, complete
   lint, complete test, and upgrade entry points without choosing a Cargo
-  package or copying source-repository orchestration. `sc-lint init --just`
-  must create an idempotent, product-owned `sc-lint.toml`, thin Just
+  package or copying source-repository orchestration. The product-owned
+  installation must create an idempotent `sc-lint.toml`, thin Just
   integration, `.sc-lint/bootstrap`, and Windows `.sc-lint/bootstrap.ps1`
-  helpers with non-mutating
-  `--check`/`--dry-run` modes; it must never overwrite a consumer README or
-  user-owned integration file. Consumer `just setup`, `just lint`, `just
-  test`, and `just upgrade` all depend on the same compatibility preflight;
-  lint and test execute complete configured profiles.
+  helpers with non-mutating `--check`/`--dry-run` modes; it must never
+  overwrite a consumer README or user-owned integration file. Consumer `just
+  setup`, `just lint`, `just test`, and `just upgrade` all depend on the same
+  compatibility preflight; lint and test execute complete configured profiles.
+
+  Supersession (Phase G, ADR-015 Decision 1–2 and 4): the consumer-facing
+  installation mechanism is the adoption kit (`packages/sc-lint-adoption`
+  installed as `plugins/sc-lint` via `install.py`), not a direct consumer
+  invocation of `sc-lint init --just`. `sc-lint init --just` is retained as
+  the product-side generator whose bootstrap output the kit vendors verbatim
+  and which product sprints use for fresh-workspace acceptance. The
+  idempotence and never-overwrite obligations above bind the kit: `--dry-run`
+  drift reports a unified diff and exits 1, a conflict with a user-owned file
+  exits 2, and the kit has no delete operation. Runtime delivery of the
+  helpers is governed by ADR-016.
 
 - `REQ-PRODUCT-020`
   The supported consumer installation and upgrade path must select a verified
