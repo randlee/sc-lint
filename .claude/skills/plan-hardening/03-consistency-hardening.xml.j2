@@ -1,6 +1,6 @@
 ---
 name: 03-consistency-hardening-task
-version: 1.0.0
+version: 1.2.0
 description: team-lead assignment template for cross-document consistency and ambiguity hardening after critical plan review.
 format: xml
 required_variables:
@@ -146,7 +146,7 @@ required_variables:
           Requirements and architecture docs for every crate affected by this phase.
         </doc>
         <doc id="adrs">
-          An ADR for every significant architectural decision, plus an up-to-date ADR index.
+          An ADR for every significant architectural decision, written on the planning branch and `Accepted` with a named approver before hardening closes, listed in the phase-plan `## ADR Status` table and the ADR index. Any ADR still `Proposed` at this step is an ADR-PENDING finding; hardening does not close with a pending approval.
         </doc>
         <doc id="protocol-schema-interface">
           Protocol, schema, and interface docs for every boundary touched by this phase.
@@ -168,6 +168,17 @@ required_variables:
         </doc>
       </required-documents>
 
+      For every sprint doc, additionally verify that:
+        - frontmatter `branch`, `stack`, `stack_base`, and `owner` match the
+          phase-plan stack diagram and the parallel-vs-sequential table
+        - every sprint with a layer above it has an `## Unblock Milestone`
+          section, and the table's "Unblocked when" cell for the layer above
+          names that milestone
+        - no start condition is CI, QA, or merge to `develop` unless a named
+          released artifact is consumed
+        - the phase-plan `## ADR Status` table exists and every row is
+          `Accepted` with a named approver
+
       Each entry in the task list must include:
         - Finding number
         - Document name and section (or "missing" if the document does not exist)
@@ -183,6 +194,9 @@ required_variables:
         <type id="UNDEF">An important type, trait, struct, enum, or protocol is referenced but not explicitly defined in any document.</type>
         <type id="CROSS-DOC">A definition or decision in one document is not reflected consistently in documents that depend on it.</type>
         <type id="ORDERING">Task dependencies are missing or incorrectly ordered such that a dev agent could begin work out of sequence.</type>
+        <type id="UNBLOCK-MILESTONE">A sprint with a layer above it has no `## Unblock Milestone` section, the milestone names completion/CI/merge instead of minimum functionality, or the parallel table does not reference it.</type>
+        <type id="ADR-PENDING">An ADR the phase depends on is missing from the phase-plan `## ADR Status` table, is not `Accepted`, has no named approver, or is scheduled as a sprint deliverable.</type>
+        <type id="STACK-SHAPE">The phase plan lacks a `## Branch Stacks And Parallelism` section, a sprint frontmatter disagrees with the stack diagram, or sprints are serialized into one chain when the deliverables could be partitioned into parallel stacks.</type>
         <type id="SCOPE-CONFLICT">The task framing, repo docs, or team-lead concerns materially change the user-discussed deliverable scope; consistency hardening must stop and push back instead of normalizing the new scope.</type>
       </finding-types>
     </audit-phase>
