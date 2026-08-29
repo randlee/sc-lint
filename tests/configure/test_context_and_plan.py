@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
 FIXTURES = ROOT / "tests" / "fixtures" / "configure"
 CONTRACTS = FIXTURES / "contracts"
+BINARY = ROOT / "target" / "debug" / ("sc-lint.exe" if sys.platform == "win32" else "sc-lint")
 sys.path.insert(0, str(SCRIPTS))
 
 from sc_lint_configure import ConfigureFailure
@@ -141,6 +142,9 @@ class ContextAndPlanTests(unittest.TestCase):
         process.assert_not_called()
 
     def test_actual_rust_dispatcher_errors_validate_against_the_f1_result_schema(self) -> None:
+        if not BINARY.is_file():
+            subprocess.run(["cargo", "build", "-q", "-p", "sc-lint"], cwd=ROOT, check=True)
+
         with tempfile.TemporaryDirectory() as temporary_directory:
             temporary = Path(temporary_directory)
             malformed = temporary / "malformed.json"
@@ -161,12 +165,7 @@ class ContextAndPlanTests(unittest.TestCase):
                 with self.subTest(request=request.name):
                     completed = subprocess.run(
                         [
-                            "cargo",
-                            "run",
-                            "-q",
-                            "-p",
-                            "sc-lint",
-                            "--",
+                            str(BINARY),
                             "--json",
                             "--root",
                             str(FIXTURES / "empty-rust"),
