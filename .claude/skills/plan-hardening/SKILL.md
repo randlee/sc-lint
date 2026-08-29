@@ -1,6 +1,6 @@
 ---
 name: plan-hardening
-version: 1.4.0
+version: 1.5.0
 description: >
   Team-lead drives plan hardening after the current plan state already exists
   in repo docs.
@@ -74,6 +74,8 @@ Use the example in:
   hardening round
 - substantial scope drift from the user-discussed plan is a hard stop
 - remaining in-scope work without sprint ownership is a hard stop
+- a phase plan without a `## Branch Stacks And Parallelism` section is a
+  hard stop; sprints are planned as `gh stack` layers
 - if a sprint cannot credibly land its committed deliverables at a
   production-ready level, split it before implementation
 - if a reviewer loop returns `FAIL` three times without converging, escalate to

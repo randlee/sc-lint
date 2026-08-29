@@ -100,7 +100,8 @@ required_variables:
     ownership?
 
     Use `.claude/skills/plan-hardening/sprint-planning-guidelines.md` as a
-    required reference for sprint splitting, authoritative checklist shape,
+    required reference for sprint splitting, branch-stack shape and
+    parallelism, authoritative checklist shape,
     production-ready expectations, and QA-consumable sprint-doc structure.
 
     Do not re-read documents to discover the plan — the plan is already in
@@ -219,6 +220,10 @@ required_variables:
           contracts have explicit code samples or signatures in the sprint doc
         - acceptance criteria can prove the presence of every listed
           deliverable
+        - the sprint frontmatter names its branch, worktree, stack, stack base,
+          and owner, and matches the phase-plan stack diagram
+        - the phase plan states which sprints run in parallel, which are
+          sequential and why, and the commit event that unblocks each sprint
 
       Each entry in the task list must include:
         - Finding number
@@ -234,6 +239,7 @@ required_variables:
         <type id="NON-PROD">A sprint deliverable is described in a way that would allow shape-only, test-only, or non-production-ready completion.</type>
         <type id="MISSING-CODE-SAMPLE">An important trait, feature, enum, protocol type, or boundary contract is committed by the plan but not illustrated with an explicit code sample or signature.</type>
         <type id="ORDERING">Task dependencies are missing or incorrectly ordered such that a dev agent could begin work out of sequence.</type>
+        <type id="STACK-SHAPE">The phase plan lacks a `## Branch Stacks And Parallelism` section, a sprint frontmatter disagrees with the stack diagram, or sprints are serialized into one chain when the deliverables could be partitioned into parallel stacks.</type>
         <type id="SCOPE-CONFLICT">The task framing, repo docs, or team-lead concerns materially change the user-discussed deliverable scope; hardening must stop and push back instead of adopting the new scope.</type>
       </finding-types>
     </audit-phase>
