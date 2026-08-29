@@ -306,6 +306,7 @@ fn commit_io_error(operation: &str, path: &std::path::Path, error: io::Error) ->
 mod tests {
     use super::*;
     use crate::configure::artifact::{ArtifactKind, BytesArtifact, RemoveArtifact};
+    use crate::consts::CLI_CONFIGURE_UNMANAGED_COLLISION;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
@@ -330,7 +331,7 @@ mod tests {
                 Ok(())
             } else {
                 Err(CliError::config("synthetic validation failure")
-                    .with_code("CLI.CONFIGURE_UNMANAGED_COLLISION"))
+                    .with_code(CLI_CONFIGURE_UNMANAGED_COLLISION))
             }
         }
     }

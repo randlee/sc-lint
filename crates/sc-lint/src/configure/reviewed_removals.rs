@@ -9,6 +9,7 @@ use std::path::{Component, Path, PathBuf};
 use serde_json::Value;
 
 use crate::CliError;
+use crate::consts::CLI_CONFIGURE_UNMANAGED_COLLISION;
 
 use super::artifact::{ArtifactKind, BytesArtifact, ManagedArtifact, RemoveArtifact};
 
@@ -103,7 +104,7 @@ pub(crate) fn ensure_applyable_plan(plan: &Value) -> Result<(), CliError> {
         return Ok(());
     }
     Err(configure_apply_error(
-        "CLI.CONFIGURE_UNMANAGED_COLLISION",
+        CLI_CONFIGURE_UNMANAGED_COLLISION,
         "the reviewed configure plan contains unresolved conflicts",
         "apply will not bypass conflicts or manual review steps",
         "Review the exportable patch or select a non-conflicting configuration, then regenerate the plan.",
@@ -142,7 +143,7 @@ pub(crate) fn add_reviewed_removals(
             .and_then(Value::as_str)
             .ok_or_else(|| {
                 configure_apply_error(
-                    "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                    CLI_CONFIGURE_UNMANAGED_COLLISION,
                     "the reviewed removal operation has no path",
                     "the configure plan violates the v1 operation contract",
                     "Regenerate and review the configure plan.",
@@ -154,7 +155,7 @@ pub(crate) fn add_reviewed_removals(
         )
         .ok_or_else(|| {
             configure_apply_error(
-                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                CLI_CONFIGURE_UNMANAGED_COLLISION,
                 "the reviewed removal operation is not in the sc-lint legacy allowlist",
                 format!("`{relative}` is not an exact, fingerprint-authorized legacy artifact"),
                 "Regenerate and review the configure plan; do not remove consumer-owned files automatically.",
@@ -167,7 +168,7 @@ pub(crate) fn add_reviewed_removals(
                 .any(|component| matches!(component, Component::ParentDir))
         {
             return Err(configure_apply_error(
-                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                CLI_CONFIGURE_UNMANAGED_COLLISION,
                 "the reviewed removal path escapes the consumer root",
                 format!("`{relative}` is not a repository-relative managed path"),
                 "Regenerate and review the configure plan.",
@@ -194,7 +195,7 @@ pub(crate) fn add_just_artifacts(
     if root_justfile.exists() {
         let existing = std::fs::read_to_string(&root_justfile).map_err(|error| {
             configure_apply_error(
-                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                CLI_CONFIGURE_UNMANAGED_COLLISION,
                 "the existing Justfile could not be read",
                 error.to_string(),
                 "Check Justfile permissions and review the exportable patch before retrying.",
@@ -238,7 +239,7 @@ pub(crate) fn add_managed_creation(
     match std::fs::read(&target) {
         Ok(current) if current == bytes => Ok(()),
         Ok(_) => Err(configure_apply_error(
-            "CLI.CONFIGURE_UNMANAGED_COLLISION",
+            CLI_CONFIGURE_UNMANAGED_COLLISION,
             "a managed configure target contains user-owned changes",
             format!(
                 "`{}` differs from its reviewed generated representation",
@@ -251,7 +252,7 @@ pub(crate) fn add_managed_creation(
             Ok(())
         }
         Err(error) => Err(configure_apply_error(
-            "CLI.CONFIGURE_UNMANAGED_COLLISION",
+            CLI_CONFIGURE_UNMANAGED_COLLISION,
             "a managed configure target could not be read",
             error.to_string(),
             "Check repository permissions and review the configure plan before retrying.",
@@ -270,7 +271,7 @@ fn reject_reserved_recipes(source: &str) -> Result<(), CliError> {
             .any(|line| line.trim_start().starts_with(&format!("{name}:")))
         {
             return Err(configure_apply_error(
-                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                CLI_CONFIGURE_UNMANAGED_COLLISION,
                 "the existing Justfile defines an sc-lint reserved recipe",
                 format!("reserved recipe `{name}` would be shadowed by managed integration"),
                 "Review the exportable patch; sc-lint will not overwrite or shadow your recipe.",
@@ -363,7 +364,7 @@ mod tests {
         let error = add_reviewed_removals(root.path(), &plan, &mut artifacts)
             .expect_err("near-match path is not removable");
 
-        assert_eq!(error.code(), "CLI.CONFIGURE_UNMANAGED_COLLISION");
+        assert_eq!(error.code(), CLI_CONFIGURE_UNMANAGED_COLLISION);
         assert!(artifacts.is_empty());
     }
 }

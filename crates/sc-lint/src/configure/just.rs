@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use crate::CliError;
+use crate::consts::CLI_CONFIGURE_UNMANAGED_COLLISION;
 
 pub(crate) const MARKER_BEGIN: &str = "# >>> sc-lint managed integration >>>";
 pub(crate) const MARKER_END: &str = "# <<< sc-lint managed integration <<<";
@@ -80,7 +81,7 @@ fn invalid(target: &Path, cause: impl std::fmt::Display) -> CliError {
         "generated Justfile `{}` is invalid",
         target.display()
     ))
-    .with_code("CLI.CONFIGURE_UNMANAGED_COLLISION")
+    .with_code(CLI_CONFIGURE_UNMANAGED_COLLISION)
     .with_cause(cause.to_string())
     .with_suggested_action("Review the exportable patch; no repository files were changed.")
     .with_documentation("sc-lint docs troubleshooting")
@@ -88,7 +89,7 @@ fn invalid(target: &Path, cause: impl std::fmt::Display) -> CliError {
 
 fn conflict(cause: &str) -> CliError {
     CliError::config("the existing Justfile cannot accept sc-lint's managed integration")
-        .with_code("CLI.CONFIGURE_UNMANAGED_COLLISION")
+        .with_code(CLI_CONFIGURE_UNMANAGED_COLLISION)
         .with_cause(cause)
         .with_suggested_action(
             "Review the exportable patch; no user-owned Justfile content was modified.",
@@ -115,7 +116,7 @@ mod tests {
         let source = format!("{}{}", managed_block("\n"), managed_block("\n"));
         assert_eq!(
             insert_or_replace(&source).expect_err("conflict").code(),
-            "CLI.CONFIGURE_UNMANAGED_COLLISION"
+            CLI_CONFIGURE_UNMANAGED_COLLISION
         );
     }
 

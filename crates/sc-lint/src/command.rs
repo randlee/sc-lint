@@ -15,6 +15,7 @@ use crate::configure::reviewed_removals::{
     ensure_applyable_plan, ensure_reviewed_plan_matches, plan_proposes, read_configure_request,
 };
 use crate::consts;
+use crate::consts::CLI_CONFIGURE_UNMANAGED_COLLISION;
 use crate::contract::ServiceName;
 use crate::dispatch;
 use crate::installer;
@@ -875,7 +876,7 @@ fn normalize_configure_failure(
     let stable_code = match code {
         "CLI.CONFIGURE_UNSUPPORTED_SCHEMA" => "CLI.CONFIGURE_UNSUPPORTED_SCHEMA",
         "CLI.CONFIGURE_UI_UNAVAILABLE" => "CLI.CONFIGURE_UI_UNAVAILABLE",
-        "CLI.CONFIGURE_UNMANAGED_COLLISION" => "CLI.CONFIGURE_UNMANAGED_COLLISION",
+        CLI_CONFIGURE_UNMANAGED_COLLISION => CLI_CONFIGURE_UNMANAGED_COLLISION,
         "CLI.CONFIGURE_STALE_PLAN" => "CLI.CONFIGURE_STALE_PLAN",
         "CLI.CONFIGURE_ROLLBACK_FAILED" => "CLI.CONFIGURE_ROLLBACK_FAILED",
         _ => {
