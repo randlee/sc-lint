@@ -603,6 +603,53 @@ pub(crate) fn execute(
     }
 }
 
+const CONFIGURE_SCRIPT: &str = "scripts/sc_lint_configure.py";
+const CONFIGURE_PROTOCOL_RECOVERY: &str =
+    "Verify the installed sc-lint release and regenerate the configure plan.";
+
+/// The planner can emit only the frozen F.1 configure error codes. Keeping
+/// their wire spelling here prevents a stringly-typed normalizer from growing
+/// an accidental sixth variant.
+#[derive(Clone, Copy)]
+enum ConfigureFailureCode {
+    UnsupportedSchema,
+    UiUnavailable,
+    UnmanagedCollision,
+    StalePlan,
+    RollbackFailed,
+}
+
+impl ConfigureFailureCode {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "CLI.CONFIGURE_UNSUPPORTED_SCHEMA" => Some(Self::UnsupportedSchema),
+            "CLI.CONFIGURE_UI_UNAVAILABLE" => Some(Self::UiUnavailable),
+            "CLI.CONFIGURE_UNMANAGED_COLLISION" => Some(Self::UnmanagedCollision),
+            "CLI.CONFIGURE_STALE_PLAN" => Some(Self::StalePlan),
+            "CLI.CONFIGURE_ROLLBACK_FAILED" => Some(Self::RollbackFailed),
+            _ => None,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::UnsupportedSchema => "CLI.CONFIGURE_UNSUPPORTED_SCHEMA",
+            Self::UiUnavailable => "CLI.CONFIGURE_UI_UNAVAILABLE",
+            Self::UnmanagedCollision => "CLI.CONFIGURE_UNMANAGED_COLLISION",
+            Self::StalePlan => "CLI.CONFIGURE_STALE_PLAN",
+            Self::RollbackFailed => "CLI.CONFIGURE_ROLLBACK_FAILED",
+        }
+    }
+}
+
+fn configure_protocol_error(message: impl Into<String>) -> CliError {
+    CliError::backend_protocol(message)
+        .with_cause("the configure planner response did not satisfy the v1 protocol")
+        .with_detail(consts::FIELD_SCRIPT, json!(CONFIGURE_SCRIPT))
+        .with_suggested_action(CONFIGURE_PROTOCOL_RECOVERY)
+        .with_documentation("sc-lint docs configuration")
+}
+
 #[expect(
     clippy::result_large_err,
     reason = "The thin configure dispatcher must retain stable recovery data while it normalizes the Python planner result."
@@ -622,13 +669,11 @@ fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError>
     }
     let output = configure_planner_output(command, request)?;
     let payload: Value = serde_json::from_slice(&output.stdout).map_err(|error| {
-        CliError::backend_protocol("sc-lint configure planner returned malformed JSON")
+        configure_protocol_error("sc-lint configure planner returned malformed JSON")
             .with_source(error)
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
     })?;
     let object = payload.as_object().ok_or_else(|| {
-        CliError::backend_protocol("sc-lint configure planner returned a non-object payload")
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        configure_protocol_error("sc-lint configure planner returned a non-object payload")
     })?;
     match object.get("ok").and_then(Value::as_bool) {
         Some(true) => {
@@ -637,16 +682,14 @@ fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError>
                 .cloned()
                 .filter(Value::is_object)
                 .ok_or_else(|| {
-                    CliError::backend_protocol("sc-lint configure planner returned no plan data")
-                        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+                    configure_protocol_error("sc-lint configure planner returned no plan data")
                 })?;
             Ok(CommandSuccess::direct(data))
         }
         Some(false) => Err(normalize_configure_failure(object)?),
-        None => Err(CliError::backend_protocol(
+        None => Err(configure_protocol_error(
             "sc-lint configure planner omitted the result status",
-        )
-        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))),
+        )),
     }
 }
 
@@ -670,7 +713,7 @@ fn configure_planner_output(
                 "sc-lint configure could not read the JSON request from standard input",
             )
             .with_source(error)
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+            .with_detail(consts::FIELD_SCRIPT, json!(CONFIGURE_SCRIPT))
             .with_suggested_action(
                 "Provide one complete JSON request on standard input, then rerun configure.",
             )
@@ -684,14 +727,14 @@ fn configure_planner_output(
         .map_err(configure_planner_start_error)?;
     let mut child_stdin = child.stdin.take().ok_or_else(|| {
         CliError::backend_failure("sc-lint configure could not open planner standard input")
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+            .with_detail(consts::FIELD_SCRIPT, json!(CONFIGURE_SCRIPT))
     })?;
     child_stdin.write_all(&request_bytes).map_err(|error| {
         CliError::backend_failure(
             "sc-lint configure could not forward the JSON request to the planner",
         )
         .with_source(error)
-        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        .with_detail(consts::FIELD_SCRIPT, json!(CONFIGURE_SCRIPT))
         .with_suggested_action(
             "Provide one complete JSON request on standard input, then rerun configure.",
         )
@@ -700,14 +743,14 @@ fn configure_planner_output(
     child.wait_with_output().map_err(|error| {
         CliError::backend_failure("sc-lint configure planner did not finish")
             .with_source(error)
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+            .with_detail(consts::FIELD_SCRIPT, json!(CONFIGURE_SCRIPT))
     })
 }
 
 fn configure_planner_start_error(error: std::io::Error) -> CliError {
     CliError::backend_failure("sc-lint configure planner failed to start")
         .with_source(error)
-        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        .with_detail(consts::FIELD_SCRIPT, json!(CONFIGURE_SCRIPT))
 }
 
 fn configure_script_candidates_for_executable(executable: &Path) -> Vec<PathBuf> {
@@ -716,11 +759,11 @@ fn configure_script_candidates_for_executable(executable: &Path) -> Vec<PathBuf>
     };
     let mut candidates = vec![
         bin_dir.join("sc_lint_configure.py"),
-        bin_dir.join("scripts/sc_lint_configure.py"),
+        bin_dir.join(CONFIGURE_SCRIPT),
     ];
     if let Some(prefix) = bin_dir.parent() {
-        candidates.push(prefix.join("scripts/sc_lint_configure.py"));
-        candidates.push(prefix.join("share/sc-lint/scripts/sc_lint_configure.py"));
+        candidates.push(prefix.join(CONFIGURE_SCRIPT));
+        candidates.push(prefix.join("share/sc-lint").join(CONFIGURE_SCRIPT));
     }
     candidates
 }
@@ -736,7 +779,7 @@ fn configure_script_candidates() -> Vec<PathBuf> {
             .parent()
             .and_then(Path::parent)
             .expect("sc-lint crate has a workspace root")
-            .join("scripts/sc_lint_configure.py"),
+            .join(CONFIGURE_SCRIPT),
     );
     candidates
 }
@@ -765,7 +808,7 @@ fn configure_script_path_from_candidates(candidates: &[PathBuf]) -> Result<PathB
     let searched = candidates
         .first()
         .cloned()
-        .unwrap_or_else(|| PathBuf::from("scripts/sc_lint_configure.py"));
+        .unwrap_or_else(|| PathBuf::from(CONFIGURE_SCRIPT));
     Err(CliError::backend_failure("sc-lint configure planner asset is unavailable")
         .with_cause("the planner script or its schema helper was not found in a supported install layout")
         .with_detail(consts::FIELD_SCRIPT, json!(searched.display().to_string()))
@@ -786,41 +829,30 @@ fn normalize_configure_failure(
         .get("error")
         .and_then(Value::as_object)
         .ok_or_else(|| {
-            CliError::backend_protocol("sc-lint configure planner returned no error object")
-                .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+            configure_protocol_error("sc-lint configure planner returned no error object")
         })?;
     let message = error
         .get("message")
         .and_then(Value::as_str)
         .ok_or_else(|| {
-            CliError::backend_protocol("sc-lint configure planner error omitted message")
-                .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+            configure_protocol_error("sc-lint configure planner error omitted message")
         })?;
-    let code = error.get("code").and_then(Value::as_str).ok_or_else(|| {
-        CliError::backend_protocol("sc-lint configure planner error omitted code")
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    let code = error
+        .get("code")
+        .and_then(Value::as_str)
+        .ok_or_else(|| configure_protocol_error("sc-lint configure planner error omitted code"))?;
+    let stable_code = ConfigureFailureCode::parse(code).ok_or_else(|| {
+        configure_protocol_error("sc-lint configure planner returned an unknown stable error code")
+            .with_detail("reported_code", json!(code))
     })?;
-    let stable_code = match code {
-        "CLI.CONFIGURE_UNSUPPORTED_SCHEMA" => "CLI.CONFIGURE_UNSUPPORTED_SCHEMA",
-        "CLI.CONFIGURE_UI_UNAVAILABLE" => "CLI.CONFIGURE_UI_UNAVAILABLE",
-        "CLI.CONFIGURE_UNMANAGED_COLLISION" => "CLI.CONFIGURE_UNMANAGED_COLLISION",
-        "CLI.CONFIGURE_STALE_PLAN" => "CLI.CONFIGURE_STALE_PLAN",
-        "CLI.CONFIGURE_ROLLBACK_FAILED" => "CLI.CONFIGURE_ROLLBACK_FAILED",
-        _ => {
-            return Err(CliError::backend_protocol(
-                "sc-lint configure planner returned an unknown stable error code",
-            )
-            .with_detail("reported_code", json!(code)));
-        }
-    };
     let cause = required_configure_string(error, "cause")?;
     let pointer = required_configure_pointer(error)?;
     let recovery = required_configure_string(error, "recovery")?;
     let recovery_description = required_configure_string(error, "recovery_description")?;
     let docs_ref = required_configure_string(error, "docs_ref")?;
     let normalized = CliError::config(message)
-        .with_code(stable_code)
-        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        .with_code(stable_code.as_str())
+        .with_detail(consts::FIELD_SCRIPT, json!(CONFIGURE_SCRIPT))
         .with_cause(cause)
         .with_detail("pointer", pointer)
         .with_detail("recovery", json!(recovery))
@@ -841,8 +873,7 @@ fn required_configure_string(
         .get(field)
         .and_then(Value::as_str)
         .ok_or_else(|| {
-            CliError::backend_protocol(format!("sc-lint configure planner error omitted {field}"))
-                .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+            configure_protocol_error(format!("sc-lint configure planner error omitted {field}"))
         })
         .map(ToOwned::to_owned)
 }
@@ -853,16 +884,14 @@ fn required_configure_string(
 )]
 fn required_configure_pointer(error: &serde_json::Map<String, Value>) -> Result<Value, CliError> {
     let pointer = error.get("pointer").ok_or_else(|| {
-        CliError::backend_protocol("sc-lint configure planner error omitted pointer")
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        configure_protocol_error("sc-lint configure planner error omitted pointer")
     })?;
     if pointer.is_null() || pointer.is_string() {
         return Ok(pointer.clone());
     }
-    Err(
-        CliError::backend_protocol("sc-lint configure planner error returned a non-string pointer")
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py")),
-    )
+    Err(configure_protocol_error(
+        "sc-lint configure planner error returned a non-string pointer",
+    ))
 }
 
 fn python_command() -> OsString {

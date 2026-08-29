@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -77,11 +76,9 @@ class AgentJsonAndSkillTests(unittest.TestCase):
     def configure(
         self, root: Path, request: Path | str, *, input_text: str | None = None
     ) -> subprocess.CompletedProcess[str]:
-        environment = os.environ.copy()
-        environment["PATH"] = f"{BINARY.parent}{os.pathsep}{environment.get('PATH', '')}"
         return subprocess.run(
             [
-                "sc-lint",
+                str(BINARY),
                 "configure",
                 "--request",
                 str(request),
@@ -91,7 +88,6 @@ class AgentJsonAndSkillTests(unittest.TestCase):
                 "--json",
             ],
             cwd=ROOT,
-            env=environment,
             input=input_text,
             check=False,
             capture_output=True,
