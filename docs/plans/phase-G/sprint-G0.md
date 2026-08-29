@@ -8,6 +8,7 @@ stack: A
 stack_base: feature/phase-G-planning
 target: develop (via stack A, PR base feature/phase-G-planning)
 owner: clint
+owner: clint
 ---
 
 # Sprint G.0 — Abandon Phase F And Record ADR-015 / ADR-016

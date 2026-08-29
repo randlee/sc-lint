@@ -8,6 +8,7 @@ stack: B
 stack_base: develop
 target: develop (via stack B, PR base develop)
 owner: cfast
+owner: cfast
 ---
 
 # Sprint G.3a — sc-lint Python Bindings Via Maturin

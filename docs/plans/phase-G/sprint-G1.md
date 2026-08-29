@@ -8,6 +8,7 @@ stack: A
 stack_base: sprint/G.0-abandon-phase-F
 target: develop (via stack A, PR base sprint/G.0-abandon-phase-F)
 owner: clint
+owner: clint
 ---
 
 # Sprint G.1 — sc-lint Adoption Kit

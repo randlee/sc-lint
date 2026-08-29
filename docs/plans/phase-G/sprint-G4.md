@@ -4,6 +4,7 @@ title: First-Wave Consumer Adoption And sc-publish Delegation
 status: planned
 branch: n/a (consumer repositories and ../sc-publish)
 target: each consumer's develop
+owner: clint
 ---
 
 # Sprint G.4 — First-Wave Consumer Adoption And sc-publish Delegation
