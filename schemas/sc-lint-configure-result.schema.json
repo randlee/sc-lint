@@ -38,8 +38,11 @@
       "required": ["code", "pointer", "recovery", "docs_ref"],
       "properties": {
         "code": {"enum": ["CLI.CONFIGURE_UNSUPPORTED_SCHEMA", "CLI.CONFIGURE_UI_UNAVAILABLE", "CLI.CONFIGURE_UNMANAGED_COLLISION", "CLI.CONFIGURE_STALE_PLAN", "CLI.CONFIGURE_ROLLBACK_FAILED"]},
+        "message": {"type": "string", "minLength": 1},
+        "cause": {"type": "string", "minLength": 1},
         "pointer": {"type": ["string", "null"]},
         "recovery": {"type": "string", "minLength": 1},
+        "recovery_description": {"type": "string", "minLength": 1},
         "docs_ref": {"type": "string", "minLength": 1}
       }
     }

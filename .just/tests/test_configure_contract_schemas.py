@@ -60,7 +60,20 @@ class ConfigureContractSchemaTests(unittest.TestCase):
     def test_every_configure_error_fixture_validates(self) -> None:
         for fixture in sorted(FIXTURES.glob("result-error-*.json")):
             with self.subTest(fixture=fixture.name):
-                validate("sc-lint-configure-result.schema.json", load_json(fixture))
+                error_fixture = load_json(fixture)
+                validate("sc-lint-configure-result.schema.json", error_fixture)
+                self.assertTrue(error_fixture["error"]["message"])
+                self.assertTrue(error_fixture["error"]["cause"])
+                self.assertTrue(error_fixture["error"]["recovery_description"])
+
+    def test_plan_and_result_reject_invalid_fixtures(self) -> None:
+        for fixture_name, schema_name in (
+            ("invalid-plan-missing-plan-id.json", "sc-lint-configure-plan.schema.json"),
+            ("invalid-result-unknown-error-code.json", "sc-lint-configure-result.schema.json"),
+        ):
+            with self.subTest(fixture=fixture_name):
+                with self.assertRaises(AssertionError):
+                    validate(schema_name, load_json(FIXTURES / fixture_name))
 
     def test_success_data_is_the_verbatim_plan_fixture(self) -> None:
         success = load_json(FIXTURES / "result-success.json")

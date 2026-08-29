@@ -140,6 +140,8 @@ Contents:
   — installed-product consumer commands and generated Just integration
 - [`adr/ADR-013-analyzer-shared-support.md`](./adr/ADR-013-analyzer-shared-support.md)
   — shared rule-neutral AST support without analyzer-to-analyzer dependencies
+- [`adr/ADR-014-consumer-configuration-automation.md`](./adr/ADR-014-consumer-configuration-automation.md)
+  — Phase F's JSON-driven consumer configuration and safe established-repository path
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
 - [`../../README.md`](../../README.md) — top-level CLI crate and workspace guide
@@ -439,6 +441,14 @@ Related architecture decisions:
   — accepted observability boundary seams and future direct-link constraints
 - [`./adr/ADR-010-portability-scope-and-parity.md`](./adr/ADR-010-portability-scope-and-parity.md)
   — shared portability ownership/parity policy for Windows-path, env, and shell lint expansion
+- [`./adr/ADR-011-interface-versioning-and-published-artifacts.md`](./adr/ADR-011-interface-versioning-and-published-artifacts.md)
+  — interface-family versioning and published report-artifact policy
+- [`./adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
+  — installed-product consumer adoption and generated Just integration
+- [`./adr/ADR-013-analyzer-shared-support.md`](./adr/ADR-013-analyzer-shared-support.md)
+  — shared rule-neutral AST support without analyzer-to-analyzer dependencies
+- [`./adr/ADR-014-consumer-configuration-automation.md`](./adr/ADR-014-consumer-configuration-automation.md)
+  — proposed JSON-driven configuration and safe established-repository replacement
 
 Planned A.8 user-guide convention:
 

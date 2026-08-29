@@ -246,11 +246,11 @@ details but may not change these fields or their meaning.
 <!-- configure-contract-fixture: result-errors -->
 ```json
 [
-  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UNSUPPORTED_SCHEMA","pointer":"/schema_version","recovery":"use_supported_schema_version","docs_ref":"sc-lint docs configuration"}},
-  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UI_UNAVAILABLE","pointer":"/ui","recovery":"rerun_with_request_json","docs_ref":"sc-lint docs configuration"}},
-  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UNMANAGED_COLLISION","pointer":"/operations/1","recovery":"review_exported_patch","docs_ref":"sc-lint docs troubleshooting"}},
-  {"ok":false,"command":"configure.apply","error":{"code":"CLI.CONFIGURE_STALE_PLAN","pointer":"/plan_id","recovery":"regenerate_and_review_plan","docs_ref":"sc-lint docs configuration"}},
-  {"ok":false,"command":"configure.apply","error":{"code":"CLI.CONFIGURE_ROLLBACK_FAILED","pointer":null,"recovery":"restore_listed_backups","docs_ref":"sc-lint docs troubleshooting"}}
+  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UNSUPPORTED_SCHEMA","message":"The request uses an unsupported configure schema.","cause":"schema_version is not v1","pointer":"/schema_version","recovery":"use_supported_schema_version","recovery_description":"Use a supported schema version and regenerate the request.","docs_ref":"sc-lint docs configuration"}},
+  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UI_UNAVAILABLE","message":"The requested configuration UI is unavailable.","cause":"the Wyvern launcher could not start","pointer":"/ui","recovery":"rerun_with_request_json","recovery_description":"Rerun configure with a JSON request while the UI is unavailable.","docs_ref":"sc-lint docs configuration"}},
+  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UNMANAGED_COLLISION","message":"An existing user-owned integration conflicts with the proposed change.","cause":"the file does not match a managed integration fingerprint","pointer":"/operations/1","recovery":"review_exported_patch","recovery_description":"Review the exported patch; no user-owned file was modified.","docs_ref":"sc-lint docs troubleshooting"}},
+  {"ok":false,"command":"configure.apply","error":{"code":"CLI.CONFIGURE_STALE_PLAN","message":"The reviewed configuration plan is stale.","cause":"a source digest changed after the plan was generated","pointer":"/plan_id","recovery":"regenerate_and_review_plan","recovery_description":"Regenerate the plan and review it before applying changes.","docs_ref":"sc-lint docs configuration"}},
+  {"ok":false,"command":"configure.apply","error":{"code":"CLI.CONFIGURE_ROLLBACK_FAILED","message":"The configuration transaction could not restore every prior file.","cause":"a staged write or validation failure left restoration incomplete","pointer":null,"recovery":"restore_listed_backups","recovery_description":"Restore the listed backup files before retrying.","docs_ref":"sc-lint docs troubleshooting"}}
 ]
 ```
 

@@ -321,8 +321,6 @@ recovery action, and offline documentation reference. `ConfigureError`
 normalizes into the common `CliError` envelope rather than introducing a
 separate human-only channel.
 
-## Compatibility And Version-Probe Contract
-
 ## Consumer Integration And Profile Contract
 
 Consumer mode is selected by command shape, never by a repository name,
@@ -353,6 +351,8 @@ command = ["cargo", "fmt", "--all", "--check"]
 name = "workspace"
 command = ["cargo", "test", "--workspace"]
 ```
+
+## Compatibility And Version-Probe Contract
 
 The only consumer minimum-version location is:
 

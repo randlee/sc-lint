@@ -43,16 +43,22 @@ transformer can act on an approved plan.
 
 The plan is separate from the top-level result envelope so F.2 can create it
 and F.4a/F.4b can consume it verbatim. It has a versioned identifier,
-operation order, conflicts, and manual steps. A `needs_confirmation` operation
-must name its reason and allowed choices. A `manual_conflict` must carry both a
-typed conflict and an exportable unified diff; neither is a permission to
-write an unknown file.
+operation order, conflicts, and manual steps. `operation_id` is the
+cross-collection join key: every item in `conflicts` and every
+`manual_steps[].operation_id` names an entry in `operations[].operation_id`.
+The schema gives each occurrence one shared identifier type; F.2 validates
+that the named operation exists when it builds a plan. A
+`needs_confirmation` operation must name its reason and allowed choices. A
+`manual_conflict` must carry both a typed conflict and an exportable unified
+diff; neither is a permission to write an unknown file.
 
 Result success uses the normal CLI envelope with the plan under `data`.
 Failures use a fixed configure-code set and include a JSON pointer (or `null`
-when no pointer applies), recovery action, and offline documentation reference.
-`ConfigureError` normalizes through this envelope; it is not a second error
-format.
+when no pointer applies), a stable `recovery` token, a short human-readable
+`recovery_description`, and an offline documentation reference. Optional
+`message` and `cause` fields retain the common `CliError` explanatory context
+without creating a second error shape. `ConfigureError` normalizes through
+this envelope; it is not a second error format.
 
 ## Golden Fixtures
 
