@@ -30,6 +30,11 @@ Contents:
   portability plan
 - [`phase-D-plan.md`](../plans/phase-D/phase-D-plan.md) — Phase D
   boundary-inventory improvement plan
+- [`phase-F-plan.md`](../plans/phase-F/phase-F-plan.md) — consumer setup
+  automation plan: shallow conventional-path context, JSON-driven and
+  Python/Wyvern-guided explanatory configuration, safe established-repository
+  replacement; Phase P separately qualifies and converts both sc-compose and
+  atm-core with the released artifact
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and phase-plan touchpoint guide
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
@@ -111,6 +116,18 @@ Contents:
   sprint
 - [`sprint-D1.md`](../plans/phase-D/sprint-D1.md) — direct workspace package-edge
   enforcement planning sprint
+- [`sprint-F1.md`](../plans/phase-F/sprint-F1.md) — configuration contract,
+  requirements, and ADR sprint
+- [`sprint-F2.md`](../plans/phase-F/sprint-F2.md) — bounded conventional-path
+  context and deterministic configuration-plan sprint
+- [`sprint-F3a-wizard-ux-contract.md`](../plans/phase-F/sprint-F3a-wizard-ux-contract.md) — field-level wizard UX contract and fixture handoff
+- [`sprint-F3b-wyvern-capability-gate.md`](../plans/phase-F/sprint-F3b-wyvern-capability-gate.md) — released Wyvern capability qualification
+- [`sprint-F3c-agent-json-and-skill.md`](../plans/phase-F/sprint-F3c-agent-json-and-skill.md) — agent JSON contract and setup skill
+- [`sprint-F3d-wizard-adapter-and-pages.md`](../plans/phase-F/sprint-F3d-wizard-adapter-and-pages.md) — thin Wyvern launcher and pages
+- [`sprint-F3e-wizard-acceptance-and-docs.md`](../plans/phase-F/sprint-F3e-wizard-acceptance-and-docs.md) — wizard acceptance, accessibility, and docs
+- [`sprint-F4a-transactional-apply-and-just.md`](../plans/phase-F/sprint-F4a-transactional-apply-and-just.md) — transactional config/Just integration
+- [`sprint-F4b-action-and-workflow-transformer.md`](../plans/phase-F/sprint-F4b-action-and-workflow-transformer.md) — config-derived Action and workflow transformer
+- [`sprint-F5.md`](../plans/phase-F/sprint-F5.md) — release, documentation, and Phase P qualification handoff; Phase P owns the separate sc-compose and atm-core qualification/conversion PRs
 - [`cli-requirements.md`](./cli-requirements.md) — detailed requirements for
   the planned top-level `sc-lint` CLI
 - [`cli-architecture.md`](./cli-architecture.md) — detailed architecture for

@@ -529,6 +529,42 @@ The product should support both:
   form, exact-pin recommendation, and recoverable error contract are part of
   the released product interface.
 
+### Phase F consumer setup automation (planned)
+
+- `REQ-PRODUCT-023`
+  The released product must provide a consumer-configuration operation that
+  can plan and safely apply Phase E integration in both an empty repository
+  and an established repository with a user-owned Justfile or CI workflow.
+  It must use one typed, versioned request/plan contract for interactive human
+  and noninteractive agent invocation; it must discover facts without running
+  lint/test/install commands, show all proposed changes before mutation, and
+  apply only digest-checked operations through a validated rollback-capable
+  transaction. A differing unknown user-owned file is a structured conflict,
+  not an inferred overwrite. The operation must never write a consumer README,
+  copy a source-checkout utility, invoke `cargo run -p`, or require a consumer
+  to create an installer or reconstruct a product profile.
+
+- `REQ-PRODUCT-024`
+  The product must provide a guided setup experience over that same request
+  contract. It must accept machine JSON supplied by an agent and provide an
+  optional interactive UI without making a UI prerequisite for automation.
+  The interactive flow must present one reviewable page for baseline,
+  boundary, portability, runtime, attributes/directives, and any selected
+  consumer command groups; each page states detected facts and recommended
+  settings and permits explicit accept, modification, or disablement. The
+  final confirmation renders the exact plan and no cancellation/error may
+  mutate the target repository.
+
+- `REQ-PRODUCT-025`
+  A configured consumer has one compatibility-version authority:
+  `[tool.sc-lint].minimum_version` in `sc-lint.toml`. Generated Just assets,
+  local bootstrap, and the reusable GitHub Action must select/preflight the
+  same declared version. An Action may accept an optional version assertion
+  only to reject drift; it must not select an artifact different from the
+  config. Established-repository conversion must preserve existing unrelated
+  Just/CI content and may delete only exact, documented legacy integration
+  assets after replacement validation.
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements

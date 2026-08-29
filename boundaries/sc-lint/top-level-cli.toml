@@ -17,7 +17,7 @@ constructor = "none"
 # the CLI contract as `CommandEnvelope<T>`. ADR-009 also locks the current
 # observability seam list: `contract::ServiceName`, `logging::ObservedCommand`,
 # `logging::dispatch_event`, and the existing `CommandEnvelope.command` field.
-roots = ["CheckTarget", "Cli", "ClippyTarget", "CompatibilityCommand", "Command", "DocsGuide", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "MinimumVersion", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "contract::ServiceName", "logging::ObservedCommand", "logging::dispatch_event", "run"]
+roots = ["CheckTarget", "Cli", "ClippyTarget", "CompatibilityCommand", "Command", "ConfigureCommand", "DocsGuide", "LintTarget", "ViewTarget", "CommandContext", "DispatchTelemetry", "LoadedConfig", "MinimumVersion", "CommandEnvelope", "CliError", "CliErrorKind", "ConfigureError", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "contract::ServiceName", "logging::ObservedCommand", "logging::dispatch_event", "run"]
 
 [dependencies]
 # Release 0.1.x permits direct linkage only to the boundary backend crate, the

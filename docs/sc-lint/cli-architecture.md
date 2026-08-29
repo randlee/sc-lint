@@ -8,6 +8,7 @@ Related ADRs:
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
 - [`./adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
+- [`./adr/ADR-014-consumer-configuration-automation.md`](./adr/ADR-014-consumer-configuration-automation.md)
 
 ## Role
 
@@ -83,6 +84,16 @@ the configuration boundary and run in the config directory. `lint --consumer
 source-maintainer profile path. The root repository's maintenance Justfile
 remains a distinct source-maintainer surface.
 
+Phase F adds a separate established-repository path: `sc-lint configure`.
+`ConfigureCommand` is the public parser root for its context, plan, and apply
+subcommands, while `ConfigureError` is its structured error family. Both are
+registered `BOUNDARY-ScLintCli` composition roots and keep the existing
+`CommandEnvelope<T>`/recovery contract; they do not form a second CLI or error
+surface. `configure` owns policy validation and plan/apply dispatch. The
+optional Python/Wyvern adapter only presents the same versioned JSON request
+and cannot mutate a consumer repository. Its crate-private apply artifacts are
+documented in the crate architecture and ADR-014, not exposed as CLI plugins.
+
 ## Initial Command Families
 
 - `lint`
@@ -93,6 +104,12 @@ remains a distinct source-maintainer surface.
   - version and upgrade inspection
 - `ci`
   - repo CI-equivalent orchestration including tests
+
+Planned Phase F command family:
+
+- `configure`
+  - product-owned consumer setup/replacement with versioned JSON context,
+    reviewed plan, and later explicit apply
 
 Planned direct platform-aware command family:
 
@@ -193,6 +210,11 @@ types explicitly:
     - message
     - optional details
     - optional suggested action
+- `ConfigureCommand`
+  - public Phase F parser root for `configure.plan` and `configure.apply`
+- `ConfigureError`
+  - public Phase F structured configure failure family, normalized through the
+    same `CliError`-compatible machine envelope and recovery contract
 
 The implemented public contract exports `Cli`, `Command`, `CommandEnvelope<T>`,
 and `CliError`. Profile selection and machine-mode selection remain CLI-owned
@@ -217,6 +239,10 @@ letting each command family invent its own local pattern:
   - `CommandEnvelope<T>` serialization and success helpers
 - `error`
   - `CliError`, stable code mapping, and recovery-oriented constructors
+- `configure`
+  - Phase F `ConfigureCommand`, schema/context/plan dispatch, and
+    `ConfigureError` normalization; private apply artifacts remain below this
+    public command boundary
 - `dispatch`
   - backend selection and execution
 - `render`

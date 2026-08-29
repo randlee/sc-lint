@@ -18,6 +18,16 @@ source-checkout, or analyzer-package interface.
 | GA-007 | The stable adoption form is `randlee/sc-lint@v1`. Security-sensitive consumers must pin the exact immutable action commit and state the product `version` explicitly. Release publication refreshes the movable `v1` Action tag only after the release is published. | [CI guide](../../docs-bundle/ci.md), [release workflow](../../.github/workflows/release.yml) |
 | GA-008 | The Action supports an explicit local `artifact-url` and `checksums-url` for hermetic fixtures/offline mirrors; it never silently falls back to a package manager, Cargo, a source checkout, or an analyzer package name. | [`action.yml`](../../action.yml), all-platform fixture in [`action/test/action.test.cjs`](../../action/test/action.test.cjs), [CI guide](../../docs-bundle/ci.md) |
 
+## Planned Phase F version-authority amendment
+
+Phase F (`REQ-PRODUCT-025`) replaces the independent required `version` input
+with config-derived selection: the Action parses
+`[tool.sc-lint].minimum_version` from `config-path` and uses that exact value
+for its archive and compatibility preflight. A transitional `version` input,
+if retained, is optional assertion-only and must fail on semantic mismatch; it
+cannot select an archive. F.4b owns implementation and updates the input
+table, fixtures, CI guide, and release behavior together.
+
 ## Inputs and outputs
 
 | Input | Required | Default | Meaning |
