@@ -8,7 +8,6 @@ stack: A
 stack_base: sprint/G.1-adoption-kit
 target: develop (via stack A, PR base sprint/G.1-adoption-kit)
 owner: clint
-owner: clint
 ---
 
 # Sprint G.2 — Adoption Skill, Agent Prompts, Marketplace Entry

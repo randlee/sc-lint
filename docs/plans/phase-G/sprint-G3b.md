@@ -8,7 +8,6 @@ stack: B
 stack_base: sprint/G.3a-python-bindings
 target: develop (via stack B, PR base sprint/G.3a-python-bindings)
 owner: cfast
-owner: cfast
 ---
 
 # Sprint G.3b — Self-Contained Release And Consumer-Blocking Lint Fixes
