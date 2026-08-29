@@ -228,6 +228,10 @@ required_variables:
           unless the sprint consumes a named released artifact
         - every sprint with a layer above it has an `## Unblock Milestone`
           section naming the minimum functionality the next layer needs
+        - the phase plan has an `## ADR Status` table (`ADR | Title | Status |
+          Approved by`) listing every ADR the phase depends on, every row
+          reads `Accepted` with a named approver, and no sprint doc lists
+          writing or approving one of those ADRs as a deliverable
 
       Each entry in the task list must include:
         - Finding number
@@ -243,6 +247,8 @@ required_variables:
         <type id="NON-PROD">A sprint deliverable is described in a way that would allow shape-only, test-only, or non-production-ready completion.</type>
         <type id="MISSING-CODE-SAMPLE">An important trait, feature, enum, protocol type, or boundary contract is committed by the plan but not illustrated with an explicit code sample or signature.</type>
         <type id="ORDERING">Task dependencies are missing or incorrectly ordered such that a dev agent could begin work out of sequence.</type>
+        <type id="UNBLOCK-MILESTONE">A sprint with a layer above it has no `## Unblock Milestone` section, or its milestone names sprint completion, CI, or merge instead of the minimum functionality the next layer needs.</type>
+        <type id="ADR-PENDING">An ADR the phase depends on is missing from the phase-plan `## ADR Status` table, is not `Accepted`, has no named approver, or is scheduled as a sprint deliverable.</type>
         <type id="STACK-SHAPE">The phase plan lacks a `## Branch Stacks And Parallelism` section, a sprint frontmatter disagrees with the stack diagram, or sprints are serialized into one chain when the deliverables could be partitioned into parallel stacks.</type>
         <type id="SCOPE-CONFLICT">The task framing, repo docs, or team-lead concerns materially change the user-discussed deliverable scope; hardening must stop and push back instead of adopting the new scope.</type>
       </finding-types>
