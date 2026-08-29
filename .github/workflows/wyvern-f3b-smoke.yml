@@ -1,0 +1,64 @@
+name: Wyvern F.3b capability smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            archive: wyvern_0.6.0_x86_64-unknown-linux-gnu.tar.gz
+          - os: macos-14
+            archive: wyvern_0.6.0_aarch64-apple-darwin.tar.gz
+          - os: macos-13
+            archive: wyvern_0.6.0_x86_64-apple-darwin.tar.gz
+          - os: windows-latest
+            archive: wyvern_0.6.0_x86_64-pc-windows-msvc.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Download immutable release assets
+        shell: bash
+        env:
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          set -euo pipefail
+          base="https://github.com/randlee/wyvern/releases/download/v0.6.0"
+          curl --fail --location --retry 3 --output "$ARCHIVE" "$base/$ARCHIVE"
+          curl --fail --location --retry 3 --output checksums.txt "$base/checksums.txt"
+          grep "  $ARCHIVE$" checksums.txt > expected-checksum.txt
+          if command -v sha256sum >/dev/null; then
+            sha256sum --check expected-checksum.txt
+          else
+            shasum -a 256 -c expected-checksum.txt
+          fi
+      - name: Extract release archive and run protocol matrix
+        shell: bash
+        env:
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          set -euo pipefail
+          python - "$ARCHIVE" <<'PY'
+          import pathlib
+          import sys
+          import tarfile
+          import zipfile
+
+          archive = pathlib.Path(sys.argv[1])
+          if archive.suffix == ".zip":
+              with zipfile.ZipFile(archive) as source:
+                  source.extractall("release")
+          else:
+              with tarfile.open(archive) as source:
+                  source.extractall("release")
+          PY
+          binary="$(find release -type f \( -name wyvern -o -name wyvern.exe \) -print -quit)"
+          test -n "$binary"
+          python docs/sc-lint/configure-wizard-fixtures/wyvern-smoke/run_smoke.py --binary "$binary"

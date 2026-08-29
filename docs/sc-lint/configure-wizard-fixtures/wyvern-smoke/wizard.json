@@ -1,0 +1,12 @@
+{
+  "type": "wizard",
+  "page": {
+    "id": "overview",
+    "title": "Overview",
+    "html": "pages/overview.html"
+  },
+  "config": {
+    "protocol_version": "wizard-http-v1",
+    "fixture": "sc-lint-f3b"
+  }
+}
