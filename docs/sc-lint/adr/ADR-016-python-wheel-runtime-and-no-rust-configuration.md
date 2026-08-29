@@ -44,8 +44,13 @@ same problem for `sc-compose` by provisioning a pinned wheel.
    analyzers are declarative configuration, never bootstrap, wheel, or Rust
    edits. ADR-012's four recipes are thus exactly four kit-owned names;
    arguments and consumer-owned recipes are permitted.
-4. A profile entry in `sc-lint.toml` may reference only a shipped binary or
-   a `sc_lint` module; never a repository-relative script.
+4. A **kit-rendered** profile or layer entry in `sc-lint.toml` may reference
+   only a shipped binary or a `sc_lint` module; never a repository-relative
+   script. Consumer-owned entries (steps the consumer adds to a profile or
+   layer outside the kit-rendered set) may invoke any command, including
+   repository-local scripts; the kit never renders, validates, or drifts on
+   them. (Amended 2026-08-29, approved by user (Rand Lee); previously the
+   restriction applied to every entry.)
 
 Resolution sequence performed by `.sc-lint/bootstrap <op>`:
 
@@ -72,9 +77,10 @@ Pre/post work is an ordinary extra layer step, not a hook DSL. The kit pins only
 `sc-lint`; other toolchain pins remain consumer-owned. Validate/view/bench/fuzz
 dispatchers are consumer-owned Justfile recipes outside the managed import
 block. Patterns observed independently in 2+ consumer repositories may be
-promoted into the kit under Locked Principle 9. Profile entries remain limited
-to shipped binaries or `sc_lint` modules; no domain-lint script extension is
-authorized here.
+promoted into the kit under Locked Principle 9. Kit-rendered entries remain
+limited to shipped binaries or `sc_lint` modules (Decision 4); consumer-owned
+domain-lint steps may reference repository-local scripts and are the primary
+extension point for repo-specific enforcement.
 
 ## Consequences
 

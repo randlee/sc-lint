@@ -70,7 +70,7 @@ From Phase F" list); everything else is discarded.
 | ADR | Title | Status | Approved by |
 | --- | --- | --- | --- |
 | ADR-015 | Standard Repo Tools Adoption Kit | Accepted | user (Rand Lee) |
-| ADR-016 | Python Wheel Runtime And No Rust For Configuration | Accepted | user (Rand Lee) |
+| ADR-016 | Python Wheel Runtime And No Rust For Configuration | Accepted (Decision 4 amended 2026-08-29: kit-rendered entries only) | user (Rand Lee) |
 
 The ADRs, requirements, and architecture traceability landed on this planning
 branch before implementation. The user accepted both ADRs on 2026-08-29, so no
