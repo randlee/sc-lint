@@ -3,9 +3,10 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-016 |
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-08-29 |
 | Deciders | user, flint, team-lead |
+| Approved by | user (Rand Lee), 2026-08-29 |
 | Related | ADR-012, ADR-015 |
 
 ## Context

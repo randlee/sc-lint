@@ -3,9 +3,10 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-015 |
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-08-29 |
 | Deciders | user, flint, team-lead |
+| Approved by | user (Rand Lee), 2026-08-29 |
 | Supersedes | ADR-014 (Phase F, rejected, never merged) |
 
 ## Context

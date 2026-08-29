@@ -65,13 +65,12 @@ From Phase F" list); everything else is discarded.
 
 | ADR | Title | Status | Approved by |
 | --- | --- | --- | --- |
-| ADR-015 | Standard Repo Tools Adoption Kit | Proposed | pending user approval |
-| ADR-016 | Python Wheel Runtime And No Rust For Configuration | Proposed | pending user approval |
+| ADR-015 | Standard Repo Tools Adoption Kit | Accepted | user (Rand Lee) |
+| ADR-016 | Python Wheel Runtime And No Rust For Configuration | Accepted | user (Rand Lee) |
 
-The ADR drafts, requirements, and architecture traceability land on this
-planning branch before implementation. Their status remains `Proposed` until
-the user approves them; no Phase G orchestration may start while an approval is
-pending.
+The ADRs, requirements, and architecture traceability landed on this planning
+branch before implementation. The user accepted both ADRs on 2026-08-29, so no
+Phase G orchestration approval remains pending.
 
 ## Consumer End State
 
