@@ -29,10 +29,10 @@ owner: cfast
 
 ## Deliverables
 
-- Git housekeeping performed by team-lead, recorded in the PR description:
-  PR #128 closed unmerged; tag `archive/phase-F` at `integrate/phase-F` head;
-  worktrees `sprint/F.*` and `integrate/phase-F` removed; branches deleted
-  after tagging; `worktree-tracking.md` updated.
+- cfast performs and records the git housekeeping in the PR description:
+  close PR #128 unmerged; tag `archive/phase-F` at `integrate/phase-F` head;
+  remove worktrees `sprint/F.*` and `integrate/phase-F`; delete branches after
+  tagging; and update `worktree-tracking.md`.
 
 ## Unblock Milestone
 

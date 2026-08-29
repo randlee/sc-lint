@@ -140,7 +140,7 @@ The only overlapping product/kit path is `.sc-lint/bootstrap*`: G.1 vendors
 the product snapshot and G.3a changes the product implementation. G.3b is
 the sole, higher reconciliation layer and only re-syncs the kit copy after
 the named Stack A merge. No stack takes another stack's commit as its branch
-base. Stack A has three delivery layers and Stack B two, so neither requires
+base. Stack A has three delivery layers and Stack B three, so neither requires
 further subdivision.
 
 ```text
