@@ -32,6 +32,7 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 - `docs/sc-lint/cli-contract.md`
 - `docs/sc-lint/cli-architecture.md`
 - `docs/sc-lint/crate-architecture.md`
+- `docs/sc-lint/README.md`
 - `docs/architecture.md`
 - `docs/issues-inventory.md`
 - `docs/sc-lint/github-action-requirements.md`
@@ -51,6 +52,9 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
   bounded Python launcher, schemas, apply engine, and workflow transformer to
   one product boundary, and name Linux/macOS/Windows fixture evidence as the
   cross-platform validation authority for later sprints.
+- the sc-lint documentation index names every current Phase F sprint and the
+  Phase F/Phase P ownership boundary, so public planning links cannot direct
+  readers to retired sprint files or consumer-conversion scope.
 - the issues inventory records any open F.1 contract ambiguity or external
   qualification blocker with an owner and sprint disposition; no unresolved
   issue may be hidden in a plan footnote.

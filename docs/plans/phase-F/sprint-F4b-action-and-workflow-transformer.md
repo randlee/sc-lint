@@ -18,8 +18,8 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
 
 - F.1 Action/version-authority requirements and ADR-014;
 - F.2 typed plan/conflict contract;
-- F.4a accepted generated `sc-lint.toml`, transactional apply contract, and
-  exported conflict/patch shapes;
+- F.4a accepted generated `sc-lint.toml`, `ManagedArtifact` transaction
+  extension contract, and exported conflict/patch shapes;
 - existing Phase E reusable Action release-artifact, checksum, and offline-doc
   contracts.
 
@@ -29,6 +29,7 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
 - `action.yml`
 - `action/index.js`
 - `action/test/action.test.cjs`
+- `docs/sc-lint/github-action-requirements.md`
 - `tests/configure/test_workflow_transformer.py` (new)
 - `tests/fixtures/configure/workflow/` (new)
 - `docs-bundle/ci.md`
@@ -40,6 +41,9 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
   artifact, and exposes no independent selection input. A retained `version`
   input is optional assertion-only and fails before download when semantically
   unequal to config.
+- F.4b synchronizes the F.1-owned Action version-authority amendment into the
+  Action input table, fixtures, CI guide, and release behavior; it does not
+  redefine the underlying product requirement.
 - the F.4b workflow transformer may create the standalone
   `.github/workflows/sc-lint.yml` only through an F.2/F.4a-approved plan. It
   uses `randlee/sc-lint@v1` with `setup`, `lint`, and `test`, points to the
@@ -49,8 +53,9 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
   unknown, near-match, or user-owned shape produces the F.1
   `manual_conflict`/exportable-patch contract with no write.
 - generated workflow operations participate in the F.4a transaction and its
-  digest recheck/rollback boundary; F.4b validates generated YAML before the
-  transaction commits it but does not implement a second transaction engine.
+  digest recheck/rollback boundary. F.4b supplies the `WorkflowYamlArtifact`
+  `ManagedArtifact` implementation, validates generated YAML before the
+  transaction commits it, and does not implement a second transaction engine.
 
 ## Production-Ready Closure
 
@@ -85,7 +90,9 @@ select an alternate artifact.
 - every **configure workflow-plan** error uses the F.1 stable envelope and
   recovery reference; Action acquisition/runtime errors remain in the
   Action-requirements error family. Every generated workflow operation is
-  committed or rolled back by F.4a's single transaction.
+  committed or rolled back by F.4a's single transaction, including the F.4a
+  synthetic-second-artifact extension scenario and a real `WorkflowYaml`
+  rollback fixture.
 - `docs-bundle/ci.md` documents only the released Action and the four-command
   consumer contract; it does not direct consumers to Cargo, a checkout, copied
   Python, or a manual installer.

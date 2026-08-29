@@ -181,17 +181,18 @@ template—is the authority for consumer evidence and PRs.
 ```text
 F.1 contracts / ADR / requirements
  └─ F.2 shallow context + deterministic JSON plan
-     └─ F.3a wizard UX/specification contract
-         └─ F.3b released Wyvern wizard capability gate
-             └─ F.3c agent JSON and setup skill
-                 └─ F.3d thin launcher and page implementation
-                     └─ F.3e wizard acceptance, accessibility, and docs
-                         └─ F.4a transactional apply and Just migration
-                             └─ F.4b Action and workflow transformer
-                                 └─ F.5 release, documentation, and Phase P qualification handoff
-                                     └─ P.1 dual-reference released-artifact qualification
-                                         ├─ P.2 sc-compose consumer PR
-                                         └─ P.3 atm-core consumer PR
+     ├─ F.3a wizard UX/specification contract
+     │   ├─ F.3b released Wyvern wizard capability gate
+     │   └─ F.3c agent JSON and setup skill
+     │       (F.3b + F.3c) ──> F.3d thin launcher and page implementation
+     │                            └─ F.3e wizard acceptance, accessibility, and docs
+     └─ F.4a transactional apply and Just migration
+         └─ F.4b Action and workflow transformer
+
+(F.3e + F.4b) ──> F.5 release, documentation, and Phase P qualification handoff
+                    └─ P.1 dual-reference released-artifact qualification
+                        ├─ P.2 sc-compose consumer PR
+                        └─ P.3 atm-core consumer PR
 ```
 
 ### F.1 — Contract And Architecture Foundation
@@ -207,14 +208,17 @@ the wizard presents. It deliberately does not become a repository parser.
 ### F.3a–F.3e — Fully Specified, Capability-Gated Wyvern Wizard
 
 The original overloaded F.3 is split before implementation. F.3a writes the
-field-level UX contract and handoff package; F.3b proves a **released** Wyvern
-wizard capability; F.3c delivers the equivalent agent JSON contract; F.3d
-implements only a thin adapter and static pages; and F.3e validates the human
-experience. Wyvern 0.1.0's single-dialog API is not sufficient evidence for
-this flow. `next`/`back` are adequate only when the released dependency also
-provides browser-history data restoration, branching, cancel/dismiss, finish,
-and headless-test behavior. sc-lint must not replace missing capability with a
-Python state machine or an ad-hoc browser application.
+field-level UX contract and handoff package. F.3b proves a **released** Wyvern
+wizard capability while F.3c independently delivers the equivalent agent JSON
+contract; F.3d begins only after both are complete, then F.3e validates the
+human experience. F.4a/F.4b are likewise independent of the optional wizard:
+they are driven by F.1/F.2's schema and plan contract so an agent can preview
+and apply without a browser. F.5 joins the human and apply paths before a
+release handoff. Wyvern 0.1.0's single-dialog API is not sufficient evidence
+for the human flow. `next`/`back` are adequate only when the released dependency
+also provides browser-history data restoration, branching, cancel/dismiss,
+finish, and headless-test behavior. sc-lint must not replace missing capability
+with a Python state machine or an ad-hoc browser application.
 
 - [F.3a UX contract and Wyvern handoff](sprint-F3a-wizard-ux-contract.md)
 - [F.3b released Wyvern capability gate](sprint-F3b-wyvern-capability-gate.md)

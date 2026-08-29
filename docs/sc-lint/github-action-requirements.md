@@ -25,8 +25,8 @@ with config-derived selection: the Action parses
 `[tool.sc-lint].minimum_version` from `config-path` and uses that exact value
 for its archive and compatibility preflight. A transitional `version` input,
 if retained, is optional assertion-only and must fail on semantic mismatch; it
-cannot select an archive. F.4 owns implementation and updates the input table,
-fixtures, CI guide, and release behavior together.
+cannot select an archive. F.4b owns implementation and updates the input
+table, fixtures, CI guide, and release behavior together.
 
 ## Inputs and outputs
 

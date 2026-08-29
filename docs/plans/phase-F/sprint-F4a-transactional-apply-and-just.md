@@ -9,22 +9,22 @@ target: develop
 
 ## Goal
 
-Turn an approved F.2/F.3 plan into a verified transaction that installs the
+Turn an approved F.2 plan into a verified transaction that installs the
 product-owned config and Just integration into both empty and established
 repositories. F.4a owns safe mutation and Just coexistence; the Action and
-workflow boundary is separately closed by F.4b.
+workflow boundary is separately closed by F.4b. Its agent-safe apply path does
+not wait for optional Wyvern qualification or page implementation.
 
 ## Hard Dependencies
 
 - F.1 contracts/ADR-014
 - F.2 typed plan/digest/conflict engine
-- F.3e normalized requests, qualified wizard final-confirmation front end, and
-  cross-adapter equivalence evidence
 - existing Phase E bootstrap, installer, config, and documentation
 
 ## Exact Targets
 
 - `crates/sc-lint/src/configure/apply.rs` (new)
+- `crates/sc-lint/src/configure/artifact.rs` (new)
 - `crates/sc-lint/src/configure/just.rs` (new)
 - `crates/sc-lint/src/configure/legacy.rs` (new)
 - `crates/sc-lint/src/consumer_integration.rs`
@@ -41,11 +41,11 @@ workflow boundary is separately closed by F.4b.
 - `configure --apply` accepts only a plan whose identifier and source digests
   match a freshly recomputed plan. It stages all outputs beside their targets,
   applies an ordered transaction, validates every changed TOML, Just, and JSON
-  artifact, and restores prior bytes/modes on any failure. F.4b validates a
-  generated YAML workflow before passing it to this transaction. A partial
-  rollback is its own stable, actionable error with backup paths. Staging,
-  digest recheck, commit, and rollback apply uniformly to every generated
-  artifact type, including that pre-validated YAML workflow.
+  artifact, and restores prior bytes/modes on any failure. A private,
+  object-safe managed-artifact interface is the single extension point for
+  every staged output. F.4b pre-validates a `WorkflowYamlArtifact` implementation
+  through that interface before it enters this transaction. A partial rollback
+  is its own stable, actionable error with backup paths.
 - empty repositories receive the canonical Phase E `sc-lint.toml`, bootstrap
   helpers, and root Justfile path. Established repositories with no existing
   `setup`, `lint`, `test`, or `upgrade` recipe receive the same config/bootstrap
@@ -87,6 +87,35 @@ import '.sc-lint/justfile'
 # <<< sc-lint managed integration <<<
 ```
 
+## Required Transaction Extension Contract
+
+`ManagedArtifact` is crate-private: downstream consumers cannot implement it
+and the transaction does not use a second workflow-specific staging path. The
+trait is object-safe because it is used internally as a heterogeneous staged
+set; `ConfigureError` retains the F.1 code/recovery envelope.
+
+```rust
+pub(crate) trait ManagedArtifact {
+    fn kind(&self) -> ArtifactKind;
+    fn target(&self) -> &std::path::Path;
+    fn staged_bytes(&self) -> &[u8];
+    fn validate_staged(&self) -> Result<(), ConfigureError>;
+}
+
+pub(crate) enum ArtifactKind {
+    Toml,
+    Justfile,
+    Json,
+    WorkflowYaml,
+}
+```
+
+Each concrete artifact exposes its `ArtifactKind` in its structured operation
+details. The transaction stages `Box<dyn ManagedArtifact>` values in ordered
+plan order, rechecks their source digests, invokes `validate_staged`, and uses
+the same commit/rollback path for all implementations. No external extension
+or plugin surface is created.
+
 ## Acceptance Criteria
 
 - a successful apply leaves only the reviewed plan changes; a failed write,
@@ -105,10 +134,16 @@ import '.sc-lint/justfile'
 - every plan operation, conflict, exportable patch, and stable apply error
   exactly matches the F.1 contract samples; F.4a does not invent a local error
   or patch shape.
+- the F.4a transaction runs one fault-injection fixture containing a normal
+  TOML/Just artifact plus a test-only `SyntheticArtifact` implementation of
+  `ManagedArtifact`. Failure in the synthetic second artifact restores the
+  first artifact's original bytes and mode, proving the extension contract
+  rather than only the initial parser set.
 
 ## Required Validation
 
 - transaction fault-injection tests at each write/rename/validation stage
+- `ManagedArtifact` extension fixture with a test-only synthetic second type
 - TOML, Just, and JSON syntax validation fixtures
 - empty/existing/marker-conflict/stale-plan/legacy-near-miss fixtures
 - `just lint`

@@ -69,7 +69,7 @@ target-repository mutation.
   not apply; unresolved conflict makes the apply confirmation unavailable.
 - A handoff fixture pack with schema-valid, sanitized context/request/plan JSON
   for an empty Rust repo and for the current sc-compose and atm-core shapes.
-  The README records source checkout paths, baseline commits, fixture-generation
+  The README records source repository URLs, baseline commits, fixture-generation
   command, redaction rules, and expected screenshot/test scenarios.
 - An explicit Wyvern capability matrix that distinguishes required host
   features from sc-lint-owned domain behavior. Required host features are
@@ -162,6 +162,9 @@ rendered by a consumer wizard.
 - The fixture pack contains no executable shell text, credentials, local home
   path, source archive, or copied utility, and reproduces the current consumer
   facts from the recorded baseline commits.
+- F.3a fixture repositories are UX-design inputs only. They may not be cited
+  as Phase P qualification evidence, which requires fresh released-artifact
+  preview/apply/reapply and CI evidence for both consumers.
 - the authoritative UX document includes the complete per-page table above
   with field labels, help/error/recovery copy, JSON pointers, defaults,
   validation, and navigation. A prose summary or static mock-up without it is
