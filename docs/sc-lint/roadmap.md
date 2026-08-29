@@ -194,6 +194,25 @@ targets are:
   cross-platform consumer fixtures, `AGENTS.md`, root `README.md`, and
   installed documentation as the maintained executable reference model.
 
+### Phase F
+
+Phase `F` makes consumer adoption a product-owned configuration/replacement
+operation. Its small MVP checks only conventional Rust-repository paths and
+uses a versioned JSON interface for agents plus a Python-launched, schema-driven
+Wyvern wizard for people. The wizard begins only after a field-level UX contract
+and a released Wyvern multi-page capability are qualified; Wyvern 0.1's
+single-dialog API is not sufficient. It first explains what will be set up,
+including all proposed files and uninspected existing integration, and does not
+perform a deep repository analysis. Later fixture-proven steps preserve existing
+Justfiles through a bounded managed import rather than a whole-file replacement.
+After F.2's common JSON plan, the agent JSON path and the F.4a/F.4b apply path
+proceed independently of the optional Wyvern qualification; F.3d joins the
+Wyvern and agent branches for the human adapter, while F.5 joins the completed
+human and apply branches. F.4a closes the transactional config/Just boundary;
+F.4b separately closes config-derived Action/workflow transformation. Phase P
+owns qualification and conversion of both sc-compose and atm-core. See
+[Phase F plan](../plans/phase-F/phase-F-plan.md).
+
 ### Current code moves required
 
 The current implementation now places the shared portability rule family in

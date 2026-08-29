@@ -79,6 +79,10 @@ Initial convention:
   - `test`
 - `sc-lint init --just`
   - `init`
+- `sc-lint configure --request setup.json --dry-run --json`
+  - `configure.plan`
+- `sc-lint configure --request setup.json --apply`
+  - `configure.apply`
 - `sc-lint view findings`
   - `view.findings`
 - `sc-lint view graph`
@@ -134,6 +138,11 @@ Current implementation status:
 - `init`
   - implemented product-owned consumer integration renderer with check,
     dry-run, idempotency, and conflict behavior
+- `configure.plan` / `configure.apply`
+  - planned Phase F consumer replacement contract: bounded conventional-path
+    context, JSON/Python-Wyvern request adapters, reviewed plan, and a later
+    digest-checked transaction; it is distinct from the empty-repository `init`
+    surface
 - `check.native`
   - implemented native preflight path
 - `check.xwin`

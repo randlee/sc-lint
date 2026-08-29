@@ -337,6 +337,40 @@ specialized backend tools and mixed Rust/Python implementations.
   with the searched bundle path, recovery action, and `sc-lint docs
   installation` reference.
 
+- `REQ-CLI-025`
+  `sc-lint configure` must provide the product-owned consumer setup and
+  replacement path. Its MVP must support an explicit root, non-mutating
+  context/plan mode, and a stable `--json` result envelope. It may not use
+  interactive presentation as its configuration engine. The first context
+  collection is limited to conventional path presence and may not parse
+  arbitrary user integrations, scan sources, or run Cargo metadata.
+
+- `REQ-CLI-026`
+  The configure request and plan payloads must be versioned typed schemas.
+  The request supports explicit minimum-version, lint-family choices, Just
+  integration selection, CI selection, and consumer profile argv arrays. The
+  plan identifies proposed operations, uninspected integration, conflicts,
+  summaries, and manual steps. Later apply semantics add preconditions/digests,
+  diffs, and removals. Unknown schema versions and invalid fields fail before
+  any repository write with a path-qualified `CliError`.
+
+- `REQ-CLI-027`
+  `sc-lint configure --request <path|-> --json` must be a noninteractive
+  agent-safe path. The optional Wyvern UI must only collect the same request
+  data and render the plan; it cannot bypass validation, bounded context, or a
+  later final explicit apply confirmation. Its first page must explain what is
+  being set up, the standard `just` developer contract, proposed files, facts
+  found, uninspected existing integration, and recommendation reasons.
+  Absent/failed UI capability has structured recovery and never blocks JSON
+  use.
+
+- `REQ-CLI-028`
+  Applying a configure plan must revalidate every source digest, stage and
+  syntax-check generated TOML/Just/YAML/JSON assets, and restore prior content
+  and permissions if any operation or validation fails. Stale plans,
+  unmanaged collisions, transaction failures, and incomplete rollback each
+  have distinct stable error codes, recovery action, and documentation link.
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:
