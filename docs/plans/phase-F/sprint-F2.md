@@ -48,8 +48,10 @@ framework.
   recovery action, and docs reference. The dispatcher carries no discovery,
   recommendation, or UI policy.
 - the plan is advisory and typed (`propose_create`, `needs_confirmation`,
-  `manual_conflict`), ordered, and includes the exact files that a later F.4
-  apply operation could manage. It carries no inferred file rewrite.
+  `manual_conflict`), ordered, and includes the exact files that later F.4a/F.4b
+  operations could manage. Its populated confirmation, conflict,
+  exportable-patch, and error envelopes exactly match F.1's required contract
+  samples; it carries no inferred file rewrite.
 - any existing Justfile or workflow is reported as present-but-not-inspected;
   the plan asks the user/agent to choose an integration posture. It never
   claims compatibility, reads an arbitrary recipe, or proposes deletion.

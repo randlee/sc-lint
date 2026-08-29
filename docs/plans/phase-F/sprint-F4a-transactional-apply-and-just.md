@@ -1,17 +1,18 @@
 ---
-id: F.4
-title: Safe Consumer Integration And CI Replacement Transformers
+id: F.4a
+title: Transactional Configure Apply And Just Integration
 status: planned
 target: develop
 ---
 
-# Sprint F.4 — Safe Consumer Integration And CI Replacement Transformers
+# Sprint F.4a — Transactional Configure Apply And Just Integration
 
 ## Goal
 
 Turn an approved F.2/F.3 plan into a verified transaction that installs the
-product-owned integration into both empty and established repositories. F.4 is
-where safety is enforced, not delegated to the wizard.
+product-owned config and Just integration into both empty and established
+repositories. F.4a owns safe mutation and Just coexistence; the Action and
+workflow boundary is separately closed by F.4b.
 
 ## Hard Dependencies
 
@@ -19,23 +20,19 @@ where safety is enforced, not delegated to the wizard.
 - F.2 typed plan/digest/conflict engine
 - F.3e normalized requests, qualified wizard final-confirmation front end, and
   cross-adapter equivalence evidence
-- existing Phase E bootstrap, installer, config, documentation, and Action
+- existing Phase E bootstrap, installer, config, and documentation
 
 ## Exact Targets
 
 - `crates/sc-lint/src/configure/apply.rs` (new)
 - `crates/sc-lint/src/configure/just.rs` (new)
-- `crates/sc-lint/src/configure/workflow.rs` (new)
 - `crates/sc-lint/src/configure/legacy.rs` (new)
 - `crates/sc-lint/src/consumer_integration.rs`
 - `crates/sc-lint/assets/consumer-Justfile`
 - `crates/sc-lint/assets/consumer-config.toml`
-- `action.yml`
-- `action/index.js`
-- `action/test/action.test.cjs`
-- configuration/apply fixtures and tests
+- `tests/configure/test_apply_and_just.py` (new)
+- `tests/fixtures/configure/apply-and-just/` (new)
 - `docs-bundle/just-setup.md`
-- `docs-bundle/ci.md`
 - `docs-bundle/upgrade.md`
 - `docs-bundle/troubleshooting.md`
 
@@ -43,9 +40,10 @@ where safety is enforced, not delegated to the wizard.
 
 - `configure --apply` accepts only a plan whose identifier and source digests
   match a freshly recomputed plan. It stages all outputs beside their targets,
-  applies an ordered transaction, validates every changed TOML/Just/YAML/JSON
-  artifact, and restores prior bytes/modes on any failure. A partial rollback
-  is its own stable, actionable error with backup paths.
+  applies an ordered transaction, validates every changed TOML, Just, and JSON
+  artifact, and restores prior bytes/modes on any failure. F.4b validates a
+  generated YAML workflow before passing it to this transaction. A partial
+  rollback is its own stable, actionable error with backup paths.
 - empty repositories receive the canonical Phase E `sc-lint.toml`, bootstrap
   helpers, and root Justfile path. Established repositories with no existing
   `setup`, `lint`, `test`, or `upgrade` recipe receive the same config/bootstrap
@@ -63,38 +61,22 @@ where safety is enforced, not delegated to the wizard.
   canonical managed behavior, or reports a no-write conflict. It must not
   create aliases that leave `just lint` or `just test` noncanonical.
 - generated `sc-lint.toml` has the sole minimum-version authority and complete
-  selected argv profiles. The Action obtains the exact release version by
-  parsing that config; `version` becomes optional assertion-only input. A
-  mismatch fails before download and cannot select a different artifact.
-- a generated standalone `.github/workflows/sc-lint.yml` uses
-  `randlee/sc-lint@v1` with setup/lint/test operations and no copied source
-  scripts. Existing workflow changes are supported only for F.4-recognized,
-  fixture-proven shapes and are presented as a bounded patch; unknown YAML
-  remains untouched.
+  selected argv profiles. F.4b consumes that file as the Action's immutable
+  selection authority; F.4a neither modifies a workflow nor accepts a second
+  version value.
 - legacy deletion is an allowlisted, digest-checked operation. The initial
   allowlist covers the exact sc-compose 0.4 custom `setup-sc-lint`,
   `setup-lint-toolchain`, copied `.just` artifacts, and manual consumer
   workaround only after their replacements validate. The transformer must not
   delete arbitrary files named similarly.
 
-## Required Integration Samples
+## Required Integration Sample
 
 ```just
 # >>> sc-lint managed integration >>>
 import '.sc-lint/justfile'
 # <<< sc-lint managed integration <<<
 ```
-
-```yaml
-- uses: randlee/sc-lint@v1
-  with:
-    operation: lint
-    config-path: sc-lint.toml
-```
-
-The Action derives the selected release from `[tool.sc-lint].minimum_version`.
-An optional `version` assertion is valid only when semantically equal to that
-field and is retained solely for migration diagnostics, not selection.
 
 ## Acceptance Criteria
 
@@ -108,17 +90,17 @@ field and is retained solely for migration diagnostics, not selection.
   collision class.
 - neither `configure` nor generated recipes write a README, invoke `cargo run`,
   copy `.just/*.py`, or download a source archive.
-- Action tests prove config-derived selection, assertion mismatch, archive
-  verification, Linux/macOS/Windows behavior, and absence of fallback paths.
-- F.4, not the shallow F.2 context collector, recognizes every supported legacy
+- F.4a, not the shallow F.2 context collector, recognizes every supported legacy
   migration fingerprint. A migration is impossible to apply to a near-match
   fixture.
+- every plan operation, conflict, exportable patch, and stable apply error
+  exactly matches the F.1 contract samples; F.4a does not invent a local error
+  or patch shape.
 
 ## Required Validation
 
 - transaction fault-injection tests at each write/rename/validation stage
-- TOML, Just, YAML, and JSON syntax validation fixtures
-- Action fixture matrix for Linux/macOS/Windows
+- TOML, Just, and JSON syntax validation fixtures
 - empty/existing/marker-conflict/stale-plan/legacy-near-miss fixtures
 - `just lint`
 - `just test`
@@ -127,4 +109,6 @@ field and is retained solely for migration diagnostics, not selection.
 
 - final conversion of either reference consumer; Phase P owns that
   dual-consumer acceptance proof and returns any newly exposed product defect
-  to F.2/F.4.
+  to F.2/F.4a;
+- GitHub Action behavior or `.github/workflows/sc-lint.yml` generation, which
+  F.4b owns.

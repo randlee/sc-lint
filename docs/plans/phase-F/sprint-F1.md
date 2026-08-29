@@ -126,12 +126,64 @@ until a separate shipped executable/profile contract exists.
   "command": "configure.plan",
   "data": {
     "plan_id": "sha256:...",
-    "operations": [{"path": ".sc-lint/justfile", "kind": "propose_create"}],
+    "operations": [{"operation_id":"managed-justfile","path":".sc-lint/justfile","kind":"propose_create"}],
     "conflicts": [],
     "manual_steps": []
   },
   "diagnostics": []
 }
+```
+
+The following populated operation shapes are normative for the F.1 plan schema.
+F.2 emits them during planning; F.4a and F.4b consume them without defining
+another conflict or patch representation:
+
+```json
+{
+  "operations": [
+    {
+      "operation_id": "just-integration",
+      "path": "Justfile",
+      "kind": "needs_confirmation",
+      "reason": "existing_integration_uninspected",
+      "choices": ["keep_existing", "generate_managed_import", "review_patch"]
+    },
+    {
+      "operation_id": "legacy-recipe",
+      "path": "Justfile",
+      "kind": "manual_conflict",
+      "conflict": {
+        "code": "CLI.CONFIGURE_UNMANAGED_COLLISION",
+        "observed_digest": "sha256:4a3d...",
+        "recovery": "review_exported_patch"
+      },
+      "exportable_patch": {
+        "format": "unified-diff",
+        "path": "Justfile",
+        "content": "--- a/Justfile\n+++ b/Justfile\n@@ -1 +1 @@\n-legacy lint\n+# managed integration"
+      }
+    }
+  ],
+  "conflicts": ["legacy-recipe"],
+  "manual_steps": [
+    {"operation_id": "legacy-recipe", "action": "review_exported_patch"}
+  ]
+}
+```
+
+Every failed command uses the same top-level envelope. These representative
+instances fix the required code, pointer, recovery action, and docs reference
+for each named configure failure; implementation may add machine-readable
+details but may not change these fields or their meaning.
+
+```json
+[
+  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UNSUPPORTED_SCHEMA","pointer":"/schema_version","recovery":"use_supported_schema_version","docs_ref":"sc-lint docs configuration"}},
+  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UI_UNAVAILABLE","pointer":"/ui","recovery":"rerun_with_request_json","docs_ref":"sc-lint docs configuration"}},
+  {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UNMANAGED_COLLISION","pointer":"/operations/1","recovery":"review_exported_patch","docs_ref":"sc-lint docs troubleshooting"}},
+  {"ok":false,"command":"configure.apply","error":{"code":"CLI.CONFIGURE_STALE_PLAN","pointer":"/plan_id","recovery":"regenerate_and_review_plan","docs_ref":"sc-lint docs configuration"}},
+  {"ok":false,"command":"configure.apply","error":{"code":"CLI.CONFIGURE_ROLLBACK_FAILED","pointer":null,"recovery":"restore_listed_backups","docs_ref":"sc-lint docs troubleshooting"}}
+]
 ```
 
 ## Acceptance Criteria
@@ -151,6 +203,9 @@ until a separate shipped executable/profile contract exists.
   compatibility analysis.
 - all mutations have preconditions, digest recheck, validation, rollback, and
   stable recovery semantics.
+- the named populated operation, conflict/exportable-patch, and five error
+  samples above validate against the four F.1-owned schemas and are used as
+  golden fixtures by F.2, F.4a, and F.4b.
 - the Action has exactly one version policy authority: `sc-lint.toml`.
 - ADR-014 and requirements/architecture/roadmap/project-plan updates land in
   the same implementation PR as the contract types.

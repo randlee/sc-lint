@@ -30,7 +30,7 @@ semantics.
 interactive human:  sc-lint configure --root <repo> --ui wyvern
 agent / automation: sc-lint configure --root <repo> --request setup.json --json
 safe preview:       sc-lint configure --root <repo> --request setup.json --dry-run --json
-apply (F.4):        sc-lint configure --root <repo> --request setup.json --apply --json
+apply (F.4a):       sc-lint configure --root <repo> --request setup.json --apply --json
 ```
 
 `sc-lint init --just` remains the narrow, empty-repository initializer from
@@ -66,8 +66,8 @@ product proof.
    normal top-level JSON envelope. Agents never scrape terminal prompts or UI
    markup.
 3. The interactive flow first answers “what am I setting up?”: it displays the
-   repository facts, the standard sc-lint developer contract (`just setup`,
-   `just lint`, `just test`, `just upgrade`), every proposed file/change, and
+   repository facts, the standard developer contract defined in
+   [Consumer End State](#consumer-end-state), every proposed file/change, and
    the reason for each recommendation. It then presents one confirmable page
    per lint family and integration choice. A final page displays the exact JSON
    plan and requires confirmation before any later apply operation.
@@ -121,14 +121,14 @@ Phase F extends, rather than reopens, Phase E requirements:
 
 | Requirement | Phase F addition | Owning sprint | Closure evidence |
 | --- | --- | --- | --- |
-| `REQ-PRODUCT-019` | one version authority is retained during conversion | F.1, F.4, F.5 | request/config/Action drift fixtures |
+| `REQ-PRODUCT-019` | one version authority is retained during conversion | F.1, F.4a, F.4b, F.5 | request/config/Action drift fixtures |
 | `REQ-PRODUCT-020` | configured output uses existing verified setup/upgrade | F.2, F.5 | clean-machine lifecycle fixtures |
 | `REQ-PRODUCT-021` | released offline documentation remains complete | F.3e, F.5 | installed-bundle and release-artifact fixtures |
-| `REQ-PRODUCT-022` | Action version derives from config; optional workflow patch is safe | F.4, F.5 | Action and workflow fixtures |
-| `REQ-PRODUCT-023` (new) | deterministic configuration/adoption planning and transaction | F.1, F.2, F.4, F.5 | JSON, conflict, rollback, cross-platform fixtures |
+| `REQ-PRODUCT-022` | Action version derives from config; optional workflow patch is safe | F.4b, F.5 | Action and workflow fixtures |
+| `REQ-PRODUCT-023` (new) | deterministic configuration/adoption planning and transaction | F.1, F.2, F.4a, F.4b, F.5 | JSON, conflict, rollback, cross-platform fixtures |
 | `REQ-PRODUCT-024` (new) | guided human setup over the same request contract | F.1, F.3a-F.3e | page-to-JSON, capability, accessibility, and cross-adapter fixtures |
-| `REQ-PRODUCT-025` (new) | one version authority and preserved established integration | F.1, F.4, F.5 | config/Action drift, marker, and release-artifact fixtures |
-| `REQ-CLI-025`–`028` (new) | configure command, request schema, plan schema, stable errors | F.1, F.2, F.3a-F.3e, F.4 | CLI contract, schema, adapter, and apply tests |
+| `REQ-PRODUCT-025` (new) | one version authority and preserved established integration | F.1, F.4a, F.4b, F.5 | config/Action drift, marker, and release-artifact fixtures |
+| `REQ-CLI-025`–`028` (new) | configure command, request schema, plan schema, stable errors | F.1, F.2, F.3a-F.3e, F.4a, F.4b | CLI contract, schema, adapter, apply, and workflow tests |
 
 ## Consumer End State
 
@@ -186,11 +186,12 @@ F.1 contracts / ADR / requirements
              └─ F.3c agent JSON and setup skill
                  └─ F.3d thin launcher and page implementation
                      └─ F.3e wizard acceptance, accessibility, and docs
-                         └─ F.4 safe Just/config/Action transformers
-                             └─ F.5 release, documentation, and Phase P qualification handoff
-                                 └─ P.1 dual-reference released-artifact qualification
-                                     ├─ P.2 sc-compose consumer PR
-                                     └─ P.3 atm-core consumer PR
+                         └─ F.4a transactional apply and Just migration
+                             └─ F.4b Action and workflow transformer
+                                 └─ F.5 release, documentation, and Phase P qualification handoff
+                                     └─ P.1 dual-reference released-artifact qualification
+                                         ├─ P.2 sc-compose consumer PR
+                                         └─ P.3 atm-core consumer PR
 ```
 
 ### F.1 — Contract And Architecture Foundation
@@ -221,11 +222,20 @@ Python state machine or an ad-hoc browser application.
 - [F.3d thin launcher and page implementation](sprint-F3d-wizard-adapter-and-pages.md)
 - [F.3e wizard acceptance and documentation](sprint-F3e-wizard-acceptance-and-docs.md)
 
-### F.4 — Safe Integration And CI Replacement Transformers
+### F.4a — Transactional Apply And Just Integration
 
-Implement staged apply/rollback, marked Justfile integration, generated
-config/bootstrap/Action workflow, and only explicitly supported legacy
-migrations.
+Implement staged apply/rollback, generated config/bootstrap, marked Justfile
+integration, and only explicitly supported legacy migrations. This closes the
+single file transaction and never creates or patches a workflow.
+
+### F.4b — Config-Derived Action And Workflow Transformer
+
+Implement the reusable Action's config-derived version selection and the
+optional fixture-proven standalone workflow transformer. It consumes F.4a's
+approved plan and transaction instead of recreating either boundary.
+
+- [F.4a transactional apply and Just integration](sprint-F4a-transactional-apply-and-just.md)
+- [F.4b Action and workflow transformer](sprint-F4b-action-and-workflow-transformer.md)
 
 ### F.5 — Release, Documentation, And Phase P Qualification Handoff
 

@@ -18,9 +18,10 @@ target-repository mutation.
 
 - F.1 accepted configure request/plan/error schemas and ADR-014;
 - F.2 accepted bounded-context and deterministic-plan contract;
-- current reference inputs at `/Users/randlee/Documents/github/sc-compose`
-  and `/Users/randlee/Documents/github/atm-core`, each recorded by commit and
-  copied into disposable fixture/worktree locations before inspection.
+- the `sc-compose` repository at `https://github.com/randlee/sc-compose.git`
+  and `atm-core` repository at `https://github.com/randlee/atm-core`, each
+  cloned to any engineer-selected local path, pinned to its recorded baseline
+  commit, and copied into a disposable fixture/worktree before inspection.
 
 ## Exact Targets
 
@@ -96,7 +97,7 @@ data to render while F.1 finalizes the published schemas:
   },
   "source": {
     "repository": "sc-compose",
-    "root": "/Users/randlee/Documents/github/sc-compose",
+    "repository_url": "https://github.com/randlee/sc-compose.git",
     "baseline_commit": "38cf63a5e1fe68f93be39fbed30315de4e3b620f"
   }
 }
@@ -114,7 +115,7 @@ data to render while F.1 finalizes the published schemas:
   },
   "source": {
     "repository": "atm-core",
-    "root": "/Users/randlee/Documents/github/atm-core",
+    "repository_url": "https://github.com/randlee/atm-core",
     "baseline_commit": "b3475b397c544bd43a43fb97f855b6ddb68f01b1"
   }
 }
@@ -138,9 +139,11 @@ data to render while F.1 finalizes the published schemas:
 }
 ```
 
-The committed fixture JSON redacts local `root` values; the path is retained in
-the fixture README and generation record only. The source paths above are
-planning inputs, never data sent to or rendered by a consumer wizard.
+The committed fixture JSON contains repository identity and baseline commit,
+not any local clone path. The fixture README records the remote URL,
+generation command, and redaction rules; an engineer may use any clone
+location. These source records are planning inputs, never data sent to or
+rendered by a consumer wizard.
 
 ## Acceptance Criteria
 

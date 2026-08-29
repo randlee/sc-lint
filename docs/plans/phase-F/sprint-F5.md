@@ -18,9 +18,9 @@ PRs.
 
 ## Hard Dependencies
 
-- F.1 through F.4
-- release infrastructure capable of producing the F.4 configuration/Action
-  contract as an immutable distributed artifact
+- F.1 through F.4b
+- release infrastructure capable of producing the F.4a configuration and F.4b
+  Action contract as an immutable distributed artifact
 
 ## Exact Targets
 
@@ -40,7 +40,7 @@ PRs.
 - product fixtures cover empty repositories, recognized legacy migrations,
   near-miss/no-write conflicts, transactional rollback, marker idempotency,
   and the reusable Action on Linux, macOS, and Windows.
-- F.5 validates (rather than rewrites) the F.3e/F.4 installed documentation
+- F.5 validates (rather than rewrites) the F.3e/F.4a/F.4b installed documentation
   bundle against the public setup workflow: discovery, JSON/Wyvern selection,
   preview, explicit apply, reapply, conflict recovery, and the four standard
   `just` commands. It clearly says that a real consumer conversion is complete
@@ -66,8 +66,8 @@ PRs.
   closure artifact is the distributable product evidence and handoff manifest.
   Phase P alone owns the subsequent two-repository qualification and PRs.
 - if Phase P exposes an unsupported existing-repository shape, it returns a
-  concrete sc-lint finding to F.2/F.4; it does not authorize a manual consumer
-  workaround or a false close.
+  concrete sc-lint finding to F.2, F.4a, or F.4b; it does not authorize a
+  manual consumer workaround or a false close.
 
 ## Required Validation
 

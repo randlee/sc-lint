@@ -31,7 +31,7 @@ platforms and explain the same flow in the installed documentation.
   cancellation/dismissal, and no-write guarantee.
 - Documentation with the ten-page map, JSON alternative, screenshot/fixture
   references, preview/apply distinction, and Wyvern availability recovery.
-  F.4 owns transactional conflict and apply troubleshooting in
+  F.4a owns transactional conflict and apply troubleshooting in
   `docs-bundle/troubleshooting.md`, avoiding competing documentation owners.
 
 ## Acceptance Criteria

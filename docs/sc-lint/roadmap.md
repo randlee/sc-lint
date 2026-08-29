@@ -204,8 +204,9 @@ and a released Wyvern multi-page capability are qualified; Wyvern 0.1's
 single-dialog API is not sufficient. It first explains what will be set up,
 including all proposed files and uninspected existing integration, and does not
 perform a deep repository analysis. Later fixture-proven steps preserve existing
-Justfiles through a bounded managed import rather than a whole-file replacement
-and unify config and Action version authority. Phase P owns qualification and
+Justfiles through a bounded managed import rather than a whole-file replacement.
+F.4a closes the transactional config/Just boundary; F.4b separately closes
+config-derived Action/workflow transformation. Phase P owns qualification and
 conversion of both sc-compose and atm-core. See [Phase F plan](../plans/phase-F/phase-F-plan.md).
 
 ### Current code moves required
