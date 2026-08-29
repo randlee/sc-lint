@@ -68,10 +68,70 @@ owner: <teammate>
 A sprint doc whose branch, stack, or stack base disagrees with the phase-plan
 diagram is a structural finding.
 
+## Architecting Stacks For A Phase
+
+Do this before writing any sprint doc. The output is the phase plan's
+`## Branch Stacks And Parallelism` section.
+
+1. **List deliverables, not sprints.** Enumerate every committed deliverable
+   with the repo paths it creates or modifies.
+2. **Partition by path set.** Group deliverables whose path sets overlap.
+   Each group with no overlap against any other group is a candidate stack.
+   Overlapping groups must be in the same stack or joined by exactly one
+   named reconciliation layer.
+3. **Order within a stack by dependency.** Foundational work (types, schemas,
+   bootstrap, CI actions) is the bottom layer; consumers of it are higher
+   layers. A layer may only depend on layers below it in the same stack.
+4. **One sprint per layer.** Each layer becomes one sprint doc, one branch,
+   one worktree, one PR. Split a layer if it fails the Split Early rules.
+5. **Root every stack on `develop`.** The bottom layer's base is `develop`
+   unless the phase has a planning branch that must land first, in which case
+   that planning branch is the base and is itself the bottom of the stack.
+6. **Assign one owner per stack.** The number of stacks that can run at once
+   is the number of available owners; do not plan more concurrent stacks than
+   owners, and do not give one owner two concurrent stacks.
+7. **Keep stacks short.** Prefer 2–3 layers per stack. A stack longer than
+   four layers is a sign that a second stack should be split off.
+8. **Name cross-stack touch points.** For every file two stacks must both
+   change, state which stack merges first and which single higher layer in
+   the other stack reconciles after that merge.
+9. **Put external-repo work in non-branch sprints.** Consumer-repo PRs and
+   rollouts are sprints with `branch: n/a`, sequenced after the stack whose
+   release they depend on.
+10. **Draw it.** Render the ASCII diagram and the parallel-vs-sequential
+    table from the result; the diagram is normative and the sprint docs must
+    match it.
+
+Reference shape for a two-stack phase:
+
+```text
+develop
+├── Stack A (owner: clint)
+│   └── sprint/X.0-foundation        PR base: develop
+│       └── sprint/X.1-kit           PR base: sprint/X.0-foundation
+│           └── sprint/X.2-skill     PR base: sprint/X.1-kit
+└── Stack B (owner: cfast)           runs in parallel with Stack A from day one
+    └── sprint/X.3a-bindings         PR base: develop
+        └── sprint/X.3b-release      PR base: sprint/X.3a-bindings
+                                     reconciles touch point with A after A merges
+```
+
 ## Plan For Parallel Implementation
 
-Optimize the phase plan for the largest number of stacks that can be
-implemented at the same time without cross-stack conflicts.
+Parallel sprints are the default, not an optimization. The phase plan must
+explicitly define which sprints run in parallel; a plan that does not name
+its parallel sprints is not hardened. Optimize for the largest number of
+stacks that can be implemented at the same time without cross-stack
+conflicts.
+
+The parallel-vs-sequential table is mandatory and has one row per sprint:
+
+| Sprint | Stack | Runs in parallel with | Waits for | Unblocked when |
+|--------|-------|-----------------------|-----------|----------------|
+
+"Unblocked when" names a commit event on a specific branch (for example
+"X.0 committed on sprint/X.0-foundation"), never a merge to `develop`, unless
+the dependency is genuinely on a released artifact.
 
 - partition deliverables into disjoint path sets before ordering sprints; each
   disjoint set becomes a candidate stack
