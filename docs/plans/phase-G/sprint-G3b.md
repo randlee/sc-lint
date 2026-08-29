@@ -2,8 +2,12 @@
 id: G.3b
 title: Self-Contained Release And Consumer-Blocking Lint Fixes
 status: planned
-branch: feature/phase-G3b-self-contained-release
-target: develop
+branch: sprint/G.3b-self-contained-release
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.3b-self-contained-release
+stack: B
+stack_base: sprint/G.3a-python-bindings
+target: develop (via stack B, PR base sprint/G.3a-python-bindings)
+owner: cfast
 ---
 
 # Sprint G.3b — Self-Contained Release And Consumer-Blocking Lint Fixes
@@ -15,7 +19,7 @@ target: develop
 
 ## Hard Dependencies
 
-- G.1 and G.3a merged (kit recipes + wheel define the runtime)
+- G.3a committed (same stack); Stack A merged to `develop` and merged forward into this worktree before start
 - issue `#84` (full/ci profile runs source-tree Cargo wrappers)
 - `scripts/release_artifacts.py`, `.github/workflows/release*.yml`
 
@@ -27,6 +31,7 @@ target: develop
 - `crates/sc-lint-attributes/src/` (identity-literals unicode-escape parser)
 - `scripts/release_artifacts.py`
 - `.github/workflows/release.yml`
+- `packages/sc-lint-adoption/.sc-lint/bootstrap`, `bootstrap.ps1` (re-sync verbatim from product after G.3a)
 - `docs/sc-lint/cli-contract.md`
 - `docs/issues-inventory.md`
 - `CHANGELOG.md`
@@ -46,6 +51,7 @@ target: develop
 - identity-literals accepts valid Rust unicode escapes (regression test with
   `"\u{1F600}"` and `'\u{7}'`).
 - `sc-lint version --json` reports the archive layout (`self_contained: true`).
+- Kit copies of `.sc-lint/bootstrap*` are byte-identical to the product files (`cmp` in CI).
 
 ## Acceptance Criteria
 

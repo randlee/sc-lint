@@ -2,8 +2,12 @@
 id: G.1
 title: sc-lint Adoption Kit
 status: planned
-branch: feature/phase-G1-adoption-kit
-target: develop
+branch: sprint/G.1-adoption-kit
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.1-adoption-kit
+stack: A
+stack_base: sprint/G.0-abandon-phase-F
+target: develop (via stack A, PR base sprint/G.0-abandon-phase-F)
+owner: clint
 ---
 
 # Sprint G.1 — sc-lint Adoption Kit

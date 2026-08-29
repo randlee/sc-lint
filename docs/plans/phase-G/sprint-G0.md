@@ -2,8 +2,12 @@
 id: G.0
 title: Abandon Phase F And Record ADR-015
 status: planned
-branch: feature/phase-G-planning
-target: develop
+branch: sprint/G.0-abandon-phase-F
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.0-abandon-phase-F
+stack: A
+stack_base: feature/phase-G-planning
+target: develop (via stack A, PR base feature/phase-G-planning)
+owner: clint
 ---
 
 # Sprint G.0 — Abandon Phase F And Record ADR-015

@@ -2,8 +2,12 @@
 id: G.2
 title: Adoption Skill, Agent Prompts, Marketplace Entry
 status: planned
-branch: feature/phase-G2-adoption-skill
-target: develop
+branch: sprint/G.2-adoption-skill
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.2-adoption-skill
+stack: A
+stack_base: sprint/G.1-adoption-kit
+target: develop (via stack A, PR base sprint/G.1-adoption-kit)
+owner: clint
 ---
 
 # Sprint G.2 — Adoption Skill, Agent Prompts, Marketplace Entry

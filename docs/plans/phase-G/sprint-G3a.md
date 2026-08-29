@@ -2,8 +2,12 @@
 id: G.3a
 title: sc-lint Python Bindings Via Maturin
 status: planned
-branch: feature/phase-G3a-python-bindings
-target: develop
+branch: sprint/G.3a-python-bindings
+worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.3a-python-bindings
+stack: B
+stack_base: develop
+target: develop (via stack B, PR base develop)
+owner: cfast
 ---
 
 # Sprint G.3a — sc-lint Python Bindings Via Maturin
@@ -16,7 +20,7 @@ target: develop
 
 ## Hard Dependencies
 
-- G.1 merged (`.sc-lint/bootstrap` is the provisioning point)
+- none from Stack A; runs in parallel with G.0–G.2 (Stack B, base `develop`)
 - reference: `../sc-publish/plugins/sc-publish/.github/scripts/bootstrap_sc_compose.py`
   and `../sc-compose/bindings/` (existing maturin layout in the ecosystem)
 - `sc-publish` PyPI channel (`pypi-publish.yml`) already vendored here
@@ -60,16 +64,15 @@ target: develop
 - `maturin build --release -m bindings/sc-lint-py/Cargo.toml` succeeds on the
   three OSes in CI; `python -c "import sc_lint; print(sc_lint.__version__)"`
   prints the workspace version.
-- Fresh `tests/fixtures/adoption/empty-workspace` after kit install:
-  `just setup` creates `.sc-lint/venv` with `sc_lint` importable;
-  `just lint` runs with no `.just/` directory present.
+- Fresh temp workspace after `sc-lint init --just`: `just setup` creates
+  `.sc-lint/venv` with `sc_lint` importable; `just lint` runs with no `.just/`
+  directory present.
 - `find .just -name '*.py' -size +1k` returns nothing.
 - `cargo test --workspace` green; `bindings/sc-lint-py/src/lib.rs` ≤ 150 lines.
 
 ## Required Validation
 
 - `cargo test --workspace`
-- `python3 -m pytest tests/adoption -q`
 - TestPyPI publish dry-run via `release-preflight.yml`
 
 ## Out Of Scope

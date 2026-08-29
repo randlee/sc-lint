@@ -85,8 +85,65 @@ README.sc-lint.md                     # kit README, renamed on install
 | G.4 | First-wave consumer PRs + sc-publish delegation | consumer repos |
 | G.5 | Ecosystem rollout | consumer repos (skill only) |
 
-Sequence: G.0 → G.1 → G.2 ∥ G.3a → G.3b → G.4 → G.5. G.4 is the qualification gate;
-there is no separate proof phase.
+G.4 is the qualification gate; there is no separate proof phase.
+
+## Branch Stacks And Parallelism
+
+Work is organised as two `gh stack` stacks (stacks are strictly linear, so
+parallelism is between stacks, never inside one). Every branch has its own
+worktree under `../sc-lint-worktrees/<branch>`.
+
+```text
+develop (trunk)
+ ├─ Stack A — adoption kit (owner: clint)
+ │   └── feature/phase-G-planning          this plan
+ │        └── sprint/G.0-abandon-phase-F   ADR-015, archive F
+ │             └── sprint/G.1-adoption-kit
+ │                  └── sprint/G.2-adoption-skill
+ └─ Stack B — product (owner: cfast)
+     └── sprint/G.3a-python-bindings
+          └── sprint/G.3b-self-contained-release
+```
+
+| Runs in parallel | Must be sequential | Why |
+| --- | --- | --- |
+| Stack A and Stack B, from day one | — | disjoint paths: A touches `packages/`, `docs/`, `.claude-plugin/`; B touches `bindings/`, `crates/`, `.just/`, `.sc-lint/bootstrap*`, release workflows |
+| G.1 implementation may start once G.0 is *committed* (not merged) | G.0 → G.1 → G.2 within Stack A | each layer's PR base is the layer below; the reviewer sees only that layer's diff |
+| G.3b may start once G.3a is committed | G.3a → G.3b within Stack B | G.3b runs recipes through the G.3a wheel |
+| G.4 sc-publish delegation PR, as soon as G.1 is committed | — | it only needs the kit action's name and input contract |
+| G.4 `wyvern` and `atm-core` consumer PRs, together | after a `sc-lint` release containing both stacks | greenfield repos, no interaction |
+| — | G.4 `sc-compose` after `wyvern`/`atm-core` prove the kit | it is the only consumer with existing scaffolding to remove (D1) |
+| G.5 all remaining repositories, together | after G.4 merges | skill-only, no product change permitted |
+
+Cross-stack touch point: G.1 vendors `.sc-lint/bootstrap*` verbatim from
+`develop`; G.3a modifies those product files. G.3b (above G.3a, and started
+only after Stack A has merged) re-syncs the kit's copy and is the single place
+that reconciles the two. G.3a's acceptance therefore uses `sc-lint init --just`
+on a fresh workspace, not the G.1 fixture.
+
+### Stack protocol
+
+The repository rule is merge-forward, never rebase; `gh stack sync` and
+`gh stack rebase` are therefore **not used**. The protocol is:
+
+1. Branches and worktrees are created with plain `git worktree add -b
+   <branch> <path> <parent>` (done by team-lead at phase start; see the
+   tracking table in `../sc-lint-worktrees/worktree-tracking.md`).
+2. The developer commits only in the sprint's worktree. When a lower layer
+   changes, the lower branch is merged **forward** into every branch above it
+   (`git merge --no-ff <lower>`), never rebased.
+3. PRs are opened and chained with the API-only command, from the main
+   checkout, bottom to top, once the bottom layer is ready for QA:
+   `gh stack link --base develop feature/phase-G-planning sprint/G.0-abandon-phase-F sprint/G.1-adoption-kit sprint/G.2-adoption-skill`
+   and `gh stack link --base develop sprint/G.3a-python-bindings sprint/G.3b-self-contained-release`.
+   Later layers are appended with `gh stack link <stack-number> <branch>`.
+4. QA runs per layer on its PR. Landing is `gh stack merge <pr> --yes --merge`
+   (merge commits, up to and including that PR), only after QA PASS and the
+   user's explicit approval per layer; never `gh pr merge`.
+5. After a layer lands, `develop` is merged forward into the remaining
+   worktrees of both stacks.
+6. Sprint docs for G.4 and G.5 have no stack: they are PRs in other
+   repositories.
 
 Sprint docs:
 - [sprint-G0.md](./sprint-G0.md)
