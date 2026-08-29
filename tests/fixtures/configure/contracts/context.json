@@ -1,0 +1,14 @@
+{
+  "schema_version": "v1",
+  "context": {
+    "cargo_toml": {"present": true, "kind": "workspace"},
+    "sc_lint_toml": {"present": false},
+    "justfile": {"present": true, "inspected": false},
+    "github_workflows": {"present": true, "inspected": false},
+    "sc_lint_directory": {"present": false}
+  },
+  "explanation": {
+    "developer_contract": ["just setup", "just lint", "just test", "just upgrade"],
+    "uninspected_existing_integration": ["Justfile", ".github/workflows/"]
+  }
+}

@@ -7,6 +7,7 @@ Related ADRs:
 - [`./adr/ADR-005-cli-profiles-and-xwin-preflight.md`](./adr/ADR-005-cli-profiles-and-xwin-preflight.md)
 - [`./adr/ADR-006-ai-first-cli-contract.md`](./adr/ADR-006-ai-first-cli-contract.md)
 - [`./adr/ADR-008-sc-observability-logging.md`](./adr/ADR-008-sc-observability-logging.md)
+- [`./adr/ADR-014-consumer-configuration-automation.md`](./adr/ADR-014-consumer-configuration-automation.md)
 
 ADR-005 governs release-1 profile and `xwin` policy and supersedes earlier
 provisional rollout notes for cross-target preflight membership.

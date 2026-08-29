@@ -134,6 +134,8 @@ Contents:
   the planned top-level `sc-lint` CLI
 - [`cli-contract.md`](./cli-contract.md) — planned top-level success/error
   envelope and backend-to-CLI normalization contract
+- [`configure-schemas.md`](./configure-schemas.md) — Phase F `configure`
+  context, request, plan, and result schema authorities and golden fixtures
 - [`adr/ADR-012-consumer-adoption-and-just-contract.md`](./adr/ADR-012-consumer-adoption-and-just-contract.md)
   — installed-product consumer commands and generated Just integration
 - [`adr/ADR-013-analyzer-shared-support.md`](./adr/ADR-013-analyzer-shared-support.md)

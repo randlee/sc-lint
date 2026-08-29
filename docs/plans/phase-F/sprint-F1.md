@@ -40,6 +40,10 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 - `schemas/sc-lint-configure-request.schema.json` (new)
 - `schemas/sc-lint-configure-plan.schema.json` (new)
 - `schemas/sc-lint-configure-result.schema.json` (new)
+- `tests/fixtures/configure/contracts/` (new; F.1 golden context, request,
+  plan, and result fixtures)
+- `.just/tests/test_configure_contract_schemas.py` (new)
+- `.github/workflows/ci.yml` (install the schema-validation test dependency)
 - `docs/sc-lint/configure-schemas.md` (new)
 - `docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md` (new)
 - `docs/sc-lint/adr/README.md`
@@ -90,6 +94,9 @@ listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
 
 ## Required Contract Samples
 
+### Context fixture
+
+<!-- configure-contract-fixture: context -->
 ```json
 {
   "schema_version": "v1",
@@ -103,15 +110,24 @@ listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
   "explanation": {
     "developer_contract": ["just setup", "just lint", "just test", "just upgrade"],
     "uninspected_existing_integration": ["Justfile", ".github/workflows/"]
-  },
+  }
+}
+```
+
+### Request fixture
+
+<!-- configure-contract-fixture: request -->
+```json
+{
+  "schema_version": "v1",
   "request": {
     "minimum_version": "0.5.0",
     "lint_families": {
-      "baseline": {"state": "recommended"},
-      "boundary": {"state": "enabled", "settings": {"inventory": "detect"}},
-      "portability": {"state": "enabled"},
-      "runtime": {"state": "disabled"},
-      "attributes": {"state": "recommended"}
+      "baseline": {"state": "recommended", "decision": "accept_recommendation"},
+      "boundary": {"state": "enabled", "decision": "modify", "settings": {"inventory": "detect"}},
+      "portability": {"state": "enabled", "decision": "accept_recommendation"},
+      "runtime": {"state": "disabled", "decision": "disable"},
+      "attributes": {"state": "recommended", "decision": "accept_recommendation"}
     },
     "just": {"mode": "keep_existing"},
     "ci": {"mode": "keep_existing"}
@@ -122,6 +138,7 @@ listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
 The initial recommended profile expansion is also fixed so a later UI cannot
 invent an implementation path:
 
+<!-- configure-contract-fixture: recommended-profile -->
 ```toml
 [[tool.sc-lint.lint]]
 name = "fmt"
@@ -140,15 +157,42 @@ The portability/runtime pages use the same installed-product command form when
 enabled. The attributes/directives page has no `[[tool.sc-lint.lint]]` command
 until a separate shipped executable/profile contract exists.
 
+<!-- configure-contract-fixture: result-success -->
 ```json
 {
   "ok": true,
   "command": "configure.plan",
   "data": {
-    "plan_id": "sha256:...",
-    "operations": [{"operation_id":"managed-justfile","path":".sc-lint/justfile","kind":"propose_create"}],
-    "conflicts": [],
-    "manual_steps": []
+    "schema_version": "v1",
+    "plan_id": "sha256:4a3d6f",
+    "operations": [
+      {
+        "operation_id": "just-integration",
+        "path": "Justfile",
+        "kind": "needs_confirmation",
+        "reason": "existing_integration_uninspected",
+        "choices": ["keep_existing", "generate_managed_import", "review_patch"]
+      },
+      {
+        "operation_id": "legacy-recipe",
+        "path": "Justfile",
+        "kind": "manual_conflict",
+        "conflict": {
+          "code": "CLI.CONFIGURE_UNMANAGED_COLLISION",
+          "observed_digest": "sha256:4a3d6f",
+          "recovery": "review_exported_patch"
+        },
+        "exportable_patch": {
+          "format": "unified-diff",
+          "path": "Justfile",
+          "content": "--- a/Justfile\n+++ b/Justfile\n@@ -1 +1 @@\n-legacy lint\n+# managed integration"
+        }
+      }
+    ],
+    "conflicts": ["legacy-recipe"],
+    "manual_steps": [
+      {"operation_id": "legacy-recipe", "action": "review_exported_patch"}
+    ]
   },
   "diagnostics": []
 }
@@ -158,8 +202,11 @@ The following populated operation shapes are normative for the F.1 plan schema.
 F.2 emits them during planning; F.4a and F.4b consume them without defining
 another conflict or patch representation:
 
+<!-- configure-contract-fixture: plan -->
 ```json
 {
+  "schema_version": "v1",
+  "plan_id": "sha256:4a3d6f",
   "operations": [
     {
       "operation_id": "just-integration",
@@ -174,7 +221,7 @@ another conflict or patch representation:
       "kind": "manual_conflict",
       "conflict": {
         "code": "CLI.CONFIGURE_UNMANAGED_COLLISION",
-        "observed_digest": "sha256:4a3d...",
+        "observed_digest": "sha256:4a3d6f",
         "recovery": "review_exported_patch"
       },
       "exportable_patch": {
@@ -196,6 +243,7 @@ instances fix the required code, pointer, recovery action, and docs reference
 for each named configure failure; implementation may add machine-readable
 details but may not change these fields or their meaning.
 
+<!-- configure-contract-fixture: result-errors -->
 ```json
 [
   {"ok":false,"command":"configure.plan","error":{"code":"CLI.CONFIGURE_UNSUPPORTED_SCHEMA","pointer":"/schema_version","recovery":"use_supported_schema_version","docs_ref":"sc-lint docs configuration"}},
@@ -234,6 +282,7 @@ details but may not change these fields or their meaning.
 
 - markdown link validation
 - contract-schema fixture review against the samples above
+- `python3 .just/tests/test_configure_contract_schemas.py`
 - `just lint`
 - `just test`
 

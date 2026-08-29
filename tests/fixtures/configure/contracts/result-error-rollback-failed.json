@@ -1,0 +1,1 @@
+{"ok": false, "command": "configure.apply", "error": {"code": "CLI.CONFIGURE_ROLLBACK_FAILED", "pointer": null, "recovery": "restore_listed_backups", "docs_ref": "sc-lint docs troubleshooting"}}

@@ -34,6 +34,9 @@ and agents while still protecting user-owned repository content.
    `.github/workflows/`) and never parses arbitrary user integration, runs
    Cargo metadata, or executes a consumer command. Product validation and a
    later plan/apply transaction remain outside the UI adapter.
+   The only contract authorities are the four `v1` schemas documented in
+   [`../configure-schemas.md`](../configure-schemas.md), with synchronized
+   golden fixtures for later planner and transaction sprints.
 2. Agents use a JSON request (`--request <path|-> --json`); this is the stable
    noninteractive contract. Human users may use the optional Wyvern UI launched
    by that Python script. Its first page explicitly says what sc-lint will set

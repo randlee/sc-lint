@@ -1,0 +1,1 @@
+{"ok": false, "command": "configure.plan", "error": {"code": "CLI.CONFIGURE_UNMANAGED_COLLISION", "pointer": "/operations/1", "recovery": "review_exported_patch", "docs_ref": "sc-lint docs troubleshooting"}}

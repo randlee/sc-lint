@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "command": "configure.plan",
+  "data": {
+    "schema_version": "v1",
+    "plan_id": "sha256:4a3d6f",
+    "operations": [
+      {
+        "operation_id": "just-integration",
+        "path": "Justfile",
+        "kind": "needs_confirmation",
+        "reason": "existing_integration_uninspected",
+        "choices": ["keep_existing", "generate_managed_import", "review_patch"]
+      },
+      {
+        "operation_id": "legacy-recipe",
+        "path": "Justfile",
+        "kind": "manual_conflict",
+        "conflict": {
+          "code": "CLI.CONFIGURE_UNMANAGED_COLLISION",
+          "observed_digest": "sha256:4a3d6f",
+          "recovery": "review_exported_patch"
+        },
+        "exportable_patch": {
+          "format": "unified-diff",
+          "path": "Justfile",
+          "content": "--- a/Justfile\n+++ b/Justfile\n@@ -1 +1 @@\n-legacy lint\n+# managed integration"
+        }
+      }
+    ],
+    "conflicts": ["legacy-recipe"],
+    "manual_steps": [
+      {"operation_id": "legacy-recipe", "action": "review_exported_patch"}
+    ]
+  },
+  "diagnostics": []
+}

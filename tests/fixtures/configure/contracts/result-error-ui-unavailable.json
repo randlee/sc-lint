@@ -1,0 +1,1 @@
+{"ok": false, "command": "configure.plan", "error": {"code": "CLI.CONFIGURE_UI_UNAVAILABLE", "pointer": "/ui", "recovery": "rerun_with_request_json", "docs_ref": "sc-lint docs configuration"}}

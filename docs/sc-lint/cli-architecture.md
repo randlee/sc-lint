@@ -93,6 +93,10 @@ surface. `configure` owns policy validation and plan/apply dispatch. The
 optional Python/Wyvern adapter only presents the same versioned JSON request
 and cannot mutate a consumer repository. Its crate-private apply artifacts are
 documented in the crate architecture and ADR-014, not exposed as CLI plugins.
+The four schema authorities are documented in
+[`configure-schemas.md`](./configure-schemas.md); later F.2-F.4b fixtures must
+exercise the same context/request/plan/result values on Linux, macOS, and
+Windows rather than defining per-platform command contracts.
 
 ## Initial Command Families
 

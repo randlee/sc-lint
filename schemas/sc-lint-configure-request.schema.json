@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/randlee/sc-lint/blob/main/schemas/sc-lint-configure-request.schema.json",
+  "title": "sc-lint Configure Request v1",
+  "description": "Explicit human or agent configuration choices; no shell text or inferred repository policy is accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request"],
+  "properties": {
+    "schema_version": {"const": "v1"},
+    "request": {"$ref": "#/$defs/request"}
+  },
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_version", "lint_families", "just", "ci"],
+      "properties": {
+        "minimum_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+        "lint_families": {"$ref": "#/$defs/lintFamilies"},
+        "just": {"$ref": "#/$defs/integrationChoice"},
+        "ci": {"$ref": "#/$defs/integrationChoice"},
+        "consumer_command_groups": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "consumer_profiles": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/consumerProfile"}
+        }
+      }
+    },
+    "lintFamilies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "boundary", "portability", "runtime", "attributes"],
+      "properties": {
+        "baseline": {"$ref": "#/$defs/familyChoice"},
+        "boundary": {"$ref": "#/$defs/familyChoice"},
+        "portability": {"$ref": "#/$defs/familyChoice"},
+        "runtime": {"$ref": "#/$defs/familyChoice"},
+        "attributes": {"$ref": "#/$defs/familyChoice"}
+      }
+    },
+    "familyChoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "decision"],
+      "properties": {
+        "state": {"enum": ["recommended", "enabled", "disabled"]},
+        "decision": {"enum": ["accept_recommendation", "modify", "disable"]},
+        "settings": {"type": "object", "additionalProperties": {"type": ["string", "number", "integer", "boolean", "null"]}}
+      },
+      "allOf": [
+        {"if": {"properties": {"decision": {"const": "modify"}}}, "then": {"required": ["settings"]}},
+        {"if": {"properties": {"decision": {"const": "disable"}}}, "then": {"properties": {"state": {"const": "disabled"}}}}
+      ]
+    },
+    "integrationChoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {"mode": {"enum": ["keep_existing", "generate_managed_import", "generate_managed_workflow", "review_patch", "disabled"]}}
+    },
+    "consumerProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "command"],
+      "properties": {
+        "kind": {"enum": ["lint", "test"]},
+        "name": {"type": "string", "minLength": 1},
+        "command": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "request": {
+    "minimum_version": "0.5.0",
+    "lint_families": {
+      "baseline": {"state": "recommended", "decision": "accept_recommendation"},
+      "boundary": {"state": "enabled", "decision": "modify", "settings": {"inventory": "detect"}},
+      "portability": {"state": "enabled", "decision": "accept_recommendation"},
+      "runtime": {"state": "disabled", "decision": "disable"},
+      "attributes": {"state": "recommended", "decision": "accept_recommendation"}
+    },
+    "just": {"mode": "keep_existing"},
+    "ci": {"mode": "keep_existing"}
+  }
+}

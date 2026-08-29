@@ -294,9 +294,32 @@ the same matrix before code lands:
 | `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
 | `version` | `version` | top-level CLI crate | `usage`, `internal` |
 | `compatibility check` | `compatibility.check` | compatibility preflight | `config`, `backend_failure`, `internal` |
+| `configure` | `configure`, `configure.plan`, `configure.apply` | F.1 schema contract, F.2 planner, and later F.4 transaction | `usage`, `config`, `capability`, `internal` with the stable `CLI.CONFIGURE_*` codes below |
 
 This matrix exists to prevent each command family from inventing its own
 response or error pattern at implementation time.
+
+## Phase F Configure Contract
+
+`sc-lint configure` is the planned consumer replacement command family. Its
+no-write `configure.plan` result and later `configure.apply` result use the
+same top-level envelope as every other noninteractive command. The context,
+request, plan, and result payload authorities are the four schemas documented
+in [`configure-schemas.md`](./configure-schemas.md); a launcher, wizard, or
+transaction cannot add family-specific envelope fields.
+
+| Stable code | Command | Required recovery |
+| --- | --- | --- |
+| `CLI.CONFIGURE_UNSUPPORTED_SCHEMA` | `configure.plan` | use a supported schema version |
+| `CLI.CONFIGURE_UI_UNAVAILABLE` | `configure.plan` | rerun with request JSON |
+| `CLI.CONFIGURE_UNMANAGED_COLLISION` | `configure.plan` | review the exportable patch |
+| `CLI.CONFIGURE_STALE_PLAN` | `configure.apply` | regenerate and review the plan |
+| `CLI.CONFIGURE_ROLLBACK_FAILED` | `configure.apply` | restore the listed backups before retrying |
+
+Every configure error includes the stable code, JSON pointer when one applies,
+recovery action, and offline documentation reference. `ConfigureError`
+normalizes into the common `CliError` envelope rather than introducing a
+separate human-only channel.
 
 ## Compatibility And Version-Probe Contract
 

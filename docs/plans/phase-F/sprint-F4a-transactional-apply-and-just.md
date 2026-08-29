@@ -32,6 +32,8 @@ not wait for optional Wyvern qualification or page implementation.
 - `crates/sc-lint/assets/consumer-config.toml`
 - `tests/configure/test_apply_and_just.py` (new)
 - `tests/fixtures/configure/apply-and-just/` (new)
+- `tests/fixtures/configure/contracts/` (F.1-owned golden inputs consumed
+  verbatim; no field redefinition)
 - `boundaries/sc-lint/top-level-cli.toml`
 - `docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md`
 - `docs/sc-lint/crate-architecture.md`
@@ -135,8 +137,8 @@ or plugin surface is created.
   migration fingerprint. A migration is impossible to apply to a near-match
   fixture.
 - every plan operation, conflict, exportable patch, and stable apply error
-  exactly matches the F.1 contract samples; F.4a does not invent a local error
-  or patch shape.
+  consumes the F.1 golden fixtures verbatim; F.4a does not invent a local
+  error, patch, or field shape.
 - the F.4a transaction runs one fault-injection fixture containing a normal
   TOML/Just artifact plus a test-only `SyntheticArtifact` implementation of
   `ManagedArtifact`. Failure in the synthetic second artifact restores the

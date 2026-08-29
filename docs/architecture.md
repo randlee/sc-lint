@@ -201,6 +201,8 @@ UI produce the same plan. A later bounded, fixture-proven apply path may manage
 an import in an existing Justfile but never replaces consumer-owned content.
 The same configuration's `minimum_version` becomes the single release-
 selection authority for bootstrap and the reusable Action.
+The four Phase F schema authorities and synchronized golden fixtures are
+listed in [`docs/sc-lint/configure-schemas.md`](./sc-lint/configure-schemas.md).
 
 The planned F.4a apply engine has one crate-private, object-safe
 `ManagedArtifact` boundary for staged generated outputs. Each artifact supplies
@@ -557,7 +559,9 @@ before extraction, exposes the binary and `sc-lint-docs` paths, then invokes
 the E.1 compatibility preflight before E.3 consumer setup/lint/test. It must
 not use `cargo run`, a source checkout, a package manager, or an analyzer
 package name as a fallback. Its `v1` major tag identifies the Action interface;
-the explicit product-version input selects the immutable release artifact.
+`[tool.sc-lint].minimum_version` in the configured `sc-lint.toml` selects the
+immutable release artifact. An optional Action version value can only assert
+equality with that configuration and must fail on drift.
 
 This architecture realizes `REQ-PRODUCT-022`; the detailed input, output,
 provenance, pinning, and recovery contract is in

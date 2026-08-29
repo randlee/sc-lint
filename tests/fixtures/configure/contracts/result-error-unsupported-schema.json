@@ -1,0 +1,1 @@
+{"ok": false, "command": "configure.plan", "error": {"code": "CLI.CONFIGURE_UNSUPPORTED_SCHEMA", "pointer": "/schema_version", "recovery": "use_supported_schema_version", "docs_ref": "sc-lint docs configuration"}}

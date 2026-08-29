@@ -32,6 +32,8 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
 - `docs/sc-lint/github-action-requirements.md`
 - `tests/configure/test_workflow_transformer.py` (new)
 - `tests/fixtures/configure/workflow/` (new)
+- `tests/fixtures/configure/contracts/` (F.1-owned golden inputs consumed
+  verbatim; no field redefinition)
 - `docs-bundle/ci.md`
 
 ## Deliverables
@@ -43,7 +45,7 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
   unequal to config.
 - F.4b synchronizes the F.1-owned Action version-authority amendment into the
   Action input table, fixtures, CI guide, and release behavior; it does not
-  redefine the underlying product requirement.
+  redefine the underlying product requirement or F.1 result/plan fields.
 - the F.4b workflow transformer may create the standalone
   `.github/workflows/sc-lint.yml` only through an F.2/F.4a-approved plan. It
   uses `randlee/sc-lint@v1` with `setup`, `lint`, and `test`, points to the

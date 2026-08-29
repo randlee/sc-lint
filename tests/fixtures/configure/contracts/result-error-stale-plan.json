@@ -1,0 +1,1 @@
+{"ok": false, "command": "configure.apply", "error": {"code": "CLI.CONFIGURE_STALE_PLAN", "pointer": "/plan_id", "recovery": "regenerate_and_review_plan", "docs_ref": "sc-lint docs configuration"}}

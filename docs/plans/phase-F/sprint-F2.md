@@ -31,6 +31,8 @@ framework.
 - `tests/fixtures/configure/empty-rust/` (new)
 - `tests/fixtures/configure/existing-just/` (new)
 - `tests/fixtures/configure/unknown-existing/` (new, minimized)
+- `tests/fixtures/configure/contracts/` (F.1-owned golden inputs consumed
+  verbatim; no field redefinition)
 
 ## Deliverables
 
@@ -50,8 +52,8 @@ framework.
 - the plan is advisory and typed (`propose_create`, `needs_confirmation`,
   `manual_conflict`), ordered, and includes the exact files that later F.4a/F.4b
   operations could manage. Its populated confirmation, conflict,
-  exportable-patch, and error envelopes exactly match F.1's required contract
-  samples; it carries no inferred file rewrite.
+  exportable-patch, and error envelopes consume F.1's golden fixtures
+  verbatim; it carries no inferred file rewrite or locally redefined field.
 - any existing Justfile or workflow is reported as present-but-not-inspected;
   the plan asks the user/agent to choose an integration posture. It never
   claims compatibility, reads an arbitrary recipe, or proposes deletion.
