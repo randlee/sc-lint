@@ -48,6 +48,13 @@ the qualified local protocol, but it may not inspect a consumer path beyond the
 F.2 context, calculate recommendation policy, retain page history, or render a
 separate browser application.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.3d adapter
+boundary: the launcher and pages use only qualified Wyvern behavior and produce
+the F.3c-equivalent request/plan. Nothing may be deferred except work explicitly
+listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Acceptance Criteria
 
 - Each recorded UI flow normalizes to exactly the same request and dry-run plan

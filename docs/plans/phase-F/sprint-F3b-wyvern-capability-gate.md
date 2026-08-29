@@ -40,6 +40,13 @@ dependency gate, not a request to recreate wizard behavior in sc-lint.
   feature is a blocking upstream finding with the fixture and expected JSON;
   it must not be emulated by Python.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.3b external
+capability gate: all supported platforms have reproducible release-artifact
+evidence or the sprint fails. Nothing may be deferred except work explicitly
+listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Required Host-Protocol Sample
 
 The smoke harness must make the host boundary reviewable as data rather than

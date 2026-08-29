@@ -52,6 +52,13 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
   digest recheck/rollback boundary; F.4b validates generated YAML before the
   transaction commits it but does not implement a second transaction engine.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.4b Action and
+workflow boundary, including all platforms, no-fallback behavior, and unknown
+workflow conflicts. Nothing may be deferred except work explicitly listed in
+[This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Required Integration Sample
 
 ```yaml

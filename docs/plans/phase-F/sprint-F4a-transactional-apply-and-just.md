@@ -43,7 +43,9 @@ workflow boundary is separately closed by F.4b.
   applies an ordered transaction, validates every changed TOML, Just, and JSON
   artifact, and restores prior bytes/modes on any failure. F.4b validates a
   generated YAML workflow before passing it to this transaction. A partial
-  rollback is its own stable, actionable error with backup paths.
+  rollback is its own stable, actionable error with backup paths. Staging,
+  digest recheck, commit, and rollback apply uniformly to every generated
+  artifact type, including that pre-validated YAML workflow.
 - empty repositories receive the canonical Phase E `sc-lint.toml`, bootstrap
   helpers, and root Justfile path. Established repositories with no existing
   `setup`, `lint`, `test`, or `upgrade` recipe receive the same config/bootstrap
@@ -69,6 +71,13 @@ workflow boundary is separately closed by F.4b.
   `setup-lint-toolchain`, copied `.just` artifacts, and manual consumer
   workaround only after their replacements validate. The transformer must not
   delete arbitrary files named similarly.
+
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.4a transaction
+and Just boundary, including failure paths and exact legacy near-misses.
+Nothing may be deferred except work explicitly listed in
+[This Sprint Does Not Close](#this-sprint-does-not-close).
 
 ## Required Integration Sample
 

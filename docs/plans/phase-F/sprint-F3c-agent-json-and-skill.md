@@ -36,6 +36,13 @@ path. F.3c does not introduce a second dispatcher or schema authority.
   preview, conflict handling, explicit confirmation, and the prohibition on
   inventing repository probes or shell commands.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.3c agent route:
+the public JSON command, conformance fixtures, and skill agree and are directly
+executable. Nothing may be deferred except work explicitly listed in
+[This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Acceptance Criteria
 
 - Every F.3a fixture can be submitted headlessly and yields deterministic,

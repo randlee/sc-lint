@@ -56,6 +56,12 @@ framework.
   the plan asks the user/agent to choose an integration posture. It never
   claims compatibility, reads an arbitrary recipe, or proposes deletion.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.2 bounded
+observation and no-write planning boundary. Nothing may be deferred except work
+explicitly listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Acceptance Criteria
 
 - the same fixture/request yields byte-identical JSON plan output on repeated

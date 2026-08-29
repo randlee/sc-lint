@@ -31,7 +31,9 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 - `docs/sc-lint/cli-requirements.md`
 - `docs/sc-lint/cli-contract.md`
 - `docs/sc-lint/cli-architecture.md`
+- `docs/sc-lint/crate-architecture.md`
 - `docs/architecture.md`
+- `docs/issues-inventory.md`
 - `docs/sc-lint/github-action-requirements.md`
 - `schemas/sc-lint-configure-context.schema.json` (new)
 - `schemas/sc-lint-configure-request.schema.json` (new)
@@ -45,6 +47,13 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 
 ## Deliverables
 
+- the CLI and crate-architecture documents assign the `sc-lint` command,
+  bounded Python launcher, schemas, apply engine, and workflow transformer to
+  one product boundary, and name Linux/macOS/Windows fixture evidence as the
+  cross-platform validation authority for later sprints.
+- the issues inventory records any open F.1 contract ambiguity or external
+  qualification blocker with an owner and sprint disposition; no unresolved
+  issue may be hidden in a plan footnote.
 - `REQ-PRODUCT-023` through `025` define product-owned consumer
   configuration, discovery, plan/apply transaction, human and agent entry
   points, preservation, one version authority, and required cross-platform
@@ -67,6 +76,13 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 - every public context/request/plan type has a JSON Schema, a JSON example, and
   an explanation of its user-facing purpose. The MVP has no general repository
   parser: its context schema contains only documented conventional path facts.
+
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.1 contract
+boundary: requirements, ADR, schemas, architecture, issue disposition, and
+golden examples ship together. Nothing may be deferred except work explicitly
+listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
 
 ## Required Contract Samples
 

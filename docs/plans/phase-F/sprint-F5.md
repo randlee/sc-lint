@@ -52,6 +52,13 @@ PRs.
   its own Phase P qualification plan. F.5 supplies product evidence only and
   neither authors that consumer plan nor performs a consumer conversion.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.5 release and
+handoff boundary: the distributed artifact, offline documentation, fixture
+evidence, and handoff manifest are complete together. Nothing may be deferred
+except work explicitly listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Acceptance Criteria
 
 - the public product contract, error/recovery documentation, and offline bundle

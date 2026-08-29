@@ -34,6 +34,13 @@ platforms and explain the same flow in the installed documentation.
   F.4a owns transactional conflict and apply troubleshooting in
   `docs-bundle/troubleshooting.md`, avoiding competing documentation owners.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.3e human-facing
+surface: supported-platform UX evidence and installed documentation must both
+be complete. Nothing may be deferred except work explicitly listed in
+[This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Acceptance Criteria
 
 - The full F.3a scenario matrix passes on Linux, macOS, and Windows; every

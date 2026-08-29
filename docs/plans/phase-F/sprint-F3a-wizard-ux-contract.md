@@ -79,6 +79,13 @@ target-repository mutation.
   The plan records that released Wyvern 0.1.0 has only single-dialog commands
   and therefore does not meet this contract.
 
+## Production-Ready Closure
+
+Every listed deliverable must land production-ready for the F.3a UX handoff:
+the complete page contract, fixtures, and host-capability criteria are usable
+without rediscovering policy. Nothing may be deferred except work explicitly
+listed in [This Sprint Does Not Close](#this-sprint-does-not-close).
+
 ## Required Contract Samples
 
 The fixture pack must retain these normalized shapes (with actual observed
