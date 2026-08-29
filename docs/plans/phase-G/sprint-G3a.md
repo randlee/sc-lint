@@ -68,6 +68,16 @@ consumer repository, render templates, or write configuration. This realizes
 REQ-PRODUCT-020 and REQ-PRODUCT-024 while retaining ADR-016's no-Rust-
 configuration boundary.
 
+## Unblock Milestone
+
+Commit the wheel contract G.3b consumes: `bindings/sc-lint-py/Cargo.toml`,
+`pyproject.toml`, and `src/lib.rs` define a buildable maturin package whose
+only pyo3 exports are `version_json()` and `run(argv)`; the Python package
+exports `binary_path()` and a locally built wheel imports successfully. Report
+that commit immediately; G.3b starts from it on
+`sprint/G.3a-python-bindings` while G.3a completes multi-platform publication,
+helper migration, bootstrap provisioning, CI, and review.
+
 ## Deliverables
 
 - `pip install sc-lint==X.Y.Z` provides module `sc_lint` with the moved

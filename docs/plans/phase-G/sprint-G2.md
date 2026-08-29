@@ -19,8 +19,9 @@ owner: clint
 
 ## Hard Dependencies
 
-- G.1 committed on `sprint/G.1-adoption-kit`; this sprint's PR base is that
-  branch, so implementation may begin before G.1 lands on `develop`.
+- G.1's **Unblock Milestone** committed on `sprint/G.1-adoption-kit`; this
+  sprint's PR base is that branch, so implementation may begin before G.1
+  CI, QA, review, or merge.
 - reference form: `../sc-publish/plugins/sc-publish/.claude/skills/publishing/SKILL.md`
   and `.claude/agents/publisher.md`
 - [docs/sc-lint/skill-authoring-constraints.md](../../sc-lint/skill-authoring-constraints.md)

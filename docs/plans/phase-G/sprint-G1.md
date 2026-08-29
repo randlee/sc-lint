@@ -20,8 +20,9 @@ owner: clint
 
 ## Hard Dependencies
 
-- G.0 committed on `sprint/G.0-abandon-phase-F`; this sprint's PR base is that
-  branch, so implementation may begin before G.0 lands on `develop`.
+- G.0's **Unblock Milestone** committed on
+  `sprint/G.0-abandon-phase-F`; this sprint's PR base is that branch, so
+  implementation may begin before G.0 CI, QA, review, or merge.
 - ADR-015 (created by G.0 on this stack)
 - [ADR-012](../../sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 - reference contract: `../sc-publish/plugins/sc-publish/install.py`
@@ -104,6 +105,16 @@ Explicitly discarded: `configure/{apply,artifact,legacy,reviewed_removals}.rs`,
   CI workflow, no consumer name). No fixture contains a real repository name.
 - `plugin.json` with `name` `sc-lint-adoption`, `version` equal to the
   workspace version, `description`, `author`.
+
+## Unblock Milestone
+
+Commit the minimal, runnable kit interface G.2 documents:
+`packages/sc-lint-adoption/install.py` accepts `--input`, `--dry-run`, and a
+repository positional argument; `install.schema.json` validates its input;
+the generic kit asset set and `tests/fixtures/adoption/install.json` let the
+empty-workspace fixture install and then report a clean dry run. Report that
+commit immediately; G.2 starts from it on `sprint/G.1-adoption-kit` while
+G.1 completes conflict cases, the established fixture, CI matrix, and review.
 
 ## Acceptance Criteria
 

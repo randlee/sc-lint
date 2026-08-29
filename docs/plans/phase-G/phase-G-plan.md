@@ -112,6 +112,24 @@ Work is organised as two `gh stack` stacks (stacks are strictly linear, so
 parallelism is between stacks, never inside one). Every branch has its own
 worktree under `../sc-lint-worktrees/<branch>`.
 
+### Stack Architecture Record
+
+The stack design was derived from deliverables and path sets before the sprint
+documents were written:
+
+| Candidate stack | Deliverable/path set | Ordered layers and reason | Owner |
+| --- | --- | --- | --- |
+| A — adoption kit | Governance and traceability under `docs/`; generic kit, fixtures, and CI under `packages/sc-lint-adoption/`, `tests/adoption/`, and `.github/workflows/ci.yml`; then the adoption skill, marketplace, and consumer guide under `packages/sc-lint-adoption/.claude/`, `.claude-plugin/`, and `docs/sc-lint/` | G.0 fixes the ADR/requirement authority; G.1 supplies the generic kit contract; G.2 consumes that contract in agent-facing guidance. These are one coherent kit path set. | clint |
+| B — product runtime | Wheel binding and bootstrap/release paths under `bindings/sc-lint-py/`, `.sc-lint/`, `.just/`, `crates/`, `scripts/`, and release workflows | G.3a establishes the published wheel entry points; G.3b consumes them in the self-contained archive and release smoke path. This path set is independent of Stack A until the named reconciliation below. | cfast |
+| External qualification | Consumer-only paths in `../sc-publish`, `../wyvern`, `../atm-core`, and `../sc-compose` | G.4a is the independently closable sc-publish delegation; G.4b qualifies the two greenfield consumers as one coupled release gate; G.4c consumes that proven greenfield artifact for the established-workspace migration. G.5 is the separately authorized remaining-repository rollout. | cfast (G.4a); clint (G.4b–G.5) |
+
+The only overlapping product/kit path is `.sc-lint/bootstrap*`: G.1 vendors
+the product snapshot and G.3a changes the product implementation. G.3b is
+the sole, higher reconciliation layer and only re-syncs the kit copy after
+the named Stack A merge. No stack takes another stack's commit as its branch
+base. Stack A has three delivery layers and Stack B two, so neither requires
+further subdivision.
+
 ```text
 develop (trunk)
  ├─ Stack A — adoption kit (owner: clint)
@@ -130,25 +148,27 @@ External, non-branch delivery closures (not `gh stack` layers):
   G.5 remaining-repository rollout after G.4a–G.4c and the approved inventory
 ```
 
-| Sprint | May run alongside | Must wait for | Exact event that unblocks it |
-| --- | --- | --- | --- |
-| G.0 | G.3a | Phase G planning branch committed | `feature/phase-G-planning` is committed and linked as Stack A's bottom planning layer |
-| G.1 | G.3a | G.0 in Stack A | G.0 is committed on `sprint/G.0-abandon-phase-F`; G.1's PR base is that branch |
-| G.2 | G.3a / independent G.3b work | G.1 in Stack A | G.1 is committed on `sprint/G.1-adoption-kit`; G.2's PR base is that branch |
-| G.3a | G.0–G.2 | none from Stack A | Stack B branch is created from `develop` and committed work may begin immediately |
-| G.3b | G.2 and all non-reconciliation Stack A work | G.3a in Stack B; bootstrap-copy closeout also waits for G.1 to land | G.3a is committed on `sprint/G.3a-python-bindings`; before the G.3b release closes, G.1 has merged to `develop` and that `develop` merge-forward is present in G.3b |
-| G.4a | G.4b | released kit Action and self-contained release | G.2 and G.3b are merged and the versioned release containing both is published |
-| G.4b | G.4a | released adopter skill and self-contained release | G.2 and G.3b are merged and the versioned release containing both is published |
-| G.4c | no product work; G.4a may finish independently | G.4b greenfield qualification | both G.4b consumer PRs merge with their required CI and drift checks green |
-| G.5 | external consumer PRs may run together | all first-wave closures and approved inventory | G.4a, G.4b, and G.4c merge; product owner records the remaining-repository inventory in the rollout table |
+| Sprint | Stack | Runs in parallel with | Waits for | Unblocked when |
+| --- | --- | --- | --- | --- |
+| G.0 | A | G.3a (Stack B) | Phase G planning layer | `feature/phase-G-planning` is committed as Stack A's bottom planning layer. |
+| G.1 | A | G.3a (Stack B) | G.0 unblock milestone | G.0's unblock milestone is committed on `sprint/G.0-abandon-phase-F`. |
+| G.2 | A | G.3a and G.3b (Stack B) | G.1 unblock milestone | G.1's unblock milestone is committed on `sprint/G.1-adoption-kit`. |
+| G.3a | B | G.0–G.2 (Stack A) | No lower sprint; Stack B roots on `develop` | Stack B's bottom layer starts immediately from `develop`; it has no lower-sprint milestone. |
+| G.3b | B | G.2 and all non-reconciliation Stack A work | G.3a unblock milestone | G.3a's unblock milestone is committed on `sprint/G.3a-python-bindings`. |
+| G.4a | external-non-branch | G.4b | Released kit Action and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |
+| G.4b | external-non-branch | G.4a | Released adopter skill and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |
+| G.4c | external-non-branch | G.4a may finish independently | G.4b greenfield qualification | Both G.4b consumer PR merge commits exist with their required CI and drift checks green. |
+| G.5 | external-non-branch | Approved remaining-consumer PRs may run together | G.4a–G.4c closures and approved inventory | The G.4a, G.4b, and G.4c external PR merge commits are recorded and the product owner commits the approved inventory to `docs/sc-lint/adoption.md`. |
 
 Cross-stack touch point: G.1 vendors `.sc-lint/bootstrap*` verbatim from
 `develop`; G.3a modifies those product files. G.3b is the sole reconciliation
-layer: it may begin all product-only work once G.3a is committed, but it may
-not claim release closure until G.1 has merged to `develop`, that merge is
-merged forward into Stack B, and the kit copy is re-synced byte-for-byte. No
-Stack B branch is based on a Stack A branch. G.3a's acceptance therefore uses
-`sc-lint init --just` on a fresh workspace, not the G.1 fixture.
+layer: it starts when G.3a's unblock milestone commits and may implement all
+product-only work while Stack A proceeds. It may not claim **release closure**
+until G.1 has merged to `develop`, that merge is merged forward into Stack B,
+and the kit copy is re-synced byte-for-byte. That later merge is a named
+reconciliation condition, not a start dependency. No Stack B branch is based
+on a Stack A branch. G.3a's acceptance therefore uses `sc-lint init --just`
+on a fresh workspace, not the G.1 fixture.
 
 ### Stack protocol
 

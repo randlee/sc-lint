@@ -69,6 +69,16 @@ owner: clint
   worktrees `sprint/F.*` and `integrate/phase-F` removed; branches deleted
   after tagging; `worktree-tracking.md` updated.
 
+## Unblock Milestone
+
+Commit the governing contract G.1 needs, without waiting for the archival
+housekeeping or review: `ADR-015`, `ADR-016`, the ADR index entries, and
+`REQ-PRODUCT-023` / `REQ-PRODUCT-024` in `docs/requirements.md`. The ADRs
+must state the kit ownership, the four-recipe interface, the wheel runtime,
+and the no-Rust-configuration boundary. Report the commit immediately; G.1
+starts from that commit on `sprint/G.0-abandon-phase-F` while G.0 CI, QA, and
+the remaining Phase F archive work continue.
+
 ## Acceptance Criteria
 
 - `ls docs/sc-lint/adr/ADR-015-*.md docs/sc-lint/adr/ADR-016-*.md` lists

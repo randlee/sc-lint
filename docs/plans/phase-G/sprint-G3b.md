@@ -19,10 +19,13 @@ owner: cfast
 
 ## Hard Dependencies
 
-- G.3a committed on `sprint/G.3a-python-bindings` (same stack). G.3b may begin
-  product-only work then. Before its release-closure and bootstrap-copy
-  acceptance criteria run, G.1 must have merged to `develop` and that
-  `develop` commit must be merge-forwarded into this worktree.
+- G.3a's **Unblock Milestone** committed on
+  `sprint/G.3a-python-bindings` (same stack). G.3b may begin product-only
+  work at that commit, without waiting for G.3a CI, QA, review, or merge.
+- The G.1 → G.3b bootstrap-copy reconciliation is not a start dependency.
+  Before G.3b's release-closure and bootstrap-copy acceptance criteria run,
+  G.1 must have merged to `develop` and that `develop` commit must be
+  merge-forwarded into this worktree.
 - issue `#84` (full/ci profile runs source-tree Cargo wrappers)
 - `scripts/release_artifacts.py`, `.github/workflows/release*.yml`
 
