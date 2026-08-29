@@ -23,7 +23,6 @@ platforms and explain the same flow in the installed documentation.
 - `docs-bundle/configuration.md`
 - `docs-bundle/using-sc-lint.md`
 - `docs-bundle/best-practices.md`
-- `docs-bundle/troubleshooting.md`
 
 ## Deliverables
 
@@ -31,8 +30,9 @@ platforms and explain the same flow in the installed documentation.
   validation announcement, contrast, responsive minimum window behavior,
   cancellation/dismissal, and no-write guarantee.
 - Documentation with the ten-page map, JSON alternative, screenshot/fixture
-  references, preview/apply distinction, conflict recovery, and Wyvern
-  availability recovery.
+  references, preview/apply distinction, and Wyvern availability recovery.
+  F.4 owns transactional conflict and apply troubleshooting in
+  `docs-bundle/troubleshooting.md`, avoiding competing documentation owners.
 
 ## Acceptance Criteria
 

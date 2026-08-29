@@ -17,8 +17,8 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 ## Hard Dependencies
 
 - `docs/phase-E/phase-E-plan.md`
-- `docs/requirements.md` `REQ-PRODUCT-019` through `022`
-- `docs/sc-lint/cli-requirements.md` `REQ-CLI-019` through `024`
+- `docs/requirements.md` `REQ-PRODUCT-019` through `025`
+- `docs/sc-lint/cli-requirements.md` `REQ-CLI-019` through `028`
 - `docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md`
 - `docs/sc-lint/github-action-requirements.md`
 - Phase F plan in this directory
@@ -33,6 +33,11 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 - `docs/sc-lint/cli-architecture.md`
 - `docs/architecture.md`
 - `docs/sc-lint/github-action-requirements.md`
+- `schemas/sc-lint-configure-context.schema.json` (new)
+- `schemas/sc-lint-configure-request.schema.json` (new)
+- `schemas/sc-lint-configure-plan.schema.json` (new)
+- `schemas/sc-lint-configure-result.schema.json` (new)
+- `docs/sc-lint/configure-schemas.md` (new)
 - `docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md` (new)
 - `docs/sc-lint/adr/README.md`
 - `docs/project-plan.md`
@@ -40,9 +45,10 @@ mutation, Justfile coexistence, and GitHub-Action version selection.
 
 ## Deliverables
 
-- `REQ-PRODUCT-023` defines product-owned consumer configuration, discovery,
-  plan/apply transaction, preservation, noninteractive JSON, and required
-  cross-platform acceptance.
+- `REQ-PRODUCT-023` through `025` define product-owned consumer
+  configuration, discovery, plan/apply transaction, human and agent entry
+  points, preservation, one version authority, and required cross-platform
+  acceptance.
 - `REQ-CLI-025` through `REQ-CLI-028` define `configure`, its versioned JSON
   request, stable plan/result envelope, UI selection, and error family.
 - ADR-014 accepts the thin Python/Wyvern MVP architecture: conventional file
@@ -137,6 +143,9 @@ until a separate shipped executable/profile contract exists.
   conversion; neither silently overwrites an arbitrary Justfile or README.
 - every lint-family page is named and its recommendation/accept/modify/disable
   semantics are represented in the JSON schema.
+- the four named schema files are the only schema authorities for the context,
+  request, plan, and result envelopes; later F.2-F.3e work consumes them and
+  may add fixtures, but does not redefine their public fields.
 - the schema has an explicit `inspected: false` representation for existing
   Justfile/workflow content so users cannot mistake a presence check for a
   compatibility analysis.

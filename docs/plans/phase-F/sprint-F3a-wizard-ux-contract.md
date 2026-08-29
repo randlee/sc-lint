@@ -32,7 +32,6 @@ target-repository mutation.
 - `docs/sc-lint/configure-wizard-fixtures/request-existing-conflict.json` (new)
 - `docs/sc-lint/configure-wizard-fixtures/plan-no-write-conflict.json` (new)
 - `docs/sc-lint/configure-wizard-fixtures/README.md` (new)
-- `docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md`
 
 ## Deliverables
 
@@ -41,6 +40,23 @@ target-repository mutation.
   final review. For every page it names visible fields, default/recommended
   value, help text, JSON pointer, validation rule, enabled/disabled condition,
   `Back`/`Next`/`Cancel` label, and the exact next-page branch.
+- The handoff fixes the following page sequence so the Wyvern team can design
+  presentation without choosing product behavior. The authored UX document
+  expands every row into exact field labels, help, error/recovery copy, and
+  schema references.
+
+  | Page | Required decision/data | Forward rule |
+  | --- | --- | --- |
+  | 1. Overview | bounded facts, four-command contract, proposed files, reasons | `Next` enters baseline; no decision bypasses this page |
+  | 2. Baseline | accept, modify argv arrays, or disable baseline format/Clippy/test profile | valid selection enters boundary |
+  | 3. Boundary | disabled/recommended/enabled plus structured inventory setting | valid selection enters portability |
+  | 4. Portability | disabled/recommended/enabled | valid selection enters runtime |
+  | 5. Runtime | disabled/recommended/enabled | valid selection enters attributes/directives |
+  | 6. Attributes/directives | declarative source intent; no executable profile command | valid selection enters command groups |
+  | 7. Command groups | every optional named group explicitly enabled, disabled, or unselected | selection enters Just integration |
+  | 8. Just integration | keep, generate, supported migration, or conflict/patch review | enters CI; unresolved collision blocks confirmation |
+  | 9. CI integration | keep, generate Action, supported patch, or conflict/patch review | enters final review; unresolved collision blocks confirmation |
+  | 10. Final review | normalized request, ordered no-write plan, diffs/conflicts/manual steps | `Confirm` emits request/plan only; `Back` restores data |
 - A stable layout contract: progress indicator, page title, explanation panel,
   selection controls, immutable discovered-facts panel, validation/error panel,
   and a compact pending-change summary. The overview and final review have
@@ -136,12 +152,16 @@ planning inputs, never data sent to or rendered by a consumer wizard.
 - The fixture pack contains no executable shell text, credentials, local home
   path, source archive, or copied utility, and reproduces the current consumer
   facts from the recorded baseline commits.
+- the authoritative UX document includes the complete per-page table above
+  with field labels, help/error/recovery copy, JSON pointers, defaults,
+  validation, and navigation. A prose summary or static mock-up without it is
+  not an acceptable handoff.
 - The capability matrix has a testable acceptance case for every required
   Wyvern feature and labels missing capability as blocking—not a reason for an
   sc-lint Python state-machine workaround.
-- ADR-014 records that the wizard is capability-gated and that the UX handoff
-  package is the source of page behavior; it does not claim Wyvern 0.1.0 has a
-  released wizard API.
+- The F.1-owned ADR-014 names this handoff package as the page-behavior
+  authority and records that the wizard is capability-gated; it does not claim
+  Wyvern 0.1.0 has a released wizard API.
 
 ## Required Validation
 

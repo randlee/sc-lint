@@ -38,7 +38,6 @@ where safety is enforced, not delegated to the wizard.
 - `docs-bundle/ci.md`
 - `docs-bundle/upgrade.md`
 - `docs-bundle/troubleshooting.md`
-- `docs/sc-lint/github-action-requirements.md`
 
 ## Deliverables
 

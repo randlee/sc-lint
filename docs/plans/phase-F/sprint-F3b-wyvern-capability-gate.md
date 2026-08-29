@@ -27,7 +27,6 @@ dependency gate, not a request to recreate wizard behavior in sc-lint.
 
 - `docs/sc-lint/configure-wizard-fixtures/wyvern-capability-matrix.md` (new)
 - `docs/sc-lint/configure-wizard-fixtures/wyvern-smoke/` (new)
-- `docs/sc-lint/configure-wizard-ux.md`
 
 ## Deliverables
 
@@ -41,12 +40,36 @@ dependency gate, not a request to recreate wizard behavior in sc-lint.
   feature is a blocking upstream finding with the fixture and expected JSON;
   it must not be emulated by Python.
 
+## Required Host-Protocol Sample
+
+The smoke harness must make the host boundary reviewable as data rather than
+by manually clicking a browser. The qualified release must accept a page
+descriptor equivalent to this and return the documented terminal state:
+
+```json
+{
+  "pages": [
+    {"id": "overview", "data": {"minimum_version": "0.5.0"}},
+    {"id": "baseline", "when": {"pointer": "/start", "equals": "configure"}}
+  ],
+  "initial_page": "overview"
+}
+```
+
+The matrix records a result equivalent to `{"status":"finished","stack":[...]}`
+and separate stable `cancelled`, `dismissed`, and `timeout` results. It proves
+back restores opaque data and a changed branch removes stale forward state; the
+harness never compensates for an absent host behavior.
+
 ## Acceptance Criteria
 
 - The qualified release passes every F.3a host-capability case on all supported
   platforms and has no network or source-checkout requirement after install.
 - A failure reproduces headlessly with an exact fixture and stable expected
   result, suitable for the Wyvern team to fix.
+- the capability record names the exact release tag, archive name, SHA-256,
+  protocol version, host OS/architecture, and command used for each result;
+  an unverified tag or locally built executable is a failure.
 
 ## Required Validation
 

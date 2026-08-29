@@ -23,14 +23,14 @@ framework.
 ## Exact Targets
 
 - `scripts/sc_lint_configure.py` (new)
-- `scripts/sc_lint_configure_schema.py` (new)
+- `scripts/sc_lint_configure_schema.py` (new; validates the F.1-owned schemas
+  without defining a second schema surface)
 - `crates/sc-lint/src/cli.rs`
 - `crates/sc-lint/src/command.rs`
 - `tests/configure/test_context_and_plan.py` (new)
 - `tests/fixtures/configure/empty-rust/` (new)
 - `tests/fixtures/configure/existing-just/` (new)
 - `tests/fixtures/configure/unknown-existing/` (new, minimized)
-- `docs/sc-lint/cli-contract.md`
 
 ## Deliverables
 

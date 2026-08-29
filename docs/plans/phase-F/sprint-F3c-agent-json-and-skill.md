@@ -9,9 +9,10 @@ target: develop
 
 ## Goal
 
-Deliver the UI-independent agent route and the setup skill using the same F.3a
-fixtures. The result is deterministic JSON planning, never an interactive or
-browser-dependent path.
+Deliver the agent-facing documentation and conformance suite for the
+already-implemented F.2 JSON route, using the same F.3a fixtures. The result
+is a deterministic JSON workflow, never an interactive or browser-dependent
+path. F.3c does not introduce a second dispatcher or schema authority.
 
 ## Hard Dependencies
 
@@ -20,18 +21,17 @@ browser-dependent path.
 
 ## Exact Targets
 
-- `scripts/sc_lint_configure.py`
-- `schemas/sc-lint-configure-context.schema.json`
-- `schemas/sc-lint-configure-request.schema.json`
 - `.claude/skills/sc-lint-consumer-setup/SKILL.md` (new)
 - `.claude/skills/sc-lint-consumer-setup/references/agent-json.md` (new)
-- configure JSON fixtures/tests
+- `tests/configure/test_agent_json_and_skill.py` (new)
+- `tests/fixtures/configure/agent/` (new)
 
 ## Deliverables
 
-- `sc-lint configure --request <path|-> --root <path> --dry-run --json`
-  accepts the F.3a request JSON, returns a normalized request and plan, and
-  neither launches Wyvern nor writes the target repository.
+- the skill and conformance fixtures exercise the F.2 command
+  `sc-lint configure --request <path|-> --root <path> --dry-run --json`, which
+  accepts F.3a request JSON, returns a normalized request and plan, and neither
+  launches Wyvern nor writes the target repository.
 - The skill explains root selection, fixture/context review, request creation,
   preview, conflict handling, explicit confirmation, and the prohibition on
   inventing repository probes or shell commands.
@@ -42,6 +42,9 @@ browser-dependent path.
   schema-valid JSON equal to the documented page selection result.
 - Invalid pointer/value combinations return a stable error with recovery and
   mutate nothing.
+- the skill contains no discovery logic, wrapper implementation, or mutable
+  schema definition: it delegates all validation and planning to the public
+  F.2 command and links to the F.1-owned schema reference.
 
 ## Required Validation
 

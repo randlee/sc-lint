@@ -19,37 +19,38 @@ PRs.
 ## Hard Dependencies
 
 - F.1 through F.4
-- a released sc-lint version containing the F.4 configuration/Action contract
-- Phase P approval and access to dedicated, clean disposable consumer copies;
-  Phase P owns any sc-compose/atm-core worktree and team acceptance.
+- release infrastructure capable of producing the F.4 configuration/Action
+  contract as an immutable distributed artifact
 
 ## Exact Targets
 
-### sc-lint repository
-
-- Phase F plans and requirements/ADR/architecture docs
-- consumer lifecycle/acceptance fixtures
-- docs-bundle setup, Just, CI, upgrade, troubleshooting, and best-practice
-  guides
-- root `README.md`, `AGENTS.md`, and Phase F project-plan/roadmap entries
-- reusable Action docs/tests/release validation
+- `docs/sc-lint/configure-release-handoff.md` (new)
+- `tests/fixtures/configure/release-artifact/` (new)
+- `tests/configure/test_release_handoff.py` (new)
 
 ## Deliverables
 
-- the released artifact, checksum manifest, supported platform targets, public
-  configuration schema version, and installed-documentation path are recorded
-  for Phase P. A source checkout or ambient developer binary is not valid
-  handoff evidence.
+- an immutable distributed release artifact, checksum manifest, supported
+  platform targets, public configuration schema version, and installed
+  documentation path are recorded in `configure-release-handoff.md` for Phase
+  P. A source checkout or ambient developer binary is not valid handoff
+  evidence. If release policy distinguishes a candidate from a promoted
+  release, the record names that status and distribution URL; Phase P may use
+  only the normal released-artifact installation path, never a local build.
 - product fixtures cover empty repositories, recognized legacy migrations,
   near-miss/no-write conflicts, transactional rollback, marker idempotency,
   and the reusable Action on Linux, macOS, and Windows.
-- sc-lint documentation explains the public setup workflow: discovery,
-  JSON/Wyvern selection, preview, explicit apply, reapply, conflict recovery,
-  and the four standard `just` commands. It clearly says that a real consumer
-  conversion is complete only after Phase P's dual-reference evidence.
+- F.5 validates (rather than rewrites) the F.3e/F.4 installed documentation
+  bundle against the public setup workflow: discovery, JSON/Wyvern selection,
+  preview, explicit apply, reapply, conflict recovery, and the four standard
+  `just` commands. It clearly says that a real consumer conversion is complete
+  only after Phase P's dual-reference evidence.
 - Phase P receives generic JSON request examples and schema-validation
   guidance. It creates the actual sanitized requests from current sc-compose
   and atm-core facts; F.5 must not substitute a template for that evidence.
+- the handoff states that P.1 cannot begin until the consumer team has approved
+  its own Phase P qualification plan. F.5 supplies product evidence only and
+  neither authors that consumer plan nor performs a consumer conversion.
 
 ## Acceptance Criteria
 
@@ -61,6 +62,9 @@ PRs.
 - the Phase P handoff identifies the exact evidence it must collect: both
   current baseline commits, two real requests, preview/apply/reapply output,
   four `just` commands, and Linux/macOS/Windows CI.
+- F.5 can close without Phase P access or a reference-consumer worktree: its
+  closure artifact is the distributable product evidence and handoff manifest.
+  Phase P alone owns the subsequent two-repository qualification and PRs.
 - if Phase P exposes an unsupported existing-repository shape, it returns a
   concrete sc-lint finding to F.2/F.4; it does not authorize a manual consumer
   workaround or a false close.

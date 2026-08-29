@@ -17,14 +17,14 @@ no repository-discovery, recommendation, mutation, or navigation policy.
 
 - F.3a UX contract;
 - F.3b PASS on the pinned released Wyvern artifact;
-- F.3c agent JSON schemas and equivalence fixtures.
+- F.3c agent JSON conformance and equivalence fixtures.
 
 ## Exact Targets
 
 - `scripts/sc_lint_configure_wyvern.py` (new)
 - `assets/configure-wizard/` (new static page assets)
-- configure front-end fixtures/tests
-- `docs-bundle/configuration.md`
+- `tests/configure/test_wyvern_adapter.py` (new)
+- `tests/fixtures/configure/wyvern/` (new)
 
 ## Deliverables
 
@@ -35,6 +35,18 @@ no repository-discovery, recommendation, mutation, or navigation policy.
   branches beyond rendering the provided descriptor/configuration.
 - Stable unavailable, invalid-result, timeout, cancel, and dismissed responses
   with a JSON recovery path.
+
+The launcher boundary remains this small:
+
+```text
+F.2 context + normalized request -> qualified Wyvern page descriptors
+qualified terminal stack -> F.1 request-schema validation -> F.2 dry-run plan
+```
+
+It may start the pinned installed Wyvern binary and pass JSON through stdin or
+the qualified local protocol, but it may not inspect a consumer path beyond the
+F.2 context, calculate recommendation policy, retain page history, or render a
+separate browser application.
 
 ## Acceptance Criteria
 

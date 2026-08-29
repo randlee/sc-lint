@@ -123,9 +123,12 @@ Phase F extends, rather than reopens, Phase E requirements:
 | --- | --- | --- | --- |
 | `REQ-PRODUCT-019` | one version authority is retained during conversion | F.1, F.4, F.5 | request/config/Action drift fixtures |
 | `REQ-PRODUCT-020` | configured output uses existing verified setup/upgrade | F.2, F.5 | clean-machine lifecycle fixtures |
+| `REQ-PRODUCT-021` | released offline documentation remains complete | F.3e, F.5 | installed-bundle and release-artifact fixtures |
 | `REQ-PRODUCT-022` | Action version derives from config; optional workflow patch is safe | F.4, F.5 | Action and workflow fixtures |
-| `REQ-PRODUCT-023` (new) | deterministic configuration/adoption planning and transaction | F.1-F.5 | JSON, conflict, rollback, cross-platform fixtures |
-| `REQ-CLI-025`–`028` (new) | configure command, request schema, plan schema, stable errors | F.1-F.3e | CLI contract and schema tests |
+| `REQ-PRODUCT-023` (new) | deterministic configuration/adoption planning and transaction | F.1, F.2, F.4, F.5 | JSON, conflict, rollback, cross-platform fixtures |
+| `REQ-PRODUCT-024` (new) | guided human setup over the same request contract | F.1, F.3a-F.3e | page-to-JSON, capability, accessibility, and cross-adapter fixtures |
+| `REQ-PRODUCT-025` (new) | one version authority and preserved established integration | F.1, F.4, F.5 | config/Action drift, marker, and release-artifact fixtures |
+| `REQ-CLI-025`–`028` (new) | configure command, request schema, plan schema, stable errors | F.1, F.2, F.3a-F.3e, F.4 | CLI contract, schema, adapter, and apply tests |
 
 ## Consumer End State
 
@@ -169,7 +172,9 @@ sc-compose-only exception.
 
 Consequently, F.5 prepares the release/documentation handoff and may validate
 product fixtures, but it cannot claim a reference-consumer conversion or close
-the real-consumer proof. The Phase P plan is the authority for that evidence.
+the real-consumer proof. Before P.1 begins, the consumer team must approve a
+Phase P qualification plan; that plan—not a Phase F sprint or handoff
+template—is the authority for consumer evidence and PRs.
 
 ## Sprint Sequence And Dependency Graph
 
@@ -210,7 +215,7 @@ provides browser-history data restoration, branching, cancel/dismiss, finish,
 and headless-test behavior. sc-lint must not replace missing capability with a
 Python state machine or an ad-hoc browser application.
 
-- [F.3a UX contract and Wyvern handoff](sprint-F3.md)
+- [F.3a UX contract and Wyvern handoff](sprint-F3a-wizard-ux-contract.md)
 - [F.3b released Wyvern capability gate](sprint-F3b-wyvern-capability-gate.md)
 - [F.3c agent JSON and setup skill](sprint-F3c-agent-json-and-skill.md)
 - [F.3d thin launcher and page implementation](sprint-F3d-wizard-adapter-and-pages.md)
