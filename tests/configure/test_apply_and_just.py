@@ -104,6 +104,39 @@ class ApplyAndJustTests(unittest.TestCase):
             self.assertIn("import '.sc-lint/justfile'\r\n", result)
             self.assertTrue((root / ".sc-lint" / "justfile").is_file())
 
+    def test_malformed_or_duplicate_marker_is_a_no_write_conflict(self) -> None:
+        for contents in (
+            "# >>> sc-lint managed integration >>>\n",
+            "# >>> sc-lint managed integration >>>\nimport '.sc-lint/justfile'\n# <<< sc-lint managed integration <<<\n"
+            "# >>> sc-lint managed integration >>>\nimport '.sc-lint/justfile'\n# <<< sc-lint managed integration <<<\n",
+        ):
+            with self.subTest(contents=contents), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+                justfile = root / "Justfile"
+                justfile.write_text(contents, encoding="utf-8")
+                request = self.request(root)
+                plan = self.plan(root, request)
+                applied = configure(root, request, "--apply", "--plan", str(plan))
+                self.assertEqual(applied.returncode, 3)
+                self.assertEqual(json.loads(applied.stderr)["error"]["code"], "CLI.CONFIGURE_UNMANAGED_COLLISION")
+                self.assertEqual(justfile.read_text(encoding="utf-8"), contents)
+
+    def test_every_reserved_recipe_is_a_no_write_collision(self) -> None:
+        for recipe in ("setup", "lint", "test", "upgrade"):
+            with self.subTest(recipe=recipe), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+                contents = f"{recipe}:\n    @echo consumer-owned\n"
+                justfile = root / "Justfile"
+                justfile.write_text(contents, encoding="utf-8")
+                request = self.request(root)
+                plan = self.plan(root, request)
+                applied = configure(root, request, "--apply", "--plan", str(plan))
+                self.assertEqual(applied.returncode, 3)
+                self.assertEqual(json.loads(applied.stderr)["error"]["code"], "CLI.CONFIGURE_UNMANAGED_COLLISION")
+                self.assertEqual(justfile.read_text(encoding="utf-8"), contents)
+
 
 if __name__ == "__main__":
     unittest.main()

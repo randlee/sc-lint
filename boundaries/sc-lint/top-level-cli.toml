@@ -17,6 +17,9 @@ constructor = "none"
 # the CLI contract as `CommandEnvelope<T>`. ADR-009 also locks the current
 # observability seam list: `contract::ServiceName`, `logging::ObservedCommand`,
 # `logging::dispatch_event`, and the existing `CommandEnvelope.command` field.
+# `Command::Configure`, `command::ConfigureRequest`, and `CliError` are the
+# implemented ConfigureCommand/ConfigureError roots; no fictional wrapper type
+# is registered merely to satisfy a documentation name.
 roots = ["CheckTarget", "Cli", "ClippyTarget", "CompatibilityCommand", "Command", "DocsGuide", "LintTarget", "ViewTarget", "CommandContext", "command::ConfigureRequest", "DispatchTelemetry", "LoadedConfig", "MinimumVersion", "CommandEnvelope", "CliError", "CliErrorKind", "RenderedOutput", "WINDOWS_XWIN_TARGET", "ImmediateOutcome", "ParsedInvocation", "ExecutionOutcome", "consts", "contract::ServiceName", "logging::ObservedCommand", "logging::dispatch_event", "run"]
 
 [dependencies]

@@ -26,6 +26,10 @@ CONFIGURE_SCHEMA_ERROR = "CLI.CONFIGURE_UNSUPPORTED_SCHEMA"
 CONFIGURE_DOCS = "sc-lint docs configuration"
 DEVELOPER_CONTRACT = ["just setup", "just lint", "just test", "just upgrade"]
 FAMILY_NAMES = ("baseline", "boundary", "portability", "runtime", "attributes")
+LEGACY_SC_COMPOSE_04 = {
+    ".github/actions/setup-sc-lint/action.yml": "sha256:25b7525e1fab654bd9724263f6e865a37403b2abcb56bcfc628d3689435f3988",
+    ".github/actions/setup-lint-toolchain/action.yml": "sha256:fab8da31ff5a7857cf97ed56a1d25eb2fe8f2089fc0f2091ae2be8fd1e8a96e8",
+}
 PACKAGE_MARKER = re.compile(r"^\s*\[package\]\s*$", flags=re.MULTILINE)
 WORKSPACE_MARKER = re.compile(r"^\s*\[workspace\]\s*$", flags=re.MULTILINE)
 
@@ -171,6 +175,7 @@ def build_plan(context: dict[str, Any], request: dict[str, Any], root: Path | No
         )
 
     _append_just_operations(operations, observations, choices["just"]["mode"])
+    _append_legacy_removals(operations, root)
     _append_workflow_operations(operations, observations, choices["ci"]["mode"])
 
     preconditions = _preconditions(root, operations) if root is not None else []
@@ -275,6 +280,35 @@ def _append_workflow_operations(
         _confirmation(
             "github-workflow", ".github/workflows/sc-lint.yml", "workflow_generation_requires_confirmation"
         )
+    )
+
+
+def _append_legacy_removals(operations: list[dict[str, Any]], root: Path | None) -> None:
+    """Emit removals only for the complete, exact sc-compose 0.4 pair.
+
+    Names alone are never permission to remove a consumer action. Requiring the
+    complete pair also prevents a partial or near-match checkout from receiving
+    a destructive plan operation.
+    """
+    if root is None:
+        return
+    matched = []
+    for path, expected in LEGACY_SC_COMPOSE_04.items():
+        candidate = root / path
+        if not candidate.is_file():
+            return
+        observed = f"sha256:{hashlib.sha256(candidate.read_bytes()).hexdigest()}"
+        if observed != expected:
+            return
+        matched.append(path)
+    operations.extend(
+        {
+            "operation_id": f"legacy-remove-{path.replace('/', '-')}",
+            "path": path,
+            "kind": "propose_remove",
+            "reason": "exact_sc_compose_0_4_legacy_fingerprint",
+        }
+        for path in matched
     )
 
 

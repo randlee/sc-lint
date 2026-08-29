@@ -105,6 +105,34 @@ class ContextAndPlanTests(unittest.TestCase):
         self.assertEqual(validate("plan", first), [])
         self.assertEqual(validate("plan", second), [])
 
+    def test_legacy_removals_require_the_complete_exact_fingerprint_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+            first = root / ".github/actions/setup-sc-lint/action.yml"
+            second = root / ".github/actions/setup-lint-toolchain/action.yml"
+            first.parent.mkdir(parents=True)
+            second.parent.mkdir(parents=True)
+            first.write_text("exact one\n", encoding="utf-8")
+            second.write_text("exact two\n", encoding="utf-8")
+            import hashlib
+            with patch.dict(
+                "sc_lint_configure.LEGACY_SC_COMPOSE_04",
+                {
+                    str(first.relative_to(root)): "sha256:" + hashlib.sha256(first.read_bytes()).hexdigest(),
+                    str(second.relative_to(root)): "sha256:" + hashlib.sha256(second.read_bytes()).hexdigest(),
+                },
+                clear=True,
+            ):
+                exact = plan_result(root, self.request)["data"]
+                second.write_text("near match\n", encoding="utf-8")
+                near_match = plan_result(root, self.request)["data"]
+        self.assertEqual(
+            [operation["kind"] for operation in exact["operations"] if operation["kind"] == "propose_remove"],
+            ["propose_remove", "propose_remove"],
+        )
+        self.assertFalse(any(operation["kind"] == "propose_remove" for operation in near_match["operations"]))
+
     def test_invalid_request_uses_f1_validation_and_stable_recovery_envelope(self) -> None:
         invalid_request = json.loads(json.dumps(self.request))
         invalid_request["request"]["consumer_profiles"] = [

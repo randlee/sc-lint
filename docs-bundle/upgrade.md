@@ -24,3 +24,20 @@ sc-lint docs --path
 
 Keep `sc-lint.toml` and the consumer README under consumer ownership; upgrade
 does not rewrite either file.
+
+## Upgrading an adopted integration
+
+For an established repository, upgrade first does not rewrite its managed
+configuration. Regenerate and review a configure plan whenever the repository
+or requested setup choices changed:
+
+```sh
+sc-lint --json --root . configure --request sc-lint-request.json > sc-lint-plan.json
+sc-lint --json --root . configure --request sc-lint-request.json --apply --plan sc-lint-plan.json
+just upgrade
+```
+
+The apply step rejects stale source digests and does not overwrite a
+consumer-owned `Justfile` recipe. It may remove only the documented exact
+legacy sc-compose 0.4 fingerprint through the reviewed transaction; similarly
+named files are left untouched.

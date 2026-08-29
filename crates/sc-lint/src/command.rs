@@ -910,7 +910,20 @@ fn add_reviewed_removals(
                     "Regenerate and review the configure plan.",
                 )
             })?;
-        let target = request.root.join(relative);
+        let relative_path = Path::new(relative);
+        if relative_path.is_absolute()
+            || relative_path
+                .components()
+                .any(|component| matches!(component, std::path::Component::ParentDir))
+        {
+            return Err(configure_apply_error(
+                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                "the reviewed removal path escapes the consumer root",
+                format!("`{relative}` is not a repository-relative managed path"),
+                "Regenerate and review the configure plan.",
+            ));
+        }
+        let target = request.root.join(relative_path);
         artifacts.push(Box::new(crate::configure::artifact::RemoveArtifact::new(
             crate::configure::artifact::ArtifactKind::Json,
             target,

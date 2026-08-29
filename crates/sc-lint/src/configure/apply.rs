@@ -182,7 +182,7 @@ fn io_error(operation: &str, path: &std::path::Path, error: io::Error) -> CliErr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::configure::artifact::{ArtifactKind, BytesArtifact};
+    use crate::configure::artifact::{ArtifactKind, BytesArtifact, RemoveArtifact};
     use std::path::Path;
 
     struct SyntheticArtifact {
@@ -256,5 +256,31 @@ mod tests {
                 0o640
             );
         }
+    }
+
+    #[test]
+    fn removal_is_committed_through_the_same_backup_transaction() {
+        let root = tempfile::tempdir().expect("temp root");
+        let target = root.path().join("legacy.json");
+        fs::write(&target, "{}\n").expect("legacy target");
+        commit(vec![Box::new(RemoveArtifact::new(
+            ArtifactKind::Json,
+            target.clone(),
+        ))])
+        .expect("remove");
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn malformed_json_is_rejected_before_any_write() {
+        let root = tempfile::tempdir().expect("temp root");
+        let target = root.path().join("generated.json");
+        let result = commit(vec![Box::new(BytesArtifact::new(
+            ArtifactKind::Json,
+            target.clone(),
+            b"not json".to_vec(),
+        ))]);
+        assert!(result.is_err());
+        assert!(!target.exists());
     }
 }
