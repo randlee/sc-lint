@@ -179,6 +179,14 @@ when deciding whether a sprint may start:
 A plan where every sprint's start condition is the previous sprint's merge
 or CI is a `STACK-SHAPE` finding and must be restructured.
 
+Sprints in a phase run back-to-back without stopping. The only valid pauses
+between sprints are unusual circumstances the plan names in advance (for
+example integration tests that must run on another machine, or a release
+that must be published before a consumer sprint can consume it). A user
+approval that could have been obtained during planning — an ADR, a scope
+question, a design choice — is never a valid pause; see "ADRs And
+Requirements Close On The Planning Branch".
+
 A plan whose sprints form one single chain when the deliverables could be
 partitioned is under-parallelized and must be restructured before hardening
 continues.
