@@ -7,9 +7,8 @@
     "github_workflows": {"present": true, "inspected": false},
     "sc_lint_directory": {"present": false}
   },
-  "source": {
-    "repository": "atm-core",
-    "repository_url": "https://github.com/randlee/atm-core",
-    "baseline_commit": "b3475b397c544bd43a43fb97f855b6ddb68f01b1"
+  "explanation": {
+    "developer_contract": ["just setup", "just lint", "just test", "just upgrade"],
+    "uninspected_existing_integration": ["Justfile", ".github/workflows/"]
   }
 }

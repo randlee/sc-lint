@@ -6,12 +6,12 @@ preview/apply/reapply, or CI success for either reference consumer.
 
 ## Fixture contract
 
-Each `*-context.json` file is a provenance wrapper. Its `context` member is
-validated against the F.1-owned
-[`sc-lint-configure-context.schema.json`](../../../schemas/sc-lint-configure-context.schema.json).
-The sibling `source` member is F.3a fixture provenance, not an extension to
-the public context schema. It identifies the immutable source used to obtain
-the observed facts without putting a clone path into a wizard payload.
+Each `*-context.json` file is a complete F.1 context envelope. It is validated
+against the F.1-owned
+[`sc-lint-configure-context.schema.json`](../../../schemas/sc-lint-configure-context.schema.json)
+and is passed to the wizard without a provenance extension. Source repository
+identity and commit are recorded in the table below, not in the context
+payload.
 
 `request-recommended.json` and `request-existing-conflict.json` validate
 against the F.1 request schema. `plan-no-write-conflict.json` validates against
@@ -28,15 +28,15 @@ permission to write a user-owned file.
 | `atm-core-context.json` | `https://github.com/randlee/atm-core` | `b3475b397c544bd43a43fb97f855b6ddb68f01b1` | workspace; existing Justfile and workflow directory are uninspected |
 
 The snapshots were made in disposable clones. Their working-directory paths,
-Git configuration, remotes other than the recorded source URL, and all file
-contents outside the bounded F.2 context are intentionally absent.
+Git configuration, and all file contents outside the bounded F.2 context are
+intentionally absent from the fixtures.
 
 ## Deterministic regeneration
 
 Use any disposable directory and the recorded commit; do not inspect,
 transform, or copy consumer utility files. The following command emits the
-schema-governed `context` value. Add the recorded `source` object from the
-table only when constructing the F.3a provenance wrapper.
+schema-governed F.1 context envelope. Keep the recorded source identity in
+this README; do not add it to the context payload.
 
 ```sh
 git clone --no-checkout https://github.com/randlee/sc-compose.git /tmp/sc-compose-f3a
@@ -52,8 +52,10 @@ checks; it starts no child process and makes no repository write.
 
 ## Redaction rules
 
-- Store only the five F.2 conventional facts, the four standard developer
-  commands, and the recorded repository identity/commit.
+- Store only the five F.2 conventional facts and the two F.1 explanation fields
+  (the four standard developer commands and uninspected integrations) in each
+  context envelope. Repository identity and commit remain documentation-only
+  provenance in the table above.
 - Do not include clone paths, home directories, usernames, credential names,
   tokens, remote configuration, source archives, or copied utilities.
 - Do not include Justfile, workflow, TOML, source, or shell contents from a

@@ -7,9 +7,8 @@
     "github_workflows": {"present": false},
     "sc_lint_directory": {"present": false}
   },
-  "source": {
-    "repository": "sc-lint empty-rust fixture",
-    "repository_url": "https://github.com/randlee/sc-lint.git",
-    "baseline_commit": "39390f659a2a5bb01ffe00704e6ed9055cc3df7a"
+  "explanation": {
+    "developer_contract": ["just setup", "just lint", "just test", "just upgrade"],
+    "uninspected_existing_integration": []
   }
 }

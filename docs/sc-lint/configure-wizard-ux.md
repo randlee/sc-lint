@@ -52,18 +52,18 @@ There is no skip route. Valid forward navigation always enters the next named pa
 
 **Explanation:** Choose the baseline argv profile. Editing a command edits individual argv tokens; sc-lint never executes entered text.
 
-The F.1 authority is [recommended-profile.toml](../../tests/fixtures/configure/contracts/recommended-profile.toml): fmt argv cargo/fmt/--all/--check; sc-boundary argv sc-lint/lint/sc-boundary; workspace argv cargo/test/--workspace. The wizard consumes that fixture and does not substitute a Clippy command or any other profile.
+The F.1 authority is [recommended-profile.toml](../../tests/fixtures/configure/contracts/recommended-profile.toml): fmt argv cargo/fmt/--all/--check; clippy argv cargo/clippy/--workspace/--all-targets/--/-D/warnings; workspace argv cargo/test/--workspace. The wizard consumes that fixture and does not substitute another profile.
 
 **Footer:** Back to overview; **Continue to boundary**; Cancel setup. Valid choice enters Boundary.
 
 | Visible field | Pointer | Default | Help, validation, recovery | Enabled condition |
 | --- | --- | --- | --- | --- |
 | **Minimum compatible sc-lint version** | Request /request/minimum_version | 0.5.0 | This is the one product compatibility floor later written to sc-lint.toml; neither a workflow nor installer selects another version. It must match the F.1 SemVer pattern. Recovery: Enter a complete SemVer value such as 0.5.0. | Always |
-| **Use recommended baseline profile** | Request /request/lint_families/baseline | selected; recommended and accept_recommendation | Use documented fmt, sc-boundary, workspace-test argv arrays. No consumer_profiles value is emitted. | Always |
+| **Use recommended baseline profile** | Request /request/lint_families/baseline | selected; recommended and accept_recommendation | Use documented fmt, clippy, workspace-test argv arrays. No consumer_profiles value is emitted. | Always |
 | **Modify baseline argv arrays** | Request /request/lint_families/baseline and /request/consumer_profiles | not selected | Emits enabled, modify, settings.profile custom; opens three fixed cards. | Always |
 | **Disable baseline profile** | Request /request/lint_families/baseline | not selected | Emits disabled and disable; removes baseline profiles. Recovery: Select Recommended or Modify to re-enable it. | Always |
 | **fmt argv** | Request /request/consumer_profiles/0 | kind lint, name fmt, fixture argv | One token per item, argv not shell. At least one non-empty token. Recovery: Add executable token or choose Recommended. | Modify only |
-| **sc-boundary argv** | Request /request/consumer_profiles/1 | kind lint, name sc-boundary, fixture argv | Same token validation. Recovery: Restore non-empty argv or choose Recommended. | Modify only |
+| **clippy argv** | Request /request/consumer_profiles/1 | kind lint, name clippy, fixture argv | Same token validation. Recovery: Restore non-empty argv or choose Recommended. | Modify only |
 | **workspace argv** | Request /request/consumer_profiles/2 | kind test, name workspace, fixture argv | Same token validation. Recovery: Restore non-empty argv or choose Recommended. | Modify only |
 
 ## 3. Boundary
@@ -166,7 +166,7 @@ Facts always include Context /context/justfile and display Present — not inspe
 
 Facts always include Context /context/github_workflows and display Present — not inspected or Not present.
 
-**Footer:** Back to Just integration; **Review no-write plan**; Cancel setup. Valid choice enters Final review. Collision leaves future apply unavailable; it never authorizes workflow rewrite.
+**Footer:** Back to Just integration; **Review no-write plan**; Cancel setup. Valid choice enters Final review. The F.3a fixture pack covers Just integration collisions only; CI conflicts remain uninspected and never authorize workflow rewrite.
 
 | Visible field | Pointer | Default | Help, validation, recovery | Enabled condition |
 | --- | --- | --- | --- | --- |

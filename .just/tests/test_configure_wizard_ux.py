@@ -32,26 +32,22 @@ def validate(instance: object, schema_value: dict, label: str) -> None:
 
 
 class ConfigureWizardUxTests(unittest.TestCase):
-    def test_fixture_contracts_and_provenance_are_valid(self) -> None:
+    def test_fixture_context_envelopes_are_valid(self) -> None:
         context_schema = schema("sc-lint-configure-context.schema.json")
         request_schema = schema("sc-lint-configure-request.schema.json")
         plan_schema = schema("sc-lint-configure-plan.schema.json")
-        context_fact_schema = {
-            "$defs": context_schema["$defs"],
-            "$ref": "#/$defs/context",
-        }
 
         for name in ("empty-rust-context.json", "sc-compose-context.json", "atm-core-context.json"):
             with self.subTest(fixture=name):
                 fixture = load_json(FIXTURES / name)
-                self.assertEqual(set(fixture), {"schema_version", "context", "source"})
+                self.assertEqual(set(fixture), {"schema_version", "context", "explanation"})
                 self.assertEqual(fixture["schema_version"], "v1")
-                validate(fixture["context"], context_fact_schema, name)
-                source = fixture["source"]
-                self.assertEqual(set(source), {"repository", "repository_url", "baseline_commit"})
-                self.assertTrue(source["repository"])
-                self.assertTrue(source["repository_url"].startswith("https://github.com/"))
-                self.assertRegex(source["baseline_commit"], r"^[0-9a-f]{40}$")
+                validate(fixture, context_schema, name)
+                explanation = fixture["explanation"]
+                self.assertEqual(
+                    explanation["developer_contract"],
+                    ["just setup", "just lint", "just test", "just upgrade"],
+                )
 
         for name in ("request-recommended.json", "request-existing-conflict.json"):
             with self.subTest(fixture=name):
