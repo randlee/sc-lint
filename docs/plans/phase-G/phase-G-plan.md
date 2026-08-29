@@ -61,6 +61,18 @@ this is a replan, not a fix. Nothing from Phase F is on `develop`. Any Phase F
 content worth keeping is recovered explicitly in `G.1` (see its "Recovered
 From Phase F" list); everything else is discarded.
 
+## ADR Status
+
+| ADR | Title | Status | Approved by |
+| --- | --- | --- | --- |
+| ADR-015 | Standard Repo Tools Adoption Kit | Proposed | pending user approval |
+| ADR-016 | Python Wheel Runtime And No Rust For Configuration | Proposed | pending user approval |
+
+The ADR drafts, requirements, and architecture traceability land on this
+planning branch before implementation. Their status remains `Proposed` until
+the user approves them; no Phase G orchestration may start while an approval is
+pending.
+
 ## Consumer End State
 
 ```text
@@ -78,7 +90,7 @@ README.sc-lint.md                     # kit README, renamed on install
 
 | Sprint | Title | Closure type |
 | --- | --- | --- |
-| G.0 | Abandon Phase F; ADR-015 (adoption kit), ADR-016 (Python wheel runtime, no Rust for configuration, four-recipe just interface) | governance / docs |
+| G.0 | Archive the rejected Phase F line | git housekeeping |
 | G.1 | Adoption kit: installer, verbatim assets, templates, fixtures | product code (Python + assets) |
 | G.2 | Adoption skill, agent prompts, marketplace entry, docs | skill / docs |
 | G.3a | `sc-lint` Python bindings via maturin, published wheel, bootstrap provisioning | packaging / PyPI |
@@ -101,10 +113,10 @@ closable.
 | REQ-PRODUCT-020 | Verified artifact activation, managed bootstrap, and no source-checkout helper copying | G.1, G.3a, G.3b, G.4b, G.4c |
 | REQ-PRODUCT-021 | Offline documentation remains product-owned and discoverable after kit adoption | G.2, G.3b, G.4b, G.4c |
 | REQ-PRODUCT-022 | Reusable verified setup Action is the CI surface installed by the kit | G.1, G.4a, G.4b, G.4c |
-| REQ-PRODUCT-023 (added by G.0) | Versioned adoption kit installs and checks one reusable, drift-detectable consumer end state | G.1–G.2, G.4a–G.5 |
-| REQ-PRODUCT-024 (added by G.0) | Version-matched wheel delivers all consumer-run Python helpers without a source-tree dependency | G.3a–G.3b, G.4b–G.4c |
+| REQ-PRODUCT-023 (planning branch) | Versioned adoption kit installs and checks one reusable, drift-detectable consumer end state | G.1–G.2, G.4a–G.5 |
+| REQ-PRODUCT-024 (planning branch) | Version-matched wheel delivers all consumer-run Python helpers without a source-tree dependency | G.3a–G.3b, G.4b–G.4c |
 | ADR-012 | Four public `just` recipes and product-owned bootstrap ownership | G.0–G.5 |
-| ADR-015 / ADR-016 (created by G.0) | Kit ownership and no-Rust-configuration/wheel-runtime design | G.1–G.5 |
+| ADR-015 / ADR-016 (planning branch; Accepted before orchestration) | Kit ownership and no-Rust-configuration/wheel-runtime design | G.1–G.5 |
 
 ## Branch Stacks And Parallelism
 

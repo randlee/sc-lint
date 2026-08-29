@@ -529,6 +529,18 @@ The product should support both:
   form, exact-pin recommendation, and recoverable error contract are part of
   the released product interface.
 
+- `REQ-PRODUCT-023`
+  A versioned, reusable adoption kit must install one generic, drift-detectable
+  consumer end state. Installation is idempotent; `--dry-run` is non-mutating
+  and reports drift; a consumer-modified managed file is a structured conflict
+  rather than an overwrite. The kit must remain repository-agnostic.
+
+- `REQ-PRODUCT-024`
+  Every consumer-run Python helper must be delivered by the version-matched
+  `sc-lint` wheel pinned by `[tool.sc-lint].minimum_version`, not copied from a
+  source checkout. Bootstrap provisions that wheel and the verified release
+  binary together so helper and binary behavior cannot drift.
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements

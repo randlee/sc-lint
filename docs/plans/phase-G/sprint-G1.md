@@ -23,7 +23,7 @@ owner: clint
 - G.0's **Unblock Milestone** committed on
   `sprint/G.0-abandon-phase-F`; this sprint's PR base is that branch, so
   implementation may begin before G.0 CI, QA, review, or merge.
-- ADR-015 (created by G.0 on this stack)
+- ADR-015 (accepted on the Phase G planning branch before orchestration)
 - [ADR-012](../../sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 - reference contract: `../sc-publish/plugins/sc-publish/install.py`
   (`--input`, `--dry-run`, positional repo, byte-for-byte copy set,

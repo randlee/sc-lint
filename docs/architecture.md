@@ -499,6 +499,12 @@ Consumer repositories do not copy these Python utilities. Their generated
 integration delegates exclusively to installed `sc-lint` and the product-owned
 `.sc-lint/bootstrap` asset as defined by ADR-012.
 
+Phase G extends this consumer-adoption boundary through
+[ADR-015](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md): the
+versioned adoption kit is the sole generic installation path. Its runtime
+delivery and the prohibition on Rust configuration logic are specified by
+[ADR-016](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md).
+
 ## Release Distribution
 
 For release `0.2.x`, release packaging and distributor updates should remain
