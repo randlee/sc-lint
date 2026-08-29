@@ -37,7 +37,11 @@ def configure(root: Path, request: Path, *arguments: str) -> subprocess.Complete
 class ApplyAndJustTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        subprocess.run(["cargo", "build", "-q", "-p", "sc-lint"], cwd=ROOT, check=True)
+        # `sc-lint test` is itself running this executable on Windows, where a
+        # rebuild cannot replace an open .exe.  The normal repository gates
+        # build it first; retain the fallback for focused, standalone runs.
+        if not BINARY.is_file():
+            subprocess.run(["cargo", "build", "-q", "-p", "sc-lint"], cwd=ROOT, check=True)
 
     def request(self, root: Path) -> Path:
         request = json.loads(REQUEST.read_text(encoding="utf-8"))
