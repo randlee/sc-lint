@@ -14,9 +14,9 @@ owner: clint
 
 ## Goal
 
-Prove the released adoption kit independently in the two greenfield first-wave
-repositories, `wyvern` and `atm-core`, before attempting the established
-`sc-compose` migration.
+Prove the released adoption kit in greenfield `wyvern` and migrate `atm-core`'s
+pre-production sc-lint surface with an explicit removal/preservation inventory
+before attempting the established `sc-compose` migration.
 
 ## Hard Dependencies
 
@@ -35,12 +35,24 @@ repositories, `wyvern` and `atm-core`, before attempting the established
 ## Deliverables
 
 - Run the G.2 adopter verbatim in disposable worktree copies of both target
-  repositories. Each consumer receives the identical kit end state: sole
+  repositories. `wyvern` receives the greenfield path; `atm-core` is a
+  migration-with-removal. Each consumer receives the identical kit end state: sole
   `minimum_version` pin, product-owned bootstrap/Just import, kit Action and
   workflow, vendored `plugins/sc-lint`, and `README.sc-lint.md`.
 - Open the two PRs in parallel. Each records the exact kit release, clean
   drift check, and any consumer-local scaffolding removal. A kit/product gap is
   an issue and release fix, never a consumer-local wrapper.
+
+## Removed
+
+Pre-production sc-lint remnants removed during migration (list pending G.4b
+scoping handoff from flint) — e.g. early scripts, copied `.just/*.py` helpers,
+`lint-config.toml`, and custom runners superseded by the released kit.
+
+## Preserved As Extensions
+
+atm-core extension points retained via declared test layers / lint profiles /
+consumer-owned Justfile recipes (list pending G.4b scoping handoff from flint).
 
 ## Acceptance Criteria
 
