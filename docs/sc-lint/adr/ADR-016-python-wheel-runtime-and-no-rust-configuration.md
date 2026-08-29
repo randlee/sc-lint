@@ -34,9 +34,16 @@ same problem for `sc-compose` by provisioning a pinned wheel.
    is published to PyPI through the `sc-publish` channel and pinned by
    `[tool.sc-lint].minimum_version`. Nothing is copied from a source
    archive.
-3. **The `just` interface is exactly ADR-012's four recipes**, each one line
-   delegating to `.sc-lint/bootstrap`; a consumer `Justfile` never encodes
-   tool knowledge.
+3. **The four ADR-012 recipe names are the standard kit-owned entry points.**
+   `just test [layer]` and `just lint [profile]` pass an optional positional
+   argument directly to bootstrap. `sc-lint.toml` declares named
+   `[tool.sc-lint.test.<layer>]` step lists and lint profiles; no argument uses
+   the declared default, and `just test all` runs every layer in declaration
+   order. The managed import block is the only kit-owned Justfile region;
+   consumer recipes outside it are untouched. New layers, profiles, and
+   analyzers are declarative configuration, never bootstrap, wheel, or Rust
+   edits. ADR-012's four recipes are thus exactly four kit-owned names;
+   arguments and consumer-owned recipes are permitted.
 4. A profile entry in `sc-lint.toml` may reference only a shipped binary or
    a `sc_lint` module; never a repository-relative script.
 

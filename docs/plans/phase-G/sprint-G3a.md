@@ -100,6 +100,9 @@ helper migration, bootstrap provisioning, CI, and review.
 - `maturin build --release -m bindings/sc-lint-py/Cargo.toml` succeeds on the
   three OSes in CI; `python -c "import sc_lint; print(sc_lint.__version__)"`
   prints the workspace version.
+- The `sc_lint` package dispatches optional test-layer and lint-profile
+  positional arguments to bootstrap only; it adds no plugin registry or
+  selection policy.
 - Fresh temp workspace after `sc-lint init --just`: `just setup` creates
   `.sc-lint/venv` with `sc_lint` importable; `just lint` runs with no `.just/`
   directory present.

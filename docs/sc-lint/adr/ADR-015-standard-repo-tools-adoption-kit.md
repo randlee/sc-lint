@@ -45,6 +45,17 @@ now defines how shared tooling is vendored into consumers.
 6. ADR-014 is rejected. No Phase F code is merged; salvageable text (the
    managed-import marker block, the canonical workflow YAML) is recovered by
    copy into the kit.
+7. **Modular applicability.** The independent crates apply only where their
+   premises hold. The kit installs one uniform file set but never forces an
+   analyzer; `[tool.sc-lint.analyzers]` is the sole repo-specific declarative
+   input, with entries such as `runtime = { enabled = true, reason = "tokio" }`
+   and `portability = { enabled = true, targets = ["linux", "macos", "windows"] }`.
+   An absent or disabled analyzer is never run or placed in derived steps. No
+   crate, kit asset, skill, or template presumes another crate is enabled. The
+   adoption skill derives this table from runtime/platform facts and records
+   reasons in `sc-lint.toml` comments. Templates render the table and derived
+   steps from `install.json`; drift fails if they disagree. Rust may validate
+   the schema but contains no selection policy.
 
 ## Consequences
 
@@ -58,3 +69,8 @@ now defines how shared tooling is vendored into consumers.
 - Rejected alternative: a `sc-lint configure` Rust command with per-consumer
   fingerprints (Phase F). It coupled the product to one consumer's snapshot
   and fought `sc-publish`'s own installer.
+- “Identical tooling” means identical installer, interface, and drift check,
+  not an identical lint set. The kit covers the common base only and documents
+  how to extend; it does not anticipate consumer-specific needs.
+- A consumer-local extension observed in at least two repositories may be
+  promoted into the kit or wheel as shared base behavior.

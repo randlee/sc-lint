@@ -48,6 +48,10 @@ drift reported as a defect. It is not a Rust engine.
    `minimum_version`, provisioned by `.sc-lint/bootstrap` — the same
    mechanism `sc-publish` uses for the `sc-compose` wheel. Nothing is copied
    from a source archive. (ADR-016)
+9. The kit covers the common base only and documents how to extend; it does
+   not try to anticipate consumer-specific needs. Extension points proven
+   common across at least two consumers may be promoted from consumer-local
+   extension into the kit or wheel as shared base behavior.
 
 ## Why Phase F Is Abandoned
 
@@ -165,11 +169,11 @@ External, non-branch delivery closures (not `gh stack` layers):
 
 | Sprint | Stack | Runs in parallel with | Waits for | Unblocked when |
 | --- | --- | --- | --- | --- |
-| G.0 | A | G.3a, G.3b, and G.3c (Stack B) | Phase G planning layer | `feature/phase-G-planning` is committed as Stack A's bottom planning layer. |
-| G.1 | A | G.3a, G.3b, and G.3c (Stack B) | G.0 unblock milestone | G.0's unblock milestone is committed on `sprint/G.0-abandon-phase-F`. |
-| G.2 | A | G.3a, G.3b, and G.3c (Stack B) | G.1 unblock milestone | G.1's unblock milestone is committed on `sprint/G.1-adoption-kit`. |
-| G.3a | B | G.0–G.2 (Stack A) | No lower sprint; Stack B roots on `develop` | Stack B's bottom layer starts immediately from `develop`; it has no lower-sprint milestone. |
-| G.3b | B | G.2 and all non-reconciliation Stack A work | G.3a unblock milestone | G.3a's unblock milestone is committed on `sprint/G.3a-python-bindings`. |
+| G.0 | A | G.3a and G.3b (Stack B), and G.3c (Stack C) | Phase G planning layer | `feature/phase-G-planning` is committed as Stack A's bottom planning layer. |
+| G.1 | A | G.3a and G.3b (Stack B), and G.3c (Stack C) | G.0 unblock milestone | G.0's unblock milestone is committed on `sprint/G.0-abandon-phase-F`. |
+| G.2 | A | G.3a and G.3b (Stack B), and G.3c (Stack C) | G.1 unblock milestone | G.1's unblock milestone is committed on `sprint/G.1-adoption-kit`. |
+| G.3a | B | G.0–G.2 (Stack A) and G.3c (Stack C) | No lower sprint; Stack B roots on `develop` | Stack B's bottom layer starts immediately from `develop`; it has no lower-sprint milestone. |
+| G.3b | B | G.0–G.2 (Stack A) and G.3c (Stack C) | G.3a unblock milestone | G.3a's unblock milestone is committed on `sprint/G.3a-python-bindings`. |
 | G.3c | C | G.0–G.2 and Stack B | No lower sprint; Stack C roots on `develop` | Stack C's bottom layer starts immediately from `develop`; it has no lower-sprint milestone or cross-stack touch point. |
 | G.4a | external-non-branch | G.4b | Released kit Action and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |
 | G.4b | external-non-branch | G.4a | Released adopter skill and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |

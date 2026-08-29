@@ -45,7 +45,8 @@ branches and updates tracking.
 
 - `git tag -l archive/phase-F` prints the tag; `git worktree list` shows no
   `phase-F` or `sprint/F.` path.
-- No `docs/sc-lint/adr/ADR-014*` file exists on `develop`.
+- Negative-regression guard: no `docs/sc-lint/adr/ADR-014*` file is introduced
+  while archiving the rejected Phase F line.
 
 ## Required Validation
 

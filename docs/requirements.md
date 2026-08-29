@@ -530,16 +530,16 @@ The product should support both:
   the released product interface.
 
 - `REQ-PRODUCT-023`
-  A versioned, reusable adoption kit must install one generic, drift-detectable
-  consumer end state. Installation is idempotent; `--dry-run` is non-mutating
-  and reports drift; a consumer-modified managed file is a structured conflict
-  rather than an overwrite. The kit must remain repository-agnostic.
+  A versioned, reusable, analyzer-agnostic adoption kit must install one
+  drift-detectable consumer end state. Analyzer selection is the sole
+  repo-specific declarative input in `[tool.sc-lint.analyzers]`; profiles
+  select applicable analyzers. Installation is idempotent and `--dry-run` is
+  non-mutating, reporting drift or a managed-file conflict rather than writing.
 
 - `REQ-PRODUCT-024`
-  Every consumer-run Python helper must be delivered by the version-matched
-  `sc-lint` wheel pinned by `[tool.sc-lint].minimum_version`, not copied from a
-  source checkout. Bootstrap provisions that wheel and the verified release
-  binary together so helper and binary behavior cannot drift.
+  The version-matched `sc-lint` wheel delivers every consumer-run helper and
+  supports declared test layers and lint profiles through `just test [layer]`
+  and `just lint [profile]`; it is never copied from a source checkout.
 
 ## Current Detailed Requirement Areas
 

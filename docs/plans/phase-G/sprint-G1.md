@@ -130,6 +130,11 @@ G.1 completes conflict cases, the established fixture, CI matrix, and review.
 - `grep -rEn "sc-compose|atm-core|wyvern" packages/ tests/adoption tests/fixtures/adoption` returns nothing.
 - CI job `adoption` passes on `ubuntu-latest`, `macos-latest`, `windows-latest`.
 - `jq -e '.name == "sc-lint-adoption" and .version != "" and .description != "" and .author != ""' packages/sc-lint-adoption/.claude-plugin/plugin.json` exits 0.
+- `install.schema.json` accepts declarative `analyzers`, named test layers, and
+  lint profiles; `sc-lint.toml.j2` renders analyzers plus derived steps. One
+  non-tokio, single-platform fixture disables runtime, selects one portability
+  target, declares `unit` and `integrate`, and exercises `just test`, `just
+  test all`, and `just test integrate`.
 
 ## Required Validation
 

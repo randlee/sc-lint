@@ -77,6 +77,11 @@ logic beyond the G.1 kit.
   fields, drift semantics, and the sc-publish delegation rule.
 - `sc-lint-adopter.md` requires the acknowledgement and completion protocol
   defined by `docs/team-protocol.md`.
+- The skill derives analyzer enablement/reason fields from async-runtime and
+  target-platform facts, migrates existing `just test-*` recipes into declared
+  layers, and both the skill and adoption guide include a “How to extend”
+  section for analyzers, test layers, lint profiles, and consumer-owned recipes
+  using the G.1 worked fixture.
 
 ## Required Validation
 

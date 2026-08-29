@@ -75,8 +75,8 @@ A, and G.3b merges `develop` forward only after G.1 has landed.
 ## Unblock Milestone
 
 Commit the self-contained archive smoke path, including the release artifact
-layout and wheel-only helper invocation. Report that commit immediately; G.3c
-starts from it while G.3b completes release publication, CI, QA, and review.
+layout and wheel-only helper invocation. Stack B ends at G.3b; G.3c is an
+independent `develop`-rooted Stack C and has no dependency on this commit.
 
 ## Required Validation
 
