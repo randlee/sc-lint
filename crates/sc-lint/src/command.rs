@@ -1,9 +1,13 @@
 use serde_json::Value;
 use serde_json::json;
 use std::ffi::OsString;
+use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
+use std::process::Output;
+use std::process::Stdio;
 
 use crate::Cli;
 use crate::CliError;
@@ -616,11 +620,7 @@ fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError>
     if request.dry_run {
         command.arg("--dry-run");
     }
-    let output = command.output().map_err(|error| {
-        CliError::backend_failure("sc-lint configure planner failed to start")
-            .with_source(error)
-            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
-    })?;
+    let output = configure_planner_output(command, request)?;
     let payload: Value = serde_json::from_slice(&output.stdout).map_err(|error| {
         CliError::backend_protocol("sc-lint configure planner returned malformed JSON")
             .with_source(error)
@@ -648,6 +648,66 @@ fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError>
         )
         .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))),
     }
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "The public stdin route needs the shared CLI recovery contract when forwarding input to the planner."
+)]
+fn configure_planner_output(
+    mut command: ProcessCommand,
+    request: &ConfigureRequest,
+) -> Result<Output, CliError> {
+    if request.request_path != Path::new("-") {
+        return command.output().map_err(configure_planner_start_error);
+    }
+
+    let mut request_bytes = Vec::new();
+    std::io::stdin()
+        .read_to_end(&mut request_bytes)
+        .map_err(|error| {
+            CliError::backend_failure(
+                "sc-lint configure could not read the JSON request from standard input",
+            )
+            .with_source(error)
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+            .with_suggested_action(
+                "Provide one complete JSON request on standard input, then rerun configure.",
+            )
+        })?;
+
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(configure_planner_start_error)?;
+    let mut child_stdin = child.stdin.take().ok_or_else(|| {
+        CliError::backend_failure("sc-lint configure could not open planner standard input")
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    })?;
+    child_stdin.write_all(&request_bytes).map_err(|error| {
+        CliError::backend_failure(
+            "sc-lint configure could not forward the JSON request to the planner",
+        )
+        .with_source(error)
+        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        .with_suggested_action(
+            "Provide one complete JSON request on standard input, then rerun configure.",
+        )
+    })?;
+    drop(child_stdin);
+    child.wait_with_output().map_err(|error| {
+        CliError::backend_failure("sc-lint configure planner did not finish")
+            .with_source(error)
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    })
+}
+
+fn configure_planner_start_error(error: std::io::Error) -> CliError {
+    CliError::backend_failure("sc-lint configure planner failed to start")
+        .with_source(error)
+        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
 }
 
 fn configure_script_candidates_for_executable(executable: &Path) -> Vec<PathBuf> {

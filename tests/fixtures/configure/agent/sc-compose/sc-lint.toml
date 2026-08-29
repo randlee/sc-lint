@@ -1,0 +1,2 @@
+[tool.sc-lint]
+minimum_version = "0.5.0"
