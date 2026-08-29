@@ -44,8 +44,8 @@ owner: flint
 
 ## Governing Contract
 
-This sprint closes REQ-PRODUCT-019, REQ-PRODUCT-020, REQ-PRODUCT-021, and
-REQ-PRODUCT-024 for the released artifact. The G.1 bootstrap-copy re-sync is
+This sprint closes REQ-PRODUCT-020, REQ-PRODUCT-021, and REQ-PRODUCT-024 for
+the released artifact. The G.1 bootstrap-copy re-sync is
 the one explicit cross-stack reconciliation: Stack B is never based on Stack
 A, and G.3b merges `develop` forward only after G.1 has landed.
 

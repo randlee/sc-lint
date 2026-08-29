@@ -4,10 +4,10 @@ title: Identity-Literals Unicode-Escape Parser Fix
 status: planned
 branch: sprint/G.3c-identity-literals-unicode-fix
 worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.3c-identity-literals-unicode-fix
-stack: B
-stack_base: sprint/G.3b-self-contained-release
-target: develop (via stack B, PR base sprint/G.3b-self-contained-release)
-owner: flint
+stack: C
+stack_base: develop
+target: develop (via stack C, PR base develop)
+owner: cfast
 ---
 
 # Sprint G.3c — Identity-Literals Unicode-Escape Parser Fix
@@ -19,9 +19,8 @@ are accepted without widening the release or adoption-kit scope.
 
 ## Hard Dependencies
 
-- G.3b's **Unblock Milestone** committed on
-  `sprint/G.3b-self-contained-release`; this sprint begins without waiting for
-  G.3b CI, QA, review, or merge.
+- none; this disjoint targeted-fix stack roots directly on `develop` and has
+  no touch point with Stack A or Stack B
 
 ## Exact Targets
 

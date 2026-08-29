@@ -133,7 +133,8 @@ documents were written:
 | Candidate stack | Deliverable/path set | Ordered layers and reason | Owner |
 | --- | --- | --- | --- |
 | A — adoption kit | Governance and traceability under `docs/`; generic kit, fixtures, and CI under `packages/sc-lint-adoption/`, `tests/adoption/`, and `.github/workflows/ci.yml`; then the adoption skill, marketplace, and consumer guide under `packages/sc-lint-adoption/.claude/`, `.claude-plugin/`, and `docs/sc-lint/` | G.0 archives Phase F; G.1 supplies the generic kit contract; G.2 consumes that contract in agent-facing guidance. These are one coherent kit path set. | cfast (G.0); clint (G.1–G.2) |
-| B — product runtime | Wheel binding and bootstrap/release paths under `bindings/sc-lint-py/`, `.sc-lint/`, `.just/`, `crates/`, `scripts/`, and release workflows; the isolated parser test/fix under `crates/sc-lint-attributes/` | G.3a establishes wheel entry points; G.3b closes the self-contained archive; G.3c is the separately reviewable identity-literals fix. This path set is independent of Stack A until the named reconciliation below. | flint |
+| B — product runtime | Wheel binding and bootstrap/release paths under `bindings/sc-lint-py/`, `.sc-lint/`, `.just/`, `crates/`, `scripts/`, and release workflows | G.3a establishes wheel entry points; G.3b closes the self-contained archive. This path set is independent of Stack A until the named reconciliation below. | flint |
+| C — targeted parser fix | Isolated identity-literals parser and regression tests under `crates/sc-lint-attributes/` | G.3c is a disjoint, independently closable consumer-blocking defect fix rooted directly on `develop`. | cfast |
 | External qualification | Consumer-only paths in `../sc-publish`, `../wyvern`, `../atm-core`, and `../sc-compose` | G.4a is the independently closable sc-publish delegation; G.4b qualifies the two greenfield consumers as one coupled release gate; G.4c consumes that proven greenfield artifact for the established-workspace migration. G.5 is the separately authorized remaining-repository rollout. | clint (G.4a–G.5) |
 
 The only overlapping product/kit path is `.sc-lint/bootstrap*`: G.1 vendors
@@ -153,7 +154,8 @@ develop (trunk)
  └─ Stack B — product (owner: flint)
      └── sprint/G.3a-python-bindings
           └── sprint/G.3b-self-contained-release
-               └── sprint/G.3c-identity-literals-unicode-fix
+ └─ Stack C — targeted fix (owner: cfast)
+     └── sprint/G.3c-identity-literals-unicode-fix  PR base: develop
 
 External, non-branch delivery closures (not `gh stack` layers):
   G.4a sc-publish delegation  ─┐
@@ -169,7 +171,7 @@ External, non-branch delivery closures (not `gh stack` layers):
 | G.2 | A | G.3a, G.3b, and G.3c (Stack B) | G.1 unblock milestone | G.1's unblock milestone is committed on `sprint/G.1-adoption-kit`. |
 | G.3a | B | G.0–G.2 (Stack A) | No lower sprint; Stack B roots on `develop` | Stack B's bottom layer starts immediately from `develop`; it has no lower-sprint milestone. |
 | G.3b | B | G.2 and all non-reconciliation Stack A work | G.3a unblock milestone | G.3a's unblock milestone is committed on `sprint/G.3a-python-bindings`. |
-| G.3c | B | G.0–G.2 (Stack A) | G.3b unblock milestone | G.3b's unblock milestone is committed on `sprint/G.3b-self-contained-release`. |
+| G.3c | C | G.0–G.2 and Stack B | No lower sprint; Stack C roots on `develop` | Stack C's bottom layer starts immediately from `develop`; it has no lower-sprint milestone or cross-stack touch point. |
 | G.4a | external-non-branch | G.4b | Released kit Action and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |
 | G.4b | external-non-branch | G.4a | Released adopter skill and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |
 | G.4c | external-non-branch | G.4a may finish independently | G.4b greenfield qualification | Both G.4b consumer PR merge commits exist with their required CI and drift checks green. |
@@ -199,7 +201,7 @@ The repository rule is merge-forward, never rebase; `gh stack sync` and
 3. PRs are opened and chained with the API-only command, from the main
    checkout, bottom to top, once the bottom layer is ready for QA:
    `gh stack link --base develop feature/phase-G-planning sprint/G.0-abandon-phase-F sprint/G.1-adoption-kit sprint/G.2-adoption-skill`
-   and `gh stack link --base develop sprint/G.3a-python-bindings sprint/G.3b-self-contained-release sprint/G.3c-identity-literals-unicode-fix`.
+   and `gh stack link --base develop sprint/G.3a-python-bindings sprint/G.3b-self-contained-release`.
    Later layers are appended with `gh stack link <stack-number> <branch>`.
 4. QA runs per layer on its PR. Landing is `gh stack merge <pr> --yes --merge`
    (merge commits, up to and including that PR), only after QA PASS and the

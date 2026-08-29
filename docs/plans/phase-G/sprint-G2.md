@@ -71,6 +71,12 @@ logic beyond the G.1 kit.
 - Every command quoted in `SKILL.md` runs verbatim against
   `tests/fixtures/adoption/empty-workspace` and exits 0.
 - `grep -rEn "sc-compose|atm-core|wyvern" packages/sc-lint-adoption/.claude docs/sc-lint/adoption.md` returns nothing.
+- The established-workspace evaluation asserts that the generated PR body
+  records the successful `--dry-run` exit-0 result.
+- `docs/sc-lint/adoption.md` documents the consumer end state, `install.json`
+  fields, drift semantics, and the sc-publish delegation rule.
+- `sc-lint-adopter.md` requires the acknowledgement and completion protocol
+  defined by `docs/team-protocol.md`.
 
 ## Required Validation
 

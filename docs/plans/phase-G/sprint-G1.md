@@ -129,6 +129,7 @@ G.1 completes conflict cases, the established fixture, CI matrix, and review.
 - Duplicating the marker block then running install → exit 2, no file written.
 - `grep -rEn "sc-compose|atm-core|wyvern" packages/ tests/adoption tests/fixtures/adoption` returns nothing.
 - CI job `adoption` passes on `ubuntu-latest`, `macos-latest`, `windows-latest`.
+- `jq -e '.name == "sc-lint-adoption" and .version != "" and .description != "" and .author != ""' packages/sc-lint-adoption/.claude-plugin/plugin.json` exits 0.
 
 ## Required Validation
 

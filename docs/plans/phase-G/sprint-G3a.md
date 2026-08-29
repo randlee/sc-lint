@@ -114,4 +114,4 @@ helper migration, bootstrap provisioning, CI, and review.
 ## Out Of Scope
 
 - exposing analyzer internals to Python beyond what the helpers already use
-- fixing lint defects (G.3b)
+- fixing lint defects (G.3c)
