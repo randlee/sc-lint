@@ -37,6 +37,27 @@ Sprint plan approved by:
 
 Always use:
 - `.claude/skills/plan-hardening/sprint-planning-guidelines.md`
+- `.claude/skills/plan-hardening/references/installation-and-troubleshooting.md`
+
+## Step 0 — Verify gh stack Installation
+
+```bash
+which gh && gh --version && gh stack --version
+```
+
+If not found on PATH, also check common install locations — Claude Code's
+bash environment may not share PATH with the interactive shell:
+
+```bash
+for p in "/opt/homebrew/bin/gh" "$HOME/.local/bin/gh"; do
+  [ -x "$p" ] && echo "Found at: $p" && break
+done
+```
+
+If `gh` or the `gh-stack` extension is missing: **read
+`references/installation-and-troubleshooting.md` before proceeding.** Do not
+continue with degraded behavior; the stack protocol in every phase plan
+depends on it.
 
 ## Execution Table
 
@@ -96,3 +117,4 @@ Use the example in:
 - `.claude/skills/plan-hardening/examples/plan-hardening-rounds.example.md`
 - `.claude/skills/plan-hardening/examples/plan-hardening-qa-vars.example.json`
 - `.claude/skills/plan-hardening/sprint-planning-guidelines.md`
+- `.claude/skills/plan-hardening/references/installation-and-troubleshooting.md`
