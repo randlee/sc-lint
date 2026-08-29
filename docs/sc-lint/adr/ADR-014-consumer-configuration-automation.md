@@ -78,18 +78,27 @@ and agents while still protecting user-owned repository content.
    migration claim. A later safe-transformer sprint may add a parser/fingerprint
    only when an acceptance fixture proves the exact behavior. Product growth is
    driven by real consumer gaps rather than speculative repository probes.
+9. The authoritative page behavior for the optional configure wizard is
+   [`configure-wizard-ux.md`](../configure-wizard-ux.md). It is capability-gated:
+   the wizard may ship only after a released Wyvern artifact proves the complete
+   multi-page, history, branching, cancellation, full-stack, local-only, and
+   deterministic headless-test contract. Wyvern 0.1.0's single-dialog commands
+   are not a released wizard API for this purpose; missing host capability is a
+   blocker, never permission for a Python state machine workaround.
 
 ## CLI Boundary Registration
 
 `configure` is a new public `sc-lint` CLI command family, not an internal
-adapter. Its public parser root is `ConfigureCommand`; its structured failure
-family is `ConfigureError`. Both are `BOUNDARY-ScLintCli` composition roots in
+adapter. Its public request root is `command::ConfigureRequest`; configure
+failures use the existing structured failure root `CliError`. These are
+`BOUNDARY-ScLintCli` composition roots in
 `boundaries/sc-lint/top-level-cli.toml`, alongside the existing top-level
-`Command` and `CliError` roots. They retain the common machine envelope,
-stable codes, path/cause context, recovery actions, and documentation links;
-`ConfigureError` does not create a second unstructured error channel. The
-private `ManagedArtifact` and `WorkflowYamlArtifact` transaction mechanism is
-separate from those public roots and remains governed by this same ADR.
+`Command` root. They retain the common machine envelope, stable codes,
+path/cause context, recovery actions, and documentation links; configure
+failures do not create a second unstructured error channel. The private
+`ManagedArtifact` and `WorkflowYamlArtifact`
+transaction mechanism is separate from those public roots and remains governed
+by this same ADR.
 
 ## Consequences
 
