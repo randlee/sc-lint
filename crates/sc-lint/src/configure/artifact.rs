@@ -26,11 +26,61 @@ pub(crate) trait ManagedArtifact {
     fn kind(&self) -> ArtifactKind;
     fn target(&self) -> &Path;
     fn staged_bytes(&self) -> &[u8];
+    fn is_removal(&self) -> bool {
+        false
+    }
     #[expect(
         clippy::result_large_err,
         reason = "The frozen F.4a extension contract uses CliError for structured recovery."
     )]
     fn validate_staged(&self) -> Result<(), CliError>;
+}
+
+/// A reviewed deletion uses the same backup and rollback transaction as a
+/// generated file replacement. It is crate-private so callers cannot broaden
+/// the finite configure allowlist.
+#[allow(
+    dead_code,
+    reason = "Legacy fingerprint recognition wires the finite removal allowlist into this shared transaction next."
+)]
+pub(crate) struct RemoveArtifact {
+    kind: ArtifactKind,
+    target: PathBuf,
+}
+
+impl RemoveArtifact {
+    #[allow(
+        dead_code,
+        reason = "Legacy fingerprint recognition wires the finite removal allowlist into this shared transaction next."
+    )]
+    pub(crate) fn new(kind: ArtifactKind, target: PathBuf) -> Self {
+        Self { kind, target }
+    }
+}
+
+impl ManagedArtifact for RemoveArtifact {
+    fn kind(&self) -> ArtifactKind {
+        self.kind
+    }
+    fn target(&self) -> &Path {
+        &self.target
+    }
+    fn staged_bytes(&self) -> &[u8] {
+        &[]
+    }
+    fn is_removal(&self) -> bool {
+        true
+    }
+    fn validate_staged(&self) -> Result<(), CliError> {
+        if self.target.is_file() {
+            Ok(())
+        } else {
+            Err(invalid(
+                &self.target,
+                "reviewed removal target is absent or is not a file",
+            ))
+        }
+    }
 }
 
 /// The product's ordinary generated files all use the same byte-owning

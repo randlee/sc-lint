@@ -46,11 +46,13 @@ pub(crate) fn commit(artifacts: Vec<Box<dyn ManagedArtifact>>) -> Result<(), Cli
             ".{}.sc-lint-backup-{nonce}-{index}",
             file_name.to_string_lossy()
         ));
-        if let Err(error) = fs::write(&staged_path, artifact.staged_bytes()) {
-            cleanup_stages(&staged);
-            return Err(io_error("stage generated artifact", &target, error));
+        if !artifact.is_removal() {
+            if let Err(error) = fs::write(&staged_path, artifact.staged_bytes()) {
+                cleanup_stages(&staged);
+                return Err(io_error("stage generated artifact", &target, error));
+            }
+            preserve_mode(&target, &staged_path, artifact.kind())?;
         }
-        preserve_mode(&target, &staged_path, artifact.kind())?;
         staged.push(StagedArtifact {
             existed: target.exists(),
             target,
@@ -87,7 +89,11 @@ fn replace_one(item: &StagedArtifact) -> io::Result<()> {
     if item.existed {
         fs::rename(&item.target, &item.backup)?;
     }
-    fs::rename(&item.staged, &item.target)
+    if item.staged.exists() {
+        fs::rename(&item.staged, &item.target)
+    } else {
+        Ok(())
+    }
 }
 
 fn rollback(items: &[StagedArtifact]) -> Result<(), Vec<String>> {
