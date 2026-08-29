@@ -1,6 +1,9 @@
 use serde_json::Value;
 use serde_json::json;
+use std::ffi::OsString;
 use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command as ProcessCommand;
 
 use crate::Cli;
 use crate::CliError;
@@ -68,6 +71,7 @@ pub(crate) enum CommandId {
     ClippyXwin,
     CompatibilityCheck,
     Docs,
+    ConfigurePlan,
     Init,
     ConsumerTest,
     Setup,
@@ -101,15 +105,25 @@ pub(crate) struct DocsRequest {
     pub(crate) path: bool,
 }
 
+/// Configure owns an explicit request and root so no standard repository
+/// discovery or configuration loading can broaden the F.2 observation scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ConfigureRequest {
+    request_path: PathBuf,
+    root: PathBuf,
+    dry_run: bool,
+}
+
 /// Command-specific payloads stay coupled to the command variant that owns
 /// them. This prevents an unrelated command context from carrying an
 /// impossible `None` payload that would only fail during dispatch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum CommandRequest {
     Setup { dry_run: bool },
     Upgrade { check: bool, dry_run: bool },
     Init(ConsumerInitRequest),
     Docs(DocsRequest),
+    Configure(ConfigureRequest),
 }
 
 impl CommandId {
@@ -142,6 +156,7 @@ impl CommandId {
                 crate::CompatibilityCommand::Check { .. } => Self::CompatibilityCheck,
             },
             Command::Docs { .. } => Self::Docs,
+            Command::Configure { .. } => Self::ConfigurePlan,
             Command::Setup { .. } => Self::Setup,
             Command::Upgrade { .. } => Self::Upgrade,
             Command::Init { .. } => Self::Init,
@@ -160,6 +175,7 @@ impl CommandId {
             Self::ClippyXwin => "clippy.xwin",
             Self::CompatibilityCheck => "compatibility.check",
             Self::Docs => "docs",
+            Self::ConfigurePlan => "configure.plan",
             Self::Init => "init",
             Self::ConsumerTest => "test",
             Self::Setup => "setup",
@@ -191,6 +207,7 @@ impl CommandId {
             | Self::ClippyXwin
             | Self::CompatibilityCheck
             | Self::Docs
+            | Self::ConfigurePlan
             | Self::Init
             | Self::ConsumerTest
             | Self::Setup
@@ -214,6 +231,7 @@ impl CommandId {
             Self::ClippyNative | Self::ClippyXwin => "clippy execution path",
             Self::CompatibilityCheck => "installed sc-lint compatibility preflight",
             Self::Docs => "offline documentation discovery",
+            Self::ConfigurePlan => "no-write consumer configuration planning",
             Self::Init => "consumer integration generation",
             Self::ConsumerTest => "consumer test profile orchestration",
             Self::Setup => "managed sc-lint installation and repair",
@@ -237,6 +255,7 @@ impl CommandId {
             Self::Version
                 | Self::CompatibilityCheck
                 | Self::Docs
+                | Self::ConfigurePlan
                 | Self::Setup
                 | Self::Upgrade
                 | Self::Init
@@ -309,6 +328,14 @@ impl CommandContext {
                         "Run it from the consumer repository root; it always manages `sc-lint.toml` there.",
                     ));
                 }
+                if matches!(command, Command::Configure { .. }) && cli.config.is_some() {
+                    return Err(CliError::usage(
+                        "`sc-lint configure` does not accept `--config`",
+                    )
+                    .with_suggested_action(
+                        "Put the requested minimum version in the JSON request and pass the consumer path with `--root`.",
+                    ));
+                }
                 if matches!(command, Command::Lint { consumer: true, target } if !matches!(target, crate::LintTarget::Ci))
                 {
                     return Err(CliError::usage(
@@ -343,6 +370,19 @@ impl CommandContext {
                         guide: *guide,
                         path: *path,
                     })),
+                    Command::Configure { request, dry_run } => {
+                        let root = cli.root.clone().ok_or_else(|| {
+                            CliError::usage("`sc-lint configure` requires `--root <path>`")
+                                .with_suggested_action(
+                                    "Pass the consumer repository directory with `--root <path>`.",
+                                )
+                        })?;
+                        Some(CommandRequest::Configure(ConfigureRequest {
+                            request_path: request.clone(),
+                            root,
+                            dry_run: *dry_run,
+                        }))
+                    }
                     _ => None,
                 };
                 (
@@ -434,16 +474,23 @@ impl CommandContext {
     }
 
     pub(crate) fn consumer_init_request(&self) -> ConsumerInitRequest {
-        match self.request {
-            Some(CommandRequest::Init(request)) => request,
+        match self.request.as_ref() {
+            Some(CommandRequest::Init(request)) => *request,
             _ => unreachable!("consumer initialization request is tied to the init command"),
         }
     }
 
     pub(crate) fn docs_request(&self) -> DocsRequest {
-        match self.request {
-            Some(CommandRequest::Docs(request)) => request,
+        match self.request.as_ref() {
+            Some(CommandRequest::Docs(request)) => *request,
             _ => unreachable!("documentation request is tied to the docs command"),
+        }
+    }
+
+    pub(crate) fn configure_request(&self) -> &ConfigureRequest {
+        match &self.request {
+            Some(CommandRequest::Configure(request)) => request,
+            _ => unreachable!("configure request is tied to the configure command"),
         }
     }
 
@@ -457,6 +504,7 @@ impl CommandContext {
                 | CommandId::Upgrade
                 | CommandId::Init
                 | CommandId::Docs
+                | CommandId::ConfigurePlan
                 | CommandId::ConsumerLintCi
                 | CommandId::ConsumerTest
         )
@@ -504,6 +552,7 @@ pub(crate) fn execute(
         CommandId::Docs => Ok(CommandSuccess::direct(crate::docs::run(
             context.docs_request(),
         )?)),
+        CommandId::ConfigurePlan => run_configure(context.configure_request()),
         CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
             loaded_config,
             context.setup_dry_run(),
@@ -547,6 +596,124 @@ pub(crate) fn execute(
         CommandId::ClippyNative => workflow::run_clippy(loaded_config, crate::ClippyTarget::Native),
         CommandId::ClippyXwin => workflow::run_clippy(loaded_config, crate::ClippyTarget::Xwin),
         CommandId::Ci => workflow::run_ci(loaded_config),
+    }
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "The thin configure dispatcher must retain stable recovery data while it normalizes the Python planner result."
+)]
+fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError> {
+    let script_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("sc-lint crate has a workspace root")
+        .join("scripts/sc_lint_configure.py");
+    let mut command = ProcessCommand::new(python_command());
+    command
+        .arg(&script_path)
+        .arg("--request")
+        .arg(&request.request_path)
+        .arg("--root")
+        .arg(&request.root)
+        .arg("--json");
+    if request.dry_run {
+        command.arg("--dry-run");
+    }
+    let output = command.output().map_err(|error| {
+        CliError::backend_failure("sc-lint configure planner failed to start")
+            .with_source(error)
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    })?;
+    let payload: Value = serde_json::from_slice(&output.stdout).map_err(|error| {
+        CliError::backend_protocol("sc-lint configure planner returned malformed JSON")
+            .with_source(error)
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    })?;
+    let object = payload.as_object().ok_or_else(|| {
+        CliError::backend_protocol("sc-lint configure planner returned a non-object payload")
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    })?;
+    match object.get("ok").and_then(Value::as_bool) {
+        Some(true) => {
+            let data = object
+                .get("data")
+                .cloned()
+                .filter(Value::is_object)
+                .ok_or_else(|| {
+                    CliError::backend_protocol("sc-lint configure planner returned no plan data")
+                        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+                })?;
+            Ok(CommandSuccess::direct(data))
+        }
+        Some(false) => Err(normalize_configure_failure(object)?),
+        None => Err(CliError::backend_protocol(
+            "sc-lint configure planner omitted the result status",
+        )
+        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))),
+    }
+}
+
+fn normalize_configure_failure(
+    object: &serde_json::Map<String, Value>,
+) -> Result<CliError, CliError> {
+    let error = object
+        .get("error")
+        .and_then(Value::as_object)
+        .ok_or_else(|| {
+            CliError::backend_protocol("sc-lint configure planner returned no error object")
+                .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        })?;
+    let message = error
+        .get("message")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            CliError::backend_protocol("sc-lint configure planner error omitted message")
+                .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+        })?;
+    let code = error.get("code").and_then(Value::as_str).ok_or_else(|| {
+        CliError::backend_protocol("sc-lint configure planner error omitted code")
+            .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))
+    })?;
+    let stable_code = match code {
+        "CLI.CONFIGURE_UNSUPPORTED_SCHEMA" => "CLI.CONFIGURE_UNSUPPORTED_SCHEMA",
+        "CLI.CONFIGURE_UI_UNAVAILABLE" => "CLI.CONFIGURE_UI_UNAVAILABLE",
+        "CLI.CONFIGURE_UNMANAGED_COLLISION" => "CLI.CONFIGURE_UNMANAGED_COLLISION",
+        "CLI.CONFIGURE_STALE_PLAN" => "CLI.CONFIGURE_STALE_PLAN",
+        "CLI.CONFIGURE_ROLLBACK_FAILED" => "CLI.CONFIGURE_ROLLBACK_FAILED",
+        _ => {
+            return Err(CliError::backend_protocol(
+                "sc-lint configure planner returned an unknown stable error code",
+            )
+            .with_detail("reported_code", json!(code)));
+        }
+    };
+    let mut normalized = CliError::config(message)
+        .with_code(stable_code)
+        .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"));
+    if let Some(cause) = error.get("cause").and_then(Value::as_str) {
+        normalized = normalized.with_cause(cause);
+    }
+    if let Some(pointer) = error.get("pointer") {
+        normalized = normalized.with_detail("pointer", pointer.clone());
+    }
+    if let Some(recovery) = error.get("recovery").and_then(Value::as_str) {
+        normalized = normalized.with_detail("recovery", json!(recovery));
+    }
+    if let Some(description) = error.get("recovery_description").and_then(Value::as_str) {
+        normalized = normalized.with_suggested_action(description);
+    }
+    if let Some(docs) = error.get("docs_ref").and_then(Value::as_str) {
+        normalized = normalized.with_documentation(docs);
+    }
+    Ok(normalized)
+}
+
+fn python_command() -> OsString {
+    if cfg!(windows) {
+        OsString::from("python")
+    } else {
+        OsString::from("python3")
     }
 }
 

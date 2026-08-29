@@ -109,6 +109,20 @@ fn command_surface_parses_the_initial_grouped_shape() {
             target: ClippyTarget::Native
         })
     ));
+
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        "consumer",
+        "configure",
+        "--request",
+        "request.json",
+        "--dry-run",
+    ]);
+    assert!(matches!(
+        cli.command.as_ref(),
+        Some(Command::Configure { dry_run: true, .. })
+    ));
 }
 
 #[test]
@@ -124,6 +138,7 @@ fn help_text_exposes_the_initial_grouped_surface() {
         "setup",
         "upgrade",
         "init",
+        "configure",
         "docs",
         "test",
         "version",
@@ -143,6 +158,33 @@ fn help_text_exposes_the_initial_grouped_surface() {
             "missing documentation guide `{guide}`"
         );
     }
+}
+
+#[test]
+fn configure_dispatches_the_bounded_python_planner_without_repo_discovery() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("workspace root");
+    let fixture_root = repo_root.join("tests/fixtures/configure/empty-rust");
+    let request = repo_root.join("tests/fixtures/configure/contracts/request.json");
+    let cli = Cli::parse_from([
+        OsString::from("sc-lint"),
+        OsString::from("--root"),
+        fixture_root.into_os_string(),
+        OsString::from("configure"),
+        OsString::from("--request"),
+        request.into_os_string(),
+        OsString::from("--dry-run"),
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("configure context");
+    assert_eq!(context.command_id(), "configure.plan");
+    assert!(context.skips_logging());
+    let loaded = LoadedConfig::load(&cli, &context).expect("configure skips repo config discovery");
+    let success = crate::command::execute(&context, &loaded).expect("configure plan succeeds");
+
+    assert_eq!(success.data["schema_version"], "v1");
+    assert_eq!(success.data["operations"][0]["path"], "sc-lint.toml");
 }
 
 #[test]
