@@ -47,7 +47,7 @@ then rerun initialization.
 | Code | Meaning | Recovery |
 | --- | --- | --- |
 | `CLI.CONFIGURE_STALE_PLAN` | The request, plan identifier, or a planned source file changed after review. | Regenerate the plan, review it again, then apply the new file. |
-| `CLI.CONFIGURE_UNMANAGED_COLLISION` | A marker block is malformed or a root `Justfile` recipe would be shadowed. | Review the exportable patch and reconcile the user-owned integration; no file was written. |
+| `CLI.CONFIGURE_UNMANAGED_COLLISION` | A marker block is malformed, a root `Justfile` recipe would be shadowed, or a legacy removal is not an exact allowlisted fingerprint. | Review the exportable patch and reconcile the user-owned integration; no file was written. |
 | `CLI.CONFIGURE_ROLLBACK_FAILED` | A failed transaction could not restore every target. | Restore the listed backup paths, repair permissions, and regenerate the plan. |
 
 An established `Justfile` is safe only when its managed block is exactly the

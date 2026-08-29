@@ -9,6 +9,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 REQUEST = ROOT / "tests" / "fixtures" / "configure" / "contracts" / "request.json"
+FIXTURES = ROOT / "tests" / "fixtures" / "configure" / "apply-and-just"
 
 
 def configure(root: Path, request: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -67,6 +68,18 @@ class ApplyAndJustTests(unittest.TestCase):
             self.assertTrue((root / ".sc-lint" / "bootstrap").is_file())
             self.assertTrue((root / ".sc-lint" / "bootstrap.ps1").is_file())
             self.assertIn("lint:", (root / "Justfile").read_text(encoding="utf-8"))
+            self.assertIn(
+                "& .\\\\.sc-lint\\\\bootstrap.ps1",
+                (root / ".sc-lint" / "justfile").read_text(encoding="utf-8"),
+            )
+            parsed = subprocess.run(
+                ["just", "--justfile", str(root / "Justfile"), "--list"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(parsed.returncode, 0, parsed.stderr)
+            self.assertIn("lint", parsed.stdout)
 
     def test_changed_target_rejects_stale_plan_without_writing(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -90,7 +103,11 @@ class ApplyAndJustTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
-            initial = "# user comment\r\nuser:\r\n    @echo user\r\n"
+            initial = (
+                (FIXTURES / "existing-just" / "Justfile")
+                .read_text(encoding="utf-8")
+                .replace("\n", "\r\n")
+            )
             (root / "Justfile").write_bytes(initial.encode("utf-8"))
             request = self.request(root)
             plan = self.plan(root, request)
@@ -103,17 +120,18 @@ class ApplyAndJustTests(unittest.TestCase):
             self.assertEqual(result.count("# >>> sc-lint managed integration >>>"), 1)
             self.assertIn("import '.sc-lint/justfile'\r\n", result)
             self.assertTrue((root / ".sc-lint" / "justfile").is_file())
+            second_plan = self.plan(root, request)
+            reapplied = configure(root, request, "--apply", "--plan", str(second_plan))
+            self.assertEqual(reapplied.returncode, 0, reapplied.stderr)
+            self.assertEqual((root / "Justfile").read_bytes().decode("utf-8"), result)
 
     def test_malformed_or_duplicate_marker_is_a_no_write_conflict(self) -> None:
-        for contents in (
-            "# >>> sc-lint managed integration >>>\n",
-            "# >>> sc-lint managed integration >>>\nimport '.sc-lint/justfile'\n# <<< sc-lint managed integration <<<\n"
-            "# >>> sc-lint managed integration >>>\nimport '.sc-lint/justfile'\n# <<< sc-lint managed integration <<<\n",
-        ):
-            with self.subTest(contents=contents), tempfile.TemporaryDirectory() as directory:
+        for fixture in ("malformed-marker", "duplicate-marker", "moved-marker", "modified-marker"):
+            with self.subTest(fixture=fixture), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
                 justfile = root / "Justfile"
+                contents = (FIXTURES / fixture / "Justfile").read_text(encoding="utf-8")
                 justfile.write_text(contents, encoding="utf-8")
                 request = self.request(root)
                 plan = self.plan(root, request)
@@ -127,7 +145,7 @@ class ApplyAndJustTests(unittest.TestCase):
             with self.subTest(recipe=recipe), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
-                contents = f"{recipe}:\n    @echo consumer-owned\n"
+                contents = (FIXTURES / f"reserved-{recipe}" / "Justfile").read_text(encoding="utf-8")
                 justfile = root / "Justfile"
                 justfile.write_text(contents, encoding="utf-8")
                 request = self.request(root)

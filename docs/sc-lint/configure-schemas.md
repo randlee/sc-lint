@@ -52,6 +52,12 @@ that the named operation exists when it builds a plan. A
 `manual_conflict` must carry both a typed conflict and an exportable unified
 diff; neither is a permission to write an unknown file.
 
+An operation that creates, updates, or removes a transaction artifact also
+uses the optional additive `artifact_kind` field (`toml`, `justfile`, `shell`,
+`json`, or `workflow_yaml`). It records the concrete private transaction type
+in a reviewable plan without creating a public extension mechanism. Existing
+v1 plans remain valid because the field is optional.
+
 Result success uses the normal CLI envelope with the plan under `data`.
 Failures use a fixed configure-code set and include a JSON pointer (or `null`
 when no pointer applies), a stable `recovery` token, a short human-readable

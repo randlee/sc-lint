@@ -5,15 +5,15 @@ use crate::CliError;
 
 /// Kind of a product-managed staged output. This is crate-private so later
 /// workflow support shares the transaction without becoming a plugin surface.
-#[allow(
-    dead_code,
-    reason = "F.4b is the only workflow/JSON producer; the closed shared enum is intentionally defined before that producer."
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ArtifactKind {
     Toml,
     Justfile,
     Shell,
+    #[allow(
+        dead_code,
+        reason = "The closed F.4a extension contract validates JSON test artifacts before a product-owned JSON output exists."
+    )]
     Json,
     WorkflowYaml,
 }
@@ -39,20 +39,12 @@ pub(crate) trait ManagedArtifact {
 /// A reviewed deletion uses the same backup and rollback transaction as a
 /// generated file replacement. It is crate-private so callers cannot broaden
 /// the finite configure allowlist.
-#[allow(
-    dead_code,
-    reason = "Legacy fingerprint recognition wires the finite removal allowlist into this shared transaction next."
-)]
 pub(crate) struct RemoveArtifact {
     kind: ArtifactKind,
     target: PathBuf,
 }
 
 impl RemoveArtifact {
-    #[allow(
-        dead_code,
-        reason = "Legacy fingerprint recognition wires the finite removal allowlist into this shared transaction next."
-    )]
     pub(crate) fn new(kind: ArtifactKind, target: PathBuf) -> Self {
         Self { kind, target }
     }

@@ -29,6 +29,36 @@ FAMILY_NAMES = ("baseline", "boundary", "portability", "runtime", "attributes")
 LEGACY_SC_COMPOSE_04 = {
     ".github/actions/setup-sc-lint/action.yml": "sha256:25b7525e1fab654bd9724263f6e865a37403b2abcb56bcfc628d3689435f3988",
     ".github/actions/setup-lint-toolchain/action.yml": "sha256:fab8da31ff5a7857cf97ed56a1d25eb2fe8f2089fc0f2091ae2be8fd1e8a96e8",
+    "scripts/materialize_sc_lint_runtime.py": "sha256:78f658da6206f037a6463d53d0bff6046973c726cb68752a73a02d4a615c2876",
+    ".just/.sc-lint-runtime-version": "sha256:40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79",
+    ".just/check_version_sync.py": "sha256:a39ec56f82f4b51992fca6a98f32f78c78114864fa58758999645b61c804d422",
+    ".just/fixture_constants.py": "sha256:21f3025a7a401e620181be76a0623bc42c0f23be45933ef015aa8b1031d82136",
+    ".just/lint-config.toml": "sha256:dca3dc3d4e214a27de183012cc1fbd95c43ee6e787852a872dbf36a1e337db06",
+    ".just/lint_boundaries.py": "sha256:baf85859ef5df73adf827cc54ffae20ea432703113125dd456f1e4fdd32b2018",
+    ".just/lint_cargo_deny.py": "sha256:95faa7958ff5355005bd0be61ff2ae7dd729241cb977cccb6c87398d678cf704",
+    ".just/lint_cargo_modules.py": "sha256:2c1efc8b44a340fdb5ca7be8879ddd977d28e42742ff1192ba674c52ebbd99e2",
+    ".just/lint_cargo_shear.py": "sha256:fdf9330ed4a44505545dd30de8f5db1fa1a146e089d3ab4411c4a78b4c8dbb69",
+    ".just/lint_codespell.py": "sha256:a6799014caea023281f7e4af2f3dedd8df14fd8dc3d7f1b6ee903983baf166ff",
+    ".just/lint_common.py": "sha256:d2d8987966123023b4e7e3b589cc4f58499348ad5ab3859a5f71886a2e1fbbf9",
+    ".just/lint_identity_literals.py": "sha256:fa45c6a8968c5b89fa512b5766fc4f32515194e5fd33a855746a5951a48d148f",
+    ".just/lint_line_counts.py": "sha256:628e8abb70a374a56012471f46b86e201ec7edc21f270dfb216312a62133a484",
+    ".just/lint_manifests.py": "sha256:ce45d91fce5481654d2404a922ef2c1cd2bcd21610bd647c580811985cf5baa5",
+    ".just/lint_sc_boundary.py": "sha256:b6214a5a2b0c8ace343507eb4ff7cfc89f56d56be3437d28e3dcefe195374683",
+    ".just/lint_sc_portability.py": "sha256:83d1e3c6952447d80ca812869d7f273cf51b3d155b42fc86fb0ff717682874f0",
+    ".just/print_help.py": "sha256:bf04ef69e32fc882ff053adf6cb803419f95dfb3a2d73aee1dc083917aa955aa",
+    ".just/python_adapter.py": "sha256:5fac85e5ae3b1e9ec814dfc88c588899b2326c92b10238e832757996cffbbd08",
+    ".just/run_fmt.py": "sha256:e332dfbe1646b311d3ce2f07f84a892f85c4f68e057868bf8bd95ffe44bf1248",
+    ".just/run_lint.py": "sha256:190d9e7747ae00f22f52be28655ec2130eb602736c5e6ac5af41079b1b567958",
+    ".just/run_pytests.py": "sha256:4af2860c2a96eaa0fd425788734cc0f60594a7b4be0e29a24fb49a6ff4cdad7f",
+    ".just/run_version.py": "sha256:65be3bbd78e7d778bbb61b6359432b2a3bb8a06b2c342684cdb3c12a01aa0722",
+    ".just/view_common.py": "sha256:190d79d88e2ed15fb7a72b8f50d1817fd155ffb4590492fb592a071ed9619f16",
+    ".just/view_findings.py": "sha256:ea1c56f4a96ad98becb2e5ee27d865cc1751bdf255170b8452c1163436713e0c",
+}
+LEGACY_REPLACEMENTS = {
+    "sc-lint.toml",
+    ".sc-lint/bootstrap",
+    ".sc-lint/bootstrap.ps1",
+    ".sc-lint/justfile",
 }
 PACKAGE_MARKER = re.compile(r"^\s*\[package\]\s*$", flags=re.MULTILINE)
 WORKSPACE_MARKER = re.compile(r"^\s*\[workspace\]\s*$", flags=re.MULTILINE)
@@ -154,6 +184,7 @@ def build_plan(context: dict[str, Any], request: dict[str, Any], root: Path | No
                 "operation_id": "sc-lint-config",
                 "path": "sc-lint.toml",
                 "kind": "propose_create",
+                "artifact_kind": "toml",
                 "reason": config_reason,
             }
         )
@@ -163,12 +194,14 @@ def build_plan(context: dict[str, Any], request: dict[str, Any], root: Path | No
                     "operation_id": "bootstrap-posix",
                     "path": ".sc-lint/bootstrap",
                     "kind": "propose_create",
+                    "artifact_kind": "shell",
                     "reason": "managed_consumer_bootstrap",
                 },
                 {
                     "operation_id": "bootstrap-windows",
                     "path": ".sc-lint/bootstrap.ps1",
                     "kind": "propose_create",
+                    "artifact_kind": "shell",
                     "reason": "managed_consumer_bootstrap",
                 },
             ]
@@ -244,6 +277,7 @@ def _append_just_operations(
                 "operation_id": "managed-justfile",
                 "path": ".sc-lint/justfile",
                 "kind": "propose_create",
+                "artifact_kind": "justfile",
                 "reason": "managed_consumer_recipes",
             }
         )
@@ -257,6 +291,7 @@ def _append_just_operations(
                 "operation_id": "managed-justfile",
                 "path": ".sc-lint/justfile",
                 "kind": "propose_create",
+                "artifact_kind": "justfile",
                 "reason": "managed_consumer_recipes",
             },
             _confirmation("root-justfile", "Justfile", "managed_import_requires_confirmation"),
@@ -284,13 +319,20 @@ def _append_workflow_operations(
 
 
 def _append_legacy_removals(operations: list[dict[str, Any]], root: Path | None) -> None:
-    """Emit removals only for the complete, exact sc-compose 0.4 pair.
+    """Emit removals only for the complete, exact sc-compose 0.4 bundle.
 
-    Names alone are never permission to remove a consumer action. Requiring the
-    complete pair also prevents a partial or near-match checkout from receiving
-    a destructive plan operation.
+    Names alone are never permission to remove a consumer artifact. Requiring
+    every action, copied helper, and the manual materializer prevents a partial
+    or near-match checkout from receiving a destructive plan operation.
     """
     if root is None:
+        return
+    proposed_paths = {
+        operation["path"]
+        for operation in operations
+        if operation["kind"] == "propose_create"
+    }
+    if not LEGACY_REPLACEMENTS.issubset(proposed_paths):
         return
     matched = []
     for path, expected in LEGACY_SC_COMPOSE_04.items():
@@ -306,10 +348,20 @@ def _append_legacy_removals(operations: list[dict[str, Any]], root: Path | None)
             "operation_id": f"legacy-remove-{path.replace('/', '-')}",
             "path": path,
             "kind": "propose_remove",
+            "artifact_kind": _legacy_artifact_kind(path),
             "reason": "exact_sc_compose_0_4_legacy_fingerprint",
         }
         for path in matched
     )
+
+
+def _legacy_artifact_kind(path: str) -> str:
+    """Map the finite legacy allowlist to the transaction's concrete kinds."""
+    if path.endswith(".yml"):
+        return "workflow_yaml"
+    if path == ".just/lint-config.toml":
+        return "toml"
+    return "shell"
 
 
 def _confirmation(operation_id: str, path: str, reason: str) -> dict[str, Any]:

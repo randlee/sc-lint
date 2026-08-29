@@ -910,6 +910,18 @@ fn add_reviewed_removals(
                     "Regenerate and review the configure plan.",
                 )
             })?;
+        let kind = crate::configure::legacy::allowlisted_removal_kind(
+            relative,
+            operation.get("reason").and_then(Value::as_str),
+        )
+        .ok_or_else(|| {
+            configure_apply_error(
+                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                "the reviewed removal operation is not in the sc-lint legacy allowlist",
+                format!("`{relative}` is not an exact, fingerprint-authorized legacy artifact"),
+                "Regenerate and review the configure plan; do not remove consumer-owned files automatically.",
+            )
+        })?;
         let relative_path = Path::new(relative);
         if relative_path.is_absolute()
             || relative_path
@@ -925,8 +937,7 @@ fn add_reviewed_removals(
         }
         let target = request.root.join(relative_path);
         artifacts.push(Box::new(crate::configure::artifact::RemoveArtifact::new(
-            crate::configure::artifact::ArtifactKind::Json,
-            target,
+            kind, target,
         )));
     }
     Ok(())

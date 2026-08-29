@@ -39,5 +39,8 @@ just upgrade
 
 The apply step rejects stale source digests and does not overwrite a
 consumer-owned `Justfile` recipe. It may remove only the documented exact
-legacy sc-compose 0.4 fingerprint through the reviewed transaction; similarly
-named files are left untouched.
+legacy sc-compose 0.4 bundle through the reviewed transaction: both old
+composite actions, the copied `.just` helper bundle/runtime marker, and the
+old materialization script. Every one must match its recorded digest and the
+new config/bootstrap/Just replacements must be valid; similarly named or
+partial files are left untouched.

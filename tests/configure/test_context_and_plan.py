@@ -44,7 +44,22 @@ class ContextAndPlanTests(unittest.TestCase):
             plan["operations"][0]["reason"],
             "recommended_profiles:baseline,boundary,portability,attributes",
         )
+        self.assertEqual(plan["operations"][0]["artifact_kind"], "toml")
         self.assertFalse(any(operation["path"] == ".sc-lint/justfile" for operation in plan["operations"]))
+
+    def test_transaction_operations_expose_concrete_artifact_kinds(self) -> None:
+        request = json.loads(json.dumps(self.request))
+        request["request"]["just"]["mode"] = "generate_managed_import"
+        plan = build_plan(collect_context(FIXTURES / "empty-rust"), request)
+        kinds = {
+            operation["path"]: operation["artifact_kind"]
+            for operation in plan["operations"]
+            if "artifact_kind" in operation
+        }
+        self.assertEqual(kinds["sc-lint.toml"], "toml")
+        self.assertEqual(kinds[".sc-lint/bootstrap"], "shell")
+        self.assertEqual(kinds[".sc-lint/bootstrap.ps1"], "shell")
+        self.assertEqual(kinds[".sc-lint/justfile"], "justfile")
 
     def test_existing_just_and_workflow_are_visible_but_uninspected(self) -> None:
         context = collect_context(FIXTURES / "existing-just")
@@ -105,7 +120,7 @@ class ContextAndPlanTests(unittest.TestCase):
         self.assertEqual(validate("plan", first), [])
         self.assertEqual(validate("plan", second), [])
 
-    def test_legacy_removals_require_the_complete_exact_fingerprint_pair(self) -> None:
+    def test_legacy_removals_require_complete_exact_fingerprints_and_replacements(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
@@ -115,6 +130,8 @@ class ContextAndPlanTests(unittest.TestCase):
             second.parent.mkdir(parents=True)
             first.write_text("exact one\n", encoding="utf-8")
             second.write_text("exact two\n", encoding="utf-8")
+            request = json.loads(json.dumps(self.request))
+            request["request"]["just"]["mode"] = "generate_managed_import"
             import hashlib
             with patch.dict(
                 "sc_lint_configure.LEGACY_SC_COMPOSE_04",
@@ -124,9 +141,13 @@ class ContextAndPlanTests(unittest.TestCase):
                 },
                 clear=True,
             ):
-                exact = plan_result(root, self.request)["data"]
+                without_replacements = plan_result(root, self.request)["data"]
+                exact = plan_result(root, request)["data"]
                 second.write_text("near match\n", encoding="utf-8")
-                near_match = plan_result(root, self.request)["data"]
+                near_match = plan_result(root, request)["data"]
+        self.assertFalse(
+            any(operation["kind"] == "propose_remove" for operation in without_replacements["operations"])
+        )
         self.assertEqual(
             [operation["kind"] for operation in exact["operations"] if operation["kind"] == "propose_remove"],
             ["propose_remove", "propose_remove"],

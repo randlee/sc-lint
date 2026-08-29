@@ -94,9 +94,19 @@ with backup paths.
 The private artifact enum includes `Toml`, `Justfile`, `Shell`, `Json`, and
 `WorkflowYaml`; all concrete writers share `ManagedArtifact`. `Shell` covers
 the POSIX/PowerShell bootstrap pair and marks a newly-created POSIX bootstrap
-executable. `Json` and `WorkflowYaml` remain reserved for F.4b's prevalidated
-workflow artifact, which must use this same transaction rather than a side
-write path.
+executable, as well as exact legacy script removals. `Json` is validated by
+the extension-contract fixture; `WorkflowYaml` identifies exact legacy action
+removals and is the F.4b workflow artifact kind. Every create/remove operation
+that enters the transaction exposes this kind through the additive
+`artifact_kind` plan field. F.4b must use this same transaction rather than a
+side write path.
+
+The initial legacy deletion fingerprint is deliberately a complete bundle:
+the two sc-compose 0.4 composite actions, the copied `.just` helper bundle and
+runtime marker, and `scripts/materialize_sc_lint_runtime.py`. The planner
+requires every digest and the replacement artifacts before proposing any
+delete. Apply repeats the path/reason allowlist check, so a forged plan or a
+later planner operation cannot delete a user-owned similarly named file.
 
 ## CLI Boundary Registration
 

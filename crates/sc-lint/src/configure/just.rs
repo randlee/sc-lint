@@ -29,17 +29,13 @@ pub(crate) fn insert_or_replace(source: &str) -> Result<String, CliError> {
     }
     if let Some((start, _)) = begin.first() {
         let end_offset = end[0].0 + MARKER_END.len();
-        let suffix = &source[end_offset..];
-        let suffix = suffix
-            .strip_prefix("\r\n")
-            .or_else(|| suffix.strip_prefix('\n'))
-            .unwrap_or(suffix);
-        return Ok(format!(
-            "{}{}{}",
-            &source[..*start],
-            managed_block(newline),
-            suffix
-        ));
+        let expected = managed_block(newline);
+        if source[*start..] != expected || end_offset >= source.len() {
+            return Err(conflict(
+                "the managed marker was moved or modified outside its generated representation",
+            ));
+        }
+        return Ok(source.to_owned());
     }
     let separator = if source.is_empty() || source.ends_with('\n') {
         ""
@@ -65,9 +61,15 @@ pub(crate) fn validate(target: &Path, bytes: &[u8]) -> Result<(), CliError> {
             "the managed marker is missing, duplicated, or malformed",
         ));
     }
-    if begin == 1 && !source.contains(MANAGED_IMPORT) {
+    if begin == 1
+        && !source.ends_with(&managed_block(if source.contains("\r\n") {
+            "\r\n"
+        } else {
+            "\n"
+        }))
+    {
         return Err(conflict(
-            "the managed marker does not contain the canonical import",
+            "the managed marker was moved or modified outside its generated representation",
         ));
     }
     Ok(())
@@ -115,5 +117,13 @@ mod tests {
             insert_or_replace(&source).expect_err("conflict").code(),
             "CLI.CONFIGURE_UNMANAGED_COLLISION"
         );
+    }
+
+    #[test]
+    fn moved_or_modified_marker_is_a_no_write_conflict() {
+        let moved = format!("{}user:\n    @echo after\n", managed_block("\n"));
+        assert!(insert_or_replace(&moved).is_err());
+        let modified = format!("{}# edited\n", managed_block("\n"));
+        assert!(insert_or_replace(&modified).is_err());
     }
 }

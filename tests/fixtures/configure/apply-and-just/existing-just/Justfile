@@ -1,0 +1,7 @@
+# Consumer-owned comment must remain byte-for-byte before the managed block.
+set dotenv-load := true
+
+import 'consumer.just'
+
+user-task:
+    @echo consumer-owned

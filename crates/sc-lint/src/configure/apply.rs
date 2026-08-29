@@ -14,6 +14,25 @@ struct StagedArtifact {
     existed: bool,
 }
 
+struct ReplaceError {
+    error: io::Error,
+    changed_current: bool,
+}
+
+/// Test-only failure points use the production transaction path to prove that
+/// staging and replacement failures restore every already-touched artifact.
+#[allow(
+    dead_code,
+    reason = "Production always supplies None; the variants are exercised by the transaction fault tests."
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InjectedFailure {
+    Stage(usize),
+    Rename(usize),
+    RenameAfterBackup(usize),
+    PostCommit(usize),
+}
+
 /// Validate all artifacts before touching disk, stage beside each target, then
 /// commit in plan order.  Any failed stage or rename restores every earlier
 /// target from its same-directory backup.
@@ -22,6 +41,17 @@ struct StagedArtifact {
     reason = "Configure apply errors carry the stable user recovery envelope."
 )]
 pub(crate) fn commit(artifacts: Vec<Box<dyn ManagedArtifact>>) -> Result<(), CliError> {
+    commit_inner(artifacts, None)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "The test-only failure seam exercises the same structured transaction recovery path."
+)]
+fn commit_inner(
+    artifacts: Vec<Box<dyn ManagedArtifact>>,
+    injected_failure: Option<InjectedFailure>,
+) -> Result<(), CliError> {
     for artifact in &artifacts {
         artifact.validate_staged()?;
     }
@@ -47,11 +77,23 @@ pub(crate) fn commit(artifacts: Vec<Box<dyn ManagedArtifact>>) -> Result<(), Cli
             file_name.to_string_lossy()
         ));
         if !artifact.is_removal() {
+            if injected_failure == Some(InjectedFailure::Stage(index)) {
+                cleanup_stages(&staged);
+                return Err(io_error(
+                    "stage generated artifact",
+                    &target,
+                    io::Error::other("test-only injected stage failure"),
+                ));
+            }
             if let Err(error) = fs::write(&staged_path, artifact.staged_bytes()) {
                 cleanup_stages(&staged);
                 return Err(io_error("stage generated artifact", &target, error));
             }
-            preserve_mode(&target, &staged_path, artifact.kind())?;
+            if let Err(error) = preserve_mode(&target, &staged_path, artifact.kind()) {
+                let _ = fs::remove_file(&staged_path);
+                cleanup_stages(&staged);
+                return Err(error);
+            }
         }
         staged.push(StagedArtifact {
             existed: target.exists(),
@@ -62,18 +104,32 @@ pub(crate) fn commit(artifacts: Vec<Box<dyn ManagedArtifact>>) -> Result<(), Cli
     }
 
     for index in 0..staged.len() {
-        if let Err(error) = replace_one(&staged[index]) {
-            let rollback_error = rollback(&staged[..=index]);
-            cleanup_stages(&staged);
-            return Err(match rollback_error {
-                Ok(()) => io_error("commit generated artifact", &staged[index].target, error),
-                Err(paths) => CliError::config("configure apply could not restore every changed file")
-                    .with_code("CLI.CONFIGURE_ROLLBACK_FAILED")
-                    .with_cause(error.to_string())
-                    .with_detail("backup_paths", serde_json::json!(paths))
-                    .with_suggested_action("Restore the listed backup paths, then regenerate and review the configure plan.")
-                    .with_documentation("sc-lint docs troubleshooting"),
-            });
+        if injected_failure == Some(InjectedFailure::Rename(index)) {
+            return rollback_error(
+                &staged,
+                index,
+                index,
+                io::Error::other("test-only injected rename failure"),
+            );
+        }
+        if let Err(error) = replace_one(
+            &staged[index],
+            injected_failure == Some(InjectedFailure::RenameAfterBackup(index)),
+        ) {
+            return rollback_error(
+                &staged,
+                index,
+                index + usize::from(error.changed_current),
+                error.error,
+            );
+        }
+        if injected_failure == Some(InjectedFailure::PostCommit(index)) {
+            return rollback_error(
+                &staged,
+                index,
+                index + 1,
+                io::Error::other("test-only injected commit failure"),
+            );
         }
     }
     for item in &staged {
@@ -85,12 +141,52 @@ pub(crate) fn commit(artifacts: Vec<Box<dyn ManagedArtifact>>) -> Result<(), Cli
     Ok(())
 }
 
-fn replace_one(item: &StagedArtifact) -> io::Result<()> {
+#[expect(
+    clippy::result_large_err,
+    reason = "Rollback reports the shared structured configure recovery envelope."
+)]
+fn rollback_error(
+    staged: &[StagedArtifact],
+    index: usize,
+    changed_count: usize,
+    error: io::Error,
+) -> Result<(), CliError> {
+    let rollback_error = rollback(&staged[..changed_count]);
+    cleanup_stages(staged);
+    Err(match rollback_error {
+        Ok(()) => io_error("commit generated artifact", &staged[index].target, error),
+        Err(paths) => CliError::config("configure apply could not restore every changed file")
+            .with_code("CLI.CONFIGURE_ROLLBACK_FAILED")
+            .with_cause(error.to_string())
+            .with_detail("backup_paths", serde_json::json!(paths))
+            .with_suggested_action(
+                "Restore the listed backup paths, then regenerate and review the configure plan.",
+            )
+            .with_documentation("sc-lint docs troubleshooting"),
+    })
+}
+
+fn replace_one(
+    item: &StagedArtifact,
+    inject_failure_after_backup: bool,
+) -> Result<(), ReplaceError> {
     if item.existed {
-        fs::rename(&item.target, &item.backup)?;
+        fs::rename(&item.target, &item.backup).map_err(|error| ReplaceError {
+            error,
+            changed_current: false,
+        })?;
+        if inject_failure_after_backup {
+            return Err(ReplaceError {
+                error: io::Error::other("test-only injected post-backup rename failure"),
+                changed_current: true,
+            });
+        }
     }
     if item.staged.exists() {
-        fs::rename(&item.staged, &item.target)
+        fs::rename(&item.staged, &item.target).map_err(|error| ReplaceError {
+            error,
+            changed_current: item.existed,
+        })
     } else {
         Ok(())
     }
@@ -183,11 +279,14 @@ fn io_error(operation: &str, path: &std::path::Path, error: io::Error) -> CliErr
 mod tests {
     use super::*;
     use crate::configure::artifact::{ArtifactKind, BytesArtifact, RemoveArtifact};
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
 
     struct SyntheticArtifact {
         target: PathBuf,
         bytes: Vec<u8>,
+        valid: bool,
     }
     impl ManagedArtifact for SyntheticArtifact {
         fn kind(&self) -> ArtifactKind {
@@ -200,8 +299,12 @@ mod tests {
             &self.bytes
         }
         fn validate_staged(&self) -> Result<(), CliError> {
-            Err(CliError::config("synthetic validation failure")
-                .with_code("CLI.CONFIGURE_UNMANAGED_COLLISION"))
+            if self.valid {
+                Ok(())
+            } else {
+                Err(CliError::config("synthetic validation failure")
+                    .with_code("CLI.CONFIGURE_UNMANAGED_COLLISION"))
+            }
         }
     }
 
@@ -219,6 +322,7 @@ mod tests {
             Box::new(SyntheticArtifact {
                 target: root.path().join("synthetic.json"),
                 bytes: b"{}".to_vec(),
+                valid: false,
             }),
         ]);
         assert!(result.is_err());
@@ -272,6 +376,35 @@ mod tests {
     }
 
     #[test]
+    fn removal_is_restored_when_a_later_transaction_step_fails() {
+        let root = tempfile::tempdir().expect("temp root");
+        let legacy = root.path().join("legacy.py");
+        let generated = root.path().join("generated.toml");
+        fs::write(&legacy, "legacy bytes\n").expect("legacy target");
+        fs::write(&generated, "value = 'before'\n").expect("generated target");
+        let result = commit_inner(
+            vec![
+                Box::new(RemoveArtifact::new(ArtifactKind::Shell, legacy.clone())),
+                Box::new(BytesArtifact::new(
+                    ArtifactKind::Toml,
+                    generated.clone(),
+                    b"value = 'after'\n".to_vec(),
+                )),
+            ],
+            Some(InjectedFailure::PostCommit(1)),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            fs::read_to_string(legacy).expect("legacy restored"),
+            "legacy bytes\n"
+        );
+        assert_eq!(
+            fs::read_to_string(generated).expect("generated restored"),
+            "value = 'before'\n"
+        );
+    }
+
+    #[test]
     fn malformed_json_is_rejected_before_any_write() {
         let root = tempfile::tempdir().expect("temp root");
         let target = root.path().join("generated.json");
@@ -282,5 +415,149 @@ mod tests {
         ))]);
         assert!(result.is_err());
         assert!(!target.exists());
+    }
+
+    #[test]
+    fn malformed_toml_and_just_are_rejected_before_any_write() {
+        let root = tempfile::tempdir().expect("temp root");
+        let existing = root.path().join("existing.toml");
+        fs::write(&existing, "value = 'before'\n").expect("existing bytes");
+        let result = commit(vec![
+            Box::new(BytesArtifact::new(
+                ArtifactKind::Toml,
+                existing.clone(),
+                b"value = [\n".to_vec(),
+            )),
+            Box::new(BytesArtifact::new(
+                ArtifactKind::Justfile,
+                root.path().join("Justfile"),
+                b"# >>> sc-lint managed integration >>>\n".to_vec(),
+            )),
+        ]);
+        assert!(result.is_err());
+        assert_eq!(
+            fs::read_to_string(existing).expect("existing remains"),
+            "value = 'before'\n"
+        );
+        assert!(!root.path().join("Justfile").exists());
+    }
+
+    #[test]
+    fn injected_stage_failure_leaves_all_original_bytes_and_modes() {
+        let root = tempfile::tempdir().expect("temp root");
+        let first = root.path().join("first.toml");
+        fs::write(&first, "value = 'before'\n").expect("first before");
+        #[cfg(unix)]
+        fs::set_permissions(&first, fs::Permissions::from_mode(0o640)).expect("first mode");
+        let result = commit_inner(
+            vec![
+                Box::new(BytesArtifact::new(
+                    ArtifactKind::Toml,
+                    first.clone(),
+                    b"value = 'after'\n".to_vec(),
+                )),
+                Box::new(BytesArtifact::new(
+                    ArtifactKind::Json,
+                    root.path().join("second.json"),
+                    b"{}\n".to_vec(),
+                )),
+            ],
+            Some(InjectedFailure::Stage(1)),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            fs::read_to_string(&first).expect("first remains"),
+            "value = 'before'\n"
+        );
+        #[cfg(unix)]
+        assert_eq!(
+            fs::metadata(&first).expect("metadata").permissions().mode() & 0o777,
+            0o640
+        );
+        assert!(!root.path().join("second.json").exists());
+    }
+
+    #[test]
+    fn injected_synthetic_rename_failure_restores_toml_just_and_mode() {
+        let root = tempfile::tempdir().expect("temp root");
+        let first = root.path().join("first.toml");
+        let justfile = root.path().join("Justfile");
+        let synthetic = root.path().join("synthetic.extension");
+        fs::write(&first, "value = 'before-first'\n").expect("first before");
+        fs::write(&justfile, "user:\n    @echo before\n").expect("Justfile before");
+        fs::write(&synthetic, "extension before\n").expect("synthetic before");
+        #[cfg(unix)]
+        fs::set_permissions(&first, fs::Permissions::from_mode(0o640)).expect("first mode");
+        let result = commit_inner(
+            vec![
+                Box::new(BytesArtifact::new(
+                    ArtifactKind::Toml,
+                    first.clone(),
+                    b"value = 'after-first'\n".to_vec(),
+                )),
+                Box::new(BytesArtifact::new(
+                    ArtifactKind::Justfile,
+                    justfile.clone(),
+                    b"user:\n    @echo after\n".to_vec(),
+                )),
+                Box::new(SyntheticArtifact {
+                    target: synthetic.clone(),
+                    bytes: b"extension output".to_vec(),
+                    valid: true,
+                }),
+            ],
+            Some(InjectedFailure::RenameAfterBackup(2)),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            fs::read_to_string(&first).expect("first restored"),
+            "value = 'before-first'\n"
+        );
+        assert_eq!(
+            fs::read_to_string(justfile).expect("Justfile restored"),
+            "user:\n    @echo before\n"
+        );
+        assert_eq!(
+            fs::read_to_string(synthetic).expect("synthetic restored"),
+            "extension before\n"
+        );
+        #[cfg(unix)]
+        assert_eq!(
+            fs::metadata(&first).expect("metadata").permissions().mode() & 0o777,
+            0o640
+        );
+    }
+
+    #[test]
+    fn injected_post_commit_failure_restores_every_prior_artifact() {
+        let root = tempfile::tempdir().expect("temp root");
+        let first = root.path().join("first.toml");
+        let second = root.path().join("second.json");
+        fs::write(&first, "value = 'before-first'\n").expect("first before");
+        fs::write(&second, "{\"value\": \"before\"}\n").expect("second before");
+        let result = commit_inner(
+            vec![
+                Box::new(BytesArtifact::new(
+                    ArtifactKind::Toml,
+                    first.clone(),
+                    b"value = 'after-first'\n".to_vec(),
+                )),
+                Box::new(BytesArtifact::new(
+                    ArtifactKind::Json,
+                    second.clone(),
+                    b"{\"value\": \"after\"}\n".to_vec(),
+                )),
+            ],
+            Some(InjectedFailure::PostCommit(1)),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            fs::read_to_string(first).expect("first restored"),
+            "value = 'before-first'\n"
+        );
+        assert_eq!(
+            fs::read_to_string(second).expect("second restored"),
+            "{\"value\": \"before\"}\n"
+        );
     }
 }

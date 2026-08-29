@@ -1,0 +1,4 @@
+# >>> sc-lint managed integration >>>
+# consumer comment inside managed range
+import '.sc-lint/justfile'
+# <<< sc-lint managed integration <<<

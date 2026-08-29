@@ -1,0 +1,6 @@
+# >>> sc-lint managed integration >>>
+import '.sc-lint/justfile'
+# <<< sc-lint managed integration <<<
+# >>> sc-lint managed integration >>>
+import '.sc-lint/justfile'
+# <<< sc-lint managed integration <<<

@@ -371,6 +371,9 @@ specialized backend tools and mixed Rust/Python implementations.
   and permissions if any operation or validation fails. Stale plans,
   unmanaged collisions, transaction failures, and incomplete rollback each
   have distinct stable error codes, recovery action, and documentation link.
+  A removal is permitted only when both the planner's exact legacy digest
+  fingerprint and the apply-side finite allowlist authorize its repository
+  relative path; a similarly named or future path is a no-write collision.
 
 ## Contract References
 
