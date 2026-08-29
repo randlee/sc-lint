@@ -12,7 +12,10 @@ hardening changes are applied.
 ## Phase F Planning Status
 
 Phase F has no open internal plan-integrity finding after its hardening passes.
-Its remaining external delivery gate is F.3b: a checksum-recorded released
+F.1's `v1` context/request/plan/result schema and golden-fixture contract has
+no unresolved contract ambiguity; F.2 owns the bounded no-write planner
+implementation against that contract. Its remaining external delivery gate is
+F.3b: a checksum-recorded released
 Wyvern artifact must pass the required multi-page/headless capability matrix.
 Failure is an upstream blocking finding for the optional human wizard, not
 permission to add a Python state machine or block the F.2 agent/F.4a apply

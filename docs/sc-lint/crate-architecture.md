@@ -295,6 +295,10 @@ configuration, wizard, or workflow crate. Its module ownership is:
 The agent/apply path depends on F.1/F.2 and may progress without a qualified
 Wyvern UI. The human adapter joins the F.3b capability gate and F.3c agent
 contract at F.3d. ADR-014 governs the entire configure boundary.
+The four F.1 schemas named in
+[`configure-schemas.md`](./configure-schemas.md) are the only public contract
+authorities; F.2 through F.4b prove their fixtures on Linux, macOS, and
+Windows without creating platform-specific configure types.
 
 ## Phase Plan Coverage
 

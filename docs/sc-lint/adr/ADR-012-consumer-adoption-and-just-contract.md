@@ -43,6 +43,13 @@ contract and is not an input to this decision.
    surface because only its reusable Action can install a verified release and
    make the generated local compatibility contract viable in CI.
 
+[ADR-014](./ADR-014-consumer-configuration-automation.md) partially
+supersedes this decision's file-ownership scope for an established-repository
+`configure` path. `init --just` retains this ADR's exact four-file ownership
+and conflict behavior; only the later, separately reviewed `configure.apply`
+transaction may own its bounded `.sc-lint/justfile`, marked root-Justfile
+import, and optional generated workflow surface.
+
 ## Canonical Generated Template
 
 ```just

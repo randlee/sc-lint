@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/randlee/sc-lint/blob/main/schemas/sc-lint-configure-context.schema.json",
+  "title": "sc-lint Configure Context v1",
+  "description": "The deliberately bounded, no-write observation passed to the configure UI and planner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "context", "explanation"],
+  "properties": {
+    "schema_version": {"const": "v1"},
+    "context": {"$ref": "#/$defs/context"},
+    "explanation": {"$ref": "#/$defs/explanation"}
+  },
+  "$defs": {
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cargo_toml", "sc_lint_toml", "justfile", "github_workflows", "sc_lint_directory"],
+      "properties": {
+        "cargo_toml": {"$ref": "#/$defs/cargoToml"},
+        "sc_lint_toml": {"$ref": "#/$defs/presence"},
+        "justfile": {"$ref": "#/$defs/uninspectedPresence"},
+        "github_workflows": {"$ref": "#/$defs/uninspectedPresence"},
+        "sc_lint_directory": {"$ref": "#/$defs/presence"}
+      }
+    },
+    "cargoToml": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["present"], "properties": {"present": {"const": false}}},
+        {"type": "object", "additionalProperties": false, "required": ["present", "kind"], "properties": {"present": {"const": true}, "kind": {"enum": ["package", "workspace"]}}}
+      ]
+    },
+    "presence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present"],
+      "properties": {"present": {"type": "boolean"}}
+    },
+    "uninspectedPresence": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["present"], "properties": {"present": {"const": false}}},
+        {"type": "object", "additionalProperties": false, "required": ["present", "inspected"], "properties": {"present": {"const": true}, "inspected": {"const": false}}}
+      ]
+    },
+    "explanation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["developer_contract", "uninspected_existing_integration"],
+      "properties": {
+        "developer_contract": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["just setup", "just lint", "just test", "just upgrade"]}
+        },
+        "uninspected_existing_integration": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["Justfile", ".github/workflows/"]}
+        }
+      }
+    }
+  }
+}

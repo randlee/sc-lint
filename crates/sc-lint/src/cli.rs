@@ -81,6 +81,15 @@ pub enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Produce a no-write configuration plan for a consumer repository.
+    Configure {
+        /// Versioned JSON request file, or - to read the request from standard input.
+        #[arg(long, value_name = "file|-")]
+        request: PathBuf,
+        /// Accepted explicitly; the F.2 planner never writes the target repository.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Discover and print the installed offline documentation bundle.
     Docs {
         /// Guide to print or resolve. Without a guide, print the overview.

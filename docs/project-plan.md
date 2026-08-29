@@ -342,6 +342,12 @@ config-derived Action/workflow transformation. F.5 joins F.3e and F.4b for
 release and documentation handoff to Phase P. Phase P—not Phase F—qualifies
 the released artifact on both sc-compose and atm-core.
 
+F.1's authoritative `v1` context, request, plan, and result schemas are
+published with synchronized golden fixtures in
+[docs/sc-lint/configure-schemas.md](./sc-lint/configure-schemas.md). They are
+the shared input contract for the F.2 planner, optional human adapter, and
+later transactional apply/workflow stages.
+
 ## Planning Conventions
 
 - This file tracks project-level phases and priorities.

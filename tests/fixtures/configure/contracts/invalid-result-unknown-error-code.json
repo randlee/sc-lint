@@ -1,0 +1,11 @@
+{
+  "ok": false,
+  "command": "configure.plan",
+  "error": {
+    "code": "CLI.CONFIGURE_UNKNOWN_FAILURE",
+    "pointer": null,
+    "recovery": "rerun_with_request_json",
+    "recovery_description": "Rerun configure with a JSON request.",
+    "docs_ref": "sc-lint docs configuration"
+  }
+}

@@ -47,8 +47,8 @@ jobs:
       - name: Install cargo-modules
         run: cargo binstall cargo-modules@0.26.0 --no-confirm
 
-      - name: Install codespell
-        run: python -m pip install codespell
+      - name: Install Python validation dependencies
+        run: python -m pip install codespell jsonschema
 
       - name: Run just lint
         run: just lint
@@ -76,6 +76,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+
+      - name: Install Python validation dependencies
+        run: python -m pip install jsonschema
 
       - name: Cache cargo registry
         uses: actions/cache@v4

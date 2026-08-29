@@ -50,6 +50,26 @@ pub(crate) fn render_error_json(command_id: &str, error: &CliError) -> String {
     }
 }
 
+pub(crate) fn render_configure_error_json(command_id: &str, error: &CliError) -> String {
+    let payload = json!({
+        "ok": false,
+        "command": command_id,
+        "error": {
+            "code": error.code(),
+            "message": error.message,
+            "cause": error.cause,
+            "pointer": error.details.get("pointer").cloned().unwrap_or(Value::Null),
+            "recovery": error.details.get("recovery").cloned().unwrap_or(Value::Null),
+            "recovery_description": error.suggested_action,
+            "docs_ref": error.documentation,
+        },
+    });
+    match serde_json::to_string_pretty(&payload) {
+        Ok(rendered) => rendered,
+        Err(_) => fallback_render_error(command_id, error),
+    }
+}
+
 pub(crate) fn render_success_human(
     context: &CommandContext,
     envelope: &CommandEnvelope<Value>,

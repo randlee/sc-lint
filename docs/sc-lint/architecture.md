@@ -13,6 +13,13 @@ This document records the crate-local architecture summary for the top-level
 - CLI-owned structured logging
 - top-level interface-version checks through `check.interfaces`
 
+Phase F adds the product-owned `configure` contract: the CLI owns the
+versioned context/request/plan/result schemas, policy validation, and later
+apply dispatch; the optional Python/Wyvern adapter is presentation-only. The
+authoritative schema definitions and their golden fixtures are in
+[`configure-schemas.md`](./configure-schemas.md). Later configuration fixtures
+must prove the same public contract on Linux, macOS, and Windows.
+
 ## Authoritative Architecture Sources
 
 The detailed architecture authorities for this crate are:

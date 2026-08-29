@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/randlee/sc-lint/blob/main/schemas/sc-lint-configure-result.schema.json",
+  "title": "sc-lint Configure Result v1",
+  "description": "The top-level success or failure envelope for configure.plan and configure.apply.",
+  "oneOf": [
+    {"$ref": "#/$defs/success"},
+    {"$ref": "#/$defs/failure"}
+  ],
+  "$defs": {
+    "command": {"enum": ["configure", "configure.plan", "configure.apply"]},
+    "diagnostics": {"type": "array", "items": {"type": "object"}},
+    "success": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "command", "data", "diagnostics"],
+      "properties": {
+        "ok": {"const": true},
+        "command": {"$ref": "#/$defs/command"},
+        "data": {"type": "object"},
+        "diagnostics": {"$ref": "#/$defs/diagnostics"}
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "command", "error"],
+      "properties": {
+        "ok": {"const": false},
+        "command": {"$ref": "#/$defs/command"},
+        "error": {"$ref": "#/$defs/error"},
+        "diagnostics": {"$ref": "#/$defs/diagnostics"}
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "pointer", "recovery", "docs_ref"],
+      "properties": {
+        "code": {"enum": ["CLI.CONFIGURE_UNSUPPORTED_SCHEMA", "CLI.CONFIGURE_UI_UNAVAILABLE", "CLI.CONFIGURE_UNMANAGED_COLLISION", "CLI.CONFIGURE_STALE_PLAN", "CLI.CONFIGURE_ROLLBACK_FAILED"]},
+        "message": {"type": "string", "minLength": 1},
+        "cause": {"type": "string", "minLength": 1},
+        "pointer": {"type": ["string", "null"]},
+        "recovery": {"type": "string", "minLength": 1},
+        "recovery_description": {"type": "string", "minLength": 1},
+        "docs_ref": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

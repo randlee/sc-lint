@@ -213,6 +213,12 @@ F.4b separately closes config-derived Action/workflow transformation. Phase P
 owns qualification and conversion of both sc-compose and atm-core. See
 [Phase F plan](../plans/phase-F/phase-F-plan.md).
 
+F.1's four `v1` schema authorities and golden fixtures are documented in
+[configure-schemas.md](./configure-schemas.md). They are shared unchanged by
+the F.2 planner, agent JSON path, optional wizard, and later apply/workflow
+transformers; platform fixtures verify the contract on Linux, macOS, and
+Windows.
+
 ### Current code moves required
 
 The current implementation now places the shared portability rule family in
@@ -462,8 +468,8 @@ The next planned boundary-enforcement work after that is:
 
 These are documented in:
 
-- [`boundary-enforcement-model.md`](./boundary-enforcement-model.md)
-- [`boundary-toml-migration.md`](./boundary-toml-migration.md)
+- [`boundary-enforcement-model.md`](../sc-lint-boundary/boundary-enforcement-model.md)
+- [`boundary-toml-migration.md`](../sc-lint-boundary/boundary-toml-migration.md)
 
 Current direction for both items:
 

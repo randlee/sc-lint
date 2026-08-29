@@ -9,6 +9,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
+- [docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md](./sc-lint/adr/ADR-014-consumer-configuration-automation.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)

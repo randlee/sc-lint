@@ -109,6 +109,20 @@ fn command_surface_parses_the_initial_grouped_shape() {
             target: ClippyTarget::Native
         })
     ));
+
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        "consumer",
+        "configure",
+        "--request",
+        "request.json",
+        "--dry-run",
+    ]);
+    assert!(matches!(
+        cli.command.as_ref(),
+        Some(Command::Configure { dry_run: true, .. })
+    ));
 }
 
 #[test]
@@ -124,6 +138,7 @@ fn help_text_exposes_the_initial_grouped_surface() {
         "setup",
         "upgrade",
         "init",
+        "configure",
         "docs",
         "test",
         "version",
@@ -143,6 +158,98 @@ fn help_text_exposes_the_initial_grouped_surface() {
             "missing documentation guide `{guide}`"
         );
     }
+}
+
+#[test]
+fn configure_dispatches_the_bounded_python_planner_without_repo_discovery() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("workspace root");
+    let fixture_root = repo_root.join("tests/fixtures/configure/empty-rust");
+    let request = repo_root.join("tests/fixtures/configure/contracts/request.json");
+    let cli = Cli::parse_from([
+        OsString::from("sc-lint"),
+        OsString::from("--root"),
+        fixture_root.into_os_string(),
+        OsString::from("configure"),
+        OsString::from("--request"),
+        request.into_os_string(),
+        OsString::from("--dry-run"),
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("configure context");
+    assert_eq!(context.command_id(), "configure.plan");
+    assert!(context.skips_logging());
+    let loaded = LoadedConfig::load(&cli, &context).expect("configure skips repo config discovery");
+    let success = crate::command::execute(&context, &loaded).expect("configure plan succeeds");
+
+    assert_eq!(success.data["schema_version"], "v1");
+    assert_eq!(success.data["operations"][0]["path"], "sc-lint.toml");
+}
+
+#[test]
+fn configure_usage_errors_cover_missing_root_and_disallowed_config() {
+    let missing_root = Cli::parse_from(["sc-lint", "configure", "--request", "request.json"]);
+    let error = CommandContext::from_cli(&missing_root).expect_err("root is required");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert!(error.message.contains("requires `--root <path>`"));
+
+    let with_config = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        "consumer",
+        "--config",
+        "sc-lint.toml",
+        "configure",
+        "--request",
+        "request.json",
+    ]);
+    let error = CommandContext::from_cli(&with_config).expect_err("config is disallowed");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert!(error.message.contains("does not accept `--config`"));
+}
+
+#[test]
+fn configure_dispatcher_renders_the_frozen_failure_shape() {
+    let fixture = TempDir::new().expect("fixture");
+    let request = fixture.path().join("malformed.json");
+    fs::write(&request, "{").expect("request");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("workspace root")
+        .join("tests/fixtures/configure/empty-rust");
+    let cli = Cli::parse_from([
+        OsString::from("sc-lint"),
+        OsString::from("--json"),
+        OsString::from("--root"),
+        root.into_os_string(),
+        OsString::from("configure"),
+        OsString::from("--request"),
+        request.into_os_string(),
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("configure context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("no standard config required");
+    let outcome = crate::execute(context, &loaded, true);
+    assert!(!outcome.ok);
+    let rendered = outcome.rendered.stderr.expect("JSON error output");
+    let failure: Value = serde_json::from_str(&rendered).expect("failure JSON");
+
+    assert_eq!(failure["ok"], false);
+    assert_eq!(failure["command"], "configure.plan");
+    assert_eq!(failure["error"]["code"], "CLI.CONFIGURE_UNSUPPORTED_SCHEMA");
+    for field in [
+        "message",
+        "cause",
+        "pointer",
+        "recovery",
+        "recovery_description",
+        "docs_ref",
+    ] {
+        assert!(failure["error"].get(field).is_some(), "missing `{field}`");
+    }
+    assert!(failure["error"].get("kind").is_none());
+    assert!(failure["error"].get("details").is_none());
 }
 
 #[test]
