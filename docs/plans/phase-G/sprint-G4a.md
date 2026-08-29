@@ -7,7 +7,8 @@ worktree: n/a (target repository worktree)
 stack: external-non-branch
 stack_base: n/a
 target: ../sc-publish develop (external PR)
-owner: cfast
+owner: clint
+# Owner assignment: clint owns most sprints; cfast takes easy closure/fix work; flint takes the harder parallel Stack B track.
 ---
 
 # Sprint G.4a — sc-publish Delegation Qualification

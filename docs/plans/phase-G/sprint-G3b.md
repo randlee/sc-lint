@@ -7,7 +7,8 @@ worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.3b-self-con
 stack: B
 stack_base: sprint/G.3a-python-bindings
 target: develop (via stack B, PR base sprint/G.3a-python-bindings)
-owner: cfast
+owner: flint
+# Owner assignment: clint owns most sprints; cfast takes easy closure/fix work; flint takes the harder parallel Stack B track.
 ---
 
 # Sprint G.3b — Self-Contained Release And Consumer-Blocking Lint Fixes

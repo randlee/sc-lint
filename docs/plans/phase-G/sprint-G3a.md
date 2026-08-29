@@ -7,7 +7,8 @@ worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.3a-python-b
 stack: B
 stack_base: develop
 target: develop (via stack B, PR base develop)
-owner: cfast
+owner: flint
+# Owner assignment: clint owns most sprints; cfast takes easy closure/fix work; flint takes the harder parallel Stack B track.
 ---
 
 # Sprint G.3a — sc-lint Python Bindings Via Maturin

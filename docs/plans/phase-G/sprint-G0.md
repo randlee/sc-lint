@@ -7,7 +7,8 @@ worktree: /Users/randlee/Documents/github/sc-lint-worktrees/sprint/G.0-abandon-p
 stack: A
 stack_base: feature/phase-G-planning
 target: develop (via stack A, PR base feature/phase-G-planning)
-owner: clint
+owner: cfast
+# Owner assignment: clint owns most sprints; cfast takes easy closure/fix work; flint takes the harder parallel Stack B track.
 ---
 
 # Sprint G.0 — Abandon Phase F And Record ADR-015 / ADR-016
