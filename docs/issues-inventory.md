@@ -9,6 +9,17 @@ As of the Phase A hardening pass, there are no open blocking plan-integrity
 findings in the documented A.1a through A.8 sprint sequence once the current
 hardening changes are applied.
 
+## Phase F Planning Status
+
+Phase F has no open internal plan-integrity finding after its hardening passes.
+Its remaining external delivery gate is F.3b: a checksum-recorded released
+Wyvern artifact must pass the required multi-page/headless capability matrix.
+Failure is an upstream blocking finding for the optional human wizard, not
+permission to add a Python state machine or block the F.2 agent/F.4a apply
+path. F.3a `sc-compose`/`atm-core` fixtures are UX design inputs only; Phase P
+must independently qualify the released sc-lint artifact in disposable copies
+of both consumers before either conversion PR can claim success.
+
 ## Active Non-Blocking Notes
 
 1. `feature/sprint-A1` remains a historical local worktree name from before the

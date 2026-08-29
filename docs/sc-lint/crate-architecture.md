@@ -276,6 +276,26 @@ planned portability follow-on sprints `C.6` through `C.9`.
   - the Phase `C` portability follow-ons stay inside the existing
     `sc-lint-portability` crate rather than creating a separate crate line
 
+## Planned Phase F Configure Boundary
+
+Phase F changes only the top-level `sc-lint` crate; it does not create a
+configuration, wizard, or workflow crate. Its module ownership is:
+
+- `configure` command/context/request/plan: public CLI boundary and F.1/F.2
+  versioned JSON contract;
+- Python/Wyvern adapter: optional presentation boundary that cannot change
+  policy or apply a target-repository write;
+- `configure::apply`, `configure::just`, and `configure::legacy`: F.4a's
+  private transaction, marked Just integration, and allowlisted migration;
+- `configure::artifact::ManagedArtifact`: crate-private, object-safe staged
+  output interface; no downstream implementation is permitted;
+- `configure::workflow::WorkflowYamlArtifact`: F.4b's YAML implementation of
+  the same transaction interface, not a second transaction engine.
+
+The agent/apply path depends on F.1/F.2 and may progress without a qualified
+Wyvern UI. The human adapter joins the F.3b capability gate and F.3c agent
+contract at F.3d. ADR-014 governs the entire configure boundary.
+
 ## Phase Plan Coverage
 
 This document keeps crate-level ownership, responsibility, and governing

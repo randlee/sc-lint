@@ -202,6 +202,14 @@ an import in an existing Justfile but never replaces consumer-owned content.
 The same configuration's `minimum_version` becomes the single release-
 selection authority for bootstrap and the reusable Action.
 
+The planned F.4a apply engine has one crate-private, object-safe
+`ManagedArtifact` boundary for staged generated outputs. Each artifact supplies
+its target path, staged bytes, and syntax validation; the enclosing transaction
+owns digest recheck, commit, and rollback. F.4b's `WorkflowYamlArtifact` is a
+second implementation of that boundary after YAML validation; it does not
+introduce a workflow-specific transaction. This is an internal `sc-lint`
+mechanism, not a consumer plugin surface, and is governed by ADR-014.
+
 The primary `lint` target surface should preserve backend-crate ownership
 explicitly. Planned primary mappings are:
 

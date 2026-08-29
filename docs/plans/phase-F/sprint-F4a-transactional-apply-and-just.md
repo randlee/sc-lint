@@ -32,6 +32,8 @@ not wait for optional Wyvern qualification or page implementation.
 - `crates/sc-lint/assets/consumer-config.toml`
 - `tests/configure/test_apply_and_just.py` (new)
 - `tests/fixtures/configure/apply-and-just/` (new)
+- `docs/sc-lint/adr/ADR-014-consumer-configuration-automation.md`
+- `docs/sc-lint/crate-architecture.md`
 - `docs-bundle/just-setup.md`
 - `docs-bundle/upgrade.md`
 - `docs-bundle/troubleshooting.md`

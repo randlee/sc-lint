@@ -205,9 +205,13 @@ single-dialog API is not sufficient. It first explains what will be set up,
 including all proposed files and uninspected existing integration, and does not
 perform a deep repository analysis. Later fixture-proven steps preserve existing
 Justfiles through a bounded managed import rather than a whole-file replacement.
-F.4a closes the transactional config/Just boundary; F.4b separately closes
-config-derived Action/workflow transformation. Phase P owns qualification and
-conversion of both sc-compose and atm-core. See [Phase F plan](../plans/phase-F/phase-F-plan.md).
+After F.2's common JSON plan, the agent JSON path and the F.4a/F.4b apply path
+proceed independently of the optional Wyvern qualification; F.3d joins the
+Wyvern and agent branches for the human adapter, while F.5 joins the completed
+human and apply branches. F.4a closes the transactional config/Just boundary;
+F.4b separately closes config-derived Action/workflow transformation. Phase P
+owns qualification and conversion of both sc-compose and atm-core. See
+[Phase F plan](../plans/phase-F/phase-F-plan.md).
 
 ### Current code moves required
 

@@ -56,9 +56,12 @@ and agents while still protecting user-owned repository content.
    rewrite.
 5. Every change is previewed. Apply rechecks source digests, stages outputs,
    validates generated syntax, commits the bounded file transaction, and
-   restores prior bytes and permissions on failure. No README, Git commit,
-   push, workflow dispatch, arbitrary Justfile content, or unknown workflow is
-   in the write set.
+   restores prior bytes and permissions on failure. F.4a owns one crate-private,
+   object-safe `ManagedArtifact` transaction interface for all staged outputs;
+   F.4b contributes a pre-validated `WorkflowYamlArtifact` through that same
+   interface. This is not a public plugin or downstream extension surface.
+   No README, Git commit, push, workflow dispatch, arbitrary Justfile content,
+   or unknown workflow is in the write set.
 6. `[tool.sc-lint].minimum_version` is the only product-version authority. The
    GitHub Action derives its artifact version from that config. An optional
    version field may assert equality for transition diagnostics but never select
@@ -83,10 +86,16 @@ and agents while still protecting user-owned repository content.
 - The product maintains fixtures for its small conventional context contract.
   An unsupported consumer shape is shown as uninspected and is a product
   finding, not permission to add a bespoke probe or workaround.
+- The transaction remains one evolvable internal boundary: a synthetic second
+  artifact and the real YAML workflow both prove that adding an artifact cannot
+  create a second staging/rollback path. This internal mechanism is governed by
+  this ADR rather than a new public-API ADR.
 - The action's independent `version` input is removed/limited to assertion,
   requiring compatible Action, documentation, and fixture changes.
-- `sc-compose` is the first reference conversion, but it does not receive
-  wizard implementation code or a special permanent integration branch.
+- `sc-compose` and `atm-core` are Phase P reference consumers. Phase P proves
+  the exact released artifact in disposable copies of both before either
+  consumer conversion PR can claim completion; neither receives wizard
+  implementation code or a special permanent integration branch.
 
 ## Alternatives Rejected
 

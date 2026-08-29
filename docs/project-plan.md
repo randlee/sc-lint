@@ -333,12 +333,13 @@ Phase `F` is the planned consumer setup-automation line. It turns Phase E's
 empty-repository initializer into a safe replacement/onboarding product for
 both new and established repositories. Its authoritative plan is
 [docs/plans/phase-F/phase-F-plan.md](./plans/phase-F/phase-F-plan.md). The
-planned sequence is F.1 contract/ADR, F.2 bounded conventional-path context
-and deterministic planning, F.3a field-level wizard UX specification, F.3b
-released-Wyvern capability qualification, F.3c agent JSON/skill, F.3d thin
-launcher and pages, F.3e wizard acceptance/docs, F.4a transactional
-apply/Just integration, F.4b config-derived Action/workflow transformation,
-and F.5 release/documentation handoff to Phase P. Phase P—not Phase F—qualifies
+planned sequence is F.1 contract/ADR followed by F.2 bounded conventional-path
+context and deterministic planning. From F.2, F.3a precedes the parallel F.3b
+released-Wyvern capability gate and F.3c agent JSON/skill; both join at F.3d
+thin launcher/pages, then F.3e wizard acceptance/docs. Independently from F.2,
+F.4a closes transactional apply/Just integration, followed by F.4b's
+config-derived Action/workflow transformation. F.5 joins F.3e and F.4b for
+release and documentation handoff to Phase P. Phase P—not Phase F—qualifies
 the released artifact on both sc-compose and atm-core.
 
 ## Planning Conventions
