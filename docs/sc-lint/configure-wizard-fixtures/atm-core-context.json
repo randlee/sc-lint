@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "context": {
+    "cargo_toml": {"present": true, "kind": "workspace"},
+    "sc_lint_toml": {"present": false},
+    "justfile": {"present": true, "inspected": false},
+    "github_workflows": {"present": true, "inspected": false},
+    "sc_lint_directory": {"present": false}
+  },
+  "source": {
+    "repository": "atm-core",
+    "repository_url": "https://github.com/randlee/atm-core",
+    "baseline_commit": "b3475b397c544bd43a43fb97f855b6ddb68f01b1"
+  }
+}

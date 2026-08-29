@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "context": {
+    "cargo_toml": {"present": true, "kind": "workspace"},
+    "sc_lint_toml": {"present": true},
+    "justfile": {"present": true, "inspected": false},
+    "github_workflows": {"present": true, "inspected": false},
+    "sc_lint_directory": {"present": false}
+  },
+  "source": {
+    "repository": "sc-compose",
+    "repository_url": "https://github.com/randlee/sc-compose.git",
+    "baseline_commit": "38cf63a5e1fe68f93be39fbed30315de4e3b620f"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "context": {
+    "cargo_toml": {"present": true, "kind": "workspace"},
+    "sc_lint_toml": {"present": false},
+    "justfile": {"present": false},
+    "github_workflows": {"present": false},
+    "sc_lint_directory": {"present": false}
+  },
+  "source": {
+    "repository": "sc-lint empty-rust fixture",
+    "repository_url": "https://github.com/randlee/sc-lint.git",
+    "baseline_commit": "39390f659a2a5bb01ffe00704e6ed9055cc3df7a"
+  }
+}
