@@ -6,6 +6,7 @@ pub const CMD_BOUNDARY: &str = "lint.sc-boundary";
 pub const CMD_PORTABILITY: &str = "lint.sc-portability";
 pub const CMD_RUNTIME: &str = "lint.sc-runtime";
 pub const ACTION_CLI_PARSE_ERROR: &str = "cli.parse_error";
+pub const CLI_CONFIGURE_UNMANAGED_COLLISION: &str = "CLI.CONFIGURE_UNMANAGED_COLLISION";
 pub const FIELD_ADAPTER: &str = "adapter";
 pub const FIELD_CONFIG_SCOPE: &str = "config_scope";
 pub const FIELD_SCRIPT: &str = "script";

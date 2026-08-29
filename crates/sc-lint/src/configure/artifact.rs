@@ -2,6 +2,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::CliError;
+use crate::consts::CLI_CONFIGURE_UNMANAGED_COLLISION;
 
 /// Kind of a product-managed staged output. This is crate-private so later
 /// workflow support shares the transaction without becoming a plugin surface.
@@ -144,7 +145,7 @@ fn invalid(target: &Path, cause: impl std::fmt::Display) -> CliError {
         "generated artifact `{}` is invalid",
         target.display()
     ))
-    .with_code("CLI.CONFIGURE_UNMANAGED_COLLISION")
+    .with_code(CLI_CONFIGURE_UNMANAGED_COLLISION)
     .with_cause(cause.to_string())
     .with_suggested_action("Review the exportable patch; no repository files were changed.")
     .with_documentation("sc-lint docs troubleshooting")

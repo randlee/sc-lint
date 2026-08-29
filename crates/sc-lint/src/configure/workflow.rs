@@ -10,6 +10,7 @@ use serde_json::json;
 use sha2::Digest;
 
 use crate::CliError;
+use crate::consts::CLI_CONFIGURE_UNMANAGED_COLLISION;
 
 use super::artifact::{ArtifactKind, ManagedArtifact};
 use super::reviewed_removals::{configure_apply_error, plan_proposes};
@@ -80,7 +81,7 @@ impl ManagedArtifact for WorkflowYamlArtifact {
         let value =
             serde_yaml_ng::from_slice::<serde_yaml_ng::Value>(&self.bytes).map_err(|error| {
                 configure_apply_error(
-                    "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                    CLI_CONFIGURE_UNMANAGED_COLLISION,
                     "the generated workflow is not valid YAML",
                     error.to_string(),
                     "Review the exportable patch; no repository files were changed.",
@@ -88,7 +89,7 @@ impl ManagedArtifact for WorkflowYamlArtifact {
             })?;
         if !value.is_mapping() {
             return Err(configure_apply_error(
-                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                CLI_CONFIGURE_UNMANAGED_COLLISION,
                 "the generated workflow is not a YAML mapping",
                 "a GitHub workflow must have a mapping as its document root",
                 "Review the exportable patch; no repository files were changed.",
@@ -122,7 +123,7 @@ pub(crate) fn add_workflow_artifact(
             Ok(())
         }
         Err(error) => Err(configure_apply_error(
-            "CLI.CONFIGURE_UNMANAGED_COLLISION",
+            CLI_CONFIGURE_UNMANAGED_COLLISION,
             "the managed workflow target could not be read",
             error.to_string(),
             "Check repository permissions and review the exportable patch before retrying.",
@@ -133,7 +134,7 @@ pub(crate) fn add_workflow_artifact(
 fn manual_conflict(target: &Path, existing: &[u8]) -> CliError {
     let observed_digest = format!("sha256:{:x}", sha2::Sha256::digest(existing));
     configure_apply_error(
-        "CLI.CONFIGURE_UNMANAGED_COLLISION",
+        CLI_CONFIGURE_UNMANAGED_COLLISION,
         "an existing workflow is not an exact sc-lint managed fingerprint",
         format!("`{}` has digest {observed_digest}", target.display()),
         "Review the exportable patch; sc-lint will not overwrite the existing workflow.",
@@ -145,7 +146,7 @@ fn manual_conflict(target: &Path, existing: &[u8]) -> CliError {
             "path": WORKFLOW_PATH,
             "kind": "manual_conflict",
             "conflict": {
-                "code": "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                "code": CLI_CONFIGURE_UNMANAGED_COLLISION,
                 "observed_digest": observed_digest,
                 "recovery": "review_exported_patch"
             },
@@ -223,7 +224,7 @@ mod tests {
             let plan = serde_json::json!({"operations": [{"path": WORKFLOW_PATH, "kind": "propose_create"}]});
             let error =
                 add_workflow_artifact(root.path(), &plan, &mut Vec::new()).expect_err("conflict");
-            assert_eq!(error.code(), "CLI.CONFIGURE_UNMANAGED_COLLISION");
+            assert_eq!(error.code(), CLI_CONFIGURE_UNMANAGED_COLLISION);
             assert_eq!(error.details["manual_conflict"]["kind"], "manual_conflict");
             assert_eq!(std::fs::read(&target).expect("unchanged"), before);
         }

@@ -26,10 +26,13 @@ does not reopen the generic transaction, Just marker, or legacy-recipe work.
 ## Exact Targets
 
 - `crates/sc-lint/src/configure/workflow.rs` (new)
+- `crates/sc-lint/src/command.rs`
+- `crates/sc-lint/src/configure/mod.rs`
 - `action.yml`
 - `action/index.js`
 - `action/test/action.test.cjs`
 - `docs/sc-lint/github-action-requirements.md`
+- `scripts/sc_lint_configure.py`
 - `tests/configure/test_workflow_transformer.py` (new)
 - `tests/fixtures/configure/workflow/` (new)
 - `tests/fixtures/configure/contracts/` (F.1-owned golden inputs consumed

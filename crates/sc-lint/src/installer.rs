@@ -1114,7 +1114,14 @@ mod tests {
         // rather than assuming it is this test crate's package version.
         let built_binary = built_cli_binary();
         let managed_binary = install_dir.join(ReleaseTarget::binary_name());
-        fs::copy(&built_binary, &managed_binary).expect("copy native CLI probe");
+        let candidate = install_dir.join(format!("candidate-{}", ReleaseTarget::binary_name()));
+        fs::copy(&built_binary, &candidate).expect("copy native CLI candidate");
+        // Use the production candidate/backup/atomic-rename activation path.
+        // Writing directly to a prior executable races Linux's ETXTBSY guard
+        // when another test has only just completed probing that binary.
+        let probe_minimum = MinimumVersion::from_str("0.0.0").expect("permissive test floor");
+        activate_candidate(&candidate, &managed_binary, &probe_minimum)
+            .expect("atomically activate native CLI probe");
         let current = probe_version(&managed_binary).expect("probe copied native CLI");
 
         let mut old_floor = current.clone();
