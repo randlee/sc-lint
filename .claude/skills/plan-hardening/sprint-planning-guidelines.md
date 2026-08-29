@@ -183,6 +183,26 @@ A plan whose sprints form one single chain when the deliverables could be
 partitioned is under-parallelized and must be restructured before hardening
 continues.
 
+## ADRs And Requirements Close On The Planning Branch
+
+Planning is not complete while any architectural decision is still open.
+
+- every ADR the phase depends on is written on the planning branch, during
+  planning, and reaches `Accepted` (user-approved) before hardening closes
+- requirements and architecture doc updates the phase depends on are made on
+  the planning branch, not deferred into a sprint
+- a sprint doc must never contain "write ADR-NNN" or "update requirements"
+  as a deliverable for a decision the sprint itself depends on; the sprint
+  references the already-accepted ADR by number
+- the phase plan carries an `## ADR Status` table (`ADR | Title | Status |
+  Approved by`) and every row reads `Accepted` before step 6
+- an ADR still `Proposed` at hardening close is a `GAP` finding, not a
+  carry-forward
+
+The expectation at orchestration start is zero user approvals pending on any
+ADR; a phase that starts with an ADR waiting on the user is a planning
+failure.
+
 ## Sprint Doc Shape
 
 Each sprint doc should have one authoritative list for:
@@ -237,6 +257,7 @@ Structural findings:
 - incorrect command, test name, or grep gate
 - uncovered call site, file, module, or runtime path
 - missing type, trait, function, boundary contract, or ADR
+- an ADR the phase depends on that is not `Accepted` on the planning branch
 - false-closure wording that hides still-open runtime or boundary work
 - sprint branch, stack, or stack base that disagrees with the phase-plan stack diagram
 - a sprint whose start condition or cross-stack touch point is unstated
