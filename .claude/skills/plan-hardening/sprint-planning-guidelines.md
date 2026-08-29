@@ -148,6 +148,29 @@ the dependency is genuinely on a released artifact.
 - state explicitly which sprints are sequential and why; an unexplained
   sequential dependency is a finding
 
+### Sprint start conditions
+
+Serial sprint plans are the primary cause of slow phases. Apply these rules
+when deciding whether a sprint may start:
+
+- a sprint may start the moment the layer below it is **committed** on its
+  branch; it does not wait for that layer's CI, QA, review, or merge
+- CI and QA of a lower layer run concurrently with implementation of the
+  layer above; a failure below is fixed in the lower branch and merged
+  forward, not by holding the upper sprint
+- a sprint in a different stack never waits for anything in this stack unless
+  the phase plan names the touch point
+- "wait for CI green" or "wait for merge to `develop`" is a valid start
+  condition only when the sprint consumes a **released artifact** (a
+  published crate, wheel, tag, or another repo's PR); the plan must say which
+  artifact
+- the coordinator (`team-lead`) dispatches the next sprint on commit, not on
+  CI pass; withholding dispatch until CI passes is a protocol violation, not
+  caution
+
+A plan where every sprint's start condition is the previous sprint's merge
+or CI is a `STACK-SHAPE` finding and must be restructured.
+
 A plan whose sprints form one single chain when the deliverables could be
 partitioned is under-parallelized and must be restructured before hardening
 continues.

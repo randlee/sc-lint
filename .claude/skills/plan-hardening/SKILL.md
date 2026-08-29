@@ -97,6 +97,8 @@ Use the example in:
 - remaining in-scope work without sprint ownership is a hard stop
 - a phase plan without a `## Branch Stacks And Parallelism` section is a
   hard stop; sprints are planned as `gh stack` layers
+- a plan whose sprints are serialized on CI pass or merge of the previous
+  sprint, when they could start on commit, is a hard stop
 - if a sprint cannot credibly land its committed deliverables at a
   production-ready level, split it before implementation
 - if a reviewer loop returns `FAIL` three times without converging, escalate to

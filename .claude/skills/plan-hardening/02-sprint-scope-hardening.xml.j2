@@ -224,6 +224,8 @@ required_variables:
           and owner, and matches the phase-plan stack diagram
         - the phase plan states which sprints run in parallel, which are
           sequential and why, and the commit event that unblocks each sprint
+        - no sprint start condition is "CI green" or "merged to develop"
+          unless the sprint consumes a named released artifact
 
       Each entry in the task list must include:
         - Finding number
