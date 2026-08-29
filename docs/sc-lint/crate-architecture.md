@@ -291,6 +291,9 @@ configuration, wizard, or workflow crate. Its module ownership is:
   policy or apply a target-repository write;
 - `configure::apply`, `configure::just`, and `configure::legacy`: F.4a's
   private transaction, marked Just integration, and allowlisted migration;
+- `configure::reviewed_removals`: F.4a's private plan-validation and
+  legacy-removal-allowlist helpers, extracted from the configure apply dispatch
+  path to satisfy RULE-003;
 - `configure::artifact::ManagedArtifact`: crate-private, object-safe staged
   output interface; no downstream implementation is permitted;
 - `configure::workflow::WorkflowYamlArtifact`: F.4b's YAML implementation of
