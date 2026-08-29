@@ -129,8 +129,9 @@ The parallel-vs-sequential table is mandatory and has one row per sprint:
 | Sprint | Stack | Runs in parallel with | Waits for | Unblocked when |
 |--------|-------|-----------------------|-----------|----------------|
 
-"Unblocked when" names a commit event on a specific branch (for example
-"X.0 committed on sprint/X.0-foundation"), never a merge to `develop`, unless
+"Unblocked when" names the lower sprint's unblock milestone as a commit
+event on a specific branch (for example "X.0 unblock milestone committed on
+sprint/X.0-foundation"), never a merge to `develop`, unless
 the dependency is genuinely on a released artifact.
 
 - partition deliverables into disjoint path sets before ordering sprints; each
@@ -153,8 +154,15 @@ the dependency is genuinely on a released artifact.
 Serial sprint plans are the primary cause of slow phases. Apply these rules
 when deciding whether a sprint may start:
 
-- a sprint may start the moment the layer below it is **committed** on its
-  branch; it does not wait for that layer's CI, QA, review, or merge
+- a sprint may start the moment the layer below it has committed its
+  **unblock milestone**: the minimum functionality the upper layer depends on
+  (types, signatures, entry points, schema, a working happy path), not the
+  lower sprint's completion; it does not wait for that layer's CI, QA,
+  review, or merge
+- every sprint doc that has a layer above it declares an
+  `## Unblock Milestone` section naming the exact files, signatures, or
+  behavior the next layer needs, and the sprint's owner reports that commit
+  the moment it lands so dispatch of the next layer is not delayed
 - CI and QA of a lower layer run concurrently with implementation of the
   layer above; a failure below is fixed in the lower branch and merged
   forward, not by holding the upper sprint

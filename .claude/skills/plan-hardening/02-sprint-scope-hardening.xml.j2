@@ -226,6 +226,8 @@ required_variables:
           sequential and why, and the commit event that unblocks each sprint
         - no sprint start condition is "CI green" or "merged to develop"
           unless the sprint consumes a named released artifact
+        - every sprint with a layer above it has an `## Unblock Milestone`
+          section naming the minimum functionality the next layer needs
 
       Each entry in the task list must include:
         - Finding number
