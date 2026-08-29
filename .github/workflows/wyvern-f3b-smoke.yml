@@ -33,12 +33,22 @@ jobs:
           base="https://github.com/randlee/wyvern/releases/download/v0.6.0"
           curl --fail --location --retry 3 --output "$ARCHIVE" "$base/$ARCHIVE"
           curl --fail --location --retry 3 --output checksums.txt "$base/checksums.txt"
-          grep "  $ARCHIVE$" checksums.txt > expected-checksum.txt
-          if command -v sha256sum >/dev/null; then
-            sha256sum --check expected-checksum.txt
-          else
-            shasum -a 256 -c expected-checksum.txt
-          fi
+          python - "$ARCHIVE" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          archive = pathlib.Path(sys.argv[1])
+          expected = next(
+              line.split()[0]
+              for line in pathlib.Path("checksums.txt").read_text().splitlines()
+              if line.split()[-1] == archive.name
+          )
+          actual = hashlib.file_digest(archive.open("rb"), "sha256").hexdigest()
+          if actual != expected:
+              raise SystemExit(f"checksum mismatch for {archive}: {actual} != {expected}")
+          print(f"SHA-256 verified: {archive.name} {actual}")
+          PY
       - name: Extract release archive and run protocol matrix
         shell: bash
         env:
