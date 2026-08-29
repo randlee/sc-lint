@@ -654,6 +654,10 @@ fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError>
     }
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Protocol validation must return the fully structured CliError that explains malformed configure planner output."
+)]
 fn normalize_configure_failure(
     object: &serde_json::Map<String, Value>,
 ) -> Result<CliError, CliError> {
