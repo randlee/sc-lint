@@ -14,9 +14,11 @@ owner: clint
 
 ## Goal
 
-Prove the released adoption kit in greenfield `wyvern` and migrate `atm-core`'s
-pre-production sc-lint surface with an explicit removal/preservation inventory
-before attempting the established `sc-compose` migration.
+Prove the released adoption kit in greenfield `wyvern` and migrate `atm-core`
+to the kit, removing pre-production sc-lint remnants before attempting the
+established `sc-compose` migration. Any atm-core extension the released kit
+does not support is filed as a GitHub issue on sc-lint and addressed after
+Phase G completes, not as Phase G scope.
 
 ## Hard Dependencies
 
@@ -41,18 +43,9 @@ before attempting the established `sc-compose` migration.
   workflow, vendored `plugins/sc-lint`, and `README.sc-lint.md`.
 - Open the two PRs in parallel. Each records the exact kit release, clean
   drift check, and any consumer-local scaffolding removal. A kit/product gap is
-  an issue and release fix, never a consumer-local wrapper.
-
-## Removed
-
-Pre-production sc-lint remnants removed during migration (list pending G.4b
-scoping handoff from flint) — e.g. early scripts, copied `.just/*.py` helpers,
-`lint-config.toml`, and custom runners superseded by the released kit.
-
-## Preserved As Extensions
-
-atm-core extension points retained via declared test layers / lint profiles /
-consumer-owned Justfile recipes (list pending G.4b scoping handoff from flint).
+  an issue and release fix after Phase G, never a consumer-local wrapper. The
+  consumer PR records its exact removal and extension inventory; it is not
+  Phase G plan content.
 
 ## Acceptance Criteria
 
