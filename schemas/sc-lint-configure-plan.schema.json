@@ -10,6 +10,7 @@
     "schema_version": {"const": "v1"},
     "plan_id": {"$ref": "#/$defs/sha256Digest"},
     "operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/operation"}},
+    "preconditions": {"type": "array", "items": {"$ref": "#/$defs/precondition"}},
     "conflicts": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/operationId"}},
     "manual_steps": {"type": "array", "items": {"$ref": "#/$defs/manualStep"}}
   },
@@ -21,6 +22,15 @@
     "operationId": {
       "type": "string",
       "minLength": 1
+    },
+    "precondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "source_digest"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:[\\\\/]).+"},
+        "source_digest": {"anyOf": [{"$ref": "#/$defs/sha256Digest"}, {"type": "null"}]}
+      }
     },
     "operation": {
       "type": "object",

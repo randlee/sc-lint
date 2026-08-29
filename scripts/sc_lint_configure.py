@@ -123,7 +123,7 @@ def collect_context(root: Path) -> dict[str, Any]:
     return context
 
 
-def build_plan(context: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
+def build_plan(context: dict[str, Any], request: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     """Return a deterministic advisory plan with no repository mutation."""
     _raise_schema_problems("request", validate("request", request))
     observations = context["context"]
@@ -157,10 +157,12 @@ def build_plan(context: dict[str, Any], request: dict[str, Any]) -> dict[str, An
     _append_just_operations(operations, observations, choices["just"]["mode"])
     _append_workflow_operations(operations, observations, choices["ci"]["mode"])
 
+    preconditions = _preconditions(root, operations) if root is not None else []
     plan = {
         "schema_version": "v1",
-        "plan_id": _plan_id(context, request),
+        "plan_id": _plan_id(context, request, preconditions),
         "operations": operations,
+        "preconditions": preconditions,
         "conflicts": [],
         "manual_steps": [],
     }
@@ -171,7 +173,7 @@ def build_plan(context: dict[str, Any], request: dict[str, Any]) -> dict[str, An
 def plan_result(root: Path, request: dict[str, Any]) -> dict[str, Any]:
     """Collect context and render the F.1 result envelope for a plan request."""
     context = collect_context(root)
-    plan = build_plan(context, request)
+    plan = build_plan(context, request, root)
     result = {"ok": True, "command": CONFIGURE_COMMAND, "data": plan, "diagnostics": []}
     _raise_schema_problems("result", validate("result", result))
     return result
@@ -266,9 +268,21 @@ def _uninspected_presence(present: bool) -> dict[str, Any]:
     return {"present": True, "inspected": False} if present else {"present": False}
 
 
-def _plan_id(context: dict[str, Any], request: dict[str, Any]) -> str:
+def _preconditions(root: Path, operations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Capture operation-target content digests for a reviewed apply plan."""
+    preconditions = []
+    for path in dict.fromkeys(operation["path"] for operation in operations):
+        candidate = root / path
+        digest = None
+        if candidate.is_file():
+            digest = f"sha256:{hashlib.sha256(candidate.read_bytes()).hexdigest()}"
+        preconditions.append({"path": path, "source_digest": digest})
+    return preconditions
+
+
+def _plan_id(context: dict[str, Any], request: dict[str, Any], preconditions: list[dict[str, Any]]) -> str:
     canonical = json.dumps(
-        {"context": context, "request": request}, sort_keys=True, separators=(",", ":")
+        {"context": context, "request": request, "preconditions": preconditions}, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return f"sha256:{hashlib.sha256(canonical).hexdigest()[:16]}"
 

@@ -87,6 +87,19 @@ class ContextAndPlanTests(unittest.TestCase):
         self.assertEqual(validate("plan", first["data"]), [])
         self.assertEqual(validate("result", first), [])
 
+    def test_planner_records_target_preconditions_in_the_plan_identifier(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+            (root / "Justfile").write_text("lint:\n    @true\n", encoding="utf-8")
+            first = plan_result(root, self.request)["data"]
+            (root / "Justfile").write_text("lint:\n    @false\n", encoding="utf-8")
+            second = plan_result(root, self.request)["data"]
+        self.assertNotEqual(first["plan_id"], second["plan_id"])
+        self.assertNotEqual(first["preconditions"], second["preconditions"])
+        self.assertEqual(validate("plan", first), [])
+        self.assertEqual(validate("plan", second), [])
+
     def test_invalid_request_uses_f1_validation_and_stable_recovery_envelope(self) -> None:
         invalid_request = json.loads(json.dumps(self.request))
         invalid_request["request"]["consumer_profiles"] = [
