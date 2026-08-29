@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::path::PathBuf;
 
 use crate::CliError;
 
@@ -6,12 +7,13 @@ use crate::CliError;
 /// workflow support shares the transaction without becoming a plugin surface.
 #[allow(
     dead_code,
-    reason = "F.4a wires concrete TOML and Just artifacts after the reviewed-plan CLI is added."
+    reason = "F.4b is the only workflow/JSON producer; the closed shared enum is intentionally defined before that producer."
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ArtifactKind {
     Toml,
     Justfile,
+    Shell,
     Json,
     WorkflowYaml,
 }
@@ -20,13 +22,88 @@ pub(crate) enum ArtifactKind {
 ///
 /// The trait is object-safe intentionally: the transaction owns an ordered
 /// heterogeneous set while preserving one validation and rollback path.
-#[allow(
-    dead_code,
-    reason = "F.4a's transaction consumes this object-safe seam once apply dispatch is wired."
-)]
 pub(crate) trait ManagedArtifact {
     fn kind(&self) -> ArtifactKind;
     fn target(&self) -> &Path;
     fn staged_bytes(&self) -> &[u8];
+    #[expect(
+        clippy::result_large_err,
+        reason = "The frozen F.4a extension contract uses CliError for structured recovery."
+    )]
     fn validate_staged(&self) -> Result<(), CliError>;
+}
+
+/// The product's ordinary generated files all use the same byte-owning
+/// artifact.  Test-only artifacts can implement `ManagedArtifact` directly,
+/// which proves the transaction does not have a hidden second write path.
+pub(crate) struct BytesArtifact {
+    kind: ArtifactKind,
+    target: PathBuf,
+    bytes: Vec<u8>,
+}
+
+impl BytesArtifact {
+    pub(crate) fn new(kind: ArtifactKind, target: PathBuf, bytes: Vec<u8>) -> Self {
+        Self {
+            kind,
+            target,
+            bytes,
+        }
+    }
+}
+
+impl ManagedArtifact for BytesArtifact {
+    fn kind(&self) -> ArtifactKind {
+        self.kind
+    }
+
+    fn target(&self) -> &Path {
+        &self.target
+    }
+
+    fn staged_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    fn validate_staged(&self) -> Result<(), CliError> {
+        match self.kind {
+            ArtifactKind::Toml => {
+                let source = std::str::from_utf8(&self.bytes)
+                    .map_err(|error| invalid(&self.target, error))?;
+                toml::from_str::<toml::Value>(source)
+                    .map_err(|error| invalid(&self.target, error))?;
+            }
+            ArtifactKind::Json => {
+                serde_json::from_slice::<serde_json::Value>(&self.bytes)
+                    .map_err(|error| invalid(&self.target, error))?;
+            }
+            ArtifactKind::Justfile => crate::configure::just::validate(&self.target, &self.bytes)?,
+            ArtifactKind::Shell => {
+                let source = std::str::from_utf8(&self.bytes)
+                    .map_err(|error| invalid(&self.target, error))?;
+                if source.trim().is_empty() {
+                    return Err(invalid(&self.target, "a shell helper cannot be empty"));
+                }
+            }
+            ArtifactKind::WorkflowYaml => {
+                // F.4b supplies the YAML parser and concrete workflow artifact;
+                // the shared transaction intentionally has no workflow shortcut.
+                if self.bytes.is_empty() {
+                    return Err(invalid(&self.target, "a workflow artifact cannot be empty"));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn invalid(target: &Path, cause: impl std::fmt::Display) -> CliError {
+    CliError::config(format!(
+        "generated artifact `{}` is invalid",
+        target.display()
+    ))
+    .with_code("CLI.CONFIGURE_UNMANAGED_COLLISION")
+    .with_cause(cause.to_string())
+    .with_suggested_action("Review the exportable patch; no repository files were changed.")
+    .with_documentation("sc-lint docs troubleshooting")
 }

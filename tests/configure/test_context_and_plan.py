@@ -43,7 +43,7 @@ class ContextAndPlanTests(unittest.TestCase):
             plan["operations"][0]["reason"],
             "recommended_profiles:baseline,boundary,portability,attributes",
         )
-        self.assertTrue(any(operation["path"] == ".sc-lint/justfile" for operation in plan["operations"]))
+        self.assertFalse(any(operation["path"] == ".sc-lint/justfile" for operation in plan["operations"]))
 
     def test_existing_just_and_workflow_are_visible_but_uninspected(self) -> None:
         context = collect_context(FIXTURES / "existing-just")
@@ -56,7 +56,9 @@ class ContextAndPlanTests(unittest.TestCase):
             ["Justfile", ".github/workflows/"],
         )
 
-        plan = build_plan(context, self.request)
+        request = json.loads(json.dumps(self.request))
+        request["request"]["just"]["mode"] = "generate_managed_import"
+        plan = build_plan(context, request)
         uninspected = [
             operation
             for operation in plan["operations"]
@@ -92,9 +94,11 @@ class ContextAndPlanTests(unittest.TestCase):
             root = Path(temporary_directory)
             (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
             (root / "Justfile").write_text("lint:\n    @true\n", encoding="utf-8")
-            first = plan_result(root, self.request)["data"]
+            request = json.loads(json.dumps(self.request))
+            request["request"]["just"]["mode"] = "generate_managed_import"
+            first = plan_result(root, request)["data"]
             (root / "Justfile").write_text("lint:\n    @false\n", encoding="utf-8")
-            second = plan_result(root, self.request)["data"]
+            second = plan_result(root, request)["data"]
         self.assertNotEqual(first["plan_id"], second["plan_id"])
         self.assertNotEqual(first["preconditions"], second["preconditions"])
         self.assertEqual(validate("plan", first), [])

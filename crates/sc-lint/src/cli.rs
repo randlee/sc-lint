@@ -89,6 +89,12 @@ pub enum Command {
         /// Accepted explicitly; the F.2 planner never writes the target repository.
         #[arg(long)]
         dry_run: bool,
+        /// Apply a previously reviewed plan after recomputing its source digests.
+        #[arg(long, requires = "plan")]
+        apply: bool,
+        /// JSON plan emitted by an earlier `sc-lint configure --json` invocation.
+        #[arg(long, value_name = "file", requires = "apply")]
+        plan: Option<PathBuf>,
     },
     /// Discover and print the installed offline documentation bundle.
     Docs {

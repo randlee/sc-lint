@@ -17,6 +17,34 @@ Windows companion `.sc-lint/bootstrap.ps1` only.
 Conflicting user-owned files produce a structured error instead of an
 overwrite.
 
+## Adopt an established repository
+
+`configure` is the reviewed-plan path for a repository that already has a
+`Justfile`. It does not infer a project-specific wrapper or copy source-tree
+Python helpers. First create and inspect a plan, then apply that exact plan:
+
+```sh
+sc-lint --json --root . configure --request sc-lint-request.json > sc-lint-plan.json
+sc-lint --json --root . configure --request sc-lint-request.json \
+  --apply --plan sc-lint-plan.json
+```
+
+Apply recomputes the plan and rejects it if its identifier or any listed
+source digest changed. In an existing root `Justfile`, it adds only this
+product-owned block and preserves bytes outside it:
+
+```just
+# >>> sc-lint managed integration >>>
+import '.sc-lint/justfile'
+# <<< sc-lint managed integration <<<
+```
+
+The managed recipes live in `.sc-lint/justfile`. If the existing root already
+defines `setup`, `lint`, `test`, or `upgrade`, configure returns a no-write
+collision rather than relying on import precedence to shadow that recipe.
+Re-run the reviewed plan after resolving the collision; do not edit the marker
+block by hand.
+
 ## Public recipes
 
 The generated file has exactly these public entry points:

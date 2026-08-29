@@ -223,7 +223,7 @@ fn is_refreshable_generated_config(actual: &str) -> bool {
     body.starts_with(prefix) && body.ends_with(suffix) && body.len() > prefix.len() + suffix.len()
 }
 
-fn generated_bootstrap_asset() -> String {
+pub(crate) fn generated_bootstrap_asset() -> String {
     const SHEBANG: &str = "#!/bin/sh\n";
     let asset = CONSUMER_BOOTSTRAP_ASSET
         .strip_prefix(SHEBANG)
@@ -231,11 +231,30 @@ fn generated_bootstrap_asset() -> String {
     format!("{SHEBANG}{GENERATED_FILE_HEADER}{asset}")
 }
 
-fn canonical_consumer_config() -> String {
+pub(crate) fn canonical_consumer_config() -> String {
     format!(
         "{GENERATED_FILE_HEADER}{}",
         CANONICAL_CONSUMER_CONFIG_ASSET.replace(CONFIG_VERSION_TOKEN, env!("CARGO_PKG_VERSION"))
     )
+}
+
+pub(crate) fn canonical_consumer_config_for(minimum_version: &str) -> String {
+    format!(
+        "{GENERATED_FILE_HEADER}{}",
+        CANONICAL_CONSUMER_CONFIG_ASSET.replace(CONFIG_VERSION_TOKEN, minimum_version)
+    )
+}
+
+pub(crate) fn canonical_consumer_justfile() -> String {
+    format!("{GENERATED_FILE_HEADER}{CONSUMER_JUSTFILE_ASSET}")
+}
+
+#[allow(
+    dead_code,
+    reason = "The transactional bootstrap artifact is added after the reviewed-plan operation list is expanded."
+)]
+pub(crate) fn generated_powershell_bootstrap_asset() -> String {
+    format!("{GENERATED_FILE_HEADER}{CONSUMER_BOOTSTRAP_POWERSHELL_ASSET}")
 }
 
 fn paths_to_strings(paths: &[PathBuf]) -> Vec<String> {

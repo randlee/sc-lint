@@ -72,6 +72,7 @@ pub(crate) enum CommandId {
     CompatibilityCheck,
     Docs,
     ConfigurePlan,
+    ConfigureApply,
     Init,
     ConsumerTest,
     Setup,
@@ -112,6 +113,7 @@ pub(crate) struct ConfigureRequest {
     request_path: PathBuf,
     root: PathBuf,
     dry_run: bool,
+    reviewed_plan_path: Option<PathBuf>,
 }
 
 /// Command-specific payloads stay coupled to the command variant that owns
@@ -156,6 +158,7 @@ impl CommandId {
                 crate::CompatibilityCommand::Check { .. } => Self::CompatibilityCheck,
             },
             Command::Docs { .. } => Self::Docs,
+            Command::Configure { apply, .. } if *apply => Self::ConfigureApply,
             Command::Configure { .. } => Self::ConfigurePlan,
             Command::Setup { .. } => Self::Setup,
             Command::Upgrade { .. } => Self::Upgrade,
@@ -176,6 +179,7 @@ impl CommandId {
             Self::CompatibilityCheck => "compatibility.check",
             Self::Docs => "docs",
             Self::ConfigurePlan => "configure.plan",
+            Self::ConfigureApply => "configure.apply",
             Self::Init => "init",
             Self::ConsumerTest => "test",
             Self::Setup => "setup",
@@ -208,6 +212,7 @@ impl CommandId {
             | Self::CompatibilityCheck
             | Self::Docs
             | Self::ConfigurePlan
+            | Self::ConfigureApply
             | Self::Init
             | Self::ConsumerTest
             | Self::Setup
@@ -232,6 +237,7 @@ impl CommandId {
             Self::CompatibilityCheck => "installed sc-lint compatibility preflight",
             Self::Docs => "offline documentation discovery",
             Self::ConfigurePlan => "no-write consumer configuration planning",
+            Self::ConfigureApply => "reviewed consumer configuration apply",
             Self::Init => "consumer integration generation",
             Self::ConsumerTest => "consumer test profile orchestration",
             Self::Setup => "managed sc-lint installation and repair",
@@ -256,6 +262,7 @@ impl CommandId {
                 | Self::CompatibilityCheck
                 | Self::Docs
                 | Self::ConfigurePlan
+                | Self::ConfigureApply
                 | Self::Setup
                 | Self::Upgrade
                 | Self::Init
@@ -370,7 +377,12 @@ impl CommandContext {
                         guide: *guide,
                         path: *path,
                     })),
-                    Command::Configure { request, dry_run } => {
+                    Command::Configure {
+                        request,
+                        dry_run,
+                        apply,
+                        plan,
+                    } => {
                         let root = cli.root.clone().ok_or_else(|| {
                             CliError::usage("`sc-lint configure` requires `--root <path>`")
                                 .with_suggested_action(
@@ -381,6 +393,7 @@ impl CommandContext {
                             request_path: request.clone(),
                             root,
                             dry_run: *dry_run,
+                            reviewed_plan_path: if *apply { plan.clone() } else { None },
                         }))
                     }
                     _ => None,
@@ -505,6 +518,7 @@ impl CommandContext {
                 | CommandId::Init
                 | CommandId::Docs
                 | CommandId::ConfigurePlan
+                | CommandId::ConfigureApply
                 | CommandId::ConsumerLintCi
                 | CommandId::ConsumerTest
         )
@@ -553,6 +567,7 @@ pub(crate) fn execute(
             context.docs_request(),
         )?)),
         CommandId::ConfigurePlan => run_configure(context.configure_request()),
+        CommandId::ConfigureApply => run_configure_apply(context.configure_request()),
         CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
             loaded_config,
             context.setup_dry_run(),
@@ -648,6 +663,339 @@ fn run_configure(request: &ConfigureRequest) -> Result<CommandSuccess, CliError>
         )
         .with_detail(consts::FIELD_SCRIPT, json!("scripts/sc_lint_configure.py"))),
     }
+}
+
+/// Apply never trusts a serialized plan on its own.  It first invokes the
+/// bounded F.2 planner again, then requires both its identifier and its
+/// per-path source-digest preconditions to be byte-for-byte unchanged.
+#[expect(
+    clippy::result_large_err,
+    reason = "Reviewed-plan rejections retain the F.1 configure error envelope."
+)]
+fn run_configure_apply(request: &ConfigureRequest) -> Result<CommandSuccess, CliError> {
+    let reviewed_path = request
+        .reviewed_plan_path
+        .as_ref()
+        .expect("apply requires --plan at CLI parsing");
+    let reviewed_raw = std::fs::read(reviewed_path).map_err(|error| {
+        configure_apply_error(
+            "CLI.CONFIGURE_STALE_PLAN",
+            "the reviewed configure plan could not be read",
+            error.to_string(),
+            "Supply the JSON plan you reviewed, then rerun configure --apply.",
+        )
+    })?;
+    let reviewed_json: Value = serde_json::from_slice(&reviewed_raw).map_err(|error| {
+        configure_apply_error(
+            "CLI.CONFIGURE_STALE_PLAN",
+            "the reviewed configure plan is not valid JSON",
+            error.to_string(),
+            "Regenerate, review, and save the configure plan before applying it.",
+        )
+    })?;
+    let reviewed = reviewed_json.get("data").cloned().unwrap_or(reviewed_json);
+    let fresh = run_configure(request)?.data;
+    ensure_reviewed_plan_matches(&reviewed, &fresh)?;
+    ensure_applyable_plan(&fresh)?;
+
+    let request_json = read_configure_request(&request.request_path)?;
+    let minimum_version = request_json
+        .pointer("/request/minimum_version")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            configure_apply_error(
+                "CLI.CONFIGURE_STALE_PLAN",
+                "the reviewed configure request has no minimum version",
+                "the request no longer satisfies the v1 configure schema",
+                "Regenerate and review the configure plan from a valid request.",
+            )
+        })?;
+    let just_mode = request_json
+        .pointer("/request/just/mode")
+        .and_then(Value::as_str)
+        .unwrap_or("disabled");
+    let mut artifacts: Vec<Box<dyn crate::configure::artifact::ManagedArtifact>> = Vec::new();
+    if plan_proposes(&fresh, "sc-lint.toml") {
+        artifacts.push(Box::new(crate::configure::artifact::BytesArtifact::new(
+            crate::configure::artifact::ArtifactKind::Toml,
+            request.root.join("sc-lint.toml"),
+            crate::consumer_integration::canonical_consumer_config_for(minimum_version)
+                .into_bytes(),
+        )));
+    }
+    if plan_proposes(&fresh, ".sc-lint/bootstrap") {
+        add_managed_creation(
+            &mut artifacts,
+            crate::configure::artifact::ArtifactKind::Shell,
+            request.root.join(".sc-lint/bootstrap"),
+            crate::consumer_integration::generated_bootstrap_asset().into_bytes(),
+        )?;
+    }
+    if plan_proposes(&fresh, ".sc-lint/bootstrap.ps1") {
+        add_managed_creation(
+            &mut artifacts,
+            crate::configure::artifact::ArtifactKind::Shell,
+            request.root.join(".sc-lint/bootstrap.ps1"),
+            crate::consumer_integration::generated_powershell_bootstrap_asset().into_bytes(),
+        )?;
+    }
+    if just_mode == "generate_managed_import" {
+        add_just_artifacts(request, &fresh, &mut artifacts)?;
+    }
+    if artifacts.is_empty() {
+        return Ok(CommandSuccess::direct(serde_json::json!({
+            "status": "current",
+            "plan_id": fresh.get("plan_id"),
+            "changed_paths": [],
+            "summary": "reviewed configure plan required no writes",
+        })));
+    }
+    if request.dry_run {
+        return Ok(CommandSuccess::direct(serde_json::json!({
+            "status": "would_apply",
+            "plan_id": fresh.get("plan_id"),
+            "changed_paths": artifacts.iter().map(|artifact| artifact.target().display().to_string()).collect::<Vec<_>>(),
+            "summary": "reviewed configure plan would apply without writing files",
+        })));
+    }
+    let changed_paths = artifacts
+        .iter()
+        .map(|artifact| artifact.target().display().to_string())
+        .collect::<Vec<_>>();
+    let changed_artifacts = artifacts
+        .iter()
+        .map(|artifact| format!("{:?}", artifact.kind()))
+        .collect::<Vec<_>>();
+    crate::configure::apply::commit(artifacts)?;
+    Ok(CommandSuccess::direct(serde_json::json!({
+        "status": "applied",
+        "plan_id": fresh.get("plan_id"),
+        "changed_paths": changed_paths,
+        "changed_artifacts": changed_artifacts,
+        "summary": "reviewed configure plan applied transactionally",
+    })))
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Configure request rereads preserve structured stale-plan recovery."
+)]
+fn read_configure_request(path: &Path) -> Result<Value, CliError> {
+    if path == Path::new("-") {
+        return Err(configure_apply_error(
+            "CLI.CONFIGURE_STALE_PLAN",
+            "configure --apply cannot reread a request from standard input",
+            "the reviewed request must be reproducible for stale-plan protection",
+            "Save the request JSON to a file and rerun configure --apply.",
+        ));
+    }
+    let raw = std::fs::read(path).map_err(|error| {
+        configure_apply_error(
+            "CLI.CONFIGURE_STALE_PLAN",
+            "the configure request could not be reread",
+            error.to_string(),
+            "Restore the reviewed request file, then regenerate and review the plan.",
+        )
+    })?;
+    serde_json::from_slice(&raw).map_err(|error| {
+        configure_apply_error(
+            "CLI.CONFIGURE_STALE_PLAN",
+            "the configure request is no longer valid JSON",
+            error.to_string(),
+            "Restore the reviewed request file, then regenerate and review the plan.",
+        )
+    })
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Stale reviewed plans require the frozen configure recovery envelope."
+)]
+fn ensure_reviewed_plan_matches(reviewed: &Value, fresh: &Value) -> Result<(), CliError> {
+    let same_identifier = reviewed.get("plan_id") == fresh.get("plan_id");
+    let same_preconditions = reviewed.get("preconditions") == fresh.get("preconditions");
+    if same_identifier && same_preconditions {
+        return Ok(());
+    }
+    let changed_path = first_changed_precondition(reviewed, fresh)
+        .unwrap_or_else(|| "the configure request".to_string());
+    Err(configure_apply_error(
+        "CLI.CONFIGURE_STALE_PLAN",
+        "the reviewed configure plan is stale",
+        format!("`{changed_path}` or the requested configuration changed after planning"),
+        "Regenerate the plan, review the updated changes, then rerun configure --apply.",
+    )
+    .with_detail("path", serde_json::json!(changed_path)))
+}
+
+fn first_changed_precondition(reviewed: &Value, fresh: &Value) -> Option<String> {
+    let reviewed_conditions = reviewed.get("preconditions")?.as_array()?;
+    let fresh_conditions = fresh.get("preconditions")?.as_array()?;
+    reviewed_conditions
+        .iter()
+        .zip(fresh_conditions)
+        .find_map(|(before, after)| {
+            (before != after).then(|| {
+                before
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown")
+                    .to_string()
+            })
+        })
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Unresolved conflicts require the frozen configure recovery envelope."
+)]
+fn ensure_applyable_plan(plan: &Value) -> Result<(), CliError> {
+    let conflicts = plan
+        .get("conflicts")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let manual_steps = plan
+        .get("manual_steps")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if conflicts.is_empty() && manual_steps.is_empty() {
+        return Ok(());
+    }
+    Err(configure_apply_error(
+        "CLI.CONFIGURE_UNMANAGED_COLLISION",
+        "the reviewed configure plan contains unresolved conflicts",
+        "apply will not bypass conflicts or manual review steps",
+        "Review the exportable patch or select a non-conflicting configuration, then regenerate the plan.",
+    ))
+}
+
+fn plan_proposes(plan: &Value, path: &str) -> bool {
+    plan.get("operations")
+        .and_then(Value::as_array)
+        .is_some_and(|operations| {
+            operations.iter().any(|operation| {
+                operation.get("path").and_then(Value::as_str) == Some(path)
+                    && operation.get("kind").and_then(Value::as_str) == Some("propose_create")
+            })
+        })
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Just coexistence failures require structured configure recovery."
+)]
+fn add_just_artifacts(
+    request: &ConfigureRequest,
+    plan: &Value,
+    artifacts: &mut Vec<Box<dyn crate::configure::artifact::ManagedArtifact>>,
+) -> Result<(), CliError> {
+    let root_justfile = request.root.join("Justfile");
+    if root_justfile.exists() {
+        let existing = std::fs::read_to_string(&root_justfile).map_err(|error| {
+            configure_apply_error(
+                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                "the existing Justfile could not be read",
+                error.to_string(),
+                "Check Justfile permissions and review the exportable patch before retrying.",
+            )
+        })?;
+        reject_reserved_recipes(&existing)?;
+        let updated = crate::configure::just::insert_or_replace(&existing)?;
+        artifacts.push(Box::new(crate::configure::artifact::BytesArtifact::new(
+            crate::configure::artifact::ArtifactKind::Justfile,
+            root_justfile,
+            updated.into_bytes(),
+        )));
+    } else {
+        artifacts.push(Box::new(crate::configure::artifact::BytesArtifact::new(
+            crate::configure::artifact::ArtifactKind::Justfile,
+            root_justfile,
+            crate::consumer_integration::canonical_consumer_justfile().into_bytes(),
+        )));
+    }
+    if plan_proposes(plan, ".sc-lint/justfile") {
+        add_managed_creation(
+            artifacts,
+            crate::configure::artifact::ArtifactKind::Justfile,
+            request.root.join(".sc-lint/justfile"),
+            crate::consumer_integration::canonical_consumer_justfile().into_bytes(),
+        )?;
+    }
+    Ok(())
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Managed-file drift is a structured no-write configure collision."
+)]
+fn add_managed_creation(
+    artifacts: &mut Vec<Box<dyn crate::configure::artifact::ManagedArtifact>>,
+    kind: crate::configure::artifact::ArtifactKind,
+    target: PathBuf,
+    bytes: Vec<u8>,
+) -> Result<(), CliError> {
+    match std::fs::read(&target) {
+        Ok(current) if current == bytes => Ok(()),
+        Ok(_) => Err(configure_apply_error(
+            "CLI.CONFIGURE_UNMANAGED_COLLISION",
+            "a managed configure target contains user-owned changes",
+            format!(
+                "`{}` differs from its reviewed generated representation",
+                target.display()
+            ),
+            "Review the exportable patch; sc-lint will not overwrite the existing file.",
+        )),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            artifacts.push(Box::new(crate::configure::artifact::BytesArtifact::new(
+                kind, target, bytes,
+            )));
+            Ok(())
+        }
+        Err(error) => Err(configure_apply_error(
+            "CLI.CONFIGURE_UNMANAGED_COLLISION",
+            "a managed configure target could not be read",
+            error.to_string(),
+            "Check repository permissions and review the configure plan before retrying.",
+        )),
+    }
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Reserved recipe collisions require structured configure recovery."
+)]
+fn reject_reserved_recipes(source: &str) -> Result<(), CliError> {
+    for name in ["setup", "lint", "test", "upgrade"] {
+        if source
+            .lines()
+            .any(|line| line.trim_start().starts_with(&format!("{name}:")))
+        {
+            return Err(configure_apply_error(
+                "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                "the existing Justfile defines an sc-lint reserved recipe",
+                format!("reserved recipe `{name}` would be shadowed by managed integration"),
+                "Review the exportable patch; sc-lint will not overwrite or shadow your recipe.",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn configure_apply_error(
+    code: &'static str,
+    message: &str,
+    cause: impl Into<String>,
+    recovery: &str,
+) -> CliError {
+    CliError::config(message)
+        .with_code(code)
+        .with_cause(cause)
+        .with_detail("pointer", Value::Null)
+        .with_detail("recovery", serde_json::json!("review_plan"))
+        .with_suggested_action(recovery)
+        .with_documentation("sc-lint docs configuration")
 }
 
 fn configure_script_candidates_for_executable(executable: &Path) -> Vec<PathBuf> {

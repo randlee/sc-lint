@@ -40,6 +40,21 @@ files produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
 conflicting file or reconcile it with [the canonical guide](./just-setup.md),
 then rerun initialization.
 
+## Configure apply conflicts
+
+`sc-lint configure --apply --plan <file>` uses the configure recovery family:
+
+| Code | Meaning | Recovery |
+| --- | --- | --- |
+| `CLI.CONFIGURE_STALE_PLAN` | The request, plan identifier, or a planned source file changed after review. | Regenerate the plan, review it again, then apply the new file. |
+| `CLI.CONFIGURE_UNMANAGED_COLLISION` | A marker block is malformed or a root `Justfile` recipe would be shadowed. | Review the exportable patch and reconcile the user-owned integration; no file was written. |
+| `CLI.CONFIGURE_ROLLBACK_FAILED` | A failed transaction could not restore every target. | Restore the listed backup paths, repair permissions, and regenerate the plan. |
+
+An established `Justfile` is safe only when its managed block is exactly the
+documented begin marker, import, and end marker. `configure` preserves CRLF
+and all bytes outside that range. Do not hand-edit the block: remove it and
+regenerate/review a plan instead.
+
 ## Clean-machine bootstrap
 
 After a repository has committed its generated `sc-lint.toml`, `Justfile`, and

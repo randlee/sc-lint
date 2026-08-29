@@ -153,6 +153,22 @@ def build_plan(context: dict[str, Any], request: dict[str, Any], root: Path | No
                 "reason": config_reason,
             }
         )
+        operations.extend(
+            [
+                {
+                    "operation_id": "bootstrap-posix",
+                    "path": ".sc-lint/bootstrap",
+                    "kind": "propose_create",
+                    "reason": "managed_consumer_bootstrap",
+                },
+                {
+                    "operation_id": "bootstrap-windows",
+                    "path": ".sc-lint/bootstrap.ps1",
+                    "kind": "propose_create",
+                    "reason": "managed_consumer_bootstrap",
+                },
+            ]
+        )
 
     _append_just_operations(operations, observations, choices["just"]["mode"])
     _append_workflow_operations(operations, observations, choices["ci"]["mode"])
@@ -215,12 +231,20 @@ def load_request(request_path: str) -> dict[str, Any]:
 def _append_just_operations(
     operations: list[dict[str, Any]], observations: dict[str, Any], mode: str
 ) -> None:
+    if mode != "generate_managed_import":
+        return
     if observations["justfile"]["present"]:
+        operations.append(
+            {
+                "operation_id": "managed-justfile",
+                "path": ".sc-lint/justfile",
+                "kind": "propose_create",
+                "reason": "managed_consumer_recipes",
+            }
+        )
         operations.append(
             _confirmation("root-justfile", "Justfile", "existing_integration_uninspected")
         )
-        return
-    if mode == "disabled":
         return
     operations.extend(
         [

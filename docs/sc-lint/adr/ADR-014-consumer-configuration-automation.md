@@ -73,11 +73,30 @@ and agents while still protecting user-owned repository content.
    transformed or deleted. An unrecognized or near-matching file returns a
    structured conflict and exportable patch/plan; it is not modified. The first
    acceptance fingerprint is sc-compose's documented 0.4 integration.
-8. The first implementation is intentionally a usable but shallow MVP. It has
-   no source scan, no Cargo metadata call, no Just/YAML parser, and no automatic
-   migration claim. A later safe-transformer sprint may add a parser/fingerprint
-   only when an acceptance fixture proves the exact behavior. Product growth is
-   driven by real consumer gaps rather than speculative repository probes.
+8. The first implementation is intentionally a usable but bounded MVP. It has
+   no source scan, Cargo metadata call, or workflow parser. F.4a reads only the
+   root `Justfile` after a reviewed plan permits that path, recognizes the
+   documented marker and reserved recipe names, and byte-preserves everything
+   else. It has no automatic legacy migration claim until a versioned exact
+   fingerprint and acceptance fixture prove that transformation. Product growth
+   is driven by real consumer gaps rather than speculative repository probes.
+
+## F.4a Apply Contract
+
+`configure --apply --plan <file>` is a distinct `configure.apply` command. It
+re-runs the bounded planner and accepts a plan only when both `plan_id` and the
+ordered `preconditions` list are unchanged. It stages generated TOML, Just,
+and bootstrap-shell bytes beside their targets, validates each artifact, then
+commits in plan order with same-directory backups. A failure restores original
+bytes and modes; an incomplete restore reports `CLI.CONFIGURE_ROLLBACK_FAILED`
+with backup paths.
+
+The private artifact enum includes `Toml`, `Justfile`, `Shell`, `Json`, and
+`WorkflowYaml`; all concrete writers share `ManagedArtifact`. `Shell` covers
+the POSIX/PowerShell bootstrap pair and marks a newly-created POSIX bootstrap
+executable. `Json` and `WorkflowYaml` remain reserved for F.4b's prevalidated
+workflow artifact, which must use this same transaction rather than a side
+write path.
 
 ## CLI Boundary Registration
 

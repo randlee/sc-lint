@@ -33,6 +33,10 @@ their governing docs, boundaries, and planned sprint work.
   - `A.3`
   - `B.3`
   - `C.10`
+  - `F.4a` — crate-private configure transaction (`configure::apply`),
+    object-safe `ManagedArtifact` implementations, reviewed-plan apply, and
+    marker-owned Just integration. This module is not a public plugin API;
+    F.4b must add its workflow artifact through the same staging/rollback path.
 
 ### `sc-lint-directives`
 
