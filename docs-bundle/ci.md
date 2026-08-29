@@ -1,31 +1,10 @@
 # Continuous integration
 
-CI should use the reusable GitHub Action below as its primary integration. It
-uses the same consumer product contract as local `just lint` and `just test`,
-but avoids relying on a previously installed binary.
-
-## Machine-readable checks
-
-Use `sc-lint --json version` for a stable probe and `--json` on profile commands
-when a runner needs to parse the envelope. Preserve stderr on failures so the
-stable code and recovery action remain visible in build artifacts.
-
-## Reproducibility
-
-Install a verified release artifact, keep the documentation bundle beside it,
-and avoid source-checkout fallbacks. Run lint and test as separate required
-steps so a failed profile is actionable. Cache dependencies, not an unverified
-sc-lint binary.
-
-See [troubleshooting](./troubleshooting.md) for preflight and backend failures.
-
-## Reusable GitHub Action
-
-For consumer CI, use the versioned Action rather than installing a Cargo
-package, cloning this repository for tooling, or copying product scripts. The
-Action downloads the named E.5 archive, verifies its SHA-256 entry in the
-matching checksum manifest, preflights `sc-lint.toml`, and runs one aggregate
-consumer operation.
+Use the released reusable Action for consumer CI. It selects the verified
+release from `[tool.sc-lint].minimum_version` in `sc-lint.toml`, verifies the
+matching SHA-256 manifest, runs compatibility preflight, and exposes the
+shipped offline documentation bundle. It does not install Cargo packages,
+clone tooling, copy scripts, or use a package-manager fallback.
 
 ```yaml
 name: sc-lint
@@ -36,68 +15,49 @@ permissions:
   contents: read
 
 jobs:
-  lint-and-test:
+  sc-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - name: Complete lint profile
-        uses: randlee/sc-lint@v1
+      - uses: randlee/sc-lint@v1
         with:
-          version: 0.5.0
+          operation: setup
+          config-path: sc-lint.toml
+      - uses: randlee/sc-lint@v1
+        with:
           operation: lint
-      - name: Complete test profile
-        uses: randlee/sc-lint@v1
+          config-path: sc-lint.toml
+      - uses: randlee/sc-lint@v1
         with:
-          version: 0.5.0
           operation: test
+          config-path: sc-lint.toml
 ```
 
-`operation: setup` downloads, verifies, extracts, and compatibility-preflights
-the release without running a profile. It exposes `binary-path`, `docs-path`,
-and `version` outputs, and adds the binary directory to `PATH` for a later
-step.
+The Action's optional `version` input is an assertion only. When supplied, it
+must semantically equal the configured `minimum_version`; it cannot select a
+different release. Pin `randlee/sc-lint` to a reviewed full commit SHA when
+your assurance policy requires an immutable Action implementation.
 
-## Manual Just alternative
+## Consumer command contract
 
-Generate and commit the managed files during onboarding. A clean CI runner can
-then use the same documented local sequence without a preinstalled binary:
+The managed local contract has exactly four commands:
 
-```yaml
-- run: just setup
-- run: just lint
-- run: just test
+```text
+just setup
+just lint
+just test
+just upgrade
 ```
 
-`just setup` downloads the configured `minimum_version` release, verifies its
-checksum manifest entry, and activates it before the profile commands run.
-This path is covered by the consumer lifecycle fixture on POSIX and Windows.
+`setup` and `upgrade` acquire the configured verified release; `lint` and
+`test` run the complete consumer profiles. CI uses the released Action above;
+the same configuration and profile contract apply locally.
 
-## Pinning, cache, and offline runners
+## Offline and failure handling
 
-`randlee/sc-lint@v1` is the supported stable-major form. For a reproducible or
-high-assurance workflow, pin the Action to a reviewed immutable full commit
-SHA and keep `version` explicit:
-
-```yaml
-- uses: randlee/sc-lint@0123456789abcdef0123456789abcdef01234567
-  with:
-    version: 0.5.0
-    operation: lint
-```
-
-The Action needs no token beyond the job's normal checkout permissions; keep
-`contents: read` unless another consumer step needs more. The `version` input
-identifies the product release, while `@v1` or the Action SHA identifies the
-Action code.
-
-For a verified internal mirror or hermetic fixture, pass both `artifact-url`
-and `checksums-url`. The archive must retain its normal E.5 filename and its
-matching checksum entry. Cache dependencies or a verified mirror, not a binary
-copied from another job. An unavailable release produces
-`ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`; it never changes to a package manager or
-source build.
-
-The shipped `sc-lint-docs` bundle is available without network access through
-the `docs-path` output, and the Action checks `sc-lint docs --path` after
-extraction. Preserve stderr in CI logs: it carries the stable error code and
-recovery text for artifact, checksum, compatibility, or profile failure.
+For an internal verified mirror, provide both `artifact-url` and
+`checksums-url`; the archive name and checksum entry must still match the
+configured release. The Action publishes `binary-path`, `docs-path`, and
+`version` outputs, and validates `sc-lint docs --path` after extraction. Keep
+stderr in CI logs so its stable artifact, checksum, compatibility, or command
+error code and recovery guidance remain available. See
+[troubleshooting](./troubleshooting.md) for recovery details.

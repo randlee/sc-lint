@@ -42,12 +42,50 @@ function releaseTarget(platform, architecture) {
   return { triple: found[0], extension: found[1] };
 }
 
-function requireInput(inputs, name) {
-  const value = inputs[name];
-  if (!value || !value.trim()) {
-    throw new ActionError(ERROR.artifact, `Action input \`${name}\` is required.`, `Set \`${name}\` to an exact released sc-lint version.`);
+function parseSemVer(value, source) {
+  const normalized = value.trim();
+  if (!/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]+)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]+))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(normalized)) {
+    throw new ActionError(
+      ERROR.artifact,
+      `${source} is not SemVer: ${value}.`,
+      "Set [tool.sc-lint].minimum_version to an exact released sc-lint SemVer without a leading v.",
+    );
   }
-  return value.trim();
+  return normalized;
+}
+
+function readConfiguredMinimumVersion(configPath, cwd) {
+  const resolved = path.resolve(cwd, configPath);
+  let contents;
+  try {
+    contents = fs.readFileSync(resolved, "utf8");
+  } catch (error) {
+    throw new ActionError(
+      ERROR.artifact,
+      `Unable to read Action config-path ${configPath}: ${error.message}`,
+      "Provide a readable sc-lint.toml containing [tool.sc-lint].minimum_version.",
+    );
+  }
+  let inScLintSection = false;
+  for (const line of contents.split(/\r?\n/)) {
+    const section = line.match(/^\s*\[([^\]]+)\]\s*(?:#.*)?$/);
+    if (section) {
+      inScLintSection = section[1].trim() === "tool.sc-lint";
+      continue;
+    }
+    if (!inScLintSection) continue;
+    const version = line.match(/^\s*minimum_version\s*=\s*(["'])(.*?)\1\s*(?:#.*)?$/);
+    if (version) return parseSemVer(version[2], "[tool.sc-lint].minimum_version");
+  }
+  throw new ActionError(
+    ERROR.artifact,
+    `Action config-path ${configPath} has no [tool.sc-lint].minimum_version value.`,
+    "Set [tool.sc-lint].minimum_version to the released sc-lint version required by this consumer.",
+  );
+}
+
+function semanticallyEqual(left, right) {
+  return parseSemVer(left, "version assertion").split("+")[0] === parseSemVer(right, "configured minimum_version").split("+")[0];
 }
 
 function actionInputs(env) {
@@ -174,9 +212,14 @@ async function runAction(options = {}) {
   if (!["setup", "lint", "test"].includes(inputs.operation)) {
     throw new ActionError(ERROR.command, `Unsupported operation ${inputs.operation}.`, "Set operation to setup, lint, or test.");
   }
-  const version = requireInput(inputs, "version");
-  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
-    throw new ActionError(ERROR.artifact, `Action input \`version\` is not SemVer: ${version}.`, "Set version to an exact released sc-lint SemVer without a leading v.");
+  const cwd = path.resolve(inputs.workingDirectory);
+  const version = readConfiguredMinimumVersion(inputs.configPath, cwd);
+  if (inputs.version && !semanticallyEqual(inputs.version, version)) {
+    throw new ActionError(
+      ERROR.compatibility,
+      `Action version assertion ${inputs.version} does not equal config minimum_version ${version}.`,
+      "Remove the version assertion or make it semantically equal to [tool.sc-lint].minimum_version before retrying.",
+    );
   }
   const target = releaseTarget(options.platform || process.platform, options.arch || process.arch);
   const archiveName = `sc-lint_${version}_${target.triple}.${target.extension}`;
@@ -206,7 +249,6 @@ async function runAction(options = {}) {
   }
 
   const execute = options.execute || spawnSync;
-  const cwd = path.resolve(inputs.workingDirectory);
   const compatibility = invoke(binary, ["--config", inputs.configPath, "compatibility", "check", "--binary", binary], cwd, execute);
   if (compatibility.status !== 0) {
     throw new ActionError(ERROR.compatibility, `Compatibility preflight failed: ${compatibility.stderr || compatibility.stdout}`.trim(), "Align sc-lint.toml minimum_version with the selected release or select a newer release.");
@@ -241,4 +283,4 @@ async function main() {
 
 if (require.main === module) void main();
 
-module.exports = { ActionError, ERROR, extractTarGz, extractZip, releaseTarget, runAction, verifyChecksum };
+module.exports = { ActionError, ERROR, extractTarGz, extractZip, readConfiguredMinimumVersion, releaseTarget, runAction, semanticallyEqual, verifyChecksum };

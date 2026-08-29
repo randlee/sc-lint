@@ -302,19 +302,20 @@ def _append_just_operations(
 def _append_workflow_operations(
     operations: list[dict[str, Any]], observations: dict[str, Any], mode: str
 ) -> None:
-    if observations["github_workflows"]["present"]:
-        operations.append(
-            _confirmation(
-                "github-workflow", ".github/workflows/sc-lint.yml", "existing_integration_uninspected"
-            )
-        )
+    if mode != "generate_managed_workflow":
         return
-    if mode in {"disabled", "keep_existing"}:
-        return
+    # F.2 still does not read or parse a workflow.  F.4b receives the approved
+    # target operation and recognizes its narrow managed fingerprint inside the
+    # Rust transaction boundary; all other existing bytes become a no-write
+    # manual conflict there.
     operations.append(
-        _confirmation(
-            "github-workflow", ".github/workflows/sc-lint.yml", "workflow_generation_requires_confirmation"
-        )
+        {
+            "operation_id": "github-workflow",
+            "path": ".github/workflows/sc-lint.yml",
+            "kind": "propose_create",
+            "artifact_kind": "workflow_yaml",
+            "reason": "managed_sc_lint_github_action",
+        }
     )
 
 

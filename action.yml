@@ -7,8 +7,8 @@ inputs:
     required: false
     default: lint
   version:
-    description: Exact released sc-lint SemVer without a leading v.
-    required: true
+    description: Optional SemVer assertion; must semantically equal config-path's [tool.sc-lint].minimum_version and never selects an artifact.
+    required: false
   config-path:
     description: Consumer configuration path relative to working-directory.
     required: false

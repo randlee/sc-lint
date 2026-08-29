@@ -44,6 +44,20 @@ pub(crate) fn commit(artifacts: Vec<Box<dyn ManagedArtifact>>) -> Result<(), Cli
     commit_inner(artifacts, None)
 }
 
+/// Test-only seam proving a concrete extension artifact rolls back through the
+/// same transaction as core artifacts; production has no injectable path.
+#[cfg(test)]
+#[expect(
+    clippy::result_large_err,
+    reason = "The test seam preserves the production transaction error type."
+)]
+pub(crate) fn commit_with_post_commit_failure_for_test(
+    artifacts: Vec<Box<dyn ManagedArtifact>>,
+    index: usize,
+) -> Result<(), CliError> {
+    commit_inner(artifacts, Some(InjectedFailure::PostCommit(index)))
+}
+
 #[expect(
     clippy::result_large_err,
     reason = "The test-only failure seam exercises the same structured transaction recovery path."

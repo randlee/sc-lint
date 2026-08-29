@@ -63,8 +63,10 @@ function fixture(platform, architecture, operation) {
   const root = temporaryDirectory();
   const output = path.join(root, "output");
   const runnerPath = path.join(root, "path");
+  const configPath = path.join(root, "sc-lint.toml");
   fs.writeFileSync(output, "");
   fs.writeFileSync(runnerPath, "");
+  fs.writeFileSync(configPath, "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n");
   const calls = [];
   return {
     archive,
@@ -75,7 +77,7 @@ function fixture(platform, architecture, operation) {
       arch: architecture,
       installRoot: path.join(root, "installed"),
       env: { GITHUB_OUTPUT: output, GITHUB_PATH: runnerPath, RUNNER_TEMP: root },
-      inputs: { operation, version: "0.4.0", configPath: "sc-lint.toml", workingDirectory: root, artifactUrl: "https://fixture/archive", checksumsUrl: "https://fixture/checksums", releaseBaseUrl: "https://fixture" },
+      inputs: { operation, version: "", configPath: "sc-lint.toml", workingDirectory: root, artifactUrl: "https://fixture/archive", checksumsUrl: "https://fixture/checksums", releaseBaseUrl: "https://fixture" },
       download: async (url) => url.endsWith("archive") ? archive : checksums,
       execute(binaryPath, args) {
         calls.push({ binaryPath, args });
@@ -127,10 +129,45 @@ test("unavailable artifact, incompatible minimum, and command failure are distin
   await assert.rejects(() => runAction(failed.options), (error) => error.code === ERROR.command && error.recovery.includes("consumer profile"));
 });
 
-test("version input is an exact SemVer rather than a release-path fragment", async () => {
+test("optional version is only a semantic assertion, before any download", async () => {
   const local = fixture("linux", "x64", "setup");
   local.options.inputs.version = "../untrusted";
+  let downloaded = false;
+  local.options.download = async () => {
+    downloaded = true;
+    throw new Error("must not download");
+  };
   await assert.rejects(() => runAction(local.options), (error) => error.code === ERROR.artifact && error.message.includes("not SemVer"));
+  assert.equal(downloaded, false);
+});
+
+test("version assertion rejects a mismatch before any download", async () => {
+  const local = fixture("linux", "x64", "setup");
+  local.options.inputs.version = "0.4.1";
+  let downloaded = false;
+  local.options.download = async () => {
+    downloaded = true;
+    throw new Error("must not download");
+  };
+  await assert.rejects(() => runAction(local.options), (error) => error.code === ERROR.compatibility && error.message.includes("does not equal"));
+  assert.equal(downloaded, false);
+});
+
+test("version assertion accepts equivalent SemVer differing only in build metadata", async () => {
+  const local = fixture("linux", "x64", "setup");
+  local.options.inputs.version = "0.4.0+consumer.1";
+  const result = await runAction(local.options);
+  assert.equal(result.version, "0.4.0");
+});
+
+test("config-path is the only release selector", async () => {
+  const local = fixture("linux", "x64", "setup");
+  fs.writeFileSync(path.join(local.options.inputs.workingDirectory, "sc-lint.toml"), "[tool.sc-lint]\nminimum_version = '0.4.0'\n");
+  const result = await runAction(local.options);
+  assert.equal(result.version, "0.4.0");
+
+  fs.writeFileSync(path.join(local.options.inputs.workingDirectory, "sc-lint.toml"), "[tool.sc-lint]\nminimum_version = \"not-a-version\"\n");
+  await assert.rejects(() => runAction(local.options), (error) => error.code === ERROR.artifact && error.message.includes("minimum_version is not SemVer"));
 });
 
 test("action source has no source or package fallback", () => {
@@ -145,4 +182,5 @@ test("metadata declares the stable interface and required output contract", () =
   }
   assert.match(metadata, /using: node20/);
   assert.match(metadata, /main: action\/index\.js/);
+  assert.match(metadata, /version:[\s\S]*?required: false/);
 });

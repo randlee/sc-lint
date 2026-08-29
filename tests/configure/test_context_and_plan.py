@@ -80,8 +80,17 @@ class ContextAndPlanTests(unittest.TestCase):
             for operation in plan["operations"]
             if operation["reason"] == "existing_integration_uninspected"
         ]
-        self.assertEqual([operation["path"] for operation in uninspected], ["Justfile", ".github/workflows/sc-lint.yml"])
+        self.assertEqual([operation["path"] for operation in uninspected], ["Justfile"])
         self.assertNotIn("manual_conflict", [operation["kind"] for operation in plan["operations"]])
+
+    def test_explicit_workflow_generation_is_a_typed_approved_target(self) -> None:
+        request = json.loads(json.dumps(self.request))
+        request["request"]["ci"]["mode"] = "generate_managed_workflow"
+        plan = build_plan(collect_context(FIXTURES / "empty-rust"), request)
+        workflow = next(operation for operation in plan["operations"] if operation["path"] == ".github/workflows/sc-lint.yml")
+        self.assertEqual(workflow["kind"], "propose_create")
+        self.assertEqual(workflow["artifact_kind"], "workflow_yaml")
+        self.assertEqual(workflow["reason"], "managed_sc_lint_github_action")
 
     def test_existing_workflow_fixture_is_uninspected_without_a_justfile(self) -> None:
         context = collect_context(FIXTURES / "existing-workflow")

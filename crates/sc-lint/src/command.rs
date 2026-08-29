@@ -746,6 +746,7 @@ fn run_configure_apply(request: &ConfigureRequest) -> Result<CommandSuccess, Cli
     if just_mode == "generate_managed_import" {
         add_just_artifacts(&request.root, &fresh, &mut artifacts)?;
     }
+    crate::configure::workflow::add_workflow_artifact(&request.root, &fresh, &mut artifacts)?;
     add_reviewed_removals(&request.root, &fresh, &mut artifacts)?;
     if artifacts.is_empty() {
         return Ok(CommandSuccess::direct(serde_json::json!({

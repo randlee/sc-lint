@@ -9,7 +9,7 @@ source-checkout, or analyzer-package interface.
 
 | ID | Requirement | Validation reference |
 | --- | --- | --- |
-| GA-001 | The Action must obtain only a named `sc-lint` release archive and its sibling `checksums.txt` from the release download location. It selects the archive for Linux x86_64, macOS x86_64/aarch64, or Windows x86_64. | [`action.yml`](../../action.yml), [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
+| GA-001 | The Action must obtain only the named `sc-lint` release archive and sibling `checksums.txt` selected by `[tool.sc-lint].minimum_version` in `config-path`. It supports Linux x86_64, macOS x86_64/aarch64, and Windows x86_64. | [`action.yml`](../../action.yml), [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
 | GA-002 | Before extracting an archive, the Action must verify its SHA-256 digest against the entry for that exact archive in `checksums.txt`. | [`action/index.js`](../../action/index.js), `checksum mismatch` fixture in [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
 | GA-003 | The Action accepts `operation` values `setup`, `lint`, and `test`. `setup` installs and preflights the release; `lint` and `test` run the E.3 consumer commands only after the E.1 compatibility preflight. | [`action.yml`](../../action.yml), operation fixtures in [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
 | GA-004 | The Action must run `sc-lint --config <config> compatibility check --binary <installed binary>` before a consumer command. It must fail when the configured minimum is incompatible. | [`action/index.js`](../../action/index.js), incompatible-floor fixture in [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
@@ -17,16 +17,15 @@ source-checkout, or analyzer-package interface.
 | GA-006 | Failures have stable codes and recovery: `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`, `ACTION.SC_LINT_CHECKSUM_MISMATCH`, `ACTION.SC_LINT_COMPATIBILITY_FAILED`, and `ACTION.SC_LINT_COMMAND_FAILED`. | [`action/index.js`](../../action/index.js), failure fixtures in [`action/test/action.test.cjs`](../../action/test/action.test.cjs), [troubleshooting](../../docs-bundle/troubleshooting.md) |
 | GA-007 | The stable adoption form is `randlee/sc-lint@v1`. Security-sensitive consumers must pin the exact immutable action commit; the product release is always selected from `config-path`'s `minimum_version`, while an optional `version` input can only assert equality. Release publication refreshes the movable `v1` Action tag only after the release is published. | [CI guide](../../docs-bundle/ci.md), [release workflow](../../.github/workflows/release.yml) |
 | GA-008 | The Action supports an explicit local `artifact-url` and `checksums-url` for hermetic fixtures/offline mirrors; it never silently falls back to a package manager, Cargo, a source checkout, or an analyzer package name. | [`action.yml`](../../action.yml), all-platform fixture in [`action/test/action.test.cjs`](../../action/test/action.test.cjs), [CI guide](../../docs-bundle/ci.md) |
+| GA-009 | `version` is optional assertion-only. If supplied, it must be SemVer-equivalent to the configured minimum version (ignoring build metadata) and must fail before a download when it is not; it can never select an artifact. | [`action.yml`](../../action.yml), assertion fixtures in [`action/test/action.test.cjs`](../../action/test/action.test.cjs) |
 
-## Planned Phase F version-authority amendment
+## Version authority
 
-Phase F (`REQ-PRODUCT-025`) replaces the independent required `version` input
-with config-derived selection: the Action parses
-`[tool.sc-lint].minimum_version` from `config-path` and uses that exact value
-for its archive and compatibility preflight. A transitional `version` input,
-if retained, is optional assertion-only and must fail on semantic mismatch; it
-cannot select an archive. F.4b owns implementation and updates the input
-table, fixtures, CI guide, and release behavior together.
+`sc-lint.toml` is the sole release-selection authority. The Action parses
+`[tool.sc-lint].minimum_version` from `config-path` before it constructs a
+release URL or starts a download, then preflights that exact release. The
+optional `version` input is an assertion for migration diagnostics only; it is
+never an alternative source of truth.
 
 ## Inputs and outputs
 
