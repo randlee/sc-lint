@@ -179,7 +179,11 @@ class ContextAndPlanTests(unittest.TestCase):
                         capture_output=True,
                         text=True,
                     )
-                    self.assertEqual(completed.returncode, 3)
+                    self.assertEqual(
+                        completed.returncode,
+                        3,
+                        msg=f"stdout={completed.stdout!r} stderr={completed.stderr!r}",
+                    )
                     failure = json.loads(completed.stderr)
                     self.assertEqual(validate("result", failure), [])
                     self.assertEqual(failure["command"], "configure.plan")
