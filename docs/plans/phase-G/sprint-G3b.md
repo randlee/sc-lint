@@ -1,12 +1,12 @@
 ---
-id: G.3
+id: G.3b
 title: Self-Contained Release And Consumer-Blocking Lint Fixes
 status: planned
-branch: feature/phase-G3-self-contained-release
+branch: feature/phase-G3b-self-contained-release
 target: develop
 ---
 
-# Sprint G.3 — Self-Contained Release And Consumer-Blocking Lint Fixes
+# Sprint G.3b — Self-Contained Release And Consumer-Blocking Lint Fixes
 
 ## Goal
 
@@ -15,7 +15,7 @@ target: develop
 
 ## Hard Dependencies
 
-- G.1 merged (kit recipes define what "every recipe" means)
+- G.1 and G.3a merged (kit recipes + wheel define the runtime)
 - issue `#84` (full/ci profile runs source-tree Cargo wrappers)
 - `scripts/release_artifacts.py`, `.github/workflows/release*.yml`
 
@@ -37,10 +37,12 @@ target: develop
   `tests/fixtures/adoption/empty-workspace` via the kit and run `just setup
   lint test upgrade`; passes with `SC_LINT_SOURCE_ROOT` unset and no `.just/`
   directory present.
-- `full` and `ci` profiles invoke only binaries shipped in the archive
-  (`#84`); any profile entry that needs a Python helper ships that helper
-  inside the archive under a product-owned path or is removed from the
-  profile.
+- `full` and `ci` profiles invoke only binaries shipped in the archive or
+  helpers imported from the `sc_lint` wheel (`#84`); no profile entry
+  references a source-tree path.
+- No Rust added for configuration: changes under `crates/` are limited to
+  dispatch paths, the parser fix, and `version --json`; a diff adding any
+  module named `configure`, `install`, `setup`, or `template` fails review.
 - identity-literals accepts valid Rust unicode escapes (regression test with
   `"\u{1F600}"` and `'\u{7}'`).
 - `sc-lint version --json` reports the archive layout (`self_contained: true`).
@@ -50,6 +52,7 @@ target: develop
 - CI job `release-smoke` green on the three OSes with no `.just/` in the
   workspace.
 - `grep -rn "\.just/" crates/sc-lint/src` returns nothing outside tests.
+- `git diff --stat develop -- crates/` touches no new module.
 - `#84` closed by the PR.
 
 ## Required Validation

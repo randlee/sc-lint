@@ -36,6 +36,17 @@ drift reported as a defect. It is not a Rust engine.
    upgrade` delegating to `.sc-lint/bootstrap`.
 6. Greenfield and adoption produce an identical end state: the new-repo
    template **is** the kits applied to an empty Cargo workspace.
+7. **No Rust is written for configuration of the tools or for anything
+   repo-specific.** Rust in this repository implements lint analysis and the
+   `sc-lint` CLI only. Installation, templating, repo facts, CI wiring, and
+   consumer scaffolding are Python, TOML/YAML/Justfile assets, skills, and
+   prompts. A sprint that adds a `configure`-style module to any crate is a
+   Phase G violation.
+8. Python helpers that consumers run (`.just` recipes, lint runners, version
+   sync) ship as a **maturin-built `sc-lint` wheel** pinned by
+   `minimum_version`, provisioned by `.sc-lint/bootstrap` — the same
+   mechanism `sc-publish` uses for the `sc-compose` wheel. Nothing is copied
+   from a source archive.
 
 ## Why Phase F Is Abandoned
 
@@ -69,18 +80,20 @@ README.sc-lint.md                     # kit README, renamed on install
 | G.0 | Abandon Phase F, ADR-015 | governance / docs |
 | G.1 | Adoption kit: installer, verbatim assets, templates, fixtures | product code (Python + assets) |
 | G.2 | Adoption skill, agent prompts, marketplace entry, docs | skill / docs |
-| G.3 | Self-contained release: remove source-tree helper dependency, fix consumer-blocking lint bugs | Rust crates |
+| G.3a | `sc-lint` Python bindings via maturin, published wheel, bootstrap provisioning | packaging / PyPI |
+| G.3b | Self-contained release: recipes run from wheel + binary only; fix consumer-blocking lint bugs | Rust crates + release |
 | G.4 | First-wave consumer PRs + sc-publish delegation | consumer repos |
 | G.5 | Ecosystem rollout | consumer repos (skill only) |
 
-Sequence: G.0 → G.1 → G.2 ∥ G.3 → G.4 → G.5. G.4 is the qualification gate;
+Sequence: G.0 → G.1 → G.2 ∥ G.3a → G.3b → G.4 → G.5. G.4 is the qualification gate;
 there is no separate proof phase.
 
 Sprint docs:
 - [sprint-G0.md](./sprint-G0.md)
 - [sprint-G1.md](./sprint-G1.md)
 - [sprint-G2.md](./sprint-G2.md)
-- [sprint-G3.md](./sprint-G3.md)
+- [sprint-G3a.md](./sprint-G3a.md)
+- [sprint-G3b.md](./sprint-G3b.md)
 - [sprint-G4.md](./sprint-G4.md)
 - [sprint-G5.md](./sprint-G5.md)
 
@@ -98,8 +111,10 @@ Sprint docs:
 - `packages/sc-lint-adoption` installs into an empty workspace and a synthetic
   established workspace with `--dry-run` exit 0 after install, exit 1 on any
   drift, on Linux, macOS, and Windows CI.
-- The released `sc-lint` archive runs every kit recipe with no source-tree
-  helper.
+- The released `sc-lint` binary plus the published `sc-lint` wheel run every
+  kit recipe with no source-tree helper and no copied script.
+- `grep -rn "configure" crates/*/src` matches nothing outside lint-rule
+  configuration loading (`sc-lint.toml` parsing).
 - `wyvern`, `atm-core`, `sc-compose` each have a merged consumer PR whose CI
   runs `just lint` and `just test` through the kit, and `sc-publish` no longer
   carries an sc-lint version pin.
