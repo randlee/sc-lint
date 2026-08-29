@@ -14,9 +14,10 @@ owner: clint
 
 ## Goal
 
-Adopt the released kit in `sc-compose` only after G.4b proves the greenfield
-path, and remove the now-redundant source-coupled sc-lint scaffolding without
-disturbing `sc-compose`'s native `template-contracts` surface.
+Adopt the released kit in `sc-compose` only after G.4b's wyvern greenfield PR
+and atm-core migration PR both merge, and remove the now-redundant
+source-coupled sc-lint scaffolding without disturbing `sc-compose`'s native
+`template-contracts` surface.
 
 ## Hard Dependencies
 

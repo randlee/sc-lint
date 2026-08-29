@@ -26,6 +26,7 @@ owner: clint
   and `.claude/agents/publisher.md`
 - [docs/sc-lint/skill-authoring-constraints.md](../../sc-lint/skill-authoring-constraints.md)
 - [docs/sc-lint/minimal-marketplace-constraints.md](../../sc-lint/minimal-marketplace-constraints.md)
+- [ADR-016](../../sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
 
 ## Exact Targets
 
@@ -82,6 +83,7 @@ logic beyond the G.1 kit.
   layers, and both the skill and adoption guide include a “How to extend”
   section for analyzers, test layers, lint profiles, and consumer-owned recipes
   using `tests/fixtures/adoption/analyzer-worked-example/`.
+- `grep -rEn "command arrays must name a shipped binary or `sc_lint` module only" docs/sc-lint/adoption.md packages/sc-lint-adoption/.claude` finds the required boundary guidance, and no example step argv in those files names a repository-relative path.
 
 ## How To Extend
 
@@ -90,7 +92,9 @@ logic beyond the G.1 kit.
   `just test <layer> *args` passes through, and `just test all` follows order.
 - **Analyzer config:** use `[tool.sc-lint.analyzers.<crate>]` with `enabled`,
   `reason`, `targets`, and crate-specific keys.
-- **Step argv/exclusions:** express flags as command arrays in a step list.
+- **Step argv/exclusions:** express flags as command arrays in a step list;
+  command arrays must name a shipped binary or `sc_lint` module only; a
+  repository-relative script is not authorized here.
 - **Platform conditionals:** use `platforms = [...]` on a step.
 - **Environment:** use per-step or per-layer `env` tables.
 - **Pre/post work:** model it as ordinary extra steps in the layer list.
