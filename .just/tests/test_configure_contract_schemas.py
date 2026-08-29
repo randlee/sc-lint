@@ -108,8 +108,12 @@ class ConfigureContractSchemaTests(unittest.TestCase):
         expected = tomllib.loads((FIXTURES / "recommended-profile.toml").read_text(encoding="utf-8"))
         self.assertEqual(documented_fixture("recommended-profile", language="toml"), expected)
         profiles = expected["tool"]["sc-lint"]
+        self.assertEqual([profile["name"] for profile in profiles["lint"]], ["fmt", "clippy"])
         self.assertEqual(profiles["lint"][0]["command"], ["cargo", "fmt", "--all", "--check"])
-        self.assertEqual(profiles["lint"][1]["command"], ["sc-lint", "lint", "sc-boundary"])
+        self.assertEqual(
+            profiles["lint"][1]["command"],
+            ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
+        )
         self.assertEqual(profiles["test"][0]["command"], ["cargo", "test", "--workspace"])
 
     def test_context_and_family_decisions_reject_unsafe_ambiguity(self) -> None:

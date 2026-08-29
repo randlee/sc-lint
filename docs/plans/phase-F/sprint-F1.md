@@ -145,8 +145,8 @@ name = "fmt"
 command = ["cargo", "fmt", "--all", "--check"]
 
 [[tool.sc-lint.lint]]
-name = "sc-boundary"
-command = ["sc-lint", "lint", "sc-boundary"]
+name = "clippy"
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
 
 [[tool.sc-lint.test]]
 name = "workspace"
