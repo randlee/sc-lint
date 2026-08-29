@@ -742,6 +742,7 @@ fn run_configure_apply(request: &ConfigureRequest) -> Result<CommandSuccess, Cli
     if just_mode == "generate_managed_import" {
         add_just_artifacts(request, &fresh, &mut artifacts)?;
     }
+    add_reviewed_removals(request, &fresh, &mut artifacts)?;
     if artifacts.is_empty() {
         return Ok(CommandSuccess::direct(serde_json::json!({
             "status": "current",
@@ -880,6 +881,42 @@ fn plan_proposes(plan: &Value, path: &str) -> bool {
                     && operation.get("kind").and_then(Value::as_str) == Some("propose_create")
             })
         })
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Reviewed removal paths retain the configure transaction recovery envelope."
+)]
+fn add_reviewed_removals(
+    request: &ConfigureRequest,
+    plan: &Value,
+    artifacts: &mut Vec<Box<dyn crate::configure::artifact::ManagedArtifact>>,
+) -> Result<(), CliError> {
+    let Some(operations) = plan.get("operations").and_then(Value::as_array) else {
+        return Ok(());
+    };
+    for operation in operations {
+        if operation.get("kind").and_then(Value::as_str) != Some("propose_remove") {
+            continue;
+        }
+        let relative = operation
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                configure_apply_error(
+                    "CLI.CONFIGURE_UNMANAGED_COLLISION",
+                    "the reviewed removal operation has no path",
+                    "the configure plan violates the v1 operation contract",
+                    "Regenerate and review the configure plan.",
+                )
+            })?;
+        let target = request.root.join(relative);
+        artifacts.push(Box::new(crate::configure::artifact::RemoveArtifact::new(
+            crate::configure::artifact::ArtifactKind::Json,
+            target,
+        )));
+    }
+    Ok(())
 }
 
 #[expect(
