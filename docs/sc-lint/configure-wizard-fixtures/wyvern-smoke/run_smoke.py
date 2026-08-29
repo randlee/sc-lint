@@ -93,11 +93,17 @@ def finish_process(process: subprocess.Popen[str], expected_button: str) -> dict
 
 def stop_process(process: subprocess.Popen[str]) -> None:
     if process.poll() is None:
-        os.killpg(process.pid, signal.SIGTERM)
+        if os.name == "nt":
+            process.terminate()
+        else:
+            os.killpg(process.pid, signal.SIGTERM)
         try:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            if os.name == "nt":
+                process.kill()
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
             process.wait(timeout=2)
 
 
