@@ -1,6 +1,6 @@
 ---
 name: plan-hardening
-version: 1.4.0
+version: 1.5.0
 description: >
   Team-lead drives plan hardening after the current plan state already exists
   in repo docs.
@@ -37,6 +37,27 @@ Sprint plan approved by:
 
 Always use:
 - `.claude/skills/plan-hardening/sprint-planning-guidelines.md`
+- `.claude/skills/plan-hardening/references/installation-and-troubleshooting.md`
+
+## Step 0 — Verify gh stack Installation
+
+```bash
+which gh && gh --version && gh stack --version
+```
+
+If not found on PATH, also check common install locations — Claude Code's
+bash environment may not share PATH with the interactive shell:
+
+```bash
+for p in "/opt/homebrew/bin/gh" "$HOME/.local/bin/gh"; do
+  [ -x "$p" ] && echo "Found at: $p" && break
+done
+```
+
+If `gh` or the `gh-stack` extension is missing: **read
+`references/installation-and-troubleshooting.md` before proceeding.** Do not
+continue with degraded behavior; the stack protocol in every phase plan
+depends on it.
 
 ## Execution Table
 
@@ -73,7 +94,16 @@ Use the example in:
   `findings_hash` again, treat it as a stale replay and do not open a new
   hardening round
 - substantial scope drift from the user-discussed plan is a hard stop
+- an ADR the phase depends on that is not `Accepted` on the planning branch
+  before step 6 is a hard stop; ADRs and requirements updates land during
+  planning, never inside a sprint
 - remaining in-scope work without sprint ownership is a hard stop
+- a phase plan without a `## Branch Stacks And Parallelism` section is a
+  hard stop; sprints are planned as `gh stack` layers
+- a plan whose sprints are serialized on CI pass or merge of the previous
+  sprint, when they could start on commit, is a hard stop
+- a sprint with a layer above it and no `## Unblock Milestone` section is a
+  hard stop
 - if a sprint cannot credibly land its committed deliverables at a
   production-ready level, split it before implementation
 - if a reviewer loop returns `FAIL` three times without converging, escalate to
@@ -94,3 +124,4 @@ Use the example in:
 - `.claude/skills/plan-hardening/examples/plan-hardening-rounds.example.md`
 - `.claude/skills/plan-hardening/examples/plan-hardening-qa-vars.example.json`
 - `.claude/skills/plan-hardening/sprint-planning-guidelines.md`
+- `.claude/skills/plan-hardening/references/installation-and-troubleshooting.md`
