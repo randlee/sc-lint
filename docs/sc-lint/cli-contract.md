@@ -314,6 +314,8 @@ transaction cannot add family-specific envelope fields.
 | `CLI.CONFIGURE_UI_UNAVAILABLE` | `configure.plan` | rerun with request JSON |
 | `CLI.CONFIGURE_UNMANAGED_COLLISION` | `configure.plan` | review the exportable patch |
 | `CLI.CONFIGURE_STALE_PLAN` | `configure.apply` | regenerate and review the plan |
+| `CLI.CONFIGURE_STAGE_FAILED` | `configure.apply` | repair the named target or its parent, then regenerate and review the plan |
+| `CLI.CONFIGURE_COMMIT_FAILED` | `configure.apply` | inspect the named target and retry; prior changes were restored |
 | `CLI.CONFIGURE_ROLLBACK_FAILED` | `configure.apply` | restore the listed backups before retrying |
 
 Every configure error includes the stable code, JSON pointer when one applies,

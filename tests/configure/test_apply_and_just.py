@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -10,17 +12,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 REQUEST = ROOT / "tests" / "fixtures" / "configure" / "contracts" / "request.json"
 FIXTURES = ROOT / "tests" / "fixtures" / "configure" / "apply-and-just"
+BINARY = ROOT / "target" / "debug" / ("sc-lint.exe" if sys.platform == "win32" else "sc-lint")
 
 
 def configure(root: Path, request: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
-            "cargo",
-            "run",
-            "-q",
-            "-p",
-            "sc-lint",
-            "--",
+            str(BINARY),
             "--json",
             "--root",
             str(root),
@@ -37,6 +35,10 @@ def configure(root: Path, request: Path, *arguments: str) -> subprocess.Complete
 
 
 class ApplyAndJustTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        subprocess.run(["cargo", "build", "-q", "-p", "sc-lint"], cwd=ROOT, check=True)
+
     def request(self, root: Path) -> Path:
         request = json.loads(REQUEST.read_text(encoding="utf-8"))
         request["request"]["just"]["mode"] = "generate_managed_import"
@@ -154,6 +156,25 @@ class ApplyAndJustTests(unittest.TestCase):
                 self.assertEqual(applied.returncode, 3)
                 self.assertEqual(json.loads(applied.stderr)["error"]["code"], "CLI.CONFIGURE_UNMANAGED_COLLISION")
                 self.assertEqual(justfile.read_text(encoding="utf-8"), contents)
+
+    def test_legacy_near_miss_is_never_planned_or_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(FIXTURES / "legacy-near-miss", root, dirs_exist_ok=True)
+            (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+            legacy_action = root / ".github" / "actions" / "setup-sc-lint" / "action.yml"
+            original = legacy_action.read_bytes()
+            request = self.request(root)
+            plan = self.plan(root, request)
+            planned = json.loads(plan.read_text(encoding="utf-8"))["data"]
+            self.assertFalse(
+                any(operation["kind"] == "propose_remove" for operation in planned["operations"])
+            )
+
+            applied = configure(root, request, "--apply", "--plan", str(plan))
+
+            self.assertEqual(applied.returncode, 0, applied.stderr)
+            self.assertEqual(legacy_action.read_bytes(), original)
 
 
 if __name__ == "__main__":

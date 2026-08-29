@@ -62,12 +62,12 @@ fn commit_inner(
         let target = artifact.target().to_path_buf();
         let parent = target
             .parent()
-            .ok_or_else(|| transaction_error("artifact target has no parent directory"))?;
+            .ok_or_else(|| stage_error("artifact target has no parent directory"))?;
         fs::create_dir_all(parent)
-            .map_err(|error| io_error("create artifact directory", &target, error))?;
+            .map_err(|error| stage_io_error("create artifact directory", &target, error))?;
         let file_name = target
             .file_name()
-            .ok_or_else(|| transaction_error("artifact target has no filename"))?;
+            .ok_or_else(|| stage_error("artifact target has no filename"))?;
         let staged_path = parent.join(format!(
             ".{}.sc-lint-stage-{nonce}-{index}",
             file_name.to_string_lossy()
@@ -79,7 +79,7 @@ fn commit_inner(
         if !artifact.is_removal() {
             if injected_failure == Some(InjectedFailure::Stage(index)) {
                 cleanup_stages(&staged);
-                return Err(io_error(
+                return Err(stage_io_error(
                     "stage generated artifact",
                     &target,
                     io::Error::other("test-only injected stage failure"),
@@ -87,7 +87,7 @@ fn commit_inner(
             }
             if let Err(error) = fs::write(&staged_path, artifact.staged_bytes()) {
                 cleanup_stages(&staged);
-                return Err(io_error("stage generated artifact", &target, error));
+                return Err(stage_io_error("stage generated artifact", &target, error));
             }
             if let Err(error) = preserve_mode(&target, &staged_path, artifact.kind()) {
                 let _ = fs::remove_file(&staged_path);
@@ -135,7 +135,7 @@ fn commit_inner(
     for item in &staged {
         if item.existed {
             fs::remove_file(&item.backup)
-                .map_err(|error| io_error("remove committed backup", &item.backup, error))?;
+                .map_err(|error| commit_io_error("remove committed backup", &item.backup, error))?;
         }
     }
     Ok(())
@@ -154,7 +154,7 @@ fn rollback_error(
     let rollback_error = rollback(&staged[..changed_count]);
     cleanup_stages(staged);
     Err(match rollback_error {
-        Ok(()) => io_error("commit generated artifact", &staged[index].target, error),
+        Ok(()) => commit_io_error("commit generated artifact", &staged[index].target, error),
         Err(paths) => CliError::config("configure apply could not restore every changed file")
             .with_code("CLI.CONFIGURE_ROLLBACK_FAILED")
             .with_cause(error.to_string())
@@ -230,10 +230,11 @@ fn preserve_mode(
     if let Ok(metadata) = fs::metadata(target) {
         let permissions = fs::Permissions::from_mode(metadata.permissions().mode());
         fs::set_permissions(staged, permissions)
-            .map_err(|error| io_error("preserve artifact mode", target, error))?;
+            .map_err(|error| stage_io_error("preserve artifact mode", target, error))?;
     } else if kind == crate::configure::artifact::ArtifactKind::Shell {
-        fs::set_permissions(staged, fs::Permissions::from_mode(0o755))
-            .map_err(|error| io_error("make generated shell helper executable", target, error))?;
+        fs::set_permissions(staged, fs::Permissions::from_mode(0o755)).map_err(|error| {
+            stage_io_error("make generated shell helper executable", target, error)
+        })?;
     }
     Ok(())
 }
@@ -248,6 +249,8 @@ fn preserve_mode(
     _staged: &std::path::Path,
     _kind: crate::configure::artifact::ArtifactKind,
 ) -> Result<(), CliError> {
+    // Windows does not expose the POSIX executable-mode contract preserved by
+    // the Unix implementation, so staging has no permission mutation to make.
     Ok(())
 }
 
@@ -258,16 +261,26 @@ fn unique_suffix() -> u128 {
         .unwrap_or_default()
 }
 
-fn transaction_error(message: &str) -> CliError {
+fn stage_error(message: &str) -> CliError {
     CliError::config(message)
-        .with_code("CLI.CONFIGURE_ROLLBACK_FAILED")
+        .with_code("CLI.CONFIGURE_STAGE_FAILED")
         .with_suggested_action("Regenerate and review the configure plan, then retry.")
         .with_documentation("sc-lint docs troubleshooting")
 }
 
-fn io_error(operation: &str, path: &std::path::Path, error: io::Error) -> CliError {
+fn stage_io_error(operation: &str, path: &std::path::Path, error: io::Error) -> CliError {
     CliError::config(format!("failed to {operation} `{}`", path.display()))
-        .with_code("CLI.CONFIGURE_ROLLBACK_FAILED")
+        .with_code("CLI.CONFIGURE_STAGE_FAILED")
+        .with_source(error)
+        .with_suggested_action(
+            "Check repository permissions, then regenerate and review the configure plan.",
+        )
+        .with_documentation("sc-lint docs troubleshooting")
+}
+
+fn commit_io_error(operation: &str, path: &std::path::Path, error: io::Error) -> CliError {
+    CliError::config(format!("failed to {operation} `{}`", path.display()))
+        .with_code("CLI.CONFIGURE_COMMIT_FAILED")
         .with_source(error)
         .with_suggested_action(
             "Check repository permissions, then regenerate and review the configure plan.",
@@ -393,7 +406,10 @@ mod tests {
             ],
             Some(InjectedFailure::PostCommit(1)),
         );
-        assert!(result.is_err());
+        assert_eq!(
+            result.expect_err("commit failure").code(),
+            "CLI.CONFIGURE_COMMIT_FAILED"
+        );
         assert_eq!(
             fs::read_to_string(legacy).expect("legacy restored"),
             "legacy bytes\n"
@@ -464,7 +480,10 @@ mod tests {
             ],
             Some(InjectedFailure::Stage(1)),
         );
-        assert!(result.is_err());
+        assert_eq!(
+            result.expect_err("stage failure").code(),
+            "CLI.CONFIGURE_STAGE_FAILED"
+        );
         assert_eq!(
             fs::read_to_string(&first).expect("first remains"),
             "value = 'before'\n"
@@ -508,7 +527,10 @@ mod tests {
             ],
             Some(InjectedFailure::RenameAfterBackup(2)),
         );
-        assert!(result.is_err());
+        assert_eq!(
+            result.expect_err("commit failure").code(),
+            "CLI.CONFIGURE_COMMIT_FAILED"
+        );
         assert_eq!(
             fs::read_to_string(&first).expect("first restored"),
             "value = 'before-first'\n"
@@ -550,7 +572,10 @@ mod tests {
             ],
             Some(InjectedFailure::PostCommit(1)),
         );
-        assert!(result.is_err());
+        assert_eq!(
+            result.expect_err("commit failure").code(),
+            "CLI.CONFIGURE_COMMIT_FAILED"
+        );
         assert_eq!(
             fs::read_to_string(first).expect("first restored"),
             "value = 'before-first'\n"

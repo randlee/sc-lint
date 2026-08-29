@@ -1,0 +1,5 @@
+name: Near-match legacy setup action
+runs:
+  using: composite
+  steps:
+    - run: echo this similarly named action is consumer-owned

@@ -1262,3 +1262,86 @@ mod configure_script_tests {
         assert_eq!(resolved, planner);
     }
 }
+
+#[cfg(test)]
+mod configure_removal_tests {
+    use super::*;
+
+    fn request(root: PathBuf) -> ConfigureRequest {
+        ConfigureRequest {
+            request_path: root.join("request.json"),
+            root,
+            dry_run: false,
+            reviewed_plan_path: None,
+        }
+    }
+
+    fn remove_plan(path: &str, reason: &str) -> Value {
+        json!({
+            "operations": [{
+                "operation_id": "legacy-remove-test",
+                "path": path,
+                "kind": "propose_remove",
+                "reason": reason,
+            }]
+        })
+    }
+
+    #[test]
+    fn stale_removal_plan_is_rejected_before_any_artifact_is_created() {
+        let reviewed = json!({
+            "plan_id": "sha256:111111",
+            "preconditions": [{
+                "path": ".github/actions/setup-sc-lint/action.yml",
+                "source_digest": "sha256:111111",
+            }],
+        });
+        let fresh = json!({
+            "plan_id": "sha256:111111",
+            "preconditions": [{
+                "path": ".github/actions/setup-sc-lint/action.yml",
+                "source_digest": "sha256:222222",
+            }],
+        });
+
+        let error = ensure_reviewed_plan_matches(&reviewed, &fresh).expect_err("stale plan");
+
+        assert_eq!(error.code(), "CLI.CONFIGURE_STALE_PLAN");
+    }
+
+    #[test]
+    fn apply_removes_only_an_exact_allowlisted_legacy_artifact() {
+        let root = tempfile::tempdir().expect("root");
+        let target = root.path().join(".github/actions/setup-sc-lint/action.yml");
+        std::fs::create_dir_all(target.parent().expect("parent")).expect("parent directory");
+        std::fs::write(&target, "legacy action\n").expect("legacy action");
+        let request = request(root.path().to_path_buf());
+        let plan = remove_plan(
+            ".github/actions/setup-sc-lint/action.yml",
+            crate::configure::legacy::EXACT_SC_COMPOSE_04_REASON,
+        );
+        let mut artifacts = Vec::new();
+
+        add_reviewed_removals(&request, &plan, &mut artifacts).expect("allowlisted removal");
+        crate::configure::apply::commit(artifacts).expect("commit removal");
+
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn apply_rejects_forged_or_near_match_removal_operations() {
+        let root = tempfile::tempdir().expect("root");
+        let request = request(root.path().to_path_buf());
+        let plan = remove_plan(
+            ".just/similarly-named-but-user-owned.py",
+            crate::configure::legacy::EXACT_SC_COMPOSE_04_REASON,
+        );
+        let mut artifacts = Vec::new();
+
+        let error = add_reviewed_removals(&request, &plan, &mut artifacts)
+            .expect_err("near-match path is not removable");
+
+        assert_eq!(error.code(), "CLI.CONFIGURE_UNMANAGED_COLLISION");
+        assert!(artifacts.is_empty());
+    }
+}

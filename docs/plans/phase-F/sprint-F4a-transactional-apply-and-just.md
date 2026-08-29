@@ -41,6 +41,16 @@ not wait for optional Wyvern qualification or page implementation.
 - `docs-bundle/upgrade.md`
 - `docs-bundle/troubleshooting.md`
 
+## F.4a-authorized cross-sprint extension
+
+ADR-014 authorizes F.4a to extend the bounded F.2 planner and top-level
+configure apply boundary only where that is necessary to execute a reviewed,
+digest-gated legacy removal. Therefore `scripts/sc_lint_configure.py`,
+`crates/sc-lint/src/command.rs`, `crates/sc-lint/src/cli.rs`, and their
+configure tests are in scope for the finite `propose_remove` operation and its
+apply-side allowlist. This is not a schema change, a general repository probe,
+or an expansion of F.2's conventional-path collector.
+
 ## Deliverables
 
 - `configure --apply` accepts only a plan whose identifier and source digests
@@ -150,8 +160,9 @@ or plugin surface is created.
 - transaction fault-injection tests at each write/rename/validation stage
 - `ManagedArtifact` extension fixture with a test-only synthetic second type
 - TOML, Just, and JSON syntax validation fixtures
-- `LINT-SC-CLI-DISPATCH` against the registered `ConfigureCommand` and
-  `ConfigureError` `BOUNDARY-ScLintCli` roots
+- `LINT-SC-CLI-DISPATCH` against the registered `Command::Configure`,
+  `command::ConfigureRequest`, and shared `CliError` `BOUNDARY-ScLintCli`
+  roots
 - empty/existing/marker-conflict/stale-plan/legacy-near-miss fixtures
 - `just lint`
 - `just test`

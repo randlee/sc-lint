@@ -10,6 +10,8 @@ copy them into temporary Rust repositories before planning and applying.
   `modified-marker` must be no-write conflicts.
 - `reserved-*` covers every product-owned recipe name. None may be shadowed
   through a Just import.
+- `legacy-near-miss` is a similarly named old-action path with different
+  bytes. It must never yield a removal operation or a deletion during apply.
 
 The generated managed Justfile is checked against its Windows bootstrap form
 (`& .\\.sc-lint\\bootstrap.ps1`) by the same external test; this fixture set

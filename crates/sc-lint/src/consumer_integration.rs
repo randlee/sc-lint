@@ -279,7 +279,12 @@ fn set_bootstrap_permissions(path: &Path) -> Result<(), CliError> {
             use std::os::unix::fs::PermissionsExt;
             let mut permissions = fs::metadata(path)
                 .map_err(|error| {
-                    CliError::config("failed to inspect generated bootstrap").with_source(error)
+                    CliError::config("failed to inspect generated bootstrap")
+                        .with_source(error)
+                        .with_suggested_action(
+                            "Check file permissions, then rerun `sc-lint init --just`.",
+                        )
+                        .with_documentation(DOCS_SETUP_REFERENCE)
                 })?
                 .permissions();
             permissions.set_mode(0o755);
