@@ -813,6 +813,17 @@ fn python_command() -> OsString {
     }
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Reserved bootstrap commands must return the same top-level CliError contract as real command paths."
+)]
+fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<CommandSuccess, CliError> {
+    Err(CliError::capability(format!(
+        "{} is a reserved contract surface. {follow_up}",
+        context.command_id()
+    )))
+}
+
 #[cfg(test)]
 mod configure_script_tests {
     use super::*;
@@ -841,15 +852,4 @@ mod configure_script_tests {
         .expect("installed candidate resolves");
         assert_eq!(resolved, planner);
     }
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Reserved bootstrap commands must return the same top-level CliError contract as real command paths."
-)]
-fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<CommandSuccess, CliError> {
-    Err(CliError::capability(format!(
-        "{} is a reserved contract surface. {follow_up}",
-        context.command_id()
-    )))
 }
