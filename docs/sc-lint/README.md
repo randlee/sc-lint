@@ -30,6 +30,8 @@ Contents:
   portability plan
 - [`phase-D-plan.md`](../plans/phase-D/phase-D-plan.md) — Phase D
   boundary-inventory improvement plan
+- [`python-bindings.md`](./python-bindings.md) — the `sc-lint` Python wheel:
+  pyo3 surface, consumer venv provisioning, and the PyPI release channel
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and phase-plan touchpoint guide
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —

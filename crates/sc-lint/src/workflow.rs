@@ -22,6 +22,7 @@ pub(crate) struct StepPlan {
     kind: String,
     command: OsString,
     args: Vec<OsString>,
+    env: Vec<(OsString, OsString)>,
 }
 
 impl StepPlan {
@@ -36,7 +37,13 @@ impl StepPlan {
             kind: kind.into(),
             command: command.into(),
             args: args.into_iter().map(Into::into).collect(),
+            env: Vec::new(),
         }
+    }
+
+    fn with_env(mut self, key: impl Into<OsString>, value: impl Into<OsString>) -> Self {
+        self.env.push((key.into(), value.into()));
+        self
     }
 
     pub(crate) fn name(&self) -> &str {
@@ -112,6 +119,7 @@ impl SystemAdapter for HostSystemAdapter {
         let output = ProcessCommand::new(&step.command)
             .current_dir(repo_root)
             .args(&step.args)
+            .envs(step.env.iter().map(|(key, value)| (key, value)))
             .output()
             .map_err(|error| {
                 let missing = error.kind() == std::io::ErrorKind::NotFound;
@@ -420,10 +428,10 @@ fn lint_profile_plan(
     let mut plan = match profile {
         LintProfile::Fast => vec![
             cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
-            python_step(repo_root, "version", "lint", ".just/check_version_sync.py"),
-            python_step(repo_root, "manifests", "lint", ".just/lint_manifests.py"),
-            python_step(repo_root, "spell", "lint", ".just/lint_codespell.py"),
-            python_step(repo_root, "pytests", "lint", ".just/run_pytests.py"),
+            python_step(repo_root, "version", "lint", "sc_lint.check_version_sync"),
+            python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
+            python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
+            python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
         ],
         LintProfile::Full => vec![
             cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
@@ -439,35 +447,25 @@ fn lint_profile_plan(
                     "warnings",
                 ],
             ),
-            python_step(repo_root, "deny", "lint", ".just/lint_cargo_deny.py"),
-            python_step(repo_root, "shear", "lint", ".just/lint_cargo_shear.py"),
-            python_step(repo_root, "version", "lint", ".just/check_version_sync.py"),
-            python_step(repo_root, "manifests", "lint", ".just/lint_manifests.py"),
-            python_step(repo_root, "spell", "lint", ".just/lint_codespell.py"),
-            python_step(repo_root, "pytests", "lint", ".just/run_pytests.py"),
-            python_step(
-                repo_root,
-                "sc-boundary",
-                "lint",
-                ".just/lint_sc_boundary.py",
-            ),
+            python_step(repo_root, "deny", "lint", "sc_lint.lint_cargo_deny"),
+            python_step(repo_root, "shear", "lint", "sc_lint.lint_cargo_shear"),
+            python_step(repo_root, "version", "lint", "sc_lint.check_version_sync"),
+            python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
+            python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
+            python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
+            python_step(repo_root, "sc-boundary", "lint", "sc_lint.lint_sc_boundary"),
             python_step(
                 repo_root,
                 "sc-portability",
                 "lint",
-                ".just/lint_sc_portability.py",
+                "sc_lint.lint_sc_portability",
             ),
-            python_step(
-                repo_root,
-                "line-counts",
-                "lint",
-                ".just/lint_line_counts.py",
-            ),
+            python_step(repo_root, "line-counts", "lint", "sc_lint.lint_line_counts"),
             python_step(
                 repo_root,
                 "identity-literals",
                 "lint",
-                ".just/lint_identity_literals.py",
+                "sc_lint.lint_identity_literals",
             ),
         ],
         LintProfile::Ci => vec![
@@ -484,23 +482,18 @@ fn lint_profile_plan(
                     "warnings",
                 ],
             ),
-            python_step(repo_root, "deny", "lint", ".just/lint_cargo_deny.py"),
-            python_step(repo_root, "shear", "lint", ".just/lint_cargo_shear.py"),
-            python_step(repo_root, "version", "lint", ".just/check_version_sync.py"),
-            python_step(repo_root, "manifests", "lint", ".just/lint_manifests.py"),
-            python_step(repo_root, "spell", "lint", ".just/lint_codespell.py"),
-            python_step(repo_root, "pytests", "lint", ".just/run_pytests.py"),
-            python_step(
-                repo_root,
-                "sc-boundary",
-                "lint",
-                ".just/lint_sc_boundary.py",
-            ),
+            python_step(repo_root, "deny", "lint", "sc_lint.lint_cargo_deny"),
+            python_step(repo_root, "shear", "lint", "sc_lint.lint_cargo_shear"),
+            python_step(repo_root, "version", "lint", "sc_lint.check_version_sync"),
+            python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
+            python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
+            python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
+            python_step(repo_root, "sc-boundary", "lint", "sc_lint.lint_sc_boundary"),
             python_step(
                 repo_root,
                 "sc-portability",
                 "lint",
-                ".just/lint_sc_portability.py",
+                "sc_lint.lint_sc_portability",
             ),
             // REQ-CLI-015: the CI profile never includes xwin-only steps.
         ],
@@ -561,22 +554,13 @@ fn cargo_step(
     StepPlan::new(name, kind, "cargo", args)
 }
 
-fn python_step(
-    repo_root: &Path,
-    name: &'static str,
-    kind: &'static str,
-    relative_script: &str,
-) -> StepPlan {
-    StepPlan::new(
-        name,
-        kind,
-        python_command(),
-        [repo_root.join(relative_script).into_os_string()],
-    )
-}
-
-fn python_command() -> &'static str {
-    if cfg!(windows) { "python" } else { "python3" }
+fn python_step(repo_root: &Path, name: &'static str, kind: &'static str, module: &str) -> StepPlan {
+    let interpreter = crate::python_adapter::PythonInterpreter::resolve(repo_root);
+    let step = StepPlan::new(name, kind, interpreter.program, ["-m", module]);
+    match interpreter.python_path {
+        Some(python_path) => step.with_env("PYTHONPATH", python_path),
+        None => step,
+    }
 }
 
 #[expect(
