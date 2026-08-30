@@ -111,8 +111,8 @@ class ConsumerContractTests(unittest.TestCase):
         )
         for name in ("bootstrap", "bootstrap.ps1"):
             self.assertEqual(
-                (ROOT / "packages/sc-lint-adoption/.sc-lint" / name).read_bytes(),
-                (ROOT / "crates/sc-lint/assets" / name).read_bytes(),
+                (ROOT / "packages/sc-lint-adoption/.sc-lint" / name).read_text(encoding="utf-8"),
+                (ROOT / "crates/sc-lint/assets" / name).read_text(encoding="utf-8"),
                 f"packages/sc-lint-adoption/.sc-lint/{name} drifted from the product asset",
             )
 
