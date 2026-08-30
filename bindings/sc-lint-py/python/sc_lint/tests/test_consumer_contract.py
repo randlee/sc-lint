@@ -138,3 +138,52 @@ class ConsumerContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PosixBootstrapNonMutatingSetupTests(unittest.TestCase):
+    """`setup --check`/`--dry-run` must never fetch a release, even when the
+    managed binary fails its compatibility check (SC-QA-101)."""
+
+    def _run_setup(self, flag: str, tmp: Path) -> tuple[subprocess.CompletedProcess[str], Path]:
+        install_dir = tmp / "managed"
+        install_dir.mkdir()
+        log = tmp / "calls.log"
+        fake_binary = install_dir / "sc-lint"
+        fake_binary.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"$*\" >> '{log}'\n"
+            'for a in "$@"; do [ "$a" = "compatibility" ] && exit 1; done\n'
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        fake_binary.chmod(0o755)
+        tools = tmp / "tools"
+        tools.mkdir()
+        curl = tools / "curl"
+        curl.write_text(f"#!/bin/sh\nprintf 'curl %s\\n' \"$*\" >> '{log}'\nexit 7\n", encoding="utf-8")
+        curl.chmod(0o755)
+        env = {
+            "PATH": f"{tools}:/usr/bin:/bin",
+            "HOME": str(tmp),
+            "SC_LINT_INSTALL_DIR": str(install_dir),
+        }
+        result = subprocess.run(
+            ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "setup", "--config", str(ROOT / "sc-lint.toml"), flag],
+            cwd=tmp,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        return result, log
+
+    def test_setup_check_and_dry_run_reuse_an_incompatible_managed_binary_without_fetching(self) -> None:
+        import tempfile
+
+        for flag in ("--check", "--dry-run"):
+            with tempfile.TemporaryDirectory() as raw:
+                result, log = self._run_setup(flag, Path(raw))
+                calls = log.read_text(encoding="utf-8") if log.exists() else ""
+                self.assertEqual(result.returncode, 0, (flag, result.stdout, result.stderr, calls))
+                self.assertNotIn("curl", calls, (flag, calls))
+                self.assertIn(f"setup {flag}", calls, (flag, calls))

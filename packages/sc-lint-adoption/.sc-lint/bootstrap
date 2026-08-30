@@ -177,7 +177,7 @@ ensure_product() {
     if "$product_binary" --config "$config" compatibility check --binary "$product_binary"; then return; fi
     if [ "$product_binary" = "$managed_binary" ]; then
         for argument in "$@"; do
-            if [ "$argument" = "--dry-run" ]; then
+            if [ "$argument" = "--check" ] || [ "$argument" = "--dry-run" ]; then
                 "$product_binary" --config "$config" setup "$@"
                 return
             fi
@@ -191,19 +191,19 @@ ensure_product() {
 
 case "$operation" in
     setup)
-        ensure_product
+        ensure_product "$@"
         "$product_binary" --config "$config" setup "$@" || exit $?
         provision_venv "$(venv_mode "$@")"
         exit $?
         ;;
     lint)
-        ensure_product
+        ensure_product "$@"
         provision_venv install || exit $?
         if [ -n "$selector" ]; then exec "$product_binary" lint --consumer --config "$config" ci --profile "$selector"; fi
         exec "$product_binary" lint --consumer --config "$config" ci
         ;;
     test)
-        ensure_product
+        ensure_product "$@"
         provision_venv install || exit $?
         if [ -n "$selector" ]; then exec "$product_binary" test --config "$config" "$selector"; fi
         exec "$product_binary" test --config "$config"

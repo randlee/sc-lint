@@ -165,7 +165,7 @@ function Ensure-Product {
     & $script:productBinary --config $Config compatibility check --binary $script:productBinary
     if ($LASTEXITCODE -ne 0) {
         if (Test-ManagedBinary $script:productBinary) {
-            if ($remaining -contains "--dry-run") {
+            if ($remaining -contains "--check" -or $remaining -contains "--dry-run") {
                 & $script:productBinary --config $Config setup @remaining
                 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             } else {
