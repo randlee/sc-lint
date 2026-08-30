@@ -34,3 +34,6 @@ reports/
 # Repo-local Python helper venv provisioned by .sc-lint/bootstrap setup / just setup
 .sc-lint/venv/
 .sc-lint/wheels/
+
+# Patch/merge backups
+*.orig

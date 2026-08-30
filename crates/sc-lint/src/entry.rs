@@ -16,6 +16,7 @@ use crate::command::CommandContext;
 use crate::command::DispatchTelemetry;
 use crate::config;
 use crate::config::LoadedConfig;
+use crate::consts;
 use crate::error::CliError;
 use crate::render;
 use crate::render::RenderedOutput;
@@ -96,7 +97,7 @@ where
                 Ok(context) => context,
                 Err(error) => {
                     let rendered = render_error(
-                        "cli.parse_error",
+                        consts::ACTION_CLI_PARSE_ERROR,
                         OutputMode::from_json_flag(cli.json),
                         &error,
                     );
@@ -147,7 +148,7 @@ pub(crate) fn execute(
             let summary = envelope
                 .data
                 .as_ref()
-                .and_then(|value| value.get("summary"))
+                .and_then(|value| value.get(consts::FIELD_SUMMARY))
                 .and_then(Value::as_str)
                 .unwrap_or("command completed")
                 .to_string();
@@ -191,7 +192,7 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
             );
             ImmediateOutcome {
                 rendered: render_error(
-                    "cli.parse_error",
+                    consts::ACTION_CLI_PARSE_ERROR,
                     OutputMode::from_json_flag(json_mode),
                     &cli_error,
                 ),

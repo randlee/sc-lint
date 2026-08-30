@@ -534,6 +534,16 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
         },
     )
     .expect("generate fixture");
+    // The bootstrap provisions `.sc-lint/venv` from PyPI; point it at the
+    // wheels `just setup` built so the fixture stays offline.
+    let wheel_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.sc-lint/wheels");
+    if !wheel_dir.is_dir() {
+        eprintln!(
+            "skipping: run `just setup` to build {}",
+            wheel_dir.display()
+        );
+        return;
+    }
     let bin_dir = root.join("bin");
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
@@ -556,6 +566,7 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
+            .env("SC_LINT_WHEEL_DIR", &wheel_dir)
             .output()
             .expect("run just fixture");
         assert!(
@@ -599,6 +610,16 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
         },
     )
     .expect("generate fixture");
+    // The bootstrap provisions `.sc-lint/venv` from PyPI; point it at the
+    // wheels `just setup` built so the fixture stays offline.
+    let wheel_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.sc-lint/wheels");
+    if !wheel_dir.is_dir() {
+        eprintln!(
+            "skipping: run `just setup` to build {}",
+            wheel_dir.display()
+        );
+        return;
+    }
     let bootstrap = fixture.path().join(".sc-lint/bootstrap.ps1");
     let record = fixture.path().join("calls.txt");
     let binary = fixture.path().join("sc-lint.cmd");
@@ -616,6 +637,7 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
         .current_dir(fixture.path())
         .env("SC_LINT_BIN", &binary)
         .env("SC_LINT_RECORD", &record)
+        .env("SC_LINT_WHEEL_DIR", &wheel_dir)
         .output()
         .expect("run Windows bootstrap");
     assert!(
