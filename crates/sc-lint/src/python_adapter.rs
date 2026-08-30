@@ -151,7 +151,7 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
         .with_detail("expected_schema", json!(ADAPTER_SCHEMA)));
     }
     let summary = object
-        .get("summary")
+        .get(consts::FIELD_SUMMARY)
         .and_then(Value::as_str)
         .unwrap_or("python adapter completed")
         .to_string();
@@ -174,9 +174,9 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
             ))
             .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         })?;
-    let kind = parse_error_kind(tool, error_object.get("kind"))?;
+    let kind = parse_error_kind(tool, error_object.get(consts::FIELD_KIND))?;
     let message = error_object
-        .get("message")
+        .get(consts::FIELD_MESSAGE)
         .and_then(Value::as_str)
         .ok_or_else(|| {
             CliError::backend_protocol(format!(
@@ -189,10 +189,16 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
     let mut error = CliError::new(kind, message)
         .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()));
-    if let Some(details) = error_object.get("details").and_then(Value::as_object) {
+    if let Some(details) = error_object
+        .get(consts::FIELD_DETAILS)
+        .and_then(Value::as_object)
+    {
         error = merge_details(error, details);
     }
-    if let Some(action) = error_object.get("suggested_action").and_then(Value::as_str) {
+    if let Some(action) = error_object
+        .get(consts::FIELD_SUGGESTED_ACTION)
+        .and_then(Value::as_str)
+    {
         error = error.with_suggested_action(action);
     }
     Ok(AdapterResult {
@@ -295,25 +301,9 @@ fn python_module_command(repo_root: &std::path::Path) -> ProcessCommand {
     command
 }
 
-pub(crate) fn adapter_kind_for_command(command_id: &str) -> Option<&'static str> {
-    python_tool_for_command(command_id).map(|_| ADAPTER_SCHEMA)
-}
-
-pub(crate) fn adapter_config_scope_for_command(command_id: &str) -> Option<&'static str> {
-    python_tool_for_command(command_id).map(PythonTool::config_scope)
-}
-
-pub(crate) fn adapter_script_for_command(command_id: &str) -> Option<&'static str> {
-    python_tool_for_command(command_id).map(PythonTool::script_relative_path)
-}
-
-fn python_tool_for_command(command_id: &str) -> Option<PythonTool> {
-    match command_id {
-        "lint.line-counts" => Some(PythonTool::LineCounts),
-        "lint.identity-literals" => Some(PythonTool::IdentityLiterals),
-        "view.findings" => Some(PythonTool::ViewFindings),
-        _ => None,
-    }
+/// Adapter schema identifier shared by every Python-backed tool.
+pub(crate) const fn adapter_kind() -> &'static str {
+    ADAPTER_SCHEMA
 }
 
 #[cfg(test)]

@@ -430,7 +430,7 @@ def emit_inventory(args: argparse.Namespace) -> int:
                 "required": distribution["required"],
                 "publish": distribution["publish"],
                 "verifyCommands": [
-                    f"python3 -m pip download {distribution['package']}=={args.version} --no-deps -d /tmp/sc-lint-wheel",
+                    f"python3 -m pip download {distribution['package']}=={args.version} --no-deps --dest <download-dir>",
                     'python3 -c "import sc_lint; print(sc_lint.__version__)"',
                 ],
             }

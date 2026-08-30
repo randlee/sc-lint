@@ -250,25 +250,35 @@ impl CommandId {
             Self::LintScBoundary => Some(consts::TOOL_BOUNDARY),
             Self::LintScPortability => Some(consts::TOOL_PORTABILITY),
             Self::LintScRuntime => Some(consts::TOOL_RUNTIME),
-            Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts.tool_name()),
-            Self::LintIdentityLiterals => {
-                Some(python_adapter::PythonTool::IdentityLiterals.tool_name())
-            }
-            Self::ViewFindings => Some(python_adapter::PythonTool::ViewFindings.tool_name()),
+            _ => match self.python_tool() {
+                Some(tool) => Some(tool.tool_name()),
+                None => None,
+            },
+        }
+    }
+
+    /// Python-backed tool behind this command, if any.
+    pub const fn python_tool(self) -> Option<python_adapter::PythonTool> {
+        match self {
+            Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts),
+            Self::LintIdentityLiterals => Some(python_adapter::PythonTool::IdentityLiterals),
+            Self::ViewFindings => Some(python_adapter::PythonTool::ViewFindings),
             _ => None,
         }
     }
 
     pub fn adapter_kind(self) -> Option<&'static str> {
-        python_adapter::adapter_kind_for_command(self.as_str())
+        self.python_tool().map(|_| python_adapter::adapter_kind())
     }
 
     pub fn adapter_config_scope(self) -> Option<&'static str> {
-        python_adapter::adapter_config_scope_for_command(self.as_str())
+        self.python_tool()
+            .map(python_adapter::PythonTool::config_scope)
     }
 
     pub fn adapter_script(self) -> Option<&'static str> {
-        python_adapter::adapter_script_for_command(self.as_str())
+        self.python_tool()
+            .map(python_adapter::PythonTool::script_relative_path)
     }
 
     pub const fn is_xwin_preflight(self) -> bool {

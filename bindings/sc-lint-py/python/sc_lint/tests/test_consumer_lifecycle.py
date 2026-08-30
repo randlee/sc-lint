@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import hashlib
 import http.server
@@ -232,6 +233,9 @@ class ConsumerLifecycleTests(unittest.TestCase):
                     resolved = shutil.which(command)
                     if resolved:
                         command_dirs.append(Path(resolved).parent)
+                # Windows has no /usr/bin: the bootstrap needs a host python
+                # on PATH to create the consumer venv.
+                command_dirs.append(Path(sys.executable).parent)
             environment["PATH"] = os.pathsep.join(
                 str(path) for path in command_dirs if path.is_dir()
             )
@@ -383,6 +387,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 resolved = shutil.which(command)
                 self.assertIsNotNone(resolved, f"{command} is required for this fixture")
                 command_dirs.append(str(Path(resolved).parent))
+            # The bootstrap needs a host python on PATH to create the consumer venv.
+            command_dirs.append(str(Path(sys.executable).parent))
             environment["PATH"] = os.pathsep.join(command_dirs)
             environment["SC_LINT_RELEASE_BASE_URL"] = "http://127.0.0.1:9/unreachable"
 
