@@ -30,9 +30,10 @@ owner: flint
 - reference: `../sc-publish/plugins/sc-publish/.github/scripts/bootstrap_sc_compose.py`
   and `../sc-compose/bindings/` (existing maturin layout in the ecosystem)
 - `sc-publish` PyPI channel (`pypi-publish.yml`) already vendored here
-- existing helpers: `.just/run_lint.py`, `.just/lint_common.py`,
+- existing helpers: all 21 `.just/*.py` modules on `develop` (enumerated
+  under Exact Targets), including `.just/run_lint.py`, `.just/lint_common.py`,
   `.just/lint_identity_literals.py`, `.just/check_version_sync.py`,
-  `.just/python_adapter.py`, `.just/view_*.py`
+  `.just/python_adapter.py`, `.just/view_common.py`, `.just/view_findings.py`
 
 ## Exact Targets
 
@@ -40,7 +41,19 @@ owner: flint
 - `bindings/sc-lint-py/pyproject.toml` (new)
 - `bindings/sc-lint-py/src/lib.rs` (new; thin pyo3 surface over existing crate APIs — **no new logic**)
 - `bindings/sc-lint-py/python/sc_lint/__init__.py` (new)
-- `bindings/sc-lint-py/python/sc_lint/{run_lint,lint_common,lint_identity_literals,check_version_sync,view}.py` (moved from `.just/`; `lint_common`/`lint_identity_literals` carry G.3c's parser fix per the cross-stack reconciliation entry)
+- `bindings/sc-lint-py/python/sc_lint/` — all 21 `.just/*.py` helpers moved
+  1:1, none dropped: `check_version_sync`, `fixture_constants`,
+  `lint_boundaries`, `lint_cargo_deny`, `lint_cargo_modules`,
+  `lint_cargo_shear`, `lint_codespell`, `lint_common`,
+  `lint_identity_literals`, `lint_line_counts`, `lint_manifests`,
+  `lint_sc_boundary`, `lint_sc_portability`, `print_help`, `python_adapter`
+  (the Python-side adapter protocol; the Rust `python_adapter.rs` below is
+  its caller, not a replacement), `run_fmt`, `run_lint`, `run_pytests`,
+  `run_version`, `view_common`, `view_findings`; plus `.just/tests/` moved to
+  `sc_lint/tests/`. `lint_common`/`lint_identity_literals` carry G.3c's
+  parser fix per the cross-stack reconciliation entry.
+- `bindings/sc-lint-py/python/sc_lint/{_binary,source_venv}.py` (new; product
+  binary lookup and the source-checkout venv provisioner)
 - `boundaries/sc-lint-py/python-bindings.toml` (new)
 - `.just/*.py` (every source-maintainer helper removed; the Justfile runs
   `python -m sc_lint.<module>` from `.sc-lint/venv` instead). This deletion
