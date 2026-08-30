@@ -47,6 +47,7 @@ owner: flint
 - `.github/workflows/release.yml` (wheel matrix: Linux x86_64, macOS x86_64/arm64, Windows x86_64; abi3)
 - `docs/sc-lint/python-bindings.md` (new)
 - `Cargo.toml` (workspace member)
+- `crates/sc-lint/src/{entry,python_adapter,command}.rs` (embedder entry point `sc_lint._native.run`; helpers dispatched as `python -m sc_lint.<module>`; typed `CommandId::python_tool`)
 
 ## Binding Boundary
 
