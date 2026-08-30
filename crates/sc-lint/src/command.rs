@@ -492,12 +492,7 @@ pub(crate) fn execute(
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
     match context.id() {
-        CommandId::Version => Ok(CommandSuccess::direct(json!({
-            consts::FIELD_TOOL: consts::SERVICE_NAME,
-            consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
-            "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
-            consts::FIELD_STATUS: "pass",
-        }))),
+        CommandId::Version => Ok(CommandSuccess::direct(version_payload())),
         CommandId::CompatibilityCheck => Ok(CommandSuccess::direct(
             loaded_config.evaluate_compatibility(context.compatibility_binary())?,
         )),
@@ -559,4 +554,13 @@ fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<Command
         "{} is a reserved contract surface. {follow_up}",
         context.command_id()
     )))
+}
+
+pub(crate) fn version_payload() -> Value {
+    json!({
+        consts::FIELD_TOOL: consts::SERVICE_NAME,
+        consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
+        "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
+        consts::FIELD_STATUS: "pass",
+    })
 }

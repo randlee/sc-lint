@@ -49,7 +49,11 @@ pub struct ImmediateOutcome {
 
 impl ImmediateOutcome {
     pub fn write(self) -> ExitCode {
-        write_rendered_output(self.rendered, self.exit_code)
+        ExitCode::from(self.write_code())
+    }
+
+    pub fn write_code(self) -> u8 {
+        emit_rendered_output(self.rendered, self.exit_code)
     }
 }
 
@@ -98,6 +102,16 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
+    ExitCode::from(run_code(args))
+}
+
+/// Runs the CLI and returns the process exit code without terminating the
+/// process. Embedders (the Python bindings) use this entry point.
+pub fn run_code<I, T>(args: I) -> u8
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
     match parse_args(args) {
         ParsedInvocation::Ready(cli) => {
             let context = match command::CommandContext::from_cli(&cli) {
@@ -108,7 +122,7 @@ where
                         OutputMode::from_json_flag(cli.json),
                         &error,
                     );
-                    return write_rendered_output(rendered, error.exit_code());
+                    return emit_rendered_output(rendered, error.exit_code());
                 }
             };
             let loaded_config = match config::LoadedConfig::load(&cli, &context) {
@@ -119,13 +133,13 @@ where
                         OutputMode::from_json_flag(cli.json),
                         &error,
                     );
-                    return write_rendered_output(rendered, error.exit_code());
+                    return emit_rendered_output(rendered, error.exit_code());
                 }
             };
             let outcome = execute(context, &loaded_config, cli.json);
-            write_rendered_output(outcome.rendered, outcome.exit_code)
+            emit_rendered_output(outcome.rendered, outcome.exit_code)
         }
-        ParsedInvocation::Immediate(outcome) => outcome.write(),
+        ParsedInvocation::Immediate(outcome) => outcome.write_code(),
     }
 }
 
@@ -242,13 +256,22 @@ pub(crate) fn render_failure(
 }
 
 pub(crate) fn write_rendered_output(rendered: RenderedOutput, exit_code: u8) -> ExitCode {
+    ExitCode::from(emit_rendered_output(rendered, exit_code))
+}
+
+fn emit_rendered_output(rendered: RenderedOutput, exit_code: u8) -> u8 {
     if let Some(stdout) = rendered.stdout {
         println!("{stdout}");
     }
     if let Some(stderr) = rendered.stderr {
         eprintln!("{stderr}");
     }
-    ExitCode::from(exit_code)
+    exit_code
+}
+
+/// Returns the `sc-lint version` JSON payload as a string.
+pub fn version_json() -> String {
+    command::version_payload().to_string()
 }
 
 #[cfg(test)]
