@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false,"required":["minimum_version","profiles","ci","analyzers"],"properties":{"minimum_version":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+$"},"profiles":{"type":"object"},"ci":{"type":"object"},"analyzers":{"type":"object"},"test":{"type":"object"}}}
