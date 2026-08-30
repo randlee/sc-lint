@@ -1,0 +1,1 @@
+{"minimum_version":"0.5.0","profiles":{"ci":["cargo","check"]},"ci":{"os":["linux"],"enabled":true},"analyzers":{"runtime":{"enabled":false,"reason":"non-tokio"},"portability":{"enabled":true,"targets":["linux"]}},"test":{"unit":["cargo","test"]}}

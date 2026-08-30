@@ -10,6 +10,7 @@ use crate::CliError;
 use crate::ClippyTarget;
 use crate::cli::LintProfile;
 use crate::command::CommandSuccess;
+use crate::config::CONSUMER_SELECTOR_ALL;
 use crate::config::ConsumerProfile;
 use crate::config::LoadedConfig;
 use crate::consts;
@@ -179,16 +180,32 @@ pub fn run_lint_profile(
     clippy::result_large_err,
     reason = "Consumer lint profiles retain the shared top-level CliError contract."
 )]
-pub fn run_consumer_lint_profile(loaded_config: &LoadedConfig) -> Result<CommandSuccess, CliError> {
-    run_consumer_profile_with(loaded_config, ConsumerProfile::Lint, &HostSystemAdapter)
+pub fn run_consumer_lint_profile(
+    loaded_config: &LoadedConfig,
+    selector: Option<&str>,
+) -> Result<CommandSuccess, CliError> {
+    run_consumer_profile_with(
+        loaded_config,
+        ConsumerProfile::Lint,
+        selector,
+        &HostSystemAdapter,
+    )
 }
 
 #[expect(
     clippy::result_large_err,
     reason = "Consumer test profiles retain the shared top-level CliError contract."
 )]
-pub fn run_consumer_test_profile(loaded_config: &LoadedConfig) -> Result<CommandSuccess, CliError> {
-    run_consumer_profile_with(loaded_config, ConsumerProfile::Test, &HostSystemAdapter)
+pub fn run_consumer_test_profile(
+    loaded_config: &LoadedConfig,
+    selector: Option<&str>,
+) -> Result<CommandSuccess, CliError> {
+    run_consumer_profile_with(
+        loaded_config,
+        ConsumerProfile::Test,
+        selector,
+        &HostSystemAdapter,
+    )
 }
 
 #[expect(
@@ -255,9 +272,10 @@ pub(crate) fn run_lint_profile_with(
 pub(crate) fn run_consumer_profile_with(
     loaded_config: &LoadedConfig,
     profile: ConsumerProfile,
+    selector: Option<&str>,
     adapter: &dyn SystemAdapter,
 ) -> Result<CommandSuccess, CliError> {
-    let (root, configured_steps) = loaded_config.consumer_profile(profile)?;
+    let (root, configured_steps) = loaded_config.consumer_profile(profile, selector)?;
     let plans = configured_steps
         .iter()
         .map(|step| {
@@ -272,6 +290,7 @@ pub(crate) fn run_consumer_profile_with(
     Ok(CommandSuccess::direct(json!({
         "status": "pass",
         "profile": profile.as_str(),
+        "selector": selector.unwrap_or(CONSUMER_SELECTOR_ALL),
         "step_count": steps.len(),
         "steps": steps.into_iter().map(|step| step.to_json()).collect::<Vec<_>>(),
     })))
