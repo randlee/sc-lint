@@ -33,6 +33,19 @@ crashing the Python adapter.
    - `ci` excludes `xwin`
    - real Windows CI remains the authoritative release gate
 
+3. Issue `#84` (`full`/`ci` profiles ran `cargo run -p sc-lint-boundary`
+   through source-tree scripts) is closed by sprint G.3b.
+   Current status:
+   - `full` and `ci` re-enter the running `sc-lint` executable for
+     `sc-boundary` and `sc-portability`
+   - `sc-lint version --json` reports `self_contained`
+   - CI job `release-smoke` runs the kit recipes from a staged archive with no
+     `.just/` directory on Linux, macOS, and Windows
+   - Deferred, not dropped: the kit-copy byte-identity `cmp` CI check for
+     `.sc-lint/bootstrap*` and `just test-adoption` depend on the adoption kit
+     from `sprint/G.1-adoption-kit`; they land in the G.1 → G.3b
+     reconciliation once G.1 has merged to `develop`
+
 ## Process / QA / Triage Scope
 
 Phase A planning did not introduce a new ATM workflow, QA-routing scheme, or

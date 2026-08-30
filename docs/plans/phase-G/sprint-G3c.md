@@ -19,8 +19,12 @@ are accepted without widening the release or adoption-kit scope.
 
 ## Hard Dependencies
 
-- none; this disjoint targeted-fix stack roots directly on `develop` and has
-  no touch point with Stack A or Stack B
+- none as start dependencies; this targeted-fix stack roots directly on
+  `develop` and has no touch point with Stack A. Its one touch point with
+  Stack B is the `.just/` helper reconciliation named in
+  `phase-G-plan.md` (G.3a removes `.just/*.py` and ships the fixed modules
+  from the `sc_lint` wheel); it is resolved by merge-forward after both
+  stacks land and does not gate G.3c.
 
 ## Exact Targets
 

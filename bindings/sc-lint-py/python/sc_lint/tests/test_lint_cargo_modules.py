@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+
+from sc_lint.lint_cargo_modules import module_cycle_command
+from sc_lint.lint_cargo_modules import run
+
+CORE_CRATE = "fixture-lib"
+CORE_PACKAGE = "synthetic-lib"
+CORE_LIB = "fixture_lib"
+
+
+class LintCargoModulesTests(unittest.TestCase):
+    def test_module_cycle_command_includes_acyclic(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            manifest_path = repo_root / "crates" / CORE_CRATE / "Cargo.toml"
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_text(
+                f'[package]\nname = "{CORE_PACKAGE}"\nversion = "1.1.2"\n[lib]\nname = "{CORE_LIB}"\n',
+                encoding="utf-8",
+            )
+            command = module_cycle_command(repo_root, manifest_path, CORE_PACKAGE)
+            self.assertIn("--acyclic", command)
+            self.assertIn("--layout", command)
+
+    @mock.patch("sc_lint.lint_cargo_modules.build_report")
+    @mock.patch("sc_lint.lint_cargo_modules.subprocess.run")
+    def test_run_reports_pass_when_all_crates_are_acyclic(
+        self,
+        subprocess_run_mock: mock.Mock,
+        build_report_mock: mock.Mock,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                f'[workspace]\nmembers = ["crates/{CORE_CRATE}"]\nresolver = "2"\n',
+                encoding="utf-8",
+            )
+            crate_dir = repo_root / "crates" / CORE_CRATE
+            crate_dir.mkdir(parents=True)
+            (crate_dir / "Cargo.toml").write_text(
+                f'[package]\nname = "{CORE_PACKAGE}"\nversion = "1.1.2"\n[lib]\nname = "{CORE_LIB}"\n',
+                encoding="utf-8",
+            )
+            subprocess_run_mock.return_value = mock.Mock(returncode=0, stdout="ok\n", stderr="")
+            self.assertEqual(run(repo_root), 0)
+            self.assertTrue(build_report_mock.called)

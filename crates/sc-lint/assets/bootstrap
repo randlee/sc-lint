@@ -37,6 +37,63 @@ install_dir="${SC_LINT_INSTALL_DIR:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/sc-
 managed_binary="$install_dir/sc-lint"
 product_binary=""
 
+# Python helper package (sc_lint wheel) provisioned next to the config file.
+venv_dir="$(cd "$(dirname "$config")" && pwd)/.sc-lint/venv"
+venv_python="$venv_dir/bin/python3"
+
+host_python() {
+    command -v python3 2>/dev/null || command -v python 2>/dev/null
+}
+
+venv_ready() {
+    [ -x "$venv_python" ] && "$venv_python" -c 'import sys, sc_lint
+parse = lambda value: tuple(int(part) for part in value.split("+")[0].split(".")[:3])
+sys.exit(0 if parse(sc_lint.__version__) >= parse(sys.argv[1]) else 1)' "$1" >/dev/null 2>&1
+}
+
+venv_mode() {
+    for argument in "$@"; do
+        case "$argument" in
+            --check) echo check; return ;;
+            --dry-run) echo dry-run; return ;;
+        esac
+    done
+    echo install
+}
+
+# provision_venv <install|check|dry-run>: ensure .sc-lint/venv holds sc-lint>=minimum_version.
+# SC_LINT_WHEEL_DIR selects an offline wheel directory instead of PyPI.
+provision_venv() {
+    version="$(minimum_version)"
+    if venv_ready "$version"; then return 0; fi
+    case "$1" in
+        check)
+            printf '%s\n' "setup: $venv_dir does not provide sc-lint>=$version (CLI.SC_LINT_PYTHON_UNAVAILABLE)" >&2
+            return 4
+            ;;
+        dry-run)
+            printf '%s\n' "setup: would install sc-lint==$version into $venv_dir"
+            return 0
+            ;;
+    esac
+    if [ ! -x "$venv_python" ]; then
+        python="$(host_python)"
+        if [ -z "$python" ] || ! "$python" -m venv "$venv_dir"; then
+            printf '%s\n' "setup: could not create $venv_dir (CLI.SC_LINT_PYTHON_UNAVAILABLE)" >&2
+            return 4
+        fi
+    fi
+    if [ -n "${SC_LINT_WHEEL_DIR:-}" ]; then
+        set -- --no-index --find-links "$SC_LINT_WHEEL_DIR"
+    else
+        set --
+    fi
+    if ! "$venv_python" -m pip install --quiet --disable-pip-version-check "$@" "sc-lint==$version"; then
+        printf '%s\n' "setup: could not install sc-lint==$version into $venv_dir (CLI.SC_LINT_PYTHON_UNAVAILABLE)" >&2
+        return 4
+    fi
+}
+
 resolve_product_binary() {
     if [ -n "${SC_LINT_BIN:-}" ] && command -v "$SC_LINT_BIN" >/dev/null 2>&1; then
         product_binary="$(command -v "$SC_LINT_BIN")"
@@ -131,14 +188,18 @@ ensure_product() {
 case "$operation" in
     setup)
         ensure_product
-        exec "$product_binary" --config "$config" setup "$@"
+        "$product_binary" --config "$config" setup "$@" || exit $?
+        provision_venv "$(venv_mode "$@")"
+        exit $?
         ;;
     lint)
         ensure_product
+        provision_venv install || exit $?
         exec "$product_binary" lint --consumer --config "$config" ci
         ;;
     test)
         ensure_product
+        provision_venv install || exit $?
         exec "$product_binary" test --config "$config"
         ;;
     upgrade)
@@ -156,6 +217,8 @@ case "$operation" in
             bootstrap_install upgrade "$@"
             exit $?
         fi
-        exec "$product_binary" --config "$config" upgrade "$@"
+        "$product_binary" --config "$config" upgrade "$@" || exit $?
+        provision_venv "$(venv_mode "$@")"
+        exit $?
         ;;
 esac

@@ -100,3 +100,86 @@ jobs:
 
       - name: Run just test
         run: just test
+
+  release-smoke:
+    # G.3b: the released archive must run every kit recipe with no source-tree
+    # helper. Stages the archive exactly like release.yml, then drives
+    # tests/fixtures/adoption/empty-workspace through `sc-lint init --just`,
+    # `just setup/lint/test`, and the bootstrap upgrade check with no `.just/`.
+    name: Release smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+          components: clippy, rustfmt
+
+      - name: Install just
+        run: cargo install just --locked
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-release-smoke-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin_args="$(python3 scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          cargo build --release ${bin_args}
+
+      - name: Build the sc_lint wheel and its dependencies for offline install
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet maturin==1.9.4
+          python -m pip wheel --wheel-dir "${RUNNER_TEMP}/wheels" bindings/sc-lint-py
+
+      - name: Stage and package the release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          docs_source="$(python3 scripts/release_artifacts.py documentation-source-directory --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          staging="${RUNNER_TEMP}/release-staging"
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            python3 scripts/release_artifacts.py stage-release-archive \
+              --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+              --binaries-directory target/release \
+              --documentation-directory "${docs_source}" \
+              --staging-directory "${staging}" --windows
+            archive="${RUNNER_TEMP}/sc-lint-smoke.zip"
+            python3 -c "import shutil,sys; shutil.make_archive(sys.argv[1][:-4], 'zip', sys.argv[2])" "${archive}" "${staging}"
+          else
+            python3 scripts/release_artifacts.py stage-release-archive \
+              --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+              --binaries-directory target/release \
+              --documentation-directory "${docs_source}" \
+              --staging-directory "${staging}"
+            archive="${RUNNER_TEMP}/sc-lint-smoke.tar.gz"
+            COPYFILE_DISABLE=1 tar czf "${archive}" -C "${staging}" .
+          fi
+          windows_flag=""
+          [[ "${RUNNER_OS}" == "Windows" ]] && windows_flag="--windows"
+          python3 scripts/release_artifacts.py validate-release-archive \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" --archive "${archive}" ${windows_flag}
+          echo "SMOKE_ARCHIVE=${archive}" >> "$GITHUB_ENV"
+
+      - name: Run the release-archive smoke test
+        shell: bash
+        run: python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}" --wheel-dir "${RUNNER_TEMP}/wheels"

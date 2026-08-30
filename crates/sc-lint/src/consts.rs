@@ -27,3 +27,12 @@ pub const FIELD_SUGGESTED_ACTION: &str = "suggested_action";
 pub const FIELD_DOCS: &str = "docs";
 pub const FIELD_STEPS: &str = "steps";
 pub const FIELD_ROOT: &str = "root";
+pub const FIELD_EXIT_CODE: &str = "exit_code";
+pub const FIELD_BACKEND_PATH: &str = "backend_path";
+
+/// Repo-relative directory of the consumer-provisioned Python virtual environment.
+pub const VENV_RELATIVE_DIR: &str = ".sc-lint/venv";
+/// Repo-relative `python-source` directory of the source checkout's wheel package.
+pub const SOURCE_PYTHON_PACKAGE_DIR: &str = "bindings/sc-lint-py/python";
+/// Documentation bundle directory shipped beside the release binaries.
+pub const DOCS_BUNDLE_DIR: &str = "sc-lint-docs";

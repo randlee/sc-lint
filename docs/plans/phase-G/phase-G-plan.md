@@ -137,14 +137,30 @@ documents were written:
 | --- | --- | --- | --- |
 | A — adoption kit | Governance and traceability under `docs/`; generic kit, fixtures, and CI under `packages/sc-lint-adoption/`, `tests/adoption/`, and `.github/workflows/ci.yml`; then the adoption skill, marketplace, and consumer guide under `packages/sc-lint-adoption/.claude/`, `.claude-plugin/`, and `docs/sc-lint/` | G.0 archives Phase F; G.1 supplies the generic kit contract; G.2 consumes that contract in agent-facing guidance. These are one coherent kit path set. | cfast (G.0); clint (G.1–G.2) |
 | B — product runtime | Wheel binding and bootstrap/release paths under `bindings/sc-lint-py/`, `.sc-lint/`, `.just/`, `crates/`, `scripts/`, and release workflows | G.3a establishes wheel entry points; G.3b closes the self-contained archive. This path set is independent of Stack A until the named reconciliation below. | flint |
-| C — targeted parser fix | Rust-literal parser and identity-literals utility under `.just/lint_common.py` and `.just/lint_identity_literals.py`, with focused tests under `.just/tests/` | G.3c is a disjoint, independently closable consumer-blocking defect fix rooted directly on `develop`; validation is the focused Python suite plus the `just lint` identity-literals target. | cfast |
+| C — targeted parser fix | Rust-literal parser and identity-literals utility under `.just/lint_common.py` and `.just/lint_identity_literals.py`, with focused tests under `.just/tests/` | G.3c is a disjoint, independently closable consumer-blocking defect fix rooted directly on `develop` (independent in start sequencing; its `.just/` path overlap with G.3a is covered by the reconciliation entry below); validation is the focused Python suite plus the `just lint` identity-literals target. | cfast |
 | External qualification | Consumer-only paths in `../sc-publish`, `../wyvern`, `../atm-core`, and `../sc-compose` | G.4a is the independently closable sc-publish delegation; G.4b qualifies greenfield `wyvern` while migrating `atm-core` as one coupled release gate; G.4c consumes wyvern's proven greenfield artifact for the established-workspace migration. G.5 is the separately authorized remaining-repository rollout. | clint (G.4a–G.5) |
 
-The only overlapping product/kit path is `.sc-lint/bootstrap*`: G.1 vendors
-the product snapshot and G.3a changes the product implementation. G.3b is
-the sole, higher reconciliation layer and only re-syncs the kit copy after
-the named Stack A merge. No stack takes another stack's commit as its branch
-base. Stack A has three delivery layers and Stack B three, so neither requires
+Two paths overlap across stacks, each with a named reconciliation:
+
+- `.sc-lint/bootstrap*` (Stacks A and B): G.1 vendors the product snapshot
+  and G.3a changes the product implementation. G.3b is the sole, higher
+  reconciliation layer and only re-syncs the kit copy after the named Stack A
+  merge.
+- `.just/lint_common.py`, `.just/lint_identity_literals.py`, and
+  `.just/tests/` (Stacks B and C): G.3c fixes the Rust-literal parser in
+  place under `.just/`, while G.3a removes every `.just/*.py` helper and
+  ships the same modules from the `sc_lint` wheel
+  (`bindings/sc-lint-py/python/sc_lint/{lint_common,lint_identity_literals}.py`
+  and `.../sc_lint/tests/`). G.3a is the reconciliation layer: it carries
+  G.3c's parser fix and tests forward into the wheel copy (ported from G.3c
+  commits `ea647cb` and `9d60a96`), so G.3a never edits the `.just/` files
+  G.3c owns — it only deletes them with the rest of `.just/*.py`. Whichever
+  stack lands on `develop` second merges `develop` forward and resolves the
+  resulting modify/delete conflict by keeping the deletion: the wheel copy is
+  authoritative and already contains G.3c's fix. This is a merge-forward
+  reconciliation, not a start dependency for either stack.
+
+No stack takes another stack's commit as its branch base. Stack A has three delivery layers and Stack B three, so neither requires
 further subdivision.
 
 ```text
@@ -172,9 +188,9 @@ External, non-branch delivery closures (not `gh stack` layers):
 | G.0 | A | G.3a and G.3b (Stack B), and G.3c (Stack C) | Phase G planning layer | `feature/phase-G-planning` is committed as Stack A's bottom planning layer. |
 | G.1 | A | G.3a and G.3b (Stack B), and G.3c (Stack C) | G.0 unblock milestone | G.0's unblock milestone is committed on `sprint/G.0-abandon-phase-F`. |
 | G.2 | A | G.3a and G.3b (Stack B), and G.3c (Stack C) | G.1 unblock milestone | G.1's unblock milestone is committed on `sprint/G.1-adoption-kit`. |
-| G.3a | B | G.0–G.2 (Stack A) and G.3c (Stack C) | No lower sprint; Stack B roots on `develop` | Stack B's bottom layer starts immediately from `develop`; it has no lower-sprint milestone. |
+| G.3a | B | G.0–G.2 (Stack A) and G.3c (Stack C) | No lower sprint; Stack B roots on `develop` | Stack B's bottom layer starts immediately from `develop`; it has no lower-sprint milestone. Its `.just/` helper touch point with G.3c is a merge-forward reconciliation (see the cross-stack entries above), not a start dependency. |
 | G.3b | B | G.0–G.2 (Stack A) and G.3c (Stack C) | G.3a unblock milestone | G.3a's unblock milestone is committed on `sprint/G.3a-python-bindings`. |
-| G.3c | C | G.0–G.2 and Stack B | No lower sprint; Stack C roots on `develop` | Stack C's bottom layer starts immediately from `develop`; it has no lower-sprint milestone or cross-stack touch point. |
+| G.3c | C | G.0–G.2 and Stack B | No lower sprint; Stack C roots on `develop` | Stack C's bottom layer starts immediately from `develop`; it has no lower-sprint milestone. Its only cross-stack touch point is the `.just/` helper reconciliation with G.3a (see the cross-stack entries above), resolved by merge-forward after both land. |
 | G.4a | external-non-branch | G.4b | Released kit Action and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |
 | G.4b | external-non-branch | G.4a | Released adopter skill and self-contained release | The versioned `sc-lint` release containing G.2 and G.3b is published. |
 | G.4c | external-non-branch | G.4a may finish independently | G.4b greenfield qualification | Both G.4b consumer PR merge commits exist with their required CI and drift checks green. |
@@ -189,6 +205,12 @@ and the kit copy is re-synced byte-for-byte. That later merge is a named
 reconciliation condition, not a start dependency. No Stack B branch is based
 on a Stack A branch. G.3a's acceptance therefore uses `sc-lint init --just`
 on a fresh workspace, not the G.1 fixture.
+
+Second cross-stack touch point: G.3c edits `.just/lint_common.py`,
+`.just/lint_identity_literals.py`, and `.just/tests/` in place; G.3a deletes
+all `.just/*.py` and ships those modules (with G.3c's fix ported) from the
+`sc_lint` wheel. Neither stack waits for the other; the second to land merges
+`develop` forward and keeps the deletion, per the reconciliation entry above.
 
 ### Stack protocol
 
