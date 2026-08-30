@@ -352,6 +352,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 resolved = shutil.which(command)
                 self.assertIsNotNone(resolved, f"{command} is required for this fixture")
                 command_dirs.append(str(Path(resolved).parent))
+            # The bootstrap needs a host python on PATH to create the consumer venv.
+            command_dirs.append(str(Path(sys.executable).parent))
             environment["PATH"] = os.pathsep.join(command_dirs)
 
             with self.release_server(Path(temporary.name)) as release_base:
