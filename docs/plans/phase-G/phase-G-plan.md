@@ -140,11 +140,22 @@ documents were written:
 | C — targeted parser fix | Rust-literal parser and identity-literals utility under `.just/lint_common.py` and `.just/lint_identity_literals.py`, with focused tests under `.just/tests/` | G.3c is a disjoint, independently closable consumer-blocking defect fix rooted directly on `develop`; validation is the focused Python suite plus the `just lint` identity-literals target. | cfast |
 | External qualification | Consumer-only paths in `../sc-publish`, `../wyvern`, `../atm-core`, and `../sc-compose` | G.4a is the independently closable sc-publish delegation; G.4b qualifies greenfield `wyvern` while migrating `atm-core` as one coupled release gate; G.4c consumes wyvern's proven greenfield artifact for the established-workspace migration. G.5 is the separately authorized remaining-repository rollout. | clint (G.4a–G.5) |
 
-The only overlapping product/kit path is `.sc-lint/bootstrap*`: G.1 vendors
-the product snapshot and G.3a changes the product implementation. G.3b is
-the sole, higher reconciliation layer and only re-syncs the kit copy after
-the named Stack A merge. No stack takes another stack's commit as its branch
-base. Stack A has three delivery layers and Stack B three, so neither requires
+Two paths overlap across stacks, each with a named reconciliation:
+
+- `.sc-lint/bootstrap*` (Stacks A and B): G.1 vendors the product snapshot
+  and G.3a changes the product implementation. G.3b is the sole, higher
+  reconciliation layer and only re-syncs the kit copy after the named Stack A
+  merge.
+- `.just/lint_common.py` and `.just/lint_identity_literals.py` (Stacks B and
+  C): G.3c fixes the Rust-literal parser in place under `.just/`, while G.3a
+  relocates the same helpers into the `sc_lint` wheel
+  (`bindings/sc-lint-py/python/sc_lint/`). G.3a is the reconciliation layer:
+  it carries G.3c's parser fix and tests forward into the wheel copy
+  (ported from G.3c commits `ea647cb` and `9d60a96`), and whichever stack
+  lands on `develop` second merges `develop` forward so the `.just/` shim and
+  the wheel module agree. Neither stack edits the other's copy.
+
+No stack takes another stack's commit as its branch base. Stack A has three delivery layers and Stack B three, so neither requires
 further subdivision.
 
 ```text
