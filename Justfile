@@ -111,6 +111,10 @@ lint: _source-build _source-venv
 test: _source-build _source-venv
     .sc-lint/bootstrap test --config sc-lint.toml
 
+# Run the vendorable consumer-adoption kit integration suite.
+test-adoption:
+    python3 -m pytest tests/adoption -q
+
 # Inspect the managed upgrade path without changing the source checkout.
 upgrade: _source-build _source-venv
     .sc-lint/bootstrap upgrade --config sc-lint.toml --check --dry-run

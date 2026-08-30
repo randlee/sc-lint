@@ -1,0 +1,79 @@
+"""Integration tests for the vendorable adoption kit."""
+from __future__ import annotations
+
+import importlib.util
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+KIT = ROOT / "packages" / "sc-lint-adoption"
+INSTALL = KIT / "install.py"
+FIXTURES = ROOT / "tests" / "fixtures" / "adoption"
+
+
+def copy_fixture(name: str) -> Path:
+    temporary = Path(tempfile.mkdtemp())
+    destination = temporary / "consumer"
+    shutil.copytree(FIXTURES / name, destination)
+    return destination
+
+
+def run(*arguments: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["python3", str(INSTALL), *arguments], cwd=cwd, text=True, capture_output=True, check=False
+    )
+
+
+def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> None:
+    consumer = copy_fixture("empty-workspace")
+    install = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert install.returncode == 0, install.stderr
+    clean = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
+    assert clean.returncode == 0, clean.stdout
+    recipes = subprocess.run(["just", "--list"], cwd=consumer, text=True, capture_output=True, check=False)
+    assert recipes.returncode == 0, recipes.stderr
+    for recipe in ("setup", "lint", "test", "upgrade"):
+        assert f"    {recipe}" in recipes.stdout
+
+
+def test_established_justfile_preserves_unmanaged_recipe() -> None:
+    consumer = copy_fixture("established-workspace")
+    before = (consumer / "Justfile").read_text()
+    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 0, result.stderr
+    rendered = (consumer / "Justfile").read_text()
+    assert before in rendered
+    assert rendered.count("# >>> sc-lint managed integration >>>") == 1
+
+
+def test_dry_run_reports_modified_managed_asset() -> None:
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    managed = consumer / ".sc-lint" / "justfile"
+    managed.write_text(managed.read_text() + "# consumer edit\n")
+    result = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 1
+    assert str(managed) in result.stdout
+
+
+def test_duplicate_markers_are_conflicts_without_writes() -> None:
+    consumer = copy_fixture("empty-workspace")
+    justfile = consumer / "Justfile"
+    justfile.write_text("# >>> sc-lint managed integration >>>\n# <<< sc-lint managed integration <<<\n" * 2)
+    before = justfile.read_bytes()
+    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 2
+    assert str(justfile) in result.stderr or "marker conflict" in result.stderr
+    assert justfile.read_bytes() == before
+
+
+def test_analyzer_worked_example_is_declarative() -> None:
+    consumer = copy_fixture("analyzer-worked-example")
+    result = run("--input", str(FIXTURES / "analyzer-worked-example" / "install.json"), str(consumer))
+    assert result.returncode == 0, result.stderr
+    config = (consumer / "sc-lint.toml").read_text()
+    assert '"no async runtime"' in config
+    assert '"linux"' in config
+    assert "unit =" in config and "integrate =" in config
