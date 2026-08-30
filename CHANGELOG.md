@@ -2,9 +2,24 @@
 
 All notable changes to sc-lint are documented here.
 
-## [Unreleased]
+## [0.6.0] — 2026-08-30
 
 ### Features
+
+- **Adoption kit** (G.1) — `packages/sc-lint-adoption` installs a
+  drift-detectable consumer end state (`install.py --dry-run` exit 1 on drift,
+  exit 2 on user-owned conflicts); managed `.sc-lint/install.json`; kit-provided
+  `setup-sc-lint` GitHub Action; bootstrap `setup --check/--dry-run` never
+  fetches a release.
+- **Adoption skill** (G.2) — `sc-lint-adoption` plugin skill, `sc-lint-adopter`
+  agent, durable evals, marketplace entry, and `docs/sc-lint/adoption.md`
+  (`just test-*` → layers migration, offline docs via `sc-lint docs --path`).
+- **Identity-literal Unicode fix** (G.3c).
+- Phase F archived (G.0, tag `archive/phase-F`).
+
+### Version
+
+Workspace bumped from `0.5.0` → `0.6.0`; adoption plugin `0.6.0`.
 
 - **Python wheel runtime** (G.3a) — the repository helper scripts ship as the
   `sc-lint` PyPI distribution; the bootstrap provisions `.sc-lint/venv` and
