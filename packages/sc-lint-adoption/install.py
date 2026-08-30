@@ -70,6 +70,7 @@ def desired(data: dict, repo: Path) -> dict[Path, bytes]:
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.j2" and not data["ci"]["enabled"]: continue
         result[target] = render(ROOT / source, data).encode()
+    result[Path(".sc-lint/install.json")] = json.dumps(data, indent=2, sort_keys=True).encode() + b"\n"
     justfile = repo / "Justfile"; original = justfile.read_text() if justfile.exists() else ""
     if original.count(MARKER_START) != original.count(MARKER_END) or original.count(MARKER_START) > 1: raise RuntimeError(f"{justfile}: marker conflict")
     block = render(ROOT / Path("templates/Justfile.import.j2"), data).strip()
@@ -89,8 +90,9 @@ def load_manifest(repo: Path) -> dict[str, str] | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(); parser.add_argument("--input", type=Path, required=True); parser.add_argument("--dry-run", action="store_true"); parser.add_argument("repo", type=Path); args = parser.parse_args()
-    try: data = values(args.input); targets = desired(data, args.repo); prior = load_manifest(args.repo)
+    parser = argparse.ArgumentParser(); parser.add_argument("--input", type=Path); parser.add_argument("--dry-run", action="store_true"); parser.add_argument("repo", type=Path); args = parser.parse_args()
+    input_path = args.input or args.repo / ".sc-lint" / "install.json"
+    try: data = values(input_path); targets = desired(data, args.repo); prior = load_manifest(args.repo)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error: print(f"conflict: {error}", file=sys.stderr); return 2
     changes = []
     for relative, expected in targets.items():

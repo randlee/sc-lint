@@ -79,8 +79,20 @@ def test_vendored_kit_can_recheck_and_schema_stays_vendored() -> None:
     installer = consumer / "plugins" / "sc-lint" / "install.py"
     assert installer.is_file()
     assert not (consumer / "install.schema.json").exists()
-    result = subprocess.run(["python3", str(installer), "--dry-run", "--input", str(input_path), str(consumer)], text=True, capture_output=True, check=False)
+    result = subprocess.run(["python3", "plugins/sc-lint/install.py", "."], cwd=consumer, text=True, capture_output=True, check=False)
     assert result.returncode == 0, result.stderr
+    result = subprocess.run(["python3", "plugins/sc-lint/install.py", "--dry-run", "."], cwd=consumer, text=True, capture_output=True, check=False)
+    assert result.returncode == 0, result.stderr
+    assert (consumer / ".sc-lint" / "install.json").is_file()
+
+
+def test_bare_rerun_reports_a_missing_persisted_input() -> None:
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    (consumer / ".sc-lint" / "install.json").unlink()
+    result = subprocess.run(["python3", "plugins/sc-lint/install.py", "."], cwd=consumer, text=True, capture_output=True, check=False)
+    assert result.returncode == 2
+    assert ".sc-lint" in result.stderr and "install.json" in result.stderr
 
 
 def test_duplicate_markers_are_conflicts_without_writes() -> None:
