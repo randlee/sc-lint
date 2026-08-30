@@ -13,6 +13,7 @@ operation="${1:-}"
 shift
 config=""
 selector=""
+flags=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -21,10 +22,13 @@ while [ "$#" -gt 0 ]; do
             config="$2"
             shift 2
             ;;
-        --check|--dry-run) shift ;;
+        --check|--dry-run) flags="$flags $1"; shift ;;
         *) [ -z "$selector" ] || usage; selector="$1"; shift ;;
     esac
 done
+# Re-expose the mode flags as "$@" for the setup/upgrade paths below.
+# shellcheck disable=SC2086
+set -- $flags
 
 [ -n "$config" ] || usage
 case "$operation" in setup|lint|test|upgrade) ;; *) usage ;; esac
