@@ -38,6 +38,8 @@ Contents:
   repo-local constraints for the shared HTML/XHTML/JSON reporting line
 - [`version-adoption.md`](./version-adoption.md) — authoritative consumer
   adoption guide for the planned `sc-lint-version` interface-checking line
+- [`adoption.md`](./adoption.md) — authoritative guide for installing the
+  managed `sc-lint` consumer contract and extending it safely
 - [`skill-authoring-constraints.md`](./skill-authoring-constraints.md) —
   repo-local constraints for the `sc-lint-version` adoption skill
 - [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —
