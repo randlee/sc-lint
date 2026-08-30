@@ -8,6 +8,7 @@ members = [
   "crates/sc-lint-runtime",
   "crates/sc-lint-schema",
   "crates/sc-lint-analyzer-support",
+  "bindings/sc-lint-py",
 ]
 resolver = "2"
 

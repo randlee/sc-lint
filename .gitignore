@@ -30,3 +30,7 @@ __pycache__
 reports/
 .claude/projects/
 .claude/scheduled_tasks.lock
+
+# Repo-local Python helper venv provisioned by .sc-lint/bootstrap setup / just setup
+.sc-lint/venv/
+.sc-lint/wheels/

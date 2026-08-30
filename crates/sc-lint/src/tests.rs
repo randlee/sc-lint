@@ -452,6 +452,16 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
         },
     )
     .expect("generate fixture");
+    // The bootstrap provisions `.sc-lint/venv` from PyPI; point it at the
+    // wheels `just setup` built so the fixture stays offline.
+    let wheel_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.sc-lint/wheels");
+    if !wheel_dir.is_dir() {
+        eprintln!(
+            "skipping: run `just setup` to build {}",
+            wheel_dir.display()
+        );
+        return;
+    }
     let bin_dir = root.join("bin");
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
@@ -479,6 +489,7 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
+            .env("SC_LINT_WHEEL_DIR", &wheel_dir)
             .output()
             .expect("run just fixture");
         assert!(

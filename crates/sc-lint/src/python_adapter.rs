@@ -30,11 +30,12 @@ impl PythonTool {
         }
     }
 
+    /// Python module (inside the `sc_lint` wheel) that implements this tool.
     pub const fn script_relative_path(self) -> &'static str {
         match self {
-            Self::LineCounts => ".just/lint_line_counts.py",
-            Self::IdentityLiterals => ".just/lint_identity_literals.py",
-            Self::ViewFindings => ".just/view_findings.py",
+            Self::LineCounts => "sc_lint.lint_line_counts",
+            Self::IdentityLiterals => "sc_lint.lint_identity_literals",
+            Self::ViewFindings => "sc_lint.view_findings",
         }
     }
 
@@ -63,10 +64,8 @@ pub(crate) fn run_python_tool(
     tool: PythonTool,
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
-    let script_path = repo_root.join(tool.script_relative_path());
-    let output = ProcessCommand::new(python_command())
-        .current_dir(repo_root)
-        .arg(&script_path)
+    let output = python_module_command(repo_root)
+        .arg(tool.script_relative_path())
         .arg("--root")
         .arg(repo_root)
         .args(
@@ -243,6 +242,57 @@ fn python_command() -> OsString {
     } else {
         OsString::from("python3")
     }
+}
+
+/// Builds `python -m` using the repo-local `.sc-lint/venv` interpreter when it
+/// exists; otherwise the host interpreter, with the source checkout's package
+/// directory on `PYTHONPATH` so a source repository works before `just setup`.
+/// Interpreter used for `python -m sc_lint.<module>` helpers: the repo venv when
+/// provisioned, otherwise the host interpreter with the source package on `PYTHONPATH`.
+pub(crate) struct PythonInterpreter {
+    pub(crate) program: std::ffi::OsString,
+    pub(crate) python_path: Option<std::ffi::OsString>,
+}
+
+impl PythonInterpreter {
+    pub(crate) fn resolve(repo_root: &std::path::Path) -> Self {
+        let venv_python = repo_root
+            .join(consts::VENV_RELATIVE_DIR)
+            .join(if cfg!(windows) {
+                "Scripts/python.exe"
+            } else {
+                "bin/python3"
+            });
+        if venv_python.is_file() {
+            return Self {
+                program: venv_python.into_os_string(),
+                python_path: None,
+            };
+        }
+        let source_package_dir = repo_root.join(consts::SOURCE_PYTHON_PACKAGE_DIR);
+        let python_path = source_package_dir.is_dir().then(|| {
+            let mut python_path = source_package_dir.into_os_string();
+            if let Some(existing) = std::env::var_os("PYTHONPATH") {
+                python_path.push(if cfg!(windows) { ";" } else { ":" });
+                python_path.push(existing);
+            }
+            python_path
+        });
+        Self {
+            program: python_command(),
+            python_path,
+        }
+    }
+}
+
+fn python_module_command(repo_root: &std::path::Path) -> ProcessCommand {
+    let interpreter = PythonInterpreter::resolve(repo_root);
+    let mut command = ProcessCommand::new(interpreter.program);
+    if let Some(python_path) = interpreter.python_path {
+        command.env("PYTHONPATH", python_path);
+    }
+    command.current_dir(repo_root).arg("-m");
+    command
 }
 
 pub(crate) fn adapter_kind_for_command(command_id: &str) -> Option<&'static str> {

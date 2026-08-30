@@ -103,11 +103,32 @@ def load_manifest(path: Path) -> dict:
             raise SystemExit(f"duplicate release binary {name}")
         seen_bins.add(name)
 
+    python_distributions = data.get("python_distributions", [])
+    if not isinstance(python_distributions, list):
+        raise SystemExit("[[python_distributions]] must be an array of tables")
+    python_required = {"artifact", "package", "pyproject", "cargo_toml", "build_system", "required", "publish"}
+    for idx, entry in enumerate(python_distributions):
+        if not isinstance(entry, dict):
+            raise SystemExit(f"python_distributions[{idx}] must be a table")
+        missing = sorted(python_required - set(entry))
+        if missing:
+            raise SystemExit(f"python_distributions[{idx}] missing fields: {', '.join(missing)}")
+        artifact = require_str(entry, "artifact", f"python_distributions[{idx}]")
+        require_str(entry, "package", f"python_distributions[{idx}]")
+        require_str(entry, "pyproject", f"python_distributions[{idx}]")
+        require_str(entry, "cargo_toml", f"python_distributions[{idx}]")
+        if require_str(entry, "build_system", f"python_distributions[{idx}]") != "maturin":
+            raise SystemExit(f"{artifact}: only build_system = \"maturin\" is supported")
+        if artifact in seen_artifacts:
+            raise SystemExit(f"duplicate artifact {artifact}")
+        seen_artifacts.add(artifact)
+
     crates.sort(key=lambda item: (item["publish_order"], item["artifact"]))
     return {
         "crates": crates,
         "release_binaries": binaries,
         "documentation_bundle": documentation_bundle,
+        "python_distributions": python_distributions,
     }
 
 
@@ -397,6 +418,23 @@ def emit_inventory(args: argparse.Namespace) -> int:
                 "verifyCommands": verify,
             }
         )
+    for distribution in manifest["python_distributions"]:
+        if not distribution["publish"]:
+            continue
+        items.append(
+            {
+                "artifact": distribution["artifact"],
+                "version": args.version,
+                "sourceRef": args.source_ref,
+                "publishTarget": "pypi",
+                "required": distribution["required"],
+                "publish": distribution["publish"],
+                "verifyCommands": [
+                    f"python3 -m pip download {distribution['package']}=={args.version} --no-deps -d /tmp/sc-lint-wheel",
+                    'python3 -c "import sc_lint; print(sc_lint.__version__)"',
+                ],
+            }
+        )
     items.sort(key=lambda item: item["artifact"])
     payload = {
         "releaseVersion": args.version,
@@ -408,6 +446,15 @@ def emit_inventory(args: argparse.Namespace) -> int:
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return 0
+
+
+def list_python_distributions(args: argparse.Namespace) -> int:
+    """Print `artifact|package|cargo_toml` for every publishable Python distribution."""
+    for distribution in load_manifest(Path(args.manifest))["python_distributions"]:
+        if args.publishable_only and not distribution["publish"]:
+            continue
+        print(f"{distribution['artifact']}|{distribution['package']}|{distribution['cargo_toml']}")
     return 0
 
 
@@ -789,6 +836,11 @@ def build_parser() -> argparse.ArgumentParser:
     emit.add_argument("--generated-at")
     emit.add_argument("--output", required=True)
     emit.set_defaults(func=emit_inventory)
+
+    list_python = subparsers.add_parser("list-python-distributions")
+    list_python.add_argument("--manifest", required=True)
+    list_python.add_argument("--publishable-only", action="store_true")
+    list_python.set_defaults(func=list_python_distributions)
 
     list_tomls = subparsers.add_parser("list-cargo-tomls")
     list_tomls.add_argument("--manifest", required=True)

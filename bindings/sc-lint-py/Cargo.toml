@@ -1,0 +1,24 @@
+[package]
+name = "sc-lint-py"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Python bindings for the sc-lint CLI (maturin/pyo3 extension module)."
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[lib]
+name = "sc_lint_py"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+python-extension = ["pyo3/extension-module"]
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["abi3-py39"] }
+sc-lint = { path = "../../crates/sc-lint", version = "0.5.0" }

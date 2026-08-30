@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+import unittest
+
+
+from sc_lint.print_help import render_help
+
+
+class PrintHelpTests(unittest.TestCase):
+    def test_render_help_mentions_expected_entries(self) -> None:
+        output = render_help("sc-lint")
+        self.assertIn("version latest", output)
+        self.assertIn("lint fast", output)
+        self.assertIn("lint full", output)
+        self.assertIn("lint ci", output)
+        self.assertIn("lint modules", output)
+        self.assertIn("lint sc-boundary", output)
+        self.assertIn("lint sc-portability", output)
+        self.assertIn("lint line-counts", output)
+        self.assertIn("lint identity-literals", output)
+        self.assertIn("lint manifests", output)
+        self.assertIn("lint pytests", output)
+        self.assertIn("fmt apply", output)
+        self.assertNotIn("lint daemon-singleton", output)
+        self.assertNotIn("lint boundaries", output)
+        self.assertNotIn("view boundaries", output)
+
+
+if __name__ == "__main__":
+    unittest.main()
