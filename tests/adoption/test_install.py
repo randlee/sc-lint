@@ -50,6 +50,19 @@ def test_established_justfile_preserves_unmanaged_recipe() -> None:
     assert rendered.count("# >>> sc-lint managed integration >>>") == 1
 
 
+def test_established_test_recipe_is_a_declared_layer_after_migration() -> None:
+    consumer = copy_fixture("established-workspace")
+    input_path = consumer / "install.json"
+    result = run("--input", str(input_path), str(consumer))
+    assert result.returncode == 0, result.stderr
+    config = (consumer / "sc-lint.toml").read_text()
+    assert 'name = "integration"' in config
+    assert 'command = ["cargo", "test", "--test", "integration"]' in config
+    justfile = (consumer / "Justfile").read_text()
+    assert "test-integration:\n    just test integration" in justfile
+    assert "hello:" in justfile
+
+
 def test_dry_run_reports_modified_managed_asset() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
@@ -119,10 +132,14 @@ def test_analyzer_worked_example_is_declarative() -> None:
 def test_analyzer_worked_example_runs_all_declared_just_layers() -> None:
     binary = ROOT / "target" / "debug" / "sc-lint"
     wheels = ROOT / ".sc-lint" / "wheels"
-    if not binary.exists() or not wheels.exists():
+    workspace_version = next(
+        line.split('"')[1] for line in (ROOT / "Cargo.toml").read_text().splitlines() if line.startswith("version =")
+    )
+    expected_wheel = f"sc_lint-{workspace_version}"
+    if not binary.exists() or not any(wheels.glob(f"{expected_wheel}-*.whl")):
         import pytest
 
-        pytest.skip("requires the source product binary and offline wheel set")
+        pytest.skip("requires the source product binary and matching offline wheel set")
     consumer = copy_fixture("analyzer-worked-example")
     result = run("--input", str(FIXTURES / "analyzer-worked-example" / "install.json"), str(consumer))
     assert result.returncode == 0, result.stderr
