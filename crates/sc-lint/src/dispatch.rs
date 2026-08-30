@@ -163,7 +163,14 @@ fn run_delegated_backend(
             .with_source(error)
             .with_detail(consts::FIELD_TOOL, json!(tool))
             .with_detail(consts::FIELD_ROOT, json!(repo_root.display().to_string()))
-            .with_detail("backend_path", json!(backend_binary.display().to_string()))
+            .with_detail(
+                consts::FIELD_BACKEND_PATH,
+                json!(backend_binary.display().to_string()),
+            )
+            .with_suggested_action(
+                "Install the release archive so the backend binary sits beside `sc-lint`, or run `cargo build --workspace` in a source checkout, then rerun the profile.",
+            )
+            .with_documentation("sc-lint docs setup")
         })?;
 
     if !output.status.success() {
@@ -183,8 +190,14 @@ fn run_delegated_backend(
         .with_cause(cause)
         .with_detail(consts::FIELD_TOOL, json!(tool))
         .with_detail(consts::FIELD_ROOT, json!(repo_root.display().to_string()))
-        .with_detail("backend_path", json!(backend_binary.display().to_string()))
-        .with_detail("exit_status", json!(output.status.code())));
+        .with_detail(
+            consts::FIELD_BACKEND_PATH,
+            json!(backend_binary.display().to_string()),
+        )
+        .with_detail(consts::FIELD_EXIT_CODE, json!(output.status.code()))
+        .with_suggested_action(format!(
+            "Run `{tool} analyze --root <repo> --format json` directly for the backend's own diagnostics, then rerun the profile."
+        )));
     }
 
     let raw = std::str::from_utf8(&output.stdout).map_err(|error| {

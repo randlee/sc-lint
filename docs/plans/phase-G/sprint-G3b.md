@@ -32,20 +32,31 @@ owner: flint
 
 ## Exact Targets
 
-- `crates/sc-lint/src/dispatch.rs`
-- `crates/sc-lint/src/python_adapter.rs`
-- `crates/sc-lint/src/config.rs`
-- `scripts/release_artifacts.py`
-- `.github/workflows/release.yml`
-- `packages/sc-lint-adoption/.sc-lint/bootstrap`, `bootstrap.ps1` (re-sync verbatim from product after G.3a)
-- `docs/sc-lint/cli-contract.md`
-- `docs/issues-inventory.md`
-- `CHANGELOG.md`
+As implemented (PR #142):
+
+- `crates/sc-lint/src/dispatch.rs`, `workflow.rs`, `command.rs`, `consts.rs`,
+  `config.rs` (self-invoking `product_step`, `self_contained`, backend lookup)
+- `crates/sc-lint-portability/src/portability.rs` (`sc-lint.toml` is the only
+  repo config; legacy `.just/lint-config.toml` fallback removed)
+- `bindings/sc-lint-py/python/sc_lint/run_lint.py` and tests (source-tree
+  `lint_sc_boundary.py` / `lint_sc_portability.py` removed)
+- `Justfile`, `sc-lint.toml`, `scripts/release_smoke.py`,
+  `.github/workflows/ci.yml` (`release-smoke` job),
+  `tests/fixtures/adoption/empty-workspace`
+- `docs/sc-lint/cli-contract.md`, `docs/issues-inventory.md`, `CHANGELOG.md`
+
+Closure notes: `python_adapter.rs`, `scripts/release_artifacts.py`, and
+`.github/workflows/release.yml` needed no change — G.3a already made the
+Python helpers wheel-resident and the release archive already carries every
+backend binary. `packages/sc-lint-adoption/.sc-lint/bootstrap*` re-sync is
+deferred to the G.1 → G.3b reconciliation (see below).
 
 ## Governing Contract
 
-This sprint closes REQ-PRODUCT-020, REQ-PRODUCT-021, and REQ-PRODUCT-024 for
-the released artifact. The G.1 bootstrap-copy re-sync is
+This sprint closes REQ-PRODUCT-020 and REQ-PRODUCT-021 for the released
+artifact and delivers the G.3b portion of REQ-PRODUCT-024 (remaining
+REQ-PRODUCT-024 ownership stays with G.4b/G.4c per the phase-G traceability
+table). The G.1 bootstrap-copy re-sync is
 the one explicit cross-stack reconciliation: Stack B is never based on Stack
 A, and G.3b merges `develop` forward only after G.1 has landed.
 
@@ -63,6 +74,8 @@ A, and G.3b merges `develop` forward only after G.1 has landed.
   module named `configure`, `install`, `setup`, or `template` fails review.
 - `sc-lint version --json` reports the archive layout (`self_contained: true`).
 - Kit copies of `.sc-lint/bootstrap*` are byte-identical to the product files (`cmp` in CI).
+  **Deferred** to the G.1 → G.3b reconciliation: the kit does not exist until
+  `sprint/G.1-adoption-kit` merges to `develop`.
 
 ## Acceptance Criteria
 
@@ -82,7 +95,8 @@ independent `develop`-rooted Stack C and has no dependency on this commit.
 
 - `cargo test --workspace`
 - `sc-lint lint --profile ci`
-- `just test-adoption`
+- `just test-adoption` — **deferred** with the kit `cmp` check until G.1 has
+  landed; `release-smoke` CI covers the archive path in the meantime.
 
 ## Out Of Scope
 

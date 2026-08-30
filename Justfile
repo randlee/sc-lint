@@ -70,10 +70,12 @@ _lint-pytests:
 build:
     cargo build --workspace
 
-# Build the product binary used by this repository's consumer-model recipes.
+# Build the product binary and the backend binaries it re-enters from
+# `target/debug` (`full`/`ci` profiles dispatch sc-boundary/sc-portability
+# through the running executable, so the siblings must exist beside it).
 [private]
 _source-build:
-    cargo build --bin sc-lint
+    cargo build --workspace
 
 # Provision .sc-lint/venv with the sc_lint helper wheel built from this checkout.
 [private]

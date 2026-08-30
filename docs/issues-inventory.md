@@ -34,6 +34,10 @@ hardening changes are applied.
    - `sc-lint version --json` reports `self_contained`
    - CI job `release-smoke` runs the kit recipes from a staged archive with no
      `.just/` directory on Linux, macOS, and Windows
+   - Deferred, not dropped: the kit-copy byte-identity `cmp` CI check for
+     `.sc-lint/bootstrap*` and `just test-adoption` depend on the adoption kit
+     from `sprint/G.1-adoption-kit`; they land in the G.1 → G.3b
+     reconciliation once G.1 has merged to `develop`
 
 ## Process / QA / Triage Scope
 

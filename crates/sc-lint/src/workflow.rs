@@ -151,7 +151,7 @@ impl SystemAdapter for HostSystemAdapter {
                 .with_detail("step", json!(step.name()))
                 .with_detail("command", json!(step.display_command()))
                 .with_detail("root", json!(repo_root.display().to_string()))
-                .with_detail("exit_code", json!(output.status.code()))
+                .with_detail(consts::FIELD_EXIT_CODE, json!(output.status.code()))
                 .with_detail("stdout", json!(stdout))
                 .with_detail("stderr", json!(stderr));
             if !cause.is_empty() {
