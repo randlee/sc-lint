@@ -190,8 +190,7 @@ switch ($Operation) {
     "lint" {
         Ensure-Product
         Install-Venv "install"
-        $profile = if ($selector.Count -eq 1) { $selector[0] } else { "ci" }
-        & $productBinary lint --consumer --config $Config $profile
+        if ($selector.Count -eq 1) { & $productBinary lint --consumer --config $Config ci --profile $selector[0] } else { & $productBinary lint --consumer --config $Config ci }
     }
     "test" {
         Ensure-Product

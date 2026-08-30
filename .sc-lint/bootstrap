@@ -12,6 +12,7 @@ operation="${1:-}"
 [ -n "$operation" ] || usage
 shift
 config=""
+selector=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -20,15 +21,14 @@ while [ "$#" -gt 0 ]; do
             config="$2"
             shift 2
             ;;
-        --check|--dry-run)
-            break
-            ;;
-        *) usage ;;
+        --check|--dry-run) shift ;;
+        *) [ -z "$selector" ] || usage; selector="$1"; shift ;;
     esac
 done
 
 [ -n "$config" ] || usage
 case "$operation" in setup|lint|test|upgrade) ;; *) usage ;; esac
+case "$operation" in lint|test) ;; *) [ -z "$selector" ] || usage ;; esac
 
 minimum_version() {
     sed -n 's/^[[:space:]]*minimum_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$config" | head -n 1
@@ -196,11 +196,13 @@ case "$operation" in
     lint)
         ensure_product
         provision_venv install || exit $?
+        if [ -n "$selector" ]; then exec "$product_binary" lint --consumer --config "$config" ci --profile "$selector"; fi
         exec "$product_binary" lint --consumer --config "$config" ci
         ;;
     test)
         ensure_product
         provision_venv install || exit $?
+        if [ -n "$selector" ]; then exec "$product_binary" test --config "$config" "$selector"; fi
         exec "$product_binary" test --config "$config"
         ;;
     upgrade)

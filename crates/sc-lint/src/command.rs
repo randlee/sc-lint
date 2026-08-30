@@ -104,18 +104,27 @@ pub(crate) struct DocsRequest {
 /// Command-specific payloads stay coupled to the command variant that owns
 /// them. This prevents an unrelated command context from carrying an
 /// impossible `None` payload that would only fail during dispatch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum CommandRequest {
-    Setup { dry_run: bool },
-    Upgrade { check: bool, dry_run: bool },
+    Setup {
+        dry_run: bool,
+    },
+    Upgrade {
+        check: bool,
+        dry_run: bool,
+    },
     Init(ConsumerInitRequest),
     Docs(DocsRequest),
+    /// Optional lint profile step or test layer selector for consumer profile commands.
+    ConsumerSelector(Option<String>),
 }
 
 impl CommandId {
     pub fn from_cli_command(command: &Command) -> Self {
         match command {
-            Command::Lint { target, consumer } => match target {
+            Command::Lint {
+                target, consumer, ..
+            } => match target {
                 crate::LintTarget::ScBoundary => Self::LintScBoundary,
                 crate::LintTarget::ScPortability => Self::LintScPortability,
                 crate::LintTarget::ScRuntime => Self::LintScRuntime,
@@ -145,7 +154,7 @@ impl CommandId {
             Command::Setup { .. } => Self::Setup,
             Command::Upgrade { .. } => Self::Upgrade,
             Command::Init { .. } => Self::Init,
-            Command::Test => Self::ConsumerTest,
+            Command::Test { .. } => Self::ConsumerTest,
             Command::Version => Self::Version,
             Command::Ci => Self::Ci,
         }
@@ -319,7 +328,7 @@ impl CommandContext {
                         "Run it from the consumer repository root; it always manages `sc-lint.toml` there.",
                     ));
                 }
-                if matches!(command, Command::Lint { consumer: true, target } if !matches!(target, crate::LintTarget::Ci))
+                if matches!(command, Command::Lint { consumer: true, target, .. } if !matches!(target, crate::LintTarget::Ci))
                 {
                     return Err(CliError::usage(
                             "`--consumer` is only supported by `sc-lint lint ci`",
@@ -353,6 +362,14 @@ impl CommandContext {
                         guide: *guide,
                         path: *path,
                     })),
+                    Command::Lint {
+                        consumer: true,
+                        profile,
+                        ..
+                    } => Some(CommandRequest::ConsumerSelector(profile.clone())),
+                    Command::Test { layer } => {
+                        Some(CommandRequest::ConsumerSelector(layer.clone()))
+                    }
                     _ => None,
                 };
                 (
@@ -450,6 +467,14 @@ impl CommandContext {
         }
     }
 
+    /// Selector for consumer profile commands: `None` and `all` run every configured step.
+    pub(crate) fn consumer_selector(&self) -> Option<&str> {
+        match &self.request {
+            Some(CommandRequest::ConsumerSelector(selector)) => selector.as_deref(),
+            _ => None,
+        }
+    }
+
     pub(crate) fn docs_request(&self) -> DocsRequest {
         match self.request {
             Some(CommandRequest::Docs(request)) => request,
@@ -521,8 +546,12 @@ pub(crate) fn execute(
         CommandId::Init => Ok(CommandSuccess::direct(crate::config::run_consumer_init(
             context.consumer_init_request(),
         )?)),
-        CommandId::ConsumerLintCi => workflow::run_consumer_lint_profile(loaded_config),
-        CommandId::ConsumerTest => workflow::run_consumer_test_profile(loaded_config),
+        CommandId::ConsumerLintCi => {
+            workflow::run_consumer_lint_profile(loaded_config, context.consumer_selector())
+        }
+        CommandId::ConsumerTest => {
+            workflow::run_consumer_test_profile(loaded_config, context.consumer_selector())
+        }
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),

@@ -195,7 +195,8 @@ case "$operation" in
     lint)
         ensure_product
         provision_venv install || exit $?
-        exec "$product_binary" lint --consumer --config "$config" "${selector:-ci}"
+        if [ -n "$selector" ]; then exec "$product_binary" lint --consumer --config "$config" ci --profile "$selector"; fi
+        exec "$product_binary" lint --consumer --config "$config" ci
         ;;
     test)
         ensure_product

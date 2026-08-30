@@ -21,7 +21,8 @@ $remaining = @()
 for ($index = 0; $index -lt $Rest.Count; $index++) {
     if ($index -ne $configIndex -and $index -ne ($configIndex + 1)) { $remaining += $Rest[$index] }
 }
-if ($remaining | Where-Object { $_ -notin @("--check", "--dry-run") }) { Stop-Usage }
+$selector = @($remaining | Where-Object { $_ -notin @("--check", "--dry-run") })
+if ($selector.Count -gt 1 -or ($Operation -notin @("lint", "test") -and $selector.Count -ne 0)) { Stop-Usage }
 
 $installDirectory = if ($env:SC_LINT_INSTALL_DIR) { $env:SC_LINT_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "sc-lint\\bin" }
 $managedBinary = Join-Path $installDirectory "sc-lint.exe"
@@ -190,12 +191,12 @@ switch ($Operation) {
     "lint" {
         Ensure-Product
         Install-Venv "install"
-        & $productBinary lint --consumer --config $Config ci
+        if ($selector.Count -eq 1) { & $productBinary lint --consumer --config $Config ci --profile $selector[0] } else { & $productBinary lint --consumer --config $Config ci }
     }
     "test" {
         Ensure-Product
         Install-Venv "install"
-        & $productBinary test --config $Config
+        if ($selector.Count -eq 1) { & $productBinary test --config $Config $selector[0] } else { & $productBinary test --config $Config }
     }
     "upgrade" {
         $productBinary = Resolve-ProductBinary
