@@ -71,7 +71,32 @@ The installer input describes consumer facts, not imperative setup code:
 `minimum_version` is a SemVer floor. `profiles` contains named, ordered lint
 profiles. `ci` records the intended platform matrix. `analyzers` records each
 choice with an explicit enablement reason; derive it from observed async-runtime
-and target-platform facts. `test` optionally declares ordered test layers.
+and target-platform facts. Analyzers are the sole repository-specific *policy*
+input. `profiles`, `ci`, and `test` are consumer-owned recipe declarations,
+not policy. `test` optionally declares ordered test layers.
+
+## Migrate existing named test recipes
+
+Inspect the root `Justfile` for every `test-<name>` recipe. Put that recipe's
+underlying command in the matching consumer-owned `install.json` `test` entry;
+the installer renders it as a `[[tool.sc-lint.test]]` layer. Then replace the
+old recipe body with `just test <name>` so callers retain the named entry point
+while execution is declared in the shared test contract. Preserve all
+consumer-owned recipes that are not tests. This is an explicit consumer-PR
+migration: the kit does not infer commands from arbitrary repository scripts
+or delete recipes.
+
+For example, migrate `test-integration` from `cargo test --test integration`
+to this input and compatibility recipe:
+
+```json
+"test": {"integration": ["cargo", "test", "--test", "integration"]}
+```
+
+```just
+test-integration:
+    just test integration
+```
 
 ## Drift and safe application
 
@@ -86,6 +111,14 @@ for every drifted managed file and returns:
 After applying, rerun `--dry-run`. The consumer PR must include the literal
 `sc-lint adoption dry-run exit 0` line only when the final recheck converges.
 If drift remains, attach that output instead.
+
+## Offline documentation
+
+The product-owned offline documentation bundle is available after adoption.
+Locate its installed filesystem path with `sc-lint docs --path`; use
+`sc-lint docs` for the overview or `sc-lint docs <guide>` for an installed
+guide such as `installation` and `troubleshooting`. Do not substitute a source
+checkout for this product-owned bundle.
 
 ## How to extend
 
@@ -107,3 +140,11 @@ The worked example at
 `tests/fixtures/adoption/analyzer-worked-example/` demonstrates an explicit
 runtime reason, Linux portability target, named test layers, lint profile, and
 a consumer-owned recipe.
+
+## Assignment template
+
+`packages/sc-lint-adoption/.claude/skills/sc-lint-adoption/adopt.xml.j2` is
+rendered by ATM when it assigns the adoption work. The rendered assignment is
+consumed by the `sc-lint-adopter` agent and carries the same seven-step
+procedure described by the installed skill; it does not define another
+workflow.

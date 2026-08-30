@@ -29,6 +29,7 @@ absent.
 ```bash
 cargo metadata --no-deps --format-version 1
 if [ -f Justfile ]; then just --list; fi
+if [ -f Justfile ]; then rg -n '^test-[[:alnum:]_-]+:' Justfile || true; fi
 if [ -d .github/workflows ]; then grep -RIn "runs-on:" .github/workflows; fi
 rustup show active-toolchain
 ```
@@ -36,6 +37,16 @@ rustup show active-toolchain
 Use those facts to decide analyzer `enabled` and `reason` fields: set runtime
 analysis only when the repository uses an async runtime, and scope portability
 targets to the observed CI platforms. Do not invent a registry of analyzers.
+
+### Migrate named test recipes
+
+For every existing root `test-<name>` recipe, preserve its underlying command
+as the consumer-owned `test.<name>` entry in `install.json`; the installer
+renders that entry as a `[[tool.sc-lint.test]]` layer. Replace that recipe's
+body with `just test <name>` so its existing name remains a thin compatibility
+alias for the declared layer. Keep all consumer-owned recipes that are not
+tests unchanged. This is a scoped consumer-PR migration; the kit does not
+guess commands, scan arbitrary scripts, or delete recipes.
 
 ## 2. Write and validate `install.json`
 
@@ -74,6 +85,14 @@ After reviewing the diff, apply exactly the same input.
 python3 "$SC_LINT_ADOPTION_ROOT/install.py" --input install.json .
 ```
 
+## Offline documentation
+
+After installation, locate the product-owned offline documentation bundle with
+`sc-lint docs --path`. Use `sc-lint docs` for the installed overview and
+`sc-lint docs <guide>` for a named guide such as `installation` or
+`troubleshooting`. These commands use the installed product bundle; do not
+look for documentation in a source checkout.
+
 ## 5. Verify the consumer interface
 
 Run the aggregate commands exactly. They are the only routine command contract
@@ -111,3 +130,8 @@ drift remains, include the new dry-run output instead of claiming convergence.
 See `tests/fixtures/adoption/analyzer-worked-example/` for a complete worked
 configuration showing analyzer reasons, test layers, profiles, and a
 consumer-owned recipe.
+
+`adopt.xml.j2` is the ATM-rendered form of these same seven steps: the
+orchestrator renders it with the repository, `install.json`, and completion
+recipient, then the `sc-lint-adopter` agent consumes that assignment. It is
+not a second adoption procedure.

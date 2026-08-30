@@ -1,0 +1,12 @@
+{
+  "minimum_version": "0.5.0",
+  "profiles": {"ci": ["cargo", "check"]},
+  "ci": {"os": ["linux"], "enabled": true},
+  "analyzers": {
+    "runtime": {"enabled": false, "reason": "no async runtime"},
+    "portability": {"enabled": true, "targets": ["linux"]}
+  },
+  "test": {
+    "integration": ["cargo", "test", "--test", "integration"]
+  }
+}

@@ -15,6 +15,12 @@ managed-file conflict, invalid input, or validation failure blocks adoption,
 report it immediately with the preserved dry-run output; do not bypass the
 managed markers or overwrite consumer-owned files.
 
+When a root `Justfile` has a `test-<name>` recipe, migrate its underlying
+command into the matching consumer-owned `install.json` test entry and replace
+that recipe body with `just test <name>`. Preserve all non-test
+consumer-owned recipes. After installation, use `sc-lint docs --path` to
+locate the installed offline documentation bundle rather than a source tree.
+
 The final completion message must name the consumer PR, commit, `install.json`
 summary, literal dry-run exit result, `just setup && just lint && just test`
 results, and every removed consumer-local scaffold. Do not claim convergence
