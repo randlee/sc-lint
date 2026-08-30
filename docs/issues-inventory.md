@@ -9,6 +9,13 @@ As of the Phase A hardening pass, there are no open blocking plan-integrity
 findings in the documented A.1a through A.8 sprint sequence once the current
 hardening changes are applied.
 
+The consumer-blocking identity-literals unicode-escape defects tracked by
+[issue #85](https://github.com/randlee/sc-lint/issues/85) and
+[issue #88](https://github.com/randlee/sc-lint/issues/88) are closed by the
+Rust-literal decoder in `.just/lint_common.py`. Rust brace-form escapes such as
+`"\\u{1F600}"` and `'\\u{7}'` now produce normal lint results instead of
+crashing the Python adapter.
+
 ## Active Non-Blocking Notes
 
 1. `feature/sprint-A1` remains a historical local worktree name from before the
