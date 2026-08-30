@@ -49,8 +49,9 @@ python3 -m json.tool install.json >/dev/null
 python3 -c 'import json; json.load(open("install.json")); print("install.json: valid JSON")'
 ```
 
-For declared command arrays, command arrays must name a shipped binary or `sc_lint` module only;
-a repository-relative script is not authorized in a kit-rendered step.
+Kit-rendered command arrays must name a shipped binary or `sc_lint` module only;
+profile and test-layer commands are consumer-owned and rendered verbatim. A
+repository-relative script is not authorized in a kit-rendered step.
 
 ## 3. Run the drift check
 

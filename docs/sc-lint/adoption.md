@@ -98,7 +98,7 @@ If drift remains, attach that output instead.
 - **Consumer-owned recipes:** add normal root `Justfile` recipes outside the
   managed import block.
 
-For any kit-rendered command array, command arrays must name a shipped binary or `sc_lint` module only.
+Kit-rendered command arrays must name a shipped binary or `sc_lint` module only; profile and test-layer commands are consumer-owned and rendered verbatim.
 Do not name a repository-relative script in a kit-rendered step. Model environment, platform, pre-work, and post-work with
 declarative fields instead. Only `sc-lint` is kit-pinned; other tool pins stay
 consumer-owned.
