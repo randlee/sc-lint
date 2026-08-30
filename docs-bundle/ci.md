@@ -43,12 +43,12 @@ jobs:
       - name: Complete lint profile
         uses: randlee/sc-lint@v1
         with:
-          version: 0.5.0
+          version: 0.6.0
           operation: lint
       - name: Complete test profile
         uses: randlee/sc-lint@v1
         with:
-          version: 0.5.0
+          version: 0.6.0
           operation: test
 ```
 
@@ -81,7 +81,7 @@ SHA and keep `version` explicit:
 ```yaml
 - uses: randlee/sc-lint@0123456789abcdef0123456789abcdef01234567
   with:
-    version: 0.5.0
+    version: 0.6.0
     operation: lint
 ```
 
