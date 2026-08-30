@@ -39,7 +39,7 @@ owner: flint
 - `bindings/sc-lint-py/python/sc_lint/__init__.py` (new)
 - `bindings/sc-lint-py/python/sc_lint/{run_lint,lint_common,check_version_sync,view}.py` (moved from `.just/`)
 - `boundaries/sc-lint-py/python-bindings.toml` (new)
-- `.just/*.py` (source-maintainer copies replaced by imports from `sc_lint`)
+- `.just/*.py` (source-maintainer copies replaced by imports from `sc_lint`; `.just/lint_common.py` and `.just/lint_identity_literals.py` are Stack C's files — G.3a only ports G.3c's parser fix into the wheel copy per the phase-G-plan cross-stack reconciliation entry)
 - `Justfile` (source recipes use the wheel from a local venv)
 - `.sc-lint/bootstrap`, `.sc-lint/bootstrap.ps1` (`setup` provisions
   `sc-lint==<minimum_version>` into `.sc-lint/venv`; `upgrade` re-pins)
