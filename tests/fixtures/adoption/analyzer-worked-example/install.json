@@ -1,6 +1,6 @@
 {
   "minimum_version": "0.5.0",
-  "profiles": {"ci": ["sc-lint", "lint", "ci"]},
+  "profiles": {"ci": ["cargo", "check"]},
   "ci": {"os": ["linux"], "enabled": true},
   "analyzers": {
     "runtime": {"enabled": false, "reason": "no async runtime"},

@@ -102,3 +102,19 @@ def test_analyzer_worked_example_is_declarative() -> None:
     assert 'reason = "no async runtime"' in config
     assert '"linux"' in config
     assert 'name = "unit"' in config and 'name = "integrate"' in config
+
+
+def test_analyzer_worked_example_runs_all_declared_just_layers() -> None:
+    binary = ROOT / "target" / "debug" / "sc-lint"
+    wheels = ROOT / ".sc-lint" / "wheels"
+    if not binary.exists() or not wheels.exists():
+        import pytest
+
+        pytest.skip("requires the source product binary and offline wheel set")
+    consumer = copy_fixture("analyzer-worked-example")
+    result = run("--input", str(FIXTURES / "analyzer-worked-example" / "install.json"), str(consumer))
+    assert result.returncode == 0, result.stderr
+    environment = {**os.environ, "SC_LINT_BIN": str(binary), "SC_LINT_WHEEL_DIR": str(wheels)}
+    for arguments in (("test",), ("test", "all"), ("test", "integrate"), ("lint",)):
+        command = subprocess.run(["just", *arguments], cwd=consumer, env=environment, text=True, capture_output=True, check=False)
+        assert command.returncode == 0, command.stderr
