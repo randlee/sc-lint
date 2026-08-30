@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import shutil
 import subprocess
 import tempfile
@@ -32,6 +33,7 @@ def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> No
     assert install.returncode == 0, install.stderr
     clean = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
     assert clean.returncode == 0, clean.stdout
+    assert os.access(consumer / ".sc-lint" / "bootstrap", os.X_OK)
     recipes = subprocess.run(["just", "--list"], cwd=consumer, text=True, capture_output=True, check=False)
     assert recipes.returncode == 0, recipes.stderr
     for recipe in ("setup", "lint", "test", "upgrade"):
@@ -74,6 +76,6 @@ def test_analyzer_worked_example_is_declarative() -> None:
     result = run("--input", str(FIXTURES / "analyzer-worked-example" / "install.json"), str(consumer))
     assert result.returncode == 0, result.stderr
     config = (consumer / "sc-lint.toml").read_text()
-    assert '"no async runtime"' in config
+    assert 'reason = "no async runtime"' in config
     assert '"linux"' in config
-    assert "unit =" in config and "integrate =" in config
+    assert 'name = "unit"' in config and 'name = "integrate"' in config

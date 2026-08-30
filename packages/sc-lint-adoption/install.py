@@ -25,10 +25,25 @@ def values(path: Path) -> dict:
         raise ValueError("minimum_version must be SemVer")
     return data
 
+def toml_value(value: object) -> str:
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f"{key} = {toml_value(item)}" for key, item in value.items()) + " }"
+    if isinstance(value, list):
+        return "[" + ", ".join(toml_value(item) for item in value) + "]"
+    if isinstance(value, bool):
+        return str(value).lower()
+    return json.dumps(value)
+
 def render(template: Path, data: dict) -> str:
-    analyzers = "\n".join(f"{name} = {json.dumps(value)}" for name, value in data["analyzers"].items())
-    profiles = "\n".join(f"{name} = {json.dumps(value)}" for name, value in data["profiles"].items())
-    layers = "\n".join(f"{name} = {json.dumps(value)}" for name, value in data.get("test", {}).items())
+    analyzers = "\n".join(f"{name} = {toml_value(value)}" for name, value in data["analyzers"].items())
+    profiles = "\n\n".join(
+        f'[[tool.sc-lint.lint]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}'
+        for name, command in data["profiles"].items()
+    )
+    layers = "\n\n".join(
+        f'[[tool.sc-lint.test]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}'
+        for name, command in data.get("test", {}).items()
+    )
     return template.read_text().replace("{{ minimum_version }}", data["minimum_version"]).replace("{{ analyzers }}", analyzers).replace("{{ profiles }}", profiles).replace("{{ test_layers }}", layers)
 
 def desired(data: dict, repo: Path) -> dict[Path, str | bytes]:
@@ -71,6 +86,9 @@ def main() -> int:
             print("".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), fromfile=str(path), tofile=str(path))))
         return 1 if changes else 0
     for path, _, new in changes:
-        path.parent.mkdir(parents=True, exist_ok=True); path.write_text(new)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(new)
+        if path.relative_to(args.repo) == Path(".sc-lint/bootstrap"):
+            path.chmod(0o755)
     return 0
 if __name__ == "__main__": raise SystemExit(main())
