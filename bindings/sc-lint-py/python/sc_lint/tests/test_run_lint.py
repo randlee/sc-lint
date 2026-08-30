@@ -83,8 +83,9 @@ resolver = "2"
             repo_root = Path(tempdir)
             tasks = build_tasks(repo_root)
             self.assertEqual(tasks["modules"].command[-2:], ["-m", "sc_lint.lint_cargo_modules"])
-            self.assertEqual(tasks["sc-boundary"].command[-2:], ["-m", "sc_lint.lint_sc_boundary"])
-            self.assertEqual(tasks["sc-portability"].command[-2:], ["-m", "sc_lint.lint_sc_portability"])
+            # Native product commands (issue #84): never `cargo run -p` wrappers.
+            self.assertEqual(tasks["sc-boundary"].command[-2:], ["lint", "sc-boundary"])
+            self.assertEqual(tasks["sc-portability"].command[-2:], ["lint", "sc-portability"])
             self.assertEqual(tasks["line-counts"].command[-2:], ["-m", "sc_lint.lint_line_counts"])
             self.assertEqual(tasks["identity-literals"].command[-2:], ["-m", "sc_lint.lint_identity_literals"])
             self.assertEqual(tasks["manifests"].command[-2:], ["-m", "sc_lint.lint_manifests"])

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 
+from sc_lint import binary_path
 from sc_lint.lint_common import discover_repo_root
 from sc_lint.lint_common import format_duration
 from sc_lint.lint_common import make_log_path
@@ -64,6 +65,9 @@ class LintResult:
 
 def build_tasks(repo_root: Path) -> dict[str, LintTask]:
     python_executable = sys.executable
+    # The analyzers are native product commands (issue #84); never wrap
+    # `cargo run -p` so the same task shape works from a released archive.
+    product_binary = str(binary_path())
     return {
         "fmt": LintTask("fmt", ["just", "_lint-fmt"]),
         "clippy": LintTask("clippy", ["just", "_lint-clippy"]),
@@ -71,14 +75,8 @@ def build_tasks(repo_root: Path) -> dict[str, LintTask]:
         "deny": LintTask("deny", [python_executable, "-m", "sc_lint.lint_cargo_deny"]),
         "shear": LintTask("shear", [python_executable, "-m", "sc_lint.lint_cargo_shear"]),
         "version": LintTask("version", [python_executable, "-m", "sc_lint.check_version_sync"]),
-        "sc-boundary": LintTask(
-            "sc-boundary",
-            [python_executable, "-m", "sc_lint.lint_sc_boundary"],
-        ),
-        "sc-portability": LintTask(
-            "sc-portability",
-            [python_executable, "-m", "sc_lint.lint_sc_portability"],
-        ),
+        "sc-boundary": LintTask("sc-boundary", [product_binary, "lint", "sc-boundary"]),
+        "sc-portability": LintTask("sc-portability", [product_binary, "lint", "sc-portability"]),
         "line-counts": LintTask(
             "line-counts",
             [python_executable, "-m", "sc_lint.lint_line_counts"],

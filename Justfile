@@ -46,14 +46,6 @@ _lint-shear:
     {{python_cmd}} -m sc_lint.lint_cargo_shear
 
 [private]
-_lint-sc-boundary:
-    {{python_cmd}} -m sc_lint.lint_sc_boundary
-
-[private]
-_lint-sc-portability:
-    {{python_cmd}} -m sc_lint.lint_sc_portability
-
-[private]
 _lint-manifests:
     {{python_cmd}} -m sc_lint.lint_manifests
 

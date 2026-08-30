@@ -2,6 +2,23 @@
 
 All notable changes to sc-lint are documented here.
 
+## [Unreleased]
+
+### Features
+
+- **Python wheel runtime** (G.3a) — the repository helper scripts ship as the
+  `sc-lint` PyPI distribution; the bootstrap provisions `.sc-lint/venv` and
+  the CLI runs helpers as `python -m sc_lint.<module>`.
+- **Self-contained release** (G.3b) — `full`/`ci` lint profiles invoke only
+  archive binaries or wheel helpers (closes #84); `sc-lint version --json`
+  reports `self_contained`; CI job `release-smoke` runs the kit recipes from a
+  staged archive on every OS.
+
+### Removed
+
+- The legacy `.just/lint-config.toml` repo-config fallback in the CLI;
+  `sc-lint.toml` is the only repo configuration file.
+
 ## [0.5.0] — 2026-08-12
 
 ### Features

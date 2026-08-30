@@ -453,13 +453,8 @@ fn lint_profile_plan(
             python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
             python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
             python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
-            python_step(repo_root, "sc-boundary", "lint", "sc_lint.lint_sc_boundary"),
-            python_step(
-                repo_root,
-                "sc-portability",
-                "lint",
-                "sc_lint.lint_sc_portability",
-            ),
+            product_step("sc-boundary", "lint", ["lint", "sc-boundary"]),
+            product_step("sc-portability", "lint", ["lint", "sc-portability"]),
             python_step(repo_root, "line-counts", "lint", "sc_lint.lint_line_counts"),
             python_step(
                 repo_root,
@@ -488,13 +483,8 @@ fn lint_profile_plan(
             python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
             python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
             python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
-            python_step(repo_root, "sc-boundary", "lint", "sc_lint.lint_sc_boundary"),
-            python_step(
-                repo_root,
-                "sc-portability",
-                "lint",
-                "sc_lint.lint_sc_portability",
-            ),
+            product_step("sc-boundary", "lint", ["lint", "sc-boundary"]),
+            product_step("sc-portability", "lint", ["lint", "sc-portability"]),
             // REQ-CLI-015: the CI profile never includes xwin-only steps.
         ],
     };
@@ -552,6 +542,17 @@ fn cargo_step(
     args: impl IntoIterator<Item = impl Into<OsString>>,
 ) -> StepPlan {
     StepPlan::new(name, kind, "cargo", args)
+}
+
+/// A step that re-enters the running `sc-lint` executable so composite
+/// profiles reuse the native single-target dispatch path (issue #84). The
+/// released archive therefore needs no source-tree wrapper for these steps.
+fn product_step(
+    name: &'static str,
+    kind: &'static str,
+    args: impl IntoIterator<Item = impl Into<OsString>>,
+) -> StepPlan {
+    StepPlan::new(name, kind, crate::dispatch::product_binary(), args)
 }
 
 fn python_step(repo_root: &Path, name: &'static str, kind: &'static str, module: &str) -> StepPlan {

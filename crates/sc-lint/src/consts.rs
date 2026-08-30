@@ -32,3 +32,5 @@ pub const FIELD_ROOT: &str = "root";
 pub const VENV_RELATIVE_DIR: &str = ".sc-lint/venv";
 /// Repo-relative `python-source` directory of the source checkout's wheel package.
 pub const SOURCE_PYTHON_PACKAGE_DIR: &str = "bindings/sc-lint-py/python";
+/// Documentation bundle directory shipped beside the release binaries.
+pub const DOCS_BUNDLE_DIR: &str = "sc-lint-docs";

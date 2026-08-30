@@ -561,6 +561,7 @@ pub(crate) fn version_payload() -> Value {
         consts::FIELD_TOOL: consts::SERVICE_NAME,
         consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
         "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
+        "self_contained": dispatch::self_contained_layout(),
         consts::FIELD_STATUS: "pass",
     })
 }

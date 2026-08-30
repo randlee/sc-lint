@@ -543,10 +543,7 @@ fn find_repo_config(repo_root: &Path, override_path: Option<&Path>) -> Option<Pa
     if let Some(path) = override_path {
         return Some(resolve_repo_relative_path(repo_root, path));
     }
-    [CONFIG_FILENAME, ".just/lint-config.toml"]
-        .into_iter()
-        .map(|relative| repo_root.join(relative))
-        .find(|path| path.exists())
+    Some(repo_root.join(CONFIG_FILENAME)).filter(|path| path.exists())
 }
 
 #[expect(
