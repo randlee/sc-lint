@@ -1,1 +1,3 @@
 crates/sc-lint/assets/bootstrap text eol=lf
+packages/sc-lint-adoption/.sc-lint/bootstrap text eol=lf
+.sc-lint/bootstrap text eol=lf

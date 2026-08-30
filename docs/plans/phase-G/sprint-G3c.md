@@ -19,12 +19,17 @@ are accepted without widening the release or adoption-kit scope.
 
 ## Hard Dependencies
 
-- none; this disjoint targeted-fix stack roots directly on `develop` and has
-  no touch point with Stack A or Stack B
+- none as start dependencies; this targeted-fix stack roots directly on
+  `develop` and has no touch point with Stack A. Its one touch point with
+  Stack B is the `.just/` helper reconciliation named in
+  `phase-G-plan.md` (G.3a removes `.just/*.py` and ships the fixed modules
+  from the `sc_lint` wheel); it is resolved by merge-forward after both
+  stacks land and does not gate G.3c.
 
 ## Exact Targets
 
-- `crates/sc-lint-attributes/src/` identity-literals parser and its regression tests
+- `.just/lint_common.py` Rust-literal parser and `.just/lint_identity_literals.py`
+  identity-literals utility, with focused tests under `.just/tests/`
 - `docs/issues-inventory.md`
 
 ## Deliverables
@@ -38,11 +43,20 @@ are accepted without widening the release or adoption-kit scope.
 
 - The focused identity-literals regression test covers `"\u{1F600}"` and
   `'\u{7}'` and passes.
-- `cargo test -p sc-lint-attributes` passes.
+- `python3 -m unittest discover -s .just/tests -p 'test_lint*.py'` passes.
+- `just lint` runs the identity-literals target successfully.
 
 ## Required Validation
 
-- `cargo test -p sc-lint-attributes`
+- `python3 -m unittest discover -s .just/tests -p 'test_lint*.py'`
+- `just lint`
+
+Validation evidence for the implementation is recorded against the two
+changed utility files: `test_lint_common.py` ran 15 tests and
+`test_lint_identity_literals.py` ran 2 tests (17 focused tests total); the
+broader `test_lint*.py` discovery ran 48 tests. The direct
+`python3 .just/lint_identity_literals.py` identity-literals target and the
+full `just lint` command both passed.
 
 ## Out Of Scope
 

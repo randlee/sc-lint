@@ -37,6 +37,9 @@ pub enum Command {
         /// Run the explicitly configured consumer profile instead of the source-maintainer profile.
         #[arg(long)]
         consumer: bool,
+        /// Run only the named consumer lint profile step (`all` runs every step in declaration order).
+        #[arg(long, requires = "consumer")]
+        profile: Option<String>,
     },
     View {
         #[arg(value_enum)]
@@ -90,8 +93,11 @@ pub enum Command {
         #[arg(long)]
         path: bool,
     },
-    /// Run the complete explicitly configured consumer test profile.
-    Test,
+    /// Run the explicitly configured consumer test profile.
+    Test {
+        /// Test layer to run. Omitted or `all` runs every configured layer in declaration order.
+        layer: Option<String>,
+    },
     Version,
     Ci,
 }

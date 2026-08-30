@@ -127,3 +127,16 @@ name = "sc-lint-portability"
 
 [[release_binaries]]
 name = "sc-lint-runtime"
+
+# Python distributions are built by maturin from the pyproject below, attached
+# to the GitHub Release as wheels + sdist, and uploaded to PyPI by the
+# `publish-pypi` job (environment `pypi`, secret `PYPI_TOKEN`); the release
+# preflight rehearses the upload against TestPyPI (`testpypi`, `TEST_PYPI_TOKEN`).
+[[python_distributions]]
+artifact = "sc-lint-py"
+package = "sc-lint"
+pyproject = "bindings/sc-lint-py/pyproject.toml"
+cargo_toml = "bindings/sc-lint-py/Cargo.toml"
+build_system = "maturin"
+required = true
+publish = true

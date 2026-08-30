@@ -95,11 +95,11 @@ bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1
 setup:
     {{bootstrap_command}} setup --config sc-lint.toml
 
-lint:
-    {{bootstrap_command}} lint --config sc-lint.toml
+lint *profile:
+    {{bootstrap_command}} lint --config sc-lint.toml {{profile}}
 
-test:
-    {{bootstrap_command}} test --config sc-lint.toml
+test *layer:
+    {{bootstrap_command}} test --config sc-lint.toml {{layer}}
 
 upgrade:
     {{bootstrap_command}} upgrade --config sc-lint.toml
