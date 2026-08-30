@@ -22,6 +22,72 @@ DIRECTIVE_RE = re.compile(
 STRING_LITERAL_RE = re.compile(
     r'r(?P<hashes>#+)?"(?P<raw>.*?)"(?P=hashes)|"(?P<quoted>(?:[^"\\]|\\.)*)"'
 )
+# A Rust character literal contains one scalar (or one escape token). Keeping
+# this to one token prevents an apostrophe inside a string from becoming a
+# false character match across the rest of the source line.
+CHAR_LITERAL_RE = re.compile(r"'(?P<quoted>(?:\\u\{[0-9A-Fa-f]{1,6}\}|\\.|[^'\\]))'")
+
+RUST_SIMPLE_ESCAPES = {
+    "0": "\0",
+    "\\": "\\",
+    "\"": '"',
+    "'": "'",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+}
+
+
+def decode_rust_literal(value: str) -> str:
+    """Decode Rust literal escapes without applying Python's escape grammar.
+
+    In particular, Rust's brace-form unicode escape (``\\u{...}``) is valid
+    syntax but raises ``UnicodeDecodeError`` under Python's ``unicode_escape``
+    codec. Unknown escapes are retained verbatim so this helper cannot turn a
+    valid source literal into a lint-process failure.
+    """
+
+    decoded: list[str] = []
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if character != "\\":
+            decoded.append(character)
+            index += 1
+            continue
+
+        if index + 2 < len(value) and value[index + 1] == "u" and value[index + 2] == "{":
+            end = value.find("}", index + 3)
+            if end != -1:
+                digits = value[index + 3 : end]
+                try:
+                    codepoint = int(digits, 16)
+                    if digits and len(digits) <= 6 and codepoint <= 0x10FFFF:
+                        decoded.append(chr(codepoint))
+                        index = end + 1
+                        continue
+                except ValueError:
+                    pass
+
+        if index + 1 < len(value):
+            escaped = value[index + 1]
+            simple = RUST_SIMPLE_ESCAPES.get(escaped)
+            if simple is not None:
+                decoded.append(simple)
+                index += 2
+                continue
+            if escaped == "x" and index + 3 < len(value):
+                digits = value[index + 2 : index + 4]
+                try:
+                    decoded.append(chr(int(digits, 16)))
+                    index += 4
+                    continue
+                except ValueError:
+                    pass
+
+        decoded.extend(("\\", value[index + 1]) if index + 1 < len(value) else ("\\",))
+        index += 2
+    return "".join(decoded)
 
 
 @dataclass(frozen=True)
@@ -471,13 +537,15 @@ def rust_file_test_scope(path: Path, lines: list[str]) -> list[bool]:
 
 
 def iter_string_literal_contents(line: str) -> list[str]:
+    matches = [*STRING_LITERAL_RE.finditer(line), *CHAR_LITERAL_RE.finditer(line)]
+    matches.sort(key=lambda match: match.start())
     literals: list[str] = []
-    for match in STRING_LITERAL_RE.finditer(line):
-        raw_value = match.group("raw")
+    for match in matches:
+        raw_value = match.groupdict().get("raw")
         if raw_value is not None:
             literals.append(raw_value)
             continue
         quoted_value = match.group("quoted")
         if quoted_value is not None:
-            literals.append(bytes(quoted_value, "utf-8").decode("unicode_escape"))
+            literals.append(decode_rust_literal(quoted_value))
     return literals

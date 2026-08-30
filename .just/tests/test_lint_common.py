@@ -217,12 +217,18 @@ version = "0.1.0"
 
         self.assertEqual(scope, [False, True, True, True, True, True])
 
-    def test_iter_string_literal_contents_supports_raw_and_escaped_literals(self) -> None:
-        line = f'let a = "team\\nlead"; let b = r#"{TEAM_LEAD_IDENTITY}"#;'
+    def test_iter_string_literal_contents_supports_rust_unicode_and_char_escapes(self) -> None:
+        line = f'let a = "team\\nlead"; let b = r#"{TEAM_LEAD_IDENTITY}"#; let c = "\\u{{1F600}}"; let d = \'\\u{{7}}\';'
         self.assertEqual(
             iter_string_literal_contents(line),
-            ["team\nlead", TEAM_LEAD_IDENTITY],
+            ["team\nlead", TEAM_LEAD_IDENTITY, "😀", "\a"],
         )
+
+    def test_iter_string_literal_contents_preserves_unknown_rust_escapes(self) -> None:
+        self.assertEqual(iter_string_literal_contents(r'let value = "\\q";'), [r"\q"])
+
+    def test_iter_string_literal_contents_does_not_treat_string_apostrophes_as_chars(self) -> None:
+        self.assertEqual(iter_string_literal_contents('let value = "don\'t";'), ["don't"])
 
     def test_iter_workspace_rust_files_includes_src_and_tests(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
