@@ -22,7 +22,10 @@ DIRECTIVE_RE = re.compile(
 STRING_LITERAL_RE = re.compile(
     r'r(?P<hashes>#+)?"(?P<raw>.*?)"(?P=hashes)|"(?P<quoted>(?:[^"\\]|\\.)*)"'
 )
-CHAR_LITERAL_RE = re.compile(r"'(?P<quoted>(?:[^'\\]|\\.)*)'")
+# A Rust character literal contains one scalar (or one escape token). Keeping
+# this to one token prevents an apostrophe inside a string from becoming a
+# false character match across the rest of the source line.
+CHAR_LITERAL_RE = re.compile(r"'(?P<quoted>(?:\\u\{[0-9A-Fa-f]{1,6}\}|\\.|[^'\\]))'")
 
 RUST_SIMPLE_ESCAPES = {
     "0": "\0",

@@ -227,6 +227,9 @@ version = "0.1.0"
     def test_iter_string_literal_contents_preserves_unknown_rust_escapes(self) -> None:
         self.assertEqual(iter_string_literal_contents(r'let value = "\\q";'), [r"\q"])
 
+    def test_iter_string_literal_contents_does_not_treat_string_apostrophes_as_chars(self) -> None:
+        self.assertEqual(iter_string_literal_contents('let value = "don\'t";'), ["don't"])
+
     def test_iter_workspace_rust_files_includes_src_and_tests(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
