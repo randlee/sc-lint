@@ -31,7 +31,8 @@ owner: flint
   and `../sc-compose/bindings/` (existing maturin layout in the ecosystem)
 - `sc-publish` PyPI channel (`pypi-publish.yml`) already vendored here
 - existing helpers: `.just/run_lint.py`, `.just/lint_common.py`,
-  `.just/check_version_sync.py`, `.just/python_adapter.py`, `.just/view_*.py`
+  `.just/lint_identity_literals.py`, `.just/check_version_sync.py`,
+  `.just/python_adapter.py`, `.just/view_*.py`
 
 ## Exact Targets
 
@@ -39,7 +40,7 @@ owner: flint
 - `bindings/sc-lint-py/pyproject.toml` (new)
 - `bindings/sc-lint-py/src/lib.rs` (new; thin pyo3 surface over existing crate APIs — **no new logic**)
 - `bindings/sc-lint-py/python/sc_lint/__init__.py` (new)
-- `bindings/sc-lint-py/python/sc_lint/{run_lint,lint_common,check_version_sync,view}.py` (moved from `.just/`)
+- `bindings/sc-lint-py/python/sc_lint/{run_lint,lint_common,lint_identity_literals,check_version_sync,view}.py` (moved from `.just/`; `lint_common`/`lint_identity_literals` carry G.3c's parser fix per the cross-stack reconciliation entry)
 - `boundaries/sc-lint-py/python-bindings.toml` (new)
 - `.just/*.py` (every source-maintainer helper removed; the Justfile runs
   `python -m sc_lint.<module>` from `.sc-lint/venv` instead). This deletion
