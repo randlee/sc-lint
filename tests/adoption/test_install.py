@@ -60,6 +60,29 @@ def test_dry_run_reports_modified_managed_asset() -> None:
     assert str(managed) in result.stdout
 
 
+def test_install_rejects_a_modified_managed_asset_without_writing() -> None:
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    managed = consumer / ".sc-lint" / "justfile"
+    managed.write_text(managed.read_text() + "# consumer edit\n")
+    before = managed.read_bytes()
+    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 2
+    assert str(managed) in result.stderr
+    assert managed.read_bytes() == before
+
+
+def test_vendored_kit_can_recheck_and_schema_stays_vendored() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = FIXTURES / "install.json"
+    assert run("--input", str(input_path), str(consumer)).returncode == 0
+    installer = consumer / "plugins" / "sc-lint" / "install.py"
+    assert installer.is_file()
+    assert not (consumer / "install.schema.json").exists()
+    result = subprocess.run(["python3", str(installer), "--dry-run", "--input", str(input_path), str(consumer)], text=True, capture_output=True, check=False)
+    assert result.returncode == 0, result.stderr
+
+
 def test_duplicate_markers_are_conflicts_without_writes() -> None:
     consumer = copy_fixture("empty-workspace")
     justfile = consumer / "Justfile"

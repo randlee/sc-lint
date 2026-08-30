@@ -1,18 +1,15 @@
 name: sc-lint
-
 on:
   pull_request:
   push:
     branches: [main, develop]
-
 jobs:
   sc-lint:
-    name: sc-lint (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: {{ ci_os }}
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable

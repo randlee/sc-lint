@@ -113,7 +113,7 @@ test: _source-build _source-venv
 
 # Run the vendorable consumer-adoption kit integration suite.
 test-adoption:
-    python3 -m pytest tests/adoption -q
+    {{host_python}} -m pytest tests/adoption -q
 
 # Inspect the managed upgrade path without changing the source checkout.
 upgrade: _source-build _source-venv
