@@ -22,6 +22,9 @@ use crate::error::ErrorCode;
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
 
+/// Selector value that runs every configured consumer profile step in declaration order.
+pub(crate) const CONSUMER_SELECTOR_ALL: &str = "all";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ConsumerProfile {
     Lint,
@@ -280,9 +283,14 @@ impl LoadedConfig {
         clippy::result_large_err,
         reason = "Consumer profile lookup retains the shared top-level CliError contract."
     )]
+    /// Resolves the consumer profile steps selected by `selector`.
+    ///
+    /// `None` and [`CONSUMER_SELECTOR_ALL`] select every configured step in
+    /// declaration order; any other value selects the single step with that name.
     pub(crate) fn consumer_profile(
         &self,
         profile: ConsumerProfile,
+        selector: Option<&str>,
     ) -> Result<(&Path, &[ConsumerProfileStep]), CliError> {
         let LoadedConfigMode::Consumer(requirement) = &self.mode else {
             return Err(CliError::internal(
@@ -293,7 +301,34 @@ impl LoadedConfig {
             ConsumerProfile::Lint => &requirement.lint,
             ConsumerProfile::Test => &requirement.test,
         };
-        Ok((&requirement.root, steps))
+        let Some(name) = selector.filter(|name| *name != CONSUMER_SELECTOR_ALL) else {
+            return Ok((&requirement.root, steps));
+        };
+        let step =
+            steps
+                .iter()
+                .find(|step| step.name() == name)
+                .ok_or_else(|| {
+                    let available = steps
+                        .iter()
+                        .map(ConsumerProfileStep::name)
+                        .collect::<Vec<_>>();
+                    consumer_profile_error(
+                self.config_path.as_deref().unwrap_or_else(|| Path::new(CONFIG_FILENAME)),
+                profile.as_str(),
+                format!(
+                    "consumer `{}` profile has no step named `{name}`; configured steps: {}",
+                    profile.as_str(),
+                    available.join(", ")
+                ),
+            )
+            .with_detail("selector", json!(name))
+            .with_detail("available", json!(available))
+            .with_suggested_action(format!(
+                "Pass one of the configured step names or `{CONSUMER_SELECTOR_ALL}`."
+            ))
+                })?;
+        Ok((&requirement.root, std::slice::from_ref(step)))
     }
 
     #[expect(
@@ -543,10 +578,7 @@ fn find_repo_config(repo_root: &Path, override_path: Option<&Path>) -> Option<Pa
     if let Some(path) = override_path {
         return Some(resolve_repo_relative_path(repo_root, path));
     }
-    [CONFIG_FILENAME, ".just/lint-config.toml"]
-        .into_iter()
-        .map(|relative| repo_root.join(relative))
-        .find(|path| path.exists())
+    Some(repo_root.join(CONFIG_FILENAME)).filter(|path| path.exists())
 }
 
 #[expect(

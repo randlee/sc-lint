@@ -1,5 +1,9 @@
 # `sc-lint-version` Consumer Adoption
 
+For the ordinary repository lint/test/setup contract, use the separate
+[managed `sc-lint` adoption guide](./adoption.md). This document remains
+specific to the planned interface-versioning line.
+
 This document is the authoritative adoption guide for consuming repositories
 that want to use the planned `sc-lint-version` interface-checking line.
 

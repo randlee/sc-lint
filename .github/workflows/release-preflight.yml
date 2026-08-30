@@ -56,6 +56,13 @@ jobs:
           echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release_version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: List manifest-declared Python distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/release_artifacts.py list-python-distributions \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" --publishable-only
+
       - name: Verify release manifest and helper files exist
         shell: bash
         run: |
@@ -172,3 +179,44 @@ jobs:
             [[ -n "$crate" ]] || continue
             cargo check -p "$crate" --locked
           done
+
+  testpypi-rehearsal:
+    # Builds the Linux abi3 wheel + sdist and uploads them to TestPyPI so the
+    # PyPI channel is exercised end to end before release.yml publishes for
+    # real. `--skip-existing` keeps re-runs of the same candidate idempotent.
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: testpypi
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install maturin
+        run: python -m pip install maturin==1.9.4
+
+      - name: Build wheel and sdist
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          while IFS='|' read -r artifact package cargo_toml; do
+            [[ -n "$artifact" ]] || continue
+            maturin build --release -m "$cargo_toml" --out dist
+            maturin sdist -m "$cargo_toml" --out dist
+          done < <(
+            python3 scripts/release_artifacts.py list-python-distributions \
+              --manifest "${RELEASE_ARTIFACT_MANIFEST}" --publishable-only
+          )
+          ls -la dist/
+
+      - name: Upload to TestPyPI (rehearsal)
+        env:
+          MATURIN_NON_INTERACTIVE: '1'
+          MATURIN_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+        run: maturin upload --repository testpypi --non-interactive --skip-existing dist/*.whl dist/*.tar.gz

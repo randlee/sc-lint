@@ -163,7 +163,14 @@ fn run_delegated_backend(
             .with_source(error)
             .with_detail(consts::FIELD_TOOL, json!(tool))
             .with_detail(consts::FIELD_ROOT, json!(repo_root.display().to_string()))
-            .with_detail("backend_path", json!(backend_binary.display().to_string()))
+            .with_detail(
+                consts::FIELD_BACKEND_PATH,
+                json!(backend_binary.display().to_string()),
+            )
+            .with_suggested_action(
+                "Install the release archive so the backend binary sits beside `sc-lint`, or run `cargo build --workspace` in a source checkout, then rerun the profile.",
+            )
+            .with_documentation("sc-lint docs setup")
         })?;
 
     if !output.status.success() {
@@ -183,8 +190,14 @@ fn run_delegated_backend(
         .with_cause(cause)
         .with_detail(consts::FIELD_TOOL, json!(tool))
         .with_detail(consts::FIELD_ROOT, json!(repo_root.display().to_string()))
-        .with_detail("backend_path", json!(backend_binary.display().to_string()))
-        .with_detail("exit_status", json!(output.status.code())));
+        .with_detail(
+            consts::FIELD_BACKEND_PATH,
+            json!(backend_binary.display().to_string()),
+        )
+        .with_detail(consts::FIELD_EXIT_CODE, json!(output.status.code()))
+        .with_suggested_action(format!(
+            "Run `{tool} analyze --root <repo> --format json` directly for the backend's own diagnostics, then rerun the profile."
+        )));
     }
 
     let raw = std::str::from_utf8(&output.stdout).map_err(|error| {
@@ -205,6 +218,34 @@ fn run_delegated_backend(
         normalized,
         DispatchTelemetry::new(tool, finding_count),
     ))
+}
+
+/// The running `sc-lint` executable, used when a profile step re-enters the
+/// product instead of a source-tree helper.
+pub(crate) fn product_binary() -> PathBuf {
+    std::env::current_exe().unwrap_or_else(|_| PathBuf::from(consts::SERVICE_NAME))
+}
+
+/// True when the running executable sits in the released archive layout:
+/// every declared backend binary and the documentation bundle are beside it,
+/// so no step depends on a source checkout.
+pub(crate) fn self_contained_layout() -> bool {
+    std::env::current_exe()
+        .ok()
+        .as_deref()
+        .and_then(Path::parent)
+        .is_some_and(self_contained_layout_in_dir)
+}
+
+fn self_contained_layout_in_dir(dir: &Path) -> bool {
+    [
+        consts::TOOL_BOUNDARY,
+        consts::TOOL_PORTABILITY,
+        consts::TOOL_RUNTIME,
+    ]
+    .into_iter()
+    .all(|tool| find_backend_binary_in_dir(dir, tool).is_some())
+        && dir.join(consts::DOCS_BUNDLE_DIR).is_dir()
 }
 
 fn find_backend_binary(tool: &str) -> PathBuf {
@@ -242,8 +283,22 @@ fn find_backend_binary_in_dir(dir: &Path, tool: &str) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::find_backend_binary_from_exe;
+    use super::self_contained_layout_in_dir;
     use std::fs;
     use tempfile::TempDir;
+
+    #[test]
+    fn self_contained_layout_requires_every_backend_and_the_docs_bundle() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let dir = temp_dir.path();
+        assert!(!self_contained_layout_in_dir(dir));
+        for tool in ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"] {
+            fs::write(dir.join(tool), "").expect("backend");
+        }
+        assert!(!self_contained_layout_in_dir(dir));
+        fs::create_dir_all(dir.join(crate::consts::DOCS_BUNDLE_DIR)).expect("docs");
+        assert!(self_contained_layout_in_dir(dir));
+    }
 
     #[test]
     fn prefers_installed_sibling_backend_binary() {

@@ -1,0 +1,6 @@
+hello:
+    @echo established
+
+# Compatibility alias retained after migration to the declared test layer.
+test-integration:
+    just test integration

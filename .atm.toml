@@ -2,10 +2,6 @@
 identity = "team-lead"
 default_team = "sc-lint"
 
-[[atm.post_send_hooks]]
-recipient = "clint"
-command = ["/Users/randlee/.atm/scripts/atm-nudge-xml-1.py", "clint"]
-
 [rmux]
 session = "sc-lint"
 
@@ -23,6 +19,11 @@ name = "clint"
 tmux_pane_id = "%46"
 command = "codex -c features.codex_hooks=true --yolo"
 env = { ATM_IDENTITY = "clint", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
+
+[[rmux.windows.panes]]
+name = "cfast"
+command = "codex -c features.codex_hooks=true --yolo"
+env = { ATM_IDENTITY = "cfast", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
 [[rmux.windows.panes]]
 name = "quality-mgr"

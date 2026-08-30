@@ -21,11 +21,77 @@ $remaining = @()
 for ($index = 0; $index -lt $Rest.Count; $index++) {
     if ($index -ne $configIndex -and $index -ne ($configIndex + 1)) { $remaining += $Rest[$index] }
 }
-if ($remaining | Where-Object { $_ -notin @("--check", "--dry-run") }) { Stop-Usage }
+$selector = @($remaining | Where-Object { $_ -notin @("--check", "--dry-run") })
+if ($selector.Count -gt 1 -or ($Operation -notin @("lint", "test") -and $selector.Count -ne 0)) { Stop-Usage }
 
 $installDirectory = if ($env:SC_LINT_INSTALL_DIR) { $env:SC_LINT_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "sc-lint\\bin" }
 $managedBinary = Join-Path $installDirectory "sc-lint.exe"
 $productBinary = $null
+
+# Python helper package (sc_lint wheel) provisioned next to the config file.
+$venvDirectory = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $Config).Path) ".sc-lint\venv"
+$venvPython = Join-Path $venvDirectory "Scripts\python.exe"
+
+function Get-MinimumVersion {
+    $minimumLine = Select-String -Path $Config -Pattern '^\s*minimum_version\s*=\s*"([^"]+)"' | Select-Object -First 1
+    if (-not $minimumLine) {
+        [Console]::Error.WriteLine("setup: could not read minimum_version from $Config (CLI.SC_LINT_CONFIG_MALFORMED)")
+        exit 3
+    }
+    return $minimumLine.Matches[0].Groups[1].Value
+}
+
+function Test-VenvReady {
+    param([string]$Version)
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) { return $false }
+    $probe = "import sys, sc_lint`nparse = lambda v: tuple(int(p) for p in v.split('+')[0].split('.')[:3])`nsys.exit(0 if parse(sc_lint.__version__) >= parse(sys.argv[1]) else 1)"
+    & $venvPython -c $probe $Version 2>$null | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Get-VenvMode {
+    param([string[]]$Arguments)
+    if ($Arguments -contains "--check") { return "check" }
+    if ($Arguments -contains "--dry-run") { return "dry-run" }
+    return "install"
+}
+
+# Ensure .sc-lint/venv holds sc-lint>=minimum_version. SC_LINT_WHEEL_DIR selects
+# an offline wheel directory instead of PyPI.
+function Install-Venv {
+    param([string]$Mode)
+    $version = Get-MinimumVersion
+    if (Test-VenvReady $version) { return }
+    if ($Mode -eq "check") {
+        [Console]::Error.WriteLine("setup: $venvDirectory does not provide sc-lint>=$version (CLI.SC_LINT_PYTHON_UNAVAILABLE)")
+        exit 4
+    }
+    if ($Mode -eq "dry-run") {
+        Write-Output "setup: would install sc-lint==$version into $venvDirectory"
+        return
+    }
+    if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
+        $hostPython = Get-Command "python" -ErrorAction SilentlyContinue
+        if (-not $hostPython) { $hostPython = Get-Command "python3" -ErrorAction SilentlyContinue }
+        if (-not $hostPython) {
+            [Console]::Error.WriteLine("setup: could not create $venvDirectory (CLI.SC_LINT_PYTHON_UNAVAILABLE)")
+            exit 4
+        }
+        & $hostPython.Source -m venv $venvDirectory
+        if ($LASTEXITCODE -ne 0) {
+            [Console]::Error.WriteLine("setup: could not create $venvDirectory (CLI.SC_LINT_PYTHON_UNAVAILABLE)")
+            exit 4
+        }
+    }
+    $pipArguments = @("-m", "pip", "install", "--quiet", "--disable-pip-version-check")
+    if ($env:SC_LINT_WHEEL_DIR) { $pipArguments += @("--no-index", "--find-links", $env:SC_LINT_WHEEL_DIR) }
+    $pipArguments += "sc-lint==$version"
+    & $venvPython @pipArguments
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine("setup: could not install sc-lint==$version into $venvDirectory (CLI.SC_LINT_PYTHON_UNAVAILABLE)")
+        exit 4
+    }
+}
 
 function Resolve-ProductBinary {
     if ($env:SC_LINT_BIN) {
@@ -100,7 +166,7 @@ function Ensure-Product {
     & $script:productBinary --config $Config compatibility check --binary $script:productBinary
     if ($LASTEXITCODE -ne 0) {
         if (Test-ManagedBinary $script:productBinary) {
-            if ($remaining -contains "--dry-run") {
+            if ($remaining -contains "--check" -or $remaining -contains "--dry-run") {
                 & $script:productBinary --config $Config setup @remaining
                 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             } else {
@@ -119,14 +185,18 @@ switch ($Operation) {
     "setup" {
         Ensure-Product
         & $productBinary --config $Config setup @remaining
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Install-Venv (Get-VenvMode $remaining)
     }
     "lint" {
         Ensure-Product
-        & $productBinary lint --consumer --config $Config ci
+        Install-Venv "install"
+        if ($selector.Count -eq 1) { & $productBinary lint --consumer --config $Config ci --profile $selector[0] } else { & $productBinary lint --consumer --config $Config ci }
     }
     "test" {
         Ensure-Product
-        & $productBinary test --config $Config
+        Install-Venv "install"
+        if ($selector.Count -eq 1) { & $productBinary test --config $Config $selector[0] } else { & $productBinary test --config $Config }
     }
     "upgrade" {
         $productBinary = Resolve-ProductBinary
@@ -139,6 +209,8 @@ switch ($Operation) {
             Invoke-VerifiedReleaseLauncher "upgrade" $remaining
         } else {
             & $productBinary --config $Config upgrade @remaining
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Install-Venv (Get-VenvMode $remaining)
         }
     }
 }
