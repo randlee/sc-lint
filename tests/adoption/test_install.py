@@ -132,10 +132,14 @@ def test_analyzer_worked_example_is_declarative() -> None:
 def test_analyzer_worked_example_runs_all_declared_just_layers() -> None:
     binary = ROOT / "target" / "debug" / "sc-lint"
     wheels = ROOT / ".sc-lint" / "wheels"
-    if not binary.exists() or not wheels.exists():
+    workspace_version = next(
+        line.split('"')[1] for line in (ROOT / "Cargo.toml").read_text().splitlines() if line.startswith("version =")
+    )
+    expected_wheel = f"sc_lint-{workspace_version}"
+    if not binary.exists() or not any(wheels.glob(f"{expected_wheel}-*.whl")):
         import pytest
 
-        pytest.skip("requires the source product binary and offline wheel set")
+        pytest.skip("requires the source product binary and matching offline wheel set")
     consumer = copy_fixture("analyzer-worked-example")
     result = run("--input", str(FIXTURES / "analyzer-worked-example" / "install.json"), str(consumer))
     assert result.returncode == 0, result.stderr
