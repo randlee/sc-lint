@@ -22,6 +22,8 @@ owner: flint
 ## Hard Dependencies
 
 - none from Stack A; runs in parallel with G.0–G.2 (Stack B, base `develop`)
+- none from Stack C; the `.just/` helper overlap with G.3c is a merge-forward
+  reconciliation named in `phase-G-plan.md`, not a start dependency
 - Phase G's ADR-016 design decision as recorded in the phase plan. G.0
   formalizes that ADR independently on Stack A; G.3a has no Stack A branch
   dependency and must not wait for its commit or merge.
@@ -39,7 +41,12 @@ owner: flint
 - `bindings/sc-lint-py/python/sc_lint/__init__.py` (new)
 - `bindings/sc-lint-py/python/sc_lint/{run_lint,lint_common,check_version_sync,view}.py` (moved from `.just/`)
 - `boundaries/sc-lint-py/python-bindings.toml` (new)
-- `.just/*.py` (source-maintainer copies replaced by imports from `sc_lint`; `.just/lint_common.py` and `.just/lint_identity_literals.py` are Stack C's files — G.3a only ports G.3c's parser fix into the wheel copy per the phase-G-plan cross-stack reconciliation entry)
+- `.just/*.py` (every source-maintainer helper removed; the Justfile runs
+  `python -m sc_lint.<module>` from `.sc-lint/venv` instead). This deletion
+  includes G.3c's `.just/lint_common.py`, `.just/lint_identity_literals.py`,
+  and `.just/tests/`: G.3a does not edit them in place, it ports G.3c's parser
+  fix into the wheel copy per the `phase-G-plan.md` cross-stack reconciliation
+  entry, and the second stack to land keeps the deletion on merge-forward.
 - `Justfile` (source recipes use the wheel from a local venv)
 - `.sc-lint/bootstrap`, `.sc-lint/bootstrap.ps1` (`setup` provisions
   `sc-lint==<minimum_version>` into `.sc-lint/venv`; `upgrade` re-pins)
@@ -92,8 +99,10 @@ helper migration, bootstrap provisioning, CI, and review.
 - `.sc-lint/bootstrap setup --config sc-lint.toml` creates `.sc-lint/venv`
   and installs the wheel matching `minimum_version`; `--check` reports the
   installed wheel version; offline path via `SC_LINT_WHEEL_DIR`.
-- `.just/` in this repository contains no copies of helper logic; each file is
-  ≤ 5 lines delegating to `sc_lint`.
+- `.just/` in this repository contains no Python helper logic: `.just/*.py`
+  is removed outright (any residual file would be ≤ 5 lines delegating to
+  `sc_lint`). This covers G.3c's two `.just/` files by deletion, not by
+  in-place rewrite — see the cross-stack reconciliation entry.
 - Wheels published to PyPI/TestPyPI through the existing `sc-publish` channel
   using the `PYPI_TOKEN` / `TEST_PYPI_TOKEN` environments.
 - `boundaries/sc-lint-py/python-bindings.toml` (new): structured boundary
@@ -115,7 +124,9 @@ helper migration, bootstrap provisioning, CI, and review.
   the G.1 kit): `just setup` creates
   `.sc-lint/venv` with `sc_lint` importable; `just lint` runs with no `.just/`
   directory present.
-- `find .just -name '*.py' -size +1k` returns nothing.
+- `find .just -name '*.py' -size +1k` returns nothing (satisfied by removing
+  `.just/*.py`; G.3c's files are removed with the rest, their fixed logic
+  lives in the wheel copy).
 - `cargo test --workspace` green; `bindings/sc-lint-py/src/lib.rs` ≤ 150 lines.
 
 ## Required Validation
