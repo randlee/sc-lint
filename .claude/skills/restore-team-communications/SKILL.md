@@ -73,6 +73,11 @@ atm teams restore sc-lint --from "$BACKUP_PATH"
 ```
 
 If required members are missing after restore, add them before verification.
+sc-lint runs under herdr, not tmux — new or restored members must use
+`--backend herdr --session default`, and each herdr agent must be renamed to
+match its roster name (`herdr agent rename <pane_id> <name>`) or ATM cannot
+resolve the send target. See the herdr reconciliation steps in
+`backup-and-restore-team.md` Step 5 for the full check.
 
 ## Step 4 — Verify Both Communication Layers
 
@@ -80,7 +85,9 @@ Repair is not complete until all checks pass:
 
 1. `SendMessage` to another Claude teammate.
 2. `atm send` to a non-Claude model.
-3. `atm send` to Codex and verify the nudge fires.
+3. `atm send` to Codex and verify the nudge fires — a clean `"outcome": "sent"`
+   with no `ATM_HERDR_AGENT_NOT_VISIBLE` warning confirms the herdr agent name
+   and backend are correct.
 
 For Codex-directed ATM sends, the nudge must include a clear call to action, not
 just a passive unread-mail announcement. Preferred structured nudge payload:

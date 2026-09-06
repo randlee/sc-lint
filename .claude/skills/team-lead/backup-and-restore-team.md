@@ -72,6 +72,46 @@ Verify members:
 atm members
 ```
 
+### Reconcile Against `.atm.toml` And Confirm Herdr Backend
+
+sc-lint runs under herdr, not tmux. `.atm.toml` is launch-only — it is not the
+source of truth for the ATM roster, so treat any drift between it and the
+roster as a roster bug to fix, not an `.atm.toml` edit.
+
+```bash
+atm members --json
+```
+
+For each member, confirm `"backend": "herdr"` and a `"herdrSession"` value
+(currently `default`). A member showing `"backend": "tmux"` or a
+`tmux_pane_id` is stale and its nudges will silently fail — fix it:
+
+```bash
+atm teams update-member sc-lint <name> --backend herdr --session default
+```
+
+Then compare the member names against every `[[rmux.windows.panes]]` entry in
+`.atm.toml` (excluding any pane meant to stay a free/manual terminal, e.g.
+`spare`). Add any pane declared in `.atm.toml` but missing from the roster:
+
+```bash
+atm teams add-member sc-lint <name> --agent-type <type> --model <model> \
+  --backend herdr --session default --home-dir "$(pwd)"
+```
+
+Finally, confirm each herdr agent is addressable by its roster name — ATM's
+herdr backend resolves the send target by agent name, not by pane label:
+
+```bash
+herdr pane list        # find pane_id for each label
+herdr agent get <name> # should NOT return agent_not_found
+herdr agent rename <pane_id> <name>   # if it does, rename to match
+```
+
+Do not add `[[atm.post_send_hooks]]` entries or tmux pane-id fields to
+`.atm.toml` to work around this — the fix belongs in the ATM roster and the
+herdr agent names, never in `.atm.toml`.
+
 If unexpected ghost members exist, trim the config manually:
 
 ```bash
@@ -139,19 +179,25 @@ Communication verification is also mandatory:
 atm send clint "New session (session-id: <SESSION_ID>). Team sc-lint restored. Please acknowledge and confirm status."
 ```
 
-If no response arrives within about 60 seconds, nudge via tmux. Preferred
-structured nudge payload when task metadata is available:
+If no response arrives within about 60 seconds, nudge via herdr — sc-lint has
+no backing tmux session, so `tmux send-keys` is not a valid fallback here.
+Preferred structured nudge payload when task metadata is available:
 
 ```text
 <atm><action>read atm</action><action>ack <TASK-ID></action><action>execute assigned task</action><when idle="immediate" busy="after-current-task"/><console announce="concise" pause="false"/></atm>
 ```
 
-Fallback plain-text nudge:
+Fallback plain-text nudge via herdr:
 
 ```bash
-tmux list-panes -a -F '#{session_name}:#{window_index}.#{pane_index} #{pane_title}'
-tmux send-keys -t <pane-id> "read atm for task <TASK-ID> and complete it before stopping" Enter
+herdr pane list                              # find pane_id for the target agent's label
+herdr agent prompt <name> "read atm for task <TASK-ID> and complete it before stopping"
 ```
+
+`herdr agent prompt` takes the roster member name directly once that agent has
+been renamed to match (see Step 5); it fails with `agent_blocked` if the
+target is mid-prompt-approval, and with `agent_not_found` if the herdr agent
+was never renamed to the roster name.
 
 ## Common Failure Modes
 
@@ -161,4 +207,6 @@ tmux send-keys -t <pane-id> "read atm for task <TASK-ID> and complete it before 
 | `TeamDelete` says no team name found | fresh session with no active team context | expected, proceed |
 | task list looks empty after restore | highwatermark mismatch or UI stale state | set `.highwatermark`, then create one real task |
 | `atm send` fails with agent not found | member missing after restore | add the member back to the team |
+| `atm send` returns `ATM_HERDR_AGENT_NOT_VISIBLE` warning | member's `backend` is `tmux`/stale, or the herdr agent was never renamed to the roster name | `atm teams update-member` to `--backend herdr`, then `herdr agent rename <pane_id> <name>` |
+| roster missing a pane declared in `.atm.toml` (e.g. `publisher`) | `.atm.toml` edited without a matching `atm teams add-member` | `atm teams add-member sc-lint <name> --backend herdr --session default` |
 | self-send or wrong identity routing | teammate launched with wrong `ATM_IDENTITY` | relaunch with the correct identity |
