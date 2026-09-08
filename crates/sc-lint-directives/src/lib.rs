@@ -1,5 +1,6 @@
 use syn::Error;
 use syn::Ident;
+use syn::LitInt;
 use syn::LitStr;
 use syn::Result;
 use syn::Token;
@@ -9,6 +10,7 @@ use syn::parse::ParseStream;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Scope {
     Boundary,
+    FunctionLength,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +18,7 @@ pub enum Directive {
     Allow(Vec<String>),
     InternalOnly,
     ForbidExternalImpls,
+    FunctionLengthFailAt(u32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +82,29 @@ pub(crate) fn parse_directive(input: ParseStream<'_>) -> Result<Directive> {
                 "unsupported boundary directive `{action_name}`; supported: allow(...), internal_only, forbid_external_impls"
             ),
         )),
+        (Scope::FunctionLength, "fail_at") => {
+            let content;
+            syn::parenthesized!(content in input);
+            let value = content.parse::<LitInt>()?;
+            if !content.is_empty() {
+                return Err(Error::new(
+                    value.span(),
+                    "function_length.fail_at accepts exactly one integer",
+                ));
+            }
+            let limit = value.base10_parse::<u32>()?;
+            if limit == 0 {
+                return Err(Error::new(
+                    value.span(),
+                    "function_length.fail_at must be greater than zero",
+                ));
+            }
+            Ok(Directive::FunctionLengthFailAt(limit))
+        }
+        (Scope::FunctionLength, _) => Err(Error::new(
+            action.span(),
+            format!("unsupported function_length directive `{action_name}`; supported: fail_at(N)"),
+        )),
     }
 }
 
@@ -86,9 +112,10 @@ fn parse_scope(input: ParseStream<'_>) -> Result<Scope> {
     let ident = input.parse::<Ident>()?;
     match ident.to_string().as_str() {
         "boundary" => Ok(Scope::Boundary),
+        "function_length" => Ok(Scope::FunctionLength),
         other => Err(Error::new(
             ident.span(),
-            format!("unsupported sc_lint scope `{other}`; supported: boundary"),
+            format!("unsupported sc_lint scope `{other}`; supported: boundary, function_length"),
         )),
     }
 }
@@ -145,5 +172,20 @@ mod tests {
     fn rejects_unknown_boundary_directive() {
         let error = syn::parse2::<AttributeInput>(quote!(boundary.unknown)).unwrap_err();
         assert!(error.to_string().contains("unsupported boundary directive"));
+    }
+
+    #[test]
+    fn parses_function_length_fail_at() {
+        let parsed: AttributeInput = syn::parse2(quote!(function_length.fail_at(120))).unwrap();
+        assert_eq!(
+            parsed.directives,
+            vec![Directive::FunctionLengthFailAt(120)]
+        );
+    }
+
+    #[test]
+    fn rejects_zero_function_length_fail_at() {
+        let error = syn::parse2::<AttributeInput>(quote!(function_length.fail_at(0))).unwrap_err();
+        assert!(error.to_string().contains("greater than zero"));
     }
 }

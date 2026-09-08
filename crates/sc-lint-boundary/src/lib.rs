@@ -10,6 +10,7 @@ use anyhow as anyhow_crate;
 use anyhow::Context;
 use anyhow::Result;
 use quote::ToTokens;
+use sc_lint_attributes::sc_lint;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
 pub use sc_lint_schema::CrateId;
@@ -462,6 +463,7 @@ impl GraphBuilder {
     }
 }
 
+#[sc_lint(function_length.fail_at(160))]
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {

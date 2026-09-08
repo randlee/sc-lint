@@ -24,6 +24,7 @@ dunce = "1"
 etcetera.workspace = true
 sc-observability.workspace = true
 sc-lint-boundary.workspace = true
+sc-lint-attributes.workspace = true
 sc-lint-schema.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -1,5 +1,6 @@
 use super::*;
 use crate::render::hex_encode;
+use sc_lint_attributes::sc_lint;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -154,6 +155,7 @@ fn visibility_label(visibility: &syn::Visibility) -> ItemVisibility {
     }
 }
 
+#[sc_lint(function_length.fail_at(500))]
 fn ingest_module_items(
     builder: &mut GraphBuilder,
     context: &TargetContext,

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::str::FromStr;
 
+use sc_lint_attributes::sc_lint;
 use semver::Version;
 use serde::Deserialize;
 use serde_json::Value;
@@ -439,6 +440,7 @@ impl LoadedConfig {
         clippy::result_large_err,
         reason = "The compatibility check must return one stable CliError envelope for each recoverable failure."
     )]
+    #[sc_lint(function_length.fail_at(110))]
     pub(crate) fn evaluate_compatibility(
         &self,
         binary_override: Option<&Path>,

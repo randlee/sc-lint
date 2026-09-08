@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 
+use sc_lint_attributes::sc_lint;
 use serde_json::Value;
 use serde_json::json;
 
@@ -439,6 +440,7 @@ pub(crate) fn run_ci_with(
     })))
 }
 
+#[sc_lint(function_length.fail_at(120))]
 fn lint_profile_plan(
     repo_root: &Path,
     profile: LintProfile,
@@ -474,6 +476,12 @@ fn lint_profile_plan(
             python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
             product_step("sc-boundary", "lint", ["lint", "sc-boundary"]),
             product_step("sc-portability", "lint", ["lint", "sc-portability"]),
+            python_step(
+                repo_root,
+                "function-length",
+                "lint",
+                "sc_lint.lint_function_length",
+            ),
             python_step(repo_root, "line-counts", "lint", "sc_lint.lint_line_counts"),
             python_step(
                 repo_root,

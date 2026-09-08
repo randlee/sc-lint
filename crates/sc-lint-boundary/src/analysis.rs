@@ -3,7 +3,9 @@ use crate::inventory::BoundaryInventory;
 use crate::inventory::BoundaryRecord;
 use crate::inventory::CallersSection;
 use crate::inventory::ReferenceScope;
+use sc_lint_attributes::sc_lint;
 
+#[sc_lint(function_length.fail_at(140))]
 pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
     let node_map: BTreeMap<_, _> = graph
         .nodes
@@ -284,6 +286,7 @@ pub(crate) fn analyze_forbid_external_impls(graph: &GraphExport) -> Vec<Finding>
     findings
 }
 
+#[sc_lint(function_length.fail_at(100))]
 pub(crate) fn analyze_named_callers(
     graph: &GraphExport,
     inventory: &BoundaryInventory,

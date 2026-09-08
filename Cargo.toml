@@ -28,6 +28,7 @@ clap = { version = "4", features = ["derive"] }
 etcetera = "0.11"
 sc-observability = "1.1.0"
 sc-lint-boundary = { version = "0.6.0", path = "crates/sc-lint-boundary" }
+sc-lint-attributes = { version = "0.6.0", path = "crates/sc-lint-attributes" }
 sc-lint-directives = { version = "0.6.0", path = "crates/sc-lint-directives" }
 sc-lint-schema = { version = "0.6.0", path = "crates/sc-lint-schema" }
 sc-lint-analyzer-support = { version = "0.6.0", path = "crates/sc-lint-analyzer-support" }

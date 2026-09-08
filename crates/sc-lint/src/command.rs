@@ -1,3 +1,4 @@
+use sc_lint_attributes::sc_lint;
 use serde_json::Value;
 use serde_json::json;
 use std::path::Path;
@@ -76,6 +77,7 @@ pub(crate) enum CommandId {
     ConsumerLintCi,
     LintFast,
     LintFull,
+    LintFunctionLength,
     LintIdentityLiterals,
     LintLineCounts,
     LintScBoundary,
@@ -128,6 +130,7 @@ impl CommandId {
                 crate::LintTarget::ScBoundary => Self::LintScBoundary,
                 crate::LintTarget::ScPortability => Self::LintScPortability,
                 crate::LintTarget::ScRuntime => Self::LintScRuntime,
+                crate::LintTarget::FunctionLength => Self::LintFunctionLength,
                 crate::LintTarget::LineCounts => Self::LintLineCounts,
                 crate::LintTarget::IdentityLiterals => Self::LintIdentityLiterals,
                 crate::LintTarget::Fast => Self::LintFast,
@@ -177,6 +180,7 @@ impl CommandId {
             Self::ConsumerLintCi => "lint.ci.consumer",
             Self::LintFast => "lint.fast",
             Self::LintFull => "lint.full",
+            Self::LintFunctionLength => "lint.function-length",
             Self::LintIdentityLiterals => "lint.identity-literals",
             Self::LintLineCounts => "lint.line-counts",
             Self::LintScBoundary => consts::CMD_BOUNDARY,
@@ -208,6 +212,7 @@ impl CommandId {
             | Self::ConsumerLintCi
             | Self::LintFast
             | Self::LintFull
+            | Self::LintFunctionLength
             | Self::LintIdentityLiterals
             | Self::LintLineCounts
             | Self::Version
@@ -231,6 +236,7 @@ impl CommandId {
             Self::ConsumerLintCi => "consumer lint profile orchestration",
             Self::LintIdentityLiterals => "python-backed identity literal lint path",
             Self::LintLineCounts => "python-backed line-count lint path",
+            Self::LintFunctionLength => "python-backed function-length lint path",
             Self::LintScBoundary => "boundary analyzer command path",
             Self::LintScPortability => "portability analyzer command path",
             Self::LintScRuntime => "runtime analyzer command path",
@@ -269,6 +275,7 @@ impl CommandId {
     /// Python-backed tool behind this command, if any.
     pub const fn python_tool(self) -> Option<python_adapter::PythonTool> {
         match self {
+            Self::LintFunctionLength => Some(python_adapter::PythonTool::FunctionLength),
             Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts),
             Self::LintIdentityLiterals => Some(python_adapter::PythonTool::IdentityLiterals),
             Self::ViewFindings => Some(python_adapter::PythonTool::ViewFindings),
@@ -315,6 +322,7 @@ impl CommandContext {
         clippy::result_large_err,
         reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
     )]
+    #[sc_lint(function_length.fail_at(100))]
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
         let (command_id, compatibility_binary, request) = match (&cli.command, cli.version) {
             (Some(command), false) => {
@@ -555,6 +563,10 @@ pub(crate) fn execute(
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),
+        CommandId::LintFunctionLength => python_adapter::run_python_tool(
+            loaded_config,
+            python_adapter::PythonTool::FunctionLength,
+        ),
         CommandId::LintLineCounts => {
             python_adapter::run_python_tool(loaded_config, python_adapter::PythonTool::LineCounts)
         }

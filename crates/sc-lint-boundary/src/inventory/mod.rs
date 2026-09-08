@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
+use sc_lint_attributes::sc_lint;
 use serde::Deserialize;
 
 mod dependency_policy;
@@ -154,6 +155,7 @@ fn validate_boundary_path(
     Ok(())
 }
 
+#[sc_lint(function_length.fail_at(110))]
 fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> {
     if record.public.facade.trim().is_empty() {
         anyhow::bail!(

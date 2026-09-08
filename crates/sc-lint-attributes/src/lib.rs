@@ -77,12 +77,22 @@ mod tests {
     }
 
     #[test]
+    fn parses_function_length_fail_at() {
+        let parsed: AttributeInput = syn::parse2(quote!(function_length.fail_at(120))).unwrap();
+        assert_eq!(
+            parsed.directives,
+            vec![Directive::FunctionLengthFailAt(120)]
+        );
+    }
+
+    #[test]
     fn expansion_is_noop_for_supported_directives() {
         let expanded = expand_sc_lint(
             quote!(
                 boundary.internal_only,
                 boundary.forbid_external_impls,
-                boundary.allow("cycle.type_method_self_loop")
+                boundary.allow("cycle.type_method_self_loop"),
+                function_length.fail_at(120)
             ),
             quote!(
                 pub struct Example;

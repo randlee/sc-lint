@@ -1,4 +1,5 @@
 use super::*;
+use sc_lint_attributes::sc_lint;
 
 pub fn render_findings_report(report: &FindingsReport) -> String {
     let mut rendered = format!(
@@ -39,6 +40,7 @@ pub fn render_graph_export_json(graph: &GraphExport) -> String {
         .expect("graph export serialization is infallible for GraphExport")
 }
 
+#[sc_lint(function_length.fail_at(100))]
 pub fn render_graph_export_turtle(graph: &GraphExport) -> String {
     let mut lines = vec![
         "@prefix sc: <urn:sc-lint-boundary:predicate:> .".to_string(),

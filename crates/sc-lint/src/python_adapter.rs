@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::process::Command as ProcessCommand;
 
+use sc_lint_attributes::sc_lint;
 use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;
@@ -16,6 +17,7 @@ pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PythonTool {
+    FunctionLength,
     LineCounts,
     IdentityLiterals,
     ViewFindings,
@@ -24,6 +26,7 @@ pub(crate) enum PythonTool {
 impl PythonTool {
     pub const fn tool_name(self) -> &'static str {
         match self {
+            Self::FunctionLength => "sc-lint-function-length",
             Self::LineCounts => "sc-lint-line-counts",
             Self::IdentityLiterals => "sc-lint-identity-literals",
             Self::ViewFindings => "sc-lint-view-findings",
@@ -33,6 +36,7 @@ impl PythonTool {
     /// Python module (inside the `sc_lint` wheel) that implements this tool.
     pub const fn script_relative_path(self) -> &'static str {
         match self {
+            Self::FunctionLength => "sc_lint.lint_function_length",
             Self::LineCounts => "sc_lint.lint_line_counts",
             Self::IdentityLiterals => "sc_lint.lint_identity_literals",
             Self::ViewFindings => "sc_lint.view_findings",
@@ -41,6 +45,7 @@ impl PythonTool {
 
     pub const fn config_scope(self) -> &'static str {
         match self {
+            Self::FunctionLength => "function_length",
             Self::LineCounts => "line_counts",
             Self::IdentityLiterals => "identities",
             Self::ViewFindings => "view.findings",
@@ -118,6 +123,7 @@ pub(crate) fn run_python_tool(
     clippy::result_large_err,
     reason = "Adapter normalization failures must use the shared top-level CliError contract."
 )]
+#[sc_lint(function_length.fail_at(100))]
 fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, CliError> {
     let text = std::str::from_utf8(raw).map_err(|error| {
         CliError::backend_protocol(format!(

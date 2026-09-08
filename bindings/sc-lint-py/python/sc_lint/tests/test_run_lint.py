@@ -32,6 +32,7 @@ resolver = "2"
         self.assertIn("pytests", names)
         self.assertIn("sc-boundary", names)
         self.assertIn("sc-portability", names)
+        self.assertIn("function-length", names)
         self.assertIn("line-counts", names)
         self.assertIn("identity-literals", names)
         self.assertNotIn("modules", names)
@@ -44,6 +45,7 @@ resolver = "2"
         self.assertEqual(resolve_task_names("modules"), ["modules"])
         self.assertEqual(resolve_task_names("sc-boundary"), ["sc-boundary"])
         self.assertEqual(resolve_task_names("sc-portability"), ["sc-portability"])
+        self.assertEqual(resolve_task_names("function-length"), ["function-length"])
         self.assertEqual(resolve_task_names("line-counts"), ["line-counts"])
         self.assertEqual(resolve_task_names("identity-literals"), ["identity-literals"])
 
@@ -86,6 +88,7 @@ resolver = "2"
             # Native product commands (issue #84): never `cargo run -p` wrappers.
             self.assertEqual(tasks["sc-boundary"].command[-2:], ["lint", "sc-boundary"])
             self.assertEqual(tasks["sc-portability"].command[-2:], ["lint", "sc-portability"])
+            self.assertEqual(tasks["function-length"].command[-2:], ["-m", "sc_lint.lint_function_length"])
             self.assertEqual(tasks["line-counts"].command[-2:], ["-m", "sc_lint.lint_line_counts"])
             self.assertEqual(tasks["identity-literals"].command[-2:], ["-m", "sc_lint.lint_identity_literals"])
             self.assertEqual(tasks["manifests"].command[-2:], ["-m", "sc_lint.lint_manifests"])
