@@ -29,8 +29,19 @@ pub struct AttributeInput {
 impl Parse for AttributeInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let mut directives = Vec::new();
+        let mut function_length_seen = false;
         while !input.is_empty() {
-            directives.push(parse_directive(input)?);
+            let directive = parse_directive(input)?;
+            if matches!(directive, Directive::FunctionLengthFailAt(_)) {
+                if function_length_seen {
+                    return Err(Error::new(
+                        input.span(),
+                        "function_length.fail_at may appear only once per sc_lint attribute",
+                    ));
+                }
+                function_length_seen = true;
+            }
+            directives.push(directive);
             if input.is_empty() {
                 break;
             }
@@ -181,6 +192,29 @@ mod tests {
             parsed.directives,
             vec![Directive::FunctionLengthFailAt(120)]
         );
+    }
+
+    #[test]
+    fn parses_combined_function_length_directive() {
+        let parsed: AttributeInput =
+            syn::parse2(quote!(boundary.internal_only, function_length.fail_at(120),)).unwrap();
+        assert_eq!(
+            parsed.directives,
+            vec![
+                Directive::InternalOnly,
+                Directive::FunctionLengthFailAt(120)
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_function_length_directives() {
+        let error = syn::parse2::<AttributeInput>(quote!(
+            function_length.fail_at(90),
+            function_length.fail_at(120)
+        ))
+        .unwrap_err();
+        assert!(error.to_string().contains("only once"));
     }
 
     #[test]

@@ -27,8 +27,12 @@ FAIL_THRESHOLD = 80
 FUNCTION_RE = re.compile(
     r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:(?:async|const|unsafe|extern)\s+)*fn\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
 )
-OVERRIDE_RE = re.compile(
-    r"^\s*#\s*\[\s*sc_lint\s*\(\s*function_length\s*\.\s*fail_at\s*\(\s*(?P<limit>[1-9][0-9]*)\s*\)\s*\)\s*\]\s*$"
+SC_LINT_ATTRIBUTE_RE = re.compile(
+    r"^\s*#\s*\[\s*sc_lint\s*\((?P<body>.*)\)\s*\]\s*$", re.DOTALL
+)
+FUNCTION_LENGTH_DIRECTIVE_RE = re.compile(
+    r"(?:^|,)\s*function_length\s*\.\s*fail_at\s*\(\s*(?P<limit>[1-9][0-9]*)\s*\)\s*(?=,|$)",
+    re.DOTALL,
 )
 
 
@@ -137,26 +141,33 @@ def preceding_attributes(lines: list[str], function_index: int) -> list[str]:
     attributes: list[str] = []
     index = function_index - 1
     while index >= 0:
-        line = lines[index].strip()
-        if not line:
+        if not lines[index].strip():
             break
-        if line.startswith("#[") and line.endswith("]"):
-            attributes.append(line)
+        attribute_lines: list[str] = []
+        while index >= 0:
+            attribute_lines.append(lines[index])
+            if lines[index].lstrip().startswith("#["):
+                attributes.append("\n".join(reversed(attribute_lines)))
+                index -= 1
+                break
             index -= 1
-            continue
-        break
+        else:
+            break
     return attributes
 
 
 def function_override(attributes: list[str], path: Path, line_number: int) -> int | None:
     for attribute in attributes:
-        match = OVERRIDE_RE.match(attribute)
-        if match:
-            return int(match.group("limit"))
-        if "function_length" in attribute and "sc_lint" in attribute:
+        match = SC_LINT_ATTRIBUTE_RE.match(attribute)
+        if match is None:
+            continue
+        directives = list(FUNCTION_LENGTH_DIRECTIVE_RE.finditer(match.group("body")))
+        if len(directives) == 1:
+            return int(directives[0].group("limit"))
+        if "function_length" in match.group("body"):
             raise AdapterError(
                 "config",
-                f"{path}:{line_number}: expected #[sc_lint(function_length.fail_at(N))] with positive integer N",
+                f"{path}:{line_number}: expected exactly one function_length.fail_at(N) directive with positive integer N",
             )
     return None
 

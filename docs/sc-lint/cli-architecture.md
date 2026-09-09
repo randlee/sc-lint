@@ -259,7 +259,7 @@ Current command behavior:
 - `lint function-length`
   - succeeds through the Python Adapter Protocol
   - counts non-comment, non-whitespace Rust code lines per production function
-  - `#[sc_lint(function_length.fail_at(N))]` supplies a reviewed per-function hard limit
+  - `#[sc_lint(function_length.fail_at(N))]` supplies an explicit per-function hard limit
 - `lint identity-literals`
   - succeeds through the Python Adapter Protocol
   - exposes a configurable framework rather than consumer-specific defaults

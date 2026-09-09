@@ -169,6 +169,15 @@ The product should support both:
   explicit migration path into `sc-lint` when their semantics are
   consumer-neutral.
 
+- `REQ-PRODUCT-006AB`
+  The function-length lint family must enforce production Rust function size
+  using non-comment, non-whitespace code lines: 70 lines is advisory and 80
+  lines is a hard failure. Test-only source is exempt. A source-local
+  `#[sc_lint(function_length.fail_at(N))]` attribute may set one positive
+  alternative hard limit for a specific function; it is the only
+  grandfathering mechanism. Its implementation and rollout plan is
+  [docs/sc-lint/function-length-lint-plan.md](./sc-lint/function-length-lint-plan.md).
+
 - `REQ-PRODUCT-006AA`
   Reusable lint families imported from a consumer repo must be assigned to the
   narrowest fitting analyzer crate rather than appended to an unrelated

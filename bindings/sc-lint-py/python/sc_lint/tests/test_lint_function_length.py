@@ -62,9 +62,28 @@ pub fn example() {
         self.assertEqual(function.fail_threshold, 120)
         self.assertEqual(classify([function]).failures, ())
 
+    def test_combined_and_multiline_override_matches_attribute_grammar(self) -> None:
+        function = inspect_source(
+            """\\
+#[sc_lint(
+    boundary.internal_only,
+    function_length.fail_at(120),
+)]
+pub fn example() {}
+"""
+        )
+        self.assertEqual(function.fail_threshold, 120)
+
     def test_malformed_function_length_attribute_fails(self) -> None:
         with self.assertRaisesRegex(Exception, "function_length.fail_at"):
             inspect_source("#[sc_lint(function_length.fail_at(0))]\nfn example() {}\n")
+
+    def test_duplicate_function_length_override_fails(self) -> None:
+        with self.assertRaisesRegex(Exception, "exactly one"):
+            inspect_source(
+                "#[sc_lint(function_length.fail_at(90), function_length.fail_at(120))]\n"
+                "fn example() {}\n"
+            )
 
 
 def inspect_source(source: str):
