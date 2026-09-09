@@ -25,6 +25,8 @@ class ConsumerContractTests(unittest.TestCase):
 
     def test_root_model_exports_the_product_binary_without_shell_specific_assignments(self) -> None:
         self.assertIn("export SC_LINT_BIN := sc_lint_binary", self.justfile)
+        self.assertIn('.sc-lint\\\\source-bin\\\\sc-lint.exe', self.justfile)
+        self.assertIn("Copy-Item target\\\\debug\\\\sc-lint.exe", self.justfile)
         for line in self.justfile.splitlines():
             self.assertFalse(
                 line.lstrip().startswith("SC_LINT_BIN="),
