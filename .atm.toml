@@ -17,7 +17,8 @@ env = { ATM_IDENTITY = "team-lead", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_
 
 [[rmux.windows.panes]]
 name = "clint"
-command = "codex -c features.codex_hooks=true --yolo"
+tmux_pane_id = "%46"
+command = "codex -c features.hooks=true --yolo"
 env = { ATM_IDENTITY = "clint", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
 [[rmux.windows.panes]]
@@ -32,7 +33,7 @@ layout = "even-horizontal"
 
 [[rmux.windows.panes]]
 name = "cfast"
-command = "codex -c features.codex_hooks=true --yolo"
+command = "codex -c features.hooks=true --yolo"
 env = { ATM_IDENTITY = "cfast", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
 [[rmux.windows.panes]]
