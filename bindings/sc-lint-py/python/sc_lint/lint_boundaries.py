@@ -22,20 +22,27 @@ TOP_LEVEL_KEYS = {
     "public",
     "implementation",
     "composition",
+    "ownership",
+    "callers",
     "dependencies",
     "references",
+    "contracts",
     "testing",
     "enforcement",
     "status",
 }
-PUBLIC_KEYS = {"facade"}
+REQUIRED_TOP_LEVEL_KEYS = TOP_LEVEL_KEYS - {"ownership", "callers", "contracts"}
+PUBLIC_KEYS = {"facade", "trait", "notes"}
 IMPLEMENTATION_KEYS = {"type", "module", "visibility", "constructor"}
 COMPOSITION_KEYS = {"roots"}
 DEPENDENCIES_KEYS = {"allowed_dependents", "allowed_dependencies", "forbidden_edges"}
 REFERENCES_KEYS = {"scope", "forbidden"}
 TESTING_KEYS = {"allowed_test_double_paths", "forbidden_test_bypasses"}
 ENFORCEMENT_KEYS = {"lint_rules", "review_gates"}
-STATUS_KEYS = {"state"}
+OWNERSHIP_KEYS = {"io_owns", "io_forbidden"}
+CALLERS_KEYS = {"approved"}
+CONTRACTS_KEYS = {"request_types", "response_types", "error_types", "notes"}
+STATUS_KEYS = {"state", "notes"}
 
 
 def boundary_file_paths(repo_root: Path) -> list[Path]:
@@ -69,7 +76,7 @@ def validate_boundary_file(
         return
 
     ensure_exact_keys(data, TOP_LEVEL_KEYS, "top-level", path, errors)
-    if not TOP_LEVEL_KEYS.issubset(data):
+    if not REQUIRED_TOP_LEVEL_KEYS.issubset(data):
         errors.append(f"{path}: missing required top-level keys")
         return
 
@@ -116,14 +123,19 @@ def validate_boundary_file(
     ensure_exact_keys(testing, TESTING_KEYS, "testing", path, errors)
     ensure_exact_keys(enforcement, ENFORCEMENT_KEYS, "enforcement", path, errors)
     ensure_exact_keys(status, STATUS_KEYS, "status", path, errors)
+    for name, keys in (("ownership", OWNERSHIP_KEYS), ("callers", CALLERS_KEYS), ("contracts", CONTRACTS_KEYS)):
+        if name in data:
+            ensure_exact_keys(data[name], keys, name, path, errors)
 
     visibility = implementation.get("visibility")
     if visibility not in {"public", "trait_only"}:
         errors.append(f"{path}: unsupported implementation.visibility `{visibility}`")
         return
 
-    if not str(public.get("facade", "")).strip():
-        errors.append(f"{path}: public.facade must be non-empty")
+    facade = str(public.get("facade", "")).strip()
+    trait = str(public.get("trait", "")).strip()
+    if bool(facade) == bool(trait):
+        errors.append(f"{path}: public must define exactly one non-empty public.facade or public.trait")
 
     if visibility == "public":
         if not str(implementation.get("type", "")).strip():

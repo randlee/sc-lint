@@ -198,6 +198,38 @@ fn rejects_forbidden_edge_inline_table_unknown_fields() {
     );
     assert!(error.contains("boundary-analyzer.toml"));
     assert!(error.contains("forbidden_edges"));
+    assert!(error.contains("typo"));
+}
+
+#[test]
+fn rejects_forbidden_edge_inline_table_missing_to_with_serde_cause() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "forbidden_edges = [{ from = \"sc-lint-boundary\" }]",
+        )
+    });
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("missing to fails")
+    );
+    assert!(error.contains("missing field `to`"));
+}
+
+#[test]
+fn rejects_forbidden_edge_non_string_non_table() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace("forbidden_edges = []", "forbidden_edges = [42]")
+    });
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("integer edge fails")
+    );
+    assert!(error.contains("from -> to"));
 }
 
 #[test]
@@ -235,7 +267,7 @@ fn structured_and_arrow_forbidden_edges_produce_equal_edges() {
     assert_eq!(structured, arrow);
 }
 
-fn assert_rejects_malformed_arrow_forbidden_edge(value: &str) {
+fn assert_rejects_malformed_arrow_forbidden_edge(value: &str, reason: &str) {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
     fixture.rewrite_valid_boundary(|contents| {
@@ -251,26 +283,30 @@ fn assert_rejects_malformed_arrow_forbidden_edge(value: &str) {
     );
     assert!(error.contains("boundary-analyzer.toml"));
     assert!(error.contains("dependencies.forbidden_edges[]"));
+    assert!(error.contains(reason));
 }
 
 #[test]
 fn rejects_forbidden_edge_arrow_without_arrow() {
-    assert_rejects_malformed_arrow_forbidden_edge("sc-lint-boundary");
+    assert_rejects_malformed_arrow_forbidden_edge("sc-lint-boundary", "missing `->`");
 }
 
 #[test]
 fn rejects_forbidden_edge_arrow_with_two_arrows() {
-    assert_rejects_malformed_arrow_forbidden_edge("sc-lint-boundary -> sc-lint -> sc-lint");
+    assert_rejects_malformed_arrow_forbidden_edge(
+        "sc-lint-boundary -> sc-lint -> sc-lint",
+        "more than one",
+    );
 }
 
 #[test]
 fn rejects_forbidden_edge_arrow_with_empty_side() {
-    assert_rejects_malformed_arrow_forbidden_edge(" -> sc-lint");
+    assert_rejects_malformed_arrow_forbidden_edge(" -> sc-lint", "left `from` side");
 }
 
 #[test]
 fn rejects_forbidden_edge_arrow_with_whitespace_only_side() {
-    assert_rejects_malformed_arrow_forbidden_edge("   -> sc-lint");
+    assert_rejects_malformed_arrow_forbidden_edge("   -> sc-lint", "left `from` side");
 }
 
 #[test]

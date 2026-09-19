@@ -98,6 +98,30 @@ class LintBoundariesTests(unittest.TestCase):
             errors = validate_inventory(repo_root)
             self.assertTrue(any("unexpected" in error for error in errors))
 
+    def test_validate_inventory_accepts_pr115_schema_additions(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            self.write_fixture(repo_root)
+            boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
+            boundary.write_text(
+                VALID_BOUNDARY.replace('facade = "Cli"', 'trait = "CliPort"\nnotes = "public contract"')
+                .replace("[dependencies]", "[ownership]\nio_owns = []\nio_forbidden = []\n\n[callers]\napproved = []\n\n[dependencies]")
+                .replace("[testing]", "[contracts]\nrequest_types = []\nresponse_types = []\nerror_types = []\nnotes = []\n\n[testing]")
+                .replace('state = "concrete_landed"', 'state = "concrete_landed"\nnotes = []'),
+                encoding="utf-8",
+            )
+            self.assertEqual(validate_inventory(repo_root), [])
+
+    def test_validate_inventory_rejects_both_or_neither_public_surface(self) -> None:
+        for public in ('facade = "Cli"\ntrait = "CliPort"', "notes = \"context\""):
+            with self.subTest(public=public), tempfile.TemporaryDirectory() as tempdir:
+                repo_root = Path(tempdir)
+                self.write_fixture(repo_root)
+                boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
+                boundary.write_text(VALID_BOUNDARY.replace('facade = "Cli"', public), encoding="utf-8")
+                errors = validate_inventory(repo_root)
+                self.assertTrue(any("exactly one non-empty public.facade or public.trait" in error for error in errors))
+
     def test_validate_inventory_rejects_duplicate_boundary_ids(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
