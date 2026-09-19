@@ -294,7 +294,7 @@ fn assert_rejects_malformed_arrow_forbidden_edge(value: &str, expected_message: 
 
 #[test]
 fn rejects_forbidden_edge_arrow_without_arrow() {
-    assert_rejects_malformed_arrow_forbidden_edge("sc-lint-boundary", "missing `->`");
+    assert_rejects_malformed_arrow_forbidden_edge("sc-lint-boundary", "missing `->` separator");
 }
 
 #[test]
@@ -1289,9 +1289,12 @@ state = "concrete_landed"
     );
 
     let error = load_boundary_inventory(fixture.root()).expect_err("public impl shape fails");
-    let message = error.to_string();
-    assert!(message.contains("implementation.type"));
-    assert!(message.contains("public, private, or pub(crate) visibility"));
+    let message = format!("{error:#}");
+    assert!(
+        message.contains(
+            "must define implementation.type for public, private, or pub(crate) visibility"
+        )
+    );
 }
 
 #[test]
