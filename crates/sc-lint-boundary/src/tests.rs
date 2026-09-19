@@ -2041,7 +2041,7 @@ fn preserves_full_trait_path_in_trait_impl_self_loop_messages() {
 }
 
 #[test]
-fn rejects_non_path_impl_owners() {
+fn rejects_impl_owners_without_a_named_target() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -2051,7 +2051,7 @@ fn rejects_non_path_impl_owners() {
         r#"
                 pub struct Loop;
 
-                impl core::fmt::Display for &Loop {
+                impl core::fmt::Display for (Loop, Loop) {
                     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                         write!(f, "loop")
                     }
@@ -2066,7 +2066,7 @@ fn rejects_non_path_impl_owners() {
 
     let message = format!("{error:#}");
     assert!(message.contains("unsupported impl owner type"));
-    assert!(message.contains("&Loop") || message.contains("& Loop"));
+    assert!(message.contains("(Loop , Loop)"));
 }
 
 #[test]
@@ -2631,4 +2631,147 @@ fn trim_indentation(input: &str) -> String {
         output.push('\n');
     }
     output
+}
+
+#[test]
+fn supports_generic_field_value_reference_impl_owner() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        mod serde { pub trait Serialize {} }
+        pub struct FieldValue<'a, T: ?Sized>(&'a T);
+        pub trait SerializeKindTag {}
+        impl<T: ?Sized + serde::Serialize> SerializeKindTag for &FieldValue<'_, T> {}
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let owner = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "FieldValue")
+        .unwrap();
+    let implementation = graph
+        .nodes
+        .iter()
+        .find(|node| node.impl_trait.as_deref() == Some("SerializeKindTag"))
+        .unwrap();
+    assert!(implementation.label.contains("&FieldValue"));
+    assert!(
+        graph
+            .edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::Targets.as_str()
+                && edge.from == implementation.id
+                && edge.to == owner.id)
+    );
+}
+
+#[test]
+fn reference_impls_and_methods_do_not_collide_with_owned_impls() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Owner;
+        pub trait Action { fn act(&self); }
+        impl Action for Owner { fn act(&self) {} }
+        impl Action for &Owner { fn act(&self) {} }
+        impl Action for &mut Owner { fn act(&self) {} }
+        impl Action for &&Owner { fn act(&self) {} }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let owner = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "Owner")
+        .unwrap();
+    let implementations: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "impl")
+        .collect();
+    let methods: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "method" && node.impl_trait.as_deref() == Some("Action"))
+        .collect();
+    assert_eq!(implementations.len(), 4);
+    assert_eq!(methods.len(), 4);
+    let owned = implementations
+        .iter()
+        .find(|node| node.label == "impl Action for Owner")
+        .unwrap();
+    assert_eq!(
+        owned.id.as_str(),
+        format!("{}::impl::416374696f6e", owner.id)
+    );
+    assert!(
+        methods
+            .iter()
+            .any(|node| node.id.as_str() == format!("{}::act", owner.id))
+    );
+    for implementation in implementations {
+        assert!(
+            graph
+                .edges
+                .iter()
+                .any(|edge| edge.kind == EdgeKind::Targets.as_str()
+                    && edge.from == implementation.id
+                    && edge.to == owner.id)
+        );
+        let method_edges: Vec<_> = graph
+            .edges
+            .iter()
+            .filter(|edge| {
+                edge.kind == EdgeKind::Contains.as_str()
+                    && edge.from == implementation.id
+                    && methods.iter().any(|method| method.id == edge.to)
+            })
+            .collect();
+        assert_eq!(method_edges.len(), 1);
+    }
+}
+
+#[test]
+fn reference_method_cycles_keep_the_underlying_type_owner() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Owner;
+        pub trait Action { fn act(&self); }
+        impl Action for &Owner { fn act(&self) { let _ = Owner; } }
+    "#,
+    );
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap();
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbCycle003);
+    assert!(
+        report.findings[0]
+            .owner_ids
+            .iter()
+            .all(|owner| owner.ends_with("::Owner"))
+    );
 }
