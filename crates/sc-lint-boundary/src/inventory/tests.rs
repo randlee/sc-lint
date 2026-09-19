@@ -382,21 +382,25 @@ fn rejects_unknown_status_fields() {
 }
 
 #[test]
-fn loads_boundary_inventory_without_planning_metadata() {
+fn rejects_missing_planning_metadata_with_actionable_error() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
     fs::remove_file(fixture.root().join("boundaries/planning.toml")).expect("remove planning");
 
-    let inventory =
-        load_boundary_inventory(fixture.root()).expect("inventory loads without planning");
-
-    assert_eq!(inventory.planning.planning.current_sprint, "A.0");
-    assert!(inventory.planning.planned_items.is_empty());
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("missing planning metadata fails")
+        .to_string();
+    assert!(error.contains("planning.toml"));
+    assert!(error.contains("[planning].current_sprint"));
 }
 
 #[test]
 fn loads_atm_boundary_vocabulary() {
     let fixture = InventoryFixture::new();
+    fixture.write(
+        "boundaries/planning.toml",
+        "[planning]\ncurrent_sprint = \"A.0\"\n",
+    );
     fixture.write(
         "boundaries/atm/adapter.toml",
         r#"
@@ -1275,6 +1279,25 @@ state = "concrete_landed"
 
     let error = load_boundary_inventory(fixture.root()).expect_err("owner dir fails");
     assert!(error.to_string().contains("owner directory"));
+}
+
+#[test]
+fn rejects_owner_crate_path_mismatch() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "owner_crate_path = \"sc_lint_boundary\"",
+            "owner_crate_path = \"wrong_crate_path\"",
+        )
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("owner crate path mismatch fails")
+        .to_string();
+    assert!(error.contains(
+        "boundary `BOUNDARY-ScLintBoundaryAnalyzer` declares owner_crate_path `wrong_crate_path` but expected `sc_lint_boundary` from owner_package `sc-lint-boundary`"
+    ));
 }
 
 #[test]

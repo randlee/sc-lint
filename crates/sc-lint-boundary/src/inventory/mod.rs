@@ -21,15 +21,10 @@ pub(crate) use types::ReferenceScope;
 pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> {
     let boundaries_root = root.join("boundaries");
     if !boundaries_root.exists() {
-        return Ok(BoundaryInventory {
-            records: Vec::new(),
-            planning: types::PlanningMetadata {
-                planning: types::PlanningHeader {
-                    current_sprint: types::SprintId::placeholder_empty_inventory(),
-                },
-                planned_items: BTreeMap::new(),
-            },
-        });
+        anyhow::bail!(
+            "boundary inventory requires `{}` with authoritative planning metadata; add boundaries/planning.toml with [planning].current_sprint",
+            boundaries_root.display()
+        );
     }
     let boundary_paths = discover_boundary_files(&boundaries_root)?;
     let mut records = Vec::new();
@@ -59,18 +54,14 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
     }
 
     let planning_path = boundaries_root.join("planning.toml");
-    let planning = if planning_path.exists() {
-        let planning: types::PlanningMetadata = parse_toml_file(&planning_path)?;
-        validate_planning_metadata(&planning, &planning_path)?;
-        planning
-    } else {
-        types::PlanningMetadata {
-            planning: types::PlanningHeader {
-                current_sprint: types::SprintId::placeholder_empty_inventory(),
-            },
-            planned_items: BTreeMap::new(),
-        }
-    };
+    if !planning_path.exists() {
+        anyhow::bail!(
+            "boundary inventory requires authoritative planning metadata at `{}`; add [planning].current_sprint",
+            planning_path.display()
+        );
+    }
+    let planning: types::PlanningMetadata = parse_toml_file(&planning_path)?;
+    validate_planning_metadata(&planning, &planning_path)?;
 
     Ok(BoundaryInventory { records, planning })
 }
@@ -134,6 +125,16 @@ fn validate_boundary_path(
         anyhow::bail!(
             "boundary file `{}` is under owner directory `{owner_dir}` but declares owner_package `{}`",
             path.display(),
+            record.owner_package
+        );
+    }
+
+    let expected_owner_crate_path = record.owner_package.replace('-', "_");
+    if record.owner_crate_path.as_str() != expected_owner_crate_path {
+        anyhow::bail!(
+            "boundary `{}` declares owner_crate_path `{}` but expected `{expected_owner_crate_path}` from owner_package `{}`",
+            record.boundary_id,
+            record.owner_crate_path,
             record.owner_package
         );
     }

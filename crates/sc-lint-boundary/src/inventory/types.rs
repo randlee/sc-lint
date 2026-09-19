@@ -154,10 +154,6 @@ impl SprintId {
         Ok(Self(trimmed.to_string()))
     }
 
-    pub(super) fn placeholder_empty_inventory() -> Self {
-        Self("A.0".to_string())
-    }
-
     fn as_str(&self) -> &str {
         &self.0
     }
