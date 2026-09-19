@@ -23,17 +23,21 @@ The project focus is:
 - release 0.6.0 inventory planning and owner-path hardening (`lint-spx.17`)
   - see [docs/plans/release-0.6.0/lint-spx.17-inventory-planning-required.md](./plans/release-0.6.0/lint-spx.17-inventory-planning-required.md)
 - release 0.6.0 PR #115 QA-1 gate (`lint-spx.16`; verdict: FAIL)
-  - see the dependent sprint records in `docs/plans/release-0.6.0/`
+  - record: `bd show lint-spx.16` (QA bead; no sprint document)
 - release 0.6.0 inventory edge-cause and Python parity (`lint-spx.18`)
   - see [docs/plans/release-0.6.0/lint-spx.18-inventory-edge-cause-py-parity.md](./plans/release-0.6.0/lint-spx.18-inventory-edge-cause-py-parity.md)
 - release 0.6.0 QA-1 documentation and test hardening (`lint-spx.19`)
   - see [docs/plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md](./plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md)
 - release 0.6.0 PR #115 QA-2 gate (`lint-spx.20`; verdict: FAIL)
-  - see the dependent sprint records in `docs/plans/release-0.6.0/`
+  - record: `bd show lint-spx.20` (QA bead; no sprint document)
 - release 0.6.0 QA-2 parity assertions and records (`lint-spx.27`)
   - see [docs/plans/release-0.6.0/lint-spx.27-inventory-qa2-parity-assertions.md](./plans/release-0.6.0/lint-spx.27-inventory-qa2-parity-assertions.md)
-- release 0.6.0 QA-3 gate (`lint-spx.28`)
-  - see the dependent sprint records in `docs/plans/release-0.6.0/`
+- release 0.6.0 QA-3 gate (`lint-spx.28`; verdict: FAIL)
+  - record: `bd show lint-spx.28` (QA bead; no sprint document)
+- release 0.6.0 QA-3 assertion and records fixes (`lint-spx.31`)
+  - see [docs/plans/release-0.6.0/lint-spx.31-inventory-qa3-assertions-records.md](./plans/release-0.6.0/lint-spx.31-inventory-qa3-assertions-records.md)
+- release 0.6.0 QA-4 gate (`lint-spx.32`)
+  - record: `bd show lint-spx.32` (QA bead; no sprint document)
 - planning direct workspace package-edge enforcement from boundary inventory in
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`
@@ -352,7 +356,6 @@ never merged; `archive/phase-F` preserves the rejected planning line.
 
 Phase `G` is the standard repo-tools adoption-kit line. Its authoritative plan
 is [docs/plans/phase-G/phase-G-plan.md](./plans/phase-G/phase-G-plan.md).
-
 
 ## Planning Conventions
 

@@ -178,10 +178,6 @@ forbidden_edges = [
 ]
 ```
 
-The `[public]` section must define exactly one non-empty `facade` or `trait`,
-and `owner_crate_path` must equal `owner_package` with hyphens replaced by
-underscores. For example, `sc-lint-boundary` maps to `sc_lint_boundary`.
-
 Operator guidance:
 
 - use `[dependencies]` for package-level architectural dependency seams
@@ -189,6 +185,12 @@ Operator guidance:
   valid package edges
 - use manifest policy for workspace metadata hygiene and internal path-version
   alignment rather than architectural package ownership
+
+## Boundary Record Schema
+
+The `[public]` section must define exactly one non-empty `facade` or `trait`,
+and `owner_crate_path` must equal `owner_package` with hyphens replaced by
+underscores. For example, `sc-lint-boundary` maps to `sc_lint_boundary`.
 
 ## Disable Model
 

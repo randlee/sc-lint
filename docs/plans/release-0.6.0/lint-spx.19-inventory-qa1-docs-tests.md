@@ -105,6 +105,9 @@ Full QA-1 report: `atm read --task lint-spx.16 --all`.
 
 ## Closeout
 
+Gate results were not recorded at the time of this closeout; QA-2 evidence in
+`lint-spx.20` records all gates exiting 0 at `eedbb3e`.
+
 Finding disposition for QA-1:
 
 - SC-QA-001: fixed in `1324e7f` (plan records).

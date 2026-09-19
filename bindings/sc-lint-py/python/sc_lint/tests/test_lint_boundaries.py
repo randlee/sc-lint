@@ -155,6 +155,20 @@ class LintBoundariesTests(unittest.TestCase):
                 validate_inventory(repo_root),
             )
 
+    def test_validate_inventory_rejects_empty_public_facade(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            self.write_fixture(repo_root)
+            boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
+            boundary.write_text(
+                VALID_BOUNDARY.replace('facade = "Cli"', 'facade = "   "'),
+                encoding="utf-8",
+            )
+            self.assertIn(
+                f"{boundary}: defines an empty public.facade",
+                validate_inventory(repo_root),
+            )
+
     def test_validate_inventory_accepts_new_visibility_and_constructor_values(self) -> None:
         for visibility, constructor in (
             ("private", "public"),
@@ -203,25 +217,26 @@ class LintBoundariesTests(unittest.TestCase):
                     validate_inventory(repo_root),
                 )
 
-    def test_validate_inventory_rejects_missing_private_implementation_fields(self) -> None:
-        for field, line in (
-            ("type", 'type = "Cli"\n'),
-            ("module", 'module = "sc_lint"\n'),
-            ("constructor", 'constructor = "private"\n'),
-        ):
-            with self.subTest(field=field), tempfile.TemporaryDirectory() as tempdir:
-                repo_root = Path(tempdir)
-                self.write_fixture(repo_root)
-                boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-                contents = VALID_BOUNDARY.replace('visibility = "public"', 'visibility = "private"')
-                contents = contents.replace('constructor = "none"', 'constructor = "private"')
-                boundary.write_text(contents.replace(line, ""), encoding="utf-8")
-                self.assertTrue(
-                    any(
-                        f"implementation.{field} must be present for private visibility" in error
-                        for error in validate_inventory(repo_root)
+    def test_validate_inventory_rejects_missing_private_and_pub_crate_fields(self) -> None:
+        for visibility, constructor in (("private", "private"), ("pub(crate)", "pub(crate)")):
+            for field, line in (
+                ("type", 'type = "Cli"\n'),
+                ("module", 'module = "sc_lint"\n'),
+                ("constructor", f'constructor = "{constructor}"\n'),
+            ):
+                with self.subTest(visibility=visibility, field=field), tempfile.TemporaryDirectory() as tempdir:
+                    repo_root = Path(tempdir)
+                    self.write_fixture(repo_root)
+                    boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
+                    contents = VALID_BOUNDARY.replace('visibility = "public"', f'visibility = "{visibility}"')
+                    contents = contents.replace('constructor = "none"', f'constructor = "{constructor}"')
+                    boundary.write_text(contents.replace(line, ""), encoding="utf-8")
+                    self.assertTrue(
+                        any(
+                            f"implementation.{field} must be present for {visibility} visibility" in error
+                            for error in validate_inventory(repo_root)
+                        )
                     )
-                )
 
     def test_validate_inventory_rejects_duplicate_boundary_ids(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

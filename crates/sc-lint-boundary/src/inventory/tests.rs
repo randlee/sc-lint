@@ -273,7 +273,7 @@ fn structured_and_arrow_forbidden_edges_produce_equal_edges() {
     assert_eq!(structured, arrow);
 }
 
-fn assert_rejects_malformed_arrow_forbidden_edge(value: &str, reason: &str) {
+fn assert_rejects_malformed_arrow_forbidden_edge(value: &str, expected_message: &str) {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
     fixture.rewrite_valid_boundary(|contents| {
@@ -289,7 +289,7 @@ fn assert_rejects_malformed_arrow_forbidden_edge(value: &str, reason: &str) {
     );
     assert!(error.contains("boundary-analyzer.toml"));
     assert!(error.contains("dependencies.forbidden_edges[]"));
-    assert!(error.contains(reason));
+    assert!(error.contains(expected_message), "{error}");
 }
 
 #[test]
@@ -307,17 +307,17 @@ fn rejects_forbidden_edge_arrow_with_two_arrows() {
 
 #[test]
 fn rejects_forbidden_edge_arrow_with_empty_side() {
-    assert_rejects_malformed_arrow_forbidden_edge(" -> sc-lint", "left `from` side");
+    assert_rejects_malformed_arrow_forbidden_edge(" -> sc-lint", "left `from` side is empty");
 }
 
 #[test]
 fn rejects_forbidden_edge_arrow_with_whitespace_only_side() {
-    assert_rejects_malformed_arrow_forbidden_edge("   -> sc-lint", "left `from` side");
+    assert_rejects_malformed_arrow_forbidden_edge("   -> sc-lint", "left `from` side is empty");
 }
 
 #[test]
 fn rejects_forbidden_edge_arrow_with_empty_to_side() {
-    assert_rejects_malformed_arrow_forbidden_edge("sc-lint ->   ", "right `to` side");
+    assert_rejects_malformed_arrow_forbidden_edge("sc-lint ->   ", "right `to` side is empty");
 }
 
 #[test]
@@ -596,7 +596,9 @@ fn rejects_unknown_fields_in_all_boundary_tables() {
         fixture.rewrite_valid_boundary(rewrite);
         match load_boundary_inventory(fixture.root()) {
             Ok(_) => failures.push(format!("{expected}: accepted")),
-            Err(error) if !format!("{error:#}").contains(expected) => {
+            Err(error)
+                if !format!("{error:#}").contains(&format!("unknown field `{expected}`")) =>
+            {
                 failures.push(format!("{expected}: {error:#}"));
             }
             Err(_) => {}
@@ -1295,22 +1297,10 @@ state = "concrete_landed"
 #[test]
 fn rejects_private_and_pub_crate_visibility_without_required_implementation_fields() {
     for visibility in ["private", "pub(crate)"] {
-        for (field, line, expected) in [
-            (
-                "type",
-                "type = \"analyze_workspace\"\n",
-                "must define implementation.type",
-            ),
-            (
-                "module",
-                "module = \"sc_lint_boundary\"\n",
-                "must define implementation.module",
-            ),
-            (
-                "constructor",
-                "constructor = \"none\"\n",
-                "must define implementation.constructor",
-            ),
+        for (field, line) in [
+            ("type", "type = \"analyze_workspace\"\n"),
+            ("module", "module = \"sc_lint_boundary\"\n"),
+            ("constructor", "constructor = \"none\"\n"),
         ] {
             let fixture = InventoryFixture::new();
             fixture.write_valid_inventory();
@@ -1325,7 +1315,10 @@ fn rejects_private_and_pub_crate_visibility_without_required_implementation_fiel
             let error = load_boundary_inventory(fixture.root())
                 .expect_err("missing implementation field fails")
                 .to_string();
-            assert!(error.contains(expected), "{visibility} {field}: {error}");
+            let expected = format!(
+                "must define implementation.{field} for public, private, or pub(crate) visibility"
+            );
+            assert!(error.contains(&expected), "{visibility} {field}: {error}");
         }
     }
 }
@@ -1650,35 +1643,30 @@ expires_when = "sprint_before_current"
 
 #[test]
 fn rejects_invalid_planning_item_key_shape() {
-    let fixture = InventoryFixture::new();
-    fixture.write_valid_inventory();
-    fixture.write(
-        "boundaries/planning.toml",
-        r#"
+    for (key, expected_key) in [
+        ("NOT-BOUNDARY.section.field", "NOT-BOUNDARY.section.field"),
+        ("BOUNDARY-ScLintCli", "BOUNDARY-ScLintCli"),
+    ] {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.write(
+            "boundaries/planning.toml",
+            &format!(
+                r#"
 [planning]
 current_sprint = "A.6"
 
-[planned_items."not-a-boundary-key"]
+[planned_items."{key}"]
 scheduled_sprint = "A.1a"
 tracking_id = "SC-LINT-CLI-003"
 expires_when = "sprint_before_current"
 "#,
-    );
+            ),
+        );
 
-    fixture.write(
-        "boundaries/planning.toml",
-        r#"
-[planning]
-current_sprint = "A.6"
-
-[planned_items."BOUNDARY-ScLintCli"]
-scheduled_sprint = "A.1a"
-tracking_id = "SC-LINT-CLI-003"
-expires_when = "sprint_before_current"
-"#,
-    );
-
-    let error = load_boundary_inventory(fixture.root()).expect_err("planning key fails");
-    let message = format!("{error:#}");
-    assert!(message.contains("planning keys must use"), "{message}");
+        let error = load_boundary_inventory(fixture.root()).expect_err("planning key fails");
+        let message = format!("{error:#}");
+        assert!(message.contains("planning keys must use"), "{message}");
+        assert!(message.contains(expected_key), "{message}");
+    }
 }

@@ -302,6 +302,14 @@ Not acceptable as the long-term source:
 
 ## Recommended Data Shape
 
+### Boundary Record Schema
+
+Boundary records must satisfy these identity rules:
+
+- `[public]` defines exactly one non-empty `facade` or `trait` value
+- `owner_crate_path` equals `owner_package` with hyphens replaced by
+  underscores
+
 The enforcement model should assume TOML-backed boundary records and TOML-backed
 planning metadata in:
 
@@ -425,14 +433,6 @@ Default behavior should be:
 
 The equivalence-test migration mode should be test-only and disabled in normal
 developer lint runs and CI.
-
-## Boundary Record Schema
-
-Boundary records must also satisfy these identity rules:
-
-- `[public]` defines exactly one non-empty `facade` or `trait` value
-- `owner_crate_path` equals `owner_package` with hyphens replaced by
-  underscores
 
 ## Testing Requirements
 

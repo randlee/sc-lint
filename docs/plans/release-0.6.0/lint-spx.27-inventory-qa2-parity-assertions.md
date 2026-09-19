@@ -142,14 +142,15 @@ All QA-2 findings are fixed in implementation commit `7f83534`:
 - ARCH-102: Python public-surface validation matches Rust wording, including
   empty, both-present, and neither-present cases.
 - ARCH-103: missing `[planning]` asserts `missing field `planning``.
-- ARCH-104: both invalid planning-key shapes assert `planning keys must use`.
+- ARCH-104: the first invalid planning-key fixture was overwritten before it
+  could load; both invalid shapes are fixed by `lint-spx.31`.
 - SC-QA-108: ownership, contracts, and status tests assert
   `unknown field `unexpected``; duplicate dependents assert `duplicate`, and
   all unknown-field cases are collected before the test reports failures.
 - ARCH-105: private and `pub(crate)` records cover missing type, module, and
   constructor diagnostics.
-- SC-QA-110: the empty right side of an arrow forbidden edge is covered by an
-  exact `right `to` side is empty` assertion.
+- SC-QA-110: the empty-side helper previously asserted only a partial phrase;
+  exact left/right messages are fixed by `lint-spx.31`.
 - SC-QA-104: the CLI workspace-graph test name is explicit, and missing
   planning configuration asserts that its cause contains `planning.toml`.
 - ARCH-108 and SC-QA-105: the top-level fixture derives `owner_crate_path`
@@ -169,10 +170,12 @@ Validation:
 - `just lint`: passed.
 - `just test`: passed.
 - `git diff --check`: passed.
-- `gh pr checks 176`: all 12 checks pending at closeout time.
+- `gh pr checks 176`: the later run passed on Ubuntu and Windows for the
+  completed jobs while macOS jobs were still pending; an earlier Ubuntu test
+  failure was `lint-spx.11` ETXTBSY, as recorded in QA3-004.
 - Draft PR #176 is linked into stack #169 with base
   `fix/inventory-qa1-docs-tests`.
 
-Post-close CI follow-up: `Test (ubuntu-latest)` later reported red in run
-`35473395473` (job `105978334178`); the workflow was still in progress when
-the failure was observed, so GitHub had not published failed-step logs yet.
+Post-close CI follow-up: `Test (ubuntu-latest)` run
+`35473395473`/job `105978334178` reported the `lint-spx.11` ETXTBSY failure;
+the final observed PR-check run was still completing its macOS jobs.
