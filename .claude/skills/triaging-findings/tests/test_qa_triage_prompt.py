@@ -29,4 +29,3 @@ def test_qa_triage_prompt_does_not_treat_validation_fail_as_success() -> None:
     ]
     assert "blocks this agent from reporting success" in gate
     assert "only `validation:pass`" in gate
-

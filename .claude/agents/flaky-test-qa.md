@@ -28,6 +28,10 @@ with free-form input.
   "review_targets": [
     "optional paths"
   ],
+  "round_limit": false,
+  "changed_files": ["optional/path.rs"],
+  "carry_forward_findings": ["optional finding id"],
+  "triage_records": ["optional/.triage/path.ttl"],
   "notes": "optional context"
 }
 ```

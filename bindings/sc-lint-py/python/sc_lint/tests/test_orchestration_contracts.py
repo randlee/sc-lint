@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -138,6 +139,17 @@ class TemplateContractTests(unittest.TestCase):
         "req-qa-assignment.json.j2": {"authoritative_sprint_doc", "branch", "carry_forward_findings", "changed_files", "commit", "notes", "phase_or_sprint_docs", "phase_sprint_documents", "review_targets", "round_limit", "scope", "triage_records", "worktree_path"},
         "ruthless-boundary-qa-assignment.json.j2": {"review_mode", "worktree_path", "review_targets", "reference_docs", "round_limit", "changed_files", "duplicate_sweep_symbols", "triage_records", "carry_forward_findings", "findings_scope_locked", "notes"},
     }
+    AGENT_CONTRACTS = {
+        "flaky-test-qa-assignment.json.j2": REPO / ".claude/agents/flaky-test-qa.md",
+        "ruthless-boundary-qa-assignment.json.j2": REPO / ".claude/agents/ruthless-boundary-qa.md",
+    }
+
+    @staticmethod
+    def fenced_json_keys(agent: Path) -> set[str]:
+        match = re.search(r"```json\s*\n(.*?)\n```", agent.read_text(encoding="utf-8"), re.S)
+        if match is None:
+            raise AssertionError(f"missing fenced JSON input contract: {agent}")
+        return set(re.findall(r'^  "([^"]+)"\s*:', match.group(1), re.M))
 
     def test_every_orchestration_template_has_a_sample_and_composes(self) -> None:
         if shutil.which("atm") is None:
@@ -156,7 +168,10 @@ class TemplateContractTests(unittest.TestCase):
                 self.assertTrue(sample.is_file(), f"missing committed sample vars: {sample}")
                 result = subprocess.run(["atm", "compose", "--template", str(template), "--vars", str(sample)], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                if template.name in self.EXPECTED_JSON_KEYS:
+                if template.name in self.AGENT_CONTRACTS:
+                    payload = json.loads(result.stdout)
+                    self.assertEqual(set(payload), self.fenced_json_keys(self.AGENT_CONTRACTS[template.name]))
+                elif template.name in self.EXPECTED_JSON_KEYS:
                     payload = json.loads(result.stdout)
                     self.assertEqual(set(payload), self.EXPECTED_JSON_KEYS[template.name])
 
