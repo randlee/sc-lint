@@ -301,7 +301,7 @@ fn rejects_forbidden_edge_arrow_without_arrow() {
 fn rejects_forbidden_edge_arrow_with_two_arrows() {
     assert_rejects_malformed_arrow_forbidden_edge(
         "sc-lint-boundary -> sc-lint -> sc-lint",
-        "more than one",
+        "contains more than one `->` separator",
     );
 }
 
@@ -493,7 +493,7 @@ fn rejects_planning_metadata_without_planning_table() {
 
 #[test]
 fn rejects_planning_metadata_without_current_sprint() {
-    assert_rejects_planning_metadata("[planning]\n", "current_sprint");
+    assert_rejects_planning_metadata("[planning]\n", "missing field `current_sprint`");
 }
 
 #[test]
@@ -1643,10 +1643,7 @@ expires_when = "sprint_before_current"
 
 #[test]
 fn rejects_invalid_planning_item_key_shape() {
-    for (key, expected_key) in [
-        ("NOT-BOUNDARY.section.field", "NOT-BOUNDARY.section.field"),
-        ("BOUNDARY-ScLintCli", "BOUNDARY-ScLintCli"),
-    ] {
+    for key in ["NOT-BOUNDARY.section.field", "BOUNDARY-ScLintCli"] {
         let fixture = InventoryFixture::new();
         fixture.write_valid_inventory();
         fixture.write(
@@ -1667,6 +1664,6 @@ expires_when = "sprint_before_current"
         let error = load_boundary_inventory(fixture.root()).expect_err("planning key fails");
         let message = format!("{error:#}");
         assert!(message.contains("planning keys must use"), "{message}");
-        assert!(message.contains(expected_key), "{message}");
+        assert!(message.contains(&format!("(got `{key}`)")), "{message}");
     }
 }

@@ -96,7 +96,10 @@ class LintBoundariesTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errors = validate_inventory(repo_root)
-            self.assertTrue(any("unexpected" in error for error in errors))
+            self.assertIn(
+                f"{repo_root / 'boundaries' / 'sc-lint' / 'top-level-cli.toml'}: unexpected status keys: unexpected",
+                errors,
+            )
 
     def test_validate_inventory_accepts_pr115_schema_additions(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

@@ -302,14 +302,6 @@ Not acceptable as the long-term source:
 
 ## Recommended Data Shape
 
-### Boundary Record Schema
-
-Boundary records must satisfy these identity rules:
-
-- `[public]` defines exactly one non-empty `facade` or `trait` value
-- `owner_crate_path` equals `owner_package` with hyphens replaced by
-  underscores
-
 The enforcement model should assume TOML-backed boundary records and TOML-backed
 planning metadata in:
 
@@ -344,6 +336,14 @@ Current implementation boundary:
 - planning-aware missing-item rule emission (`SCB-INVENTORY-001` through
   `SCB-INVENTORY-003`) remains the next enforcement stage on top of that
   loader foundation
+
+### Boundary Record Schema
+
+Boundary records must satisfy these identity rules:
+
+- `[public]` defines exactly one non-empty `facade` or `trait` value
+- `owner_crate_path` equals `owner_package` with hyphens replaced by
+  underscores
 
 ## Sprint Evaluation Rule
 

@@ -91,39 +91,33 @@ load.
 
 ## Closeout
 
-Implementation and record fixes are in `a6e7ca8`; the final QA3-008 assertion
-correction is in `01a4ab3`:
+Fixing commits:
 
-- QA3-001: the two invalid planning keys each use a separate fixture/load and
-  assert `planning keys must use` plus the offending key.
-- QA3-002: empty-side tests assert the full `left `from` side is empty` and
-  `right `to` side is empty` messages.
-- QA3-003: the QA-1 closeout now says its gates were not recorded at the time
-  and cites QA-2 evidence of all gates exiting 0 at `eedbb3e`; the QA-2
-  closeout points its two overstated claims to this layer.
-- QA3-004: the prior Ubuntu failure is recorded as `lint-spx.11` ETXTBSY,
-  matching the QA-3 triage record; it was an installer race, not this layer.
-- QA3-005: Rust private/`pub(crate)` missing-field assertions include the
-  complete widened visibility phrase; Python covers `pub(crate)` missing
-  fields and an empty facade.
-- QA3-006: README and model record-schema documentation now sits beside the
-  corresponding boundary-record material.
-- QA3-007: project-plan QA records identify `bd show` sources and include
-  `.28`, `.31`, and `.32` in order without the extra blank line.
-- QA3-008: every omnibus unknown-field case asserts `unknown field `<key>``
-  with its own key; the final planning-table assertions are in `01a4ab3`.
+- QA3-001: `a6e7ca8`.
+- QA3-002: `a6e7ca8`.
+- QA3-003: `a6e7ca8`.
+- QA3-004: `a6e7ca8`.
+- QA3-005: `a6e7ca8`.
+- QA3-006: `a6e7ca8`.
+- QA3-007: `a6e7ca8`.
+- QA3-008: `01a4ab3`.
+- Closeout-only documentation attribution: `0324a1e`.
 
-The initial stack gate showed PRs 115, 168, 171, 173, 175, and 176 present,
-all mergeable, with `needsRebase: false`; this branch is the new top layer.
-The ready-for-review PR targets `fix/inventory-qa2-parity-assertions` and is
-linked into stack #169.
+Observed stack summary from `gh stack view --json`:
 
-Validation on this branch:
+- PR #115, head `3f8e61e`, `needsRebase: false`.
+- PR #168, head `f569fe3`, `needsRebase: false`.
+- PR #171, head `5a729fa`, `needsRebase: false`.
+- PR #173, head `de76d18`, `needsRebase: false`.
+- PR #175, head `eedbb3e`, `needsRebase: false`.
+- PR #176, head `0435eac`, `needsRebase: false`.
+- PR #177, head `0324a1e`, `needsRebase: false`.
+
+Validation observed:
 
 - `cargo test -p sc-lint-boundary inventory::tests --lib`: 49 passed.
 - Python boundary tests: 13 passed.
-- `just lint`: passed.
-- `just test`: passed.
-- `git diff --check`: passed.
-- `gh pr checks <PR>`: recorded after PR creation; any red result includes
-  its failing log line and is not rerun.
+- `just lint`: exit 0.
+- `just test`: exit 0.
+- `git diff --check`: exit 0.
+- PR #177 checks, run `35474522996`: 8 pass, 4 pending, 0 fail when queried.

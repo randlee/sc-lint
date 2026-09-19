@@ -38,6 +38,8 @@ The project focus is:
   - see [docs/plans/release-0.6.0/lint-spx.31-inventory-qa3-assertions-records.md](./plans/release-0.6.0/lint-spx.31-inventory-qa3-assertions-records.md)
 - release 0.6.0 QA-4 gate (`lint-spx.32`)
   - record: `bd show lint-spx.32` (QA bead; no sprint document)
+- release 0.6.0 QA-4 record and documentation fixes (`lint-spx.34`)
+  - see [docs/plans/release-0.6.0/lint-spx.34-inventory-qa4-records.md](./plans/release-0.6.0/lint-spx.34-inventory-qa4-records.md)
 - planning direct workspace package-edge enforcement from boundary inventory in
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`
