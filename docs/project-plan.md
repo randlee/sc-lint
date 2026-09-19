@@ -17,6 +17,8 @@ The project focus is:
 - migrating generic lint/view tooling into `sc-lint`
 - moving boundary inventory and manifest-policy enforcement from Python into
   `sc-lint-boundary`
+- release 0.6.0 inventory strict-edge hardening
+  - see [docs/plans/release-0.6.0/lint-spx.14-inventory-strict-edges.md](./plans/release-0.6.0/lint-spx.14-inventory-strict-edges.md)
 - planning direct workspace package-edge enforcement from boundary inventory in
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`

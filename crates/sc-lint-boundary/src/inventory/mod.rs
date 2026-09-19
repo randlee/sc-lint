@@ -175,6 +175,14 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
     .into_iter()
     .any(|present| present);
 
+    if record.public.facade.is_some() && record.public.trait_name.is_some() {
+        anyhow::bail!(
+            "boundary `{}` in `{}` must define exactly one of public.facade or public.trait",
+            record.boundary_id,
+            path.display()
+        );
+    }
+
     if !has_public_surface {
         anyhow::bail!(
             "boundary `{}` in `{}` must define a non-empty public.facade or public.trait",

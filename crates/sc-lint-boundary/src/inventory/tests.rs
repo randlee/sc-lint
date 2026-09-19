@@ -79,6 +79,14 @@ expires_when = "sprint_before_current"
 "#,
         );
     }
+
+    fn rewrite_valid_boundary(&self, rewrite: impl FnOnce(String) -> String) {
+        let path = self
+            .root()
+            .join("boundaries/sc-lint-boundary/boundary-analyzer.toml");
+        let contents = fs::read_to_string(&path).expect("read valid boundary");
+        fs::write(path, rewrite(contents)).expect("rewrite valid boundary");
+    }
 }
 
 use std::fs;
@@ -150,6 +158,227 @@ state = "concrete_landed"
         Some("Directive")
     );
     assert_eq!(inventory.records[1].public.facade, None);
+}
+
+#[test]
+fn rejects_forbidden_edge_inline_table_unknown_fields() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "forbidden_edges = [{ from = \"sc-lint-boundary\", to = \"sc-lint\", typo = \"reject\" }]",
+        )
+    });
+
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("unknown edge field fails")
+    );
+    assert!(error.contains("boundary-analyzer.toml"));
+    assert!(error.contains("forbidden_edges"));
+}
+
+#[test]
+fn structured_and_arrow_forbidden_edges_produce_equal_edges() {
+    let structured_fixture = InventoryFixture::new();
+    structured_fixture.write_valid_inventory();
+    structured_fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "forbidden_edges = [{ from = \"sc-lint-boundary\", to = \"sc-lint\" }]",
+        )
+    });
+    let structured = load_boundary_inventory(structured_fixture.root())
+        .expect("structured edge loads")
+        .records[0]
+        .dependencies
+        .forbidden_edges
+        .clone();
+
+    let arrow_fixture = InventoryFixture::new();
+    arrow_fixture.write_valid_inventory();
+    arrow_fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "forbidden_edges = [\"sc-lint-boundary -> sc-lint\"]",
+        )
+    });
+    let arrow = load_boundary_inventory(arrow_fixture.root())
+        .expect("arrow edge loads")
+        .records[0]
+        .dependencies
+        .forbidden_edges
+        .clone();
+
+    assert_eq!(structured, arrow);
+}
+
+fn assert_rejects_malformed_arrow_forbidden_edge(value: &str) {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            &format!("forbidden_edges = [{value:?}]"),
+        )
+    });
+
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("malformed arrow edge fails")
+    );
+    assert!(error.contains("boundary-analyzer.toml"));
+    assert!(error.contains("dependencies.forbidden_edges[]"));
+}
+
+#[test]
+fn rejects_forbidden_edge_arrow_without_arrow() {
+    assert_rejects_malformed_arrow_forbidden_edge("sc-lint-boundary");
+}
+
+#[test]
+fn rejects_forbidden_edge_arrow_with_two_arrows() {
+    assert_rejects_malformed_arrow_forbidden_edge("sc-lint-boundary -> sc-lint -> sc-lint");
+}
+
+#[test]
+fn rejects_forbidden_edge_arrow_with_empty_side() {
+    assert_rejects_malformed_arrow_forbidden_edge(" -> sc-lint");
+}
+
+#[test]
+fn rejects_forbidden_edge_arrow_with_whitespace_only_side() {
+    assert_rejects_malformed_arrow_forbidden_edge("   -> sc-lint");
+}
+
+#[test]
+fn rejects_public_boundary_with_both_facade_and_trait() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "facade = \"analyze_workspace\"",
+            "facade = \"analyze_workspace\"\ntrait = \"Analyzer\"",
+        )
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("a boundary must choose one public surface")
+        .to_string();
+    assert!(error.contains("exactly one"));
+}
+
+#[test]
+fn rejects_public_boundary_with_neither_facade_nor_trait() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace("facade = \"analyze_workspace\"\n", "")
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("a boundary must define a public surface")
+        .to_string();
+    assert!(error.contains("must define a non-empty public.facade or public.trait"));
+}
+
+#[test]
+fn rejects_public_boundary_with_empty_facade() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace("facade = \"analyze_workspace\"", "facade = \"\"")
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("an empty facade is invalid")
+        .to_string();
+    assert!(error.contains("empty public.facade"));
+}
+
+#[test]
+fn rejects_public_boundary_with_empty_trait() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace("facade = \"analyze_workspace\"", "trait = \"\"")
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("an empty trait is invalid")
+        .to_string();
+    assert!(error.contains("empty public.trait"));
+}
+
+#[test]
+fn rejects_public_boundary_with_whitespace_only_trait() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace("facade = \"analyze_workspace\"", "trait = \"   \"")
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("a whitespace-only trait is invalid")
+        .to_string();
+    assert!(error.contains("empty public.trait"));
+}
+
+#[test]
+fn rejects_public_boundary_with_whitespace_only_facade() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace("facade = \"analyze_workspace\"", "facade = \"   \"")
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("a whitespace-only facade is invalid")
+        .to_string();
+    assert!(error.contains("empty public.facade"));
+}
+
+#[test]
+fn rejects_unknown_ownership_fields() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "[dependencies]",
+            "[ownership]\nio_owns = []\nio_forbidden = []\nunexpected = true\n\n[dependencies]",
+        )
+    });
+
+    load_boundary_inventory(fixture.root()).expect_err("unknown ownership field fails");
+}
+
+#[test]
+fn rejects_unknown_contracts_fields() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "[dependencies]",
+            "[contracts]\nrequest_types = []\nresponse_types = []\nerror_types = []\nunexpected = true\n\n[dependencies]",
+        )
+    });
+
+    load_boundary_inventory(fixture.root()).expect_err("unknown contracts field fails");
+}
+
+#[test]
+fn rejects_unknown_status_fields() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "state = \"concrete_landed\"",
+            "state = \"concrete_landed\"\nunexpected = true",
+        )
+    });
+
+    load_boundary_inventory(fixture.root()).expect_err("unknown status field fails");
 }
 
 #[test]

@@ -11,8 +11,15 @@ use super::types::RawBoundaryRecord;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum RawForbiddenPackageEdge {
-    Structured { from: String, to: String },
+    Structured(RawStructuredForbiddenPackageEdge),
     ArrowDelimited(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RawStructuredForbiddenPackageEdge {
+    pub(crate) from: String,
+    pub(crate) to: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -83,7 +90,9 @@ pub(crate) enum DependencyPolicyError {
         field: &'static str,
         package: WorkspacePackageName,
     },
-    #[error("invalid forbidden edge {value:?} in boundary `{boundary_id}`: expected `from -> to`")]
+    #[error(
+        "invalid `dependencies.forbidden_edges[]` value {value:?} in boundary `{boundary_id}`: expected `from -> to`"
+    )]
     InvalidForbiddenEdge {
         boundary_id: BoundaryId,
         value: String,
@@ -107,9 +116,16 @@ impl RawDependenciesSection {
         let mut seen_edges = BTreeSet::new();
         for raw_edge in self.forbidden_edges {
             let (raw_from, raw_to) = raw_edge.into_parts(boundary_id)?;
-            let from =
-                parse_workspace_package_name(raw_from, boundary_id, "forbidden_edges[].from")?;
-            let to = parse_workspace_package_name(raw_to, boundary_id, "forbidden_edges[].to")?;
+            let from = parse_workspace_package_name(
+                raw_from,
+                boundary_id,
+                "dependencies.forbidden_edges[].from",
+            )?;
+            let to = parse_workspace_package_name(
+                raw_to,
+                boundary_id,
+                "dependencies.forbidden_edges[].to",
+            )?;
             let edge = ForbiddenPackageEdge {
                 from: from.clone(),
                 to: to.clone(),
@@ -138,7 +154,7 @@ impl RawForbiddenPackageEdge {
         boundary_id: &BoundaryId,
     ) -> std::result::Result<(String, String), DependencyPolicyError> {
         match self {
-            Self::Structured { from, to } => Ok((from, to)),
+            Self::Structured(edge) => Ok((edge.from, edge.to)),
             Self::ArrowDelimited(value) => {
                 let Some((from, to)) = value.split_once("->") else {
                     return Err(DependencyPolicyError::InvalidForbiddenEdge {
