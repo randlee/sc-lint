@@ -379,8 +379,3 @@ Every handoff follows the Required Flow in
 [`docs/team-protocol.md`](../../../docs/team-protocol.md): task start, work,
 task close. A task close is terminal; the receiver does not acknowledge it. No
 silent processing.
-
-
-## Beads fix tasks
-
-After triage promotes a finding, the lead creates one child bead under the owning epic with `bd create --parent <epic-id>`. That new bead id is the `task_id` in the fix vars file and the value passed to `atm task assign <agent> --task-id`; do not reuse the QA task id for a fix.
