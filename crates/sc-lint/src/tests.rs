@@ -1461,6 +1461,11 @@ fn empty_boundary_inventory_maps_to_backend_failure_error() {
     )
     .expect("write manifest");
     std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::write(
+        temp_dir.path().join("boundaries").join("planning.toml"),
+        "[planning]\ncurrent_sprint = \"A.0\"\n",
+    )
+    .expect("write planning metadata");
     std::fs::create_dir_all(temp_dir.path().join("empty")).expect("empty dir");
 
     let cli = Cli::parse_from([

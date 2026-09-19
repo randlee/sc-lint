@@ -21,10 +21,15 @@ pub(crate) use types::ReferenceScope;
 pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> {
     let boundaries_root = root.join("boundaries");
     if !boundaries_root.exists() {
-        anyhow::bail!(
-            "boundary inventory requires `{}` with authoritative planning metadata; add boundaries/planning.toml with [planning].current_sprint",
-            boundaries_root.display()
-        );
+        return Ok(BoundaryInventory {
+            records: Vec::new(),
+            planning: types::PlanningMetadata {
+                planning: types::PlanningHeader {
+                    current_sprint: types::SprintId::placeholder_empty_inventory(),
+                },
+                planned_items: BTreeMap::new(),
+            },
+        });
     }
     let boundary_paths = discover_boundary_files(&boundaries_root)?;
     let mut records = Vec::new();
