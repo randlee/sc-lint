@@ -617,7 +617,7 @@ fn rejects_unknown_fields_in_all_boundary_tables() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("unknown planning field fails")
     );
-    if !error.contains("unexpected_planning") {
+    if !error.contains("unknown field `unexpected_planning`") {
         failures.push(format!("unexpected_planning: {error}"));
     }
 
@@ -633,7 +633,7 @@ fn rejects_unknown_fields_in_all_boundary_tables() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("unknown planned-item field fails")
     );
-    if !error.contains("unexpected_item") {
+    if !error.contains("unknown field `unexpected_item`") {
         failures.push(format!("unexpected_item: {error}"));
     }
 
