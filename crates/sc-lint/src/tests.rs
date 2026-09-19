@@ -1477,10 +1477,16 @@ fn missing_boundary_planning_maps_to_cli_config_error() {
     assert_eq!(error.kind, CliErrorKind::Config);
     assert_eq!(error.code(), "CLI.CONFIG_ERROR");
     assert!(error.cause.is_some());
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.contains("planning.toml"))
+    );
 }
 
 #[test]
-fn empty_boundary_inventory_maps_to_backend_failure_error() {
+fn empty_boundary_inventory_workspace_graph_build_maps_to_backend_failure_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     std::fs::write(
         temp_dir.path().join("Cargo.toml"),
@@ -2006,6 +2012,11 @@ homepage = "https://example.invalid/sc-lint"
         allowed_dependents: &[&str],
         forbidden_edges: &[(&str, &str)],
     ) {
+        let owner_crate_path = match owner_package {
+            "app" => "app",
+            "api" => "api",
+            other => panic!("unexpected fixture package {other}"),
+        };
         let boundary_id = owner_package
             .split('-')
             .map(|segment| {
@@ -2045,7 +2056,7 @@ homepage = "https://example.invalid/sc-lint"
             &format!("boundaries/{owner_package}/boundary.toml"),
             &format!(
                 "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
-                owner_package,
+                owner_crate_path,
                 owner_package,
             ),
         );

@@ -161,6 +161,13 @@ forbidden_edges = [
 ]
 ```
 
+That entry drives direct-workspace-edge findings through the same command path:
+
+```text
+SCB-DEPENDENCY-001 package dependency not allowed:
+workspace package `sc-lint-boundary` directly depends on `sc-lint-attributes` but `sc-lint-attributes` is not listed in `BOUNDARY-ScLintBoundaryAnalyzer` allowed_dependencies
+```
+
 Boundary inventory records may use either structured or arrow-delimited
 forbidden edges:
 
@@ -174,13 +181,6 @@ forbidden_edges = [
 The `[public]` section must define exactly one non-empty `facade` or `trait`,
 and `owner_crate_path` must equal `owner_package` with hyphens replaced by
 underscores. For example, `sc-lint-boundary` maps to `sc_lint_boundary`.
-
-That entry drives direct-workspace-edge findings through the same command path:
-
-```text
-SCB-DEPENDENCY-001 package dependency not allowed:
-workspace package `sc-lint-boundary` directly depends on `sc-lint-attributes` but `sc-lint-attributes` is not listed in `BOUNDARY-ScLintBoundaryAnalyzer` allowed_dependencies
-```
 
 Operator guidance:
 

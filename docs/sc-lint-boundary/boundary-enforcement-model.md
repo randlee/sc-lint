@@ -135,8 +135,9 @@ Operational rules:
 - each `forbidden_edges` row is one exact denied direct edge expressed either
   as a structured inline table with `from` and `to` fields or as an arrow-
   delimited string such as `"from-package -> to-package"`
-- malformed `forbidden_edges` inline tables, duplicate edges, duplicate package
-  names, and unknown fields fail inventory loading immediately
+- malformed `forbidden_edges` inline tables or arrow-delimited strings,
+  duplicate edges, duplicate package names, and unknown fields fail inventory
+  loading immediately
 - `SCB-DEPENDENCY-001` reports direct outgoing workspace edges not present in
   `allowed_dependencies`
 - `SCB-DEPENDENCY-002` reports direct incoming workspace edges not present in
@@ -424,6 +425,8 @@ Default behavior should be:
 
 The equivalence-test migration mode should be test-only and disabled in normal
 developer lint runs and CI.
+
+## Boundary Record Schema
 
 Boundary records must also satisfy these identity rules:
 

@@ -316,6 +316,11 @@ fn rejects_forbidden_edge_arrow_with_whitespace_only_side() {
 }
 
 #[test]
+fn rejects_forbidden_edge_arrow_with_empty_to_side() {
+    assert_rejects_malformed_arrow_forbidden_edge("sc-lint ->   ", "right `to` side");
+}
+
+#[test]
 fn rejects_public_boundary_with_both_facade_and_trait() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
@@ -329,7 +334,7 @@ fn rejects_public_boundary_with_both_facade_and_trait() {
     let error = load_boundary_inventory(fixture.root())
         .expect_err("a boundary must choose one public surface")
         .to_string();
-    assert!(error.contains("exactly one"));
+    assert!(error.contains("must define exactly one of public.facade or public.trait"));
 }
 
 #[test]
@@ -417,7 +422,7 @@ fn rejects_unknown_ownership_fields() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("unknown ownership field fails")
     );
-    assert!(error.contains("unexpected"));
+    assert!(error.contains("unknown field `unexpected`"));
 }
 
 #[test]
@@ -435,7 +440,7 @@ fn rejects_unknown_contracts_fields() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("unknown contracts field fails")
     );
-    assert!(error.contains("unexpected"));
+    assert!(error.contains("unknown field `unexpected`"));
 }
 
 #[test]
@@ -453,7 +458,7 @@ fn rejects_unknown_status_fields() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("unknown status field fails")
     );
-    assert!(error.contains("unexpected"));
+    assert!(error.contains("unknown field `unexpected`"));
 }
 
 #[test]
@@ -483,7 +488,7 @@ fn assert_rejects_planning_metadata(contents: &str, expected_field: &str) {
 
 #[test]
 fn rejects_planning_metadata_without_planning_table() {
-    assert_rejects_planning_metadata("[planned_items]\n", "planning");
+    assert_rejects_planning_metadata("[planned_items]\n", "missing field `planning`");
 }
 
 #[test]
@@ -507,93 +512,96 @@ fn rejects_planning_metadata_with_malformed_current_sprint() {
     );
 }
 
-fn assert_rejects_unknown_inventory_field(
-    rewrite: impl FnOnce(String) -> String,
-    expected_field: &str,
-) {
-    let fixture = InventoryFixture::new();
-    fixture.write_valid_inventory();
-    fixture.rewrite_valid_boundary(rewrite);
-
-    let error = format!(
-        "{:#}",
-        load_boundary_inventory(fixture.root()).expect_err("unknown inventory field fails")
-    );
-    assert!(error.contains(expected_field), "{error}");
-}
-
 #[test]
 fn rejects_unknown_fields_in_all_boundary_tables() {
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace(
-                "facade = \"analyze_workspace\"",
-                "facade = \"analyze_workspace\"\nunexpected_public = true",
-            )
-        },
-        "unexpected_public",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace(
-                "constructor = \"none\"",
-                "constructor = \"none\"\nunexpected_implementation = true",
-            )
-        },
-        "unexpected_implementation",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| contents.replace("roots = []", "roots = []\nunexpected_composition = true"),
-        "unexpected_composition",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace(
-                "forbidden = []",
-                "forbidden = []\nunexpected_references = true",
-            )
-        },
-        "unexpected_references",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace(
-                "forbidden_test_bypasses = []",
-                "forbidden_test_bypasses = []\nunexpected_testing = true",
-            )
-        },
-        "unexpected_testing",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace(
-                "review_gates = [\"no_proc_macro_dependency\"]",
-                "review_gates = [\"no_proc_macro_dependency\"]\nunexpected_enforcement = true",
-            )
-        },
-        "unexpected_enforcement",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace("[dependencies]", "[ownership]\nio_owns = []\nio_forbidden = []\nunexpected_ownership = true\n\n[dependencies]")
-        },
-        "unexpected_ownership",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace("[dependencies]", "[contracts]\nrequest_types = []\nresponse_types = []\nerror_types = []\nunexpected_contracts = true\n\n[dependencies]")
-        },
-        "unexpected_contracts",
-    );
-    assert_rejects_unknown_inventory_field(
-        |contents| {
-            contents.replace(
-                "state = \"concrete_landed\"",
-                "state = \"concrete_landed\"\nunexpected_status = true",
-            )
-        },
-        "unexpected_status",
-    );
+    type UnknownFieldCase = (&'static str, Box<dyn Fn(String) -> String>);
+    let cases: [UnknownFieldCase; 9] = [
+        (
+            "unexpected_public",
+            Box::new(|contents| {
+                contents.replace(
+                    "facade = \"analyze_workspace\"",
+                    "facade = \"analyze_workspace\"\nunexpected_public = true",
+                )
+            }),
+        ),
+        (
+            "unexpected_implementation",
+            Box::new(|contents| {
+                contents.replace(
+                    "constructor = \"none\"",
+                    "constructor = \"none\"\nunexpected_implementation = true",
+                )
+            }),
+        ),
+        (
+            "unexpected_composition",
+            Box::new(|contents| {
+                contents.replace("roots = []", "roots = []\nunexpected_composition = true")
+            }),
+        ),
+        (
+            "unexpected_references",
+            Box::new(|contents| {
+                contents.replace(
+                    "forbidden = []",
+                    "forbidden = []\nunexpected_references = true",
+                )
+            }),
+        ),
+        (
+            "unexpected_testing",
+            Box::new(|contents| {
+                contents.replace(
+                    "forbidden_test_bypasses = []",
+                    "forbidden_test_bypasses = []\nunexpected_testing = true",
+                )
+            }),
+        ),
+        (
+            "unexpected_enforcement",
+            Box::new(|contents| {
+                contents.replace(
+                    "review_gates = [\"no_proc_macro_dependency\"]",
+                    "review_gates = [\"no_proc_macro_dependency\"]\nunexpected_enforcement = true",
+                )
+            }),
+        ),
+        (
+            "unexpected_ownership",
+            Box::new(|contents| {
+                contents.replace("[dependencies]", "[ownership]\nio_owns = []\nio_forbidden = []\nunexpected_ownership = true\n\n[dependencies]")
+            }),
+        ),
+        (
+            "unexpected_contracts",
+            Box::new(|contents| {
+                contents.replace("[dependencies]", "[contracts]\nrequest_types = []\nresponse_types = []\nerror_types = []\nunexpected_contracts = true\n\n[dependencies]")
+            }),
+        ),
+        (
+            "unexpected_status",
+            Box::new(|contents| {
+                contents.replace(
+                    "state = \"concrete_landed\"",
+                    "state = \"concrete_landed\"\nunexpected_status = true",
+                )
+            }),
+        ),
+    ];
+    let mut failures = Vec::new();
+    for (expected, rewrite) in cases {
+        let fixture = InventoryFixture::new();
+        fixture.write_valid_inventory();
+        fixture.rewrite_valid_boundary(rewrite);
+        match load_boundary_inventory(fixture.root()) {
+            Ok(_) => failures.push(format!("{expected}: accepted")),
+            Err(error) if !format!("{error:#}").contains(expected) => {
+                failures.push(format!("{expected}: {error:#}"));
+            }
+            Err(_) => {}
+        }
+    }
 
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
@@ -607,7 +615,9 @@ fn rejects_unknown_fields_in_all_boundary_tables() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("unknown planning field fails")
     );
-    assert!(error.contains("unexpected_planning"), "{error}");
+    if !error.contains("unexpected_planning") {
+        failures.push(format!("unexpected_planning: {error}"));
+    }
 
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
@@ -621,7 +631,14 @@ fn rejects_unknown_fields_in_all_boundary_tables() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("unknown planned-item field fails")
     );
-    assert!(error.contains("unexpected_item"), "{error}");
+    if !error.contains("unexpected_item") {
+        failures.push(format!("unexpected_item: {error}"));
+    }
+
+    assert!(
+        failures.is_empty(),
+        "unknown-field cases failed: {failures:#?}"
+    );
 }
 
 #[test]
@@ -639,7 +656,7 @@ fn rejects_duplicate_allowed_dependents() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("duplicate allowed dependent fails")
     );
-    assert!(error.contains("allowed_dependents"));
+    assert!(error.contains("duplicate"), "{error}");
 }
 
 #[test]
@@ -1276,6 +1293,44 @@ state = "concrete_landed"
 }
 
 #[test]
+fn rejects_private_and_pub_crate_visibility_without_required_implementation_fields() {
+    for visibility in ["private", "pub(crate)"] {
+        for (field, line, expected) in [
+            (
+                "type",
+                "type = \"analyze_workspace\"\n",
+                "must define implementation.type",
+            ),
+            (
+                "module",
+                "module = \"sc_lint_boundary\"\n",
+                "must define implementation.module",
+            ),
+            (
+                "constructor",
+                "constructor = \"none\"\n",
+                "must define implementation.constructor",
+            ),
+        ] {
+            let fixture = InventoryFixture::new();
+            fixture.write_valid_inventory();
+            fixture.rewrite_valid_boundary(|contents| {
+                contents
+                    .replace(
+                        "visibility = \"public\"",
+                        &format!("visibility = \"{visibility}\""),
+                    )
+                    .replace(line, "")
+            });
+            let error = load_boundary_inventory(fixture.root())
+                .expect_err("missing implementation field fails")
+                .to_string();
+            assert!(error.contains(expected), "{visibility} {field}: {error}");
+        }
+    }
+}
+
+#[test]
 fn rejects_duplicate_boundary_ids() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
@@ -1610,7 +1665,20 @@ expires_when = "sprint_before_current"
 "#,
     );
 
+    fixture.write(
+        "boundaries/planning.toml",
+        r#"
+[planning]
+current_sprint = "A.6"
+
+[planned_items."BOUNDARY-ScLintCli"]
+scheduled_sprint = "A.1a"
+tracking_id = "SC-LINT-CLI-003"
+expires_when = "sprint_before_current"
+"#,
+    );
+
     let error = load_boundary_inventory(fixture.root()).expect_err("planning key fails");
-    let message = error.to_string();
-    assert!(message.contains("failed to parse TOML file"));
+    let message = format!("{error:#}");
+    assert!(message.contains("planning keys must use"), "{message}");
 }

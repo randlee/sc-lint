@@ -128,26 +128,38 @@ def validate_boundary_file(
             ensure_exact_keys(data[name], keys, name, path, errors)
 
     visibility = implementation.get("visibility")
-    if visibility not in {"public", "trait_only"}:
+    if visibility not in {"public", "trait_only", "private", "pub(crate)"}:
         errors.append(f"{path}: unsupported implementation.visibility `{visibility}`")
+        return
+
+    constructor = implementation.get("constructor")
+    if constructor is not None and constructor not in {
+        "none",
+        "public",
+        "private",
+        "pub(crate)",
+    }:
+        errors.append(f"{path}: unsupported implementation.constructor `{constructor}`")
         return
 
     facade = str(public.get("facade", "")).strip()
     trait = str(public.get("trait", "")).strip()
-    if bool(facade) == bool(trait):
-        errors.append(f"{path}: public must define exactly one non-empty public.facade or public.trait")
+    if "facade" in public and not facade:
+        errors.append(f"{path}: defines an empty public.facade")
+    elif "trait" in public and not trait:
+        errors.append(f"{path}: defines an empty public.trait")
+    elif facade and trait:
+        errors.append(f"{path}: must define exactly one of public.facade or public.trait")
+    elif not facade and not trait:
+        errors.append(f"{path}: must define a non-empty public.facade or public.trait")
 
-    if visibility == "public":
+    if visibility in {"public", "private", "pub(crate)"}:
         if not str(implementation.get("type", "")).strip():
-            errors.append(f"{path}: implementation.type must be present for public visibility")
+            errors.append(f"{path}: implementation.type must be present for {visibility} visibility")
         if not str(implementation.get("module", "")).strip():
-            errors.append(
-                f"{path}: implementation.module must be present for public visibility"
-            )
-        if implementation.get("constructor") != "none":
-            errors.append(
-                f"{path}: implementation.constructor must be `none` for public visibility"
-            )
+            errors.append(f"{path}: implementation.module must be present for {visibility} visibility")
+        if constructor is None:
+            errors.append(f"{path}: implementation.constructor must be present for {visibility} visibility")
     else:
         if "type" in implementation:
             errors.append(f"{path}: trait_only visibility must omit implementation.type")

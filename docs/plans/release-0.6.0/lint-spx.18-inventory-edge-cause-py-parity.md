@@ -73,10 +73,11 @@ SC-QA-006 (only the items introduced by PR #115).
 
 ## Out of scope
 
-- Pre-existing Python/Rust divergence not introduced by #115: visibility
-  values, `constructor`, forbidden-edge content validation in Python, sprint
-  id validation, unknown `planning.toml` keys, and Python's behaviour when
-  `boundaries/` is absent (bead `lint-spx.22`).
+- Pre-existing Python/Rust divergence not introduced by #115: forbidden-edge
+  content validation in Python, sprint id validation, unknown `planning.toml`
+  keys, and Python's behaviour when `boundaries/` is absent (bead
+  `lint-spx.22`). Visibility values, `constructor`, and their non-`none`
+  variants were introduced by PR #115 and are handled by `lint-spx.27`.
 - Docs, plan entries for other beads, REQ-SCB-013 wording, remaining test
   gaps, dead `validate_planning_metadata`, the `owner_crate_path` helper
   (all `lint-spx.19`).

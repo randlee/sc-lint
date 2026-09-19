@@ -107,29 +107,34 @@ Full QA-1 report: `atm read --task lint-spx.16 --all`.
 
 Finding disposition for QA-1:
 
-- SC-QA-001, SC-QA-002, SC-QA-003, SC-QA-007, SC-QA-013, QA-003, and
-  ARCH-012: fixed in the plan, requirements, model, and README updates.
-- SC-QA-004 and ARCH-009: fixed with explicit CLI configuration-error
+- SC-QA-001: fixed in `1324e7f` (plan records).
+- SC-QA-002: fixed in `1324e7f` (sprint records).
+- SC-QA-003: fixed in `1324e7f` (requirements/model docs).
+- SC-QA-007: fixed in `1324e7f` (model documentation).
+- SC-QA-013: fixed in `1324e7f` (plan records).
+- QA-003: fixed in `1324e7f` (README/model updates).
+- ARCH-012: fixed in `1324e7f` (records and documentation).
+- SC-QA-004: fixed in `1324e7f` with explicit CLI configuration-error
   coverage for a present `boundaries/` directory without planning metadata;
   the empty-inventory fixture retains valid planning metadata because the
   discovered workspace root reads it.
-- SC-QA-005, SC-QA-009, and SC-QA-010: fixed with planning-header,
-  unknown-field, duplicate-dependent, and facade/empty-trait tests.
-- SC-QA-011 and ARCH-003: fixed by removing redundant planning validation and
-  centralizing `BOUNDARY_ID_PREFIX`.
-- QA-002: fixed by correcting the widened implementation-visibility error and
-  asserting the diagnostic in a test.
-- ARCH-001: fixed as a documented requirement and a `pub(crate)` Rust helper in
-  `sc-lint-boundary`; the Python derivation remains unchanged per scope.
-- ARCH-009 and ARCH-012: fixed by the restored CLI test and closeout records.
-- Residual QA-003 from `lint-spx.18`: fixed by extending the Python parity test
-  with the arrow-delimited forbidden-edge form.
+- ARCH-009: fixed in `1324e7f` (restored CLI test).
+- SC-QA-005: fixed in `1324e7f` (planning-header tests).
+- SC-QA-009: fixed in `1324e7f` (unknown-field tests).
+- SC-QA-010: fixed in `1324e7f` (duplicate-dependent and facade tests).
+- SC-QA-011: partially fixed in `1324e7f`, completed by `lint-spx.27`.
+- ARCH-003: fixed in `1324e7f` (planning validation and prefix cleanup).
+- QA-002: fixed in `1324e7f` (widened visibility diagnostic).
+- ARCH-001: fixed in `1324e7f` and `eedbb3e` (documented requirement and
+  `pub(crate)` helper moved into `sc-lint-boundary`).
+- lint-spx.18 residual (deliverable 7): fixed in `1324e7f` (Python parity
+  test with the arrow-delimited forbidden-edge form).
 
 The repository's `closing-triage` skill/query script was not present in the
 available worktree or local skill catalog, so the assignment's promoted finding
 IDs were verified directly against the cited current files.
 
-Round 2 LEAD-001: fixed by moving `BOUNDARY_ID_PREFIX` and
+Round 2 LEAD-001: fixed in `eedbb3e` by moving `BOUNDARY_ID_PREFIX` and
 `owner_crate_path_for_package` out of the published `sc-lint-schema` crate and
 into `sc-lint-boundary` inventory types. `sc-lint-schema` is untouched in this
 round because its published interface must remain rule-neutral and stable.
