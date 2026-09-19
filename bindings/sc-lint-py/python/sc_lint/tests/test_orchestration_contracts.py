@@ -62,6 +62,29 @@ class DependencyContractTests(unittest.TestCase):
         self.assertEqual(detail, "broken version")
 
 
+class ExternalCliPolicyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.module = load("orchestration_test_cli", ".claude/lib/orchestration_test_cli.py")
+
+    def test_present_cli_returns(self) -> None:
+        with mock.patch.object(self.module.shutil, "which", return_value="/tool"):
+            self.module.require_dev_cli("tool", ">= 1", "install tool")
+
+    def test_missing_cli_skips_in_ci(self) -> None:
+        with mock.patch.object(self.module.shutil, "which", return_value=None), \
+             mock.patch.object(self.module.os, "getenv", return_value="1"), \
+             mock.patch.object(self.module.pytest, "skip") as skip:
+            self.module.require_dev_cli("tool", ">= 1", "install tool")
+        skip.assert_called_once_with("dev-host-only check: tool not installed in CI")
+
+    def test_missing_cli_fails_on_development_host(self) -> None:
+        with mock.patch.object(self.module.shutil, "which", return_value=None), \
+             mock.patch.object(self.module.os, "getenv", return_value=None), \
+             mock.patch.object(self.module.pytest, "fail") as fail:
+            self.module.require_dev_cli("tool", ">= 1", "install tool")
+        fail.assert_called_once_with("tool CLI is required (>= 1); install it with: install tool")
+
+
 class RosterCheckTests(unittest.TestCase):
     def setUp(self) -> None:
         self.module = load("roster_check_test", ".claude/skills/team-lead/scripts/roster_check.py")

@@ -5,12 +5,16 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(REPO_ROOT / ".claude"))
+from lib.orchestration_test_cli import require_dev_cli
+from lib.sc_compose_dependency import MIN_SC_COMPOSE_TEXT, SC_COMPOSE_INSTALL
+
 TEMPLATE = ".claude/skills/triaging-findings/triage-record.ttl.j2"
 
 
@@ -50,6 +54,7 @@ def _vars() -> dict:
 
 
 def _render(tmp_path: Path, variables: dict) -> subprocess.CompletedProcess[str]:
+    require_dev_cli("sc-compose", MIN_SC_COMPOSE_TEXT, SC_COMPOSE_INSTALL)
     vars_path = tmp_path / "vars.json"
     output_path = tmp_path / "FTQ-001.ttl"
     vars_path.write_text(json.dumps(variables), encoding="utf-8")
@@ -76,6 +81,7 @@ def _render(tmp_path: Path, variables: dict) -> subprocess.CompletedProcess[str]
 def _parse_turtle(
     path: Path, tmp_path: Path
 ) -> subprocess.CompletedProcess[str]:
+    require_dev_cli("oxigraph", "installed", "install oxigraph from its released binary")
     converted = tmp_path / "parsed.ttl"
     return subprocess.run(
         [
