@@ -1,5 +1,4 @@
 use super::*;
-use crate::render::hex_encode;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -112,7 +111,47 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
         }
     }
 
+    resolve_trait_method_edges(&mut builder);
     Ok(builder.finish())
+}
+
+fn resolve_trait_method_edges(builder: &mut GraphBuilder) {
+    let methods: BTreeMap<_, _> = builder
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "method")
+        .map(|node| (node.id.clone(), node))
+        .collect();
+    let known: BTreeSet<_> = builder.nodes.iter().map(|node| node.id.clone()).collect();
+    for edge in &mut builder.edges {
+        if !matches!(edge.kind, "references" | "references_expr") || known.contains(&edge.to) {
+            continue;
+        }
+        let Some((owner, method)) = edge.to.rsplit_once("::") else {
+            continue;
+        };
+        // Self::method inside a trait impl resolves to that impl when no
+        // inherent method exists. Otherwise accept only an unambiguous impl.
+        if let Some((source_owner, _)) = edge.from.split_once("::impl::")
+            && source_owner == owner
+            && let Some((source_impl, _)) = edge.from.rsplit_once("::")
+        {
+            let candidate = NodeId::new(format!("{source_impl}::{method}"));
+            if methods.contains_key(&candidate) {
+                edge.to = candidate;
+                continue;
+            }
+        }
+        let prefix = format!("{owner}::impl::");
+        let mut candidates = methods
+            .values()
+            .filter(|node| node.id.starts_with(&prefix) && node.label == method);
+        if let Some(candidate) = candidates.next()
+            && candidates.next().is_none()
+        {
+            edge.to = candidate.id.clone();
+        }
+    }
 }
 
 fn collect_owner_names(items: &[Item]) -> BTreeSet<String> {
@@ -494,24 +533,10 @@ fn ingest_module_items(
                     .trait_
                     .as_ref()
                     .map(|(_, path, _)| trait_path_key(path));
-                let impl_node_id = if let Some(trait_path) = &trait_path {
-                    NodeId::new(format!(
-                        "{owner_node_id}::impl::{}",
-                        hex_encode(trait_path.as_bytes())
-                    ))
+                let impl_node_id = if let Some((_, path, _)) = &item_impl.trait_ {
+                    NodeId::new(format!("{owner_node_id}::{}", trait_impl_key(&owner, path)))
                 } else {
                     NodeId::new(format!("{owner_node_id}::impl::inherent"))
-                };
-
-                // Keep established path-owner IDs stable. References share the
-                // target type, but must not merge their impls or methods with it.
-                let impl_node_id = if owner.is_reference {
-                    NodeId::new(format!(
-                        "{impl_node_id}::self::{}",
-                        hex_encode(owner.self_type.as_bytes())
-                    ))
-                } else {
-                    impl_node_id
                 };
                 let owner_label = if owner.is_reference {
                     &owner.self_type
@@ -602,7 +627,7 @@ fn ingest_module_items(
 
                 for impl_item in item_impl.items {
                     if let ImplItem::Fn(method) = impl_item {
-                        let method_owner = if owner.is_reference {
+                        let method_owner = if item_impl.trait_.is_some() {
                             &impl_node_id
                         } else {
                             &owner_node_id
@@ -647,6 +672,7 @@ fn ingest_module_items(
                                 Some(owner_name),
                                 &context.workspace_dependency_roots,
                                 |collector| {
+                                    collector.set_impl_self_type(&item_impl.self_ty);
                                     collector.visit_impl_item_fn(&method);
                                 },
                             ),

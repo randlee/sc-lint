@@ -3,6 +3,7 @@ use super::*;
 #[derive(Default)]
 pub(super) struct ReferenceCollector {
     owner_name: Option<String>,
+    impl_self_type: Option<Type>,
     local_owner_names: BTreeSet<String>,
     workspace_dependency_roots: BTreeSet<String>,
     references: BTreeSet<CollectedReference>,
@@ -16,10 +17,46 @@ impl ReferenceCollector {
     ) -> Self {
         Self {
             owner_name: owner_name.map(ToOwned::to_owned),
+            impl_self_type: None,
             local_owner_names: local_owner_names.clone(),
             workspace_dependency_roots: workspace_dependency_roots.keys().cloned().collect(),
             references: BTreeSet::new(),
         }
+    }
+
+    pub(super) fn set_impl_self_type(&mut self, self_type: &Type) {
+        self.impl_self_type = Some(self_type.clone());
+    }
+
+    fn qualified_method_path(&self, expression: &syn::ExprPath) -> Option<String> {
+        let qself = expression.qself.as_ref()?;
+        if qself.position == 0 || expression.path.segments.len() != qself.position + 1 {
+            return None;
+        }
+        let is_self = matches!(qself.ty.as_ref(), Type::Path(path) if path.path.is_ident("Self"));
+        let self_type = if is_self {
+            self.impl_self_type.as_ref()?
+        } else {
+            qself.ty.as_ref()
+        };
+        let owner = impl_owner(self_type).ok()?;
+        let trait_path = syn::Path {
+            leading_colon: expression.path.leading_colon,
+            segments: expression
+                .path
+                .segments
+                .iter()
+                .take(qself.position)
+                .cloned()
+                .collect(),
+        };
+        let method = expression.path.segments.last()?;
+        Some(format!(
+            "{}::{}::{}",
+            owner.name,
+            trait_impl_key(&owner, &trait_path),
+            method.ident
+        ))
     }
 
     fn into_references(self) -> BTreeSet<CollectedReference> {
@@ -75,7 +112,14 @@ impl<'ast> Visit<'ast> for ReferenceCollector {
     }
 
     fn visit_expr_path(&mut self, expr_path: &'ast syn::ExprPath) {
-        self.maybe_insert_path(&expr_path.path, ReferenceKind::Expr);
+        if let Some(path) = self.qualified_method_path(expr_path) {
+            self.references.insert(CollectedReference {
+                path,
+                kind: ReferenceKind::Expr,
+            });
+        } else {
+            self.maybe_insert_path(&expr_path.path, ReferenceKind::Expr);
+        }
         syn::visit::visit_expr_path(self, expr_path);
     }
 
