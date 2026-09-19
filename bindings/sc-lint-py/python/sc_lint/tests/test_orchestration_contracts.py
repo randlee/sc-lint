@@ -128,7 +128,10 @@ class FindingScriptTests(unittest.TestCase):
 
 
 class TemplateContractTests(unittest.TestCase):
-    TEMPLATE_DIR = REPO / ".claude/skills/codex-orchestration"
+    TEMPLATE_DIRS = (
+        REPO / ".claude/skills/codex-orchestration",
+        REPO / ".claude/assets/sc-rust/quality-mgr/templates",
+    )
     EXPECTED_JSON_KEYS = {
         "arch-qa-assignment.json.j2": {"authoritative_sprint_doc", "branch", "carry_forward_findings", "changed_files", "commit", "notes", "reference_docs", "review_mode", "review_targets", "round_limit", "scope", "triage_records", "worktree_path"},
         "flaky-test-qa-assignment.json.j2": {"carry_forward_findings", "changed_files", "notes", "review_targets", "round_limit", "scope", "triage_records", "worktree_path"},
@@ -139,12 +142,17 @@ class TemplateContractTests(unittest.TestCase):
     def test_every_orchestration_template_has_a_sample_and_composes(self) -> None:
         if shutil.which("atm") is None:
             self.skipTest("atm is not on PATH; cannot exercise daemon template composition")
-        for template in sorted(self.TEMPLATE_DIR.glob("*.j2")):
+        templates = [
+            template
+            for directory in self.TEMPLATE_DIRS
+            for template in sorted(directory.glob("*.j2"))
+        ]
+        for template in templates:
             with self.subTest(template=template.name):
                 sample_name = template.name.removesuffix(".j2")
                 if not sample_name.endswith(".json"):
                     sample_name += ".json"
-                sample = self.TEMPLATE_DIR / "vars" / sample_name
+                sample = template.parent / "vars" / sample_name
                 self.assertTrue(sample.is_file(), f"missing committed sample vars: {sample}")
                 result = subprocess.run(["atm", "compose", "--template", str(template), "--vars", str(sample)], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -155,7 +163,7 @@ class TemplateContractTests(unittest.TestCase):
     def test_missing_sample_var_fails_composition(self) -> None:
         if shutil.which("atm") is None:
             self.skipTest("atm is not on PATH; cannot exercise daemon template composition")
-        template = self.TEMPLATE_DIR / "ruthless-boundary-qa-assignment.json.j2"
+        template = self.TEMPLATE_DIRS[0] / "ruthless-boundary-qa-assignment.json.j2"
         with tempfile.TemporaryDirectory() as directory:
             bad_vars = Path(directory) / "bad.json"
             bad_vars.write_text('{"review_mode":"sprint","worktree_path":"/tmp"}', encoding="utf-8")

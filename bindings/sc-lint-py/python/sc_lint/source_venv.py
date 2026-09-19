@@ -69,6 +69,10 @@ def main() -> int:
     install += ["--no-index", "--find-links", wheel_dir, f"sc-lint=={version}"]
     print(f"source_venv: installing sc_lint into {VENV_DIR}", file=sys.stderr)
     subprocess.run(install, check=True)
+    subprocess.run(
+        [str(python), "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "pytest>=8,<9", "rdflib>=7,<8"],
+        check=True,
+    )
     STAMP.write_text(fingerprint + "\n", encoding="utf-8")
     return 0
 

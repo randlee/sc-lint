@@ -84,14 +84,15 @@ def main() -> int:
         return 2
     herdr_names = [agent["name"] for agent in agents if agent.get("name")]
 
-    print(f"{'member':<14}{'.atm.toml alias':<18}{'roster alias':<16}{'herdr agent':<16}state")
+    rows = []
     for member in roster:
         target = member.get("alias") or member["name"]
-        print(
-            f"{member['name']:<14}{config.get(member['name']) or '-':<18}"
-            f"{member.get('alias') or '-':<16}"
-            f"{target if target in herdr_names else 'MISSING':<16}{member.get('state', '-')}"
-        )
+        rows.append((member["name"], config.get(member["name"]) or "-", member.get("alias") or "-", target if target in herdr_names else "MISSING", member.get("state", "-")))
+    headers = ("member", ".atm.toml alias", "roster alias", "herdr agent", "state")
+    widths = [max(len(headers[index]), *(len(row[index]) for row in rows)) + 2 for index in range(4)]
+    print("".join(f"{header:<{width}}" for header, width in zip(headers[:4], widths)) + headers[4])
+    for row in rows:
+        print("".join(f"{value:<{width}}" for value, width in zip(row[:4], widths)) + row[4])
     problems = find_problems(config, roster, herdr_names)
     print()
     for problem in problems:
