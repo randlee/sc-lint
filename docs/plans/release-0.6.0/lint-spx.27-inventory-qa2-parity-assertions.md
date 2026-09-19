@@ -172,3 +172,7 @@ Validation:
 - `gh pr checks 176`: all 12 checks pending at closeout time.
 - Draft PR #176 is linked into stack #169 with base
   `fix/inventory-qa1-docs-tests`.
+
+Post-close CI follow-up: `Test (ubuntu-latest)` later reported red in run
+`35473395473` (job `105978334178`); the workflow was still in progress when
+the failure was observed, so GitHub had not published failed-step logs yet.
