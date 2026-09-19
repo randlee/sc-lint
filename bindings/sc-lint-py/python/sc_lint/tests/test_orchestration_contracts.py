@@ -156,14 +156,10 @@ class TemplateContractTests(unittest.TestCase):
         REPO / ".claude/skills/codex-orchestration",
         REPO / ".claude/assets/sc-rust/quality-mgr/templates",
     )
-    EXPECTED_JSON_KEYS = {
-        "arch-qa-assignment.json.j2": {"authoritative_sprint_doc", "branch", "carry_forward_findings", "changed_files", "commit", "notes", "reference_docs", "review_mode", "review_targets", "round_limit", "scope", "triage_records", "worktree_path"},
-        "flaky-test-qa-assignment.json.j2": {"carry_forward_findings", "changed_files", "notes", "review_targets", "round_limit", "scope", "triage_records", "worktree_path"},
-        "req-qa-assignment.json.j2": {"authoritative_sprint_doc", "branch", "carry_forward_findings", "changed_files", "commit", "notes", "phase_or_sprint_docs", "phase_sprint_documents", "review_targets", "round_limit", "scope", "triage_records", "worktree_path"},
-        "ruthless-boundary-qa-assignment.json.j2": {"review_mode", "worktree_path", "review_targets", "reference_docs", "round_limit", "changed_files", "duplicate_sweep_symbols", "triage_records", "carry_forward_findings", "findings_scope_locked", "notes"},
-    }
     AGENT_CONTRACTS = {
+        "arch-qa-assignment.json.j2": REPO / ".claude/agents/arch-qa.md",
         "flaky-test-qa-assignment.json.j2": REPO / ".claude/agents/flaky-test-qa.md",
+        "req-qa-assignment.json.j2": REPO / ".claude/agents/req-qa.md",
         "ruthless-boundary-qa-assignment.json.j2": REPO / ".claude/agents/ruthless-boundary-qa.md",
         "rust-best-practices-assignment.json.j2": REPO / ".claude/agents/rust-best-practices-agent.md",
         "rust-qa-assignment.json.j2": REPO / ".claude/agents/rust-qa-agent.md",
@@ -189,14 +185,21 @@ class TemplateContractTests(unittest.TestCase):
             return metadata.get("defaults", {}), content
         return {}, content
 
-    def compose(self, template: Path, sample: Path) -> str:
-        """Use ATM when available; otherwise validate Jinja syntax and variables.
+    def compose_with_jinja(self, template: Path, sample: Path) -> str:
+        from jinja2 import Environment, StrictUndefined
+        from markupsafe import Markup
 
-        ATM's JSON rendering semantics are authoritative.  The Jinja fallback
-        deliberately validates template syntax with autoescape disabled and
-        StrictUndefined enabled, so a minimal CI image still catches missing
-        variables rather than silently skipping this suite.
-        """
+        defaults, body = self.jinja_parts(template)
+        variables = {**defaults, **json.loads(sample.read_text(encoding="utf-8"))}
+        renderer = Environment(
+            autoescape=False,
+            undefined=StrictUndefined,
+            finalize=lambda value: value if isinstance(value, Markup) else json.dumps(value),
+        )
+        return renderer.from_string(body).render(**variables)
+
+    def compose(self, template: Path, sample: Path) -> str:
+        """Use ATM when available; otherwise render JSON-compatible Jinja."""
         if shutil.which("atm"):
             result = subprocess.run(
                 ["atm", "compose", "--template", str(template), "--vars", str(sample)],
@@ -207,19 +210,26 @@ class TemplateContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             return result.stdout
 
-        from jinja2 import Environment, StrictUndefined
+        return self.compose_with_jinja(template, sample)
 
-        defaults, body = self.jinja_parts(template)
-        variables = {**defaults, **json.loads(sample.read_text(encoding="utf-8"))}
-        renderer = Environment(autoescape=False, undefined=StrictUndefined)
-        return renderer.from_string(body).render(**variables)
+    def assert_json_contract(self, template: Path, rendered: str) -> None:
+        agent = self.AGENT_CONTRACTS.get(template.name)
+        self.assertIsNotNone(agent, f"JSON template has no receiving-agent mapping: {template}")
+        payload = json.loads(rendered)
+        self.assertEqual(set(payload), self.fenced_json_keys(agent))
 
-    def test_every_orchestration_template_has_a_sample_and_composes(self) -> None:
-        templates = [
+    def templates(self) -> list[Path]:
+        return [
             template
             for directory in self.TEMPLATE_DIRS
             for template in sorted(directory.glob("*.j2"))
         ]
+
+    def test_every_orchestration_template_has_a_sample_and_composes(self) -> None:
+        templates = self.templates()
+        json_templates = [template for template in templates if template.name.endswith(".json.j2")]
+        self.assertEqual({template.name for template in json_templates}, set(self.AGENT_CONTRACTS))
+        compared = 0
         for template in templates:
             with self.subTest(template=template.name):
                 sample_name = template.name.removesuffix(".j2")
@@ -228,14 +238,23 @@ class TemplateContractTests(unittest.TestCase):
                 sample = template.parent / "vars" / sample_name
                 self.assertTrue(sample.is_file(), f"missing committed sample vars: {sample}")
                 rendered = self.compose(template, sample)
-                if shutil.which("atm") is None:
-                    continue
-                if template.name in self.AGENT_CONTRACTS:
-                    payload = json.loads(rendered)
-                    self.assertEqual(set(payload), self.fenced_json_keys(self.AGENT_CONTRACTS[template.name]))
-                elif template.name in self.EXPECTED_JSON_KEYS:
-                    payload = json.loads(rendered)
-                    self.assertEqual(set(payload), self.EXPECTED_JSON_KEYS[template.name])
+                if template.name.endswith(".json.j2"):
+                    self.assert_json_contract(template, rendered)
+                    compared += 1
+        self.assertGreater(compared, 0)
+        print(f"compared JSON template contracts: {compared}")
+
+    def test_in_memory_json_template_rejects_extra_or_missing_agent_key(self) -> None:
+        from jinja2 import Environment, StrictUndefined
+
+        template = self.TEMPLATE_DIRS[0] / "flaky-test-qa-assignment.json.j2"
+        expected = self.fenced_json_keys(self.AGENT_CONTRACTS[template.name])
+        renderer = Environment(autoescape=False, undefined=StrictUndefined)
+        for bad_keys in (expected - {"notes"}, expected | {"unexpected"}):
+            with self.subTest(keys=bad_keys):
+                rendered = renderer.from_string(json.dumps({key: None for key in bad_keys})).render()
+                with self.assertRaises(AssertionError):
+                    self.assert_json_contract(template, rendered)
 
     def test_missing_sample_var_fails_composition(self) -> None:
         template = self.TEMPLATE_DIRS[0] / "ruthless-boundary-qa-assignment.json.j2"

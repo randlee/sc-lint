@@ -94,3 +94,15 @@ fixture. The latter fixes the Windows CI failure where an open
 Cut to `lint-spx.33`: remaining contract-test expansion, dead-command removal,
 template/skill contradiction cleanup, and the rest of the verification-script
 hardening scope from this plan.
+
+## lint-spx.37 Closeout
+
+- The contract suite compares all seven committed `*.json.j2` templates in
+  both ATM and no-ATM Jinja modes; each template has a receiving-agent mapping
+  and is compared with the first fenced JSON contract in that agent.
+- With the committed `arch-qa-assignment.json` sample,
+  `carry_forward_findings_json` has the value `"[]"`; both ATM and the Jinja
+  fallback render `"carry_forward_findings": "[]"`. The renderers retain
+  different whitespace around Jinja block output.
+- `.claude/skills/codex-orchestration/arch-qa-assignment.json.j2` is bytewise
+  identical to `atm-core` `origin/develop`.
