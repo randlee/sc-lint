@@ -182,21 +182,24 @@ work and nudges the agent. A plain send opens no task, so the agent cannot
 `atm task start` it and nothing re-nudges an agent that stops.
 
 - Include task scope, worktree, relevant docs and acceptance criteria.
-- The assignee runs `atm task start <task-id> "<one line>"` when `task_ready`
-  arrives, reports at meaningful milestones, and closes with a commit or PR
-  reference.
+- Before dispatch, create and dependency-wire the bead, assign it to the
+  recipient's ATM identity, and use its id for `--task-id` and `task_id`. The
+  assignee runs `atm task start <task-id> "<one line>"` and `bd update <task-id>
+  --claim --actor "$ATM_IDENTITY"` when `task_ready` arrives, reports at
+  meaningful milestones, and closes with a commit or PR reference.
 - **Every task must be closed.** Write the close into the assignment itself:
   the body ends with the instruction to run
-  `atm task close <task-id> completed` with the commit or PR as the report
-  when the work is done. The orchestration dispatch templates already end
-  this way; a hand-written assignment must too. An agent's queue releases
-  the next task only when the current one closes, so an open finished task
-  blocks everything behind it.
-- When work is reported complete, verify the task is closed with
-  `atm task list --all`. If it is still open, close it yourself:
-  `atm task close <task-id> completed "<what was delivered, commit or PR>"`.
-  Do not spend a round trip asking the agent to close it. The assignee is
-  told the assigner closed the task, so put the real result in the reason.
+  `atm task close <task-id> completed` plus `bd close <task-id> --actor
+  "$ATM_IDENTITY"` with the commit or PR as the report when the work is done.
+  The orchestration dispatch templates already end this way; a hand-written
+  assignment must too. An agent's queue releases the next task only when the
+  current task and bead close, so an open finished task blocks everything
+  behind it.
+- When work is reported complete, verify the task and bead are closed with
+  `atm task list --all` and `bd show <task-id>`. If rejected, reopen the bead
+  or create a child bead; do not close a bead on the assignee's behalf.
+- After every paired close, run `bd ready` and dispatch each newly unblocked
+  bead with `atm task assign`; never dispatch a blocked bead.
 
 ### Communication Rules
 

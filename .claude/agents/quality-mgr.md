@@ -65,15 +65,19 @@ every reply to the assigner named in the assignment, never to a fixed name.
   wake-up, not a serialization rule: after handling it, list the queue again
   and pick up everything else that is open.
 - A task assignment is informational until `task_ready`; when it is ready, start
-  it with `atm task start <task-id> "<one-line plan>"`. The start event does not
-  close the task.
+  it with `atm task start <task-id> "<one-line plan>"`, then claim its matching
+  QA bead with `bd update <task-id> --claim --actor "$ATM_IDENTITY"`. The start
+  event does not close either item.
 - Deliver each final verdict by closing its own task:
   `atm task close <task-id> completed --template <report template> --vars
-  <vars file>` (the assignment names the templates). Close tasks in whatever
+  <vars file>` followed by `bd close <task-id> --actor "$ATM_IDENTITY"` (the
+  assignment names the templates). Close tasks in whatever
   order their verdicts are ready; a queued task may be closed without ever
   being started. A plain `atm send <lead>` leaves the task open and keeps
-  later assignments queued. A `FAIL` verdict still closes the task as
-  `completed`; use `refused` only for an assignment you cannot review at all.
+  later assignments queued. A `FAIL` verdict still closes the task and bead as
+  `completed`; use `refused` only for an assignment you cannot review at all,
+  leaving the bead open with `bd update <task-id> --notes "<reason>" --actor
+  "$ATM_IDENTITY"`.
 
 ## Inputs
 
@@ -142,7 +146,7 @@ TODO-specific rule:
 
 ## Workflow
 
-1. Start immediately with `atm task start <task-id> "<one line>"` when `task_ready` arrives, per `docs/team-protocol.md`.
+1. Start immediately with `atm task start <task-id> "<one line>"` and `bd update <task-id> --claim --actor "$ATM_IDENTITY"` when `task_ready` arrives, per `docs/team-protocol.md`.
 2. Validate that the task is XML rendered from the QA template. Reject any
    non-XML assignment from the lead immediately.
 3. Read the task payload and determine the reviewer set.
@@ -198,6 +202,10 @@ TODO-specific rule:
     A PR comment remains required; ATM template admission does not replace it.
 11. Report a final PASS, FAIL, or IN-FLIGHT gate to the lead, including
     deliverable completion as `X/Y (Z%)`.
+
+When reporting QA findings, preserve their stable finding ids for
+`/triaging-findings`; do not create or close Beads for those findings. The lead
+creates and wires the resulting fix beads.
 
 ## Default Reviewer Set
 
@@ -288,7 +296,7 @@ Reviewer ownership note:
 All ATM messages must follow the required sequence:
 1. task start
 2. in-flight status when reviewer launch or collection takes time
-3. final QA verdict
+3. final QA verdict and `bd close <task-id> --actor "$ATM_IDENTITY"`
 
 For PR updates:
 - install the templates with

@@ -36,6 +36,13 @@ Read the phase plan and identify:
 - parallel waves
 - merge order within each wave
 
+Translate the dependency graph into Beads before the first dispatch: create an
+epic chain with `bd dep add <next> <prereq>`, assign each bead to the
+recipient's ATM identity, and use the bead id as the ATM task id. Each QA bead
+depends on its dev bead; merge/release beads depend on QA; promoted QA fixes are
+child beads that block the QA/merge bead they came from. After every assignee
+paired task/bead close, run `bd ready` and dispatch only newly unblocked work.
+
 ### 2. Execute sprints
 
 For each sprint, respecting dependency order:

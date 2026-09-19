@@ -92,20 +92,55 @@ Before starting a sprint:
    `.claude/skills/codex-orchestration/rust-best-practices-agent-assignment.json.j2`
    exist for first-pass boundary optimization review.
 
+## Beads
+
+This is the one lifecycle contract for development, fix, and QA work.
+
+1. **Identity and dispatch.** Before dispatch, the lead creates one bead for
+   each task, sets its assignee to the recipient's ATM identity, and uses that
+   bead id everywhere: `bd update <bead-id> --assignee=<atm-identity> --actor
+   "$ATM_IDENTITY"`; `atm task assign --task-id <bead-id>`; and template-vars
+   `task_id`. Release work is a child of its release epic (`bd create --parent
+   <epic>`).
+2. **Assignee-owned tandem lifecycle.** The assignee uses its ATM identity as
+   the Beads actor (either export `BEADS_ACTOR="$ATM_IDENTITY"` in its pane or
+   pass `--actor "$ATM_IDENTITY"`): start with `atm task start <id> "<plan>"`
+   and `bd update <id> --claim --actor "$ATM_IDENTITY"`; after successful
+   validation, close with `atm task close <id> completed --stdin` and
+   `bd close <id> --actor "$ATM_IDENTITY"`. A refusal runs `atm task close
+   <id> refused "<reason>"` and leaves the bead open with an actor-attributed
+   note (`bd update <id> --notes "<reason>" --actor "$ATM_IDENTITY"`). A push
+   or progress report closes neither system.
+3. **Dependency-driven flow.** Before the first dispatch, the lead creates an
+   epic chain with `bd dep add <next> <prereq>`; each QA bead depends on its
+   dev bead, and merge/release beads depend on QA beads. After every paired
+   close, the lead runs `bd ready` and immediately dispatches each unblocked
+   bead with `atm task assign`. Never dispatch a blocked bead.
+4. **QA findings and rejected work.** After `/triaging-findings`, each promoted
+   finding is a child bead of the epic; its id is the fix task id and it blocks
+   the originating QA or merge bead (`bd dep add <qa-or-merge> <fix>`).
+   `quality-mgr` reports stable finding ids but does not create beads. If a
+   lead rejects completed work, the lead reopens its bead or creates a child
+   bead; the lead never closes a bead on acceptance.
+
 ## Sprint Flow
 
-1. the lead assigns development to a developer using `dev-template.xml.j2`.
+1. the lead creates and wires the dev bead, then assigns development to its
+   assignee using `dev-template.xml.j2` with the bead id as `task_id`.
    Every dev assignment must include the sprint-plan document path as
    `sprint_doc`, and that sprint document is the authoritative source for the
    task. Assignment prose may summarize, but it must not replace or weaken the
    sprint doc.
-2. the developer starts, implements, commits, pushes, and reports branch plus SHA.
+2. the developer claims the bead in tandem with task start, then implements,
+   commits, pushes, reports branch plus SHA, and closes both task and bead
+   after validation.
 3. Before QA-1, the developer performs a self-directed Rust best-practices sweep on
    the integration branch using the same `review_targets` planned for QA-1 and
    fixes all RBP findings found there. This is a developer cleanup step, not a
    QA surprise.
 4. the lead opens or updates the PR.
-5. the lead assigns QA to `quality-mgr` using `qa-template.xml.j2`.
+5. after the dev bead closes, the lead runs `bd ready`, then assigns the
+   newly-ready QA bead to `quality-mgr` using `qa-template.xml.j2`.
    Every QA assignment must include `sprint_doc`, and `quality-mgr` must treat
    that sprint document as the authoritative QA scope source.
 6. `quality-mgr` launches the full reviewer set on QA-1 (the sprint's first
@@ -142,7 +177,8 @@ Before starting a sprint:
    same way: every finding is recorded, correlated
    across worktrees, and promoted to the current top layer of the stack. No
    finding is skipped, deferred, or left without a fix dispatch.
-10. After triage completes, the lead routes concrete fixes to a developer of
+10. After triage completes, the lead creates and wires finding child beads,
+   then routes concrete fixes to a developer of
    the tier the fix needs, using `fix-assignment.xml.j2`: easy fixes go to the
    fast tier for speed, not back to the sprint's developer by default. Fix assignments must also include
    `sprint_doc`, and the sprint document remains authoritative if the task
@@ -292,4 +328,5 @@ Use the Rust assignment templates from:
 The sequence for every ATM task assignment — start, work, task close; the
 receiver never acks a close — is defined once in
 [`docs/team-protocol.md`](../../../docs/team-protocol.md) (Required Flow).
-This skill adds nothing to it and restates none of it.
+The Beads lifecycle is defined in this skill's **Beads** section; templates
+carry its assignee commands.
