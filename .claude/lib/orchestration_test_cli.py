@@ -8,5 +8,5 @@ def require_dev_cli(name: str, minimum: str, install: str) -> None:
     if shutil.which(name):
         return
     if os.getenv("CI"):
-        pytest.skip(f"dev-host-only check: {name} not installed in CI")
+        return pytest.skip(f"dev-host-only check: {name} not installed in CI")
     pytest.fail(f"{name} CLI is required ({minimum}); install it with: {install}")
