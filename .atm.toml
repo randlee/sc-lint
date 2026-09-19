@@ -12,19 +12,18 @@ layout = "even-horizontal"
 
 [[rmux.windows.panes]]
 name = "team-lead"
-alias = "sc-lint-lead"
+alias = "lint-lead"
 model = "sonnet"
 env = { ATM_IDENTITY = "team-lead", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
 [[rmux.windows.panes]]
 name = "clint"
-tmux_pane_id = "%46"
-command = "codex -c features.hooks=true --yolo"
+command = "codex -c features.hooks=true --model gpt-5.6-terra --yolo"
 env = { ATM_IDENTITY = "clint", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
 [[rmux.windows.panes]]
 name = "quality-mgr"
-alias = "quality-mgr-lint"
+alias = "lint-quality-mgr"
 model = "sonnet"
 env = { ATM_IDENTITY = "quality-mgr", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
@@ -35,7 +34,7 @@ layout = "even-horizontal"
 
 [[rmux.windows.panes]]
 name = "cfast"
-command = "codex -c features.hooks=true --yolo"
+command = "codex -c features.hooks=true --model gpt-5.6-luna --yolo"
 env = { ATM_IDENTITY = "cfast", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
 [[rmux.windows.panes]]
@@ -50,6 +49,7 @@ layout = "even-horizontal"
 
 [[rmux.windows.panes]]
 name = "publisher"
+alias = "lint-publisher"
 model = "sonnet"
 env = { ATM_IDENTITY = "publisher", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
