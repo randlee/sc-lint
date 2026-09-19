@@ -30,7 +30,6 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
-
       - name: Install cargo-deny
         uses: taiki-e/install-action@v2
         with:
@@ -71,7 +70,6 @@ jobs:
 
       - name: Install just
         run: cargo install just --locked
-
 
       - name: Install Python
         uses: actions/setup-python@v5
