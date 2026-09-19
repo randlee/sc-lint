@@ -1,0 +1,226 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+
+from sc_lint.lint_cargo_deny import build_command as build_cargo_deny_command
+from sc_lint.lint_cargo_deny import build_runtime_config
+from sc_lint.lint_cargo_shear import annotate_sections
+from sc_lint.lint_cargo_shear import build_command as build_cargo_shear_command
+from sc_lint.lint_cargo_shear import evaluate_policy
+from sc_lint.lint_cargo_shear import load_policy_config
+from sc_lint.lint_cargo_shear import parse_sections
+from sc_lint.lint_codespell import build_command as build_codespell_command
+
+APP_CRATE = "fixture-app"
+CORE_CRATE = "fixture-lib"
+APP_PACKAGE = "synthetic-app"
+CORE_PACKAGE = "synthetic-lib"
+
+
+class ExternalLintToolTests(unittest.TestCase):
+    def test_build_cargo_deny_command_uses_pre_020_option_position(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            config_path = Path(tempdir) / "deny.runtime.toml"
+            self.assertEqual(
+                build_cargo_deny_command(config_path, (0, 19)),
+                [
+                    "cargo-deny",
+                    "check",
+                    "--config",
+                    str(config_path),
+                    "advisories",
+                    "bans",
+                    "licenses",
+                    "sources",
+                ],
+            )
+
+    def test_build_cargo_deny_command_uses_020_global_option_position(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            config_path = Path(tempdir) / "deny.runtime.toml"
+            self.assertEqual(
+                build_cargo_deny_command(config_path, (0, 20)),
+                [
+                    "cargo-deny",
+                    "--config",
+                    str(config_path),
+                    "check",
+                    "advisories",
+                    "bans",
+                    "licenses",
+                    "sources",
+                ],
+            )
+
+    def test_build_runtime_config_strips_deprecated_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "deny.toml").write_text(
+                """\
+[advisories]
+vulnerability = "deny"
+yanked = "deny"
+
+[licenses]
+unlicensed = "deny"
+allow = ["MIT"]
+""",
+                encoding="utf-8",
+            )
+
+            runtime_path = build_runtime_config(repo_root)
+            text = runtime_path.read_text(encoding="utf-8")
+
+            self.assertNotIn('vulnerability = "deny"', text)
+            self.assertNotIn('unlicensed = "deny"', text)
+            self.assertIn('yanked = "deny"', text)
+            self.assertIn('allow = ["MIT"]', text)
+
+    def test_build_cargo_shear_command_targets_workspace_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            self.assertEqual(
+                build_cargo_shear_command(repo_root),
+                ["cargo-shear"],
+            )
+
+    def test_parse_sections_extracts_warning_files(self) -> None:
+        stdout = f"""\
+shear/unlinked_files
+
+  ⚠ 1 unlinked file in `{APP_PACKAGE}`
+  │ tests/support/mod.rs
+  help: delete this file
+
+shear/empty_files
+
+  ⚠ 2 empty files in `{CORE_PACKAGE}`
+  │ src/model_registry.rs
+  │ src/schema/settings.rs
+"""
+        sections = parse_sections(stdout)
+        self.assertEqual([section.name for section in sections], ["unlinked_files", "empty_files"])
+        self.assertEqual(sections[0].file_paths, ("tests/support/mod.rs",))
+        self.assertEqual(
+            sections[1].file_paths,
+            ("src/model_registry.rs", "src/schema/settings.rs"),
+        )
+
+    def test_evaluate_policy_promotes_unapproved_warning_files_to_errors(self) -> None:
+        stdout = f"""\
+shear/unlinked_files
+
+  ⚠ 1 unlinked file in `{APP_PACKAGE}`
+  │ tests/support/mod.rs
+"""
+        sections = parse_sections(stdout)
+        findings, downgraded = evaluate_policy(
+            sections,
+            {"allowed_empty_files": {}, "allowed_unlinked_files": {}},
+        )
+        self.assertEqual(downgraded, [])
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].section_name, "unlinked_files")
+        self.assertEqual(findings[0].file_path, "tests/support/mod.rs")
+
+    def test_evaluate_policy_downgrades_allowlisted_files(self) -> None:
+        stdout = f"""\
+shear/empty_files
+
+  ⚠ 1 empty file in `{CORE_PACKAGE}`
+  │ src/model_registry.rs
+"""
+        sections = parse_sections(stdout)
+        findings, downgraded = evaluate_policy(
+            sections,
+            {
+                "allowed_empty_files": {"src/model_registry.rs": "planned stub"},
+                "allowed_unlinked_files": {},
+            },
+        )
+        self.assertEqual(findings, [])
+        self.assertEqual(
+            downgraded,
+            ["empty_files: downgraded src/model_registry.rs (planned stub)"],
+        )
+
+    def test_load_policy_config_normalizes_windows_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            just_dir = repo_root / ".just"
+            just_dir.mkdir()
+            (just_dir / "lint-config.toml").write_text(
+                """\
+[cargo_shear.allowed_empty_files]
+"src\\\\model_registry.rs" = "planned stub"
+
+[cargo_shear.allowed_unlinked_files]
+"tests\\\\support\\\\mod.rs" = "legacy pending"
+""",
+                encoding="utf-8",
+            )
+
+            policy = load_policy_config(repo_root)
+            self.assertEqual(
+                policy["allowed_empty_files"]["src/model_registry.rs"],
+                "planned stub",
+            )
+            self.assertEqual(
+                policy["allowed_unlinked_files"]["tests/support/mod.rs"],
+                "legacy pending",
+            )
+
+    def test_annotate_sections_uses_crate_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                f"""\
+[workspace]
+members = ["crates/{APP_CRATE}", "crates/{CORE_CRATE}"]
+resolver = "2"
+""",
+                encoding="utf-8",
+            )
+            for crate_name, package_name in (
+                (APP_CRATE, APP_PACKAGE),
+                (CORE_CRATE, CORE_PACKAGE),
+            ):
+                crate_dir = repo_root / "crates" / crate_name
+                crate_dir.mkdir(parents=True)
+                (crate_dir / "Cargo.toml").write_text(
+                    f"""\
+[package]
+name = "{package_name}"
+version = "1.1.2"
+""",
+                    encoding="utf-8",
+                )
+
+            sections = parse_sections(
+                f"""\
+shear/unlinked_files
+
+  ⚠ 1 unlinked file in `{APP_PACKAGE}`
+  │ tests/support/mod.rs
+"""
+            )
+            self.assertEqual(
+                annotate_sections(sections, repo_root),
+                [f"shear note: crates/{APP_CRATE}/tests/support/mod.rs [unlinked_files]"],
+            )
+
+    def test_build_codespell_command_uses_repo_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            command = build_codespell_command(repo_root)
+            self.assertEqual(command[:2], [sys.executable, "-c"])
+            self.assertIn("codespell_lib", command[2])
+            self.assertEqual(len(command), 3)
+
+
+if __name__ == "__main__":
+    unittest.main()

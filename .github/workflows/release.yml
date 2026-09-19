@@ -367,8 +367,87 @@ jobs:
           name: ${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
 
+  build-python-wheels:
+    needs: gate-and-tag
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            sdist: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            sdist: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            sdist: false
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            sdist: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install maturin
+        run: python -m pip install maturin==1.9.4
+
+      - name: Build abi3 wheels for every manifest-declared Python distribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          while IFS='|' read -r artifact package cargo_toml; do
+            [[ -n "$artifact" ]] || continue
+            maturin build --release --target ${{ matrix.target }} -m "$cargo_toml" --out dist
+            if [[ '${{ matrix.sdist }}' == 'true' ]]; then
+              maturin sdist -m "$cargo_toml" --out dist
+            fi
+          done < <(
+            python3 scripts/release_artifacts.py list-python-distributions \
+              --manifest "${RELEASE_ARTIFACT_MANIFEST}" --publishable-only
+          )
+          ls -la dist/
+
+      - name: Verify the wheel imports and reports the release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "${RUNNER_TEMP}/wheel-check"
+          if [[ -x "${RUNNER_TEMP}/wheel-check/bin/python" ]]; then
+            py="${RUNNER_TEMP}/wheel-check/bin/python"
+          else
+            py="${RUNNER_TEMP}/wheel-check/Scripts/python.exe"
+          fi
+          "$py" -m pip install --quiet --disable-pip-version-check --no-index --find-links dist sc-lint=='${{ needs.gate-and-tag.outputs.release_version }}' || \
+            "$py" -m pip install --quiet --disable-pip-version-check --find-links dist sc-lint=='${{ needs.gate-and-tag.outputs.release_version }}'
+          installed="$("$py" -c 'import sc_lint; print(sc_lint.__version__)')"
+          [[ "$installed" == '${{ needs.gate-and-tag.outputs.release_version }}' ]] || {
+            echo "wheel reports ${installed}, expected ${{ needs.gate-and-tag.outputs.release_version }}" >&2
+            exit 1
+          }
+
+      - name: Upload Python distributions
+        uses: actions/upload-artifact@v5
+        with:
+          name: python-${{ matrix.target }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+
   release:
-    needs: [gate-and-tag, build, publish-crates]
+    needs: [gate-and-tag, build, build-python-wheels, publish-crates]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -385,7 +464,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.whl' \) -exec mv {} release/ \;
           ls -la release/
 
       - name: Generate checksums
@@ -402,6 +481,36 @@ jobs:
           generate_release_notes: true
           files: |
             release/*
+
+  publish-pypi:
+    # Production upload of the wheels/sdist attached to the release. Retry a
+    # failed upload with pypi-publish.yml; it never rebuilds or re-tags.
+    needs: [gate-and-tag, release]
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
+
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: python-*
+          merge-multiple: true
+          path: dist
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install maturin
+        run: python -m pip install maturin==1.9.4
+
+      - name: Upload wheels and sdist to PyPI (idempotent)
+        env:
+          MATURIN_NON_INTERACTIVE: '1'
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: maturin upload --non-interactive --skip-existing dist/*.whl dist/*.tar.gz
 
   publish-action-major-tag:
     needs: [gate-and-tag, release]

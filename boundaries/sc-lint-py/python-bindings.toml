@@ -1,0 +1,42 @@
+boundary_id = "BOUNDARY-ScLintPy"
+owner_package = "sc-lint-py"
+owner_crate_path = "sc_lint_py"
+name = "ScLintPy"
+
+[public]
+facade = "_native"
+
+[implementation]
+type = "PyModule"
+module = "sc_lint_py"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["version_json", "run"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["sc-lint"]
+forbidden_edges = [
+  { from = "sc-lint", to = "sc-lint-py" },
+  { from = "sc-lint-py", to = "sc-lint-boundary" },
+  { from = "sc-lint-py", to = "sc-lint-portability" },
+  { from = "sc-lint-py", to = "sc-lint-runtime" },
+  { from = "sc-lint-py", to = "sc-lint-schema" },
+]
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = ["native_exports_version_json_and_run_only"]
+
+[status]
+state = "concrete_landed"

@@ -14,6 +14,15 @@
       },
       "category": "tools",
       "source": "./packages/sc-lint-version-adoption"
+    },
+    {
+      "name": "sc-lint-adoption",
+      "description": "Configures a Rust repository to use the managed sc-lint adoption kit.",
+      "author": {
+        "name": "sc-lint"
+      },
+      "category": "tools",
+      "source": "./packages/sc-lint-adoption"
     }
   ]
 }

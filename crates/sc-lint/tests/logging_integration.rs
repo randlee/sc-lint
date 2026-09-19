@@ -778,18 +778,24 @@ impl WorkspaceFixture {
                 }
             "#,
         );
+        // The python-backed adapters run `python -m sc_lint.<module>`; a source
+        // checkout without `.sc-lint/venv` resolves the package from
+        // `bindings/sc-lint-py/python`, so mirror that layout in the fixture.
+        const PACKAGE_DIR: &str = "bindings/sc-lint-py/python/sc_lint";
         for relative_path in [
-            ".just/lint-config.toml",
-            ".just/lint_common.py",
-            ".just/python_adapter.py",
-            ".just/view_common.py",
-            ".just/lint_line_counts.py",
-            ".just/lint_identity_literals.py",
-            ".just/view_findings.py",
+            ".just/lint-config.toml".to_string(),
+            format!("{PACKAGE_DIR}/__init__.py"),
+            format!("{PACKAGE_DIR}/_binary.py"),
+            format!("{PACKAGE_DIR}/lint_common.py"),
+            format!("{PACKAGE_DIR}/python_adapter.py"),
+            format!("{PACKAGE_DIR}/view_common.py"),
+            format!("{PACKAGE_DIR}/lint_line_counts.py"),
+            format!("{PACKAGE_DIR}/lint_identity_literals.py"),
+            format!("{PACKAGE_DIR}/view_findings.py"),
         ] {
-            let source = repo_source_root().join(relative_path);
+            let source = repo_source_root().join(&relative_path);
             let contents = std::fs::read_to_string(&source).expect("read support file");
-            fixture.write(relative_path, &contents);
+            fixture.write(&relative_path, &contents);
         }
         fixture
     }

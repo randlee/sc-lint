@@ -2,6 +2,40 @@
 
 All notable changes to sc-lint are documented here.
 
+## [0.6.0] — 2026-08-30
+
+### Features
+
+- **Adoption kit** (G.1) — `packages/sc-lint-adoption` installs a
+  drift-detectable consumer end state (`install.py --dry-run` exit 1 on drift,
+  exit 2 on user-owned conflicts); managed `.sc-lint/install.json`; kit-provided
+  `setup-sc-lint` GitHub Action; bootstrap `setup --check/--dry-run` never
+  fetches a release.
+- **Adoption skill** (G.2) — `sc-lint-adoption` plugin skill, `sc-lint-adopter`
+  agent, durable evals, marketplace entry, and `docs/sc-lint/adoption.md`
+  (`just test-*` → layers migration, offline docs via `sc-lint docs --path`).
+- **Identity-literal Unicode fix** (G.3c).
+- Phase F archived (G.0, tag `archive/phase-F`).
+
+### Version
+
+Workspace bumped from `0.5.0` → `0.6.0`; adoption plugin `0.6.0`.
+
+- **Python wheel runtime** (G.3a) — the repository helper scripts ship as the
+  `sc-lint` PyPI distribution; the bootstrap provisions `.sc-lint/venv` and
+  the CLI runs helpers as `python -m sc_lint.<module>`.
+- **Self-contained release** (G.3b) — `full`/`ci` lint profiles invoke only
+  archive binaries or wheel helpers (closes #84); `sc-lint version --json`
+  reports `self_contained`; CI job `release-smoke` runs the kit recipes from a
+  staged archive on every OS. Deferred to the G.1 → G.3b reconciliation
+  (after `sprint/G.1-adoption-kit` lands): the kit-copy `cmp` CI check for
+  `.sc-lint/bootstrap*` and `just test-adoption`.
+
+### Removed
+
+- The legacy `.just/lint-config.toml` repo-config fallback in the CLI and in
+  `sc-lint-portability`; `sc-lint.toml` is the only repo configuration file.
+
 ## [0.5.0] — 2026-08-12
 
 ### Features

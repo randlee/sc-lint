@@ -896,10 +896,7 @@ impl<'ast> Visit<'ast> for FunctionBodyVisitor {
 fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
     let defaults = toml::from_str::<BuiltInDefaults>(crate::DEFAULT_RULES_TOML)
         .context("failed to parse built-in portability defaults")?;
-    let repo_config_path = ["sc-lint.toml", ".just/lint-config.toml"]
-        .into_iter()
-        .map(|relative| root.join(relative))
-        .find(|path| path.exists());
+    let repo_config_path = Some(root.join("sc-lint.toml")).filter(|path| path.exists());
     let repo_config = if let Some(repo_config_path) = repo_config_path {
         let text = fs::read_to_string(&repo_config_path).with_context(|| {
             format!(

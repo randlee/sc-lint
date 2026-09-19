@@ -153,7 +153,7 @@ pub(crate) fn render_error_human(command_id: &str, error: &CliError) -> String {
         ("Configuration path", "config_path"),
         ("Bundle path", "bundle_path"),
         ("Required field", "required_field"),
-        ("Exit code", "exit_code"),
+        ("Exit code", consts::FIELD_EXIT_CODE),
         ("Standard output", "stdout"),
         ("Standard error", "stderr"),
     ] {
