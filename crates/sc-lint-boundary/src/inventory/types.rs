@@ -2,11 +2,16 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Deref;
 
-use sc_lint_schema::BOUNDARY_ID_PREFIX;
 use serde::Deserialize;
 
 use super::dependency_policy::PackageDependencyPolicy;
 use super::dependency_policy::RawDependenciesSection;
+
+pub(crate) const BOUNDARY_ID_PREFIX: &str = "BOUNDARY-";
+
+pub(crate) fn owner_crate_path_for_package(owner_package: &str) -> String {
+    owner_package.replace('-', "_")
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum InventoryParseError {

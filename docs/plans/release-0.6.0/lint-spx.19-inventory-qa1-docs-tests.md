@@ -7,7 +7,7 @@ branch: fix/inventory-qa1-docs-tests
 worktree: /Users/randlee/github/sc-lint-worktrees/fix/inventory-qa1-docs-tests
 pr_target: fix/inventory-edge-cause-py-parity
 closure_type: contract
-adrs: [ADR-004]
+adrs: [ADR-004, ADR-011]
 requirements: [REQ-SCB-012, REQ-SCB-013, REQ-SCB-020]
 ---
 
@@ -119,8 +119,8 @@ Finding disposition for QA-1:
   centralizing `BOUNDARY_ID_PREFIX`.
 - QA-002: fixed by correcting the widened implementation-visibility error and
   asserting the diagnostic in a test.
-- ARCH-001: fixed as a documented requirement and shared Rust helper; the
-  Python derivation remains unchanged per scope.
+- ARCH-001: fixed as a documented requirement and a `pub(crate)` Rust helper in
+  `sc-lint-boundary`; the Python derivation remains unchanged per scope.
 - ARCH-009 and ARCH-012: fixed by the restored CLI test and closeout records.
 - Residual QA-003 from `lint-spx.18`: fixed by extending the Python parity test
   with the arrow-delimited forbidden-edge form.
@@ -128,3 +128,8 @@ Finding disposition for QA-1:
 The repository's `closing-triage` skill/query script was not present in the
 available worktree or local skill catalog, so the assignment's promoted finding
 IDs were verified directly against the cited current files.
+
+Round 2 LEAD-001: fixed by moving `BOUNDARY_ID_PREFIX` and
+`owner_crate_path_for_package` out of the published `sc-lint-schema` crate and
+into `sc-lint-boundary` inventory types. `sc-lint-schema` is untouched in this
+round because its published interface must remain rule-neutral and stable.

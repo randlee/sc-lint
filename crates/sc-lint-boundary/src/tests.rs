@@ -1,9 +1,9 @@
 #![cfg(test)]
 
 use super::*;
+use crate::inventory::owner_crate_path_for_package;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
-use sc_lint_schema::owner_crate_path_for_package;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;

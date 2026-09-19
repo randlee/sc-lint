@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
-use sc_lint_schema::owner_crate_path_for_package;
 use serde::Deserialize;
 
 mod dependency_policy;
@@ -18,6 +17,7 @@ pub(crate) use types::BoundaryInventory;
 pub(crate) use types::BoundaryRecord;
 pub(crate) use types::CallersSection;
 pub(crate) use types::ReferenceScope;
+pub(crate) use types::owner_crate_path_for_package;
 
 pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> {
     let boundaries_root = root.join("boundaries");

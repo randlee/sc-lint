@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
 use clap::Parser;
-use sc_lint_schema::owner_crate_path_for_package;
 use serde::Serialize;
 use serde::Serializer;
 use serde_json::Value;
@@ -2046,8 +2045,8 @@ homepage = "https://example.invalid/sc-lint"
             &format!("boundaries/{owner_package}/boundary.toml"),
             &format!(
                 "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
-                owner_crate_path_for_package(owner_package),
-                owner_crate_path_for_package(owner_package),
+                owner_package,
+                owner_package,
             ),
         );
     }

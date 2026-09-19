@@ -3,12 +3,6 @@ use std::ops::Deref;
 
 use serde::Serialize;
 
-pub const BOUNDARY_ID_PREFIX: &str = "BOUNDARY-";
-
-pub fn owner_crate_path_for_package(owner_package: &str) -> String {
-    owner_package.replace('-', "_")
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputFormat {
