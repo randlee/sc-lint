@@ -347,3 +347,8 @@ After a FAIL verdict, include a short flat list of blocking findings with:
   pass` is not justification. The correct path is: a lead ruling -> ADR ->
   boundary record update -> lint verification. `arch-qa` RULE-012 governs
   this; `quality-mgr` must not override or suppress it.
+
+
+## Beads finding handoff
+
+Every blocking finding in the QA close report must carry a stable finding id, its owner epic or sprint, and the promoted branch. This is the input the lead uses to create the child Beads fix task; `quality-mgr` reports it but does not create or close the bead.

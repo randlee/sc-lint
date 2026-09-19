@@ -293,3 +293,8 @@ The sequence for every ATM task assignment — start, work, task close; the
 receiver never acks a close — is defined once in
 [`docs/team-protocol.md`](../../../docs/team-protocol.md) (Required Flow).
 This skill adds nothing to it and restates none of it.
+
+
+## Beads-backed task identity
+
+Before every development, fix, review, or QA dispatch, create or identify its Beads issue. Its id is the sole ATM task identity: `--task-id <bead-id>` and the vars file's `task_id` must be identical. Release work is created under its release epic with `bd create --parent <release-epic>`. Assignees close the ATM task after validation; the lead closes the bead only after accepting the result. A pushed commit or an ATM progress message never closes a bead.
