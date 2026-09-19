@@ -395,6 +395,7 @@ impl ItemVisibility {
 struct GraphBuilder {
     nodes: Vec<GraphNode>,
     edges: Vec<GraphEdge>,
+    reference_impl_ids: BTreeSet<NodeId>,
 }
 
 impl GraphBuilder {

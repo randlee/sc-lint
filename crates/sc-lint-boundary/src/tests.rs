@@ -3206,3 +3206,37 @@ fn qualified_non_generic_self_path_keeps_the_established_trait_impl_id() {
     );
     assert!(!implementation.id.as_str().contains("::self::"));
 }
+
+#[test]
+fn non_reference_generic_trait_impl_remains_an_unqualified_method_candidate() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Foo;
+        pub trait Borrowed<T> { fn call(); }
+        impl Borrowed<&'static str> for Foo { fn call() {} }
+        pub fn resolved() { Foo::call(); }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let resolved = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == "function" && node.label == "resolved")
+        .unwrap();
+    let method = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == "method" && node.impl_trait.as_deref() == Some("Borrowed"))
+        .unwrap();
+    assert!(graph.edges.iter().any(|edge| {
+        edge.kind == "references_expr" && edge.from == resolved.id && edge.to == method.id
+    }));
+}
