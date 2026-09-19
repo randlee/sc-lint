@@ -113,15 +113,22 @@ This is the one lifecycle contract for development, fix, and QA work.
    or progress report closes neither system.
 3. **Dependency-driven flow.** Before the first dispatch, the lead creates an
    epic chain with `bd dep add <next> <prereq>`; each QA bead depends on its
-   dev bead, and merge/release beads depend on QA beads. After every paired
-   close, the lead runs `bd ready` and immediately dispatches each unblocked
-   bead with `atm task assign`. Never dispatch a blocked bead.
+   dev bead, and merge/release beads depend on the latest QA bead. After a QA
+   paired close, the lead reads the verdict before running `bd ready`: on
+   PASS, dispatch what opens; on FAIL, first create fix child beads and QA-2,
+   make QA-2 depend on every fix bead, and make merge depend on QA-2 (`bd dep
+   add <merge> <qa-2>`). Then `bd ready` must show the fixes, not merge. A
+   merge bead is dispatchable only when its latest QA bead closed PASS. An
+   assignee views its own work with `bd ready --assignee "$ATM_IDENTITY"`; the
+   lead uses unfiltered `bd ready` for dispatch. `--actor` records identity and
+   claim ownership; it does not filter either view.
 4. **QA findings and rejected work.** After `/triaging-findings`, each promoted
-   finding is a child bead of the epic; its id is the fix task id and it blocks
-   the originating QA or merge bead (`bd dep add <qa-or-merge> <fix>`).
-   `quality-mgr` reports stable finding ids but does not create beads. If a
-   lead rejects completed work, the lead reopens its bead or creates a child
-   bead; the lead never closes a bead on acceptance.
+   finding is a child bead of the epic and its id is the fix task id. For a
+   failed QA round, every fix bead blocks its follow-up QA bead, which in turn
+   blocks merge; it never tries to block the already-closed QA bead. `quality-mgr`
+   reports stable finding ids but does not create beads. If a lead rejects
+   completed work, the lead reopens its bead or creates a child bead; the lead
+   never closes a bead on acceptance.
 
 ## Sprint Flow
 
@@ -171,13 +178,19 @@ This is the one lifecycle contract for development, fix, and QA work.
    triage-and-fix path. `rust-best-practices-agent`, `rust-best-practices-agent`,
    and `rust-service-hardening-agent` remain part of docs-only plan review
    and phase-ending review regardless of sprint round.
-8. If QA passes and CI is green, merge may proceed.
-9. After every QA round that reports any finding, at any severity, the lead
+8. After a QA close, the lead reads the verdict before `bd ready`: PASS and
+   green CI permit the now-ready merge work; FAIL must not expose merge.
+9. On any QA FAIL, the lead runs `/triaging-findings`, then creates a fix bead
+   for every promoted finding and a QA-2 bead that depends on every fix. The
+   merge bead depends on QA-2, so `bd ready` shows only fix work. Repeat this
+   rule for each failed follow-up QA round; merge becomes eligible only after
+   the latest QA bead closes PASS.
+10. After every QA round that reports any finding, at any severity, the lead
    runs `/triaging-findings` (where the repository carries that skill) the
    same way: every finding is recorded, correlated
    across worktrees, and promoted to the current top layer of the stack. No
    finding is skipped, deferred, or left without a fix dispatch.
-10. After triage completes, the lead creates and wires finding child beads,
+11. After triage completes, the lead creates and wires finding child beads,
    then routes concrete fixes to a developer of
    the tier the fix needs, using `fix-assignment.xml.j2`: easy fixes go to the
    fast tier for speed, not back to the sprint's developer by default. Fix assignments must also include

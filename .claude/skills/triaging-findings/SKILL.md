@@ -259,9 +259,12 @@ The per-finding `.ttl` record is canonical. Aggregation is derived.
 ### 4. Dispatch branch-scoped fix work to `clint`
 
 For every promoted finding that needs a fix, the lead creates a child bead of
-the phase epic before dispatch. Its bead id is the fix task id; it blocks the
-originating QA or merge bead (`bd dep add <qa-or-merge-bead> <fix-bead>`).
-Dispatch only when that fix bead is ready, assign it to the recipient's ATM
+the phase epic before dispatch. Its bead id is the fix task id. After a failed
+QA round, also create a QA-2 bead that depends on every fix bead and replace
+the merge dependency with QA-2 (`bd dep add <qa-2> <fix-bead>` and `bd dep add
+<merge-bead> <qa-2>`). Do this before `bd ready`, so it shows fix beads rather
+than merge. A merge bead is dispatchable only after its latest QA bead closes
+PASS. Dispatch only when a fix bead is ready, assign it to the recipient's ATM
 identity, and pass the id as `--task-id` / `task_id`. `quality-mgr` supplies
 stable finding ids; it does not create these beads.
 

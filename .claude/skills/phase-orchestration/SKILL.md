@@ -40,8 +40,12 @@ Translate the dependency graph into Beads before the first dispatch: create an
 epic chain with `bd dep add <next> <prereq>`, assign each bead to the
 recipient's ATM identity, and use the bead id as the ATM task id. Each QA bead
 depends on its dev bead; merge/release beads depend on QA; promoted QA fixes are
-child beads that block the QA/merge bead they came from. After every assignee
-paired task/bead close, run `bd ready` and dispatch only newly unblocked work.
+child beads that feed a follow-up QA bead; that QA bead blocks merge. After a
+QA close, read its verdict before `bd ready`: PASS may dispatch what opened;
+FAIL first creates fix beads, QA-2 depending on every fix, and a merge
+dependency on QA-2. A merge bead is dispatchable only after its latest QA bead
+closes PASS. The lead's dispatch view is unfiltered `bd ready`; an assignee
+uses `bd ready --assignee "$ATM_IDENTITY"`.
 
 ### 2. Execute sprints
 

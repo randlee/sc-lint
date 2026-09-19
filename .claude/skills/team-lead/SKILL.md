@@ -198,8 +198,12 @@ work and nudges the agent. A plain send opens no task, so the agent cannot
 - When work is reported complete, verify the task and bead are closed with
   `atm task list --all` and `bd show <task-id>`. If rejected, reopen the bead
   or create a child bead; do not close a bead on the assignee's behalf.
-- After every paired close, run `bd ready` and dispatch each newly unblocked
-  bead with `atm task assign`; never dispatch a blocked bead.
+- After every paired close, use unfiltered `bd ready` for the lead's dispatch
+  view (an assignee uses `bd ready --assignee "$ATM_IDENTITY"`). After a QA
+  close, read its verdict first: PASS permits dispatch of what opened; FAIL
+  requires fix child beads plus a QA-2 bead depending on every fix, then a
+  merge dependency on QA-2, before `bd ready`. Merge is dispatchable only when
+  its latest QA bead closes PASS; never dispatch a blocked bead.
 
 ### Communication Rules
 
