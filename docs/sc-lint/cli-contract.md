@@ -69,6 +69,8 @@ Initial convention:
   - `lint.sc-boundary`
 - `sc-lint lint line-counts`
   - `lint.line-counts`
+- `sc-lint lint function-length`
+  - `lint.function-length`
 - `sc-lint lint identity-literals`
   - `lint.identity-literals`
 - `sc-lint lint fast`
@@ -147,6 +149,8 @@ Current implementation status:
 - `ci`
   - implemented top-level lint-plus-tests path
 - `lint.line-counts`
+  - implemented Python-adapter lint path
+- `lint.function-length`
   - implemented Python-adapter lint path
 - `lint.identity-literals`
   - implemented Python-adapter lint path

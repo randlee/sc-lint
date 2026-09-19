@@ -15,6 +15,8 @@ The project focus is:
   a human wrapper over backend tools
 - migrating boundary-definition handling to structured TOML sources
 - migrating generic lint/view tooling into `sc-lint`
+- enforcing bounded production Rust functions through the function-length lint
+  family, including explicit source-local exception attributes
 - moving boundary inventory and manifest-policy enforcement from Python into
   `sc-lint-boundary`
 - planning direct workspace package-edge enforcement from boundary inventory in
@@ -51,6 +53,8 @@ The project focus is:
   - see [docs/sc-lint/adr/ADR-008-sc-observability-logging.md](./sc-lint/adr/ADR-008-sc-observability-logging.md)
   - see [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
   - see [docs/sc-lint/adr/ADR-007-analyzer-crate-partition.md](./sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- function-length lint family
+  - see [docs/sc-lint/function-length-lint-plan.md](./sc-lint/function-length-lint-plan.md)
 - extraction and migration plan
   - see [docs/sc-lint/extraction-plan.md](./sc-lint/extraction-plan.md)
 - known issues inventory

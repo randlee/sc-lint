@@ -246,6 +246,23 @@ Current implementation status:
   - top-level `sc-lint` invokes the dedicated `sc-lint-runtime` binary
     without adding a direct crate dependency
 
+### Function-length lint execution and attribute validation
+
+`lint function-length` is a Python adapter because its source-oriented
+non-comment code-line counting does not require a Rust AST backend. The Python
+implementation is the source of truth for function-span discovery, test-only
+exclusions, code-line counting, reporting, and hard-fail evaluation.
+
+The `#[sc_lint(...)]` procedural attribute remains Rust-owned: the shared
+`sc-lint-directives` syn parser validates the compile-time grammar used by all
+attribute consumers, while `sc-lint-attributes` exposes that parser as the
+public attribute. The Python adapter recognizes the same
+`function_length.fail_at(N)` directive, including a combined or multiline
+`sc_lint` attribute, and rejects malformed or duplicate function-length
+directives. Cross-language unit tests cover the combined-directive grammar.
+This split keeps runtime lint policy source-oriented without creating a second
+compile-time attribute authority.
+
 ## Backend Crate Isolation
 
 Default backend isolation rule:

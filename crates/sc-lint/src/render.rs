@@ -3,6 +3,7 @@ use crate::CommandEnvelope;
 use crate::command::CommandContext;
 use crate::command::CommandId;
 use crate::consts;
+use sc_lint_attributes::sc_lint;
 use serde::Serialize;
 use serde_json::Value;
 use serde_json::json;
@@ -50,6 +51,7 @@ pub(crate) fn render_error_json(command_id: &str, error: &CliError) -> String {
     }
 }
 
+#[sc_lint(function_length.fail_at(100))]
 pub(crate) fn render_success_human(
     context: &CommandContext,
     envelope: &CommandEnvelope<Value>,
@@ -128,17 +130,18 @@ pub(crate) fn render_success_human(
                 (None, None) => format!("{}: ok", context.command_id()),
             }
         }
-        CommandId::LintLineCounts | CommandId::LintIdentityLiterals | CommandId::ViewFindings => {
-            envelope
-                .data
-                .as_ref()
-                .and_then(|value| value.get("summary"))
-                .and_then(Value::as_str)
-                .map_or_else(
-                    || format!("{}: ok", context.command_id()),
-                    |summary| format!("{}: {summary}", context.command_id()),
-                )
-        }
+        CommandId::LintFunctionLength
+        | CommandId::LintLineCounts
+        | CommandId::LintIdentityLiterals
+        | CommandId::ViewFindings => envelope
+            .data
+            .as_ref()
+            .and_then(|value| value.get("summary"))
+            .and_then(Value::as_str)
+            .map_or_else(
+                || format!("{}: ok", context.command_id()),
+                |summary| format!("{}: {summary}", context.command_id()),
+            ),
         _ => format!("{}: ok", context.command_id()),
     }
 }

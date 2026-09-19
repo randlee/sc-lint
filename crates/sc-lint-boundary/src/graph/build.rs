@@ -2,6 +2,14 @@ use super::*;
 use crate::render::hex_encode;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use syn::ItemEnum;
+use syn::ItemFn;
+use syn::ItemImpl;
+use syn::ItemMod;
+use syn::ItemStruct;
+use syn::ItemTrait;
+use syn::ItemType;
+use syn::ItemUnion;
 
 use super::reference_collector::collect_references_with;
 
@@ -154,6 +162,15 @@ fn visibility_label(visibility: &syn::Visibility) -> ItemVisibility {
     }
 }
 
+struct ModuleItemContext<'a> {
+    context: &'a TargetContext,
+    parent_module_id: &'a NodeId,
+    module_path: &'a ModulePath,
+    module_dir: &'a Path,
+    source_path: &'a Path,
+    local_owner_names: &'a BTreeSet<String>,
+}
+
 fn ingest_module_items(
     builder: &mut GraphBuilder,
     context: &TargetContext,
@@ -164,478 +181,554 @@ fn ingest_module_items(
     file: File,
 ) -> Result<()> {
     let local_owner_names = collect_owner_names(&file.items);
-
+    let item_context = ModuleItemContext {
+        context,
+        parent_module_id,
+        module_path,
+        module_dir,
+        source_path,
+        local_owner_names: &local_owner_names,
+    };
     for item in file.items {
-        match item {
-            Item::Mod(item_mod) => {
-                let name = item_mod.ident.to_string();
-                let child_module_path = module_path.child(&name);
-                let child_module_id =
-                    format!("{}::module::{child_module_path}", context.crate_id.as_str());
-                let attributes = parse_lint_attributes(&item_mod.attrs)?;
-
-                builder.add_node(GraphNode {
-                    id: NodeId::new(child_module_id.clone()),
-                    kind: NodeKind::Module.as_str(),
-                    label: name.clone(),
-                    visibility: Some(visibility_label(&item_mod.vis).as_str()),
-                    package: context.package_name.clone(),
-                    target: Some(context.target_name.clone()),
-                    manifest_path: context.manifest_path.clone(),
-                    source_path: Some(source_path.display().to_string()),
-                    module_path: Some(child_module_path.to_string()),
-                    impl_kind: None,
-                    impl_trait: None,
-                    attributes,
-                });
-                builder.add_edge(
-                    EdgeKind::Contains,
-                    parent_module_id.clone(),
-                    child_module_id.clone(),
-                );
-
-                if let Some((_, items)) = item_mod.content {
-                    let child_module_dir = module_dir.join(&name);
-                    let inline_file = File {
-                        shebang: None,
-                        attrs: Vec::new(),
-                        items,
-                    };
-                    ingest_module_items(
-                        builder,
-                        context,
-                        &NodeId::new(child_module_id.clone()),
-                        &child_module_path,
-                        &child_module_dir,
-                        source_path,
-                        inline_file,
-                    )?;
-                } else {
-                    let child_source_path =
-                        resolve_module_source(source_path, module_dir, &name, &item_mod.attrs)
-                            .with_context(|| {
-                                format!("while resolving module `{child_module_path}`")
-                            })?;
-                    let child_module_dir = if has_explicit_module_path(&item_mod.attrs) {
-                        // #[path = "..."] points at the real child source file, so the child
-                        // module directory must be derived from that resolved location.
-                        child_source_path
-                            .parent()
-                            .map(Path::to_path_buf)
-                            .unwrap_or_else(|| module_dir.join(&name))
-                    } else if child_source_path.file_name().and_then(|name| name.to_str())
-                        == Some("mod.rs")
-                    {
-                        // mod.rs is itself the child module root, so sibling lookups should
-                        // start from the file's parent directory.
-                        child_source_path
-                            .parent()
-                            .map(Path::to_path_buf)
-                            .unwrap_or_else(|| module_dir.join(&name))
-                    } else {
-                        module_dir.join(&name)
-                    };
-                    let child_file = parse_rust_file(&child_source_path)?;
-                    ingest_module_items(
-                        builder,
-                        context,
-                        &NodeId::new(child_module_id),
-                        &child_module_path,
-                        &child_module_dir,
-                        &child_source_path,
-                        child_file,
-                    )?;
-                }
-            }
-            Item::Struct(item_struct) => {
-                let owner_name = item_struct.ident.to_string();
-                let node_id = add_item_node(
-                    builder,
-                    context,
-                    ItemNodeArgs {
-                        parent_module_id,
-                        module_path,
-                        source_path,
-                        ident: &item_struct.ident,
-                        kind: NodeKind::Type,
-                        visibility: visibility_label(&item_struct.vis),
-                        attributes: parse_lint_attributes(&item_struct.attrs)?,
-                    },
-                );
-                add_reference_edges(
-                    builder,
-                    context,
-                    &node_id,
-                    module_path,
-                    collect_references_with(
-                        &local_owner_names,
-                        Some(&owner_name),
-                        &context.workspace_dependency_roots,
-                        |collector| {
-                            collector.visit_fields(&item_struct.fields);
-                        },
-                    ),
-                );
-                add_field_nodes(
-                    builder,
-                    context,
-                    FieldNodeArgs {
-                        parent_id: &node_id,
-                        module_path,
-                        source_path,
-                        local_owner_names: &local_owner_names,
-                        owner_name: Some(&owner_name),
-                        fields: &item_struct.fields,
-                    },
-                );
-            }
-            Item::Enum(item_enum) => {
-                let owner_name = item_enum.ident.to_string();
-                let node_id = add_item_node(
-                    builder,
-                    context,
-                    ItemNodeArgs {
-                        parent_module_id,
-                        module_path,
-                        source_path,
-                        ident: &item_enum.ident,
-                        kind: NodeKind::Type,
-                        visibility: visibility_label(&item_enum.vis),
-                        attributes: parse_lint_attributes(&item_enum.attrs)?,
-                    },
-                );
-                add_reference_edges(
-                    builder,
-                    context,
-                    &node_id,
-                    module_path,
-                    collect_references_with(
-                        &local_owner_names,
-                        Some(&owner_name),
-                        &context.workspace_dependency_roots,
-                        |collector| {
-                            for variant in &item_enum.variants {
-                                collector.visit_fields(&variant.fields);
-                            }
-                        },
-                    ),
-                );
-                for variant in &item_enum.variants {
-                    let variant_id = NodeId::new(format!("{node_id}::variant::{}", variant.ident));
-                    builder.add_node(GraphNode {
-                        id: variant_id.clone(),
-                        kind: NodeKind::Variant.as_str(),
-                        label: variant.ident.to_string(),
-                        visibility: None,
-                        package: context.package_name.clone(),
-                        target: Some(context.target_name.clone()),
-                        manifest_path: context.manifest_path.clone(),
-                        source_path: Some(source_path.display().to_string()),
-                        module_path: Some(module_path.to_string()),
-                        impl_kind: None,
-                        impl_trait: None,
-                        attributes: Vec::new(),
-                    });
-                    builder.add_edge(EdgeKind::Contains, node_id.clone(), variant_id.clone());
-                    add_field_nodes(
-                        builder,
-                        context,
-                        FieldNodeArgs {
-                            parent_id: &variant_id,
-                            module_path,
-                            source_path,
-                            local_owner_names: &local_owner_names,
-                            owner_name: Some(&owner_name),
-                            fields: &variant.fields,
-                        },
-                    );
-                }
-            }
-            Item::Union(item_union) => {
-                let owner_name = item_union.ident.to_string();
-                let node_id = add_item_node(
-                    builder,
-                    context,
-                    ItemNodeArgs {
-                        parent_module_id,
-                        module_path,
-                        source_path,
-                        ident: &item_union.ident,
-                        kind: NodeKind::Type,
-                        visibility: visibility_label(&item_union.vis),
-                        attributes: parse_lint_attributes(&item_union.attrs)?,
-                    },
-                );
-                add_reference_edges(
-                    builder,
-                    context,
-                    &node_id,
-                    module_path,
-                    collect_references_with(
-                        &local_owner_names,
-                        Some(&owner_name),
-                        &context.workspace_dependency_roots,
-                        |collector| {
-                            collector.visit_fields_named(&item_union.fields);
-                        },
-                    ),
-                );
-                let union_fields = syn::Fields::Named(item_union.fields.clone());
-                add_field_nodes(
-                    builder,
-                    context,
-                    FieldNodeArgs {
-                        parent_id: &node_id,
-                        module_path,
-                        source_path,
-                        local_owner_names: &local_owner_names,
-                        owner_name: Some(&owner_name),
-                        fields: &union_fields,
-                    },
-                );
-            }
-            Item::Type(item_type) => {
-                let owner_name = item_type.ident.to_string();
-                let node_id = add_item_node(
-                    builder,
-                    context,
-                    ItemNodeArgs {
-                        parent_module_id,
-                        module_path,
-                        source_path,
-                        ident: &item_type.ident,
-                        kind: NodeKind::Type,
-                        visibility: visibility_label(&item_type.vis),
-                        attributes: parse_lint_attributes(&item_type.attrs)?,
-                    },
-                );
-                add_reference_edges(
-                    builder,
-                    context,
-                    &node_id,
-                    module_path,
-                    collect_references_with(
-                        &local_owner_names,
-                        Some(&owner_name),
-                        &context.workspace_dependency_roots,
-                        |collector| {
-                            collector.visit_type(&item_type.ty);
-                        },
-                    ),
-                );
-            }
-            Item::Trait(item_trait) => {
-                let owner_name = item_trait.ident.to_string();
-                let node_id = add_item_node(
-                    builder,
-                    context,
-                    ItemNodeArgs {
-                        parent_module_id,
-                        module_path,
-                        source_path,
-                        ident: &item_trait.ident,
-                        kind: NodeKind::Trait,
-                        visibility: visibility_label(&item_trait.vis),
-                        attributes: parse_lint_attributes(&item_trait.attrs)?,
-                    },
-                );
-                add_reference_edges(
-                    builder,
-                    context,
-                    &node_id,
-                    module_path,
-                    collect_references_with(
-                        &local_owner_names,
-                        Some(&owner_name),
-                        &context.workspace_dependency_roots,
-                        |collector| {
-                            for trait_item in &item_trait.items {
-                                collector.visit_trait_item(trait_item);
-                            }
-                        },
-                    ),
-                );
-            }
-            Item::Fn(item_fn) => {
-                let function_ident = item_fn.sig.ident.clone();
-                let node_id = add_item_node(
-                    builder,
-                    context,
-                    ItemNodeArgs {
-                        parent_module_id,
-                        module_path,
-                        source_path,
-                        ident: &function_ident,
-                        kind: NodeKind::Function,
-                        visibility: visibility_label(&item_fn.vis),
-                        attributes: parse_lint_attributes(&item_fn.attrs)?,
-                    },
-                );
-                add_reference_edges(
-                    builder,
-                    context,
-                    &node_id,
-                    module_path,
-                    collect_references_with(
-                        &local_owner_names,
-                        None,
-                        &context.workspace_dependency_roots,
-                        |collector| {
-                            collector.visit_item_fn(&item_fn);
-                        },
-                    ),
-                );
-            }
-            Item::Impl(item_impl) => {
-                let owner_name = impl_owner_name(&item_impl.self_ty)?;
-                let owner_node_id = NodeId::new(format!("{parent_module_id}::{owner_name}"));
-                let trait_path = item_impl
-                    .trait_
-                    .as_ref()
-                    .map(|(_, path, _)| trait_path_key(path));
-                let impl_node_id = if let Some(trait_path) = &trait_path {
-                    NodeId::new(format!(
-                        "{owner_node_id}::impl::{}",
-                        hex_encode(trait_path.as_bytes())
-                    ))
-                } else {
-                    NodeId::new(format!("{owner_node_id}::impl::inherent"))
-                };
-
-                if !builder
-                    .nodes
-                    .iter()
-                    .any(|node| node.id == owner_node_id.as_str())
-                {
-                    builder.add_node(GraphNode {
-                        id: owner_node_id.clone(),
-                        kind: NodeKind::Type.as_str(),
-                        label: owner_name.to_string(),
-                        visibility: None,
-                        package: context.package_name.clone(),
-                        target: Some(context.target_name.clone()),
-                        manifest_path: context.manifest_path.clone(),
-                        source_path: Some(source_path.display().to_string()),
-                        module_path: Some(module_path.to_string()),
-                        impl_kind: None,
-                        impl_trait: None,
-                        attributes: Vec::new(),
-                    });
-                    builder.add_edge(
-                        EdgeKind::Contains,
-                        parent_module_id.clone(),
-                        owner_node_id.clone(),
-                    );
-                }
-
-                builder.add_node(GraphNode {
-                    id: impl_node_id.clone(),
-                    kind: NodeKind::Impl.as_str(),
-                    label: trait_path
-                        .as_ref()
-                        .map(|path| format!("impl {path} for {owner_name}"))
-                        .unwrap_or_else(|| format!("impl {owner_name}")),
-                    visibility: None,
-                    package: context.package_name.clone(),
-                    target: Some(context.target_name.clone()),
-                    manifest_path: context.manifest_path.clone(),
-                    source_path: Some(source_path.display().to_string()),
-                    module_path: Some(module_path.to_string()),
-                    impl_kind: Some(if trait_path.is_some() {
-                        ImplKind::Trait
-                    } else {
-                        ImplKind::Inherent
-                    }),
-                    impl_trait: trait_path.clone(),
-                    attributes: Vec::new(),
-                });
-                builder.add_edge(
-                    EdgeKind::Contains,
-                    parent_module_id.clone(),
-                    impl_node_id.clone(),
-                );
-                builder.add_edge(
-                    EdgeKind::Targets,
-                    impl_node_id.clone(),
-                    owner_node_id.clone(),
-                );
-
-                if let Some((_, path, _)) = &item_impl.trait_ {
-                    let trait_reference_path = trait_path_key(path);
-                    let trait_target_node_id = resolve_reference_target(
-                        context,
-                        &impl_node_id,
-                        module_path,
-                        &trait_reference_path,
-                    );
-                    ensure_trait_reference_node(
-                        builder,
-                        context,
-                        source_path,
-                        module_path,
-                        &trait_target_node_id,
-                        &trait_reference_path,
-                    );
-                    builder.add_edge(
-                        EdgeKind::Implements,
-                        impl_node_id.clone(),
-                        trait_target_node_id,
-                    );
-                }
-
-                for impl_item in item_impl.items {
-                    if let ImplItem::Fn(method) = impl_item {
-                        let method_id =
-                            NodeId::new(format!("{owner_node_id}::{}", method.sig.ident));
-                        builder.add_node(GraphNode {
-                            id: method_id.clone(),
-                            kind: NodeKind::Method.as_str(),
-                            label: method.sig.ident.to_string(),
-                            visibility: Some(visibility_label(&method.vis).as_str()),
-                            package: context.package_name.clone(),
-                            target: Some(context.target_name.clone()),
-                            manifest_path: context.manifest_path.clone(),
-                            source_path: Some(source_path.display().to_string()),
-                            module_path: Some(module_path.to_string()),
-                            impl_kind: Some(if item_impl.trait_.is_some() {
-                                ImplKind::Trait
-                            } else {
-                                ImplKind::Inherent
-                            }),
-                            impl_trait: trait_path.clone(),
-                            attributes: parse_lint_attributes(&method.attrs)?,
-                        });
-                        builder.add_edge(
-                            EdgeKind::Declares,
-                            owner_node_id.clone(),
-                            method_id.clone(),
-                        );
-                        builder.add_edge(
-                            EdgeKind::Contains,
-                            impl_node_id.clone(),
-                            method_id.clone(),
-                        );
-                        add_reference_edges(
-                            builder,
-                            context,
-                            &method_id,
-                            module_path,
-                            collect_references_with(
-                                &local_owner_names,
-                                Some(&owner_name),
-                                &context.workspace_dependency_roots,
-                                |collector| {
-                                    collector.visit_impl_item_fn(&method);
-                                },
-                            ),
-                        );
-                    }
-                }
-            }
-            _ => {}
-        }
+        ingest_module_item(builder, &item_context, item)?;
     }
+    Ok(())
+}
 
+fn ingest_module_item(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: Item,
+) -> Result<()> {
+    match item {
+        Item::Mod(item) => ingest_module(builder, context, item),
+        Item::Struct(item) => ingest_struct(builder, context, item),
+        Item::Enum(item) => ingest_enum(builder, context, item),
+        Item::Union(item) => ingest_union(builder, context, item),
+        Item::Type(item) => ingest_type(builder, context, item),
+        Item::Trait(item) => ingest_trait(builder, context, item),
+        Item::Fn(item) => ingest_function(builder, context, item),
+        Item::Impl(item) => ingest_impl(builder, context, item),
+        _ => Ok(()),
+    }
+}
+
+fn ingest_module(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemMod,
+) -> Result<()> {
+    let name = item.ident.to_string();
+    let child_path = context.module_path.child(&name);
+    let child_id = format!(
+        "{}::module::{child_path}",
+        context.context.crate_id.as_str()
+    );
+    builder.add_node(GraphNode {
+        id: NodeId::new(child_id.clone()),
+        kind: NodeKind::Module.as_str(),
+        label: name.clone(),
+        visibility: Some(visibility_label(&item.vis).as_str()),
+        package: context.context.package_name.clone(),
+        target: Some(context.context.target_name.clone()),
+        manifest_path: context.context.manifest_path.clone(),
+        source_path: Some(context.source_path.display().to_string()),
+        module_path: Some(child_path.to_string()),
+        impl_kind: None,
+        impl_trait: None,
+        attributes: parse_lint_attributes(&item.attrs)?,
+    });
+    builder.add_edge(
+        EdgeKind::Contains,
+        context.parent_module_id.clone(),
+        child_id.clone(),
+    );
+    if let Some((_, items)) = item.content {
+        return ingest_module_items(
+            builder,
+            context.context,
+            &NodeId::new(child_id),
+            &child_path,
+            &context.module_dir.join(&name),
+            context.source_path,
+            File {
+                shebang: None,
+                attrs: Vec::new(),
+                items,
+            },
+        );
+    }
+    let child_source =
+        resolve_module_source(context.source_path, context.module_dir, &name, &item.attrs)
+            .with_context(|| format!("while resolving module `{child_path}`"))?;
+    let child_dir = child_module_dir(context.module_dir, &name, &child_source, &item.attrs);
+    ingest_module_items(
+        builder,
+        context.context,
+        &NodeId::new(child_id),
+        &child_path,
+        &child_dir,
+        &child_source,
+        parse_rust_file(&child_source)?,
+    )
+}
+
+fn child_module_dir(
+    module_dir: &Path,
+    name: &str,
+    source: &Path,
+    attributes: &[Attribute],
+) -> PathBuf {
+    if has_explicit_module_path(attributes)
+        || source.file_name().and_then(|name| name.to_str()) == Some("mod.rs")
+    {
+        return source
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| module_dir.join(name));
+    }
+    module_dir.join(name)
+}
+
+fn ingest_struct(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemStruct,
+) -> Result<()> {
+    let owner = item.ident.to_string();
+    let id = add_item_node(
+        builder,
+        context.context,
+        ItemNodeArgs {
+            parent_module_id: context.parent_module_id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            ident: &item.ident,
+            kind: NodeKind::Type,
+            visibility: visibility_label(&item.vis),
+            attributes: parse_lint_attributes(&item.attrs)?,
+        },
+    );
+    add_reference_edges(
+        builder,
+        context.context,
+        &id,
+        context.module_path,
+        collect_references_with(
+            context.local_owner_names,
+            Some(&owner),
+            &context.context.workspace_dependency_roots,
+            |collector| collector.visit_fields(&item.fields),
+        ),
+    );
+    add_field_nodes(
+        builder,
+        context.context,
+        FieldNodeArgs {
+            parent_id: &id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            local_owner_names: context.local_owner_names,
+            owner_name: Some(&owner),
+            fields: &item.fields,
+        },
+    );
+    Ok(())
+}
+
+fn ingest_enum(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemEnum,
+) -> Result<()> {
+    let owner = item.ident.to_string();
+    let id = add_item_node(
+        builder,
+        context.context,
+        ItemNodeArgs {
+            parent_module_id: context.parent_module_id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            ident: &item.ident,
+            kind: NodeKind::Type,
+            visibility: visibility_label(&item.vis),
+            attributes: parse_lint_attributes(&item.attrs)?,
+        },
+    );
+    add_reference_edges(
+        builder,
+        context.context,
+        &id,
+        context.module_path,
+        collect_references_with(
+            context.local_owner_names,
+            Some(&owner),
+            &context.context.workspace_dependency_roots,
+            |collector| {
+                for variant in &item.variants {
+                    collector.visit_fields(&variant.fields);
+                }
+            },
+        ),
+    );
+    add_enum_variants(builder, context, &id, &owner, &item);
+    Ok(())
+}
+
+fn add_enum_variants(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    enum_id: &NodeId,
+    owner: &str,
+    item: &ItemEnum,
+) {
+    for variant in &item.variants {
+        let id = NodeId::new(format!("{enum_id}::variant::{}", variant.ident));
+        builder.add_node(GraphNode {
+            id: id.clone(),
+            kind: NodeKind::Variant.as_str(),
+            label: variant.ident.to_string(),
+            visibility: None,
+            package: context.context.package_name.clone(),
+            target: Some(context.context.target_name.clone()),
+            manifest_path: context.context.manifest_path.clone(),
+            source_path: Some(context.source_path.display().to_string()),
+            module_path: Some(context.module_path.to_string()),
+            impl_kind: None,
+            impl_trait: None,
+            attributes: Vec::new(),
+        });
+        builder.add_edge(EdgeKind::Contains, enum_id.clone(), id.clone());
+        add_field_nodes(
+            builder,
+            context.context,
+            FieldNodeArgs {
+                parent_id: &id,
+                module_path: context.module_path,
+                source_path: context.source_path,
+                local_owner_names: context.local_owner_names,
+                owner_name: Some(owner),
+                fields: &variant.fields,
+            },
+        );
+    }
+}
+
+fn ingest_union(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemUnion,
+) -> Result<()> {
+    let owner = item.ident.to_string();
+    let id = add_item_node(
+        builder,
+        context.context,
+        ItemNodeArgs {
+            parent_module_id: context.parent_module_id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            ident: &item.ident,
+            kind: NodeKind::Type,
+            visibility: visibility_label(&item.vis),
+            attributes: parse_lint_attributes(&item.attrs)?,
+        },
+    );
+    add_reference_edges(
+        builder,
+        context.context,
+        &id,
+        context.module_path,
+        collect_references_with(
+            context.local_owner_names,
+            Some(&owner),
+            &context.context.workspace_dependency_roots,
+            |collector| collector.visit_fields_named(&item.fields),
+        ),
+    );
+    let fields = syn::Fields::Named(item.fields.clone());
+    add_field_nodes(
+        builder,
+        context.context,
+        FieldNodeArgs {
+            parent_id: &id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            local_owner_names: context.local_owner_names,
+            owner_name: Some(&owner),
+            fields: &fields,
+        },
+    );
+    Ok(())
+}
+
+fn ingest_type(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemType,
+) -> Result<()> {
+    let owner = item.ident.to_string();
+    let id = add_item_node(
+        builder,
+        context.context,
+        ItemNodeArgs {
+            parent_module_id: context.parent_module_id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            ident: &item.ident,
+            kind: NodeKind::Type,
+            visibility: visibility_label(&item.vis),
+            attributes: parse_lint_attributes(&item.attrs)?,
+        },
+    );
+    add_reference_edges(
+        builder,
+        context.context,
+        &id,
+        context.module_path,
+        collect_references_with(
+            context.local_owner_names,
+            Some(&owner),
+            &context.context.workspace_dependency_roots,
+            |collector| collector.visit_type(&item.ty),
+        ),
+    );
+    Ok(())
+}
+
+fn ingest_trait(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemTrait,
+) -> Result<()> {
+    let owner = item.ident.to_string();
+    let id = add_item_node(
+        builder,
+        context.context,
+        ItemNodeArgs {
+            parent_module_id: context.parent_module_id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            ident: &item.ident,
+            kind: NodeKind::Trait,
+            visibility: visibility_label(&item.vis),
+            attributes: parse_lint_attributes(&item.attrs)?,
+        },
+    );
+    add_reference_edges(
+        builder,
+        context.context,
+        &id,
+        context.module_path,
+        collect_references_with(
+            context.local_owner_names,
+            Some(&owner),
+            &context.context.workspace_dependency_roots,
+            |collector| {
+                for trait_item in &item.items {
+                    collector.visit_trait_item(trait_item);
+                }
+            },
+        ),
+    );
+    Ok(())
+}
+
+fn ingest_function(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemFn,
+) -> Result<()> {
+    let id = add_item_node(
+        builder,
+        context.context,
+        ItemNodeArgs {
+            parent_module_id: context.parent_module_id,
+            module_path: context.module_path,
+            source_path: context.source_path,
+            ident: &item.sig.ident,
+            kind: NodeKind::Function,
+            visibility: visibility_label(&item.vis),
+            attributes: parse_lint_attributes(&item.attrs)?,
+        },
+    );
+    add_reference_edges(
+        builder,
+        context.context,
+        &id,
+        context.module_path,
+        collect_references_with(
+            context.local_owner_names,
+            None,
+            &context.context.workspace_dependency_roots,
+            |collector| collector.visit_item_fn(&item),
+        ),
+    );
+    Ok(())
+}
+
+fn ingest_impl(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemImpl,
+) -> Result<()> {
+    let owner = impl_owner_name(&item.self_ty)?;
+    let owner_id = ensure_impl_owner(builder, context, &owner);
+    let trait_path = item
+        .trait_
+        .as_ref()
+        .map(|(_, path, _)| trait_path_key(path));
+    let impl_id = add_impl_node(builder, context, &owner, &owner_id, trait_path.clone());
+    add_impl_trait_edge(builder, context, &item, &impl_id);
+    add_impl_methods(
+        builder, context, item, &owner, &owner_id, &impl_id, trait_path,
+    )?;
+    Ok(())
+}
+
+fn ensure_impl_owner(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    owner: &str,
+) -> NodeId {
+    let id = NodeId::new(format!("{}::{owner}", context.parent_module_id));
+    if builder.nodes.iter().any(|node| node.id == id.as_str()) {
+        return id;
+    }
+    builder.add_node(GraphNode {
+        id: id.clone(),
+        kind: NodeKind::Type.as_str(),
+        label: owner.to_string(),
+        visibility: None,
+        package: context.context.package_name.clone(),
+        target: Some(context.context.target_name.clone()),
+        manifest_path: context.context.manifest_path.clone(),
+        source_path: Some(context.source_path.display().to_string()),
+        module_path: Some(context.module_path.to_string()),
+        impl_kind: None,
+        impl_trait: None,
+        attributes: Vec::new(),
+    });
+    builder.add_edge(
+        EdgeKind::Contains,
+        context.parent_module_id.clone(),
+        id.clone(),
+    );
+    id
+}
+
+fn add_impl_node(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    owner: &str,
+    owner_id: &NodeId,
+    trait_path: Option<String>,
+) -> NodeId {
+    let id = trait_path
+        .as_ref()
+        .map(|path| NodeId::new(format!("{owner_id}::impl::{}", hex_encode(path.as_bytes()))))
+        .unwrap_or_else(|| NodeId::new(format!("{owner_id}::impl::inherent")));
+    let kind = if trait_path.is_some() {
+        ImplKind::Trait
+    } else {
+        ImplKind::Inherent
+    };
+    builder.add_node(GraphNode {
+        id: id.clone(),
+        kind: NodeKind::Impl.as_str(),
+        label: trait_path
+            .as_ref()
+            .map(|path| format!("impl {path} for {owner}"))
+            .unwrap_or_else(|| format!("impl {owner}")),
+        visibility: None,
+        package: context.context.package_name.clone(),
+        target: Some(context.context.target_name.clone()),
+        manifest_path: context.context.manifest_path.clone(),
+        source_path: Some(context.source_path.display().to_string()),
+        module_path: Some(context.module_path.to_string()),
+        impl_kind: Some(kind),
+        impl_trait: trait_path,
+        attributes: Vec::new(),
+    });
+    builder.add_edge(
+        EdgeKind::Contains,
+        context.parent_module_id.clone(),
+        id.clone(),
+    );
+    builder.add_edge(EdgeKind::Targets, id.clone(), owner_id.clone());
+    id
+}
+
+fn add_impl_trait_edge(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: &ItemImpl,
+    impl_id: &NodeId,
+) {
+    let Some((_, path, _)) = &item.trait_ else {
+        return;
+    };
+    let reference = trait_path_key(path);
+    let target =
+        resolve_reference_target(context.context, impl_id, context.module_path, &reference);
+    ensure_trait_reference_node(
+        builder,
+        context.context,
+        context.source_path,
+        context.module_path,
+        &target,
+        &reference,
+    );
+    builder.add_edge(EdgeKind::Implements, impl_id.clone(), target);
+}
+
+fn add_impl_methods(
+    builder: &mut GraphBuilder,
+    context: &ModuleItemContext<'_>,
+    item: ItemImpl,
+    owner: &str,
+    owner_id: &NodeId,
+    impl_id: &NodeId,
+    trait_path: Option<String>,
+) -> Result<()> {
+    let kind = if item.trait_.is_some() {
+        ImplKind::Trait
+    } else {
+        ImplKind::Inherent
+    };
+    for impl_item in item.items {
+        let ImplItem::Fn(method) = impl_item else {
+            continue;
+        };
+        let id = NodeId::new(format!("{owner_id}::{}", method.sig.ident));
+        builder.add_node(GraphNode {
+            id: id.clone(),
+            kind: NodeKind::Method.as_str(),
+            label: method.sig.ident.to_string(),
+            visibility: Some(visibility_label(&method.vis).as_str()),
+            package: context.context.package_name.clone(),
+            target: Some(context.context.target_name.clone()),
+            manifest_path: context.context.manifest_path.clone(),
+            source_path: Some(context.source_path.display().to_string()),
+            module_path: Some(context.module_path.to_string()),
+            impl_kind: Some(kind),
+            impl_trait: trait_path.clone(),
+            attributes: parse_lint_attributes(&method.attrs)?,
+        });
+        builder.add_edge(EdgeKind::Declares, owner_id.clone(), id.clone());
+        builder.add_edge(EdgeKind::Contains, impl_id.clone(), id.clone());
+        add_reference_edges(
+            builder,
+            context.context,
+            &id,
+            context.module_path,
+            collect_references_with(
+                context.local_owner_names,
+                Some(owner),
+                &context.context.workspace_dependency_roots,
+                |collector| collector.visit_impl_item_fn(&method),
+            ),
+        );
+    }
     Ok(())
 }
 

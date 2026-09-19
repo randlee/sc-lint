@@ -18,6 +18,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use etcetera::{BaseStrategy, choose_base_strategy};
+use sc_lint_attributes::sc_lint;
 use semver::Version;
 use serde_json::{Value, json};
 
@@ -616,6 +617,7 @@ fn activate_candidate(
     activate_candidate_with(candidate, target, minimum, &SystemFileOps, probe_version)
 }
 
+#[sc_lint(function_length.fail_at(90))]
 fn activate_candidate_with<F, P>(
     candidate: &Path,
     target: &Path,

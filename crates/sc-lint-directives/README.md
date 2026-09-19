@@ -11,6 +11,7 @@ interpretation of supported `sc_lint` attributes, including:
 - boundary declarations such as `boundary.internal_only`
 - boundary declarations such as `boundary.forbid_external_impls`
 - approved local allow directives for specific cycle categories
+- per-function `function_length.fail_at(N)` exceptions with an explicit hard limit
 
 Centralizing directive parsing here prevents drift between proc-macro expansion
 and backend analyzer ingestion.

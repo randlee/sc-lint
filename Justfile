@@ -3,7 +3,7 @@ set windows-shell := ["pwsh", "-NoLogo", "-Command"]
 host_python := if os_family() == "windows" { "python" } else { "python3" }
 # Source recipes run the sc_lint helper package from the repo-local venv (G.3a).
 python_cmd := if os_family() == "windows" { ".\\.sc-lint\\venv\\Scripts\\python.exe" } else { ".sc-lint/venv/bin/python3" }
-sc_lint_binary := if os_family() == "windows" { ".\\target\\debug\\sc-lint.exe" } else { "./target/debug/sc-lint" }
+sc_lint_binary := if os_family() == "windows" { ".\\.sc-lint\\source-bin\\sc-lint.exe" } else { "./target/debug/sc-lint" }
 export SC_LINT_BIN := sc_lint_binary
 
 # Show the curated repo task help.
@@ -46,6 +46,10 @@ _lint-shear:
     {{python_cmd}} -m sc_lint.lint_cargo_shear
 
 [private]
+_lint-function-length:
+    {{python_cmd}} -m sc_lint.lint_function_length
+
+[private]
 _lint-manifests:
     {{python_cmd}} -m sc_lint.lint_manifests
 
@@ -76,6 +80,7 @@ build:
 [private]
 _source-build:
     cargo build --workspace
+    {{ if os_family() == "windows" { "New-Item -ItemType Directory -Force .sc-lint\\source-bin | Out-Null; Copy-Item target\\debug\\sc-lint.exe .sc-lint\\source-bin\\sc-lint.exe -Force" } else { "true" } }}
 
 # Provision .sc-lint/venv with the sc_lint helper wheel built from this checkout.
 [private]

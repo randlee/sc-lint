@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use sc_lint_attributes::sc_lint;
 use serde_json::Value;
 use serde_json::json;
 
@@ -50,6 +51,7 @@ pub(crate) fn run_consumer_init(request: ConsumerInitRequest) -> Result<Value, C
     clippy::result_large_err,
     reason = "Consumer integration file ownership errors use the shared top-level CliError contract."
 )]
+#[sc_lint(function_length.fail_at(110))]
 pub(crate) fn run_consumer_init_at(
     root: &Path,
     request: ConsumerInitRequest,

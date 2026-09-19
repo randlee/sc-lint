@@ -256,6 +256,10 @@ Current command behavior:
 - `lint line-counts`
   - succeeds through the Python Adapter Protocol
   - loads line-count thresholds and exclusions from `.just/lint-config.toml`
+- `lint function-length`
+  - succeeds through the Python Adapter Protocol
+  - counts non-comment, non-whitespace Rust code lines per production function
+  - `#[sc_lint(function_length.fail_at(N))]` supplies an explicit per-function hard limit
 - `lint identity-literals`
   - succeeds through the Python Adapter Protocol
   - exposes a configurable framework rather than consumer-specific defaults
@@ -268,7 +272,7 @@ Current command behavior:
   - collates generated findings artifacts into a stable findings index
 - `lint`
   - implemented for profiles, `sc-boundary`, `sc-portability`, `sc-runtime`,
-    `line-counts`, and `identity-literals`
+    `line-counts`, `function-length`, and `identity-literals`
 - `view`
   - `findings` is implemented
   - `graph` remains reserved until the graph contract is stable

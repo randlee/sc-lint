@@ -11,6 +11,7 @@ policy declarations that analyzers later inspect, such as:
 
 - `#[sc_lint(boundary.internal_only)]`
 - `#[sc_lint(boundary.forbid_external_impls)]`
+- `#[sc_lint(function_length.fail_at(120))]`
 - approved `boundary.allow(...)` cycle suppressors
 
 The crate stays intentionally thin: it provides the attribute namespace and

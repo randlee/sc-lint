@@ -45,6 +45,9 @@ fn parse_lint_attributes(attrs: &[Attribute]) -> Result<Vec<LintAttribute>> {
                         values: Vec::new(),
                     });
                 }
+                // Function-length directives are owned by the top-level
+                // function-length lint and carry no boundary graph meaning.
+                Directive::FunctionLengthFailAt(_) => {}
             }
         }
     }

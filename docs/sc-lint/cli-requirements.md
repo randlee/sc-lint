@@ -408,6 +408,7 @@ specialized backend tools and mixed Rust/Python implementations.
 - the adapter schema is `sc-lint-python-v1`
 - extracted Python-backed utility commands now include:
   - `sc-lint lint line-counts`
+  - `sc-lint lint function-length`
   - `sc-lint lint identity-literals`
   - `sc-lint view findings`
 - `view graph` remains reserved because the graph-oriented contract is not yet
