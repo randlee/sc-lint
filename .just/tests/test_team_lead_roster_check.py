@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import tomllib
+import tempfile
 import unittest
 from unittest import mock
 
@@ -106,6 +107,22 @@ class TableOutputTests(unittest.TestCase):
             self.assertEqual(roster_check.main(), 0)
         rows = [call.args[0] for call in printed.call_args_list if call.args and call.args[0].startswith("lint-quality-mgr")]
         self.assertEqual(len(rows[0].split()), 5)
+
+
+class FailureDiagnosticsTests(unittest.TestCase):
+    def test_missing_executable_is_actionable(self) -> None:
+        with mock.patch.object(roster_check.subprocess, "run", side_effect=FileNotFoundError("atm")):
+            with self.assertRaisesRegex(RuntimeError, "atm members.*could not be executed"):
+                roster_check.run_json(["atm", "members"])
+
+    def test_malformed_toml_names_the_input_path(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".toml") as file:
+            file.write("[broken")
+            file.flush()
+            with mock.patch("sys.argv", ["roster_check.py", "--team", "sc-lint", "--atm-toml", file.name]), \
+                 mock.patch("sys.stderr") as stderr:
+                self.assertEqual(roster_check.main(), 2)
+        self.assertIn(file.name, "".join(call.args[0] for call in stderr.write.call_args_list))
 
 
 if __name__ == "__main__":
