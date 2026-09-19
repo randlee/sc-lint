@@ -220,6 +220,10 @@ def _load_graph(
                     "persisted path must be repository-relative"
                 )
 
+    if parsed_files == 0 and not diagnostics:
+        diagnostics.append(
+            f"#error: {findings_dir}: findings directory contains no Turtle files"
+        )
     for triple in finding_graph:
         graph.add(triple)
     return (

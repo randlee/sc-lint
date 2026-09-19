@@ -161,6 +161,15 @@ def test_missing_directory_is_error_result(tmp_path):
     assert "findings directory does not exist" in result.diagnostics[0]
 
 
+def test_empty_directory_is_error_result(tmp_path):
+    validator = _validator()
+    findings = tmp_path / "findings"
+    findings.mkdir()
+    result = validator.run_validation(findings_dir=findings)
+    assert result.kind == "error"
+    assert "contains no Turtle files" in result.diagnostics[0]
+
+
 def test_missing_structure_input_is_error_result(tmp_path):
     validator = _validator()
     findings = tmp_path / "findings"
@@ -245,6 +254,9 @@ def test_broken_sparql_is_error_result(tmp_path):
     validator = _validator()
     findings = tmp_path / "findings"
     findings.mkdir()
+    (findings / "F-1.ttl").write_text(
+        PREFIX + "triage:f1 a triage:Finding ; triage:findingId \"F-1\" .\n"
+    )
     broken_scripts = tmp_path / "scripts"
     broken_scripts.mkdir()
     (broken_scripts / "validate-findings.sparql").write_text("SELECT definitely broken")
