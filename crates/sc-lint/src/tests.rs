@@ -39,11 +39,22 @@ const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justf
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
     let canonical = CANONICAL_CONSUMER_JUSTFILE.replace("\r\n", "\n");
     assert!(canonical.starts_with("set windows-shell := [\"pwsh\", \"-NoLogo\", \"-Command\"]\n"));
-    for recipe in ["setup", "lint", "test", "upgrade"] {
+    for (recipe, selector) in [
+        ("setup", None),
+        ("lint", Some("profile")),
+        ("test", Some("layer")),
+        ("upgrade", None),
+    ] {
+        let expected = match selector {
+            Some(selector) => format!(
+                "{recipe} *{selector}:\n    {{{{bootstrap_command}}}} {recipe} --config sc-lint.toml {{{{{selector}}}}}"
+            ),
+            None => {
+                format!("{recipe}:\n    {{{{bootstrap_command}}}} {recipe} --config sc-lint.toml")
+            }
+        };
         assert!(
-            canonical.contains(&format!(
-                "{recipe}:\n    {{{{bootstrap_command}}}} {recipe} --config sc-lint.toml"
-            )),
+            canonical.contains(&expected),
             "consumer template does not delegate `{recipe}` to the product bootstrap"
         );
     }
@@ -245,10 +256,11 @@ fn consumer_commands_require_an_explicit_consumer_mode() {
         Some(Command::Lint {
             target: LintTarget::Ci,
             consumer: true,
+            profile: None,
         })
     ));
     let test = Cli::parse_from(["sc-lint", "test"]);
-    assert!(matches!(test.command, Some(Command::Test)));
+    assert!(matches!(test.command, Some(Command::Test { layer: None })));
     let init = Cli::parse_from(["sc-lint", "init", "--just", "--check"]);
     assert!(matches!(
         init.command,
@@ -383,7 +395,7 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
     let lint_context = CommandContext::from_cli(&lint_cli).expect("consumer lint context");
     let loaded = LoadedConfig::load(&lint_cli, &lint_context).expect("consumer config");
     let passing = FakeSystemAdapter::new(false);
-    let lint = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Lint, &passing)
+    let lint = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Lint, None, &passing)
         .expect("all lint members run");
     assert_eq!(
         step_names(lint.data["steps"].as_array().expect("steps")),
@@ -406,10 +418,86 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
     failing
         .failures
         .insert("test-workspace", "configured test failed");
-    let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, &failing)
+    let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &failing)
         .expect_err("a required test member fails the aggregate");
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
     assert_eq!(*failing.invocations.borrow(), vec!["test-workspace"]);
+}
+
+#[test]
+fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"cargo\", \"clippy\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n\n[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n\n[[tool.sc-lint.test]]\nname = \"integrate\"\ncommand = [\"cargo\", \"test\", \"--test\", \"integration\"]\n",
+    )
+    .expect("consumer config");
+    let config = config_path.to_str().expect("config path");
+
+    let layer_cli = Cli::parse_from(["sc-lint", "--config", config, "test", "integrate"]);
+    let layer_context = CommandContext::from_cli(&layer_cli).expect("test layer context");
+    assert_eq!(layer_context.consumer_selector(), Some("integrate"));
+    let loaded = LoadedConfig::load(&layer_cli, &layer_context).expect("consumer config");
+    let adapter = FakeSystemAdapter::new(false);
+    let run = workflow::run_consumer_profile_with(
+        &loaded,
+        ConsumerProfile::Test,
+        layer_context.consumer_selector(),
+        &adapter,
+    )
+    .expect("named layer runs");
+    assert_eq!(*adapter.invocations.borrow(), vec!["integrate"]);
+    assert_eq!(run.data["selector"], "integrate");
+
+    let all_cli = Cli::parse_from(["sc-lint", "--config", config, "test", "all"]);
+    let all_context = CommandContext::from_cli(&all_cli).expect("all layers context");
+    let adapter = FakeSystemAdapter::new(false);
+    workflow::run_consumer_profile_with(
+        &loaded,
+        ConsumerProfile::Test,
+        all_context.consumer_selector(),
+        &adapter,
+    )
+    .expect("all layers run");
+    assert_eq!(*adapter.invocations.borrow(), vec!["unit", "integrate"]);
+
+    let profile_cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config,
+        "lint",
+        "ci",
+        "--consumer",
+        "--profile",
+        "fmt",
+    ]);
+    let profile_context = CommandContext::from_cli(&profile_cli).expect("lint profile context");
+    let adapter = FakeSystemAdapter::new(false);
+    workflow::run_consumer_profile_with(
+        &loaded,
+        ConsumerProfile::Lint,
+        profile_context.consumer_selector(),
+        &adapter,
+    )
+    .expect("named lint profile runs");
+    assert_eq!(*adapter.invocations.borrow(), vec!["fmt"]);
+
+    let error = workflow::run_consumer_profile_with(
+        &loaded,
+        ConsumerProfile::Test,
+        Some("nightly"),
+        &FakeSystemAdapter::new(false),
+    )
+    .expect_err("unknown layer is a configuration error");
+    assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED");
+    assert_eq!(error.details["selector"], "nightly");
+    assert_eq!(error.details["available"], json!(["unit", "integrate"]));
+
+    assert!(
+        Cli::try_parse_from(["sc-lint", "lint", "ci", "--profile", "fmt"]).is_err(),
+        "`--profile` requires `--consumer`"
+    );
 }
 
 #[test]
@@ -431,7 +519,8 @@ fn consumer_missing_backend_is_a_structured_recovery_error() {
     ]);
     let context = CommandContext::from_cli(&cli).expect("consumer context");
     let loaded = LoadedConfig::load(&cli, &context).expect("consumer config");
-    let error = workflow::run_consumer_lint_profile(&loaded).expect_err("missing backend fails");
+    let error =
+        workflow::run_consumer_lint_profile(&loaded, None).expect_err("missing backend fails");
     assert_eq!(error.code(), "CLI.SC_LINT_BACKEND_NOT_FOUND");
     assert_eq!(error.documentation.as_deref(), Some("sc-lint docs setup"));
     assert!(!error.to_string().to_ascii_lowercase().contains("traceback"));
@@ -452,6 +541,16 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
         },
     )
     .expect("generate fixture");
+    // The bootstrap provisions `.sc-lint/venv` from PyPI; point it at the
+    // wheels `just setup` built so the fixture stays offline.
+    let wheel_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.sc-lint/wheels");
+    if !wheel_dir.is_dir() {
+        eprintln!(
+            "skipping: run `just setup` to build {}",
+            wheel_dir.display()
+        );
+        return;
+    }
     let bin_dir = root.join("bin");
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
@@ -479,6 +578,7 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
+            .env("SC_LINT_WHEEL_DIR", &wheel_dir)
             .output()
             .expect("run just fixture");
         assert!(
@@ -523,6 +623,16 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
         },
     )
     .expect("generate fixture");
+    // The bootstrap provisions `.sc-lint/venv` from PyPI; point it at the
+    // wheels `just setup` built so the fixture stays offline.
+    let wheel_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.sc-lint/wheels");
+    if !wheel_dir.is_dir() {
+        eprintln!(
+            "skipping: run `just setup` to build {}",
+            wheel_dir.display()
+        );
+        return;
+    }
     let bin_dir = root.join("bin");
     fs::create_dir_all(&bin_dir).expect("bin dir");
     let record = root.join("calls.txt");
@@ -545,6 +655,7 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
+            .env("SC_LINT_WHEEL_DIR", &wheel_dir)
             .output()
             .expect("run just fixture");
         assert!(
@@ -588,6 +699,16 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
         },
     )
     .expect("generate fixture");
+    // The bootstrap provisions `.sc-lint/venv` from PyPI; point it at the
+    // wheels `just setup` built so the fixture stays offline.
+    let wheel_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.sc-lint/wheels");
+    if !wheel_dir.is_dir() {
+        eprintln!(
+            "skipping: run `just setup` to build {}",
+            wheel_dir.display()
+        );
+        return;
+    }
     let bootstrap = fixture.path().join(".sc-lint/bootstrap.ps1");
     let record = fixture.path().join("calls.txt");
     let binary = fixture.path().join("sc-lint.cmd");
@@ -605,6 +726,7 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
         .current_dir(fixture.path())
         .env("SC_LINT_BIN", &binary)
         .env("SC_LINT_RECORD", &record)
+        .env("SC_LINT_WHEEL_DIR", &wheel_dir)
         .output()
         .expect("run Windows bootstrap");
     assert!(

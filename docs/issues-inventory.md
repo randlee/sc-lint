@@ -9,6 +9,13 @@ As of the Phase A hardening pass, there are no open blocking plan-integrity
 findings in the documented A.1a through A.8 sprint sequence once the current
 hardening changes are applied.
 
+The consumer-blocking identity-literals unicode-escape defects tracked by
+[issue #85](https://github.com/randlee/sc-lint/issues/85) and
+[issue #88](https://github.com/randlee/sc-lint/issues/88) are closed by the
+Rust-literal decoder in `.just/lint_common.py`. Rust brace-form escapes such as
+`"\\u{1F600}"` and `'\\u{7}'` now produce normal lint results instead of
+crashing the Python adapter.
+
 ## Active Non-Blocking Notes
 
 1. `feature/sprint-A1` remains a historical local worktree name from before the
@@ -25,6 +32,19 @@ hardening changes are applied.
    - `full` may include `xwin check` and `xwin clippy` when available
    - `ci` excludes `xwin`
    - real Windows CI remains the authoritative release gate
+
+3. Issue `#84` (`full`/`ci` profiles ran `cargo run -p sc-lint-boundary`
+   through source-tree scripts) is closed by sprint G.3b.
+   Current status:
+   - `full` and `ci` re-enter the running `sc-lint` executable for
+     `sc-boundary` and `sc-portability`
+   - `sc-lint version --json` reports `self_contained`
+   - CI job `release-smoke` runs the kit recipes from a staged archive with no
+     `.just/` directory on Linux, macOS, and Windows
+   - Deferred, not dropped: the kit-copy byte-identity `cmp` CI check for
+     `.sc-lint/bootstrap*` and `just test-adoption` depend on the adoption kit
+     from `sprint/G.1-adoption-kit`; they land in the G.1 → G.3b
+     reconciliation once G.1 has merged to `develop`
 
 ## Process / QA / Triage Scope
 

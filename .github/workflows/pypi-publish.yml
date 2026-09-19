@@ -1,0 +1,71 @@
+name: Publish PyPI
+
+# Re-uploads the Python distributions already attached to a published GitHub
+# Release. release.yml publishes to PyPI on its own; this workflow exists so an
+# upload failure can be retried without re-tagging, rebuilding, or touching
+# crates.io. Uses the same environments/secrets as release.yml and
+# release-preflight.yml: `pypi`/`PYPI_TOKEN`, `testpypi`/`TEST_PYPI_TOKEN`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published GitHub Release tag to publish (e.g. v1.4.1)"
+        required: true
+        type: string
+      target:
+        description: "Python package repository"
+        required: true
+        default: testpypi
+        type: choice
+        options:
+          - testpypi
+          - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-pypi-${{ inputs.target }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'production' && 'pypi' || 'testpypi' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Download Python assets from the published GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download '${{ inputs.tag }}' --repo '${{ github.repository }}' \
+            --pattern '*.whl' --pattern 'sc_lint-*.tar.gz' --dir dist
+          ls -la dist/
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install maturin
+        run: python -m pip install maturin==1.9.4
+
+      - name: Upload to TestPyPI
+        if: ${{ inputs.target == 'testpypi' }}
+        env:
+          MATURIN_NON_INTERACTIVE: '1'
+          MATURIN_PYPI_TOKEN: ${{ secrets.TEST_PYPI_TOKEN }}
+        run: maturin upload --repository testpypi --non-interactive --skip-existing dist/*.whl dist/*.tar.gz
+
+      - name: Upload to PyPI
+        if: ${{ inputs.target == 'production' }}
+        env:
+          MATURIN_NON_INTERACTIVE: '1'
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: maturin upload --non-interactive --skip-existing dist/*.whl dist/*.tar.gz

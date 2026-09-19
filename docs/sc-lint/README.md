@@ -30,12 +30,16 @@ Contents:
   portability plan
 - [`phase-D-plan.md`](../plans/phase-D/phase-D-plan.md) — Phase D
   boundary-inventory improvement plan
+- [`python-bindings.md`](./python-bindings.md) — the `sc-lint` Python wheel:
+  pyo3 surface, consumer venv provisioning, and the PyPI release channel
 - [`crate-architecture.md`](./crate-architecture.md) — crate-by-crate role,
   ownership, and phase-plan touchpoint guide
 - [`interface-reporting-constraints.md`](./interface-reporting-constraints.md) —
   repo-local constraints for the shared HTML/XHTML/JSON reporting line
 - [`version-adoption.md`](./version-adoption.md) — authoritative consumer
   adoption guide for the planned `sc-lint-version` interface-checking line
+- [`adoption.md`](./adoption.md) — authoritative guide for installing the
+  managed `sc-lint` consumer contract and extending it safely
 - [`skill-authoring-constraints.md`](./skill-authoring-constraints.md) —
   repo-local constraints for the `sc-lint-version` adoption skill
 - [`minimal-marketplace-constraints.md`](./minimal-marketplace-constraints.md) —

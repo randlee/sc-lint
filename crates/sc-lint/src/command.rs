@@ -104,18 +104,27 @@ pub(crate) struct DocsRequest {
 /// Command-specific payloads stay coupled to the command variant that owns
 /// them. This prevents an unrelated command context from carrying an
 /// impossible `None` payload that would only fail during dispatch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum CommandRequest {
-    Setup { dry_run: bool },
-    Upgrade { check: bool, dry_run: bool },
+    Setup {
+        dry_run: bool,
+    },
+    Upgrade {
+        check: bool,
+        dry_run: bool,
+    },
     Init(ConsumerInitRequest),
     Docs(DocsRequest),
+    /// Optional lint profile step or test layer selector for consumer profile commands.
+    ConsumerSelector(Option<String>),
 }
 
 impl CommandId {
     pub fn from_cli_command(command: &Command) -> Self {
         match command {
-            Command::Lint { target, consumer } => match target {
+            Command::Lint {
+                target, consumer, ..
+            } => match target {
                 crate::LintTarget::ScBoundary => Self::LintScBoundary,
                 crate::LintTarget::ScPortability => Self::LintScPortability,
                 crate::LintTarget::ScRuntime => Self::LintScRuntime,
@@ -145,7 +154,7 @@ impl CommandId {
             Command::Setup { .. } => Self::Setup,
             Command::Upgrade { .. } => Self::Upgrade,
             Command::Init { .. } => Self::Init,
-            Command::Test => Self::ConsumerTest,
+            Command::Test { .. } => Self::ConsumerTest,
             Command::Version => Self::Version,
             Command::Ci => Self::Ci,
         }
@@ -250,25 +259,35 @@ impl CommandId {
             Self::LintScBoundary => Some(consts::TOOL_BOUNDARY),
             Self::LintScPortability => Some(consts::TOOL_PORTABILITY),
             Self::LintScRuntime => Some(consts::TOOL_RUNTIME),
-            Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts.tool_name()),
-            Self::LintIdentityLiterals => {
-                Some(python_adapter::PythonTool::IdentityLiterals.tool_name())
-            }
-            Self::ViewFindings => Some(python_adapter::PythonTool::ViewFindings.tool_name()),
+            _ => match self.python_tool() {
+                Some(tool) => Some(tool.tool_name()),
+                None => None,
+            },
+        }
+    }
+
+    /// Python-backed tool behind this command, if any.
+    pub const fn python_tool(self) -> Option<python_adapter::PythonTool> {
+        match self {
+            Self::LintLineCounts => Some(python_adapter::PythonTool::LineCounts),
+            Self::LintIdentityLiterals => Some(python_adapter::PythonTool::IdentityLiterals),
+            Self::ViewFindings => Some(python_adapter::PythonTool::ViewFindings),
             _ => None,
         }
     }
 
     pub fn adapter_kind(self) -> Option<&'static str> {
-        python_adapter::adapter_kind_for_command(self.as_str())
+        self.python_tool().map(|_| python_adapter::adapter_kind())
     }
 
     pub fn adapter_config_scope(self) -> Option<&'static str> {
-        python_adapter::adapter_config_scope_for_command(self.as_str())
+        self.python_tool()
+            .map(python_adapter::PythonTool::config_scope)
     }
 
     pub fn adapter_script(self) -> Option<&'static str> {
-        python_adapter::adapter_script_for_command(self.as_str())
+        self.python_tool()
+            .map(python_adapter::PythonTool::script_relative_path)
     }
 
     pub const fn is_xwin_preflight(self) -> bool {
@@ -309,7 +328,7 @@ impl CommandContext {
                         "Run it from the consumer repository root; it always manages `sc-lint.toml` there.",
                     ));
                 }
-                if matches!(command, Command::Lint { consumer: true, target } if !matches!(target, crate::LintTarget::Ci))
+                if matches!(command, Command::Lint { consumer: true, target, .. } if !matches!(target, crate::LintTarget::Ci))
                 {
                     return Err(CliError::usage(
                             "`--consumer` is only supported by `sc-lint lint ci`",
@@ -343,6 +362,14 @@ impl CommandContext {
                         guide: *guide,
                         path: *path,
                     })),
+                    Command::Lint {
+                        consumer: true,
+                        profile,
+                        ..
+                    } => Some(CommandRequest::ConsumerSelector(profile.clone())),
+                    Command::Test { layer } => {
+                        Some(CommandRequest::ConsumerSelector(layer.clone()))
+                    }
                     _ => None,
                 };
                 (
@@ -440,6 +467,14 @@ impl CommandContext {
         }
     }
 
+    /// Selector for consumer profile commands: `None` and `all` run every configured step.
+    pub(crate) fn consumer_selector(&self) -> Option<&str> {
+        match &self.request {
+            Some(CommandRequest::ConsumerSelector(selector)) => selector.as_deref(),
+            _ => None,
+        }
+    }
+
     pub(crate) fn docs_request(&self) -> DocsRequest {
         match self.request {
             Some(CommandRequest::Docs(request)) => request,
@@ -492,12 +527,7 @@ pub(crate) fn execute(
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
     match context.id() {
-        CommandId::Version => Ok(CommandSuccess::direct(json!({
-            consts::FIELD_TOOL: consts::SERVICE_NAME,
-            consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
-            "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
-            consts::FIELD_STATUS: "pass",
-        }))),
+        CommandId::Version => Ok(CommandSuccess::direct(version_payload())),
         CommandId::CompatibilityCheck => Ok(CommandSuccess::direct(
             loaded_config.evaluate_compatibility(context.compatibility_binary())?,
         )),
@@ -516,8 +546,12 @@ pub(crate) fn execute(
         CommandId::Init => Ok(CommandSuccess::direct(crate::config::run_consumer_init(
             context.consumer_init_request(),
         )?)),
-        CommandId::ConsumerLintCi => workflow::run_consumer_lint_profile(loaded_config),
-        CommandId::ConsumerTest => workflow::run_consumer_test_profile(loaded_config),
+        CommandId::ConsumerLintCi => {
+            workflow::run_consumer_lint_profile(loaded_config, context.consumer_selector())
+        }
+        CommandId::ConsumerTest => {
+            workflow::run_consumer_test_profile(loaded_config, context.consumer_selector())
+        }
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),
@@ -559,4 +593,14 @@ fn reserved_command(context: &CommandContext, follow_up: &str) -> Result<Command
         "{} is a reserved contract surface. {follow_up}",
         context.command_id()
     )))
+}
+
+pub(crate) fn version_payload() -> Value {
+    json!({
+        consts::FIELD_TOOL: consts::SERVICE_NAME,
+        consts::FIELD_VERSION: env!("CARGO_PKG_VERSION"),
+        "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
+        "self_contained": dispatch::self_contained_layout(),
+        consts::FIELD_STATUS: "pass",
+    })
 }

@@ -29,6 +29,10 @@ current planning surface.
 - [`ADR-013-analyzer-shared-support.md`](./ADR-013-analyzer-shared-support.md)
   - rule-neutral shared AST scanning/rendering support without analyzer-to-
     analyzer dependencies
+- [`ADR-015-standard-repo-tools-adoption-kit.md`](./ADR-015-standard-repo-tools-adoption-kit.md)
+  - standard repo-tools adoption kit and rejection of Phase F's consumer-specific engine
+- [`ADR-016-python-wheel-runtime-and-no-rust-configuration.md`](./ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
+  - version-matched Python wheel runtime and no-Rust configuration boundary
 
 ## Draft ADRs
 

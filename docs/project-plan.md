@@ -318,7 +318,8 @@ inventory dependency-policy enforcement and the requirements/architecture
 hardening needed to align the planning surface with the structured boundary
 roadmap.
 
-Phase `E` is the current consumer-adoption and distributed-documentation line.
+Phase `E` is implemented: the consumer-adoption and distributed-documentation
+line closed in PR #104.
 Its authoritative plan is
 [docs/phase-E/phase-E-plan.md](./phase-E/phase-E-plan.md). Exact initial
 targets are:
@@ -328,6 +329,12 @@ targets are:
 - E.7: the root `Justfile`, root `sc-lint.toml`, CI/release integration,
   consumer fixtures, `AGENTS.md`, root `README.md`, and installed docs that
   make this repository the executable reference consumer.
+
+Phase `F` is abandoned: its consumer-specific Rust configuration engine was
+never merged; `archive/phase-F` preserves the rejected planning line.
+
+Phase `G` is the standard repo-tools adoption-kit line. Its authoritative plan
+is [docs/plans/phase-G/phase-G-plan.md](./plans/phase-G/phase-G-plan.md).
 
 ## Planning Conventions
 

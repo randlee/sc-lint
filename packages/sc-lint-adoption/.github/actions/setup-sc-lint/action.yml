@@ -1,0 +1,61 @@
+name: Setup sc-lint
+description: Install and verify the sc-lint release selected by sc-lint.toml.
+
+inputs:
+  config:
+    description: Consumer sc-lint configuration file.
+    required: false
+    default: sc-lint.toml
+
+runs:
+  using: composite
+  steps:
+    - name: Install verified sc-lint release (POSIX)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        config='${{ inputs.config }}'
+        version="$(sed -n 's/^[[:space:]]*minimum_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$config" | head -n 1)"
+        test -n "$version"
+        case "${RUNNER_OS}/${RUNNER_ARCH}" in
+          Linux/X64) target=x86_64-unknown-linux-gnu ;;
+          macOS/X64) target=x86_64-apple-darwin ;;
+          macOS/ARM64) target=aarch64-apple-darwin ;;
+          *) echo "unsupported platform ${RUNNER_OS}/${RUNNER_ARCH}" >&2; exit 1 ;;
+        esac
+        archive="sc-lint_${version}_${target}.tar.gz"
+        base="https://github.com/randlee/sc-lint/releases/download/v${version}"
+        curl --fail --location --retry 3 --output "$RUNNER_TEMP/checksums.txt" "$base/checksums.txt"
+        curl --fail --location --retry 3 --output "$RUNNER_TEMP/$archive" "$base/$archive"
+        expected="$(awk -v name="$archive" '$2 == name || $2 == "*" name { print $1; exit }' "$RUNNER_TEMP/checksums.txt")"
+        test -n "$expected"
+        actual="$(shasum -a 256 "$RUNNER_TEMP/$archive" | awk '{print $1}')"
+        test "$actual" = "$expected"
+        mkdir -p "$RUNNER_TEMP/sc-lint"
+        tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/sc-lint"
+        echo "$RUNNER_TEMP/sc-lint" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/sc-lint/sc-lint" version --json
+    - name: Install verified sc-lint release (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $config = '${{ inputs.config }}'
+        $line = Select-String -Path $config -Pattern '^\s*minimum_version\s*=\s*"([^"]+)"' | Select-Object -First 1
+        if (-not $line) { throw "minimum_version missing from $config" }
+        $version = $line.Matches[0].Groups[1].Value
+        $archive = "sc-lint_${version}_x86_64-pc-windows-msvc.zip"
+        $base = "https://github.com/randlee/sc-lint/releases/download/v$version"
+        $checksums = Join-Path $env:RUNNER_TEMP "checksums.txt"
+        $archivePath = Join-Path $env:RUNNER_TEMP $archive
+        Invoke-WebRequest -UseBasicParsing -Uri "$base/checksums.txt" -OutFile $checksums
+        Invoke-WebRequest -UseBasicParsing -Uri "$base/$archive" -OutFile $archivePath
+        $expectedLine = Get-Content $checksums | Where-Object { $_ -match ("\s\*?" + [regex]::Escape($archive) + "$") } | Select-Object -First 1
+        if (-not $expectedLine) { throw "checksum missing $archive" }
+        $expected = ($expectedLine -split '\s+')[0]
+        $actual = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash
+        if ($actual -ne $expected) { throw "checksum mismatch" }
+        $destination = Join-Path $env:RUNNER_TEMP "sc-lint"
+        Expand-Archive -Path $archivePath -DestinationPath $destination -Force
+        Add-Content -Path $env:GITHUB_PATH -Value $destination
+        & (Join-Path $destination "sc-lint.exe") version --json
