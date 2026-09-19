@@ -301,7 +301,7 @@ Current supported exports:
 
 Current compatibility marker:
 
-- `schema_version = "0.1.0"`
+- `schema_version = "0.2.0"` for the current `sc-lint-boundary` graph contract
 
 Do **not** target a specific graph database format in the MVP.
 

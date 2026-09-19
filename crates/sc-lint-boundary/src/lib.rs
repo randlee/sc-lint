@@ -39,7 +39,7 @@ mod render;
 #[cfg(test)]
 mod tests;
 
-const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
+const SC_LINT_SCHEMA_VERSION: &str = "0.2.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 const SC_LINT_BOUNDARY_TOOL: &str = "sc-lint-boundary";
 const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");

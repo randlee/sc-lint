@@ -5,7 +5,7 @@ This document records the current export contract for `sc-lint-boundary`.
 ## Versioning
 
 - tool: `sc-lint-boundary`
-- current schema version: `0.1.0`
+- current schema version: `0.2.0`
 
 Both graph JSON and findings JSON include:
 
@@ -14,6 +14,33 @@ Both graph JSON and findings JSON include:
 - `schema_version`
 
 The schema version is the compatibility key for downstream graph consumers.
+
+### Migration from 0.1.0
+
+Version `0.2.0` reflects the trait-method identity correction in the graph
+builder. Consumers must rebaseline stored graphs and findings that persist
+`node_ids`; no legacy IDs or compatibility mapping are emitted.
+
+The following IDs change:
+
+- trait method IDs change from `<owner-id>::<method>` to
+  `<trait-impl-id>::<method>`, so same-named methods from different trait
+  implementations remain distinct;
+- trait implementation IDs change when the trait has generic arguments or the
+  implemented self type is generic or a reference, because those arguments are
+  now retained in the implementation key.
+
+The following IDs remain stable:
+
+- path-owner IDs, including crate, module, type, and trait nodes;
+- inherent method IDs (`<owner-id>::<method>`);
+- non-generic trait implementation IDs and their other stable node metadata.
+
+Downstream consumers should discard or migrate cached graph and finding
+records, regenerate exports with `0.2.0`, and rebaseline any stored
+`node_ids` or edge endpoints. Do not attempt to infer trait ownership from a
+method-name suffix; use the implementation node and `contains`/`declares`/
+`targets` edges.
 
 ## Graph Export Formats
 

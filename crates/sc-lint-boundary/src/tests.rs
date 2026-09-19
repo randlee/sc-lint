@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::inventory::owner_crate_path_for_package;
+use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
 use std::fs;
@@ -24,7 +25,7 @@ fn findings_report_text_is_stable() {
     let report = super::FindingsReport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         status: ReportStatus::Pass,
         scanned_crates: 2,
         findings: Vec::new(),
@@ -40,14 +41,14 @@ fn graph_export_serializes_tool_metadata() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         nodes: Vec::new(),
         edges: Vec::new(),
     };
     let json = serde_json::to_string(&graph).unwrap();
     assert!(json.contains("\"tool\":\"sc-lint-boundary\""));
     assert!(json.contains("\"version\":\"0.1.0\""));
-    assert!(json.contains("\"schema_version\":\"0.1.0\""));
+    assert!(json.contains("\"schema_version\":\"0.2.0\""));
 }
 
 #[test]
@@ -55,7 +56,7 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         nodes: vec![GraphNode {
             id: NodeId::new("crate::example::example"),
             kind: "type",
@@ -97,7 +98,7 @@ fn render_graph_export_turtle_escapes_special_characters_and_attributes() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         nodes: vec![GraphNode {
             id: NodeId::new("crate::example::example"),
             kind: "type",
@@ -326,7 +327,7 @@ fn renders_graph_as_turtle() {
     assert!(turtle.contains("rdf:type sc:type ."));
     assert!(turtle.contains("sc:visibility \"public\" ."));
     assert!(turtle.contains("sc:label \"Example\" ."));
-    assert!(turtle.contains("sc:schemaVersion \"0.1.0\" ."));
+    assert!(turtle.contains("sc:schemaVersion \"0.2.0\" ."));
 }
 
 #[test]
@@ -2858,6 +2859,69 @@ fn trait_adapters_preserve_distinct_methods_and_forwarding_edges() {
                 .all(|id| id.as_str() == owner.id.as_str())
         }));
     }
+}
+
+#[test]
+fn schema_v02_fixture_captures_trait_method_id_migration_in_json_and_turtle() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub struct Adapter; pub trait Typed { fn write(&self); } pub trait Legacy { fn write(&self); } impl Adapter { pub fn write(&self) {} } impl Typed for Adapter { fn write(&self) {} } impl Legacy for Adapter { fn write(&self) {} }",
+    );
+
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let owner = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "Adapter" && node.kind == "type")
+        .unwrap();
+    let owner_id = owner.id.clone();
+    let inherent_id = NodeId::new(format!("{owner_id}::write"));
+    let typed_id = NodeId::new(format!("{owner_id}::impl::{}::write", hex_encode(b"Typed")));
+    let legacy_id = NodeId::new(format!(
+        "{owner_id}::impl::{}::write",
+        hex_encode(b"Legacy")
+    ));
+
+    assert_eq!(graph.schema_version, "0.2.0");
+    assert!(graph.nodes.iter().any(|node| node.id == owner_id));
+    assert!(graph.nodes.iter().any(|node| node.id == inherent_id));
+    assert!(graph.nodes.iter().any(|node| node.id == typed_id));
+    assert!(graph.nodes.iter().any(|node| node.id == legacy_id));
+    assert_eq!(
+        graph
+            .nodes
+            .iter()
+            .filter(|node| node.kind == "method" && node.label == "write")
+            .count(),
+        3
+    );
+
+    let graph_json: serde_json::Value =
+        serde_json::from_str(&render_graph_export_json(&graph)).unwrap();
+    assert_eq!(graph_json["schema_version"], "0.2.0");
+    assert!(graph_json.to_string().contains(typed_id.as_str()));
+    assert!(graph_json.to_string().contains(legacy_id.as_str()));
+
+    let turtle = render_graph_export_turtle(&graph);
+    assert!(turtle.contains("sc:schemaVersion \"0.2.0\" ."));
+    assert!(turtle.contains(&typed_id.to_string()));
+    assert!(turtle.contains(&legacy_id.to_string()));
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap();
+    let findings_json = serde_json::to_value(&report).unwrap();
+    assert_eq!(findings_json["schema_version"], "0.2.0");
 }
 
 #[test]
