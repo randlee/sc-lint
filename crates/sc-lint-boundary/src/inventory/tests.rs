@@ -108,6 +108,27 @@ fn loads_valid_boundary_inventory() {
 }
 
 #[test]
+fn loads_empty_inventory_without_boundaries_directory() {
+    let fixture = InventoryFixture::new();
+
+    let inventory = load_boundary_inventory(fixture.root()).expect("empty inventory loads");
+
+    assert!(inventory.records.is_empty());
+    assert!(inventory.planning.planned_items.is_empty());
+}
+
+#[test]
+fn loads_hyphenated_owner_package_with_matching_underscore_crate_path() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+
+    let inventory = load_boundary_inventory(fixture.root()).expect("matching crate path loads");
+
+    assert_eq!(inventory.records[0].owner_package, "sc-lint-boundary");
+    assert_eq!(inventory.records[0].owner_crate_path, "sc_lint_boundary");
+}
+
+#[test]
 fn loads_trait_public_boundary_inventory() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
