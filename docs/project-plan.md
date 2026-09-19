@@ -137,6 +137,10 @@ The scheduled sprint plans are:
   - Assignee-owned Beads lifecycle for dev, fix, and QA task assignment
   - `docs/plans/orchestration/lint-spx.5-orchestration-beads-lifecycle.md`
 
+- `lint-spx.13`
+  - Orchestration script tests and template/caller contract coverage
+  - `docs/plans/orchestration/lint-spx.13-orchestration-script-tests.md`
+
 - `A.1a`
   - CLI bootstrap and contract definition
   - includes the A.1a exit-review checkpoint for Workstreams 4-7

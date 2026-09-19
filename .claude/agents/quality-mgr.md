@@ -157,7 +157,8 @@ TODO-specific rule:
 6. Render structured JSON assignments:
    - `req-qa` from `.claude/skills/codex-orchestration/req-qa-assignment.json.j2`
    - `arch-qa` from `.claude/skills/codex-orchestration/arch-qa-assignment.json.j2`
-   - `rust-best-practices-agent` from `.claude/skills/codex-orchestration/rust-best-practices-agent-assignment.json.j2`
+   - `ruthless-boundary-qa` from `.claude/skills/codex-orchestration/ruthless-boundary-qa-assignment.json.j2`
+   - `rust-best-practices-agent` from `.claude/assets/sc-rust/quality-mgr/templates/rust-best-practices-assignment.json.j2`
      on every sprint QA round for the near term, plus docs-only plan review
      and phase-ending review
    - `flaky-test-qa` from `.claude/skills/codex-orchestration/flaky-test-qa-assignment.json.j2` only when tests changed or instability is suspected
@@ -211,6 +212,7 @@ creates and wires the resulting fix beads.
 For implementation QA-1 in this Rust repo:
 - always run `req-qa`
 - always run `arch-qa`
+- always run `ruthless-boundary-qa`
 - always run `rust-best-practices-agent`
 - always run `rust-qa-agent`
 - always run `rust-best-practices-agent`

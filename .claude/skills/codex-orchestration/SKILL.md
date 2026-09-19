@@ -89,7 +89,7 @@ Before starting a sprint:
    vars). The template path goes through the daemon-owned admission path
    and the dispatch is queryable from outside.
 9. `.claude/agents/rust-best-practices-agent.md` and
-   `.claude/skills/codex-orchestration/rust-best-practices-agent-assignment.json.j2`
+   `.claude/assets/sc-rust/quality-mgr/templates/rust-best-practices-assignment.json.j2`
    exist for first-pass boundary optimization review.
 10. Every agent pane exports `BEADS_ACTOR` equal to its `ATM_IDENTITY` (the
     pane name, not an alias), and bead assignee values use those same names.
