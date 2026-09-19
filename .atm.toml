@@ -18,7 +18,6 @@ env = { ATM_IDENTITY = "team-lead", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_
 
 [[rmux.windows.panes]]
 name = "clint"
-tmux_pane_id = "%46"
 command = "codex -c features.hooks=true --yolo"
 env = { ATM_IDENTITY = "clint", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
@@ -50,6 +49,7 @@ layout = "even-horizontal"
 
 [[rmux.windows.panes]]
 name = "publisher"
+alias = "sc-lint-publisher"
 model = "sonnet"
 env = { ATM_IDENTITY = "publisher", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
