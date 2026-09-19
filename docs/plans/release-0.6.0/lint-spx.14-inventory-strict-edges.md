@@ -41,7 +41,15 @@ Source: review `lint-spx.3`, findings 1 and 4.
   for every nested table and the forbidden-edge entries.
 - `just lint` and `just test` pass on the merged layer; `git diff --check`
   clean.
-- No change to planning.toml handling or the owner_crate_path check: those
-  are bead `lint-spx.15` and wait on a decision.
+- Planning metadata and `owner_crate_path` were intentionally deferred during
+  this sprint. The `lint-spx.15` decision required authoritative
+  `boundaries/planning.toml` whenever `boundaries/` exists and restored the
+  `owner_crate_path` invariant; `lint-spx.17` implemented that decision.
 - Frontmatter `status: complete` at closeout; bead claimed and closed in
   tandem with the ATM task.
+
+## Closeout
+
+Implemented by `lint-spx.14` commit `1ae9893` on the merged layer. Targeted
+inventory tests passed (35 tests at closeout), `git diff --check` passed, and
+the aggregate `just lint` and `just test` gates passed.

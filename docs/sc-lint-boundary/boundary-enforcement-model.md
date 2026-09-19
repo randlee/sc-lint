@@ -132,8 +132,9 @@ Operational rules:
   workspace member
 - `allowed_dependents = []` means no external workspace package may directly
   depend on that owner package
-- each `forbidden_edges` row is one exact denied direct edge expressed as one
-  structured inline table with `from` and `to` fields
+- each `forbidden_edges` row is one exact denied direct edge expressed either
+  as a structured inline table with `from` and `to` fields or as an arrow-
+  delimited string such as `"from-package -> to-package"`
 - malformed `forbidden_edges` inline tables, duplicate edges, duplicate package
   names, and unknown fields fail inventory loading immediately
 - `SCB-DEPENDENCY-001` reports direct outgoing workspace edges not present in
@@ -414,12 +415,21 @@ Default behavior should be:
 - TOML planning metadata is authoritative
 - `boundaries/planning.toml` is the default authoritative planning-metadata
   file
+- when `boundaries/` exists, `boundaries/planning.toml` is required and must
+  define `[planning].current_sprint`; when `boundaries/` is absent, loading
+  returns an empty inventory and does not require planning metadata
 - duplicate boundary definitions across sources are errors unless explicitly in
   an equivalence-test migration mode
 - duplicate item keys in the planning metadata are errors
 
 The equivalence-test migration mode should be test-only and disabled in normal
 developer lint runs and CI.
+
+Boundary records must also satisfy these identity rules:
+
+- `[public]` defines exactly one non-empty `facade` or `trait` value
+- `owner_crate_path` equals `owner_package` with hyphens replaced by
+  underscores
 
 ## Testing Requirements
 

@@ -3,6 +3,7 @@
 use super::*;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
+use sc_lint_schema::owner_crate_path_for_package;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -2375,8 +2376,8 @@ impl WorkspaceFixture {
                     [status]
                     state = "concrete_landed"
                 "#,
-                owner_package.replace('-', "_"),
-                owner_package.replace('-', "_"),
+                owner_crate_path_for_package(owner_package),
+                owner_crate_path_for_package(owner_package),
             ),
         );
     }

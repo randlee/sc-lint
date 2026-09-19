@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
 use clap::Parser;
+use sc_lint_schema::owner_crate_path_for_package;
 use serde::Serialize;
 use serde::Serializer;
 use serde_json::Value;
@@ -1453,6 +1454,33 @@ fn malformed_backend_json_maps_to_backend_protocol_error() {
 }
 
 #[test]
+fn missing_boundary_planning_maps_to_cli_config_error() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    std::fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        "[workspace]\nmembers=[]\nresolver=\"2\"\n",
+    )
+    .expect("write manifest");
+    std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::create_dir_all(temp_dir.path().join("empty")).expect("empty dir");
+
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        temp_dir.path().join("empty").to_str().expect("empty path"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("dispatch context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let error = crate::command::execute(&context, &loaded).expect_err("missing planning fails");
+
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert_eq!(error.code(), "CLI.CONFIG_ERROR");
+    assert!(error.cause.is_some());
+}
+
+#[test]
 fn empty_boundary_inventory_maps_to_backend_failure_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     std::fs::write(
@@ -2018,8 +2046,8 @@ homepage = "https://example.invalid/sc-lint"
             &format!("boundaries/{owner_package}/boundary.toml"),
             &format!(
                 "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
-                owner_package.replace('-', "_"),
-                owner_package.replace('-', "_"),
+                owner_crate_path_for_package(owner_package),
+                owner_crate_path_for_package(owner_package),
             ),
         );
     }

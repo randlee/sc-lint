@@ -87,6 +87,12 @@ expires_when = "sprint_before_current"
         let contents = fs::read_to_string(&path).expect("read valid boundary");
         fs::write(path, rewrite(contents)).expect("rewrite valid boundary");
     }
+
+    fn rewrite_valid_planning(&self, rewrite: impl FnOnce(String) -> String) {
+        let path = self.root().join("boundaries/planning.toml");
+        let contents = fs::read_to_string(&path).expect("read valid planning");
+        fs::write(path, rewrite(contents)).expect("rewrite valid planning");
+    }
 }
 
 use std::fs;
@@ -407,7 +413,11 @@ fn rejects_unknown_ownership_fields() {
         )
     });
 
-    load_boundary_inventory(fixture.root()).expect_err("unknown ownership field fails");
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("unknown ownership field fails")
+    );
+    assert!(error.contains("unexpected"));
 }
 
 #[test]
@@ -421,7 +431,11 @@ fn rejects_unknown_contracts_fields() {
         )
     });
 
-    load_boundary_inventory(fixture.root()).expect_err("unknown contracts field fails");
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("unknown contracts field fails")
+    );
+    assert!(error.contains("unexpected"));
 }
 
 #[test]
@@ -435,7 +449,11 @@ fn rejects_unknown_status_fields() {
         )
     });
 
-    load_boundary_inventory(fixture.root()).expect_err("unknown status field fails");
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("unknown status field fails")
+    );
+    assert!(error.contains("unexpected"));
 }
 
 #[test]
@@ -449,6 +467,196 @@ fn rejects_missing_planning_metadata_with_actionable_error() {
         .to_string();
     assert!(error.contains("planning.toml"));
     assert!(error.contains("[planning].current_sprint"));
+}
+
+fn assert_rejects_planning_metadata(contents: &str, expected_field: &str) {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.write("boundaries/planning.toml", contents);
+
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("invalid planning metadata fails")
+    );
+    assert!(error.contains(expected_field), "{error}");
+}
+
+#[test]
+fn rejects_planning_metadata_without_planning_table() {
+    assert_rejects_planning_metadata("[planned_items]\n", "planning");
+}
+
+#[test]
+fn rejects_planning_metadata_without_current_sprint() {
+    assert_rejects_planning_metadata("[planning]\n", "current_sprint");
+}
+
+#[test]
+fn rejects_planning_metadata_with_empty_current_sprint() {
+    assert_rejects_planning_metadata(
+        "[planning]\ncurrent_sprint = \"\"\n",
+        "sprint ids must not be empty",
+    );
+}
+
+#[test]
+fn rejects_planning_metadata_with_malformed_current_sprint() {
+    assert_rejects_planning_metadata(
+        "[planning]\ncurrent_sprint = \"not-a-sprint\"\n",
+        "sprint ids must use <phase>.<step> format",
+    );
+}
+
+fn assert_rejects_unknown_inventory_field(
+    rewrite: impl FnOnce(String) -> String,
+    expected_field: &str,
+) {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(rewrite);
+
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("unknown inventory field fails")
+    );
+    assert!(error.contains(expected_field), "{error}");
+}
+
+#[test]
+fn rejects_unknown_fields_in_all_boundary_tables() {
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace(
+                "facade = \"analyze_workspace\"",
+                "facade = \"analyze_workspace\"\nunexpected_public = true",
+            )
+        },
+        "unexpected_public",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace(
+                "constructor = \"none\"",
+                "constructor = \"none\"\nunexpected_implementation = true",
+            )
+        },
+        "unexpected_implementation",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| contents.replace("roots = []", "roots = []\nunexpected_composition = true"),
+        "unexpected_composition",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace(
+                "forbidden = []",
+                "forbidden = []\nunexpected_references = true",
+            )
+        },
+        "unexpected_references",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace(
+                "forbidden_test_bypasses = []",
+                "forbidden_test_bypasses = []\nunexpected_testing = true",
+            )
+        },
+        "unexpected_testing",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace(
+                "review_gates = [\"no_proc_macro_dependency\"]",
+                "review_gates = [\"no_proc_macro_dependency\"]\nunexpected_enforcement = true",
+            )
+        },
+        "unexpected_enforcement",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace("[dependencies]", "[ownership]\nio_owns = []\nio_forbidden = []\nunexpected_ownership = true\n\n[dependencies]")
+        },
+        "unexpected_ownership",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace("[dependencies]", "[contracts]\nrequest_types = []\nresponse_types = []\nerror_types = []\nunexpected_contracts = true\n\n[dependencies]")
+        },
+        "unexpected_contracts",
+    );
+    assert_rejects_unknown_inventory_field(
+        |contents| {
+            contents.replace(
+                "state = \"concrete_landed\"",
+                "state = \"concrete_landed\"\nunexpected_status = true",
+            )
+        },
+        "unexpected_status",
+    );
+
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_planning(|contents| {
+        contents.replace(
+            "current_sprint = \"A.6\"",
+            "current_sprint = \"A.6\"\nunexpected_planning = true",
+        )
+    });
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("unknown planning field fails")
+    );
+    assert!(error.contains("unexpected_planning"), "{error}");
+
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_planning(|contents| {
+        contents.replace(
+            "expires_when = \"sprint_before_current\"",
+            "expires_when = \"sprint_before_current\"\nunexpected_item = true",
+        )
+    });
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("unknown planned-item field fails")
+    );
+    assert!(error.contains("unexpected_item"), "{error}");
+}
+
+#[test]
+fn rejects_duplicate_allowed_dependents() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "allowed_dependents = [\"sc-lint\"]",
+            "allowed_dependents = [\"sc-lint\", \"sc-lint\"]",
+        )
+    });
+
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("duplicate allowed dependent fails")
+    );
+    assert!(error.contains("allowed_dependents"));
+}
+
+#[test]
+fn rejects_facade_with_empty_trait() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "facade = \"analyze_workspace\"",
+            "facade = \"analyze_workspace\"\ntrait = \"\"",
+        )
+    });
+
+    let error = load_boundary_inventory(fixture.root())
+        .expect_err("empty trait fails even with facade")
+        .to_string();
+    assert!(error.contains("empty public.trait"));
 }
 
 #[test]
@@ -1062,7 +1270,9 @@ state = "concrete_landed"
     );
 
     let error = load_boundary_inventory(fixture.root()).expect_err("public impl shape fails");
-    assert!(error.to_string().contains("implementation.type"));
+    let message = error.to_string();
+    assert!(message.contains("implementation.type"));
+    assert!(message.contains("public, private, or pub(crate) visibility"));
 }
 
 #[test]

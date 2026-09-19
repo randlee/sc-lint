@@ -107,6 +107,7 @@ class LintBoundariesTests(unittest.TestCase):
                 VALID_BOUNDARY.replace('facade = "Cli"', 'trait = "CliPort"\nnotes = "public contract"')
                 .replace("[dependencies]", "[ownership]\nio_owns = []\nio_forbidden = []\n\n[callers]\napproved = []\n\n[dependencies]")
                 .replace("[testing]", "[contracts]\nrequest_types = []\nresponse_types = []\nerror_types = []\nnotes = []\n\n[testing]")
+                .replace("forbidden_edges = []", 'forbidden_edges = ["sc-lint -> sc-lint-schema"]')
                 .replace('state = "concrete_landed"', 'state = "concrete_landed"\nnotes = []'),
                 encoding="utf-8",
             )

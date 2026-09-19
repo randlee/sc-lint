@@ -161,6 +161,20 @@ forbidden_edges = [
 ]
 ```
 
+Boundary inventory records may use either structured or arrow-delimited
+forbidden edges:
+
+```toml
+forbidden_edges = [
+  { from = "sc-lint-boundary", to = "sc-lint-attributes" },
+  "sc-lint-boundary -> sc-observability",
+]
+```
+
+The `[public]` section must define exactly one non-empty `facade` or `trait`,
+and `owner_crate_path` must equal `owner_package` with hyphens replaced by
+underscores. For example, `sc-lint-boundary` maps to `sc_lint_boundary`.
+
 That entry drives direct-workspace-edge findings through the same command path:
 
 ```text

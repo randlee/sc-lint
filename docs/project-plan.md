@@ -19,6 +19,12 @@ The project focus is:
   `sc-lint-boundary`
 - release 0.6.0 inventory strict-edge hardening
   - see [docs/plans/release-0.6.0/lint-spx.14-inventory-strict-edges.md](./plans/release-0.6.0/lint-spx.14-inventory-strict-edges.md)
+- release 0.6.0 inventory planning and owner-path hardening (`lint-spx.17`)
+  - see [docs/plans/release-0.6.0/lint-spx.17-inventory-planning-required.md](./plans/release-0.6.0/lint-spx.17-inventory-planning-required.md)
+- release 0.6.0 PR #115 QA-1 and QA-2 gates (`lint-spx.16`, `lint-spx.20`)
+  - see the dependent sprint records in `docs/plans/release-0.6.0/`
+- release 0.6.0 QA-1 documentation and test hardening (`lint-spx.19`)
+  - see [docs/plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md](./plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md)
 - planning direct workspace package-edge enforcement from boundary inventory in
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`

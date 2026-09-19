@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Deref;
 
+use sc_lint_schema::BOUNDARY_ID_PREFIX;
 use serde::Deserialize;
 
 use super::dependency_policy::PackageDependencyPolicy;
@@ -82,9 +83,9 @@ impl BoundaryId {
                 "boundary ids must not be empty",
             ));
         }
-        if !trimmed.starts_with("BOUNDARY-") {
+        if !trimmed.starts_with(BOUNDARY_ID_PREFIX) {
             return Err(InventoryParseError::boundary_id(format!(
-                "boundary ids must start with `BOUNDARY-` (got `{trimmed}`)"
+                "boundary ids must start with `{BOUNDARY_ID_PREFIX}` (got `{trimmed}`)"
             )));
         }
         Ok(Self(trimmed.to_string()))
@@ -346,7 +347,7 @@ impl PlanningKey {
                 "planning keys must not be empty",
             ));
         }
-        if !trimmed.starts_with("BOUNDARY-") || !trimmed.contains('.') {
+        if !trimmed.starts_with(BOUNDARY_ID_PREFIX) || !trimmed.contains('.') {
             return Err(InventoryParseError::planning_key(format!(
                 "planning keys must use <boundary_id>.<section>.<field>[.<subfield>] shape (got `{trimmed}`)"
             )));
