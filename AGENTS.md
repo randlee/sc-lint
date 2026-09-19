@@ -136,3 +136,7 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## ATM Assignment Contract
+
+For orchestration work, every dev, fix, review, and QA assignment uses `atm task assign <agent> --task-id <bead-id> --template <template> --vars <vars.json>`. The Beads id is the ATM task id and the vars-file `task_id`. Assignees start and close the ATM task; the lead closes the bead after accepting the result. Use `clint` for harder work and `cfast` for fast-tier changes; `team-lead` is the default lead role, which may be held by another identity.

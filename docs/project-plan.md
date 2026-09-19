@@ -129,6 +129,10 @@ Active follow-on after the completed Phase `C` line:
 
 The scheduled sprint plans are:
 
+- `lint-spx.1`
+  - Beads-backed ATM task-assignment orchestration
+  - `docs/plans/orchestration/lint-spx.1-codex-orchestration-task-assign.md`
+
 - `A.1a`
   - CLI bootstrap and contract definition
   - includes the A.1a exit-review checkpoint for Workstreams 4-7

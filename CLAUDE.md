@@ -122,3 +122,7 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Do not commit or push without clear authority from the active profile or the current user request.
 - If a required sync or push is blocked, stop and report the exact command and error.
 <!-- END BEADS INTEGRATION -->
+
+## ATM Assignment Contract
+
+For orchestration work, every dev, fix, review, and QA assignment uses `atm task assign <agent> --task-id <bead-id> --template <template> --vars <vars.json>`. The Beads id is the ATM task id and the vars-file `task_id`. Assignees start and close the ATM task; the lead closes the bead after accepting the result. Use `clint` for harder work and `cfast` for fast-tier changes; `team-lead` is the default lead role, which may be held by another identity.
