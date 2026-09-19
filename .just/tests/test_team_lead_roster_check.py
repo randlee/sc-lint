@@ -116,13 +116,13 @@ class FailureDiagnosticsTests(unittest.TestCase):
                 roster_check.run_json(["atm", "members"])
 
     def test_malformed_toml_names_the_input_path(self) -> None:
-        with tempfile.NamedTemporaryFile("w", suffix=".toml") as file:
-            file.write("[broken")
-            file.flush()
-            with mock.patch("sys.argv", ["roster_check.py", "--team", "sc-lint", "--atm-toml", file.name]), \
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "broken.toml"
+            path.write_text("[broken", encoding="utf-8")
+            with mock.patch("sys.argv", ["roster_check.py", "--team", "sc-lint", "--atm-toml", str(path)]), \
                  mock.patch("sys.stderr") as stderr:
                 self.assertEqual(roster_check.main(), 2)
-        self.assertIn(file.name, "".join(call.args[0] for call in stderr.write.call_args_list))
+        self.assertIn(str(path), "".join(call.args[0] for call in stderr.write.call_args_list))
 
 
 if __name__ == "__main__":
