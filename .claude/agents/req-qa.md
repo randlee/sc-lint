@@ -214,7 +214,7 @@ Return fenced JSON only.
         "docs/project-plan.md:45"
       ],
       "target_refs": [
-        "docs/atm-core/architecture.md:67"
+        "docs/architecture.md:67"
       ],
       "issue": "clear statement of mismatch",
       "required_correction": "specific corrective action",
