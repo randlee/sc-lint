@@ -2723,7 +2723,7 @@ fn reference_impls_and_methods_do_not_collide_with_owned_impls() {
     assert!(
         methods
             .iter()
-            .any(|node| node.id.as_str() == format!("{}::act", owner.id))
+            .any(|node| node.id.as_str() == format!("{}::impl::416374696f6e::act", owner.id))
     );
     for implementation in implementations {
         assert!(
@@ -2774,5 +2774,174 @@ fn reference_method_cycles_keep_the_underlying_type_owner() {
             .owner_ids
             .iter()
             .all(|owner| owner.ends_with("::Owner"))
+    );
+}
+
+#[test]
+fn trait_adapters_preserve_distinct_methods_and_forwarding_edges() {
+    for reverse_order in [false, true] {
+        let fixture = WorkspaceFixture::new();
+        fixture.write_workspace_root();
+        fixture.write_package_manifest("example");
+        let definitions = "pub struct Adapter; pub trait Typed { fn write(&self); } pub trait Legacy { fn write(&self); }";
+        let inherent = "impl Adapter { pub fn write(&self) {} }";
+        let traits = "impl Typed for Adapter { fn write(&self) { Adapter::write(self); } } impl Legacy for Adapter { fn write(&self) { <Self as Typed>::write(self); } }";
+        let source = if reverse_order {
+            format!("{definitions} {traits} {inherent}")
+        } else {
+            format!("{definitions} {inherent} {traits}")
+        };
+        fixture.write_source("example", "lib.rs", &source);
+        let graph = export_workspace_graph(&ExportGraphOptions {
+            root: fixture.root().to_path_buf(),
+        })
+        .unwrap();
+        let owner = graph
+            .nodes
+            .iter()
+            .find(|node| node.label == "Adapter")
+            .unwrap();
+        let methods: Vec<_> = graph
+            .nodes
+            .iter()
+            .filter(|node| {
+                node.kind == "method"
+                    && node.label == "write"
+                    && node.id.starts_with(owner.id.as_str())
+            })
+            .collect();
+        assert_eq!(methods.len(), 3);
+        let inherent = methods
+            .iter()
+            .find(|node| node.impl_kind == Some(ImplKind::Inherent))
+            .unwrap();
+        let typed = methods
+            .iter()
+            .find(|node| node.impl_trait.as_deref() == Some("Typed"))
+            .unwrap();
+        let legacy = methods
+            .iter()
+            .find(|node| node.impl_trait.as_deref() == Some("Legacy"))
+            .unwrap();
+        assert_eq!(inherent.id.as_str(), format!("{}::write", owner.id));
+        for (from, to) in [
+            (typed.id.clone(), inherent.id.clone()),
+            (legacy.id.clone(), typed.id.clone()),
+        ] {
+            assert_ne!(from, to);
+            assert!(
+                graph.edges.iter().any(|edge| edge.kind == "references_expr"
+                    && edge.from == from
+                    && edge.to == to)
+            );
+        }
+        assert!(
+            !graph
+                .edges
+                .iter()
+                .any(|edge| edge.kind == "references_expr" && edge.from == edge.to)
+        );
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Cycles),
+        })
+        .unwrap();
+        assert!(
+            !report.findings.is_empty(),
+            "identity correction must not suppress owner-level cycle policy"
+        );
+        assert!(report.findings.iter().all(|finding| {
+            finding
+                .owner_ids
+                .iter()
+                .all(|id| id.as_str() == owner.id.as_str())
+        }));
+    }
+}
+
+#[test]
+fn generic_trait_and_self_arguments_distinguish_impl_methods() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Adapter<T>(T);
+        pub trait Convert<T> { fn convert(&self); }
+        impl Convert<u8> for Adapter<u8> { fn convert(&self) {} }
+        impl Convert<u16> for Adapter<u8> { fn convert(&self) {} }
+        impl Convert<u8> for Adapter<u16> { fn convert(&self) {} }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let implementations: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "impl" && node.impl_trait.as_deref() == Some("Convert"))
+        .collect();
+    let methods: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "method" && node.impl_trait.as_deref() == Some("Convert"))
+        .collect();
+    assert_eq!(implementations.len(), 3);
+    assert_eq!(methods.len(), 3);
+    for implementation in implementations {
+        assert_eq!(
+            graph
+                .edges
+                .iter()
+                .filter(|edge| edge.kind == "contains"
+                    && edge.from == implementation.id
+                    && methods.iter().any(|method| method.id == edge.to))
+                .count(),
+            1
+        );
+    }
+}
+
+#[test]
+fn trait_self_calls_resolve_without_inventing_inherent_methods() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Adapter;
+        pub trait Action { fn first(); fn second(); }
+        impl Action for Adapter { fn first() { Self::second(); <Self as Action>::second(); } fn second() {} }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let first = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "first" && node.impl_trait.as_deref() == Some("Action"))
+        .unwrap();
+    let second = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "second" && node.impl_trait.as_deref() == Some("Action"))
+        .unwrap();
+    assert_eq!(
+        graph
+            .edges
+            .iter()
+            .filter(|edge| edge.kind == "references_expr"
+                && edge.from == first.id
+                && edge.to == second.id)
+            .count(),
+        1
     );
 }

@@ -1,4 +1,5 @@
 use super::*;
+use crate::render::hex_encode;
 use cargo_metadata::MetadataCommand;
 
 mod build;
@@ -186,6 +187,17 @@ fn impl_owner(self_ty: &Type) -> Result<ImplOwner> {
             self_ty.to_token_stream()
         ),
     }
+}
+
+fn trait_impl_key(owner: &ImplOwner, path: &syn::Path) -> String {
+    // Keep generic arguments: Trait<u8> and Trait<u16> are different impls.
+    let trait_key = path.to_token_stream().to_string().replace(' ', "");
+    let mut key = format!("impl::{}", hex_encode(trait_key.as_bytes()));
+    let self_key = owner.self_type.replace(' ', "");
+    if owner.is_reference || self_key != owner.name {
+        key.push_str(&format!("::self::{}", hex_encode(self_key.as_bytes())));
+    }
+    key
 }
 
 pub(crate) fn trait_path_key(path: &syn::Path) -> String {
