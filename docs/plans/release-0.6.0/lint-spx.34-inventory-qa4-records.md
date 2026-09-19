@@ -101,8 +101,9 @@ Fixing commit for QA4-001 through QA4-007: `795787b`.
   `## Sprint Evaluation Rule`.
 - QA4-005: the README boundary-record paragraph is in the record examples
   section and has no standalone H2.
-- QA4-006: five assertions use the production message substrings observed in
-  `dependency_policy.rs`, `inventory/mod.rs`, and the Python validator.
+- QA4-006: `tests.rs:297` and `tests.rs:1293` were fixed in `6fc2388`;
+  `tests.rs:304`, `tests.rs:496`, and `test_lint_boundaries.py:99` were
+  fixed in `795787b`.
 - QA4-007: the planning-key test iterates a plain key array and asserts the
   production `(got `<key>`)` form.
 
