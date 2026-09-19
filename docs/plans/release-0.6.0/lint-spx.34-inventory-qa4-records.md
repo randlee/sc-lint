@@ -2,7 +2,7 @@
 sprint: lint-spx.34
 bead: lint-spx.34
 epic: lint-spx
-status: in_progress
+status: complete
 branch: fix/inventory-qa4-records
 worktree: /Users/randlee/github/sc-lint-worktrees/fix/inventory-qa4-records
 pr_target: fix/inventory-qa3-assertions-records
@@ -84,3 +84,46 @@ observed, write "not observed".
 
 - Production code; `lint-spx.11`; ADR-004 edits (`lint-spx.25`); `lint-spx.21`,
   `lint-spx.22`.
+
+## Closeout
+
+Fixing commit for QA4-001 through QA4-007: `795787b`.
+
+- QA4-001: the lint-spx.27 CI paragraph records run `35473395473`, job
+  `105978334178`, step `Run just test`, the installer panic and its 77/1
+  result, plus bead `lint-spx.11`.
+- QA4-002: the lint-spx.27 finding bullets identify `7f83534` and
+  `a6e7ca8` for the carried-forward assertion corrections.
+- QA4-003: the lint-spx.31 closeout records PR #177, run
+  `35474522996` with 8 pass, 4 pending, 0 fail, and the seven-layer stack
+  summary; `0324a1e` is identified as closeout-only.
+- QA4-004: the model heading is after the planning material and before
+  `## Sprint Evaluation Rule`.
+- QA4-005: the README boundary-record paragraph is in the record examples
+  section and has no standalone H2.
+- QA4-006: five assertions use the production message substrings observed in
+  `dependency_policy.rs`, `inventory/mod.rs`, and the Python validator.
+- QA4-007: the planning-key test iterates a plain key array and asserts the
+  production `(got `<key>`)` form.
+
+Stack summary observed before this layer and linked PR #178:
+
+- PR #115, head `3f8e61e`, `needsRebase: false`.
+- PR #168, head `f569fe3`, `needsRebase: false`.
+- PR #171, head `5a729fa`, `needsRebase: false`.
+- PR #173, head `de76d18`, `needsRebase: false`.
+- PR #175, head `eedbb3e`, `needsRebase: false`.
+- PR #176, head `0435eac`, `needsRebase: false`.
+- PR #177, head `0324a1e`, `needsRebase: false`.
+- PR #178, head `795787b`, `needsRebase: false`.
+
+Validation:
+
+- `just lint`: exit 0.
+- `just test`: exit 0.
+- `git diff --check`: exit 0.
+- `git diff --name-only`: test files and Markdown files only.
+- `gh pr checks 178`: run `35475143135`, 0 pass, 12 pending, 0 fail when
+  queried.
+- PR #178 is ready for review and linked into stack #169 with base
+  `fix/inventory-qa3-assertions-records`.
