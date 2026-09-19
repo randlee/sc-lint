@@ -9,10 +9,10 @@ use super::types::BoundaryRecord;
 use super::types::RawBoundaryRecord;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RawForbiddenPackageEdge {
-    pub(crate) from: String,
-    pub(crate) to: String,
+#[serde(untagged)]
+pub(crate) enum RawForbiddenPackageEdge {
+    Structured { from: String, to: String },
+    ArrowDelimited(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -83,6 +83,11 @@ pub(crate) enum DependencyPolicyError {
         field: &'static str,
         package: WorkspacePackageName,
     },
+    #[error("invalid forbidden edge {value:?} in boundary `{boundary_id}`: expected `from -> to`")]
+    InvalidForbiddenEdge {
+        boundary_id: BoundaryId,
+        value: String,
+    },
 }
 
 impl RawDependenciesSection {
@@ -101,10 +106,10 @@ impl RawDependenciesSection {
         let mut forbidden_edges = Vec::with_capacity(self.forbidden_edges.len());
         let mut seen_edges = BTreeSet::new();
         for raw_edge in self.forbidden_edges {
+            let (raw_from, raw_to) = raw_edge.into_parts(boundary_id)?;
             let from =
-                parse_workspace_package_name(raw_edge.from, boundary_id, "forbidden_edges[].from")?;
-            let to =
-                parse_workspace_package_name(raw_edge.to, boundary_id, "forbidden_edges[].to")?;
+                parse_workspace_package_name(raw_from, boundary_id, "forbidden_edges[].from")?;
+            let to = parse_workspace_package_name(raw_to, boundary_id, "forbidden_edges[].to")?;
             let edge = ForbiddenPackageEdge {
                 from: from.clone(),
                 to: to.clone(),
@@ -124,6 +129,32 @@ impl RawDependenciesSection {
             allowed_dependencies,
             forbidden_edges,
         })
+    }
+}
+
+impl RawForbiddenPackageEdge {
+    fn into_parts(
+        self,
+        boundary_id: &BoundaryId,
+    ) -> std::result::Result<(String, String), DependencyPolicyError> {
+        match self {
+            Self::Structured { from, to } => Ok((from, to)),
+            Self::ArrowDelimited(value) => {
+                let Some((from, to)) = value.split_once("->") else {
+                    return Err(DependencyPolicyError::InvalidForbiddenEdge {
+                        boundary_id: boundary_id.clone(),
+                        value,
+                    });
+                };
+                if from.contains("->") || to.contains("->") {
+                    return Err(DependencyPolicyError::InvalidForbiddenEdge {
+                        boundary_id: boundary_id.clone(),
+                        value,
+                    });
+                }
+                Ok((from.trim().to_string(), to.trim().to_string()))
+            }
+        }
     }
 }
 
@@ -175,8 +206,10 @@ impl TryFrom<RawBoundaryRecord> for BoundaryRecord {
             public: value.public,
             implementation: value.implementation,
             composition: value.composition,
+            ownership: value.ownership,
             callers: value.callers,
             references: value.references,
+            contracts: value.contracts,
             testing: value.testing,
             enforcement: value.enforcement,
             status: value.status,

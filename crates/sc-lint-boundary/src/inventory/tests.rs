@@ -100,6 +100,216 @@ fn loads_valid_boundary_inventory() {
 }
 
 #[test]
+fn loads_trait_public_boundary_inventory() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.write(
+        "boundaries/sc-lint-directives/trait-boundary.toml",
+        r#"
+boundary_id = "BOUNDARY-DirectiveTraitSurface"
+owner_package = "sc-lint-directives"
+owner_crate_path = "sc_lint_directives"
+name = "DirectiveTraitSurface"
+
+[public]
+trait = "Directive"
+notes = "Trait surfaces are valid public boundary declarations."
+
+[implementation]
+visibility = "trait_only"
+
+[composition]
+roots = ["Directive"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "concrete_landed"
+"#,
+    );
+
+    let inventory = load_boundary_inventory(fixture.root()).expect("trait inventory loads");
+    assert_eq!(inventory.records.len(), 2);
+    assert_eq!(
+        inventory.records[1].public.trait_name.as_deref(),
+        Some("Directive")
+    );
+    assert_eq!(inventory.records[1].public.facade, None);
+}
+
+#[test]
+fn loads_boundary_inventory_without_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fs::remove_file(fixture.root().join("boundaries/planning.toml")).expect("remove planning");
+
+    let inventory =
+        load_boundary_inventory(fixture.root()).expect("inventory loads without planning");
+
+    assert_eq!(inventory.planning.planning.current_sprint, "A.0");
+    assert!(inventory.planning.planned_items.is_empty());
+}
+
+#[test]
+fn loads_atm_boundary_vocabulary() {
+    let fixture = InventoryFixture::new();
+    fixture.write(
+        "boundaries/atm/adapter.toml",
+        r#"
+boundary_id = "BOUNDARY-AtmAdapter"
+owner_package = "atm"
+owner_crate_path = "atm"
+name = "AtmAdapter"
+
+[public]
+trait = "AdapterPort"
+notes = "A public trait surface."
+
+[implementation]
+type = "Adapter"
+module = "atm::adapter"
+visibility = "public"
+constructor = "public"
+
+[composition]
+roots = ["atm::bootstrap"]
+
+[ownership]
+io_owns = ["adapter_io"]
+io_forbidden = ["storage_io"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["atm-core"]
+forbidden_edges = ["atm -> atm-storage"]
+
+[references]
+scope = "global"
+forbidden = []
+
+[contracts]
+request_types = ["Request"]
+response_types = ["Response"]
+error_types = ["AtmError"]
+notes = ["Documented contract."]
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "active"
+notes = ["Live."]
+"#,
+    );
+    fixture.write(
+        "boundaries/atm-private/private-adapter.toml",
+        r#"
+boundary_id = "BOUNDARY-AtmPrivateAdapter"
+owner_package = "atm-private"
+owner_crate_path = "atm_private"
+name = "AtmPrivateAdapter"
+
+[public]
+facade = "private_adapter"
+
+[implementation]
+type = "PrivateAdapter"
+module = "atm_private::adapter"
+visibility = "private"
+constructor = "private"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "inside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "retired"
+"#,
+    );
+    fixture.write(
+        "boundaries/atm-crate/crate-adapter.toml",
+        r#"
+boundary_id = "BOUNDARY-AtmCrateAdapter"
+owner_package = "atm-crate"
+owner_crate_path = "atm_crate"
+name = "AtmCrateAdapter"
+
+[public]
+facade = "crate_adapter"
+
+[implementation]
+type = "CrateAdapter"
+module = "atm_crate::adapter"
+visibility = "pub(crate)"
+constructor = "pub(crate)"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "unix_implemented_windows_pending"
+"#,
+    );
+
+    let inventory = load_boundary_inventory(fixture.root()).expect("ATM vocabulary loads");
+
+    assert_eq!(inventory.records.len(), 3);
+}
+
+#[test]
 fn allows_trait_only_records_to_omit_type_and_module() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();

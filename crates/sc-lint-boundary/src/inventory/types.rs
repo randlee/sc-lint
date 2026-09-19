@@ -432,9 +432,11 @@ pub(crate) struct RawBoundaryRecord {
     pub(crate) public: PublicSection,
     pub(crate) implementation: ImplementationSection,
     pub(crate) composition: CompositionSection,
+    pub(crate) ownership: Option<OwnershipSection>,
     pub(crate) callers: Option<CallersSection>,
     pub(crate) dependencies: RawDependenciesSection,
     pub(crate) references: ReferencesSection,
+    pub(crate) contracts: Option<ContractsSection>,
     pub(crate) testing: TestingSection,
     pub(crate) enforcement: EnforcementSection,
     pub(crate) status: StatusSection,
@@ -449,9 +451,11 @@ pub(crate) struct BoundaryRecord {
     pub(crate) public: PublicSection,
     pub(crate) implementation: ImplementationSection,
     pub(crate) composition: CompositionSection,
+    pub(crate) ownership: Option<OwnershipSection>,
     pub(crate) callers: Option<CallersSection>,
     pub(crate) dependencies: PackageDependencyPolicy,
     pub(crate) references: ReferencesSection,
+    pub(crate) contracts: Option<ContractsSection>,
     pub(crate) testing: TestingSection,
     pub(crate) enforcement: EnforcementSection,
     pub(crate) status: StatusSection,
@@ -460,7 +464,10 @@ pub(crate) struct BoundaryRecord {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PublicSection {
-    pub(crate) facade: String,
+    pub(crate) facade: Option<String>,
+    #[serde(rename = "trait")]
+    pub(crate) trait_name: Option<String>,
+    pub(crate) notes: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -477,6 +484,13 @@ pub(crate) struct ImplementationSection {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CompositionSection {
     pub(crate) roots: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct OwnershipSection {
+    pub(crate) io_owns: Vec<String>,
+    pub(crate) io_forbidden: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -501,6 +515,15 @@ pub(crate) struct ReferencesSection {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct ContractsSection {
+    pub(crate) request_types: Vec<String>,
+    pub(crate) response_types: Vec<String>,
+    pub(crate) error_types: Vec<String>,
+    pub(crate) notes: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct TestingSection {
     pub(crate) allowed_test_double_paths: Vec<String>,
     pub(crate) forbidden_test_bypasses: Vec<String>,
@@ -517,6 +540,7 @@ pub(crate) struct EnforcementSection {
 #[serde(deny_unknown_fields)]
 pub(crate) struct StatusSection {
     pub(crate) state: BoundaryState,
+    pub(crate) notes: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -546,25 +570,38 @@ pub(crate) struct PlannedItem {
 pub(crate) enum Visibility {
     Public,
     TraitOnly,
+    Private,
+    #[serde(rename = "pub(crate)")]
+    PubCrate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Constructor {
     None,
+    Public,
+    Private,
+    #[serde(rename = "pub(crate)")]
+    PubCrate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ReferenceScope {
+    InsideOwnerCrate,
     OutsideOwnerCrate,
+    Global,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum BoundaryState {
+    Active,
+    Retired,
     Planned,
     ConcreteLanded,
+    StubLanded,
+    UnixImplementedWindowsPending,
     ReservedFuture,
 }
 
