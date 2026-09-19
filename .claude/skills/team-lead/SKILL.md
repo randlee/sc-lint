@@ -185,12 +185,12 @@ work and nudges the agent. A plain send opens no task, so the agent cannot
 - Before dispatch, create and dependency-wire the bead, assign it to the
   recipient's ATM identity, and use its id for `--task-id` and `task_id`. The
   assignee runs `atm task start <task-id> "<one line>"` and `bd update <task-id>
-  --claim --actor "$ATM_IDENTITY"` when `task_ready` arrives, reports at
+  --claim` when `task_ready` arrives, reports at
   meaningful milestones, and closes with a commit or PR reference.
 - **Every task must be closed.** Write the close into the assignment itself:
   the body ends with the instruction to run
-  `atm task close <task-id> completed` plus `bd close <task-id> --actor
-  "$ATM_IDENTITY"` with the commit or PR as the report when the work is done.
+  `atm task close <task-id> completed` plus `bd close <task-id>` with the
+  commit or PR as the report when the work is done.
   The orchestration dispatch templates already end this way; a hand-written
   assignment must too. An agent's queue releases the next task only when the
   current task and bead close, so an open finished task blocks everything

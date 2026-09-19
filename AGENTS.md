@@ -63,9 +63,8 @@ when the product compatibility preflight needs to be checked or repaired.
 For every dev, fix, and QA task, create and dependency-wire a bead before ATM
 dispatch; its id is the `--task-id` and template `task_id`. The lead assigns the
 bead to the recipient's ATM identity. The assignee starts with `atm task start`
-and `bd update <id> --claim --actor "$ATM_IDENTITY"`, and completes with `atm
-task close` and `bd close <id> --actor "$ATM_IDENTITY"`. Refusal leaves the bead
-open with an actor-attributed note. After each paired close the lead runs `bd
+and `bd update <id> --claim`, and completes with `atm task close` and `bd close
+<id>`. Refusal leaves the bead open with a note. After each paired close the lead runs `bd
 ready` and dispatches only newly unblocked work; rejected completed work is
 reopened or replaced by a child bead, never closed by the lead on acceptance.
 

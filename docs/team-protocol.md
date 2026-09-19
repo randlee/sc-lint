@@ -4,10 +4,10 @@ This protocol is mandatory for all `sc-lint` ATM team communications.
 
 ## Required Flow
 
-1. Read an actionable ATM assignment and immediately run `atm task start <task-id> "<one-line plan>"`, then claim its matching bead with `bd update <task-id> --claim --actor "$ATM_IDENTITY"`.
+1. Read an actionable ATM assignment and immediately run `atm task start <task-id> "<one-line plan>"`, then claim its matching bead with `bd update <task-id> --claim`.
 2. Execute the requested work.
 3. Send a concise progress report after pushing.
-4. After validation passes, close the ATM task with `atm task close <task-id> completed --stdin` and the matching bead with `bd close <task-id> --actor "$ATM_IDENTITY"`.
+4. After validation passes, close the ATM task with `atm task close <task-id> completed --stdin` and the matching bead with `bd close <task-id>`.
 5. No silent processing; report blockers promptly.
 
 Every assignment is dispatched as `atm task assign <agent> --task-id <task-id> --template <template.j2> --vars <vars.json>`. Do not hand-render an assignment and send it with `atm send`.
@@ -15,9 +15,7 @@ Every assignment is dispatched as `atm task assign <agent> --task-id <task-id> -
 For dev, fix, and QA work, the bead id is the ATM task id. The lead creates and
 dependency-wires beads before dispatch, sets `--assignee` to the recipient's ATM
 identity, and runs `bd ready` after each paired close to dispatch only newly
-unblocked work. Assignees must use `--actor "$ATM_IDENTITY"` (or export
-`BEADS_ACTOR="$ATM_IDENTITY"`) because the shared git identity is not an agent
-identity. A refused ATM task leaves its bead open with an actor-attributed note;
+unblocked work. A refused ATM task leaves its bead open with a note;
 if completed work is rejected, the lead reopens the bead or creates a child bead.
 
 ## Messaging Rules

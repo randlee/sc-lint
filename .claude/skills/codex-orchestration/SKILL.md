@@ -91,6 +91,8 @@ Before starting a sprint:
 9. `.claude/agents/rust-best-practices-agent.md` and
    `.claude/skills/codex-orchestration/rust-best-practices-agent-assignment.json.j2`
    exist for first-pass boundary optimization review.
+10. Every agent pane exports `BEADS_ACTOR` equal to its `ATM_IDENTITY` (the
+    pane name, not an alias), and bead assignee values use those same names.
 
 ## Beads
 
@@ -98,19 +100,18 @@ This is the one lifecycle contract for development, fix, and QA work.
 
 1. **Identity and dispatch.** Before dispatch, the lead creates one bead for
    each task, sets its assignee to the recipient's ATM identity, and uses that
-   bead id everywhere: `bd update <bead-id> --assignee=<atm-identity> --actor
-   "$ATM_IDENTITY"`; `atm task assign --task-id <bead-id>`; and template-vars
+   bead id everywhere: `bd update <bead-id> --assignee=<atm-identity>`;
+   `atm task assign --task-id <bead-id>`; and template-vars
    `task_id`. Release work is a child of its release epic (`bd create --parent
    <epic>`).
-2. **Assignee-owned tandem lifecycle.** The assignee uses its ATM identity as
-   the Beads actor (either export `BEADS_ACTOR="$ATM_IDENTITY"` in its pane or
-   pass `--actor "$ATM_IDENTITY"`): start with `atm task start <id> "<plan>"`
-   and `bd update <id> --claim --actor "$ATM_IDENTITY"`; after successful
-   validation, close with `atm task close <id> completed --stdin` and
-   `bd close <id> --actor "$ATM_IDENTITY"`. A refusal runs `atm task close
-   <id> refused "<reason>"` and leaves the bead open with an actor-attributed
-   note (`bd update <id> --notes "<reason>" --actor "$ATM_IDENTITY"`). A push
-   or progress report closes neither system.
+2. **Assignee-owned tandem lifecycle.** First self-check `[ "$BEADS_ACTOR" =
+   "$ATM_IDENTITY" ]`. If it fails, stop and report to the lead rather than
+   claiming under the shared git user. Then start with `atm task start <id>
+   "<plan>"` and `bd update <id> --claim`; after successful validation, close
+   with `atm task close <id> completed --stdin` and `bd close <id>`. A refusal
+   runs `atm task close <id> refused "<reason>"` and leaves the bead open with
+   a note (`bd update <id> --notes "<reason>"`). A push or progress report
+   closes neither system.
 3. **Dependency-driven flow.** Before the first dispatch, the lead creates an
    epic chain with `bd dep add <next> <prereq>`; each QA bead depends on its
    dev bead, and merge/release beads depend on the latest QA bead. After a QA
@@ -120,8 +121,7 @@ This is the one lifecycle contract for development, fix, and QA work.
    add <merge> <qa-2>`). Then `bd ready` must show the fixes, not merge. A
    merge bead is dispatchable only when its latest QA bead closed PASS. An
    assignee views its own work with `bd ready --assignee "$ATM_IDENTITY"`; the
-   lead uses unfiltered `bd ready` for dispatch. `--actor` records identity and
-   claim ownership; it does not filter either view.
+   lead uses unfiltered `bd ready` for dispatch.
 4. **QA findings and rejected work.** After `/triaging-findings`, each promoted
    finding is a child bead of the epic and its id is the fix task id. For a
    failed QA round, every fix bead blocks its follow-up QA bead, which in turn
