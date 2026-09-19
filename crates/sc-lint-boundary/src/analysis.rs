@@ -520,7 +520,8 @@ fn owner_id_for_node_id(node_id: &NodeId, node_kind: &str) -> Option<OwnerId> {
             .rsplit_once("::")
             .map(|(parent, _)| OwnerId::new(parent)),
         "method" => node_id
-            .rsplit_once("::")
+            .split_once("::impl::")
+            .or_else(|| node_id.rsplit_once("::"))
             .map(|(parent, _)| OwnerId::new(parent)),
         "variant" => node_id
             .rsplit_once("::variant::")
