@@ -128,7 +128,7 @@ the next sprints ready to run. Stay silent in ATM unless a teammate has to act.
 
 ## Documentation
 
-atm-core ships its own conceptual and command help — prefer it over
+the `atm` CLI ships its own conceptual and command help — prefer it over
 re-deriving procedural detail here:
 
 ```bash

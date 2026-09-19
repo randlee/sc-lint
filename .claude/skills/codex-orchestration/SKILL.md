@@ -22,7 +22,7 @@ This skill defines the repo-local orchestration workflow for this repository.
 
 - The **lead** coordinates sprint sequencing, worktree assignments, PR flow,
   and every dispatch and report in this skill. `team-lead` is the default
-  lead; `fenix` or any other identity may hold the role.
+  lead; `flint` or any other identity may hold the role.
 - the developer is the agent the lead assigns the task to:
   `atm task assign <agent> --template <template> --vars <json>`. That
   positional agent is the only place a developer is named. No template takes
@@ -202,7 +202,7 @@ to assign a read-only review to a developer.
 After the phase lands, where the repository carries `triaging-findings`, run
 its post-mortem
 (`.claude/skills/triaging-findings/references/post-mortem.md`); the write-up
-lives in `docs/postmortems/` and feeds the stack guidelines above.
+lives in `docs/plans/` and feeds the branch-management rules in `CLAUDE.md` and `AGENTS.md`.
 
 For phase-ending QA routed through `quality-mgr`, the reviewer set is
 mandatory:

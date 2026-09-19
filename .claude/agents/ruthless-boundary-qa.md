@@ -58,12 +58,12 @@ When `findings_scope_locked` is absent or `false`, this restriction does not app
 ## Execution Steps
 
 1. Read:
-   - `docs/architecture/boundary/general-guidelines.md`
-   - `docs/architecture/boundary/crosshost-compose-directdeliver.md`
-   - `docs/architecture/boundary/atm-graft-trait-leak.md`
-   - `docs/architecture/boundary/rusqlite-storage-coupling.md`
-   - `.claude/agents/boundary-guard.md`
-   - `docs/adr/ADR-001-sealed-trait-pattern.md`
+   - `docs/architecture.md`
+   - `docs/requirements.md`
+   - `docs/sc-lint-boundary/`
+   - `docs/sc-lint-boundary/`
+   - `.claude/agents/rust-best-practices-agent.md`
+   - `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`
    - `docs/sc-lint/README.md`
 2. Treat these enforcement surfaces as mandatory evidence, not optional context:
    - `boundaries/**/*.toml`
@@ -128,9 +128,9 @@ When `findings_scope_locked` is absent or `false`, this restriction does not app
         "evidence": "Why this is real.",
         "justification_check": "Missing requirement/ADR justification | duplicated implementation | collapsible path | justified and retained",
         "related_artifacts": [
-          "boundaries/atm-core/example.toml",
+          "boundaries/",
           ".just/lint_boundaries.py",
-          "docs/architecture/boundary/general-guidelines.md"
+          "docs/architecture.md"
         ]
       }
     ],
@@ -158,4 +158,3 @@ When `findings_scope_locked` is absent or `false`, this restriction does not app
 - invalid input -> `success: false`, `error.code: invalid_input`
 - missing required evidence -> `success: false`, `error.code: review_error`
 - never output prose outside fenced JSON
-
