@@ -2,7 +2,7 @@
 sprint: lint-spx.13
 bead: lint-spx.13
 epic: lint-spx
-status: planned
+status: complete
 branch: chore/orchestration-script-tests
 worktree: /Users/randlee/github/sc-lint-worktrees/chore/orchestration-script-tests
 pr_target: chore/orchestration-beads-lifecycle
