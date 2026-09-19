@@ -27,4 +27,3 @@ def parse_version(text: str | None) -> tuple[int, int, int] | None:
         return None
     match = _VERSION_RE.search(text)
     return tuple(int(part) for part in match.groups()) if match else None
-
