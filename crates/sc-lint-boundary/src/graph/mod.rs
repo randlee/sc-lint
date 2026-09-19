@@ -150,6 +150,7 @@ struct ImplOwner {
     name: String,
     self_type: String,
     is_reference: bool,
+    needs_self_discriminator: bool,
 }
 
 fn impl_owner(self_ty: &Type) -> Result<ImplOwner> {
@@ -163,6 +164,10 @@ fn impl_owner(self_ty: &Type) -> Result<ImplOwner> {
                 name: segment.ident.to_string(),
                 self_type: self_ty.to_token_stream().to_string(),
                 is_reference: false,
+                // A qualified path such as `crate::Owner` names the same type
+                // as `Owner`; retain the established implementation ID. Only
+                // arguments distinguish otherwise-overlapping path owners.
+                needs_self_discriminator: !matches!(segment.arguments, syn::PathArguments::None),
             })
         }
         Type::Reference(reference) => {
@@ -178,6 +183,7 @@ fn impl_owner(self_ty: &Type) -> Result<ImplOwner> {
             };
             owner.self_type = format!("&{lifetime}{mutability}{}", owner.self_type);
             owner.is_reference = true;
+            owner.needs_self_discriminator = true;
             Ok(owner)
         }
         Type::Paren(paren) => impl_owner(&paren.elem),
@@ -194,7 +200,7 @@ fn trait_impl_key(owner: &ImplOwner, path: &syn::Path) -> String {
     let trait_key = path.to_token_stream().to_string().replace(' ', "");
     let mut key = format!("impl::{}", hex_encode(trait_key.as_bytes()));
     let self_key = owner.self_type.replace(' ', "");
-    if owner.is_reference || self_key != owner.name {
+    if owner.needs_self_discriminator {
         key.push_str(&format!("::self::{}", hex_encode(self_key.as_bytes())));
     }
     key

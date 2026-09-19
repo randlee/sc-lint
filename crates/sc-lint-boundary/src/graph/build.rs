@@ -123,6 +123,12 @@ fn resolve_trait_method_edges(builder: &mut GraphBuilder) {
         .map(|node| (node.id.clone(), node))
         .collect();
     let known: BTreeSet<_> = builder.nodes.iter().map(|node| node.id.clone()).collect();
+    let reference_impls: BTreeSet<_> = builder
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "impl" && node.label.contains(" for &"))
+        .map(|node| node.id.clone())
+        .collect();
     for edge in &mut builder.edges {
         if !matches!(edge.kind, "references" | "references_expr") || known.contains(&edge.to) {
             continue;
@@ -143,9 +149,14 @@ fn resolve_trait_method_edges(builder: &mut GraphBuilder) {
             }
         }
         let prefix = format!("{owner}::impl::");
-        let mut candidates = methods
-            .values()
-            .filter(|node| node.id.starts_with(&prefix) && node.label == method);
+        let mut candidates = methods.values().filter(|node| {
+            node.id.starts_with(&prefix)
+                && node.label == method
+                && node
+                    .id
+                    .rsplit_once("::")
+                    .is_none_or(|(impl_id, _)| !reference_impls.contains(&NodeId::new(impl_id)))
+        });
         if let Some(candidate) = candidates.next()
             && candidates.next().is_none()
         {
