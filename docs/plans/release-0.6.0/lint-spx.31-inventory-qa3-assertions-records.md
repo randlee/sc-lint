@@ -91,7 +91,8 @@ load.
 
 ## Closeout
 
-Implementation and record fixes are in `a6e7ca8`:
+Implementation and record fixes are in `a6e7ca8`; the final QA3-008 assertion
+correction is in `01a4ab3`:
 
 - QA3-001: the two invalid planning keys each use a separate fixture/load and
   assert `planning keys must use` plus the offending key.
@@ -110,7 +111,7 @@ Implementation and record fixes are in `a6e7ca8`:
 - QA3-007: project-plan QA records identify `bd show` sources and include
   `.28`, `.31`, and `.32` in order without the extra blank line.
 - QA3-008: every omnibus unknown-field case asserts `unknown field `<key>``
-  with its own key.
+  with its own key; the final planning-table assertions are in `01a4ab3`.
 
 The initial stack gate showed PRs 115, 168, 171, 173, 175, and 176 present,
 all mergeable, with `needsRebase: false`; this branch is the new top layer.
