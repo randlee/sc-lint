@@ -29,7 +29,7 @@ defaults:
   "worktree_path": {{ worktree_path }},
   "review_targets": {{ review_targets }},
   "topics": {% if topics %}
-    [{% for topic in topics %}"{{ topic }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    [{% for topic in topics %}{{ topic }}{% if not loop.last %}, {% endif %}{% endfor %}]
   {% elif review_mode == "doc_review" %}
     ["config_validation", "timeouts", "graceful_shutdown", "retry_scope", "backpressure", "health_readiness"]
   {% elif review_mode == "sprint_review" %}

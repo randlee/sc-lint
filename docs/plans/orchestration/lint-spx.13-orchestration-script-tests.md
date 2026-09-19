@@ -68,6 +68,15 @@ every template must accept exactly what its caller is told to pass.
 - This doc's frontmatter is `status: complete`; bead `lint-spx.13` claimed and
   closed in tandem with the ATM task.
 
+## Gate behavior
+
+`just lint` and `just test` invoke `sc_lint.run_pytests`, which runs the
+repository unittest suite and then the six ported pytest files explicitly.
+Template composition uses `atm compose` when `atm` is on `PATH`; a CI image
+without it instead performs a named Jinja2 syntax/`StrictUndefined` check with
+autoescape disabled. The canonical triage-record test names and reports its
+`sc-compose` Python-binding skip when that optional binding is unavailable.
+
 ## This sprint does not close
 
 - plan-hardening templates (bead `lint-spx.12`).

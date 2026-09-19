@@ -70,7 +70,7 @@ def main() -> int:
     print(f"source_venv: installing sc_lint into {VENV_DIR}", file=sys.stderr)
     subprocess.run(install, check=True)
     subprocess.run(
-        [str(python), "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "pytest>=8,<9", "rdflib>=7,<8"],
+        [str(python), "-m", "pip", "install", "--quiet", "--disable-pip-version-check", "pytest>=8,<9", "rdflib>=7,<8", "Jinja2>=3.1,<4", "PyYAML>=6,<7"],
         check=True,
     )
     STAMP.write_text(fingerprint + "\n", encoding="utf-8")

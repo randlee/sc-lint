@@ -45,6 +45,9 @@ with free-form input.
   ],
   "practice_mode": "all | selected",
   "practice_ids": ["RBP-001", "RBP-004"],
+  "round_limit": false,
+  "changed_files": ["optional files changed in the assigned round"],
+  "triage_records": ["optional triage-record paths relevant to this review"],
   "carry_forward_findings": ["optional/pre-existing finding ids assigned for verification this round"],
   "findings_scope_locked": false,
   "notes": "optional context"
@@ -57,6 +60,8 @@ Rules:
 - `practice_mode` is required.
 - `review_targets` is optional. Omit to review default changed-file scope plus directly impacted boundaries.
 - `practice_ids` must be non-empty when `practice_mode` is `selected`.
+- `round_limit`, `changed_files`, and `triage_records` are optional lifecycle
+  context supplied by the orchestration caller.
 - Unknown practice ids are input errors. Do not guess.
 - When `practice_mode` is `all`, review the full canonical inventory from `practice-inventory.md`.
 

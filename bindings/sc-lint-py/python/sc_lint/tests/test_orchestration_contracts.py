@@ -142,6 +142,9 @@ class TemplateContractTests(unittest.TestCase):
     AGENT_CONTRACTS = {
         "flaky-test-qa-assignment.json.j2": REPO / ".claude/agents/flaky-test-qa.md",
         "ruthless-boundary-qa-assignment.json.j2": REPO / ".claude/agents/ruthless-boundary-qa.md",
+        "rust-best-practices-assignment.json.j2": REPO / ".claude/agents/rust-best-practices-agent.md",
+        "rust-qa-assignment.json.j2": REPO / ".claude/agents/rust-qa-agent.md",
+        "rust-service-hardening-assignment.json.j2": REPO / ".claude/agents/rust-service-hardening-agent.md",
     }
 
     @staticmethod
@@ -151,9 +154,44 @@ class TemplateContractTests(unittest.TestCase):
             raise AssertionError(f"missing fenced JSON input contract: {agent}")
         return set(re.findall(r'^  "([^"]+)"\s*:', match.group(1), re.M))
 
+    @staticmethod
+    def jinja_parts(template: Path) -> tuple[dict[str, object], str]:
+        """Return ATM defaults and body for the Jinja CI-only fallback."""
+        content = template.read_text(encoding="utf-8")
+        if content.startswith("---\n"):
+            _, front_matter, content = content.split("---\n", 2)
+            import yaml
+
+            metadata = yaml.safe_load(front_matter)
+            return metadata.get("defaults", {}), content
+        return {}, content
+
+    def compose(self, template: Path, sample: Path) -> str:
+        """Use ATM when available; otherwise validate Jinja syntax and variables.
+
+        ATM's JSON rendering semantics are authoritative.  The Jinja fallback
+        deliberately validates template syntax with autoescape disabled and
+        StrictUndefined enabled, so a minimal CI image still catches missing
+        variables rather than silently skipping this suite.
+        """
+        if shutil.which("atm"):
+            result = subprocess.run(
+                ["atm", "compose", "--template", str(template), "--vars", str(sample)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout
+
+        from jinja2 import Environment, StrictUndefined
+
+        defaults, body = self.jinja_parts(template)
+        variables = {**defaults, **json.loads(sample.read_text(encoding="utf-8"))}
+        renderer = Environment(autoescape=False, undefined=StrictUndefined)
+        return renderer.from_string(body).render(**variables)
+
     def test_every_orchestration_template_has_a_sample_and_composes(self) -> None:
-        if shutil.which("atm") is None:
-            self.skipTest("atm is not on PATH; cannot exercise daemon template composition")
         templates = [
             template
             for directory in self.TEMPLATE_DIRS
@@ -166,21 +204,24 @@ class TemplateContractTests(unittest.TestCase):
                     sample_name += ".json"
                 sample = template.parent / "vars" / sample_name
                 self.assertTrue(sample.is_file(), f"missing committed sample vars: {sample}")
-                result = subprocess.run(["atm", "compose", "--template", str(template), "--vars", str(sample)], capture_output=True, text=True, check=False)
-                self.assertEqual(result.returncode, 0, result.stderr)
+                rendered = self.compose(template, sample)
+                if shutil.which("atm") is None:
+                    continue
                 if template.name in self.AGENT_CONTRACTS:
-                    payload = json.loads(result.stdout)
+                    payload = json.loads(rendered)
                     self.assertEqual(set(payload), self.fenced_json_keys(self.AGENT_CONTRACTS[template.name]))
                 elif template.name in self.EXPECTED_JSON_KEYS:
-                    payload = json.loads(result.stdout)
+                    payload = json.loads(rendered)
                     self.assertEqual(set(payload), self.EXPECTED_JSON_KEYS[template.name])
 
     def test_missing_sample_var_fails_composition(self) -> None:
-        if shutil.which("atm") is None:
-            self.skipTest("atm is not on PATH; cannot exercise daemon template composition")
         template = self.TEMPLATE_DIRS[0] / "ruthless-boundary-qa-assignment.json.j2"
         with tempfile.TemporaryDirectory() as directory:
             bad_vars = Path(directory) / "bad.json"
             bad_vars.write_text('{"review_mode":"sprint","worktree_path":"/tmp"}', encoding="utf-8")
-            result = subprocess.run(["atm", "compose", "--template", str(template), "--vars", str(bad_vars)], capture_output=True, text=True, check=False)
-        self.assertNotEqual(result.returncode, 0)
+            if shutil.which("atm"):
+                result = subprocess.run(["atm", "compose", "--template", str(template), "--vars", str(bad_vars)], capture_output=True, text=True, check=False)
+                self.assertNotEqual(result.returncode, 0)
+            else:
+                with self.assertRaisesRegex(Exception, "undefined|Undefined"):
+                    self.compose(template, bad_vars)

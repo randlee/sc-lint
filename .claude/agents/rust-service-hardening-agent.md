@@ -44,6 +44,11 @@ with free-form input.
     "actix-web",
     "reqwest"
   ],
+  "service_indicators_extra": ["optional additional service indicators"],
+  "round_limit": false,
+  "changed_files": ["optional files changed in the assigned round"],
+  "triage_records": ["optional triage-record paths relevant to this review"],
+  "carry_forward_findings": ["optional/pre-existing finding ids assigned for verification this round"],
   "notes": "optional context"
 }
 ```
@@ -54,6 +59,9 @@ Rules:
 - `topics` is optional. Omit to use the default topic set for the selected review mode.
 - `service_indicator_dependencies` is optional. Omit to use the default service-indicator dependency list shown above.
 - `review_targets` is optional. Omit to review default changed-file scope plus directly impacted runtime boundaries.
+- `service_indicators_extra`, `round_limit`, `changed_files`, `triage_records`,
+  and `carry_forward_findings` are optional lifecycle context supplied by the
+  orchestration caller.
 
 ## Review Process
 
