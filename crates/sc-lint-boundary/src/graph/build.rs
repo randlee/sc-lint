@@ -487,7 +487,8 @@ fn ingest_module_items(
                 );
             }
             Item::Impl(item_impl) => {
-                let owner_name = impl_owner_name(&item_impl.self_ty)?;
+                let owner = impl_owner(&item_impl.self_ty)?;
+                let owner_name = &owner.name;
                 let owner_node_id = NodeId::new(format!("{parent_module_id}::{owner_name}"));
                 let trait_path = item_impl
                     .trait_
@@ -500,6 +501,22 @@ fn ingest_module_items(
                     ))
                 } else {
                     NodeId::new(format!("{owner_node_id}::impl::inherent"))
+                };
+
+                // Keep established path-owner IDs stable. References share the
+                // target type, but must not merge their impls or methods with it.
+                let impl_node_id = if owner.is_reference {
+                    NodeId::new(format!(
+                        "{impl_node_id}::self::{}",
+                        hex_encode(owner.self_type.as_bytes())
+                    ))
+                } else {
+                    impl_node_id
+                };
+                let owner_label = if owner.is_reference {
+                    &owner.self_type
+                } else {
+                    owner_name
                 };
 
                 if !builder
@@ -533,8 +550,8 @@ fn ingest_module_items(
                     kind: NodeKind::Impl.as_str(),
                     label: trait_path
                         .as_ref()
-                        .map(|path| format!("impl {path} for {owner_name}"))
-                        .unwrap_or_else(|| format!("impl {owner_name}")),
+                        .map(|path| format!("impl {path} for {owner_label}"))
+                        .unwrap_or_else(|| format!("impl {owner_label}")),
                     visibility: None,
                     package: context.package_name.clone(),
                     target: Some(context.target_name.clone()),
@@ -585,8 +602,13 @@ fn ingest_module_items(
 
                 for impl_item in item_impl.items {
                     if let ImplItem::Fn(method) = impl_item {
+                        let method_owner = if owner.is_reference {
+                            &impl_node_id
+                        } else {
+                            &owner_node_id
+                        };
                         let method_id =
-                            NodeId::new(format!("{owner_node_id}::{}", method.sig.ident));
+                            NodeId::new(format!("{method_owner}::{}", method.sig.ident));
                         builder.add_node(GraphNode {
                             id: method_id.clone(),
                             kind: NodeKind::Method.as_str(),
@@ -622,7 +644,7 @@ fn ingest_module_items(
                             module_path,
                             collect_references_with(
                                 &local_owner_names,
-                                Some(&owner_name),
+                                Some(owner_name),
                                 &context.workspace_dependency_roots,
                                 |collector| {
                                     collector.visit_impl_item_fn(&method);
