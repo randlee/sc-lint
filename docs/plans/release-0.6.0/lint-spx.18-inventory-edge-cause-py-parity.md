@@ -87,5 +87,5 @@ SC-QA-006 (only the items introduced by PR #115).
 Focused validation passed before the final aggregate gates: `cargo test -p
 sc-lint-boundary inventory::tests --lib` (40 passed),
 `python -m unittest ...test_lint_boundaries` (6 passed), and `git diff --check`.
-The final branch commit and `just lint` / `just test` evidence are recorded in
-the ATM closeout for this layer.
+Implementation commit: `703df05`. Final aggregate validation passed with
+`just lint` and `just test`; the ATM closeout records the gate evidence.
