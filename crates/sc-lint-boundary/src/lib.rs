@@ -451,6 +451,8 @@ impl GraphBuilder {
                 .then_with(|| left.from.cmp(&right.from))
                 .then_with(|| left.to.cmp(&right.to))
         });
+        // Deferred method resolution can make previously distinct edges equal.
+        self.edges.dedup();
 
         GraphExport {
             tool: SC_LINT_BOUNDARY_TOOL,

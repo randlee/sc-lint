@@ -69,6 +69,22 @@ Notes:
   - `crate`
   - `restricted`
 
+### Method identity
+
+Inherent methods retain `<owner>::<method>` IDs. Trait methods use
+`<impl-id>::<method>`, so traits with the same method name do not share a node
+with each other or with inherent methods. Implementation keys retain trait
+arguments and nontrivial self types, including references and generic arguments.
+Consumers should use node metadata and `contains`/`declares`/`targets` edges
+rather than infer trait ownership from a method-name suffix.
+
+Qualified trait calls resolve to the corresponding implementation method.
+Unqualified calls prefer an existing inherent target; otherwise the analyzer
+uses the current trait implementation or a unique trait-method candidate.
+Ambiguous candidates remain unresolved instead of being merged. Cycle rules
+still operate on the underlying type owner; distinct methods do not imply a
+waiver of owner-level cycle diagnostics.
+
 ## Edge Model
 
 Current edge kinds:
