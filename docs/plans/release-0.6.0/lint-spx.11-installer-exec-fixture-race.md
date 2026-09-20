@@ -117,7 +117,8 @@ attribute, `--test-threads=1`, a global test mutex, CI reruns.
   ETXTBSY failure was not reproduced on this host.
 - Deliverable 5: comments at `installer.rs:1119` and `:1331` state that the
   test process must not own a write fd for an executable it probes.
-- Validation: focused installer suite `10 passed`; `git diff --check` exit 0;
-  PR #180 is ready for review, based on `develop`, and `gh stack view --json`
-  reports one layer with `needsRebase=false`. Aggregate gates and PR checks
-  are recorded after they complete.
+- Validation: focused installer suite `10 passed`; `just lint` exit 0; `just
+  test` exit 0; `git diff --check` exit 0. The added-line forbidden-mechanism
+  grep returned no output. PR #180 is ready for review, based on `develop`,
+  and `gh stack view --json` reports one layer with `needsRebase=false`.
+  PR #180 CI run `35477797540` was observed as `0 pass / 12 pending / 0 fail`.
