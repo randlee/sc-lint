@@ -215,7 +215,6 @@ For implementation QA-1 in this Rust repo:
 - always run `rust-qa-agent`
 - always run `rust-best-practices-agent`
 - always run `rust-service-hardening-agent`
-- always run `rust-service-hardening-agent`
 - run `flaky-test-qa` when tests changed, CI shows intermittent behavior, or
   `rust-qa-agent` surfaces unstable execution symptoms
 
