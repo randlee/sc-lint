@@ -17,6 +17,29 @@ The project focus is:
 - migrating generic lint/view tooling into `sc-lint`
 - moving boundary inventory and manifest-policy enforcement from Python into
   `sc-lint-boundary`
+- release 0.6.0 inventory strict-edge hardening (`lint-spx.14`)
+  - see [docs/plans/release-0.6.0/lint-spx.14-inventory-strict-edges.md](./plans/release-0.6.0/lint-spx.14-inventory-strict-edges.md)
+- release 0.6.0 inventory decision (`lint-spx.15`; bead: `lint-spx.15`)
+- release 0.6.0 inventory planning and owner-path hardening (`lint-spx.17`)
+  - see [docs/plans/release-0.6.0/lint-spx.17-inventory-planning-required.md](./plans/release-0.6.0/lint-spx.17-inventory-planning-required.md)
+- release 0.6.0 PR #115 QA-1 gate (`lint-spx.16`; verdict: FAIL)
+  - record: `bd show lint-spx.16` (QA bead; no sprint document)
+- release 0.6.0 inventory edge-cause and Python parity (`lint-spx.18`)
+  - see [docs/plans/release-0.6.0/lint-spx.18-inventory-edge-cause-py-parity.md](./plans/release-0.6.0/lint-spx.18-inventory-edge-cause-py-parity.md)
+- release 0.6.0 QA-1 documentation and test hardening (`lint-spx.19`)
+  - see [docs/plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md](./plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md)
+- release 0.6.0 PR #115 QA-2 gate (`lint-spx.20`; verdict: FAIL)
+  - record: `bd show lint-spx.20` (QA bead; no sprint document)
+- release 0.6.0 QA-2 parity assertions and records (`lint-spx.27`)
+  - see [docs/plans/release-0.6.0/lint-spx.27-inventory-qa2-parity-assertions.md](./plans/release-0.6.0/lint-spx.27-inventory-qa2-parity-assertions.md)
+- release 0.6.0 QA-3 gate (`lint-spx.28`; verdict: FAIL)
+  - record: `bd show lint-spx.28` (QA bead; no sprint document)
+- release 0.6.0 QA-3 assertion and records fixes (`lint-spx.31`)
+  - see [docs/plans/release-0.6.0/lint-spx.31-inventory-qa3-assertions-records.md](./plans/release-0.6.0/lint-spx.31-inventory-qa3-assertions-records.md)
+- release 0.6.0 QA-4 gate (`lint-spx.32`)
+  - record: `bd show lint-spx.32` (QA bead; no sprint document)
+- release 0.6.0 QA-4 record and documentation fixes (`lint-spx.34`)
+  - see [docs/plans/release-0.6.0/lint-spx.34-inventory-qa4-records.md](./plans/release-0.6.0/lint-spx.34-inventory-qa4-records.md)
 - planning direct workspace package-edge enforcement from boundary inventory in
   `sc-lint-boundary`
 - backporting reusable lint families that were first proven on `atm-core`
