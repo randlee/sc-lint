@@ -107,7 +107,7 @@ After each scrum-master reports completion:
 
 ### 4. Post-sprint: clint design review
 
-After every sprint PR is merged to `integrate/phase-{N}`, request an `arch-ctm`
+After every sprint PR is merged to `integrate/phase-{N}`, request a `clint`
 review via ATM CLI. Do not block the next eligible sprint unless clint
 reports critical blocking findings.
 

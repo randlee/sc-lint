@@ -106,3 +106,28 @@ hardening scope from this plan.
   different whitespace around Jinja block output.
 - `.claude/skills/codex-orchestration/arch-qa-assignment.json.j2` is bytewise
   identical to `atm-core` `origin/develop`.
+
+## lint-spx.36 Closeout
+
+- Byte-identical to `atm-core origin/develop`: `ruthless-boundary-qa-assignment.json.j2`
+  (`d16e9d49d40015321e7e51ac7a82b162dd63856c`),
+  `rust-service-hardening-assignment.json.j2`
+  (`c17b981f54f3eaf8e76b4192fc92b82a0d1d6876`), and
+  `validate-findings.sparql` (`a8756c01bbea1cae0b41d24cbb059debb58a3fed`).
+- AUDIT-5a: `quality-mgr.md`, `codex-orchestration/SKILL.md`, and
+  `qa-template.xml.j2` restore `ruthless-boundary-qa` in each reviewer set.
+- AUDIT-5c: `team-lead/SKILL.md` restores the upstream task-close paragraph
+  beside A2 Beads commands; `roster_check.py` retains only the B column-width
+  change; `backup-and-restore-team.md` is deleted.
+- A1: `phase-orchestration/SKILL.md`, `triaging-findings/SKILL.md`,
+  `qa-triage.md`, and `codex-orchestration/SKILL.md` restore upstream
+  integration-branch text with approved agent-name substitutions.
+- A2: `quality-mgr.md`, the three dispatch templates, and the Beads sections
+  retain the assigned-bead claim/close lifecycle additions. B: the sc-lint
+  `just lint && just test` substitutions and roster column-width fix remain.
+- No sc-lint equivalent was found for upstream boundary reading-list entries:
+  `crosshost-compose-directdeliver.md`, `atm-graft-trait-leak.md`,
+  `rusqlite-storage-coupling.md`, `boundary-guard.md`, and
+  `ADR-001-sealed-trait-pattern.md`.
+- Lead-ruling records: the restored upstream gh-stack-guidelines link in
+  `codex-orchestration/SKILL.md`, and its former pane-name-versus-alias text.

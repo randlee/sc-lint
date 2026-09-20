@@ -61,10 +61,7 @@ def find_problems(
 
 
 def run_json(command: list[str]) -> dict:
-    try:
-        completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    except OSError as error:
-        raise RuntimeError(f"{' '.join(command)} could not be executed: {error}") from error
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
         raise RuntimeError(f"{' '.join(command)} failed: {completed.stderr.strip()}")
     return json.loads(completed.stdout)
@@ -82,9 +79,6 @@ def main() -> int:
         config = config_aliases(tomllib.loads(Path(args.atm_toml).read_text("utf-8")), args.team)
         roster = run_json(["atm", "members", "--team", args.team, "--json"])["members"]
         agents = run_json(["herdr", "agent", "list"])["result"]["agents"]
-    except tomllib.TOMLDecodeError as error:
-        print(f"roster_check: {args.atm_toml}: malformed TOML: {error}", file=sys.stderr)
-        return 2
     except (OSError, RuntimeError, KeyError, ValueError) as error:
         print(f"roster_check: {error}", file=sys.stderr)
         return 2
