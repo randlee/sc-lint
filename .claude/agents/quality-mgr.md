@@ -34,7 +34,7 @@ Always read before starting a QA assignment:
 - `docs/team-protocol.md`
 - `.claude/agents/req-qa.md`
 - `.claude/agents/arch-qa.md`
-- `.claude/agents/rust-best-practices-agent.md`
+- `.claude/agents/ruthless-boundary-qa.md`
 - `.claude/agents/flaky-test-qa.md`
 - `.claude/skills/quality-management-gh/SKILL.md`
 - `.claude/skills/todo-triage/SKILL.md`
@@ -215,7 +215,7 @@ For implementation QA-1 in this Rust repo:
 - always run `ruthless-boundary-qa`
 - always run `rust-best-practices-agent`
 - always run `rust-qa-agent`
-- always run `rust-best-practices-agent`
+- always run `rust-service-hardening-agent`
 - always run `rust-service-hardening-agent`
 - run `flaky-test-qa` when tests changed, CI shows intermittent behavior, or
   `rust-qa-agent` surfaces unstable execution symptoms
@@ -225,7 +225,7 @@ For QA-2 and later (fix-verification) rechecks of implementation work:
 - always run `arch-qa`
 - always run `rust-qa-agent` (objective execution-fact gates: fmt, clippy,
   tests, lint, RULE-003, pytests — not a subjective findings pass)
-- do not run `rust-best-practices-agent`
+- do not run `ruthless-boundary-qa`
 - do not run `rust-best-practices-agent`
 - do not run `rust-service-hardening-agent`
 - run `flaky-test-qa` when tests changed, CI shows intermittent behavior, or
@@ -236,7 +236,7 @@ For QA-2 and later (fix-verification) rechecks of implementation work:
   the report and does not affect the verdict
 
 Boundary-review deployment rule:
-- `rust-best-practices-agent`, `rust-best-practices-agent`, and
+- `ruthless-boundary-qa`, `rust-best-practices-agent`, and
   `rust-service-hardening-agent` are QA-1 only — unconditionally omit all
   three from QA-2 and later fix-verification rounds on the same sprint
   branch, with no lead-narrowing carve-out needed
@@ -249,7 +249,7 @@ Boundary-review deployment rule:
 For phase-ending QA:
 - always run `req-qa`
 - always run `arch-qa`
-- always run `rust-best-practices-agent`
+- always run `ruthless-boundary-qa`
 - always run `rust-qa-agent`
 - always run `rust-best-practices-agent`
 - always run `rust-service-hardening-agent`
@@ -266,7 +266,7 @@ For phase-ending QA:
 For docs-only plan review (`review_mode: plan`):
 - run `req-qa`
 - run `arch-qa`
-- run `rust-best-practices-agent`
+- run `ruthless-boundary-qa`
 - always run `rust-best-practices-agent`
 - always run `rust-service-hardening-agent`
 - always run `schema-reviewer` (blocking on any planned breaking HTTP/Herdr/SQLite interface
@@ -319,10 +319,10 @@ For PR updates:
 Use concise ATM summaries to the lead.
 
 PASS format:
-`Sprint <id> QA: PASS — deliverables <complete>/<total> (100%); req-qa PASS, arch-qa PASS, rust-best-practices-agent PASS|SKIPPED, rust-qa PASS; rust-best-practices PASS|SKIPPED; rust-service-hardening PASS|SKIPPED; flaky-test-qa PASS|SKIPPED; PR #<n>; worktree <path>`
+`Sprint <id> QA: PASS — deliverables <complete>/<total> (100%); req-qa PASS, arch-qa PASS, ruthless-boundary-qa PASS|SKIPPED, rust-qa PASS; rust-best-practices PASS|SKIPPED; rust-service-hardening PASS|SKIPPED; flaky-test-qa PASS|SKIPPED; PR #<n>; worktree <path>`
 
 FAIL format:
-`Sprint <id> QA: FAIL — deliverables <complete>/<total> (<percent>%); blockers: <ids>; req-qa=<status>; arch-qa=<status>; rust-best-practices-agent=<status>; rust-qa=<status>; rust-best-practices=<status>; rust-service-hardening=<status>; flaky-test-qa=<status>; PR #<n>; worktree <path>`
+`Sprint <id> QA: FAIL — deliverables <complete>/<total> (<percent>%); blockers: <ids>; req-qa=<status>; arch-qa=<status>; ruthless-boundary-qa=<status>; rust-qa=<status>; rust-best-practices=<status>; rust-service-hardening=<status>; flaky-test-qa=<status>; PR #<n>; worktree <path>`
 
 After a FAIL verdict, include a short flat list of blocking findings with:
 - finding id

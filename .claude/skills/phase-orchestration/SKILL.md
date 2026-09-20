@@ -22,7 +22,7 @@ Audience: team-lead only. Scrum-masters have their own process defined in
 
 Before starting a phase:
 1. The phase plan exists in `docs/project-plan.md` or a linked phase document.
-2. The integration branch `develop` exists and is up to date with
+2. The integration branch `integrate/phase-{N}` exists and is up to date with
    `develop`.
 3. The Claude/ATM team is active.
 4. `clint` is running and reachable via ATM CLI.
@@ -107,7 +107,7 @@ After each scrum-master reports completion:
 
 ### 4. Post-sprint: clint design review
 
-After every sprint PR is merged to `develop`, request an `clint`
+After every sprint PR is merged to `integrate/phase-{N}`, request an `arch-ctm`
 review via ATM CLI. Do not block the next eligible sprint unless clint
 reports critical blocking findings.
 
@@ -130,7 +130,7 @@ Before starting the next wave:
 
 After all sprints merge:
 1. perform any phase-end version or release prep required by the plan
-2. create PR `develop -> develop`
+2. create PR `integrate/phase-{N} -> develop`
 3. wait for CI green
 4. merge after user approval
 5. shut down remaining scrum-masters

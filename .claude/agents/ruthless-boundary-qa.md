@@ -61,12 +61,6 @@ When `findings_scope_locked` is absent or `false`, this restriction does not app
 
 1. Read:
    - `docs/architecture.md`
-   - `docs/requirements.md`
-   - `docs/sc-lint-boundary/`
-   - `docs/sc-lint-boundary/`
-   - `.claude/agents/rust-best-practices-agent.md`
-   - `docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md`
-   - `docs/sc-lint/README.md`
 2. Treat these enforcement surfaces as mandatory evidence, not optional context:
    - `boundaries/**/*.toml`
    - `.just/lint_boundaries.py`

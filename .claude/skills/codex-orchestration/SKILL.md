@@ -8,7 +8,7 @@ depends_on:
   req-qa: 0.x
   arch-qa: 0.x
   flaky-test-qa: 0.x
-  rust-best-practices-agent: 0.x
+  ruthless-boundary-qa: 0.x
   rust-qa-agent: 0.x
   rust-best-practices-agent: 0.x
   rust-service-hardening-agent: 0.x
@@ -88,8 +88,8 @@ Before starting a sprint:
    `atm compose --template <template> --vars <json>` (same renderer, same
    vars). The template path goes through the daemon-owned admission path
    and the dispatch is queryable from outside.
-9. `.claude/agents/rust-best-practices-agent.md` and
-   `.claude/assets/sc-rust/quality-mgr/templates/rust-best-practices-assignment.json.j2`
+9. `.claude/agents/ruthless-boundary-qa.md` and
+   `.claude/skills/codex-orchestration/ruthless-boundary-qa-assignment.json.j2`
    exist for first-pass boundary optimization review.
 10. Every agent pane exports `BEADS_ACTOR` equal to its `ATM_IDENTITY` (the
     pane name, not an alias), and bead assignee values use those same names.
@@ -154,13 +154,13 @@ This is the one lifecycle contract for development, fix, and QA work.
    QA pass):
    - `req-qa`
    - `arch-qa`
-   - `rust-best-practices-agent`
+   - `ruthless-boundary-qa`
    - `rust-qa-agent`
    - `rust-best-practices-agent`
    - `rust-service-hardening-agent`
    - `flaky-test-qa` when test instability risk is present
 7. QA-2 and later (fix-verification) rounds on the same sprint branch omit
-   `rust-best-practices-agent`, `rust-best-practices-agent`, and
+   `ruthless-boundary-qa`, `rust-best-practices-agent`, and
    `rust-service-hardening-agent` unconditionally — they reliably surface
    findings on any diff regardless of size, which turns a small fix-round
    into unbounded review churn. QA-2+ rounds launch `req-qa` + `arch-qa`
@@ -175,7 +175,7 @@ This is the one lifecycle contract for development, fix, and QA work.
    merge — merge gate is 0B+0I+0m with no exceptions and no backlog
    deferral. QA-1 findings route back to the developer via
    `fix-assignment.xml.j2` before QA-2, following the standard
-   triage-and-fix path. `rust-best-practices-agent`, `rust-best-practices-agent`,
+   triage-and-fix path. `ruthless-boundary-qa`, `rust-best-practices-agent`,
    and `rust-service-hardening-agent` remain part of docs-only plan review
    and phase-ending review regardless of sprint round.
 8. After a QA close, the lead reads the verdict before `bd ready`: PASS and
@@ -200,9 +200,9 @@ This is the one lifecycle contract for development, fix, and QA work.
 ## Stacked Phases
 
 Every phase runs as one append-only `gh stack` of sprint and fix layers
-above `develop`. The rule is defined once, in
-[`CLAUDE.md` and `AGENTS.md`](../../../CLAUDE.md)
-§0, and is not restated here. What it means for this skill: the lead owns
+above `integrate/phase-N`. The rule is defined once, in
+[`docs/development/gh-stack-guidelines.md`](../../../docs/development/gh-stack-guidelines.md)
+and is not restated here. What it means for this skill: the lead owns
 the stack and each dev owns exactly one layer; every dispatch below — dev,
 fix, cleanup — is a new worktree cut from the current top, and the
 `<stack-discipline>` element every template carries is the dev-facing copy
@@ -218,7 +218,7 @@ of §0.
 4. `quality-mgr` treats `review_mode: plan` as docs-only review and launches:
    - `req-qa`
    - `arch-qa`
-   - `rust-best-practices-agent`
+   - `ruthless-boundary-qa`
    - `rust-best-practices-agent`
    - `rust-service-hardening-agent`
 5. If plan QA passes, the hardened plan is ready for implementation dispatch.
@@ -257,7 +257,7 @@ For phase-ending QA routed through `quality-mgr`, the reviewer set is
 mandatory:
 - `req-qa`
 - `arch-qa`
-- `rust-best-practices-agent`
+- `ruthless-boundary-qa`
 - `rust-qa-agent`
 - `rust-best-practices-agent`
 - `rust-service-hardening-agent`

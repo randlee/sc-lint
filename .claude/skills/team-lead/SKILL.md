@@ -50,7 +50,7 @@ name and `alias` is optional except for the three members named below:
 ```toml
 [[rmux.windows.panes]]
 name = "quality-mgr"
-alias = "atm-quality"
+alias = "lint-quality-mgr"
 env = { ATM_IDENTITY = "quality-mgr", ATM_TEAM = "sc-lint" }
 ```
 
@@ -195,9 +195,13 @@ work and nudges the agent. A plain send opens no task, so the agent cannot
   assignment must too. An agent's queue releases the next task only when the
   current task and bead close, so an open finished task blocks everything
   behind it.
-- When work is reported complete, verify the task and bead are closed with
-  `atm task list --all` and `bd show <task-id>`. If rejected, reopen the bead
-  or create a child bead; do not close a bead on the assignee's behalf.
+- When work is reported complete, verify the task is closed with
+  `atm task list --all`. If it is still open, close it yourself:
+  `atm task close <task-id> completed "<what was delivered, commit or PR>"`.
+  Do not spend a round trip asking the agent to close it. The assignee is
+  told the assigner closed the task, so put the real result in the reason.
+- Verify the matching bead is closed with `bd show <task-id>`; if rejected,
+  reopen the bead or create a child bead.
 - After every paired close, use unfiltered `bd ready` for the lead's dispatch
   view (an assignee uses `bd ready --assignee "$ATM_IDENTITY"`). After a QA
   close, read its verdict first: PASS permits dispatch of what opened; FAIL

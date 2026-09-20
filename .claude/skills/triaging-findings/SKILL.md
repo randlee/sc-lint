@@ -336,7 +336,7 @@ Until a dedicated closeout writer exists, use:
 ## Phase-End Post-Mortem
 
 At the end of a phase, after all sprint branches are integrated into
-`develop` and before the final merge to `develop`, run the
+`integrate/phase-X` and before the final merge to `develop`, run the
 post-mortem review described in `references/post-mortem.md`.
 
 Participants:
@@ -363,7 +363,7 @@ Required gate:
   deferred on the integration branch
 - that review team must verify no integrated fix was missed outside the original
   changed-file scopes
-- do not merge `develop` to `develop` until that review passes
+- do not merge `integrate/phase-X` to `develop` until that review passes
 
 ## Reporting to Dev
 

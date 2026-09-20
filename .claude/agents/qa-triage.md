@@ -31,7 +31,7 @@ with free-form input.
 {
   "triage_mode": "initial_pass",
   "phase_id": "phase-R",
-  "integration_branch": "develop",
+  "integration_branch": "integrate/phase-R",
   "integration_worktree_path": "/abs/integrate-phase-R",
   "structure_path": "/abs/integrate-phase-R/.sprints/R/structure.ttl",
   "events_path": "/abs/integrate-phase-R/.sprints/R/events.ttl",
@@ -362,7 +362,7 @@ Return fenced JSON only.
   "data": {
     "triage_mode": "followup_pass",
     "phase_id": "phase-R",
-    "integration_branch": "develop",
+    "integration_branch": "integrate/phase-R",
     "integration_worktree_path": "/abs/integrate-phase-R",
     "finding_id": "FTQ-001",
     "status": "open | fixed | fixed_partial | regressed",
