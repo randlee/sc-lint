@@ -16,6 +16,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from xml.etree import ElementTree
 
 from sc_lint.lint_common import discover_repo_root
 
@@ -191,10 +192,21 @@ class TemplateContractTests(unittest.TestCase):
 
         defaults, body = self.jinja_parts(template)
         variables = {**defaults, **json.loads(sample.read_text(encoding="utf-8"))}
+        xml_template = template.name.endswith(".xml.j2")
         renderer = Environment(
-            autoescape=False,
+            autoescape=xml_template,
             undefined=StrictUndefined,
-            finalize=lambda value: value if isinstance(value, Markup) else json.dumps(value),
+            finalize=lambda value: (
+                value
+                if isinstance(value, Markup) or (xml_template and isinstance(value, str))
+                else json.dumps(value)
+            ),
+        )
+        renderer.filters["cdata_escape"] = lambda value: Markup(
+            str(value).replace("]]>", "]]]]><![CDATA[>")
+        )
+        renderer.filters["string"] = lambda value: (
+            value if isinstance(value, str) else json.dumps(value)
         )
         return renderer.from_string(body).render(**variables)
 
@@ -332,3 +344,104 @@ class TemplateContractTests(unittest.TestCase):
                     self.assertEqual(payload[field], adversarial)
                 self.assertEqual(payload["pr"], 123)
                 self.assertEqual(payload["findings"], {"blocking": 1, "important": 2, "minor": 3})
+
+    def test_qa_template_renders_strict_xml_with_typed_values(self) -> None:
+        adversarial = 'quoted "value" \\ path\nline <tag>& snowman ☃ ]]> twice ]]>'
+        attribute_adversarial = 'quoted "value" \\ path <tag>& snowman ☃ ]]> twice ]]>'
+        variables = {
+            "task_id": attribute_adversarial,
+            "sprint": attribute_adversarial,
+            "sprint_doc": adversarial,
+            "review_mode": adversarial,
+            "description": adversarial,
+            "pr_number": 187,
+            "branch": adversarial,
+            "worktree_path": adversarial,
+            "commits": [adversarial, "def456"],
+            "review_targets": [adversarial],
+            "references": [adversarial],
+            "lead": adversarial,
+            "cc": adversarial,
+            "changed_files": [adversarial],
+            "triage_records": [adversarial],
+        }
+        template = REPO / ".claude/skills/codex-orchestration/qa-template.xml.j2"
+        source = template.read_text(encoding="utf-8")
+        self.assertNotIn("{% autoescape false", source)
+        for entity in ("&lt;", "&gt;", "&amp;", "&quot;"):
+            self.assertNotIn(entity, source)
+
+        with tempfile.TemporaryDirectory() as directory:
+            vars_path = Path(directory) / "vars.json"
+            vars_path.write_text(json.dumps(variables), encoding="utf-8")
+            if shutil.which("sc-compose"):
+                result = subprocess.run(
+                    [
+                        "sc-compose",
+                        "render",
+                        "--strict",
+                        "--check-render",
+                        "--json",
+                        "--file",
+                        str(template),
+                        "--var-file",
+                        str(vars_path),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                envelope = json.loads(result.stdout)
+                self.assertFalse(
+                    [
+                        diagnostic
+                        for diagnostic in envelope["diagnostics"]
+                        if diagnostic["severity"] == "error"
+                    ]
+                )
+                rendered = envelope["payload"]["body"]
+            else:
+                rendered = self.compose(template, vars_path)
+            root = ElementTree.fromstring(rendered)
+
+        self.assertEqual(root.attrib["id"], attribute_adversarial)
+        self.assertEqual(root.attrib["sprint"], attribute_adversarial)
+        self.assertEqual(root.findtext("description"), adversarial)
+        self.assertEqual(root.findtext("branch"), adversarial)
+        self.assertEqual(root.findtext("worktree"), adversarial)
+        self.assertEqual(json.loads(root.findtext("pr-number")), variables["pr_number"])
+        self.assertEqual(json.loads(root.findtext("commits")), variables["commits"])
+        self.assertEqual(
+            json.loads(root.findtext("review-targets")), variables["review_targets"]
+        )
+        self.assertEqual(
+            json.loads(root.findtext("changed-files")), variables["changed_files"]
+        )
+        self.assertEqual(
+            json.loads(root.findtext("triage-records")), variables["triage_records"]
+        )
+        self.assertEqual(json.loads(root.findtext("references")), variables["references"])
+
+        legacy_strings = {
+            **variables,
+            "pr_number": "",
+            "commits": "HEAD",
+            "review_targets": "- src/",
+            "changed_files": "",
+            "triage_records": "",
+            "references": "- plan",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            vars_path = Path(directory) / "legacy-vars.json"
+            vars_path.write_text(json.dumps(legacy_strings), encoding="utf-8")
+            legacy_root = ElementTree.fromstring(self.compose(template, vars_path))
+        for field, expected in (
+            ("pr-number", ""),
+            ("commits", "HEAD"),
+            ("review-targets", "\n- src/\n  "),
+            ("changed-files", "\n\n  "),
+            ("triage-records", "\n\n  "),
+            ("references", "\n- plan\n  "),
+        ):
+            self.assertEqual(legacy_root.findtext(field), expected)
