@@ -285,3 +285,50 @@ class TemplateContractTests(unittest.TestCase):
                 vars_path.write_text(json.dumps(variables), encoding="utf-8")
                 payload = json.loads(self.compose(template, vars_path))
                 self.assertEqual(payload["carry_forward_findings"], expected)
+
+    def test_quality_report_machine_json_round_trips_strings(self) -> None:
+        adversarial = 'quoted "value" \\ path\nline <tag>&'
+        common = {
+            "generated_at": "2026-09-20T20:00:00Z",
+            "qa_pass": 1,
+            "sprint_id": adversarial,
+            "task_id": adversarial,
+            "branch": adversarial,
+            "commit": adversarial,
+            "pr_number": 123,
+            "verdict": adversarial,
+            "findings_blocking": 1,
+            "findings_important": 2,
+            "findings_minor": 3,
+            "merge_readiness": adversarial,
+            "merge_reason": adversarial,
+        }
+        cases = {
+            "findings-report.md.j2": {
+                **common,
+                "blocking_ids": adversarial,
+                "blocking_findings_md": "- finding",
+                "detailed_findings_md": "- detail",
+                "next_action": adversarial,
+                "action_owner": adversarial,
+            },
+            "quality-report.md.j2": {
+                **common,
+                "validated_scope_md": "- scope",
+                "residual_risks_md": "- none",
+                "recommendation": adversarial,
+            },
+        }
+        for template_name, variables in cases.items():
+            template = REPO / ".claude/skills/quality-management-gh" / template_name
+            with self.subTest(template=template_name), tempfile.TemporaryDirectory() as directory:
+                vars_path = Path(directory) / "vars.json"
+                vars_path.write_text(json.dumps(variables), encoding="utf-8")
+                rendered = self.compose(template, vars_path)
+                match = re.search(r"```json\s*\n(.*?)\n```", rendered, re.S)
+                self.assertIsNotNone(match)
+                payload = json.loads(match.group(1))
+                for field in ("sprint", "task", "branch", "commit", "verdict", "merge_readiness", "merge_reason"):
+                    self.assertEqual(payload[field], adversarial)
+                self.assertEqual(payload["pr"], 123)
+                self.assertEqual(payload["findings"], {"blocking": 1, "important": 2, "minor": 3})
