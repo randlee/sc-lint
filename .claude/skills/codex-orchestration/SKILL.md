@@ -201,7 +201,7 @@ This is the one lifecycle contract for development, fix, and QA work.
 
 Every phase runs as one append-only `gh stack` of sprint and fix layers
 above `integrate/phase-N`. The rule is defined once, in
-[`docs/development/gh-stack-guidelines.md`](../../../docs/development/gh-stack-guidelines.md)
+[`CLAUDE.md` and `AGENTS.md`](../../../CLAUDE.md)
 and is not restated here. What it means for this skill: the lead owns
 the stack and each dev owns exactly one layer; every dispatch below — dev,
 fix, cleanup — is a new worktree cut from the current top, and the
