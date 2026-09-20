@@ -117,17 +117,20 @@ hardening scope from this plan.
 - AUDIT-5a: `quality-mgr.md`, `codex-orchestration/SKILL.md`, and
   `qa-template.xml.j2` restore `ruthless-boundary-qa` in each reviewer set.
 - AUDIT-5c: `team-lead/SKILL.md` restores the upstream task-close paragraph
-  beside A2 Beads commands; `roster_check.py` retains only the B column-width
-  change; `backup-and-restore-team.md` is deleted.
+  beside A2 Beads commands; `backup-and-restore-team.md` is deleted.
 - A1: `phase-orchestration/SKILL.md`, `triaging-findings/SKILL.md`,
   `qa-triage.md`, and `codex-orchestration/SKILL.md` restore upstream
   integration-branch text with approved agent-name substitutions.
 - A2: `quality-mgr.md`, the three dispatch templates, and the Beads sections
   retain the assigned-bead claim/close lifecycle additions. B: the sc-lint
-  `just lint && just test` substitutions and roster column-width fix remain.
+  `just lint && just test` substitutions, roster column-width fix, and the
+  test-backed missing-executable and malformed-TOML roster diagnostics remain.
 - No sc-lint equivalent was found for upstream boundary reading-list entries:
   `crosshost-compose-directdeliver.md`, `atm-graft-trait-leak.md`,
   `rusqlite-storage-coupling.md`, `boundary-guard.md`, and
   `ADR-001-sealed-trait-pattern.md`.
 - Lead-ruling records: the restored upstream gh-stack-guidelines link in
   `codex-orchestration/SKILL.md`, and its former pane-name-versus-alias text.
+- Upstream note: `atm-core origin/develop` has the same roster diagnostic tests
+  while its `roster_check.py` lacks their behavior; `just lint` after that
+  source reversion fails those two tests.
