@@ -58,6 +58,16 @@ just test
 These are complete aggregate gates, not advisory shortcuts. Use `just setup`
 when the product compatibility preflight needs to be checked or repaired.
 
+## Task–Bead Lifecycle
+
+For every dev, fix, and QA task, create and dependency-wire a bead before ATM
+dispatch; its id is the `--task-id` and template `task_id`. The lead assigns the
+bead to the recipient's ATM identity. The assignee starts with `atm task start`
+and `bd update <id> --claim`, and completes with `atm task close` and `bd close
+<id>`. Refusal leaves the bead open with a note. After each paired close the lead runs `bd
+ready` and dispatches only newly unblocked work; rejected completed work is
+reopened or replaced by a child bead, never closed by the lead on acceptance.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:1105d646 -->
 ## Beads Issue Tracker
 

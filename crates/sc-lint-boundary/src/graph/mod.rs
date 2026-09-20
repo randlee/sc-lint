@@ -1,4 +1,5 @@
 use super::*;
+use crate::render::hex_encode;
 use cargo_metadata::MetadataCommand;
 
 mod build;
@@ -145,23 +146,64 @@ fn parse_rust_file(path: &Path) -> Result<File> {
         .with_context(|| format!("failed to parse Rust source {}", path.display()))
 }
 
-fn impl_owner_name(self_ty: &Type) -> Result<String> {
+struct ImplOwner {
+    name: String,
+    self_type: String,
+    is_reference: bool,
+    needs_self_discriminator: bool,
+}
+
+fn impl_owner(self_ty: &Type) -> Result<ImplOwner> {
     match self_ty {
         Type::Path(type_path) => {
-            // `syn::Type::Path` always stores at least one segment for a valid path type.
-            if let Some(segment) = type_path.path.segments.last() {
-                Ok(segment.ident.to_string())
-            } else {
-                Err(anyhow::anyhow!(
-                    "impl owner path is missing a terminal segment"
-                ))
-            }
+            let segment =
+                type_path.path.segments.last().ok_or_else(|| {
+                    anyhow::anyhow!("impl owner path is missing a terminal segment")
+                })?;
+            Ok(ImplOwner {
+                name: segment.ident.to_string(),
+                self_type: self_ty.to_token_stream().to_string(),
+                is_reference: false,
+                // A qualified path such as `crate::Owner` names the same type
+                // as `Owner`; retain the established implementation ID. Only
+                // arguments distinguish otherwise-overlapping path owners.
+                needs_self_discriminator: !matches!(segment.arguments, syn::PathArguments::None),
+            })
         }
+        Type::Reference(reference) => {
+            let mut owner = impl_owner(&reference.elem)?;
+            let lifetime = reference
+                .lifetime
+                .as_ref()
+                .map_or_else(String::new, |value| format!("{} ", value.to_token_stream()));
+            let mutability = if reference.mutability.is_some() {
+                "mut "
+            } else {
+                ""
+            };
+            owner.self_type = format!("&{lifetime}{mutability}{}", owner.self_type);
+            owner.is_reference = true;
+            owner.needs_self_discriminator = true;
+            Ok(owner)
+        }
+        Type::Paren(paren) => impl_owner(&paren.elem),
+        Type::Group(group) => impl_owner(&group.elem),
         _ => anyhow::bail!(
-            "unsupported impl owner type `{}`; only path owners are supported",
+            "unsupported impl owner type `{}`; expected a path or reference to a path",
             self_ty.to_token_stream()
         ),
     }
+}
+
+fn trait_impl_key(owner: &ImplOwner, path: &syn::Path) -> String {
+    // Keep generic arguments: Trait<u8> and Trait<u16> are different impls.
+    let trait_key = path.to_token_stream().to_string().replace(' ', "");
+    let mut key = format!("impl::{}", hex_encode(trait_key.as_bytes()));
+    let self_key = owner.self_type.replace(' ', "");
+    if owner.needs_self_discriminator {
+        key.push_str(&format!("::self::{}", hex_encode(self_key.as_bytes())));
+    }
+    key
 }
 
 pub(crate) fn trait_path_key(path: &syn::Path) -> String {
@@ -204,4 +246,29 @@ pub(crate) fn load_metadata(root: &Path) -> Result<cargo_metadata::Metadata> {
         .current_dir(root)
         .exec()
         .with_context(|| format!("failed to load cargo metadata for {}", root.display()))
+}
+
+#[cfg(test)]
+mod owner_tests {
+    use super::*;
+
+    #[test]
+    fn parenthesized_and_grouped_owners_are_transparent() {
+        let path: Type = syn::parse_quote!(Owner);
+        let parenthesized: Type = syn::parse_quote!((Owner));
+        let grouped = Type::Group(syn::TypeGroup {
+            group_token: Default::default(),
+            elem: Box::new(parenthesized),
+        });
+        let plain = impl_owner(&path).unwrap();
+        let wrapped = impl_owner(&grouped).unwrap();
+        assert_eq!(plain.name, wrapped.name);
+        assert_eq!(plain.self_type, wrapped.self_type);
+        assert!(!wrapped.is_reference);
+        let reference: Type = syn::parse_quote!((&'a mut (Owner)));
+        let wrapped = impl_owner(&reference).unwrap();
+        assert_eq!(wrapped.name, "Owner");
+        assert_eq!(wrapped.self_type, "&'a mut Owner");
+        assert!(wrapped.is_reference);
+    }
 }

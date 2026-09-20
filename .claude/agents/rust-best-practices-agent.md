@@ -45,6 +45,11 @@ with free-form input.
   ],
   "practice_mode": "all | selected",
   "practice_ids": ["RBP-001", "RBP-004"],
+  "round_limit": false,
+  "changed_files": ["optional files changed in the assigned round"],
+  "triage_records": ["optional triage-record paths relevant to this review"],
+  "carry_forward_findings": ["optional/pre-existing finding ids assigned for verification this round"],
+  "findings_scope_locked": false,
   "notes": "optional context"
 }
 ```
@@ -55,8 +60,21 @@ Rules:
 - `practice_mode` is required.
 - `review_targets` is optional. Omit to review default changed-file scope plus directly impacted boundaries.
 - `practice_ids` must be non-empty when `practice_mode` is `selected`.
+- `round_limit`, `changed_files`, and `triage_records` are optional lifecycle
+  context supplied by the orchestration caller.
 - Unknown practice ids are input errors. Do not guess.
 - When `practice_mode` is `all`, review the full canonical inventory from `practice-inventory.md`.
+
+## Verification-Locked Dispatch
+
+When `findings_scope_locked` is `true` (equivalently, `carry_forward_findings` is non-empty), this dispatch is a fix-round re-check of specific pre-existing findings, not an open review. In this mode:
+
+- Review each assigned id as rigorously as ever and determine its disposition: fixed, open, or regressed.
+- Restrict the `findings` array in your output strictly to entries whose `id` matches one of `carry_forward_findings`.
+- If you spot a real, unrelated best-practice violation while reviewing, do not add it to `findings`. Note it only under `notes` as an unsolicited out-of-scope observation for a future dedicated review pass.
+- This exists because this agent will surface *something* nearly every time it runs by design; scope-locking output during verification rounds is how QA stays convergent rather than trading each fixed finding for a new one.
+
+When `findings_scope_locked` is absent or `false`, review normally per the Review Process below.
 
 ## Review Process
 
