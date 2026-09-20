@@ -2,7 +2,7 @@
 sprint: lint-spx.11
 bead: lint-spx.11
 epic: lint-spx
-status: planned
+status: complete
 branch: fix/installer-exec-fixture-race
 worktree: /Users/randlee/github/sc-lint-worktrees/fix/installer-exec-fixture-race
 pr_target: develop
@@ -89,3 +89,35 @@ attribute, `--test-threads=1`, a global test mutex, CI reruns.
 
 - Production installer changes (report only). The skill stack #172 and the
   #115 stack #169.
+
+## Closeout
+
+- Fixing commits: `00b4092` changed `crates/sc-lint/src/installer.rs`; the
+  sprint record was committed first in `150423f`.
+- Deliverable 1: `installer.rs:1120` uses `fs::hard_link` from the built CLI
+  in `target/debug` into a `TempDir::new_in` child directory on the same
+  filesystem; the test process does not write the executable before
+  `probe_version` executes it at `installer.rs:1121`.
+- Deliverable 2: `installer.rs:1331-1344` sends probe contents through a
+  child `sh` process (`cat` then `chmod`) and drops the test process's stdin
+  pipe before waiting. Call sites are `installer.rs:986`, `:1027`, `:1028`,
+  `:1170`, `:1179`, and `:1306`. Each call either archives the closed child
+  output or invokes installer activation after the child has exited; the
+  production activation path renames a closed candidate at `:654` and probes
+  it at `:665`.
+- Deliverable 3: workspace search found no other test path that keeps a write
+  fd open while executing the same path. `crates/sc-lint/src/tests.rs:640`
+  and `:715` write Windows `.cmd` fixtures before `just`/`pwsh` launches;
+  `crates/sc-lint/tests/logging_integration.rs:915` writes a cargo wrapper
+  before PATH lookup. The remaining `fs::write` matches create data files,
+  configs, logs, or scripts whose writes complete before a later command.
+- Deliverable 4: on this macOS host, `origin/develop` ran the focused command
+  for 200 iterations with 200 passed and 0 failed; this branch ran the same
+  command for 200 iterations with 200 passed and 0 failed. The Linux-only
+  ETXTBSY failure was not reproduced on this host.
+- Deliverable 5: comments at `installer.rs:1119` and `:1331` state that the
+  test process must not own a write fd for an executable it probes.
+- Validation: focused installer suite `10 passed`; `git diff --check` exit 0;
+  PR #180 is ready for review, based on `develop`, and `gh stack view --json`
+  reports one layer with `needsRebase=false`. Aggregate gates and PR checks
+  are recorded after they complete.

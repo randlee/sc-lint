@@ -1113,7 +1113,7 @@ mod tests {
         // version states exercise the actual installer command path without a
         // Unix shell fixture or platform-specific permission assumptions. CI
         // may reuse a cached executable from a preceding workspace build, so
-        // derive the compatible floor from the binary we actually copied
+        // derive the compatible floor from the binary we actually link
         // rather than assuming it is this test crate's package version.
         let managed_binary = install_dir.join(ReleaseTarget::binary_name());
         // Keep the test process from holding a write fd for the executable it probes.
