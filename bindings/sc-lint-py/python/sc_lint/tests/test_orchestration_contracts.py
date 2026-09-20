@@ -267,3 +267,21 @@ class TemplateContractTests(unittest.TestCase):
             else:
                 with self.assertRaisesRegex(Exception, "undefined|Undefined"):
                     self.compose(template, bad_vars)
+
+    def test_carry_forward_findings_render_as_json_arrays(self) -> None:
+        expected = [{"id": "F-1", "severity": "important"}]
+        for template_name in self.AGENT_CONTRACTS:
+            template = next(
+                directory / template_name
+                for directory in self.TEMPLATE_DIRS
+                if (directory / template_name).is_file()
+            )
+            sample_name = template.name.removesuffix(".j2")
+            sample = template.parent / "vars" / sample_name
+            variables = json.loads(sample.read_text(encoding="utf-8"))
+            variables["carry_forward_findings_json"] = json.dumps(expected)
+            with self.subTest(template=template.name), tempfile.TemporaryDirectory() as directory:
+                vars_path = Path(directory) / "vars.json"
+                vars_path.write_text(json.dumps(variables), encoding="utf-8")
+                payload = json.loads(self.compose(template, vars_path))
+                self.assertEqual(payload["carry_forward_findings"], expected)
