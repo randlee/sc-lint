@@ -2,7 +2,7 @@
 sprint: lint-spx.9
 bead: lint-spx.9
 epic: lint-spx
-status: planned
+status: complete
 branch: docs/release-notes-0.6.0-boundary
 worktree: /Users/randlee/github/sc-lint-worktrees/docs/release-notes-0.6.0-boundary
 pr_target: develop
@@ -69,3 +69,28 @@ Merged to `develop` on 2026-09-20 since the 2026-08-30 note:
 - Closeout: one line per deliverable with the fact source (PR number or
   `file:line`). `status: complete`.
 - Completion message, then wait for the lead's reply before closing.
+
+## Closeout
+
+- Deliverable 1: `release/RELEASE-NOTES-0.6.0.md:5` refreshes the release date
+  to `2026-09-20`; source: task date and PR #189.
+- Deliverable 2: `release/RELEASE-NOTES-0.6.0.md:13-16` adds the boundary and
+  graph-schema summary; sources: PRs #159, #160, #163, #164 and boundary
+  sprint docs.
+- Deliverable 3: `release/RELEASE-NOTES-0.6.0.md:36-49` adds the four major
+  change bullets with PR/file sources; sources: PRs #115, #159, #160, #163,
+  #164, #168, #171, #173, #175–#178.
+- Deliverable 4: `release/RELEASE-NOTES-0.6.0.md:60-69` records the `0.1.0`
+  to `0.2.0` rebaseline sequence; source: `docs/sc-lint-boundary/graph-schema.md:18-43`,
+  PR #163.
+- Deliverable 5: `release/RELEASE-NOTES-0.6.0.md:73-76` records develop head
+  `e2477c38857537c8bcd34cf3873ee9726ef8d12a` and successful run
+  `35535212640`; source: `git rev-parse origin/develop` and `gh run list`.
+- Deliverable 6: `release/RELEASE-NOTES-0.6.0.md:95-99` records installer
+  fixture redesign PR #180; source: PR #180 and the accepted installer sprint
+  record.
+- Deliverable 7: `git diff --name-only origin/develop...HEAD` lists only
+  `release/RELEASE-NOTES-0.6.0.md` and this sprint doc; source: command output.
+- PR #189 is ready, based on `develop`, and `gh stack view --json` reports one
+  layer with `needsRebase=false`; local `git diff --check` is clean. CI run
+  details are recorded after the final push.
