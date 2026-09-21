@@ -92,5 +92,6 @@ Merged to `develop` on 2026-09-20 since the 2026-08-30 note:
 - Deliverable 7: `git diff --name-only origin/develop...HEAD` lists only
   `release/RELEASE-NOTES-0.6.0.md` and this sprint doc; source: command output.
 - PR #189 is ready, based on `develop`, and `gh stack view --json` reports one
-  layer with `needsRebase=false`; local `git diff --check` is clean. CI run
-  details are recorded after the final push.
+  layer with `needsRebase=false`; `just lint`, `just test`, and
+  `git diff --check` exit 0. PR #189 CI run `35559945150` was observed as
+  `0 pass / 12 pending / 0 fail`.
