@@ -7,6 +7,7 @@ from pathlib import Path
 import argparse
 import sys
 import unittest
+import subprocess
 
 from sc_lint.lint_common import discover_repo_root
 
@@ -67,7 +68,16 @@ def main(argv: list[str]) -> int:
     print_fixture_summary(fixture_counts)
     runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=1)
     result = runner.run(suite)
-    return 0 if result.wasSuccessful() else 1
+    orchestration_tests = [
+        repo_root / ".claude/skills/closing-triage/scripts/test_query_open_findings.py",
+        repo_root / ".claude/skills/graph-orchestration/scripts/test_validate_findings.py",
+        repo_root / ".claude/skills/triaging-findings/tests/test_check_dependencies.py",
+        repo_root / ".claude/skills/triaging-findings/tests/test_triage_record_template.py",
+        repo_root / ".claude/skills/triaging-findings/tests/test_qa_triage_prompt.py",
+        repo_root / ".just/tests/test_team_lead_roster_check.py",
+    ]
+    pytest = subprocess.run([sys.executable, "-m", "pytest", "-q", *map(str, orchestration_tests)], check=False)
+    return 0 if result.wasSuccessful() and pytest.returncode == 0 else 1
 
 
 if __name__ == "__main__":
