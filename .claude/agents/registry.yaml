@@ -84,3 +84,23 @@ skills:
       rust-code-reviewer: 0.x
       rust-code-explorer: 0.x
       rust-qa-agent: 0.x
+# atm-bd-orchestration configuration (read by its install.py; no defaults)
+roles:
+  lead: team-lead
+  dev-sanity: dev-sanity
+  quality-mgr: quality-mgr
+bead_prefix: lint
+worktree_base: ../sc-lint-worktrees
+test_command: just test
+lint_command: just lint
+integration_branch_pattern: integrate/phase-{phase}
+plans_dir: docs/plans
+requirements_globs:
+  - docs/requirements.md
+  - docs/*/requirements.md
+adr_globs:
+  - docs/sc-lint/adr/*.md
+policy_path: .claude/project/quality-policy.md
+reviewers_round1:
+  - req-qa
+  - arch-qa
