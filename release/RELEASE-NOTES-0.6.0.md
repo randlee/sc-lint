@@ -3,7 +3,7 @@
 ## Release
 
 - Version: `0.6.0`
-- Date: 2026-09-20
+- Date: 2026-10-09
 - Release owner: sc-lint maintainers
 - Approval: pending release publication approval
 
@@ -56,6 +56,18 @@ owners, trait-method identity, structured inventory validation, and the
   requires `boundaries/planning.toml`, checks `owner_crate_path`, preserves
   edge parse causes, and keeps the Python validator aligned with Rust
   (#115, #168, #171, #173, #175–#178).
+- `identity-literals` no longer crashes on valid Rust unicode escapes such as
+  `\u{feff}`; the parser now handles Rust escape syntax (#140, G.3c; fixes
+  issues #85 and #88).
+- CI runs on every pull request that is a member of a stack rooted on
+  `develop`, regardless of base branch (#182; earlier `sprint/*` trigger #121).
+- Phase F (rejected) is archived and Phase G supersedes it (#139, G.0).
+- Contributor orchestration: the beads-driven codex-orchestration port covers
+  task assignment, beads-paired task lifecycle, orchestration script and
+  template tests, hardened verification mechanics, contract-key CI checks, and
+  upstream alignment (#166, #167, #170, #174, #179, #181). Related internal
+  changes (beads integration #162, ATM roster/alias cleanup #156, #158, #161,
+  plan-hardening docs #129) do not affect consumers.
 
 ## Migration Notes
 
@@ -76,13 +88,17 @@ owners, trait-method identity, structured inventory validation, and the
 ## Validation
 
 - `develop` head is `e2477c38857537c8bcd34cf3873ee9726ef8d12a`.
-- Latest `develop` CI run `35535212640` completed successfully (Test, Just
+- Latest `develop` CI run `35559810599` (2026-09-21) completed successfully (Test, Just
   lint, Release smoke, and Adoption kit).
 - Release publication order and package preflight are driven by
   `release/publish-artifacts.toml`.
 - The included-crates list above was generated from that same publish manifest.
 
 ## Packaging / Publication Notes
+
+- 0.6.0 is the first PyPI publication of the `sc-lint` wheel
+  (`bindings/sc-lint-py`); the adoption kit bootstrap installs
+  `sc-lint==<version>` from PyPI unless `SC_LINT_WHEEL_DIR` is set.
 
 - `sc-lint-analyzer-support` is a first-time crates.io publication; its
   manifest entry waits 15 seconds after publish to allow index propagation
