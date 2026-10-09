@@ -2,7 +2,7 @@
 sprint: lint-spx.41
 bead: lint-spx.41
 epic: lint-spx
-status: in-progress
+status: complete
 branch: docs/release-notes-0.6.0-boundary
 worktree: /Users/randlee/github/sc-lint-worktrees/docs/release-notes-0.6.0-boundary
 pr_target: develop
