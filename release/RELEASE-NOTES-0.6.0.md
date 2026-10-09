@@ -35,14 +35,14 @@ owners, trait-method identity, structured inventory validation, and the
 - Adoption kit (`packages/sc-lint-adoption`): `install.py` installs/validates
   the consumer end state, `--dry-run` reports drift (exit 1) and user-owned
   conflicts (exit 2), persists managed `.sc-lint/install.json`, and ships the
-  reusable `setup-sc-lint` GitHub Action.
+  reusable `setup-sc-lint` GitHub Action (#144, G.1).
 - Adoption skill and agent: `sc-lint-adoption` plugin (skill, `sc-lint-adopter`
-  agent, evals, marketplace entry) and `docs/sc-lint/adoption.md`.
+  agent, evals, marketplace entry) and `docs/sc-lint/adoption.md` (#145, G.2).
 - Python wheel runtime: helper scripts ship as the `sc-lint` PyPI distribution;
-  bootstrap provisions `.sc-lint/venv`.
+  bootstrap provisions `.sc-lint/venv` (G.3a, landed via #142).
 - Self-contained release: `full`/`ci` lint profiles use only archive binaries
   or wheel helpers; `sc-lint version --json` reports `self_contained`;
-  `release-smoke` CI job on every OS.
+  `release-smoke` CI job on every OS (#142, G.3b).
 - Bootstrap hardening: `setup --check/--dry-run` never fetch a release; flags
   forwarded to the managed binary; kit/repo bootstrap copies pinned LF.
 - Legacy `.just/lint-config.toml` fallback removed; `sc-lint.toml` is the only
@@ -99,7 +99,6 @@ owners, trait-method identity, structured inventory validation, and the
 - 0.6.0 is the first PyPI publication of the `sc-lint` wheel
   (`bindings/sc-lint-py`); the adoption kit bootstrap installs
   `sc-lint==<version>` from PyPI unless `SC_LINT_WHEEL_DIR` is set.
-
 - `sc-lint-analyzer-support` is a first-time crates.io publication; its
   manifest entry waits 15 seconds after publish to allow index propagation
   before dependent crates are published.
