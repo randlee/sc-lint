@@ -114,6 +114,30 @@ def test_first_install_refuses_pre_existing_kit_file_without_writing() -> None:
         assert not (consumer / "plugins" / "sc-lint").exists()
 
 
+def test_rerun_refuses_pre_existing_new_kit_file_without_writing() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = FIXTURES / "install.json"
+    assert run("--input", str(input_path), str(consumer)).returncode == 0
+
+    relative = "plugins/sc-lint/README.md"
+    manifest_path = consumer / ".sc-lint" / "installed.json"
+    manifest = json.loads(manifest_path.read_text())
+    assert relative in manifest["managed"]
+    del manifest["managed"][relative]
+    manifest_path.write_text(json.dumps(manifest))
+
+    new_kit_file = consumer / relative
+    new_kit_file.write_text("consumer-owned content\n")
+    before_manifest = manifest_path.read_bytes()
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 2
+    assert str(new_kit_file) in result.stderr
+    assert new_kit_file.read_text() == "consumer-owned content\n"
+    assert manifest_path.read_bytes() == before_manifest
+
+
 def test_workflow_uses_vendored_action_and_root_has_no_action() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0

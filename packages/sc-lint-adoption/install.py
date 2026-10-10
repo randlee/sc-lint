@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent
 MARKER_START = "# >>> sc-lint managed integration >>>"
 MARKER_END = "# <<< sc-lint managed integration <<<"
 MANIFEST = Path(".sc-lint/installed.json")
-FIRST_INSTALL_MERGED = {Path("Justfile"), Path(".sc-lint/install.json")}
+MERGED_SURFACES = {Path("Justfile"), Path(".sc-lint/install.json")}
 RENAMED = {Path("README.md"): Path("README.sc-lint.md")}
 TEMPLATES = {
     Path("templates/sc-lint.toml.j2"): Path("sc-lint.toml"),
@@ -97,21 +97,25 @@ def main() -> int:
     input_path = args.input or args.repo / ".sc-lint" / "install.json"
     try: data = values(input_path); targets = desired(data, args.repo); prior = load_manifest(args.repo)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error: print(f"conflict: {error}", file=sys.stderr); return 2
-    if prior is None:
-        clashes = []
-        for relative, expected in targets.items():
-            path = args.repo / relative
-            if relative in FIRST_INSTALL_MERGED or not path.exists():
-                continue
-            if not path.is_file() or path.read_bytes() != expected:
-                clashes.append(path)
-        if clashes:
-            print(
-                "conflict: first install would overwrite pre-existing files:\n"
-                + "\n".join(f"  {path}" for path in clashes),
-                file=sys.stderr,
-            )
-            return 2
+    previously_managed = prior or {}
+    clashes = []
+    for relative, expected in targets.items():
+        path = args.repo / relative
+        if (
+            relative in MERGED_SURFACES
+            or relative.as_posix() in previously_managed
+            or not path.exists()
+        ):
+            continue
+        if not path.is_file() or path.read_bytes() != expected:
+            clashes.append(path)
+    if clashes:
+        print(
+            "conflict: install would overwrite pre-existing files:\n"
+            + "\n".join(f"  {path}" for path in clashes),
+            file=sys.stderr,
+        )
+        return 2
     changes = []
     for relative, expected in targets.items():
         path = args.repo / relative; current = path.read_bytes() if path.exists() else b""
