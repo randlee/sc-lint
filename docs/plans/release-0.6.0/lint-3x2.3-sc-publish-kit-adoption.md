@@ -62,8 +62,26 @@ the single sc-lint declaration. Requires the kit's generic
   four binaries).
 - The v1 Action tag move is now a manual dispatch after release, like the
   other post-release channels, rather than an automatic job.
-- Archive layout: the kit stages the bundle at
-  `<archive-root>/sc-lint-docs/` and binaries under `bin/`; audit of bootstrap,
-  Homebrew and setup-action consumers is recorded in the PR.
+- Archive layout: see the audit below (breaking for bootstrap and the setup action).
 - Pin currently references sc-publish PR #125 head `df0531e`; re-pin to the
   merged sc-publish commit before the PR is opened.
+
+## Archive-layout audit (breaking change, needs a ruling)
+
+Old sc-lint archives were flat: `sc-lint`, the backends and `sc-lint-docs/` at
+the archive root. Kit archives are `sc-lint_<version>_<target>/bin/<binary>`
+plus `sc-lint-docs/` under that single top-level directory.
+
+| Consumer | Assumes | Effect with kit archives |
+|---|---|---|
+| `packages/sc-lint-adoption/.sc-lint/bootstrap` (`bootstrap_install`) | `extract/sc-lint` | fails: "release archive did not contain sc-lint" |
+| `.github/actions/setup-sc-lint/action.yml` (unix, windows) | `$install_dir/sc-lint` and sibling backends | fails: missing executable |
+| `scripts/release_smoke.py` + CI release-smoke job | flat archive built by the legacy `stage-release-archive` | still passes, but now smoke-tests a layout that is no longer released |
+| Homebrew formula (kit `formula.rb.j2`) | kit layout via `binary_path` | correct by construction |
+| PyPI wheel | n/a | unaffected |
+
+Recommended fix (not applied; changes the adoption kit's public bootstrap):
+make bootstrap and the setup action accept both layouts (`extract/sc-lint` or
+`extract/*/bin/sc-lint`, backends beside it), and point the CI smoke job at
+a kit-layout archive. Alternative: keep flat archives, which the kit cannot
+produce today.
