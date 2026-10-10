@@ -1600,22 +1600,15 @@ state = "concrete_landed"
 }
 
 #[test]
-fn rejects_owner_crate_path_mismatch() {
+fn ignores_opaque_extensions_table() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
     fixture.rewrite_valid_boundary(|contents| {
-        contents.replace(
-            "owner_crate_path = \"sc_lint_boundary\"",
-            "owner_crate_path = \"wrong_crate_path\"",
-        )
+        contents + "\n[extensions.atm]\nteam = \"core\"\nlimits = { max = 3 }\n"
     });
 
-    let error = load_boundary_inventory(fixture.root())
-        .expect_err("owner crate path mismatch fails")
-        .to_string();
-    assert!(error.contains(
-        "boundary `BOUNDARY-ScLintBoundaryAnalyzer` declares owner_crate_path `wrong_crate_path` but expected `sc_lint_boundary` from owner_package `sc-lint-boundary`"
-    ));
+    let inventory = load_boundary_inventory(fixture.root()).expect("extensions are ignored");
+    assert_eq!(inventory.records.len(), 1);
 }
 
 #[test]

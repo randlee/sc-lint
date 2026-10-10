@@ -1,7 +1,6 @@
 #![cfg(test)]
 
 use super::*;
-use crate::inventory::owner_crate_path_for_package;
 use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
@@ -2377,8 +2376,8 @@ impl WorkspaceFixture {
                     [status]
                     state = "concrete_landed"
                 "#,
-                owner_crate_path_for_package(owner_package),
-                owner_crate_path_for_package(owner_package),
+                owner_package.replace('-', "_"),
+                owner_package.replace('-', "_"),
             ),
         );
     }

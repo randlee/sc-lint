@@ -34,7 +34,12 @@ impl NodeKind {
 }
 
 pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
-    let metadata = load_metadata(root)?;
+    build_workspace_graph_from(&load_metadata(root)?)
+}
+
+pub(crate) fn build_workspace_graph_from(
+    metadata: &cargo_metadata::Metadata,
+) -> Result<GraphExport> {
     let workspace_members = metadata.workspace_members.clone();
     let workspace_packages = metadata
         .packages

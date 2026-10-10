@@ -501,13 +501,18 @@ pub fn analyze_workspace(
             source: source.into(),
         }
     })?;
-    if options.rule == Some(RuleFilter::Dependencies) {
-        let metadata = graph::load_metadata(&options.root).map_err(|source| {
-            BoundaryError::PackagePolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            }
+    let metadata =
+        graph::load_metadata(&options.root).map_err(|source| BoundaryError::InventoryLoad {
+            root: options.root.clone(),
+            source: source.into(),
         })?;
+    inventory::validate_owner_crate_paths(&inventory, &metadata).map_err(|source| {
+        BoundaryError::InventoryLoad {
+            root: options.root.clone(),
+            source: source.into(),
+        }
+    })?;
+    if options.rule == Some(RuleFilter::Dependencies) {
         let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
             .map_err(|source| BoundaryError::PackagePolicyAnalysis {
                 root: options.root.clone(),
@@ -531,7 +536,7 @@ pub fn analyze_workspace(
             findings: dependency_report.findings,
         });
     }
-    let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
+    let graph = graph::build_workspace_graph_from(&metadata).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
             root: options.root.clone(),
             source: source.into(),
@@ -559,12 +564,6 @@ pub fn analyze_workspace(
         findings.extend(analysis::analyze_named_callers(&graph, &inventory));
     }
     if filter.is_none() {
-        let metadata = graph::load_metadata(&options.root).map_err(|source| {
-            BoundaryError::PackagePolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            }
-        })?;
         findings.extend(
             package_policy::analyze_package_policy(&metadata, &inventory)
                 .map_err(|source| BoundaryError::PackagePolicyAnalysis {

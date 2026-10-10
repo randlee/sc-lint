@@ -6,6 +6,7 @@ mod build;
 mod reference_collector;
 
 pub(crate) use build::build_workspace_graph;
+pub(crate) use build::build_workspace_graph_from;
 
 pub(crate) fn node_has_allow_rule(node: &GraphNode, rule_id: &str) -> bool {
     node.attributes.iter().any(|attr| {

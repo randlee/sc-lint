@@ -30,10 +30,15 @@ pub(crate) fn analyze_package_policy(
         .iter()
         .map(|package| package.name.to_string())
         .collect::<BTreeSet<_>>();
-    let direct_edges =
+    let (runtime_edges, dev_edges) =
         collect_direct_workspace_edges(&workspace_packages, &workspace_package_names);
 
-    let findings = collect_policy_findings(inventory, &workspace_package_names, &direct_edges);
+    let findings = collect_policy_findings(
+        inventory,
+        &workspace_package_names,
+        &runtime_edges,
+        &dev_edges,
+    );
 
     Ok(PackagePolicyReport {
         findings,
@@ -44,8 +49,12 @@ pub(crate) fn analyze_package_policy(
 fn collect_direct_workspace_edges(
     workspace_packages: &[&cargo_metadata::Package],
     workspace_package_names: &BTreeSet<String>,
-) -> BTreeSet<ForbiddenPackageEdge> {
-    let mut direct_edges = BTreeSet::new();
+) -> (
+    BTreeSet<ForbiddenPackageEdge>,
+    BTreeSet<ForbiddenPackageEdge>,
+) {
+    let mut runtime_edges = BTreeSet::new();
+    let mut dev_edges = BTreeSet::new();
     for package in workspace_packages {
         let from = WorkspacePackageName::from_package_name(package.name.to_string());
         for dependency in &package.dependencies {
@@ -53,23 +62,34 @@ fn collect_direct_workspace_edges(
             if !workspace_package_names.contains(&dependency_name) {
                 continue;
             }
-            direct_edges.insert(ForbiddenPackageEdge {
+            let edge = ForbiddenPackageEdge {
                 from: from.clone(),
                 to: WorkspacePackageName::from_package_name(dependency_name),
-            });
+            };
+            if dependency.kind == cargo_metadata::DependencyKind::Development {
+                dev_edges.insert(edge);
+            } else {
+                runtime_edges.insert(edge);
+            }
         }
     }
-    direct_edges
+    dev_edges.retain(|edge| !runtime_edges.contains(edge));
+    (runtime_edges, dev_edges)
 }
 
 fn collect_policy_findings(
     inventory: &BoundaryInventory,
     workspace_package_names: &BTreeSet<String>,
-    direct_edges: &BTreeSet<ForbiddenPackageEdge>,
+    runtime_edges: &BTreeSet<ForbiddenPackageEdge>,
+    dev_edges: &BTreeSet<ForbiddenPackageEdge>,
 ) -> Vec<Finding> {
+    let direct_edges = runtime_edges
+        .union(dev_edges)
+        .cloned()
+        .collect::<BTreeSet<_>>();
     let mut findings = Vec::new();
     let mut forbidden_findings = BTreeSet::new();
-    let incoming_edges = index_incoming_edges(direct_edges);
+    let incoming_edges = index_incoming_edges(&direct_edges);
 
     for record in &inventory.records {
         if !workspace_package_names.contains(record.owner_package.as_ref()) {
@@ -78,9 +98,19 @@ fn collect_policy_findings(
 
         let owner = WorkspacePackageName::from_package_name(record.owner_package.as_ref());
 
-        for edge in direct_edges.iter().filter(|edge| edge.from == owner) {
+        for edge in runtime_edges.iter().filter(|edge| edge.from == owner) {
             if !record.dependencies.allowed_dependencies.contains(&edge.to) {
                 findings.push(disallowed_dependency_finding(record, edge));
+            }
+        }
+        for edge in dev_edges.iter().filter(|edge| edge.from == owner) {
+            if !record.dependencies.allowed_dependencies.contains(&edge.to)
+                && !record
+                    .dependencies
+                    .allowed_dev_dependencies
+                    .contains(&edge.to)
+            {
+                findings.push(disallowed_dev_dependency_finding(record, edge));
             }
         }
 
@@ -103,6 +133,25 @@ fn collect_policy_findings(
             .then_with(|| left.message.cmp(&right.message))
     });
     findings
+}
+
+fn disallowed_dev_dependency_finding(
+    record: &BoundaryRecord,
+    edge: &ForbiddenPackageEdge,
+) -> Finding {
+    Finding {
+        rule_id: RuleId::ScbDependency001,
+        kind: "package_dependency_not_allowed".into(),
+        message: format!(
+            "workspace package `{}` directly dev-depends on `{}` but `{}` is not listed in `{}` allowed_dependencies or allowed_dev_dependencies",
+            edge.from, edge.to, edge.to, record.boundary_id
+        ),
+        owner_ids: vec![
+            OwnerId::new(edge.from.as_ref()),
+            OwnerId::new(edge.to.as_ref()),
+        ],
+        node_ids: Vec::new(),
+    }
 }
 
 fn index_incoming_edges(

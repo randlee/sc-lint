@@ -1496,7 +1496,7 @@ fn missing_boundary_planning_maps_to_cli_config_error() {
 }
 
 #[test]
-fn empty_boundary_inventory_workspace_graph_build_maps_to_backend_failure_error() {
+fn empty_boundary_inventory_metadata_load_maps_to_config_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     std::fs::write(
         temp_dir.path().join("Cargo.toml"),
@@ -1522,8 +1522,8 @@ fn empty_boundary_inventory_workspace_graph_build_maps_to_backend_failure_error(
     let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
     let error = crate::command::execute(&context, &loaded).expect_err("dispatch should fail");
 
-    assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_eq!(error.code(), "CLI.BACKEND_EXEC_FAILURE");
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert_eq!(error.code(), "CLI.CONFIG_ERROR");
     assert!(error.cause.is_some());
     assert!(std::error::Error::source(&error).is_some());
 }
