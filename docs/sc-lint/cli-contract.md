@@ -195,14 +195,17 @@ Required properties:
   JSON shape per backend
 - diagnostics are additive and do not replace the business payload
 
-Planned Phase `C` business-verdict rule:
+Business-verdict behavior:
 
 - `sc-lint check interfaces` is a business-verdict command rather than a
   transport or protocol failure surface
 - a completed comparison that detects breaking changes remains a
   `CommandEnvelope<T>` result with the negative verdict carried inside `data`
-- nonzero exit for that negative verdict is planned policy behavior, not a
-  `CliError` reclassification
+- `sc-lint check interfaces` currently exits `0` for a completed comparison,
+  including one with a breaking-change verdict; a nonzero exit for that verdict
+  remains planned policy behavior, not a `CliError` reclassification
+- `lint sc-boundary`, `lint sc-portability` and `lint sc-runtime` now exit `10`
+  when `data.status = "fail"`; the envelope remains `ok: true`
 
 The implemented field names are stable for the Phase A bootstrap line.
 
@@ -490,10 +493,11 @@ boundary rather than leaking raw Python stderr.
 
 Exit codes remain top-level CLI concerns.
 
-Recommended initial policy:
+Current CLI exit-code mapping:
 
 - `0`
-  - command succeeded
+  - command completed successfully; analyzer lint commands use this for a
+    passing verdict, while a failed analyzer verdict uses code `10`
 - `1`
   - top-level internal failure
 - `2`

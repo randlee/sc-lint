@@ -67,6 +67,23 @@ fn cli_contract_exit_code_mapping_matches_code_constants() {
 }
 
 #[test]
+fn cli_contract_documents_current_business_verdict_exit_codes() {
+    let contract = CLI_CONTRACT
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(contract.contains(
+        "`sc-lint check interfaces` currently exits `0` for a completed comparison, including one with a breaking-change verdict"
+    ));
+    assert!(contract.contains(
+        "`lint sc-boundary`, `lint sc-portability` and `lint sc-runtime` now exit `10` when `data.status = \"fail\"`; the envelope remains `ok: true`"
+    ));
+    assert!(contract.contains(
+        "command completed successfully; analyzer lint commands use this for a passing verdict, while a failed analyzer verdict uses code `10`"
+    ));
+}
+
+#[test]
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
     let canonical = CANONICAL_CONSUMER_JUSTFILE.replace("\r\n", "\n");
     assert!(canonical.starts_with("set windows-shell := [\"pwsh\", \"-NoLogo\", \"-Command\"]\n"));
