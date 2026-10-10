@@ -199,12 +199,16 @@ case "$operation" in
         ;;
     lint)
         ensure_product "$@"
+        export SC_LINT_BIN="$product_binary"
+        PATH="$(dirname "$product_binary"):$PATH"; export PATH
         provision_venv install || exit $?
         if [ -n "$selector" ]; then exec "$product_binary" lint --consumer --config "$config" ci --profile "$selector"; fi
         exec "$product_binary" lint --consumer --config "$config" ci
         ;;
     test)
         ensure_product "$@"
+        export SC_LINT_BIN="$product_binary"
+        PATH="$(dirname "$product_binary"):$PATH"; export PATH
         provision_venv install || exit $?
         if [ -n "$selector" ]; then exec "$product_binary" test --config "$config" "$selector"; fi
         exec "$product_binary" test --config "$config"

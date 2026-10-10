@@ -189,11 +189,15 @@ switch ($Operation) {
     }
     "lint" {
         Ensure-Product
+        $env:SC_LINT_BIN = $productBinary
+        $env:PATH = (Split-Path -Parent $productBinary) + [IO.Path]::PathSeparator + $env:PATH
         Install-Venv "install"
         if ($selector.Count -eq 1) { & $productBinary lint --consumer --config $Config ci --profile $selector[0] } else { & $productBinary lint --consumer --config $Config ci }
     }
     "test" {
         Ensure-Product
+        $env:SC_LINT_BIN = $productBinary
+        $env:PATH = (Split-Path -Parent $productBinary) + [IO.Path]::PathSeparator + $env:PATH
         Install-Venv "install"
         if ($selector.Count -eq 1) { & $productBinary test --config $Config $selector[0] } else { & $productBinary test --config $Config }
     }
