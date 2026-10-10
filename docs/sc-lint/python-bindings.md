@@ -10,7 +10,7 @@ invoke in every consumer; no consumer copies helper scripts any more
 
 | Surface | Contents |
 | --- | --- |
-| `sc_lint._native` (pyo3, abi3-py39) | exactly two exports: `version_json() -> str` (the `sc-lint --json version` payload) and `run(argv: list[str]) -> int` (runs the CLI in-process, returns its exit code). No lint logic lives here. |
+| `sc_lint._native` (pyo3, abi3-py39) | exactly two exports: `version_json() -> str` (the `sc-lint --json version` payload) and `run(argv: list[str]) -> int` (runs the CLI in-process, returns its exit code: `0`-`6` as documented in cli-contract.md, and `7` (`verdict_fail`) when a business-verdict command — `lint sc-boundary|sc-portability|sc-runtime`, `lint --consumer`, or `test` — reports `data.status = "fail"`). No lint logic lives here. |
 | `sc_lint.__version__` | parsed from `version_json()`; always equals the workspace version. |
 | `sc_lint.binary_path()` | resolves the native `sc-lint` executable: `SC_LINT_BIN`, then the managed install dir (`SC_LINT_INSTALL_DIR`, `$XDG_DATA_HOME/sc-lint/bin`, `~/.local/share/sc-lint/bin`), then `PATH`. |
 | `sc_lint.<helper>` modules | the former `.just/*.py` helpers (`run_lint`, `run_pytests`, `lint_*`, `check_version_sync`, `view_findings`, …) run as `python -m sc_lint.<helper>`. |

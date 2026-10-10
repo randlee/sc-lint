@@ -73,9 +73,12 @@ Initial convention:
   - `lint.identity-literals`
 - `sc-lint lint fast`
   - `lint.fast`
-- `sc-lint lint --consumer --config sc-lint.toml ci`
+- `sc-lint lint --consumer --config sc-lint.toml [SELECTOR] [SCOPE]`
+  (also `lint --consumer ci`, `lint ci --consumer`,
+  `lint --consumer ci --profile <selector>`)
   - `lint.ci.consumer`
-- `sc-lint test`
+- `sc-lint test --config sc-lint.toml [SELECTOR...] [-- ARGS...]`,
+  `sc-lint test --list`
   - `test`
 - `sc-lint init --just`
   - `init`
@@ -127,10 +130,11 @@ Current implementation status:
 - `lint.ci`
   - implemented lint-only CI-parity profile path
 - `lint.ci.consumer`
-  - implemented explicit consumer lint profile path; its configured argv steps
-    run from `sc-lint.toml` without source-checkout discovery
+  - implemented consumer lint selector run (REQ-CLI-023); `data` per
+    *Consumer Step Payload*
 - `test`
-  - implemented explicit consumer test profile path
+  - implemented consumer test selector run and `--list` (REQ-CLI-023); `data`
+    per *Consumer Step Payload*
 - `init`
   - implemented product-owned consumer integration renderer with check,
     dry-run, idempotency, and conflict behavior
@@ -162,6 +166,19 @@ Current implementation status:
 - `lint.sc-runtime`
   - implemented delegated backend path
 
+Delegated analyzer reports (`lint.sc-portability`, `lint.sc-runtime`) carry the
+backend `FindingsReport` unchanged in `data`. An analyzer whose
+`[tool.sc-lint.analyzers.<name>]` table sets `enabled = false` reports:
+
+    {"findings": [], "scanned_crates": 0, "schema_version": "0.1.0",
+     "status": "pass", "tool": "sc-lint-runtime", "version": "<version>"}
+
+A backend configuration error (unknown key, bad selector, bad pattern) exits
+the backend with code 2 and a single `error: <message>` stderr line; `sc-lint`
+reports it as an error envelope whose cause is that line, with kind `usage`
+(exit 2) when the line names `--rule-filter` and `config` (exit 3) otherwise
+(see *Rust binary backend*).
+
 ## Canonical Success Envelope
 
 Machine-readable success results should use one stable top-level envelope
@@ -189,14 +206,29 @@ Required properties:
   JSON shape per backend
 - diagnostics are additive and do not replace the business payload
 
-Planned Phase `C` business-verdict rule:
+Business-verdict rule (REQ-CLI-005J):
 
-- `sc-lint check interfaces` is a business-verdict command rather than a
-  transport or protocol failure surface
-- a completed comparison that detects breaking changes remains a
+- `sc-lint lint sc-boundary`, `sc-lint lint sc-portability`, and
+  `sc-lint lint sc-runtime` are business-verdict commands: a completed analysis
+  is always a `CommandEnvelope<T>` success (`ok: true`) with the backend report
+  under `data`
+- the consumer selector runs `sc-lint lint --consumer` (`lint.ci.consumer`)
+  and `sc-lint test` (`test`) are business-verdict commands: a run whose steps
+  all started is a success envelope whose `data.status` is `"fail"` when any
+  step exited nonzero; `sc-lint test --list` reports `"pass"`
+- when `data.status` is `"fail"` the process exits `7` (`verdict_fail`); any
+  other status exits `0`; stdout carries the same envelope in both cases, no
+  error envelope is written, and the analyzer commands write nothing to stderr
+- `ok: true` with exit `7` is the verdict shape; it is never a `CliError`
+  reclassification, and `CliError` exit codes `1`-`6` keep their meaning
+- the human rendering of the analyzer commands is
+  `<tool>: <status> (<n> findings)`
+- the built-in profiles (`lint fast|full|ci`, `ci`) are not business-verdict
+  commands; a member step that exits `7` fails the profile with a `CliError`
+  (exit `5`)
+- `sc-lint check interfaces` remains a planned business-verdict command: a
+  completed comparison that detects breaking changes stays a
   `CommandEnvelope<T>` result with the negative verdict carried inside `data`
-- nonzero exit for that negative verdict is planned policy behavior, not a
-  `CliError` reclassification
 
 The implemented field names are stable for the Phase A bootstrap line.
 
@@ -303,9 +335,12 @@ Cargo manifest, or analyzer package:
   JSON-envelope producer.
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
-- profile commands are argv arrays, not shell strings. Each command runs in
-  the configuration directory and any required member failure fails the
-  aggregate command with a structured `CliError`.
+- selector commands are argv arrays, not shell strings. Each runs in the
+  configuration directory or its `cwd`, with `env` overlaid; its stdout is
+  copied to sc-lint's stderr and its stderr is inherited, so stdout carries
+  only the envelope. A step that exits nonzero is reported in `data.steps`
+  with `status: "fail"`; the envelope stays `ok: true` and the command exits
+  `7` (`verdict_fail`). A step that cannot start is a structured `CliError`.
 - missing configured executables use
   `CLI.SC_LINT_BACKEND_NOT_FOUND` with installation recovery and the setup
   documentation reference.
@@ -321,6 +356,119 @@ command = ["cargo", "fmt", "--all", "--check"]
 name = "workspace"
 command = ["cargo", "test", "--workspace"]
 ```
+
+The 0.5 `[[tool.sc-lint.lint]]` / `[[tool.sc-lint.test]]` array form above
+remains valid. Since 0.6.1 a configuration may instead use the table form,
+which names selectors and groups (REQ-CLI-023):
+
+```toml
+[tool.sc-lint.lint]
+default = ["fast", "clippy"]
+
+[tool.sc-lint.lint.selectors.fmt]
+command = ["cargo", "fmt", "--all", "--check"]
+
+[tool.sc-lint.lint.selectors.clippy]
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+
+[tool.sc-lint.lint.selectors.clippy-windows]
+command = ["cargo", "xwin", "clippy", "--target", "x86_64-pc-windows-msvc", "--workspace", "--", "-D", "warnings"]
+platforms = ["windows"]
+
+[tool.sc-lint.lint.selectors.fast]
+group = ["fmt"]
+
+[tool.sc-lint.lint.selectors.ci]
+group = ["fast", "clippy", "clippy-windows"]
+
+[tool.sc-lint.test]
+default = ["unit"]
+
+[tool.sc-lint.test.selectors.unit]
+command = ["cargo", "test", "--workspace"]
+
+[tool.sc-lint.test.selectors.e2e]
+command = ["cargo", "test", "--test", "e2e"]
+platforms = ["linux", "macos"]
+
+[tool.sc-lint.test.selectors.full]
+group = ["unit", "e2e"]
+```
+
+### Consumer Step Payload
+
+`sc-lint --json lint --consumer ci all` on a Linux host without `cargo xwin`,
+with `keep_going = true`, exits `7`:
+
+```json
+{"ok":true,"command":"lint.ci.consumer","data":{
+ "status":"fail","profile":"lint","form":"table","selector":"ci","selectors":["ci"],
+ "scope":"all","host_platform":"linux","keep_going":true,"args":[],
+ "step_count":5,"counts":{"pass":3,"fail":1,"skipped":1,"not_run":0},
+ "summary":"3 passed, 1 failed, 1 skipped, 0 not run",
+ "steps":[
+  {"name":"fmt","kind":"lint","command":"cargo fmt --all --check","status":"pass"},
+  {"name":"version","kind":"lint","command":"python tools/check_version.py","status":"pass"},
+  {"name":"clippy","kind":"lint","command":"cargo clippy --workspace --all-targets -- -D warnings","status":"fail","exit_code":101},
+  {"name":"clippy-windows","kind":"lint","command":"cargo xwin clippy --target x86_64-pc-windows-msvc --workspace -- -D warnings","status":"skipped","reason":"requires `cargo xwin`, which is not available on host `linux`"},
+  {"name":"lines","kind":"lint","command":"python tools/check_lines.py","status":"pass"}]},
+ "diagnostics":[]}
+```
+
+`data` fields:
+
+- `status`: `"fail"` when any step has status `"fail"`, otherwise `"pass"`
+- `profile`: `"lint"` or `"test"`
+- `form`: `"legacy"` (array form) or `"table"`
+- `selector`: `"default"`, `"ci"`, `"all"`, or the requested names joined
+  with a space
+- `selectors`: the resolved selector names before group expansion
+- `scope`: `host`, `all`, `linux`, `macos` or `windows`; always `host` for
+  `test`
+- `host_platform`: `linux`, `macos`, `windows`, or `null` on another OS
+- `keep_going`: the table value (`false` for the legacy form)
+- `args`: the arguments given after `--` (`test` only, otherwise `[]`)
+- `step_count`: the number of expanded steps
+- `counts`: `pass`, `fail`, `skipped` and `not_run` step counts
+- `summary`: `"<pass> passed, <fail> failed, <skipped> skipped, <not_run> not run"`
+- `steps[]`: `name`, `kind` (`lint` or `test`), `command` (argv joined with
+  spaces), `status` (`pass`, `fail`, `skipped`, `not_run`), `exit_code`
+  (`fail` with an exit code only), `reason` (`skipped` and `not_run` only)
+
+Step reasons (`{h}` is the host platform or `unknown`, `{p}` the requested
+platform, `{list}` the step's `platforms` joined with `, `, `{name}` the
+failing step):
+
+```text
+host platform `{h}` is not in platforms [{list}]
+platform scope `{p}` is not in platforms [{list}]
+requires `cargo xwin`, which is not available on host `{h}`
+stopped after failing step `{name}` (keep_going = false)
+```
+
+The first is used under scope `host`, the second under an explicit
+`<platform>`, the third under `all` for a `cargo xwin` step, and the fourth
+for steps after a failure when `keep_going = false`. Under an explicit
+`<platform>`, a `cargo xwin` step without `cargo xwin` is a capability error
+(exit `4`) before any step runs.
+
+`sc-lint --json test --list` exits `0`:
+
+```json
+{"ok":true,"command":"test","data":{
+ "status":"pass","profile":"test","mode":"list","form":"table","default":["unit","python"],
+ "summary":"5 selectors",
+ "selectors":[
+  {"name":"coverage","kind":"command","default":false,"description":null,"command":["cargo","llvm-cov","--workspace"],"platforms":[],"cwd":null,"env":{}},
+  {"name":"e2e","kind":"command","default":false,"description":null,"command":["cargo","test","--test","e2e"],"platforms":["linux","macos"],"cwd":null,"env":{}},
+  {"name":"full","kind":"group","default":false,"description":null,"members":["unit","python","e2e"]},
+  {"name":"python","kind":"command","default":true,"description":null,"command":["python","-m","unittest","discover","-s","tests"],"platforms":[],"cwd":null,"env":{}},
+  {"name":"unit","kind":"command","default":true,"description":"Rust unit tests","command":["cargo","test","--workspace"],"platforms":[],"cwd":null,"env":{}}]},
+ "diagnostics":[]}
+```
+
+Selectors are listed in lexicographic order for the table form and in
+declaration order for the legacy form.
 
 The only consumer minimum-version location is:
 
@@ -434,6 +582,12 @@ When the CLI calls a Rust library directly, as A.1b does for
 - backend-specific details may be retained under `details`
 - the top-level CLI remains responsible for the final `kind` / `code`
   normalization
+- `sc-lint lint sc-boundary` passes `--rule-filter` and the resolved config
+  path into `AnalyzeOptions`; a `--rule-filter` selector error maps to
+  `usage` (exit 2), any other `[tool.sc-lint.analyzers.boundary]` error maps
+  to `config` (exit 3), and a disabled boundary table reports `status:
+  "pass"`, `scanned_crates: 0`, `findings: []` with `tool:
+  "sc-lint-boundary"`
 
 ### Rust binary backend
 
@@ -451,6 +605,16 @@ If the delegated binary:
   - emit `CLI.BACKEND_EXEC_FAILURE`
 - exits zero with malformed machine-readable output
   - emit `CLI.BACKEND_PROTOCOL_ERROR`
+- exits zero with a valid report whose `status` is `"fail"`
+  - emit the success envelope and exit `7` (`verdict_fail`); see the
+    business-verdict rule
+
+`sc-lint lint <analyzer>` invokes `analyze --root <root> --format json`, then
+appends `--config <path>` when a config file was given or found, then
+`--rule-filter <value>` when given. A delegated backend that exits 2 maps to
+`usage` (exit 2) when its stderr names `--rule-filter`, otherwise to
+`config` (exit 3); the stderr text is the error `cause`. Other nonzero exits
+keep `CLI.BACKEND_EXEC_FAILURE`.
 
 ### Python adapter backend
 
@@ -484,10 +648,10 @@ boundary rather than leaking raw Python stderr.
 
 Exit codes remain top-level CLI concerns.
 
-Recommended initial policy:
+Policy:
 
 - `0`
-  - command succeeded
+  - command succeeded (for business-verdict commands: verdict `pass`)
 - `1`
   - top-level internal failure
 - `2`
@@ -500,8 +664,15 @@ Recommended initial policy:
   - delegated backend execution failure
 - `6`
   - delegated backend protocol failure
+- `7`
+  - `verdict_fail`: a business-verdict command (`lint sc-boundary`,
+    `lint sc-portability`, `lint sc-runtime`, or a consumer selector run with
+    a failing step) completed and its payload verdict is negative; the
+    envelope is a success (`ok: true`) and no `CliError` exists
+    (REQ-CLI-005J)
 
-These codes are owned by the CLI and must not drift per backend.
+These codes are owned by the CLI and must not drift per backend. `1`-`6` map
+one-to-one to `CliError.kind`; `7` is never produced by a `CliError`.
 
 For Python-adapter command paths in A.3:
 
@@ -571,6 +742,9 @@ A.1b extends that gate with:
 - backend execution failure mapping
 - backend protocol failure mapping
 - dispatch-start and dispatch-normalized log events for the real backend path
+- business-verdict exit `7` for `lint.sc-boundary`, `lint.sc-portability`,
+  and `lint.sc-runtime` with an `ok: true` envelope, and exit `0` on `pass`
+  (`crates/sc-lint/src/tests.rs`, `crates/sc-lint/tests/verdict_exit.rs`)
 
 ## Graph and Interactive Futures
 

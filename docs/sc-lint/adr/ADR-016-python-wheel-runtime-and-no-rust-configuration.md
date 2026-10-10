@@ -3,10 +3,11 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-016 |
-| Status | Accepted |
+| Status | Proposed (amendment 2026-10-10, phase-h) |
 | Date | 2026-08-29 |
 | Deciders | user, flint, team-lead |
 | Approved by | user (Rand Lee), 2026-08-29 |
+| Amendment | 2026-10-10 phase-h: Decision 3 selector tables and verbatim `just lint`/`just test` arguments; How To Extend selector vocabulary; awaiting approval in PR #206 |
 | Related | ADR-012, ADR-015 |
 
 ## Context
@@ -35,11 +36,13 @@ same problem for `sc-compose` by provisioning a pinned wheel.
    `[tool.sc-lint].minimum_version`. Nothing is copied from a source
    archive.
 3. **The four ADR-012 recipe names are the standard kit-owned entry points.**
-   `just test [layer]` and `just lint [profile]` pass an optional positional
-   argument directly to bootstrap. `sc-lint.toml` declares named
-   `[tool.sc-lint.test.<layer>]` step lists and lint profiles; no argument uses
-   the declared default, and `just test all` runs every layer in declaration
-   order. The managed import block is the only kit-owned Justfile region;
+   `just test [selector...] [-- args]` and `just lint [selector] [scope]` pass
+   their arguments verbatim to bootstrap. `sc-lint.toml` declares
+   `[tool.sc-lint.test]` and `[tool.sc-lint.lint]` selector tables
+   (REQ-CLI-023): no argument runs `default`, a named selector or group runs on
+   request, `just test all` runs every command selector, and `just lint ci all`
+   adds declared platform steps.
+   The managed import block is the only kit-owned Justfile region;
    consumer recipes outside it are untouched. New layers, profiles, and
    analyzers are declarative configuration, never bootstrap, wheel, or Rust
    edits. ADR-012's four recipes are thus exactly four kit-owned names;
@@ -72,7 +75,7 @@ upgrade:  .sc-lint/bootstrap upgrade --config sc-lint.toml
 ## How To Extend
 
 Use declarative `sc-lint.toml` lint profiles, test layers, per-analyzer tables,
-step argv/exclusions, platform conditionals, and per-step/per-layer `env`.
+step argv/exclusions, selector groups, per-step `platforms`, `env`, and `cwd`.
 Pre/post work is an ordinary extra layer step, not a hook DSL. The kit pins only
 `sc-lint`; other toolchain pins remain consumer-owned. Validate/view/bench/fuzz
 dispatchers are consumer-owned Justfile recipes outside the managed import

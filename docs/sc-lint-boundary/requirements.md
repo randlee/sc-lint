@@ -44,8 +44,13 @@ family.
 
 - `REQ-SCB-016`
   A direct workspace package dependency from owner package `X` to workspace
-  package `Y` that is not listed in `dependencies.allowed_dependencies` for the
-  owner record must fail with `SCB-DEPENDENCY-001`.
+  package `Y` must fail with `SCB-DEPENDENCY-001` when `Y` is not listed in
+  `dependencies.allowed_dependencies` for the owner record, except that an edge
+  declared only in `[dev-dependencies]` sections (including target-specific
+  `[target.<cfg>.dev-dependencies]`) also passes when `Y` is listed in
+  `dependencies.allowed_dev_dependencies`. An edge with any normal, build, or
+  target-specific normal/build declaration is checked against
+  `allowed_dependencies` only.
 
 - `REQ-SCB-017`
   A direct workspace package dependency from workspace package `Y` to owner
@@ -61,19 +66,26 @@ family.
   allowlists.
 
 - `REQ-SCB-019`
-  The first package dependency policy implementation scope is direct
-  workspace-member edges only, including direct edges declared under
-  `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]`, and
-  target-specific dependency sections when they name another current workspace
-  member. Transitive reachability and third-party crates.io or git
-  dependencies outside the workspace-member set are out of scope until a later
-  scheduled sprint adds them explicitly.
+  Package dependency policy covers direct workspace-member edges only,
+  including direct edges declared under `[dependencies]`, `[dev-dependencies]`,
+  `[build-dependencies]`, and target-specific dependency sections when they
+  name another current workspace member. `allowed_dependents` (`REQ-SCB-017`)
+  and `forbidden_edges` (`REQ-SCB-018`) apply to edges of every kind; only the
+  outgoing allowlist distinguishes dev-only edges (`REQ-SCB-016`). Transitive
+  reachability and third-party crates.io or git dependencies outside the
+  workspace-member set are out of scope until a later scheduled sprint adds
+  them explicitly.
 
 - `REQ-SCB-020`
   Package dependency policy entries must be validated at inventory load.
   Malformed forbidden-edge strings, duplicate forbidden edges, duplicate
-  package names inside one dependency-policy record, and unknown fields under
-  `[dependencies]` are hard errors.
+  package names inside one of `allowed_dependents`, `allowed_dependencies`, or
+  `allowed_dev_dependencies` (optional, default empty), invalid package names
+  in those lists, and unknown fields under `[dependencies]` are hard errors.
+  A boundary record may carry consumer-owned data in
+  `[extensions.<namespace>]` tables: each namespace value must be a table, its
+  contents are parsed and never interpreted, and any other unknown field in a
+  boundary record remains a hard error.
 
 - `REQ-SCB-021`
   Package dependency policy is a boundary-inventory rule family owned by
@@ -115,8 +127,13 @@ family.
   warn.
 
 - `REQ-SCB-022`
-  Every boundary record's `owner_crate_path` must equal
-  `owner_package` with `-` replaced by `_`.
+  A boundary record's `owner_crate_path` must equal the name of the library
+  target (`lib`, `rlib`, `dylib`, `cdylib`, `staticlib`, or `proc-macro`) of
+  its `owner_package` as reported by `cargo metadata`. When `owner_package` is
+  not a workspace member or has no library target, `owner_crate_path` must
+  equal `owner_package` with `-` replaced by `_`. The check runs with package
+  dependency policy analysis, and a mismatch is a hard configuration error
+  naming the boundary, the declared value, and the expected value.
 
 - `REQ-SCB-023`
   A boundary's `[public]` section must define exactly one non-empty `facade` or

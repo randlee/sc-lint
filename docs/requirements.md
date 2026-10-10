@@ -496,10 +496,31 @@ The product should support both:
   invocation of `sc-lint init --just`. `sc-lint init --just` is retained as
   the product-side generator whose bootstrap output the kit vendors verbatim
   and which product sprints use for fresh-workspace acceptance. The
-  idempotence and never-overwrite obligations above bind the kit: `--dry-run`
-  drift reports a unified diff and exits 1, a conflict with a user-owned file
-  exits 2, and the kit has no delete operation. Runtime delivery of the
-  helpers is governed by ADR-016.
+  idempotence and never-overwrite obligations above bind the kit. On a first
+  install (no `.sc-lint/installed.json`) and on every later install, the kit
+  writes nothing when any of these holds: a file at a kit path differs from
+  the kit content and is not recorded unmodified in `.sc-lint/installed.json`;
+  a recorded managed file was modified; the root `Justfile` has other than
+  zero or one managed block; or the root `Justfile` outside the managed block,
+  including its imports, defines a recipe, alias, module or variable name that
+  the kit's `.sc-lint/justfile` defines. The root `Justfile` is merged at its
+  managed block and is never a byte conflict. `.sc-lint/install.json` is never
+  a conflict when it is the installer's input. The kit deletes only a path
+  recorded in `.sc-lint/installed.json` whose content still matches its
+  recorded digest and which the current kit no longer installs; a modified one
+  is a conflict. `install.py` exits 0 when converged or applied, 1 on
+  `--dry-run` with pending changes (unified diff on stdout), and 2 on invalid
+  input, a missing or older-than-1.44.0 `just` when the root `Justfile` has
+  consumer content, or any conflict (one `conflict: <posix path>: <reason>`
+  line each on stderr); `--dry-run` exits 2 exactly when the install would.
+  Since kit 0.6.1, `install.py` validates `install.json` completely (unknown
+  keys at any depth, types, enumerations, names, references and cycles) and
+  exits 2 naming the JSON path of the first error on an `error: install input
+  <json path>: <reason>` stderr line; it rejects the 0.6.0 `profiles`,
+  `test: {"<layer>": [argv]}` and `analyzers.<name>.targets` shapes with exit
+  2 and a message giving the replacement; and it rejects `minimum_version`
+  below 0.6.1. Re-running from the persisted `.sc-lint/install.json` is
+  byte-identical. Runtime delivery of the helpers is governed by ADR-016.
 
 - `REQ-PRODUCT-020`
   The supported consumer installation and upgrade path must select a verified
@@ -511,11 +532,15 @@ The product should support both:
   downgrade a newer compatible installation, and install only into the managed
   product location. The selected immutable release artifact is reported
   separately from that floor, which remains the installed-version comparison
-  policy. Consumer repositories use the product-owned
-  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` assets; they delegate
-  `ensure`, `setup`, and `upgrade` to
-  installed `sc-lint` and never copies source-checkout scripts or overwrites a
-  consumer README.
+  policy.
+  Consumer repositories use the product-owned `.sc-lint/bootstrap` and
+  `.sc-lint/bootstrap.ps1` assets; they delegate `setup`, `lint`, `test`, and
+  `upgrade` to installed `sc-lint`, never copy source-checkout scripts, and
+  never overwrite a consumer README. Before `lint` and `test` they export
+  `SC_LINT_BIN` as the absolute path of the resolved product binary
+  (`SC_LINT_BIN`, then the managed binary, then `PATH`) and prepend that
+  binary's directory to `PATH`, so a consumer step that runs `sc-lint`
+  executes the same binary; the product's exit status is returned unchanged.
 
 - `REQ-PRODUCT-021`
   Every primary release distribution, including release archives and Homebrew,
@@ -551,15 +576,61 @@ The product should support both:
 
 - `REQ-PRODUCT-023`
   A versioned, reusable, analyzer-agnostic adoption kit must install one
-  drift-detectable consumer end state. Analyzer selection is the sole
-  repo-specific declarative input in `[tool.sc-lint.analyzers]`; profiles
-  select applicable analyzers. Installation is idempotent and `--dry-run` is
-  non-mutating, reporting drift or a managed-file conflict rather than writing.
+  drift-detectable consumer end state from one `install.json`, which is the
+  JSON image of the rendered `sc-lint.toml`: `lint` and `test` (`keep_going`,
+  `default`, `selectors`) and `analyzers.<name>` render one-to-one into
+  `[tool.sc-lint.lint]`, `[tool.sc-lint.test]` and
+  `[tool.sc-lint.analyzers.<name>]`, with consumer-chosen selector names
+  emitted as quoted TOML keys. Analyzer selection and per-analyzer
+  configuration are the sole repo-specific analyzer input, in
+  `[tool.sc-lint.analyzers.<name>]` tables (`boundary`, `portability`,
+  `runtime`); lint and test selectors are consumer-owned declarations the kit
+  renders but never derives. Installation is idempotent and `--dry-run` is
+  non-mutating, reporting drift or a managed-file conflict rather than
+  writing. The kit serves its CI action from the vendored package
+  (`./plugins/sc-lint/.github/actions/setup-sc-lint`) and installs no file
+  under the consumer's `.github/actions/`; with `ci.enabled = false` it
+  installs nothing under the consumer's `.github/`.
+
+  Each analyzer reads only its own table, from `<root>/sc-lint.toml` or the
+  file given to its backend with `analyze --config <path>`. Every table
+  accepts the common keys `enabled` (default `true`), `reason`
+  (documentation only), `exclude_rules`, `fail_rules` (rule ids such as
+  `PORT-001` or analyzer family names) and `exclude_paths` (`/`-separated
+  globs relative to the analysis root), plus that analyzer's own keys; any
+  other key, including the removed `targets`, is a configuration error naming
+  the analyzer and the key. A disabled analyzer analyzes nothing and reports
+  `status = "pass"` with no findings. `exclude_rules` and `exclude_paths` drop
+  findings; `fail_rules` (default: the analyzer's built-in failing set)
+  decides which reported findings make `status = "fail"`. A backend's
+  `analyze --rule-filter <RULE-ID|family>[,...]` runs exactly the selected
+  rules and overrides `exclude_rules`. The portability analyzer also accepts
+  `config_home_env` and `unix_path_prefixes`; configured prefixes extend, and
+  never replace, both the PORT-001 test-code list and the PORT-006
+  production-code list, and analyzer-table values take precedence over the
+  legacy top-level `[portability]` table, which remains readable.
+
+  `sc-lint lint <analyzer> --rule-filter <value>` forwards the value unchanged
+  to that analyzer, and forwards the resolved sc-lint config path as the
+  analyzer's `--config`; a malformed or unknown `--rule-filter` selector is a
+  usage error (exit 2) and any other analyzer-table error is a configuration
+  error (exit 3). The boundary analyzer's selectors are its rule ids
+  (`SCB-CYCLE-001` through `SCB-MANIFEST-002`) and the families `boundaries`,
+  `cycles`, `dependencies`, `forbid_external_impls`, `internal_only`, and
+  `manifests`; its default `fail_rules` are every rule id except
+  `SCB-CYCLE-002` and `SCB-CYCLE-003`.
 
 - `REQ-PRODUCT-024`
-  The version-matched `sc-lint` wheel delivers every consumer-run helper and
-  supports declared test layers and lint profiles through `just test [layer]`
-  and `just lint [profile]`; it is never copied from a source checkout.
+  The version-matched `sc-lint` wheel delivers every consumer-run helper; it
+  is never copied from a source checkout. Consumers run their declared lint
+  and test selectors through `just lint [<selector> [<scope>]]` and
+  `just test [<selector>...] [-- <argument>...]`, which pass their arguments
+  to the bootstrap unchanged, including `--`, dash-prefixed tokens and
+  arguments containing spaces. `lint` runs the named lint selector (the
+  declared `default` when none is named) for the host or the named platform
+  scope; `test` runs the named test selectors (the declared `default` when
+  none is named) with arguments after `--` appended to the single selected
+  command.
 
 ## Current Detailed Requirement Areas
 

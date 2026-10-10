@@ -51,7 +51,8 @@ their governing docs, boundaries, and planned sprint work.
 
 - role:
   - shared machine-schema types for analyzer inputs, outputs, and shared
-    interface artifacts
+    interface artifacts, including the per-analyzer configuration contract
+    (`[tool.sc-lint.analyzers.<name>]` parsing and validation, ADR-015 D7)
 - governing docs:
   - `docs/architecture.md`
   - `docs/sc-lint/README.md`
