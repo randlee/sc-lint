@@ -198,7 +198,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install maturin
-        run: python -m pip install maturin==1.9.4
+        run: python -m pip install "maturin[zig]==1.9.4"
 
       - name: Build wheel and sdist
         shell: bash
@@ -207,7 +207,8 @@ jobs:
           mkdir -p dist
           while IFS='|' read -r artifact package cargo_toml; do
             [[ -n "$artifact" ]] || continue
-            maturin build --release -m "$cargo_toml" --out dist
+            # manylinux2014 (glibc 2.17), matching release.yml build-python-wheels.
+            maturin build --release --compatibility manylinux2014 --zig -m "$cargo_toml" --out dist
             maturin sdist -m "$cargo_toml" --out dist
           done < <(
             python3 scripts/release_artifacts.py list-python-distributions \

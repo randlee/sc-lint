@@ -68,6 +68,10 @@ owners, trait-method identity, structured inventory validation, and the
   upstream alignment (#166, #167, #170, #174, #179, #181). Related internal
   changes (beads integration #162, ATM roster/alias cleanup #156, #158, #161,
   plan-hardening docs #129) do not affect consumers.
+- Phase G integration and version bump: `integrate/phase-G` into `develop`
+  (#147) and the 0.6.0 version bump (#148).
+- Internal-only changes with no consumer impact: #112, #113, #130, #151, #189,
+  #205, #207.
 
 ## Migration Notes
 
@@ -87,9 +91,10 @@ owners, trait-method identity, structured inventory validation, and the
 
 ## Validation
 
-- `develop` head is `e2477c38857537c8bcd34cf3873ee9726ef8d12a`.
-- Latest `develop` CI run `35559810599` (2026-09-21) completed successfully (Test, Just
-  lint, Release smoke, and Adoption kit).
+- `develop` head at the time of writing is `66dbca976ea8d3b680701257332df7364740bc92`
+  (PR #207). CI run `38031333834` (workflow CI, 2026-10-10) on that commit
+  completed successfully. The commit and run are refreshed at release time,
+  after the final sync to `develop`.
 - Release publication order and package preflight are driven by
   `release/publish-artifacts.toml`.
 - The included-crates list above was generated from that same publish manifest.
