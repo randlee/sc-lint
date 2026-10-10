@@ -7,12 +7,13 @@ Intent: `docs/plans/phase-i/intent.md`
 | ID | Status | Summary | Stated |
 | --- | --- | --- | --- |
 | ANC-001 | locked | Four layers: shared types/attributes, cargo tools, CLI, just template | 2026-10-10 |
-| ANC-002 | proposed | just test is repo-customized, not implemented in sc-lint | 2026-10-10 |
+| ANC-002 | retired | just test is repo-customized, not implemented in sc-lint | 2026-10-10 |
 | ANC-003 | proposed | Each gap fix lands at its appropriate layer | 2026-10-10 |
 | ANC-004 | proposed | Substantial redesign is discussed with Rand before planning | 2026-10-10 |
 | ANC-005 | proposed | No additions beyond what the filed issues require | 2026-10-10 |
 | ANC-006 | proposed | Issue fixes are line-item targeted additions, not redesign | 2026-10-10 |
 | ANC-007 | proposed | Sprint plans carry code samples; no dev-time decisions | 2026-10-10 |
+| ANC-008 | locked | Repo owns just test; sc-lint supplies patterns and helpers | 2026-10-10 |
 
 ## ANC-001
 
@@ -32,7 +33,7 @@ Beads: anchor `lint-hl1`, plan questions `lint-hl1.1`, dev questions `lint-hl1.2
 
 > I would expect 'just test' for the most part to be customized by the repo.
 
-Said by Rand Lee, planning session, 2026-10-10. Status: proposed. Version 1.
+Said by Rand Lee, planning session, 2026-10-10. Status: retired. Version 2.
 
 Summary: just test is repo-customized, not implemented in sc-lint
 
@@ -99,3 +100,17 @@ Summary: Sprint plans carry code samples; no dev-time decisions
 Scope: every phase-i sprint bead's design field
 
 Deterministic check to pair with the development gate: each sprint bead design contains fenced code for every deliverable
+
+## ANC-008
+
+> I expect 'just test' to be managed and customized by the repo.  sc-lint supplies patterns and general helper functions
+
+Said by Rand Lee, planning session, 2026-10-10. Status: locked. Version 1.
+
+Summary: Repo owns just test; sc-lint supplies patterns and helpers
+
+Scope: the adoption-kit just template, any sc-lint CLI test command, and any helper sc-lint ships for consumer test recipes
+
+Deterministic check to pair with the development gate: git diff of the phase adds no consumer test orchestration to crates/sc-lint; the kit's test recipe is a consumer-editable pattern; any sc-lint addition for testing is a general helper the recipe calls
+
+Beads: anchor `lint-9lk`, plan questions `lint-9lk.1`, dev questions `lint-9lk.2`

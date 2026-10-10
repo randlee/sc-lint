@@ -60,8 +60,8 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 1,
-      "status": "proposed",
+      "version": 2,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -73,6 +73,12 @@
           "at": "2026-10-10T16:54:40+00:00",
           "event": "created",
           "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:11:11+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-008",
+          "reason": "Rand restated the directive 2026-10-10 with new wording"
         }
       ]
     },
@@ -233,6 +239,47 @@
           "at": "2026-10-10T16:54:41+00:00",
           "event": "created",
           "status": "proposed"
+        }
+      ]
+    },
+    {
+      "id": "ANC-008",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "I expect 'just test' to be managed and customized by the repo.  sc-lint supplies patterns and general helper functions",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "summary": "Repo owns just test; sc-lint supplies patterns and helpers",
+      "scope": "the adoption-kit just template, any sc-lint CLI test command, and any helper sc-lint ships for consumer test recipes",
+      "deterministic_check": "git diff of the phase adds no consumer test orchestration to crates/sc-lint; the kit's test recipe is a consumer-editable pattern; any sc-lint addition for testing is a general helper the recipe calls",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 1,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "lint-9lk",
+        "plan_questions": "lint-9lk.1",
+        "dev_questions": "lint-9lk.2"
+      },
+      "history": [
+        {
+          "at": "2026-10-10T17:11:04+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-10T17:11:13+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-9lk",
+            "plan_questions": "lint-9lk.1",
+            "dev_questions": "lint-9lk.2"
+          }
         }
       ]
     }

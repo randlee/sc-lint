@@ -50,8 +50,9 @@ Dependency rules:
 - (c) calls into (b), as a library or as the tool's binary, and adds no lint
   rules of its own
 - (d) is a recommendation the consumer repository owns and edits. It maps
-  recipes onto (b) and (c); recipes such as `just test` are, for the most
-  part, customized by the consumer repository rather than implemented in (c)
+  recipes onto (b) and (c). `just test` is managed and customized by the
+  consumer repository; `sc-lint` supplies patterns and general helper
+  functions for it rather than implementing it in (c)
 
 Each change in a phase lands in the lowest layer that can carry it.
 
@@ -77,7 +78,8 @@ planned.
 - ADR-012 assigns "complete test" to installed `sc-lint` (see
   [Top-level CLI Role](#top-level-cli-role)), and the (d) kit justfile
   routes `setup`, `lint`, `test` and `upgrade` through the bootstrap into (c).
-  The layering leaves `just test` to the consumer repository.
+  The layering leaves `just test` to the consumer repository, with `sc-lint`
+  supplying patterns and general helper functions.
 - (c) embeds a copy of the (d) bootstrap assets
   (`crates/sc-lint/assets/bootstrap{,.ps1}`, included by `installer.rs`),
   byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap{,.ps1}`.
