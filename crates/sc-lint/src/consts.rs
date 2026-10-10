@@ -29,6 +29,15 @@ pub const FIELD_DOCS: &str = "docs";
 pub const FIELD_STEPS: &str = "steps";
 pub const FIELD_ROOT: &str = "root";
 pub const FIELD_EXIT_CODE: &str = "exit_code";
+
+/// Top-level CLI exit codes. Error kinds use 1–6; business verdict 10 is disjoint.
+pub const EXIT_SUCCESS: u8 = 0;
+pub const EXIT_INTERNAL: u8 = 1;
+pub const EXIT_USAGE: u8 = 2;
+pub const EXIT_CONFIG: u8 = 3;
+pub const EXIT_CAPABILITY: u8 = 4;
+pub const EXIT_BACKEND_FAILURE: u8 = 5;
+pub const EXIT_BACKEND_PROTOCOL: u8 = 6;
 pub const EXIT_VERDICT_FAIL: u8 = 10;
 pub const FIELD_BACKEND_PATH: &str = "backend_path";
 

@@ -186,7 +186,7 @@ pub(crate) fn verdict_exit_code(command_id: command::CommandId, data: Option<&Va
     if command_id.is_analyzer_lint() && failed {
         consts::EXIT_VERDICT_FAIL
     } else {
-        0
+        consts::EXIT_SUCCESS
     }
 }
 
@@ -197,7 +197,7 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
     match error.kind() {
         ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => ImmediateOutcome {
             rendered: render::RenderedOutput::stdout(error.to_string()),
-            exit_code: 0,
+            exit_code: consts::EXIT_SUCCESS,
         },
         _ => {
             let cli_error = CliError::usage(error.render().to_string()).with_suggested_action(
