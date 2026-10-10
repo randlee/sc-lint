@@ -7,105 +7,31 @@ Intent: `docs/plans/phase-i/intent.md`
 | ID | Status | Summary | Stated |
 | --- | --- | --- | --- |
 | ANC-001 | locked | Four layers: shared types/attributes, cargo tools, CLI, just template | 2026-10-10 |
-| ANC-002 | retired | just test is repo-customized, not implemented in sc-lint | 2026-10-10 |
-| ANC-003 | proposed | Each gap fix lands at its appropriate layer | 2026-10-10 |
-| ANC-004 | proposed | Substantial redesign is discussed with Rand before planning | 2026-10-10 |
-| ANC-005 | proposed | No additions beyond what the filed issues require | 2026-10-10 |
-| ANC-006 | proposed | Issue fixes are line-item targeted additions, not redesign | 2026-10-10 |
-| ANC-007 | proposed | Sprint plans carry code samples; no dev-time decisions | 2026-10-10 |
-| ANC-008 | locked | Repo owns just test; sc-lint supplies patterns and helpers | 2026-10-10 |
+| ANC-002 | locked | Repo owns just test; sc-lint supplies patterns and helpers | 2026-10-10 |
+| ANC-003 | proposed | Each change lands in the lowest capable layer; sprint names it | 2026-10-10 |
+| ANC-004 | proposed | Redesign needs Rand's prior approval | 2026-10-10 |
+| ANC-005 | proposed | Only targeted additions required by #193-#204 | 2026-10-10 |
+| ANC-006 | proposed | Sprint designs carry code for every deliverable | 2026-10-10 |
 
 ## ANC-001
 
 > sc-lint must be a layered design.  w/ layers (lowest to highest):  a) sc-lint-types (shared types) and sc-lint-attribute (shared attributes)  b) independent cargo tools (i.e. sc-lint-boundary)  c) sc-lint cli which calls into (b)  d) just template (recommended just command layout w/ recommended mapping to (b) and (c) )
 
-Said by Rand Lee, planning session, 2026-10-10. Status: locked. Version 1.
+Said by Rand Lee, planning session, 2026-10-10. Status: locked. Version 2.
 
 Summary: Four layers: shared types/attributes, cargo tools, CLI, just template
 
 Scope: every phase-i change: architecture documentation, crate dependencies, CLI commands, and the adoption-kit just template
 
-Deterministic check to pair with the development gate: cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; git diff of the phase shows each change in the layer its sprint names
+Deterministic check to pair with the development gate: cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; docs/architecture.md has a Layered Architecture section naming layers (a)-(d)
 
 Beads: anchor `lint-hl1`, plan questions `lint-hl1.1`, dev questions `lint-hl1.2`
 
 ## ANC-002
 
-> I would expect 'just test' for the most part to be customized by the repo.
-
-Said by Rand Lee, planning session, 2026-10-10. Status: retired. Version 2.
-
-Summary: just test is repo-customized, not implemented in sc-lint
-
-Scope: the adoption-kit just template and any CLI test command
-
-Deterministic check to pair with the development gate: git diff of the phase adds no consumer test logic to crates/sc-lint; the kit justfile test recipe is a consumer-editable recipe
-
-## ANC-003
-
-> The intent is to make these changes at the appropriate layer
-
-Said by Rand Lee, planning session, 2026-10-10. Status: proposed. Version 1.
-
-Summary: Each gap fix lands at its appropriate layer
-
-Scope: every phase-i sprint that addresses a GitHub issue filed by atm-core (#193-#204)
-
-Deterministic check to pair with the development gate: git diff --stat per sprint touches only the crates or kit files of the layer the sprint names
-
-## ANC-004
-
-> any substantial redesign work is to be discussed w/ me before documented or planned.
-
-Said by Rand Lee, planning session, 2026-10-10. Status: proposed. Version 1.
-
-Summary: Substantial redesign is discussed with Rand before planning
-
-Scope: all phase-i plan and documentation changes
-
-Deterministic check to pair with the development gate: no ADR, requirement or architecture redesign lands on plan/phase-i without a recorded Rand ruling
-
-## ANC-005
-
-> I do NOT want unauthorized additions beyond what is required to address the issues filed.
-
-Said by Rand Lee, planning session, 2026-10-10. Status: proposed. Version 1.
-
-Summary: No additions beyond what the filed issues require
-
-Scope: every phase-i sprint and bead
-
-Deterministic check to pair with the development gate: every phase-i sprint bead cites the GitHub issue (#193-#204) each deliverable addresses
-
-## ANC-006
-
-> These should all be line item targeted additions not redesign
-
-Said by Rand Lee, planning session, 2026-10-10. Status: proposed. Version 1.
-
-Summary: Issue fixes are line-item targeted additions, not redesign
-
-Scope: every phase-i sprint that addresses a GitHub issue filed by atm-core
-
-Deterministic check to pair with the development gate: git diff --stat per sprint is additive and confined to the files the issue names
-
-## ANC-007
-
-> I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.
-
-Said by Rand Lee, planning session, 2026-10-10. Status: proposed. Version 1.
-
-Summary: Sprint plans carry code samples; no dev-time decisions
-
-Scope: every phase-i sprint bead's design field
-
-Deterministic check to pair with the development gate: each sprint bead design contains fenced code for every deliverable
-
-## ANC-008
-
 > I expect 'just test' to be managed and customized by the repo.  sc-lint supplies patterns and general helper functions
 
-Said by Rand Lee, planning session, 2026-10-10. Status: locked. Version 1.
+Said by Rand Lee, planning session, 2026-10-10. Status: locked. Version 3.
 
 Summary: Repo owns just test; sc-lint supplies patterns and helpers
 
@@ -114,3 +40,51 @@ Scope: the adoption-kit just template, any sc-lint CLI test command, and any hel
 Deterministic check to pair with the development gate: git diff of the phase adds no consumer test orchestration to crates/sc-lint; the kit's test recipe is a consumer-editable pattern; any sc-lint addition for testing is a general helper the recipe calls
 
 Beads: anchor `lint-9lk`, plan questions `lint-9lk.1`, dev questions `lint-9lk.2`
+
+## ANC-003
+
+> Each phase-i change lands in the lowest layer that can carry it, and each sprint bead names that layer.
+
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "The intent is to make these changes at the appropriate layer", 2026-10-10. Status: proposed. Version 2.
+
+Summary: Each change lands in the lowest capable layer; sprint names it
+
+Scope: every phase-i sprint bead and its delivered diff
+
+Deterministic check to pair with the development gate: each sprint bead names one layer (a)-(d); git diff --stat of its PR touches only that layer's crates or kit files
+
+## ANC-004
+
+> No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.
+
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "any substantial redesign work is to be discussed w/ me before documented or planned.", 2026-10-10. Status: proposed. Version 2.
+
+Summary: Redesign needs Rand's prior approval
+
+Scope: all phase-i documentation, ADR and plan-bead changes
+
+Deterministic check to pair with the development gate: every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval
+
+## ANC-005
+
+> Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.
+
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign", 2026-10-10. Status: proposed. Version 2.
+
+Summary: Only targeted additions required by #193-#204
+
+Scope: every phase-i sprint bead and deliverable
+
+Deterministic check to pair with the development gate: every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names
+
+## ANC-006
+
+> Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.
+
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.", 2026-10-10. Status: proposed. Version 2.
+
+Summary: Sprint designs carry code for every deliverable
+
+Scope: every phase-i sprint bead's design field
+
+Deterministic check to pair with the development gate: each sprint bead design contains a fenced code block for every numbered deliverable

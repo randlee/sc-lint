@@ -13,13 +13,13 @@
       "context": "planning session",
       "summary": "Four layers: shared types/attributes, cargo tools, CLI, just template",
       "scope": "every phase-i change: architecture documentation, crate dependencies, CLI commands, and the adoption-kit just template",
-      "deterministic_check": "cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; git diff of the phase shows each change in the layer its sprint names",
+      "deterministic_check": "cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; docs/architecture.md has a Layered Architecture section naming layers (a)-(d)",
       "fixtures": {
         "pass": [],
         "fail": []
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 2,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -41,209 +41,18 @@
             "plan_questions": "lint-hl1.1",
             "dev_questions": "lint-hl1.2"
           }
+        },
+        {
+          "at": "2026-10-10T17:12:54+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check"
+          ]
         }
       ]
     },
     {
       "id": "ANC-002",
-      "source_type": "ANC",
-      "source_ref": null,
-      "statement": "I would expect 'just test' for the most part to be customized by the repo.",
-      "stated_by": "Rand Lee",
-      "stated_at": "2026-10-10",
-      "context": "planning session",
-      "summary": "just test is repo-customized, not implemented in sc-lint",
-      "scope": "the adoption-kit just template and any CLI test command",
-      "deterministic_check": "git diff of the phase adds no consumer test logic to crates/sc-lint; the kit justfile test recipe is a consumer-editable recipe",
-      "fixtures": {
-        "pass": [],
-        "fail": []
-      },
-      "question_overrides": {},
-      "version": 2,
-      "status": "retired",
-      "promoted_to": null,
-      "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
-      },
-      "history": [
-        {
-          "at": "2026-10-10T16:54:40+00:00",
-          "event": "created",
-          "status": "proposed"
-        },
-        {
-          "at": "2026-10-10T17:11:11+00:00",
-          "event": "retired",
-          "replaced_by": "ANC-008",
-          "reason": "Rand restated the directive 2026-10-10 with new wording"
-        }
-      ]
-    },
-    {
-      "id": "ANC-003",
-      "source_type": "ANC",
-      "source_ref": null,
-      "statement": "The intent is to make these changes at the appropriate layer",
-      "stated_by": "Rand Lee",
-      "stated_at": "2026-10-10",
-      "context": "planning session",
-      "summary": "Each gap fix lands at its appropriate layer",
-      "scope": "every phase-i sprint that addresses a GitHub issue filed by atm-core (#193-#204)",
-      "deterministic_check": "git diff --stat per sprint touches only the crates or kit files of the layer the sprint names",
-      "fixtures": {
-        "pass": [],
-        "fail": []
-      },
-      "question_overrides": {},
-      "version": 1,
-      "status": "proposed",
-      "promoted_to": null,
-      "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
-      },
-      "history": [
-        {
-          "at": "2026-10-10T16:54:40+00:00",
-          "event": "created",
-          "status": "proposed"
-        }
-      ]
-    },
-    {
-      "id": "ANC-004",
-      "source_type": "ANC",
-      "source_ref": null,
-      "statement": "any substantial redesign work is to be discussed w/ me before documented or planned.",
-      "stated_by": "Rand Lee",
-      "stated_at": "2026-10-10",
-      "context": "planning session",
-      "summary": "Substantial redesign is discussed with Rand before planning",
-      "scope": "all phase-i plan and documentation changes",
-      "deterministic_check": "no ADR, requirement or architecture redesign lands on plan/phase-i without a recorded Rand ruling",
-      "fixtures": {
-        "pass": [],
-        "fail": []
-      },
-      "question_overrides": {},
-      "version": 1,
-      "status": "proposed",
-      "promoted_to": null,
-      "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
-      },
-      "history": [
-        {
-          "at": "2026-10-10T16:54:40+00:00",
-          "event": "created",
-          "status": "proposed"
-        }
-      ]
-    },
-    {
-      "id": "ANC-005",
-      "source_type": "ANC",
-      "source_ref": null,
-      "statement": "I do NOT want unauthorized additions beyond what is required to address the issues filed.",
-      "stated_by": "Rand Lee",
-      "stated_at": "2026-10-10",
-      "context": "planning session",
-      "summary": "No additions beyond what the filed issues require",
-      "scope": "every phase-i sprint and bead",
-      "deterministic_check": "every phase-i sprint bead cites the GitHub issue (#193-#204) each deliverable addresses",
-      "fixtures": {
-        "pass": [],
-        "fail": []
-      },
-      "question_overrides": {},
-      "version": 1,
-      "status": "proposed",
-      "promoted_to": null,
-      "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
-      },
-      "history": [
-        {
-          "at": "2026-10-10T16:54:40+00:00",
-          "event": "created",
-          "status": "proposed"
-        }
-      ]
-    },
-    {
-      "id": "ANC-006",
-      "source_type": "ANC",
-      "source_ref": null,
-      "statement": "These should all be line item targeted additions not redesign",
-      "stated_by": "Rand Lee",
-      "stated_at": "2026-10-10",
-      "context": "planning session",
-      "summary": "Issue fixes are line-item targeted additions, not redesign",
-      "scope": "every phase-i sprint that addresses a GitHub issue filed by atm-core",
-      "deterministic_check": "git diff --stat per sprint is additive and confined to the files the issue names",
-      "fixtures": {
-        "pass": [],
-        "fail": []
-      },
-      "question_overrides": {},
-      "version": 1,
-      "status": "proposed",
-      "promoted_to": null,
-      "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
-      },
-      "history": [
-        {
-          "at": "2026-10-10T16:54:40+00:00",
-          "event": "created",
-          "status": "proposed"
-        }
-      ]
-    },
-    {
-      "id": "ANC-007",
-      "source_type": "ANC",
-      "source_ref": null,
-      "statement": "I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.",
-      "stated_by": "Rand Lee",
-      "stated_at": "2026-10-10",
-      "context": "planning session",
-      "summary": "Sprint plans carry code samples; no dev-time decisions",
-      "scope": "every phase-i sprint bead's design field",
-      "deterministic_check": "each sprint bead design contains fenced code for every deliverable",
-      "fixtures": {
-        "pass": [],
-        "fail": []
-      },
-      "question_overrides": {},
-      "version": 1,
-      "status": "proposed",
-      "promoted_to": null,
-      "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
-      },
-      "history": [
-        {
-          "at": "2026-10-10T16:54:41+00:00",
-          "event": "created",
-          "status": "proposed"
-        }
-      ]
-    },
-    {
-      "id": "ANC-008",
       "source_type": "ANC",
       "source_ref": null,
       "statement": "I expect 'just test' to be managed and customized by the repo.  sc-lint supplies patterns and general helper functions",
@@ -258,7 +67,7 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 1,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -268,18 +77,173 @@
       },
       "history": [
         {
-          "at": "2026-10-10T17:11:04+00:00",
+          "at": "2026-10-10T16:54:40+00:00",
           "event": "created",
-          "status": "locked"
+          "status": "proposed"
         },
         {
-          "at": "2026-10-10T17:11:13+00:00",
-          "event": "beads_set",
-          "beads": {
-            "anchor": "lint-9lk",
-            "plan_questions": "lint-9lk.1",
-            "dev_questions": "lint-9lk.2"
-          }
+          "at": "2026-10-10T17:11:11+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-008",
+          "reason": "Rand restated the directive 2026-10-10 with new wording"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "locked",
+          "note": "Rand supplied improved wording for ANC-002 (not a new anchor); locked"
+        }
+      ]
+    },
+    {
+      "id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each phase-i change lands in the lowest layer that can carry it, and each sprint bead names that layer.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"The intent is to make these changes at the appropriate layer\"",
+      "summary": "Each change lands in the lowest capable layer; sprint names it",
+      "scope": "every phase-i sprint bead and its delivered diff",
+      "deterministic_check": "each sprint bead names one layer (a)-(d); git diff --stat of its PR touches only that layer's crates or kit files",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        }
+      ]
+    },
+    {
+      "id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"any substantial redesign work is to be discussed w/ me before documented or planned.\"",
+      "summary": "Redesign needs Rand's prior approval",
+      "scope": "all phase-i documentation, ADR and plan-bead changes",
+      "deterministic_check": "every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        }
+      ]
+    },
+    {
+      "id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign\"",
+      "summary": "Only targeted additions required by #193-#204",
+      "scope": "every phase-i sprint bead and deliverable",
+      "deterministic_check": "every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        }
+      ]
+    },
+    {
+      "id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.\"",
+      "summary": "Sprint designs carry code for every deliverable",
+      "scope": "every phase-i sprint bead's design field",
+      "deterministic_check": "each sprint bead design contains a fenced code block for every numbered deliverable",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:41+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
         }
       ]
     }
