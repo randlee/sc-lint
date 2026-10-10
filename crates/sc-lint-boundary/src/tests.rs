@@ -2202,6 +2202,67 @@ fn fails_when_sc_lint_attribute_has_mixed_valid_and_invalid_directives() {
     assert!(format!("{error:#}").contains("unsupported boundary directive"));
 }
 
+fn lib_name_fixture(owner_crate_path: &str) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "") + "[lib]\nname = \"app_core\"\npath = \"src/lib.rs\"\n"),
+    );
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    let boundary_path = fixture.root().join("boundaries/app/boundary.toml");
+    let boundary = fs::read_to_string(&boundary_path).unwrap().replace(
+        "owner_crate_path = \"app\"",
+        &format!("owner_crate_path = \"{owner_crate_path}\""),
+    );
+    fs::write(boundary_path, boundary).unwrap();
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture
+}
+
+#[test]
+fn owner_crate_path_uses_cargo_lib_target_name() {
+    let options = |fixture: &WorkspaceFixture| AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    let lib_named = lib_name_fixture("app_core");
+    assert_eq!(
+        analyze_workspace(&options(&lib_named)).unwrap().status,
+        ReportStatus::Pass
+    );
+
+    let package_named = lib_name_fixture("app");
+    let error = analyze_workspace(&options(&package_named)).unwrap_err();
+    assert!(matches!(error, BoundaryError::InventoryLoad { .. }));
+    assert!(
+        error
+            .to_string()
+            .contains("expected `app_core` from the lib target")
+    );
+}
+
+#[test]
+fn bin_only_owner_package_skips_lib_target_validation() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "")
+            + "[[bin]]\nname = \"app_bin\"\npath = \"src/main.rs\"\n"),
+    );
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_source("app", "main.rs", "fn main() {}");
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .unwrap();
+    assert_eq!(report.status, ReportStatus::Pass);
+}
+
 struct WorkspaceFixture {
     tempdir: TempDir,
 }
