@@ -37,7 +37,7 @@ pub struct AnalyzerSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum AnalyzerConfigError {
-    #[error("{analyzer}: unknown --rule-filter selector `{selector}`")]
+    #[error("{analyzer}: unknown rule selector `{selector}`")]
     Selector {
         analyzer: &'static str,
         selector: String,
@@ -85,30 +85,6 @@ impl AnalyzerConfigError {
         }
     }
 
-    pub const fn is_usage(&self) -> bool {
-        matches!(self, Self::Selector { .. })
-    }
-
-    pub const fn exit_code(&self) -> i32 {
-        if self.is_usage() { 2 } else { 3 }
-    }
-
-    pub const fn suggested_action(&self) -> &'static str {
-        match self {
-            Self::Selector { .. } => {
-                "Use a rule id or family the analyzer lists in docs-bundle/configuration.md \"Analyzer tables\"."
-            }
-            Self::Read { .. } => "Check that the --config path exists and is readable.",
-            Self::Parse { .. } => "Fix the TOML syntax at the reported location.",
-            Self::NotATable { .. } | Self::WrongType { .. } => {
-                "Give the key the type listed in docs-bundle/configuration.md \"Analyzer tables\"."
-            }
-            Self::UnknownKey { .. } => {
-                "Remove the key, or use one listed in docs-bundle/configuration.md \"Analyzer tables\"."
-            }
-            Self::UnknownRule { .. } => "Use a rule id or family the analyzer defines.",
-        }
-    }
 }
 
 pub fn read_config_document(

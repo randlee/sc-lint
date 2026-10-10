@@ -110,13 +110,12 @@ fn config_without_analyzer_table_yields_defaults() {
 }
 
 #[test]
-fn explicit_missing_config_is_exit_three() {
+fn explicit_missing_config_is_a_read_error() {
     let directory = TempDir::new().unwrap();
     let missing = directory.path().join("missing.toml");
     let error =
         load_analyzer_settings(&CATALOG, directory.path(), Some(&missing), None).unwrap_err();
 
-    assert_eq!(error.exit_code(), 3);
     assert_eq!(error.code(), "ANALYZER_CONFIG.READ");
 }
 
@@ -125,7 +124,6 @@ fn unknown_key_names_analyzer_and_key() {
     let directory = config_dir("[tool.sc-lint.analyzers.example]\nunknown = []\n");
     let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
 
-    assert_eq!(error.exit_code(), 3);
     assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_KEY");
     assert_eq!(
         error.to_string(),
@@ -149,12 +147,11 @@ fn own_keys_are_preserved_and_common_keys_are_consumed() {
 }
 
 #[test]
-fn invalid_common_key_type_is_exit_three() {
+fn invalid_common_key_type_is_a_structured_error() {
     let directory =
         config_dir("[tool.sc-lint.analyzers.example]\nexclude_rules = \"EXAMPLE-001\"\n");
     let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
 
-    assert_eq!(error.exit_code(), 3);
     assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
 }
 
@@ -171,7 +168,7 @@ fn families_and_rule_filters_resolve_to_catalog_rules() {
 }
 
 #[test]
-fn bad_rule_filter_is_usage_error() {
+fn bad_rule_filter_is_a_selector_error() {
     let directory = TempDir::new().unwrap();
     let error =
         load_analyzer_settings(&CATALOG, directory.path(), None, Some("unknown")).unwrap_err();
@@ -183,18 +180,16 @@ fn bad_rule_filter_is_usage_error() {
             selector: "unknown".to_owned(),
         }
     );
-    assert!(error.is_usage());
-    assert_eq!(error.exit_code(), 2);
     assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
 }
 
 #[test]
-fn empty_rule_filter_entry_is_usage_error() {
+fn empty_rule_filter_entry_is_a_selector_error() {
     let directory = TempDir::new().unwrap();
     let error =
         load_analyzer_settings(&CATALOG, directory.path(), None, Some("EXAMPLE-001,")).unwrap_err();
 
-    assert_eq!(error.exit_code(), 2);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
 }
 
 #[test]
