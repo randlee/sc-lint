@@ -2,10 +2,13 @@
 """Gate Rust function length against a recorded baseline.
 
 Functions at or over FAIL_THRESHOLD code lines fail the gate only when they are
-new or grew past their baseline entry. Functions in the WARN band are advisory.
-Allowances ratchet down: a shrunk function is reported stale, and writing the
-baseline records its new length. Raising an allowance needs --allow-growth.
-Counting ignores comments and whitespace; literal text counts as code.
+new or grew past their allowance. Functions in the WARN band are advisory.
+Each baseline row is one allowance. Same-named functions in a file pair with
+allowances by length, not position, so inserting or deleting one does not shift
+another onto the wrong allowance. A stale allowance (its function shrank or
+went away) fails the gate until --write-baseline ratchets it down. Raising an
+allowance needs --allow-growth. Counting ignores comments and whitespace;
+literal text counts as code.
 """
 from __future__ import annotations
 
@@ -41,21 +44,21 @@ RAW_STRING_RE = re.compile(r"(?:br|r)(?P<hashes>#*)\"")
 CHAR_LITERAL_RE = re.compile(r"'(?:\\u\{[0-9A-Fa-f_]+\}|\\.|[^'\\\n])'")
 TEST_ATTRIBUTE_RE = re.compile(r"#\[(?:[A-Za-z_]\w*::)*test(?:\(.*\))?\]|#\[cfg\(test\)\]")
 
-Key = tuple[str, str, int]
+Key = tuple[str, str]
+Baseline = dict[Key, list[int]]
 
 
 @dataclass(frozen=True)
 class FunctionSpan:
     path: str
     name: str
-    occurrence: int
     start_line: int
     end_line: int
     code_lines: int
 
     @property
     def key(self) -> Key:
-        return (self.path, self.name, self.occurrence)
+        return (self.path, self.name)
 
 
 @dataclass(frozen=True)
@@ -69,10 +72,22 @@ class Violation:
 
 
 @dataclass(frozen=True)
+class StaleAllowance:
+    path: str
+    name: str
+    recorded_lines: int
+    current_lines: int | None
+
+
+@dataclass(frozen=True)
 class Evaluation:
     advisories: tuple[FunctionSpan, ...]
     violations: tuple[Violation, ...]
-    stale: tuple[Key, ...]
+    stale: tuple[StaleAllowance, ...]
+
+    @property
+    def failed(self) -> bool:
+        return bool(self.violations or self.stale)
 
 
 def is_word(character: str) -> bool:
@@ -174,7 +189,6 @@ def find_functions(source: str, relative_path: Path) -> list[FunctionSpan]:
     code_lines, structure_lines = code_text.split("\n"), structure_text.split("\n")
     test_scope = rust_file_test_scope(Path("/" + relative_path.as_posix()), structure_lines)
     functions: list[FunctionSpan] = []
-    occurrences: dict[str, int] = {}
     pending: list[str] = []
     index = 0
     while index < len(structure_lines):
@@ -193,12 +207,9 @@ def find_functions(source: str, relative_path: Path) -> list[FunctionSpan]:
             index += 1
             continue
         if not any(TEST_ATTRIBUTE_RE.fullmatch(attribute) for attribute in pending):
-            name = match.group("name")
-            occurrence = occurrences.get(name, 0)
-            occurrences[name] = occurrence + 1
             code_count = sum(bool(line.strip()) for line in code_lines[index : end + 1])
             functions.append(
-                FunctionSpan(relative_path.as_posix(), name, occurrence, index + 1, end + 1, code_count)
+                FunctionSpan(relative_path.as_posix(), match.group("name"), index + 1, end + 1, code_count)
             )
         pending = []
         index = end + 1
@@ -212,34 +223,58 @@ def scan_repo(repo_root: Path) -> list[FunctionSpan]:
     return functions
 
 
-def over_cap_by_key(functions: list[FunctionSpan]) -> dict[Key, FunctionSpan]:
-    """Map each over-cap function to its span. Identity is (path, name, occurrence in file)."""
-    return {function.key: function for function in functions if function.code_lines >= FAIL_THRESHOLD}
+def over_cap_by_group(functions: list[FunctionSpan]) -> dict[Key, list[FunctionSpan]]:
+    """Group the over-cap functions by (path, name), the baseline identity."""
+    groups: dict[Key, list[FunctionSpan]] = {}
+    for function in functions:
+        if function.code_lines >= FAIL_THRESHOLD:
+            groups.setdefault(function.key, []).append(function)
+    return groups
 
 
-def read_baseline(repo_root: Path) -> dict[Key, int] | None:
-    """Return the recorded allowances, or None when the baseline file does not exist."""
+def pair_allowances(
+    functions: list[FunctionSpan], allowances: list[int]
+) -> tuple[list[tuple[FunctionSpan, int]], list[FunctionSpan], list[int]]:
+    """Pair same-named functions with allowances by length. Return (pairs, new functions, unused allowances).
+
+    Exact length matches pair first, so an earlier deletion or insertion cannot shift
+    an allowance onto a different function. The rest pair in ascending order.
+    """
+    left = sorted(allowances)
+    pairs: list[tuple[FunctionSpan, int]] = []
+    unpaired: list[FunctionSpan] = []
+    for function in functions:
+        if function.code_lines in left:
+            left.remove(function.code_lines)
+            pairs.append((function, function.code_lines))
+        else:
+            unpaired.append(function)
+    unpaired.sort(key=lambda function: function.code_lines)
+    count = min(len(unpaired), len(left))
+    pairs.extend(zip(unpaired[:count], left[:count]))
+    return pairs, unpaired[count:], left[count:]
+
+
+def read_baseline(repo_root: Path) -> Baseline | None:
+    """Return the recorded allowances per (path, name), or None when the baseline file does not exist."""
     path = repo_root / BASELINE_PATH
     if not path.is_file():
         return None
-    entries: dict[Key, int] = {}
+    entries: Baseline = {}
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip() or line.startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) != 4 or not parts[2].isdigit() or not parts[3].isdigit():
+        if len(parts) != 3 or not parts[2].isdigit():
             raise AdapterError(
                 "config",
-                f"{BASELINE_PATH.as_posix()}:{number}: expected a path<TAB>name<TAB>occurrence<TAB>code_lines row",
+                f"{BASELINE_PATH.as_posix()}:{number}: expected a path<TAB>name<TAB>code_lines row",
             )
-        key = (parts[0], parts[1], int(parts[2]))
-        if key in entries:
-            raise AdapterError("config", f"{BASELINE_PATH.as_posix()}:{number}: duplicate baseline row {key}")
-        entries[key] = int(parts[3])
-    return entries
+        entries.setdefault((parts[0], parts[1]), []).append(int(parts[2]))
+    return {key: sorted(values) for key, values in entries.items()}
 
 
-def load_baseline(repo_root: Path) -> dict[Key, int]:
+def load_baseline(repo_root: Path) -> Baseline:
     entries = read_baseline(repo_root)
     if entries is None:
         raise AdapterError("config", f"missing {BASELINE_PATH.as_posix()}; generate it with --write-baseline")
@@ -250,41 +285,48 @@ def write_baseline(repo_root: Path, functions: list[FunctionSpan], allow_growth:
     """Record every over-cap function at its current length.
 
     Raising an existing allowance, or adding one, is refused unless allow_growth is set.
+    Shrunk or removed allowances are dropped, which is how they ratchet down.
     """
-    over = over_cap_by_key(functions)
     recorded = read_baseline(repo_root)
     if recorded is not None and not allow_growth:
-        raised = [
-            key
-            for key, function in sorted(over.items())
-            if key not in recorded or function.code_lines > recorded[key]
-        ]
+        raised = evaluate(functions, recorded).violations
         if raised:
-            names = ", ".join(f"{path}:{name}#{occurrence}" for path, name, occurrence in raised)
+            names = ", ".join(f"{v.function.path}:{v.function.name} ({v.function.code_lines})" for v in raised)
             raise AdapterError(
                 "config",
                 f"refusing to raise {len(raised)} baseline allowance(s): {names}; pass --allow-growth to record them",
             )
-    rows = [f"{path}\t{name}\t{occurrence}\t{function.code_lines}" for (path, name, occurrence), function in sorted(over.items())]
+    rows = [
+        f"{path}\t{name}\t{function.code_lines}"
+        for (path, name), group in sorted(over_cap_by_group(functions).items())
+        for function in sorted(group, key=lambda function: function.code_lines)
+    ]
     header = [
         f"# function-length baseline: functions at or over {FAIL_THRESHOLD} code lines.",
-        "# columns: path, name, occurrence (0-based within the file), code_lines.",
+        "# columns: path, name, code_lines. A name may repeat; each row is one allowance.",
         "# regenerate: python -m sc_lint.lint_function_length --write-baseline",
     ]
     (repo_root / BASELINE_PATH).write_text("\n".join([*header, *rows]) + "\n", encoding="utf-8")
     return len(rows)
 
 
-def evaluate(functions: list[FunctionSpan], baseline: dict[Key, int]) -> Evaluation:
-    over = over_cap_by_key(functions)
-    violations = tuple(
-        Violation(function, baseline.get(key))
-        for key, function in sorted(over.items())
-        if key not in baseline or function.code_lines > baseline[key]
-    )
+def evaluate(functions: list[FunctionSpan], baseline: Baseline) -> Evaluation:
+    over = over_cap_by_group(functions)
+    violations: list[Violation] = []
+    stale: list[StaleAllowance] = []
+    for key in sorted(set(over) | set(baseline)):
+        path, name = key
+        pairs, new, unused = pair_allowances(over.get(key, []), baseline.get(key, []))
+        for function, allowance in pairs:
+            if function.code_lines > allowance:
+                violations.append(Violation(function, allowance))
+            elif function.code_lines < allowance:
+                stale.append(StaleAllowance(path, name, allowance, function.code_lines))
+        violations.extend(Violation(function, None) for function in new)
+        stale.extend(StaleAllowance(path, name, allowance, None) for allowance in unused)
     advisories = tuple(f for f in functions if WARN_THRESHOLD <= f.code_lines < FAIL_THRESHOLD)
-    stale = tuple(key for key in sorted(baseline) if key not in over or over[key].code_lines < baseline[key])
-    return Evaluation(advisories, violations, stale)
+    ordered = sorted(violations, key=lambda v: (v.function.path, v.function.start_line))
+    return Evaluation(advisories, tuple(ordered), tuple(stale))
 
 
 def render(function: FunctionSpan) -> str:
@@ -296,16 +338,18 @@ def render_violation(violation: Violation) -> str:
     return f"{render(violation.function)}: {detail}"
 
 
-def render_stale(key: Key) -> str:
-    path, name, occurrence = key
-    return f"{path} {name}#{occurrence}"
+def render_stale(stale: StaleAllowance) -> str:
+    if stale.current_lines is None:
+        return f"{stale.path} {stale.name}: allowance {stale.recorded_lines} has no matching function"
+    return f"{stale.path} {stale.name}: allowance {stale.recorded_lines} is above current {stale.current_lines}"
 
 
 def build_data(repo_root: Path, evaluation: Evaluation, elapsed_ms: int) -> dict:
     output_dir = reset_findings_dir(repo_root, TOOL_NAME)
-    failed = bool(evaluation.violations)
+    failed = evaluation.failed
     summary = (
-        f"function-length gate failed: {len(evaluation.violations)} new or grown function(s)"
+        f"function-length gate failed: {len(evaluation.violations)} new or grown function(s), "
+        f"{len(evaluation.stale)} stale allowance(s); run --write-baseline to ratchet"
         if failed
         else "function-length gate passed"
     )
@@ -318,13 +362,13 @@ def build_data(repo_root: Path, evaluation: Evaluation, elapsed_ms: int) -> dict
             for v in evaluation.violations
         ],
         "advisories": [asdict(f) for f in evaluation.advisories],
-        "stale_baseline": [render_stale(key) for key in evaluation.stale],
+        "stale_baseline": [asdict(s) for s in evaluation.stale],
         "elapsed_ms": elapsed_ms,
     }
     lines = [summary]
     lines.extend(f"violation: {render_violation(v)}" for v in evaluation.violations)
     lines.extend(f"advisory: {render(f)}" for f in evaluation.advisories)
-    lines.extend(f"stale: {render_stale(key)}" for key in evaluation.stale)
+    lines.extend(f"stale: {render_stale(s)}" for s in evaluation.stale)
     write_json(output_dir / "summary.json", data)
     write_text(output_dir / "summary.txt", "\n".join(lines) + "\n")
     data["artifact_dir"] = relative_artifact_path(repo_root, output_dir)
@@ -366,9 +410,9 @@ def main(argv: list[str]) -> int:
                 print(f"error: {render_violation(violation)}")
             for function in evaluation.advisories:
                 print(f"advisory: {render(function)}")
-            for key in evaluation.stale:
-                print(f"stale: {render_stale(key)}")
-        return 1 if evaluation.violations else 0
+            for stale in evaluation.stale:
+                print(f"stale: {render_stale(stale)}")
+        return 1 if evaluation.failed else 0
     except AdapterError as error:
         if args is not None and args.json:
             write_adapter_json(error_payload(error))

@@ -7,6 +7,7 @@ import unittest
 from sc_lint.lint_function_length import BASELINE_PATH
 from sc_lint.lint_function_length import FAIL_THRESHOLD
 from sc_lint.lint_function_length import WARN_THRESHOLD
+from sc_lint.lint_function_length import StaleAllowance
 from sc_lint.lint_function_length import evaluate
 from sc_lint.lint_function_length import find_functions
 from sc_lint.lint_function_length import load_baseline
@@ -18,7 +19,7 @@ from sc_lint.python_adapter import AdapterError
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 DEMO_PATH = Path("crates/demo/src/lib.rs")
-DEMO_KEY = ("crates/demo/src/lib.rs", "example", 0)
+DEMO_KEY = ("crates/demo/src/lib.rs", "example")
 
 
 def body_of(line_count: int) -> str:
@@ -37,6 +38,12 @@ def function_named(source: str, name: str):
 
 def sized(name: str, line_count: int):
     return function_named(f"pub fn {name}() {{\n{body_of(line_count - 2)}\n}}\n", name)
+
+
+def sized_group(name: str, line_counts: list[int]):
+    """Functions named `name` in one file, in source order, each with the given code-line count."""
+    source = "".join(f"pub fn {name}() {{\n{body_of(count - 2)}\n}}\n" for count in line_counts)
+    return [function for function in functions_in(source) if function.name == name]
 
 
 class CountingTests(unittest.TestCase):
@@ -102,7 +109,9 @@ class AttributeTests(unittest.TestCase):
             "#[test(\n    ignore,\n)]\nfn b() {}\n"
         )
         self.assertEqual(exempt, [])
-        kept = functions_in(f"#[sc_lint_test(flavor)]\npub fn c() {{\n{body}\n}}\n#[testing]\npub fn d() {{\n{body}\n}}\n")
+        kept = functions_in(
+            f"#[sc_lint_test(flavor)]\npub fn c() {{\n{body}\n}}\n#[testing]\npub fn d() {{\n{body}\n}}\n"
+        )
         self.assertEqual([function.name for function in kept], ["c", "d"])
 
     def test_cfg_test_module_exempts_its_functions(self) -> None:
@@ -129,22 +138,44 @@ class AttributeTests(unittest.TestCase):
         self.assertEqual([function.name for function in functions], ["example", "sized"])
 
 
-class OccurrenceTests(unittest.TestCase):
-    def test_same_named_functions_get_distinct_occurrences(self) -> None:
-        functions = functions_in(
-            "impl A {\n    fn new() {}\n}\nimpl B {\n    fn new() {}\n}\n"
-        )
-        self.assertEqual([(f.name, f.occurrence) for f in functions], [("new", 0), ("new", 1)])
+class PairingTests(unittest.TestCase):
+    """Same-named functions pair with allowances by length, so position never decides identity."""
 
-    def test_new_same_named_function_cannot_hide_behind_an_existing_entry(self) -> None:
-        body = body_of(FAIL_THRESHOLD - 2)
-        source = (
-            f"impl A {{\n    fn new() {{\n{body}\n    }}\n}}\n"
-            f"impl B {{\n    fn new() {{\n{body_of(FAIL_THRESHOLD + 5)}\n    }}\n}}\n"
+    def test_inserting_a_small_same_named_function_before_keeps_the_allowance(self) -> None:
+        functions = sized_group("fmt", [10, FAIL_THRESHOLD + 5])
+        evaluation = evaluate(functions, {DEMO_KEY[:1] + ("fmt",): [FAIL_THRESHOLD + 5]})
+        self.assertEqual((evaluation.violations, evaluation.stale), ((), ()))
+        self.assertFalse(evaluation.failed)
+
+    def test_deleting_an_earlier_same_named_function_is_stale_not_new_or_grown(self) -> None:
+        functions = sized_group("fmt", [FAIL_THRESHOLD + 10])
+        key = DEMO_KEY[:1] + ("fmt",)
+        evaluation = evaluate(functions, {key: [FAIL_THRESHOLD + 2, FAIL_THRESHOLD + 10]})
+        self.assertEqual(evaluation.violations, ())
+        self.assertEqual(
+            evaluation.stale,
+            (StaleAllowance(key[0], "fmt", FAIL_THRESHOLD + 2, None),),
         )
-        functions = functions_in(source)
-        evaluation = evaluate(functions, {(DEMO_PATH.as_posix(), "new", 0): FAIL_THRESHOLD})
-        self.assertEqual([(v.reason, v.function.occurrence) for v in evaluation.violations], [("new", 1)])
+        self.assertTrue(evaluation.failed)
+
+    def test_adding_a_new_same_named_function_is_reported_as_new(self) -> None:
+        functions = sized_group("fmt", [FAIL_THRESHOLD + 2, FAIL_THRESHOLD + 40])
+        key = DEMO_KEY[:1] + ("fmt",)
+        evaluation = evaluate(functions, {key: [FAIL_THRESHOLD + 2]})
+        self.assertEqual(
+            [(v.reason, v.function.code_lines) for v in evaluation.violations],
+            [("new", FAIL_THRESHOLD + 40)],
+        )
+        self.assertEqual(evaluation.stale, ())
+
+    def test_growing_one_of_several_same_named_functions_is_grown(self) -> None:
+        functions = sized_group("fmt", [FAIL_THRESHOLD + 2, FAIL_THRESHOLD + 12])
+        key = DEMO_KEY[:1] + ("fmt",)
+        evaluation = evaluate(functions, {key: [FAIL_THRESHOLD + 2, FAIL_THRESHOLD + 10]})
+        self.assertEqual(
+            [(v.reason, v.recorded_lines, v.function.code_lines) for v in evaluation.violations],
+            [("grown", FAIL_THRESHOLD + 10, FAIL_THRESHOLD + 12)],
+        )
 
 
 class BaselineTests(unittest.TestCase):
@@ -159,44 +190,71 @@ class BaselineTests(unittest.TestCase):
     def write_text(self, text: str) -> None:
         (self.root / BASELINE_PATH).write_text(text, encoding="utf-8")
 
-    def test_unchanged_or_shrunk_over_cap_function_passes(self) -> None:
+    def test_unchanged_over_cap_function_passes(self) -> None:
         function = sized("example", FAIL_THRESHOLD + 3)
-        self.assertEqual(evaluate([function], {DEMO_KEY: function.code_lines}).violations, ())
-        self.assertEqual(evaluate([function], {DEMO_KEY: function.code_lines + 10}).violations, ())
+        evaluation = evaluate([function], {DEMO_KEY: [function.code_lines]})
+        self.assertEqual((evaluation.violations, evaluation.stale), ((), ()))
 
     def test_growth_past_the_recorded_length_fails(self) -> None:
         function = sized("example", FAIL_THRESHOLD + 3)
-        evaluation = evaluate([function], {DEMO_KEY: function.code_lines - 1})
+        evaluation = evaluate([function], {DEMO_KEY: [function.code_lines - 1]})
         self.assertEqual(
             [(v.reason, v.recorded_lines) for v in evaluation.violations],
             [("grown", FAIL_THRESHOLD + 2)],
         )
 
-    def test_entry_no_longer_over_cap_is_stale_not_failing(self) -> None:
-        evaluation = evaluate([sized("example", WARN_THRESHOLD)], {DEMO_KEY: FAIL_THRESHOLD + 1})
+    def test_entry_whose_function_left_the_cap_is_stale_and_fails_the_gate(self) -> None:
+        evaluation = evaluate([sized("example", WARN_THRESHOLD)], {DEMO_KEY: [FAIL_THRESHOLD + 1]})
         self.assertEqual(evaluation.violations, ())
-        self.assertEqual(evaluation.stale, (DEMO_KEY,))
+        self.assertEqual(evaluation.stale, (StaleAllowance(DEMO_KEY[0], DEMO_KEY[1], FAIL_THRESHOLD + 1, None),))
+        self.assertTrue(evaluation.failed)
 
-    def test_shrunk_entry_is_stale_and_write_ratchets_it_down(self) -> None:
+    def test_shrunk_entry_fails_until_the_baseline_is_ratcheted(self) -> None:
         function = sized("example", FAIL_THRESHOLD + 5)
-        evaluation = evaluate([function], {DEMO_KEY: FAIL_THRESHOLD + 9})
-        self.assertEqual((evaluation.violations, evaluation.stale), ((), (DEMO_KEY,)))
-        self.assertEqual(write_baseline(self.root, [function]), 1)
-        self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 5})
+        evaluation = evaluate([function], {DEMO_KEY: [FAIL_THRESHOLD + 9]})
+        self.assertEqual(evaluation.violations, ())
+        self.assertEqual(
+            evaluation.stale,
+            (StaleAllowance(DEMO_KEY[0], DEMO_KEY[1], FAIL_THRESHOLD + 9, FAIL_THRESHOLD + 5),),
+        )
+        self.assertTrue(evaluation.failed)
+
+    def test_ratcheted_allowance_does_not_permit_regrowth(self) -> None:
+        shrunk = sized("example", FAIL_THRESHOLD + 5)
+        self.assertEqual(write_baseline(self.root, [shrunk]), 1)
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: [FAIL_THRESHOLD + 5]})
+        regrown = sized("example", FAIL_THRESHOLD + 7)
+        evaluation = evaluate([regrown], load_baseline(self.root))
+        self.assertEqual(
+            [(v.reason, v.recorded_lines) for v in evaluation.violations],
+            [("grown", FAIL_THRESHOLD + 5)],
+        )
+
+    def test_write_lowers_a_shrunk_allowance_without_allow_growth(self) -> None:
+        self.write_text(f"crates/demo/src/lib.rs\texample\t{FAIL_THRESHOLD + 9}\n")
+        self.assertEqual(write_baseline(self.root, [sized("example", FAIL_THRESHOLD + 5)]), 1)
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: [FAIL_THRESHOLD + 5]})
 
     def test_write_then_load_round_trips_over_cap_functions(self) -> None:
         function = sized("example", FAIL_THRESHOLD + 1)
         self.assertEqual(write_baseline(self.root, [function]), 1)
-        self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 1})
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: [FAIL_THRESHOLD + 1]})
+
+    def test_repeated_names_hold_one_allowance_per_row(self) -> None:
+        self.write_text(
+            f"crates/demo/src/lib.rs\texample\t{FAIL_THRESHOLD + 4}\n"
+            f"crates/demo/src/lib.rs\texample\t{FAIL_THRESHOLD}\n"
+        )
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: [FAIL_THRESHOLD, FAIL_THRESHOLD + 4]})
 
     def test_write_refuses_to_raise_an_existing_allowance(self) -> None:
-        self.write_text(f"crates/demo/src/lib.rs\texample\t0\t{FAIL_THRESHOLD + 1}\n")
+        self.write_text(f"crates/demo/src/lib.rs\texample\t{FAIL_THRESHOLD + 1}\n")
         function = sized("example", FAIL_THRESHOLD + 4)
         with self.assertRaisesRegex(AdapterError, "--allow-growth"):
             write_baseline(self.root, [function])
-        self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 1})
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: [FAIL_THRESHOLD + 1]})
         self.assertEqual(write_baseline(self.root, [function], allow_growth=True), 1)
-        self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 4})
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: [FAIL_THRESHOLD + 4]})
 
     def test_write_refuses_a_new_entry_next_to_an_existing_baseline(self) -> None:
         self.write_text("# empty baseline\n")
@@ -204,16 +262,16 @@ class BaselineTests(unittest.TestCase):
             write_baseline(self.root, [sized("example", FAIL_THRESHOLD)])
         self.assertEqual(load_baseline(self.root), {})
 
-    def test_missing_malformed_and_duplicate_baselines_are_config_errors(self) -> None:
+    def test_missing_and_malformed_baselines_are_config_errors(self) -> None:
         with self.assertRaisesRegex(AdapterError, "--write-baseline"):
             load_baseline(self.root)
-        for text, pattern in (
-            ("crates/demo/src/lib.rs\texample\t80\n", "path<TAB>name<TAB>occurrence<TAB>code_lines"),
-            ("crates/demo/src/lib.rs\texample\t0\t80\n" * 2, "duplicate"),
+        for text in (
+            "crates/demo/src/lib.rs\texample\t80\t0\n",
+            "crates/demo/src/lib.rs\texample\tmany\n",
         ):
-            with self.subTest(pattern=pattern):
+            with self.subTest(text=text):
                 self.write_text(text)
-                with self.assertRaisesRegex(AdapterError, pattern):
+                with self.assertRaisesRegex(AdapterError, "path<TAB>name<TAB>code_lines"):
                     load_baseline(self.root)
 
 

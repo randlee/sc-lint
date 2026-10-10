@@ -90,6 +90,25 @@ pub(crate) fn run_python_tool(
     adapter_outcome(tool, output.status.code(), &output.stdout)
 }
 
+/// Items shown per list in a failure envelope; the full counts are always reported.
+const FAILURE_REPORT_LIMIT: usize = 10;
+
+/// Name the offending items and the findings artifact in a failed verdict's details.
+fn with_failure_report(mut error: CliError, data: &Value) -> CliError {
+    for key in ["violations", "stale_baseline", consts::FIELD_FINDINGS] {
+        if let Some(items) = data.get(key).and_then(Value::as_array) {
+            let shown: Vec<Value> = items.iter().take(FAILURE_REPORT_LIMIT).cloned().collect();
+            error = error
+                .with_detail(format!("{key}_count"), json!(items.len()))
+                .with_detail(key, Value::Array(shown));
+        }
+    }
+    if let Some(artifact_dir) = data.get("artifact_dir") {
+        error = error.with_detail("artifact_dir", artifact_dir.clone());
+    }
+    error
+}
+
 /// A non-zero exit or a `fail` status is a failed command, not a successful envelope.
 #[expect(
     clippy::result_large_err,
@@ -107,11 +126,12 @@ fn adapter_outcome(
     let mut data = parsed.data.unwrap_or_else(|| json!({}));
     let status = data.get(consts::FIELD_STATUS).and_then(Value::as_str);
     if exit_code != Some(0) || status == Some("fail") {
-        return Err(CliError::backend_failure(parsed.summary)
+        let error = CliError::backend_failure(parsed.summary)
             .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
             .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()))
             .with_detail(consts::FIELD_STATUS, json!(status))
-            .with_detail(consts::FIELD_EXIT_CODE, json!(exit_code)));
+            .with_detail(consts::FIELD_EXIT_CODE, json!(exit_code));
+        return Err(with_failure_report(error, &data));
     }
     if let Some(object) = data.as_object_mut() {
         object
@@ -415,6 +435,49 @@ mod tests {
 
         assert_eq!(error.kind, CliErrorKind::BackendFailure);
         assert_eq!(error.details[consts::FIELD_EXIT_CODE], 1);
+    }
+
+    #[test]
+    fn failing_verdict_names_the_violations_with_a_cap() {
+        let violations: Vec<Value> = (0..12)
+            .map(|index| {
+                json!({
+                    "path": "crates/demo/src/lib.rs",
+                    "name": format!("f{index}"),
+                    "code_lines": 90,
+                    "recorded_lines": 85,
+                    "reason": "grown",
+                })
+            })
+            .collect();
+        let payload = json!({
+            "adapter_schema": ADAPTER_SCHEMA,
+            "ok": true,
+            "summary": "function-length gate failed: 12 new or grown function(s), 0 stale allowance(s)",
+            "data": {
+                "status": "fail",
+                "violations": violations,
+                "stale_baseline": [],
+                "artifact_dir": "artifacts/findings/function-length",
+            },
+            "diagnostics": [],
+        })
+        .to_string();
+        let error = adapter_outcome(PythonTool::FunctionLength, Some(1), payload.as_bytes())
+            .expect_err("a failing verdict must fail the command");
+
+        assert_eq!(error.details["violations_count"], 12);
+        let shown = error.details["violations"]
+            .as_array()
+            .expect("violations list");
+        assert_eq!(shown.len(), FAILURE_REPORT_LIMIT);
+        assert_eq!(shown[0]["name"], "f0");
+        assert_eq!(shown[0]["recorded_lines"], 85);
+        assert_eq!(error.details["stale_baseline_count"], 0);
+        assert_eq!(
+            error.details["artifact_dir"],
+            "artifacts/findings/function-length"
+        );
     }
 
     #[test]

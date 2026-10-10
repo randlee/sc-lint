@@ -151,6 +151,7 @@ Current implementation status:
 - `lint.function-length`
   - implemented Python-adapter lint path
   - not in the `Ci` profile (`lint.ci`), like `lint.line-counts` and `lint.identity-literals`; gated by `just lint` and the `Full` profile
+  - a stale baseline allowance (its function shrank or went away) fails the gate until `--write-baseline` ratchets it down, so a recorded allowance never permits regrowth
 - `lint.line-counts`
   - implemented Python-adapter lint path
 - `lint.identity-literals`
