@@ -141,10 +141,19 @@ Test-only path literals are also flagged:
 PORT-001 hardcoded Unix-only absolute path `/tmp/example` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source
 ```
 
-## Disable Model
+## Configuration
 
-There is currently no approved rule-disable path in the shipped
-`sc-lint lint sc-portability` surface.
+`sc-lint-portability` reads `[tool.sc-lint.analyzers.portability]` from
+`sc-lint.toml`. Common keys are `enabled`, `reason`, `exclude_rules`,
+`fail_rules`, and `exclude_paths`. Portability also accepts
+`config_home_env`, `unix_path_prefixes`, and `targets`; `targets` is accepted
+for adopted configurations but is not interpreted by a rule yet.
+
+`config_home_env` and `unix_path_prefixes` override and extend the legacy
+`[portability]` configuration respectively. Pass `--config PATH` to select a
+different config file and `--rule-filter PORT-001,PORT-006` to run selected
+rules. Invalid configuration exits with code 3; an invalid rule filter exits
+with code 2.
 
 Important limits:
 
