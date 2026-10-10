@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
-use sc_lint_attributes::sc_lint;
 use serde::Deserialize;
 
 mod dependency_policy;
@@ -161,8 +160,13 @@ fn validate_boundary_path(
     Ok(())
 }
 
-#[sc_lint(function_length.fail_at(110))]
 fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> {
+    validate_public_surface(record, path)?;
+    validate_implementation_fields(record, path)?;
+    validate_approved_callers(record, path)
+}
+
+fn validate_public_surface(record: &BoundaryRecord, path: &Path) -> Result<()> {
     let has_public_surface = [
         ("public.facade", record.public.facade.as_deref()),
         ("public.trait", record.public.trait_name.as_deref()),
@@ -198,7 +202,10 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
             path.display()
         );
     }
+    Ok(())
+}
 
+fn validate_implementation_fields(record: &BoundaryRecord, path: &Path) -> Result<()> {
     match record.implementation.visibility {
         types::Visibility::Public | types::Visibility::Private | types::Visibility::PubCrate => {
             if record
@@ -250,7 +257,10 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
             }
         }
     }
+    Ok(())
+}
 
+fn validate_approved_callers(record: &BoundaryRecord, path: &Path) -> Result<()> {
     if let Some(callers) = &record.callers {
         let mut seen_symbols = BTreeSet::new();
         for approved_entry in &callers.approved {
