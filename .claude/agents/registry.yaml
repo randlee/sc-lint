@@ -119,10 +119,17 @@ skills:
       rust-code-reviewer: 0.x
       rust-code-explorer: 0.x
       rust-qa-agent: 0.x
+  plan-anchoring:
+    version: 0.3.2
+    path: .claude/skills/plan-anchoring/SKILL.md
+    depends_on:
+      anchor-plan-review: "0.x"
+      anchor-sprint-review: "0.x"
+      anchor-question-tune: "0.x"
 # atm-bd-orchestration configuration (read by its install.py; no defaults)
 roles:
   lead: team-lead
-  dev-sanity: dev-sanity
+  dev-sanity: lint-sanity
   quality-mgr: quality-mgr
 bead_prefix: lint
 worktree_base: ../sc-lint-worktrees
@@ -139,10 +146,3 @@ policy_path: .claude/project/quality-policy.md
 reviewers_round1:
   - req-qa
   - arch-qa
-  plan-anchoring:
-    version: 0.3.2
-    path: .claude/skills/plan-anchoring/SKILL.md
-    depends_on:
-      anchor-plan-review: "0.x"
-      anchor-sprint-review: "0.x"
-      anchor-question-tune: "0.x"

@@ -54,8 +54,19 @@ model = "sonnet"
 env = { ATM_IDENTITY = "publisher", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
 
 [[rmux.windows.panes]]
+name = "lint-sanity"
+model = "sonnet"
+dir = "/Users/randlee/github/sc-lint"
+env = { ATM_IDENTITY = "lint-sanity", ATM_TEAM = "sc-lint", CLAUDE_CODE_TASK_LIST_ID = "sc-lint" }
+
+[[rmux.windows.panes]]
 name = "spare"
 env = { ATM_TEAM = "sc-lint" }
+
+[startup.lint-sanity]
+all = ["Your role is dev-sanity under atm-bd-orchestration: read .claude/agents/dev-sanity.md now (again after every compaction) and run its Startup section",
+       "Use native atm send or atm ack for messages to flint (the phase-i lead) and team-lead",
+       "Use native atm read to read messages from team-members" ]
 
 [startup.team-lead]
 all = ["Read /codex-orchestration SKILL.md"]
