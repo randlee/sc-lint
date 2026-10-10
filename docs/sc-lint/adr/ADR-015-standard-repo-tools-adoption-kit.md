@@ -74,3 +74,24 @@ now defines how shared tooling is vendored into consumers.
   how to extend; it does not anticipate consumer-specific needs.
 - A consumer-local extension observed in at least two repositories may be
   promoted into the kit or wheel as shared base behavior.
+
+## Amendment 2026-10-10 — analyzer table keys
+
+| Field | Value |
+| --- | --- |
+| Status | Accepted (Rand, 2026-10-10) |
+| Source | #201, as narrowed by Rand's 2026-10-10 comment on #201; #202 |
+
+1. Extends Decision 7: each `[tool.sc-lint.analyzers.<name>]` entry carries the
+   common keys `enabled`, `reason`, `exclude_rules`, `fail_rules` and
+   `exclude_paths`, plus that analyzer's own keys (portability:
+   `config_home_env`, `unix_path_prefixes`, `targets`; boundary and runtime: none).
+2. Decision 7: `targets` stays a portability key so adopted configs keep
+   working; no rule reads it yet. A key that is neither common nor the
+   analyzer's own is rejected by the analyzer (exit 3) and by the kit installer.
+3. The Decision 7 example
+   `portability = { enabled = true, targets = ["linux", "macos", "windows"] }`
+   stands.
+4. "Rust may validate the schema but contains no selection policy" stands:
+   each analyzer reads and applies only its own table.
+5. Decision 4: "ADR-012 unchanged" reads "ADR-012 as amended 2026-10-10".

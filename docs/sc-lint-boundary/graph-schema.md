@@ -108,9 +108,13 @@ rather than infer trait ownership from a method-name suffix.
 Qualified trait calls resolve to the corresponding implementation method.
 Unqualified calls prefer an existing inherent target; otherwise the analyzer
 uses the current trait implementation or a unique trait-method candidate.
-Ambiguous candidates remain unresolved instead of being merged. Cycle rules
-still operate on the underlying type owner; distinct methods do not imply a
-waiver of owner-level cycle diagnostics.
+Ambiguous candidates remain unresolved instead of being merged. An
+enum-variant expression (`Self::A`, `E::A`) resolves to the variant node
+`<owner>::variant::<name>`, never to a method, and variant edges do not enter
+the owner graph. Cycle rules still operate on the underlying type owner;
+distinct methods do not imply a waiver of owner-level cycle diagnostics,
+except for delegation edges (see SCB-CYCLE-002/003 below).
+(Amended 2026-10-10, Accepted, #204.)
 
 ## Edge Model
 
@@ -153,6 +157,15 @@ Current implemented rule ids:
 - `PORT-001`
 - `PORT-002`
 - `PORT-003`
+
+`SCB-CYCLE-002` and `SCB-CYCLE-003` exclude a delegation edge when the callee
+cannot reach back to the caller through the owner's expression edges. Owner
+reference edges record the callee node. A delegation edge is a
+method-to-method expression edge within one owner where the callee's name
+differs from the caller's, and either the callee is not public (private
+helper) or the caller is a trait-impl method (receiver call). A trait-impl
+method that forwards to a method of the same name stays a self-loop.
+(Amended 2026-10-10, Accepted, #204.)
 
 ## Source-Level Allowances
 

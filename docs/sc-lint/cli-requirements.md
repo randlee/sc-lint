@@ -87,7 +87,10 @@ specialized backend tools and mixed Rust/Python implementations.
   planning line, `sc-lint check interfaces` is such a command: breaking-change
   detection remains a `CommandEnvelope<T>` result with payload-owned verdict
   fields, while `CliError` remains reserved for execution/config/protocol
-  failures.
+  failures. `sc-lint lint sc-boundary`, `sc-lint lint sc-portability` and
+  `sc-lint lint sc-runtime` are also such commands: each exits 10 when its
+  result has `data.status = "fail"`, and the envelope stays `ok: true`.
+  (Amended 2026-10-10, Accepted, #200.)
 
 - `REQ-CLI-005I`
   Before a command family is considered implementation-ready, the contract docs
@@ -159,6 +162,11 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-portability`
   - `sc-runtime`
   and future crate-backed additions should follow the same pattern.
+  These three targets accept `sc-lint lint <target> --rule-filter
+  <RULE-ID|family>[,...]`, which the CLI forwards unchanged to the backend
+  with the resolved `--config` path; the CLI does not interpret selectors.
+  `--rule-filter` on any other `lint` target is a usage error (exit 2).
+  (Amended 2026-10-10, Accepted, #201.)
 
 - `REQ-CLI-007G`
   Narrower grouped aliases such as `unix-gating` or `runtime-waits` may exist

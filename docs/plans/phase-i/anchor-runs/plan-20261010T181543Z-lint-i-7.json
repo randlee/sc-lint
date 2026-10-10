@@ -1,0 +1,405 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261010T181543Z-lint-i-7",
+  "gate": "plan",
+  "created_at": "2026-10-10T18:15:43+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-i/docs/plans/phase-i/anchors.json",
+  "plan": "phase-i",
+  "item": {
+    "id": "lint-i-7",
+    "title": "i-7: shared analyzer config parser (#201)",
+    "source": "/private/tmp/claude-501/-Users-randlee-github-sc-lint/0ffddd7f-a34f-42d8-9a4a-9dbba6ca5493/scratchpad/lint-i-7/item.txt",
+    "chars": 3499,
+    "truncated": false,
+    "chars_before_reduction": 8789,
+    "code_reduced": {
+      "blocks": 2,
+      "lines": 88
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.13.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must be a layered design.  w/ layers (lowest to highest):  a) sc-lint-types (shared types) and sc-lint-attribute (shared attributes)  b) independent cargo tools (i.e. sc-lint-boundary)  c) sc-lint cli which calls into (b)  d) just template (recommended just command layout w/ recommended mapping to (b) and (c) )",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; docs/architecture.md has a Layered Architecture section naming layers (a)-(d)",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.92,
+          "probabilities": {
+            "yes": 0.95,
+            "no": 0.05,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.56,
+          "probabilities": {
+            "yes": 0.71,
+            "no": 0.24,
+            "unclear": 0.05
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.52,
+          "probabilities": {
+            "yes": 0.3,
+            "no": 0.68,
+            "unclear": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.52,
+      "explanation": "Jev was not confident (min confidence 0.52); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 2162,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 3499,
+      "item_shortened": false,
+      "request_bytes": 6819
+    },
+    {
+      "anchor_id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"any substantial redesign work is to be discussed w/ me before documented or planned.\"",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.95,
+          "probabilities": {
+            "yes": 0.97,
+            "no": 0.03,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.43,
+          "probabilities": {
+            "yes": 0.3,
+            "no": 0.62,
+            "unclear": 0.08
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.03,
+            "no": 0.96,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.43,
+      "explanation": "Jev was not confident (min confidence 0.43); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 2090,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 3499,
+      "item_shortened": false,
+      "request_bytes": 6589
+    },
+    {
+      "anchor_id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign\"",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.55,
+          "probabilities": {
+            "yes": 0.7,
+            "no": 0.28,
+            "unclear": 0.02
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.95,
+          "probabilities": {
+            "yes": 0.03,
+            "no": 0.97,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.55,
+      "explanation": "Jev was not confident (min confidence 0.55); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 2096,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 3499,
+      "item_shortened": false,
+      "request_bytes": 6573
+    },
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.\"",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "each sprint bead design contains a fenced code block for every numbered deliverable",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.85,
+          "probabilities": {
+            "yes": 0.9,
+            "no": 0.1,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.38,
+          "probabilities": {
+            "yes": 0.4,
+            "no": 0.59,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.27,
+          "probabilities": {
+            "yes": 0.48,
+            "no": 0.51,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.27,
+      "explanation": "Jev was not confident (min confidence 0.27); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 2079,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 3499,
+      "item_shortened": false,
+      "request_bytes": 6528
+    },
+    {
+      "anchor_id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each phase-i change lands in the lowest layer that can carry it, and each sprint bead names that layer.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"The intent is to make these changes at the appropriate layer\"",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "each sprint bead names one layer (a)-(d); git diff --stat of its PR touches only that layer's crates or kit files",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.95,
+          "probabilities": {
+            "yes": 0.97,
+            "no": 0.03,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.95,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 2080,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 3499,
+      "item_shortened": false,
+      "request_bytes": 6532
+    },
+    {
+      "anchor_id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "I expect 'just test' to be managed and customized by the repo.  sc-lint supplies patterns and general helper functions",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "git diff of the phase adds no consumer test orchestration to crates/sc-lint; the kit's test recipe is a consumer-editable pattern; any sc-lint addition for testing is a general helper the recipe calls",
+      "verdict": "not_applicable",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "yes": 0.05,
+            "no": 0.95,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.95,
+          "probabilities": {
+            "yes": 0.03,
+            "no": 0.97,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.02,
+            "no": 0.98,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.92,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 2099,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 3499,
+      "item_shortened": false,
+      "request_bytes": 6615
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 4,
+      "satisfied": 1,
+      "not_applicable": 1
+    },
+    "failing": [
+      "ANC-001",
+      "ANC-004",
+      "ANC-005",
+      "ANC-006"
+    ],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

@@ -1,0 +1,402 @@
+{
+  "schema": "plan-anchoring/anchors/1",
+  "plan": "phase-i",
+  "intent_ref": "docs/plans/phase-i/intent.md",
+  "anchors": [
+    {
+      "id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each change sits in the layer that owns it: (a) shared types and attributes, (b) independent cargo analyzer tools, (c) the sc-lint CLI, which calls (b), (d) the just template; no layer depends on a higher one and no (b) tool depends on another (b) tool.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "summary": "Four layers: shared types/attributes, cargo tools, CLI, just template",
+      "scope": "every phase-i change: architecture documentation, crate dependencies, CLI commands, and the adoption-kit just template",
+      "deterministic_check": "cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; docs/architecture.md has a Layered Architecture section naming layers (a)-(d)",
+      "fixtures": {
+        "pass": [
+          "Layer (b), sc-lint-portability. The analyzer reads its own table through the shared parser in sc-lint-analyzer-support; it gains no dependency on sc-lint-boundary or on the sc-lint CLI.",
+          "Layer (c), the sc-lint CLI. dispatch.rs forwards --rule-filter unchanged to the sc-portability backend; the CLI does not interpret selectors.",
+          "Layer (a), sc-lint-analyzer-support. Adds a TOML table parser that the three analyzers call; the crate gains no dependency on any analyzer or on the CLI."
+        ],
+        "fail": [
+          "Add sc-lint-boundary as a dependency of sc-lint-portability so portability can reuse the boundary inventory loader.",
+          "Move PORT-006 prefix matching into crates/sc-lint/src/dispatch.rs so the CLI filters portability findings itself.",
+          "sc-lint-schema now depends on the sc-lint CLI crate so the shared Finding type can carry the CLI's exit codes."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "lint-hl1",
+        "plan_questions": "lint-hl1.1",
+        "dev_questions": "lint-hl1.2"
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-10T16:54:54+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-hl1",
+            "plan_questions": "lint-hl1.1",
+            "dev_questions": "lint-hl1.2"
+          }
+        },
+        {
+          "at": "2026-10-10T17:12:54+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check"
+          ]
+        },
+        {
+          "at": "2026-10-10T18:32:20+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ],
+      "quote": "sc-lint must be a layered design.  w/ layers (lowest to highest):  a) sc-lint-types (shared types) and sc-lint-attribute (shared attributes)  b) independent cargo tools (i.e. sc-lint-boundary)  c) sc-lint cli which calls into (b)  d) just template (recommended just command layout w/ recommended mapping to (b) and (c) )"
+    },
+    {
+      "id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A consumer's `just test` stays defined and customized in the consumer repository; sc-lint ships only recipe patterns and general helper functions, never test orchestration.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "summary": "Repo owns just test; sc-lint supplies patterns and helpers",
+      "scope": "the adoption-kit just template, any sc-lint CLI test command, and any helper sc-lint ships for consumer test recipes",
+      "deterministic_check": "git diff of the phase adds no consumer test orchestration to crates/sc-lint; the kit's test recipe is a consumer-editable pattern; any sc-lint addition for testing is a general helper the recipe calls",
+      "fixtures": {
+        "pass": [
+          "The kit's test recipe stays a plain just recipe that the consumer edits; sc-lint adds a general helper, `sc-lint util list-crates`, that the recipe may call.",
+          "The kit justfile shows a recommended `test *args:` recipe pattern; the consumer replaces its body with their own test commands."
+        ],
+        "fail": [
+          "Add a [test] manifest to sc-lint.toml with selectors and defaults; `sc-lint test <selector>` reads it and runs each step.",
+          "The CLI's workflow.rs gains step groups, parallel execution and keep_going for the consumer's test steps.",
+          "The kit test recipe becomes a managed block that the installer overwrites on every upgrade."
+        ]
+      },
+      "question_overrides": {},
+      "version": 5,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "lint-9lk",
+        "plan_questions": "lint-9lk.1",
+        "dev_questions": "lint-9lk.2"
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:11:11+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-008",
+          "reason": "Rand restated the directive 2026-10-10 with new wording"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "locked",
+          "note": "Rand supplied improved wording for ANC-002 (not a new anchor); locked"
+        },
+        {
+          "at": "2026-10-10T18:32:20+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-10T18:33:19+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ],
+      "quote": "I expect 'just test' to be managed and customized by the repo.  sc-lint supplies patterns and general helper functions",
+      "kind": "prohibition"
+    },
+    {
+      "id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each phase-i change lands in the lowest layer that can carry it, and each sprint bead names that layer.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"The intent is to make these changes at the appropriate layer\"",
+      "summary": "Each change lands in the lowest capable layer; sprint names it",
+      "scope": "every phase-i sprint bead and its delivered diff",
+      "deterministic_check": "each sprint bead names one layer (a)-(d); git diff --stat of its PR touches only that layer's crates or kit files",
+      "fixtures": {
+        "pass": [],
+        "fail": []
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "lint-yn8",
+        "plan_questions": "lint-yn8.1",
+        "dev_questions": "lint-yn8.2"
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:18:55+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-yn8",
+            "plan_questions": "lint-yn8.1",
+            "dev_questions": "lint-yn8.2"
+          }
+        }
+      ],
+      "quote": "The intent is to make these changes at the appropriate layer"
+    },
+    {
+      "id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"any substantial redesign work is to be discussed w/ me before documented or planned.\"",
+      "summary": "Redesign needs Rand's prior approval",
+      "scope": "all phase-i documentation, ADR and plan-bead changes",
+      "deterministic_check": "every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval",
+      "fixtures": {
+        "pass": [
+          "Adds `analyze_workspace_configured` to sc-lint-runtime and a --config flag to its binary.",
+          "Adds the install key justfile.windows_shell to the kit schema and installer.",
+          "Amends ADR-012's canonical template to drop `default: lint`, as Rand approved in discussion on 2026-10-10."
+        ],
+        "fail": [
+          "Amend ADR-012 so `just test` is implemented by the CLI's test command.",
+          "Create a new crate, sc-lint-config, to hold analyzer configuration.",
+          "Move consumer step execution from the just template into crates/sc-lint/src/workflow.rs."
+        ]
+      },
+      "question_overrides": {},
+      "version": 4,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "lint-zjw",
+        "plan_questions": "lint-zjw.1",
+        "dev_questions": "lint-zjw.2"
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:18:57+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-zjw",
+            "plan_questions": "lint-zjw.1",
+            "dev_questions": "lint-zjw.2"
+          }
+        },
+        {
+          "at": "2026-10-10T18:32:20+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ],
+      "quote": "any substantial redesign work is to be discussed w/ me before documented or planned.",
+      "kind": "directive"
+    },
+    {
+      "id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign\"",
+      "summary": "Only targeted additions required by #193-#204",
+      "scope": "every phase-i sprint bead and deliverable",
+      "deterministic_check": "every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names",
+      "fixtures": {
+        "pass": [
+          "Deliverable 1 (#203): owner_crate_path is checked against the lib target name from cargo metadata. Deliverable 2: a test for a package with a [lib] name.",
+          "Deliverable 1 (#200): `sc-lint lint <analyzer>` exits 10 on status fail. Deliverable 2: cli-contract.md lists exit code 10.",
+          "Deliverable 1 (#202): portability reads unix_path_prefixes from [tool.sc-lint.analyzers.portability], extending PORT-001 and PORT-006."
+        ],
+        "fail": [
+          "Deliverable 3: rename every RuleId variant to a new naming scheme for consistency.",
+          "Deliverable 4: add an approval matrix and a gate ledger to the root bead that track every ruling.",
+          "Deliverable 2: introduce a RuleCatalog trait registry so third-party analyzers can register at runtime.",
+          "Deliverable 5 (#200): add a --fail-on flag so users can choose which statuses fail."
+        ]
+      },
+      "question_overrides": {},
+      "version": 4,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "lint-7fs",
+        "plan_questions": "lint-7fs.1",
+        "dev_questions": "lint-7fs.2"
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:40+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:18:58+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-7fs",
+            "plan_questions": "lint-7fs.1",
+            "dev_questions": "lint-7fs.2"
+          }
+        },
+        {
+          "at": "2026-10-10T18:32:20+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ],
+      "quote": "I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign"
+    },
+    {
+      "id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.\"",
+      "summary": "Sprint designs carry code for every deliverable",
+      "scope": "every phase-i sprint bead's design field",
+      "deterministic_check": "each sprint bead design contains a fenced code block for every numbered deliverable",
+      "fixtures": {
+        "pass": [
+          "Deliverable 1: exit 10 on a fail verdict. Design:\n```rust\npub const EXIT_VERDICT_FAIL: u8 = 10;\n```",
+          "Deliverable 1: the shared parser. Design:\n```rust\npub fn load_analyzer_settings(catalog: &RuleCatalog, root: &Path) -> Result<AnalyzerSettings, AnalyzerConfigError> {\n<redacted: 40 of 44 code lines are in the plan but were not sent to Jev>\n```",
+          "Deliverable 1: drop the kit default recipe. Design: delete lines 1-4 of packages/sc-lint-adoption/.sc-lint/justfile."
+        ],
+        "fail": [
+          "Deliverable 1: add config parsing. Design: choose a suitable TOML library and decide the error type.",
+          "Deliverable 2: improve cycle precision. Design: the developer determines which edges to exclude.",
+          "Deliverable 1: handle Justfile collisions as appropriate; either warn or fail, whichever fits best."
+        ]
+      },
+      "question_overrides": {},
+      "version": 4,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": "lint-57u",
+        "plan_questions": "lint-57u.1",
+        "dev_questions": "lint-57u.2"
+      },
+      "history": [
+        {
+          "at": "2026-10-10T16:54:41+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-10T17:30:00+00:00",
+          "event": "reworded",
+          "status": "proposed",
+          "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:19:00+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-57u",
+            "plan_questions": "lint-57u.1",
+            "dev_questions": "lint-57u.2"
+          }
+        },
+        {
+          "at": "2026-10-10T18:32:20+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ],
+      "quote": "I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.",
+      "kind": "structural"
+    }
+  ]
+}

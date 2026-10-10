@@ -80,3 +80,29 @@ Recipe arguments per ADR-016 Decision 3 (2026-08-30).
 - Consumer mode is encoded in the generated command path: `lint --consumer --config sc-lint.toml ci`
   and `test` read named argv profiles from `sc-lint.toml`; source-maintainer
   `lint ci` remains a separate source-checkout command path.
+
+## Amendment 2026-10-10 — the consumer owns its `just` recipes
+
+| Field | Value |
+| --- | --- |
+| Status | Accepted (Rand, 2026-10-10) |
+| Decider | Rand |
+
+Rand's rulings, verbatim: "sc-lint does not 'own' just test. sc-lint will have
+a recommended 'just test' implementation AND sc-lint should have a 'default'
+'just' implementation it can install on a new repo." and "sc-lint doesn't own
+'just', it has best practices and recommendations for naming conventions that
+we want enforced across all repos. 'just' is fully working on 10-20 repos
+today."
+
+1. Replaces "complete test" in Decision 1: installed `sc-lint` owns setup,
+   compatibility, complete lint and upgrade behaviour. The consumer repository
+   owns its `Justfile`, including `just test`; sc-lint provides `sc-lint test`,
+   a recommended `test` recipe and the recipe naming conventions.
+2. Replaces Decision 2 for the adoption kit: the imported kit justfile defines
+   `setup`, `lint` and `upgrade` only. The installer adds the recommended `test`
+   recipe outside the managed block when the consumer `Justfile` has none, and a
+   repository with no `Justfile` starts from the default one (`set
+   windows-shell`, `default: lint`). An existing `test` recipe is never changed.
+3. The Canonical Generated Template above stays the `sc-lint init --just`
+   output.
