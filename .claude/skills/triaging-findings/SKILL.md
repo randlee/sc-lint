@@ -1,7 +1,18 @@
 ---
 name: triaging-findings
-version: 1.1.0
+version: 1.3.0
 description: Orchestrate pre-dispatch QA finding triage as team-lead. Launch one qa-triage agent per finding, collect phase-scoped Turtle records, aggregate by promoted branch, and only then dispatch branch-scoped fix assignments to clint.
+requires:
+  cli:
+    - name: sc-compose
+      minimum_version: 1.6.1
+    - name: oxigraph
+    - name: rg
+  python:
+    - package: rdflib
+    - package: sc-compose
+      import_name: sc_compose
+      minimum_version: 1.6.1
 depends_on:
   codex-orchestration: 0.x
   quality-management-gh: 1.x
@@ -14,6 +25,25 @@ Audience: `team-lead` only.
 Use this skill when QA has produced findings and you need to correlate them
 across worktrees before any fix work is sent to `clint`.
 
+## Step 1 — Verify CLI dependencies
+
+Run this preflight before reading inputs, delegating agents, or rendering a
+record:
+
+```bash
+python3 .claude/skills/triaging-findings/scripts/check_dependencies.py
+```
+
+The preflight requires the released v1.6.1 `sc-compose` CLI prebuilt release binary and
+the Python `sc_compose` binding at `>= 1.6.1`, plus `oxigraph`, `rg`, and Python `rdflib`. It checks PATH plus
+common Homebrew/Cargo/user-install locations and returns a structured result.
+A non-zero result is a hard stop; read
+`references/installation-and-troubleshooting.md`, fix the environment, and
+rerun the preflight. Do not silently continue with a missing or old CLI.
+
+The installation reference is intentionally separate from this entry point so
+it is loaded only when setup or troubleshooting is needed.
+
 For phase-end learning and process hardening, also read:
 - `references/post-mortem.md`
 
@@ -24,7 +54,8 @@ Before using this workflow:
 2. The target phase has an explicit `phase_id` such as `phase-R`.
 3. The ordered worktree list is known in promotion order.
 4. QA findings exist in a structured form with stable finding ids.
-5. `sc-compose` is installed for rendering assignment templates.
+5. The Step 1 preflight passes: the pinned `sc-compose` CLI and `sc_compose >= 1.6.1` Python binding,
+   `oxigraph`, `rg`, and Python `rdflib` are available.
 
 ## Ownership Model
 
@@ -43,14 +74,25 @@ For each triage batch, assemble:
 - `integration_worktree_path`
 - `triage_root`
 - ordered `worktrees` with branch, absolute path, head SHA, and order index
+- repository-relative `worktree_paths` labels aligned with `worktrees` (never
+  copy the runtime checkout paths)
 - finding records with:
   - `finding_id`
   - `title`
   - `description`
+  - `phase_id`
+  - `triage_mode`
+  - `category`
   - `severity`
   - `pattern`
   - `repeatable`
   - `sweep_scope`
+  - `status`
+  - `dispatch_ready`
+  - `triaged_at`
+  - `found_in` (declared sprint local id, such as `AICH-S7`)
+  - `found_at` (authoritative QA discovery/result timestamp in UTC ending in
+    `Z`)
 - triage mode:
   - `initial_pass`
   - `followup_pass`
@@ -62,6 +104,58 @@ Required ownership rule:
 - `triage_root` must live under `integration_worktree_path`
 - the phase integration worktree is the canonical source of truth for triage
   artifacts
+
+Runtime checkout paths (`integration_worktree_path`, `triage_root`, and
+`worktrees[].path`) may be absolute while the sweep runs, but they are not
+canonical finding data and must not be copied into the Turtle record. The
+`triage:Occurrence` `triage:file` and `triage:WorktreeSnapshot`
+`triage:path` values must be repository-relative (no leading `/` or `\\`, any
+`..` path component, or drive prefix). Supply a repository-relative worktree
+label in `worktree_paths`; never pass the runtime checkout path in that array.
+The template rejects invalid values before the Turtle parse check.
+
+## Canonical Turtle rendering
+
+Every finding record must be rendered from
+`.claude/skills/triaging-findings/triage-record.ttl.j2`; do not hand-write a
+parallel Turtle shape. Its frontmatter declares the required variables above,
+including `found_in` and `found_at`. The occurrence and worktree inputs are
+parallel scalar arrays (`occurrences` with `occurrence_files`,
+`occurrence_lines`, `occurrence_snippets`, `occurrence_statuses`,
+`occurrence_closed`, `occurrence_branches`, `occurrence_head_shas`, and
+`occurrence_worktree_ids`; likewise `worktrees` with `worktree_paths`,
+`worktree_branches`, `worktree_head_shas`, and `worktree_order_indices`). Keep
+each array aligned by index.
+
+Render to the canonical path and parse it before committing the batch:
+
+```bash
+TRIAGE_ROOT=/abs/integrate-phase-R/.triage
+PHASE_ID=phase-R
+FINDING_ID=FTQ-001
+OUTPUT="$TRIAGE_ROOT/$PHASE_ID/findings/$FINDING_ID.ttl"
+mkdir -p "$(dirname "$OUTPUT")"
+sc-compose render \
+  --root . \
+  --file .claude/skills/triaging-findings/triage-record.ttl.j2 \
+  --var-file /tmp/triage-record-vars.json \
+  --output "$OUTPUT"
+PARSED=$(mktemp)
+trap 'rm -f "$PARSED"' EXIT
+oxigraph convert \
+  --from-file "$OUTPUT" \
+  --from-format ttl \
+  --to-file "$PARSED" \
+  --to-format ttl
+```
+
+The rendered Finding must contain `triage:foundIn triage:<declared-sprint>` and
+`triage:foundAt "<UTC timestamp ending in Z>"^^xsd:dateTime`. Missing required
+vars must fail the render through the template frontmatter contract; a
+non-repository-relative occurrence path renders an invalid sentinel and must
+make `oxigraph convert` exit nonzero. Malformed Turtle must likewise make the
+conversion fail. Do not add `--strict` to this render until `sc-compose`
+supports loop-local names in strict token validation.
 
 ## Triage Modes
 
@@ -132,13 +226,11 @@ Separate them into:
 - regressed findings
 - non-dispatchable findings
 
-The per-finding `.ttl` record is canonical. Aggregation is derived.
-
 ### 3.1 Commit triage artifacts before dispatch
 
 After all `qa-triage` agents in the batch have finished and after aggregation
-confirms the `.ttl` set is complete, stage, commit, and push the triage
-artifacts to git before sending any dev assignment to `clint`.
+confirms the `.ttl` set is complete, stage and commit the triage artifacts to
+git before sending any dev assignment to `clint`.
 
 Required commit scope:
 - the phase findings under `<triage_root>/<phase_id>/findings/`
@@ -148,8 +240,11 @@ Required commit scope:
 Required timing:
 - after triage batch aggregation
 - before branch-scoped fix dispatch
-- on the phase integration-branch worktree identified by
-  `integration_branch` / `integration_worktree_path`
+- on the integration-branch worktree that is the canonical triage source of
+  truth for the phase
+
+`triage_root` must point to the integration-branch worktree for the active
+phase, not a feature branch or main-repo path.
 
 Reason:
 - parallel `qa-triage` agents write into one shared triage root
@@ -159,7 +254,19 @@ Reason:
 
 Do not dispatch dev work from uncommitted `.ttl` state.
 
+The per-finding `.ttl` record is canonical. Aggregation is derived.
+
 ### 4. Dispatch branch-scoped fix work to `clint`
+
+For every promoted finding that needs a fix, the lead creates a child bead of
+the phase epic before dispatch. Its bead id is the fix task id. After a failed
+QA round, also create a QA-2 bead that depends on every fix bead and replace
+the merge dependency with QA-2 (`bd dep add <qa-2> <fix-bead>` and `bd dep add
+<merge-bead> <qa-2>`). Do this before `bd ready`, so it shows fix beads rather
+than merge. A merge bead is dispatchable only after its latest QA bead closes
+PASS. Dispatch only when a fix bead is ready, assign it to the recipient's ATM
+identity, and pass the id as `--task-id` / `task_id`. `quality-mgr` supplies
+stable finding ids; it does not create these beads.
 
 For each promoted branch with open work:
 1. render `.claude/skills/codex-orchestration/fix-assignment.xml.j2`
@@ -174,7 +281,7 @@ Recommended render pattern:
 sc-compose render \
   --root .claude/skills/codex-orchestration \
   --file fix-assignment.xml.j2 \
-  --var-file "$(mktemp)"
+  --var-file /tmp/fix-vars.json
 ```
 
 For follow-up QA or reviewer rechecks, build the carry-forward payload from the
@@ -189,23 +296,11 @@ python3 scripts/triage_carry_forward.py \
 
 Use the script output as the `carry_forward_findings_json` template input.
 
-For implementation sprint-end QA or QA-2+ routing, also run the TODO scan on
-the promoted branch worktree:
-
-```bash
-python3 scripts/find_todos.py <worktree-root>
-```
-
-Treat every emitted TODO row as a QA finding input. Do not let TODO comments
-act as silent deferral markers in follow-up routing.
-
 Prompt/handoff contract:
 - `qa-triage` itself is a JSON-in / fenced-JSON-out agent prompt
 - ATM task assignment templates remain XML ATM messages
 - when dispatching work, pass triage record paths or rendered carry-forward JSON
   rather than copying raw `.ttl` contents into the task body
-- use `fix-assignment.xml.j2` as the branch-scoped handoff template after
-  triage completes
 
 ## Dispatch Rules
 
@@ -241,7 +336,7 @@ Until a dedicated closeout writer exists, use:
 ## Phase-End Post-Mortem
 
 At the end of a phase, after all sprint branches are integrated into
-`integration/phase-X` and before the final merge to `develop`, run the
+`integrate/phase-X` and before the final merge to `develop`, run the
 post-mortem review described in `references/post-mortem.md`.
 
 Participants:
@@ -251,7 +346,7 @@ Participants:
 
 Purpose:
 - review the phase finding set as a whole
-- run one final `integration/phase-X` quality gate
+- run one final `develop` quality gate
 - classify recurring patterns
 - produce systemic follow-up recommendations such as:
   - new ADRs
@@ -261,11 +356,36 @@ Purpose:
   - QA-process improvements
 
 Required gate:
-- `quality-mgr` must run a full review on `integration/phase-X`
+- `quality-mgr` must run a full review on `develop`
 - `quality-mgr` should deploy a background review team by role for that final
   pass, using the appropriate reviewer mix for the phase artifacts
 - that review must verify 100% of phase findings are fixed or intentionally
   deferred on the integration branch
 - that review team must verify no integrated fix was missed outside the original
   changed-file scopes
-- do not merge `integration/phase-X` to `develop` until that review passes
+- do not merge `integrate/phase-X` to `develop` until that review passes
+
+## Reporting to Dev
+
+Send findings to `clint` only after triage completes.
+
+Each fix assignment must include:
+- target branch and worktree
+- finding ids
+- concise summaries
+- all promoted-branch occurrences
+- whether the issue is repeatable
+- whether merge-forward handling is part of the task
+- required validation
+
+Do not send:
+- findings already closed by follow-up QA
+- findings with `dispatch_ready = false`
+- lower-branch duplicates already subsumed by a higher promoted branch
+
+## ATM Message Contract
+
+Every handoff follows the Required Flow in
+[`docs/team-protocol.md`](../../../docs/team-protocol.md): task start, work,
+task close. A task close is terminal; the receiver does not acknowledge it. No
+silent processing.

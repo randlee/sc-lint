@@ -22,20 +22,27 @@ TOP_LEVEL_KEYS = {
     "public",
     "implementation",
     "composition",
+    "ownership",
+    "callers",
     "dependencies",
     "references",
+    "contracts",
     "testing",
     "enforcement",
     "status",
 }
-PUBLIC_KEYS = {"facade"}
+REQUIRED_TOP_LEVEL_KEYS = TOP_LEVEL_KEYS - {"ownership", "callers", "contracts"}
+PUBLIC_KEYS = {"facade", "trait", "notes"}
 IMPLEMENTATION_KEYS = {"type", "module", "visibility", "constructor"}
 COMPOSITION_KEYS = {"roots"}
 DEPENDENCIES_KEYS = {"allowed_dependents", "allowed_dependencies", "forbidden_edges"}
 REFERENCES_KEYS = {"scope", "forbidden"}
 TESTING_KEYS = {"allowed_test_double_paths", "forbidden_test_bypasses"}
 ENFORCEMENT_KEYS = {"lint_rules", "review_gates"}
-STATUS_KEYS = {"state"}
+OWNERSHIP_KEYS = {"io_owns", "io_forbidden"}
+CALLERS_KEYS = {"approved"}
+CONTRACTS_KEYS = {"request_types", "response_types", "error_types", "notes"}
+STATUS_KEYS = {"state", "notes"}
 
 
 def boundary_file_paths(repo_root: Path) -> list[Path]:
@@ -69,7 +76,7 @@ def validate_boundary_file(
         return
 
     ensure_exact_keys(data, TOP_LEVEL_KEYS, "top-level", path, errors)
-    if not TOP_LEVEL_KEYS.issubset(data):
+    if not REQUIRED_TOP_LEVEL_KEYS.issubset(data):
         errors.append(f"{path}: missing required top-level keys")
         return
 
@@ -116,26 +123,43 @@ def validate_boundary_file(
     ensure_exact_keys(testing, TESTING_KEYS, "testing", path, errors)
     ensure_exact_keys(enforcement, ENFORCEMENT_KEYS, "enforcement", path, errors)
     ensure_exact_keys(status, STATUS_KEYS, "status", path, errors)
+    for name, keys in (("ownership", OWNERSHIP_KEYS), ("callers", CALLERS_KEYS), ("contracts", CONTRACTS_KEYS)):
+        if name in data:
+            ensure_exact_keys(data[name], keys, name, path, errors)
 
     visibility = implementation.get("visibility")
-    if visibility not in {"public", "trait_only"}:
+    if visibility not in {"public", "trait_only", "private", "pub(crate)"}:
         errors.append(f"{path}: unsupported implementation.visibility `{visibility}`")
         return
 
-    if not str(public.get("facade", "")).strip():
-        errors.append(f"{path}: public.facade must be non-empty")
+    constructor = implementation.get("constructor")
+    if constructor is not None and constructor not in {
+        "none",
+        "public",
+        "private",
+        "pub(crate)",
+    }:
+        errors.append(f"{path}: unsupported implementation.constructor `{constructor}`")
+        return
 
-    if visibility == "public":
+    facade = str(public.get("facade", "")).strip()
+    trait = str(public.get("trait", "")).strip()
+    if "facade" in public and not facade:
+        errors.append(f"{path}: defines an empty public.facade")
+    elif "trait" in public and not trait:
+        errors.append(f"{path}: defines an empty public.trait")
+    elif facade and trait:
+        errors.append(f"{path}: must define exactly one of public.facade or public.trait")
+    elif not facade and not trait:
+        errors.append(f"{path}: must define a non-empty public.facade or public.trait")
+
+    if visibility in {"public", "private", "pub(crate)"}:
         if not str(implementation.get("type", "")).strip():
-            errors.append(f"{path}: implementation.type must be present for public visibility")
+            errors.append(f"{path}: implementation.type must be present for {visibility} visibility")
         if not str(implementation.get("module", "")).strip():
-            errors.append(
-                f"{path}: implementation.module must be present for public visibility"
-            )
-        if implementation.get("constructor") != "none":
-            errors.append(
-                f"{path}: implementation.constructor must be `none` for public visibility"
-            )
+            errors.append(f"{path}: implementation.module must be present for {visibility} visibility")
+        if constructor is None:
+            errors.append(f"{path}: implementation.constructor must be present for {visibility} visibility")
     else:
         if "type" in implementation:
             errors.append(f"{path}: trait_only visibility must omit implementation.type")

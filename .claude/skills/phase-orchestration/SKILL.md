@@ -36,6 +36,17 @@ Read the phase plan and identify:
 - parallel waves
 - merge order within each wave
 
+Translate the dependency graph into Beads before the first dispatch: create an
+epic chain with `bd dep add <next> <prereq>`, assign each bead to the
+recipient's ATM identity, and use the bead id as the ATM task id. Each QA bead
+depends on its dev bead; merge/release beads depend on QA; promoted QA fixes are
+child beads that feed a follow-up QA bead; that QA bead blocks merge. After a
+QA close, read its verdict before `bd ready`: PASS may dispatch what opened;
+FAIL first creates fix beads, QA-2 depending on every fix, and a merge
+dependency on QA-2. A merge bead is dispatchable only after its latest QA bead
+closes PASS. The lead's dispatch view is unfiltered `bd ready`; an assignee
+uses `bd ready --assignee "$ATM_IDENTITY"`.
+
 ### 2. Execute sprints
 
 For each sprint, respecting dependency order:
@@ -91,19 +102,19 @@ After each scrum-master reports completion:
    - unresolved QA-1 RBP findings not fixed in the first fix round carry to
      the next phase backlog instead of being re-raised in later rounds
 3. wait for CI green
-4. merge PR to `integrate/phase-{N}` in dependency order
+4. merge PR to `develop` in dependency order
 5. update the integration branch
 
 ### 4. Post-sprint: clint design review
 
-After every sprint PR is merged to `integrate/phase-{N}`, request an `clint`
+After every sprint PR is merged to `integrate/phase-{N}`, request a `clint`
 review via ATM CLI. Do not block the next eligible sprint unless clint
 reports critical blocking findings.
 
 ### 5. Fix sprint if needed
 
 If clint finds issues:
-1. create a new worktree from `integrate/phase-{N}`
+1. create a new worktree from `develop`
 2. let clint or a fresh scrum-master execute the fixes
 3. run `rust-qa-agent` and `req-qa` before merge
 
@@ -128,7 +139,7 @@ After all sprints merge:
 ## Scrum-Master Lifecycle
 
 - fresh per sprint
-- named tmux teammate
+- named ATM teammate
 - can spawn background sub-agents
 - shut down after sprint completion
 - never does dev work
@@ -141,15 +152,19 @@ After all sprints merge:
 
 ## ATM CLI Communication
 
-Use ATM CLI for clint:
+Assign work with a template and a task, never with a plain message:
 
 ```bash
-atm send clint "message"
+atm task assign <agent> --task-id <task-id> --template <template.j2> --vars <vars.json>
 atm read
 atm inbox
 ```
 
-Use tmux nudges when required by the local runtime setup.
+The template tracks state and the task assignment queues the work and nudges
+the agent; see `.claude/skills/codex-orchestration/SKILL.md` "Assignment
+Templates". Plain `atm send` is for questions and notices only. ATM nudges the recipient
+of every message, and an assigned task re-nudges an agent that stops working;
+there is no manual nudge.
 
 ## Anti-Patterns
 

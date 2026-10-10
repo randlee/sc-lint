@@ -1,5 +1,4 @@
 use super::*;
-use crate::render::hex_encode;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use syn::ItemEnum;
@@ -120,7 +119,53 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
         }
     }
 
+    resolve_trait_method_edges(&mut builder);
     Ok(builder.finish())
+}
+
+fn resolve_trait_method_edges(builder: &mut GraphBuilder) {
+    let methods: BTreeMap<_, _> = builder
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "method")
+        .map(|node| (node.id.clone(), node))
+        .collect();
+    let known: BTreeSet<_> = builder.nodes.iter().map(|node| node.id.clone()).collect();
+    let reference_impl_ids = &builder.reference_impl_ids;
+    for edge in &mut builder.edges {
+        if !matches!(edge.kind, "references" | "references_expr") || known.contains(&edge.to) {
+            continue;
+        }
+        let Some((owner, method)) = edge.to.rsplit_once("::") else {
+            continue;
+        };
+        // Self::method inside a trait impl resolves to that impl when no
+        // inherent method exists. Otherwise accept only an unambiguous impl.
+        if let Some((source_owner, _)) = edge.from.split_once("::impl::")
+            && source_owner == owner
+            && let Some((source_impl, _)) = edge.from.rsplit_once("::")
+        {
+            let candidate = NodeId::new(format!("{source_impl}::{method}"));
+            if methods.contains_key(&candidate) {
+                edge.to = candidate;
+                continue;
+            }
+        }
+        let prefix = format!("{owner}::impl::");
+        let mut candidates = methods.values().filter(|node| {
+            node.id.starts_with(&prefix)
+                && node.label == method
+                && node
+                    .id
+                    .rsplit_once("::")
+                    .is_none_or(|(impl_id, _)| !reference_impl_ids.contains(&NodeId::new(impl_id)))
+        });
+        if let Some(candidate) = candidates.next()
+            && candidates.next().is_none()
+        {
+            edge.to = candidate.id.clone();
+        }
+    }
 }
 
 fn collect_owner_names(items: &[Item]) -> BTreeSet<String> {
@@ -571,13 +616,13 @@ fn ingest_impl(
     context: &ModuleItemContext<'_>,
     item: ItemImpl,
 ) -> Result<()> {
-    let owner = impl_owner_name(&item.self_ty)?;
-    let owner_id = ensure_impl_owner(builder, context, &owner);
+    let owner = impl_owner(&item.self_ty)?;
+    let owner_id = ensure_impl_owner(builder, context, &owner.name);
     let trait_path = item
         .trait_
         .as_ref()
         .map(|(_, path, _)| trait_path_key(path));
-    let impl_id = add_impl_node(builder, context, &owner, &owner_id, trait_path.clone());
+    let impl_id = add_impl_node(builder, context, &owner, &owner_id, &item);
     add_impl_trait_edge(builder, context, &item, &impl_id);
     add_impl_methods(
         builder, context, item, &owner, &owner_id, &impl_id, trait_path,
@@ -619,14 +664,27 @@ fn ensure_impl_owner(
 fn add_impl_node(
     builder: &mut GraphBuilder,
     context: &ModuleItemContext<'_>,
-    owner: &str,
+    owner: &ImplOwner,
     owner_id: &NodeId,
-    trait_path: Option<String>,
+    item: &ItemImpl,
 ) -> NodeId {
-    let id = trait_path
+    let trait_path = item
+        .trait_
         .as_ref()
-        .map(|path| NodeId::new(format!("{owner_id}::impl::{}", hex_encode(path.as_bytes()))))
-        .unwrap_or_else(|| NodeId::new(format!("{owner_id}::impl::inherent")));
+        .map(|(_, path, _)| trait_path_key(path));
+    let id = if let Some((_, path, _)) = &item.trait_ {
+        NodeId::new(format!("{owner_id}::{}", trait_impl_key(owner, path)))
+    } else {
+        NodeId::new(format!("{owner_id}::impl::inherent"))
+    };
+    let owner_label = if owner.is_reference {
+        &owner.self_type
+    } else {
+        &owner.name
+    };
+    if owner.is_reference {
+        builder.reference_impl_ids.insert(id.clone());
+    }
     let kind = if trait_path.is_some() {
         ImplKind::Trait
     } else {
@@ -637,8 +695,8 @@ fn add_impl_node(
         kind: NodeKind::Impl.as_str(),
         label: trait_path
             .as_ref()
-            .map(|path| format!("impl {path} for {owner}"))
-            .unwrap_or_else(|| format!("impl {owner}")),
+            .map(|path| format!("impl {path} for {owner_label}"))
+            .unwrap_or_else(|| format!("impl {owner_label}")),
         visibility: None,
         package: context.context.package_name.clone(),
         target: Some(context.context.target_name.clone()),
@@ -685,7 +743,7 @@ fn add_impl_methods(
     builder: &mut GraphBuilder,
     context: &ModuleItemContext<'_>,
     item: ItemImpl,
-    owner: &str,
+    owner: &ImplOwner,
     owner_id: &NodeId,
     impl_id: &NodeId,
     trait_path: Option<String>,
@@ -699,7 +757,12 @@ fn add_impl_methods(
         let ImplItem::Fn(method) = impl_item else {
             continue;
         };
-        let id = NodeId::new(format!("{owner_id}::{}", method.sig.ident));
+        let method_owner = if item.trait_.is_some() {
+            impl_id
+        } else {
+            owner_id
+        };
+        let id = NodeId::new(format!("{method_owner}::{}", method.sig.ident));
         builder.add_node(GraphNode {
             id: id.clone(),
             kind: NodeKind::Method.as_str(),
@@ -723,9 +786,12 @@ fn add_impl_methods(
             context.module_path,
             collect_references_with(
                 context.local_owner_names,
-                Some(owner),
+                Some(&owner.name),
                 &context.context.workspace_dependency_roots,
-                |collector| collector.visit_impl_item_fn(&method),
+                |collector| {
+                    collector.set_impl_self_type(&item.self_ty);
+                    collector.visit_impl_item_fn(&method);
+                },
             ),
         );
     }

@@ -168,6 +168,21 @@ SCB-DEPENDENCY-001 package dependency not allowed:
 workspace package `sc-lint-boundary` directly depends on `sc-lint-attributes` but `sc-lint-attributes` is not listed in `BOUNDARY-ScLintBoundaryAnalyzer` allowed_dependencies
 ```
 
+Boundary inventory records may use either structured or arrow-delimited
+forbidden edges:
+
+```toml
+forbidden_edges = [
+  { from = "sc-lint-boundary", to = "sc-lint-attributes" },
+  "sc-lint-boundary -> sc-observability",
+]
+```
+
+Boundary records define exactly one non-empty `[public].facade` or
+`[public].trait`; `owner_crate_path` equals `owner_package` with hyphens
+replaced by underscores. For example, `sc-lint-boundary` maps to
+`sc_lint_boundary`.
+
 Operator guidance:
 
 - use `[dependencies]` for package-level architectural dependency seams

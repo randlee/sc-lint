@@ -132,10 +132,12 @@ Operational rules:
   workspace member
 - `allowed_dependents = []` means no external workspace package may directly
   depend on that owner package
-- each `forbidden_edges` row is one exact denied direct edge expressed as one
-  structured inline table with `from` and `to` fields
-- malformed `forbidden_edges` inline tables, duplicate edges, duplicate package
-  names, and unknown fields fail inventory loading immediately
+- each `forbidden_edges` row is one exact denied direct edge expressed either
+  as a structured inline table with `from` and `to` fields or as an arrow-
+  delimited string such as `"from-package -> to-package"`
+- malformed `forbidden_edges` inline tables or arrow-delimited strings,
+  duplicate edges, duplicate package names, and unknown fields fail inventory
+  loading immediately
 - `SCB-DEPENDENCY-001` reports direct outgoing workspace edges not present in
   `allowed_dependencies`
 - `SCB-DEPENDENCY-002` reports direct incoming workspace edges not present in
@@ -335,6 +337,14 @@ Current implementation boundary:
   `SCB-INVENTORY-003`) remains the next enforcement stage on top of that
   loader foundation
 
+### Boundary Record Schema
+
+Boundary records must satisfy these identity rules:
+
+- `[public]` defines exactly one non-empty `facade` or `trait` value
+- `owner_crate_path` equals `owner_package` with hyphens replaced by
+  underscores
+
 ## Sprint Evaluation Rule
 
 The linter must have one deterministic source for "current sprint" when it
@@ -414,6 +424,9 @@ Default behavior should be:
 - TOML planning metadata is authoritative
 - `boundaries/planning.toml` is the default authoritative planning-metadata
   file
+- when `boundaries/` exists, `boundaries/planning.toml` is required and must
+  define `[planning].current_sprint`; when `boundaries/` is absent, loading
+  returns an empty inventory and does not require planning metadata
 - duplicate boundary definitions across sources are errors unless explicitly in
   an equivalence-test migration mode
 - duplicate item keys in the planning metadata are errors

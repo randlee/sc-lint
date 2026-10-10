@@ -108,9 +108,19 @@ family.
   `boundaries/planning.toml`.
 
 - `REQ-SCB-013`
-  `boundaries/planning.toml` must define `[planning].current_sprint`, and
-  current-sprint parsing failure must cause planned-but-missing items to fail
-  rather than warn.
+  When `boundaries/` exists, `boundaries/planning.toml` must define
+  `[planning].current_sprint`; when `boundaries/` is absent, the loader returns
+  an empty inventory and no planning metadata is required. Current-sprint
+  parsing failure must cause planned-but-missing items to fail rather than
+  warn.
+
+- `REQ-SCB-022`
+  Every boundary record's `owner_crate_path` must equal
+  `owner_package` with `-` replaced by `_`.
+
+- `REQ-SCB-023`
+  A boundary's `[public]` section must define exactly one non-empty `facade` or
+  `trait` value.
 
 - `REQ-SCB-014`
   Sprint comparison for inventory parity must use parsed ordering, not lexical
