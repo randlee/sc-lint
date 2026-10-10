@@ -24,6 +24,7 @@ HOMEBREW_TARGETS = (
     "aarch64-apple-darwin",
     "x86_64-unknown-linux-gnu",
 )
+DOCUMENTATION_BUNDLE_FILE = "documentation-bundle.toml"
 DOCUMENTATION_BUNDLE_REQUIRED_FIELDS = {
     "source_directory",
     "package_directory",
@@ -43,9 +44,12 @@ def load_manifest(path: Path) -> dict:
     binaries = data.get("release_binaries")
     if not isinstance(binaries, list) or not binaries:
         raise SystemExit("manifest must define non-empty [[release_binaries]]")
-    documentation_bundle = data.get("documentation_bundle")
+    # The sc-publish kit renders publish-artifacts.toml without sc-lint's
+    # documentation bundle contract, so it lives in an sc-lint-owned sibling.
+    bundle_path = path.with_name(DOCUMENTATION_BUNDLE_FILE)
+    documentation_bundle = tomllib.loads(bundle_path.read_text(encoding="utf-8")).get("documentation_bundle")
     if not isinstance(documentation_bundle, dict):
-        raise SystemExit("manifest must define [documentation_bundle]")
+        raise SystemExit(f"{DOCUMENTATION_BUNDLE_FILE} must define [documentation_bundle]")
     missing_bundle_fields = sorted(DOCUMENTATION_BUNDLE_REQUIRED_FIELDS - set(documentation_bundle))
     if missing_bundle_fields:
         raise SystemExit(
@@ -106,22 +110,19 @@ def load_manifest(path: Path) -> dict:
     python_distributions = data.get("python_distributions", [])
     if not isinstance(python_distributions, list):
         raise SystemExit("[[python_distributions]] must be an array of tables")
-    python_required = {"artifact", "package", "pyproject", "cargo_toml", "build_system", "required", "publish"}
+    python_required = {"name", "source", "cargo_manifest"}
     for idx, entry in enumerate(python_distributions):
         if not isinstance(entry, dict):
             raise SystemExit(f"python_distributions[{idx}] must be a table")
         missing = sorted(python_required - set(entry))
         if missing:
             raise SystemExit(f"python_distributions[{idx}] missing fields: {', '.join(missing)}")
-        artifact = require_str(entry, "artifact", f"python_distributions[{idx}]")
-        require_str(entry, "package", f"python_distributions[{idx}]")
-        require_str(entry, "pyproject", f"python_distributions[{idx}]")
-        require_str(entry, "cargo_toml", f"python_distributions[{idx}]")
-        if require_str(entry, "build_system", f"python_distributions[{idx}]") != "maturin":
-            raise SystemExit(f"{artifact}: only build_system = \"maturin\" is supported")
-        if artifact in seen_artifacts:
-            raise SystemExit(f"duplicate artifact {artifact}")
-        seen_artifacts.add(artifact)
+        name = require_str(entry, "name", f"python_distributions[{idx}]")
+        require_str(entry, "source", f"python_distributions[{idx}]")
+        require_str(entry, "cargo_manifest", f"python_distributions[{idx}]")
+        if name in seen_artifacts:
+            raise SystemExit(f"duplicate artifact {name}")
+        seen_artifacts.add(name)
 
     crates.sort(key=lambda item: (item["publish_order"], item["artifact"]))
     return {
@@ -419,18 +420,16 @@ def emit_inventory(args: argparse.Namespace) -> int:
             }
         )
     for distribution in manifest["python_distributions"]:
-        if not distribution["publish"]:
-            continue
         items.append(
             {
-                "artifact": distribution["artifact"],
+                "artifact": distribution["name"],
                 "version": args.version,
                 "sourceRef": args.source_ref,
                 "publishTarget": "pypi",
-                "required": distribution["required"],
-                "publish": distribution["publish"],
+                "required": True,
+                "publish": True,
                 "verifyCommands": [
-                    f"python3 -m pip download {distribution['package']}=={args.version} --no-deps --dest <download-dir>",
+                    f"python3 -m pip download {distribution['name']}=={args.version} --no-deps --dest <download-dir>",
                     'python3 -c "import sc_lint; print(sc_lint.__version__)"',
                 ],
             }
@@ -450,11 +449,9 @@ def emit_inventory(args: argparse.Namespace) -> int:
 
 
 def list_python_distributions(args: argparse.Namespace) -> int:
-    """Print `artifact|package|cargo_toml` for every publishable Python distribution."""
+    """Print `name|name|cargo_manifest` for every manifest-declared Python distribution."""
     for distribution in load_manifest(Path(args.manifest))["python_distributions"]:
-        if args.publishable_only and not distribution["publish"]:
-            continue
-        print(f"{distribution['artifact']}|{distribution['package']}|{distribution['cargo_toml']}")
+        print(f"{distribution['name']}|{distribution['name']}|{distribution['cargo_manifest']}")
     return 0
 
 

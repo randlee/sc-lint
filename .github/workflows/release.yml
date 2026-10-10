@@ -7,6 +7,24 @@ on:
         description: "Release version (e.g. 1.0.0 or v1.0.0)"
         required: true
         type: string
+      target:
+        description: "Release target"
+        required: true
+        type: choice
+        default: testpypi
+        options:
+          - testpypi
+          - production
+      replace_release_assets:
+        description: "Legacy compatibility input; true is rejected by the immutable-release prerequisite"
+        required: false
+        type: boolean
+        default: false
+      already_published_channels:
+        description: "Optional comma-separated channel names preserved from a prior release run for this exact version"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -20,10 +38,17 @@ jobs:
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_version: ${{ steps.meta.outputs.release_version }}
+      release_target: ${{ steps.meta.outputs.release_target }}
+      build_ref: ${{ steps.release-ref.outputs.build_ref }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
 
       - name: Normalize version input
         id: meta
@@ -31,580 +56,593 @@ jobs:
         run: |
           set -euo pipefail
           raw='${{ github.event.inputs.version }}'
+          target='${{ github.event.inputs.target }}'
           tag="$raw"
           [[ "$tag" == v* ]] || tag="v${tag}"
           if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid version: '$raw' (expected X.Y.Z or vX.Y.Z)" >&2
             exit 1
           fi
-          version="${tag#v}"
-          echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "release_version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Python for release gate
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Run release gate
-        run: scripts/release_gate.sh origin/main origin/develop '${{ steps.meta.outputs.release_version }}'
-
-      - name: Ensure tag is correct or create it
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag='${{ steps.meta.outputs.release_tag }}'
-          main_sha="$(git rev-parse origin/main)"
-          remote_tag_sha="$(git ls-remote --tags origin "refs/tags/${tag}" | awk '{print $1}' || true)"
-          if [[ -n "$remote_tag_sha" ]]; then
-            if [[ "$remote_tag_sha" == "$main_sha" ]]; then
-              echo "Tag ${tag} already exists and points to origin/main (${main_sha}), skipping creation"
-              exit 0
-            fi
-            if git merge-base --is-ancestor "$remote_tag_sha" "$main_sha"; then
-              echo "Tag ${tag} already exists at ${remote_tag_sha}, which is an ancestor of main (${main_sha}); skipping creation"
-              exit 0
-            fi
-            echo "Tag exists but points to ${remote_tag_sha}, which is not an ancestor of origin/main (${main_sha})" >&2
+          if [[ "$target" != "testpypi" && "$target" != "production" ]]; then
+            echo "Invalid target: '$target' (expected testpypi or production)" >&2
             exit 1
           fi
-          git tag "$tag" origin/main
-          git push origin "$tag"
+          echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "release_target=$target" >> "$GITHUB_OUTPUT"
 
-  prepare-release-inventory:
-    needs: gate-and-tag
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
-
-      - name: Generate release inventory artifact
-        shell: bash
-        run: |
-          set -euo pipefail
-          version='${{ needs.gate-and-tag.outputs.release_version }}'
-          tag='${{ needs.gate-and-tag.outputs.release_tag }}'
-          commit="$(git rev-parse "$tag")"
-          generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          mkdir -p release
-          python3 scripts/release_artifacts.py emit-inventory \
-            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-            --version "$version" \
-            --tag "$tag" \
-            --commit "$commit" \
-            --source-ref "refs/tags/${tag}" \
-            --generated-at "$generated_at" \
-            --output release/release-inventory.json
-
-      - name: Validate generated release inventory against schema constraints
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          schema_path = Path("docs/release-inventory-schema.json")
-          inventory_path = Path("release/release-inventory.json")
-
-          schema = json.loads(schema_path.read_text(encoding="utf-8"))
-          inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-
-          required_top = ["releaseVersion", "releaseTag", "releaseCommit", "generatedAt", "items"]
-          for field in required_top:
-              if field not in inventory:
-                  raise SystemExit(f"inventory missing required top-level field: {field}")
-
-          items = inventory.get("items", [])
-          if not isinstance(items, list) or not items:
-              raise SystemExit("inventory.items must be a non-empty array")
-
-          required_item = ["artifact", "version", "sourceRef", "publishTarget", "verifyCommands", "required"]
-          artifacts = []
-          for idx, item in enumerate(items):
-              if not isinstance(item, dict):
-                  raise SystemExit(f"inventory.items[{idx}] must be an object")
-              for field in required_item:
-                  if field not in item:
-                      raise SystemExit(f"inventory.items[{idx}] missing required field: {field}")
-              verify = item["verifyCommands"]
-              if not isinstance(verify, list) or not verify:
-                  raise SystemExit(f"inventory.items[{idx}].verifyCommands must be non-empty")
-              if not isinstance(item["required"], bool):
-                  raise SystemExit(f"inventory.items[{idx}].required must be boolean")
-              artifacts.append(item["artifact"])
-              publish = item.get("publish", True)
-              if not isinstance(publish, bool):
-                  raise SystemExit(f"inventory.items[{idx}].publish must be boolean when present")
-              if not publish:
-                  waiver_reason = item.get("waiver_reason")
-                  if not isinstance(waiver_reason, str) or not waiver_reason.strip():
-                      raise SystemExit(
-                          f"inventory.items[{idx}] sets publish=false but waiver_reason is missing/empty"
-                      )
-              waiver = item.get("waiver")
-              if waiver is not None:
-                  for wf in ["approver", "reason", "gateCheck"]:
-                      if not str(waiver.get(wf, "")).strip():
-                          raise SystemExit(
-                              f"inventory.items[{idx}].waiver.{wf} must be present and non-empty"
-                          )
-
-          if len(artifacts) != len(set(artifacts)):
-              raise SystemExit("inventory has duplicate artifact entries")
-          if artifacts != sorted(artifacts):
-              raise SystemExit("inventory items must be sorted by artifact for deterministic ordering")
-
-          item_required = set(schema["$defs"]["item"]["required"])
-          missing = set(required_item) - item_required
-          if missing:
-              raise SystemExit(
-                  f"schema missing required item fields: {', '.join(sorted(missing))}"
-              )
-
-          print("release inventory validation passed")
-          PY
-
-      - name: Upload release inventory artifact
-        uses: actions/upload-artifact@v5
-        with:
-          name: release-inventory
-          path: release/release-inventory.json
-
-  pre-publish-audit:
-    needs: [gate-and-tag, prepare-release-inventory]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cargo package audit (core crate) + locked compile check (non-core)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t full_checks < <(
-            python3 scripts/release_artifacts.py list-preflight \
-              --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-              --mode full
-          )
-          for crate in "${full_checks[@]}"; do
-            [[ -n "$crate" ]] || continue
-            cargo package -p "$crate" --locked
-          done
-
-          mapfile -t locked_checks < <(
-            python3 scripts/release_artifacts.py list-preflight \
-              --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-              --mode locked
-          )
-          for crate in "${locked_checks[@]}"; do
-            [[ -n "$crate" ]] || continue
-            cargo check -p "$crate" --locked
-          done
-
-  publish-crates:
-    needs: [gate-and-tag, prepare-release-inventory, pre-publish-audit]
-    runs-on: ubuntu-latest
-    environment: crates-io
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Publish crates in dependency order (idempotent)
+      - name: Verify immutable release prerequisite before publication
         shell: bash
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+          REPLACE_ASSETS: ${{ inputs.replace_release_assets }}
+        run: |
+          args=()
+          if [[ "$REPLACE_ASSETS" == "true" ]]; then args+=(--replace-assets); fi
+          python3 .github/scripts/release_immutability.py --tag "$RELEASE_TAG" "${args[@]}"
+
+      - name: Read build plan from release manifest
+        id: build_plan
+        shell: bash
         run: |
           set -euo pipefail
-          version='${{ needs.gate-and-tag.outputs.release_version }}'
+          plan="$(python3 .github/scripts/release_artifacts.py build-plan --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          {
+            echo "workspace_toml=$(jq -r '.workspace_toml' <<<"${plan}")"
+            echo "has_crates=$(jq -r '.has_crates' <<<"${plan}")"
+            echo "has_release_binaries=$(jq -r '.has_release_binaries' <<<"${plan}")"
+          } >> "$GITHUB_OUTPUT"
 
-          crate_exists() {
-            local crate="$1"
-            local version="$2"
-            local published
-            published=$(curl -fsS "https://crates.io/api/v1/crates/${crate}/${version}" \
-              -H "User-Agent: sc-lint-release-publisher/1.0" 2>/dev/null \
-              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',{}).get('num',''))" 2>/dev/null || echo "")
-            [[ "$published" == "$version" ]]
-          }
+      - name: Verify requested version matches workspace
+        run: |
+          python3 .github/scripts/release_artifacts.py verify-version \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+            --workspace-toml '${{ steps.build_plan.outputs.workspace_toml }}' \
+            --version '${{ steps.meta.outputs.release_version }}'
 
-          publish_if_missing() {
-            local crate="$1"
-            local wait_seconds="${2:-0}"
-            if crate_exists "$crate" "$version"; then
-              echo "${crate} ${version} already published; skipping"
-              return 0
-            fi
-            local publish_output
-            if ! publish_output=$(cargo publish -p "$crate" --locked 2>&1); then
-              if echo "$publish_output" | grep -q "already exists"; then
-                echo "${crate} ${version} already exists (race); skipping"
-              else
-                echo "$publish_output" >&2
-                return 1
+      - name: Verify release version lockstep
+        run: |
+          python3 .github/scripts/release_artifacts.py verify-version-lockstep \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+            --workspace-toml '${{ steps.build_plan.outputs.workspace_toml }}'
+
+      - name: Run release gate
+        id: release_gate
+        env:
+          ALREADY_PUBLISHED_CHANNELS: ${{ inputs.already_published_channels }}
+        run: .github/scripts/release_gate.sh final origin/main "release-candidate-${{ steps.meta.outputs.release_tag }}" '${{ steps.meta.outputs.release_version }}' "${RELEASE_ARTIFACT_MANIFEST}" '${{ steps.build_plan.outputs.workspace_toml }}' "${ALREADY_PUBLISHED_CHANNELS}"
+
+      - name: Verify npm source at resolved release commit
+        env:
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+          RELEASE_SHA: ${{ steps.release_gate.outputs.release_sha }}
+        run: python3 .github/scripts/npm_release.py check-source --manifest "$RELEASE_ARTIFACT_MANIFEST" --tag "$RELEASE_TAG" --source-ref "$RELEASE_SHA"
+
+      - name: Ensure tag is correct or create it
+        id: release-ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin --prune --tags
+          tag='${{ steps.meta.outputs.release_tag }}'
+          target='${{ steps.meta.outputs.release_target }}'
+          main_sha='${{ steps.release_gate.outputs.release_sha }}'
+          git rev-parse --verify "${main_sha}^{commit}" >/dev/null
+          candidate_tag="release-candidate-${tag}"
+          if [[ "$target" == "production" ]]; then
+            if git ls-remote --exit-code --refs origin "refs/tags/${tag}" >/dev/null; then
+              remote_tag_sha="$(git rev-parse "refs/tags/${tag}^{commit}")"
+              if ! git merge-base --is-ancestor "$remote_tag_sha" origin/main; then
+                echo "Tag ${tag} exists at ${remote_tag_sha} but is not an ancestor of origin/main (${main_sha})" >&2
+                exit 1
               fi
+              if ! git merge-base --is-ancestor "$candidate_tag" "$remote_tag_sha"; then
+                echo "Tag ${tag} exists at ${remote_tag_sha} but does not descend from ${candidate_tag}" >&2
+                exit 1
+              fi
+              echo "Tag ${tag} already exists at verified ancestor ${remote_tag_sha}; reusing immutable tag while building from origin/main (${main_sha})"
             else
-              echo "$publish_output"
+              git tag "$tag" "$main_sha"
+              git push origin "$tag"
             fi
-            if [[ "$wait_seconds" -gt 0 ]]; then
-              sleep "$wait_seconds"
-            fi
-          }
-
-          while IFS='|' read -r crate wait_seconds; do
-            [[ -n "$crate" ]] || continue
-            publish_if_missing "$crate" "${wait_seconds:-0}"
-          done < <(
-            python3 scripts/release_artifacts.py list-publish-plan \
-              --manifest "${RELEASE_ARTIFACT_MANIFEST}"
-          )
+          else
+            echo "Rehearsal mode: validating release tag ${tag} locally only; not pushing any tag to origin"
+          fi
+          echo "build_ref=$main_sha" >> "$GITHUB_OUTPUT"
 
   build:
-    needs: gate-and-tag
+    if: ${{ needs.release-plan.outputs.has_release_binaries == 'true' }}
+    needs: [gate-and-tag, release-plan]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            archive: tar.gz
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            archive: tar.gz
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            archive: tar.gz
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            archive: zip
+      matrix: ${{ fromJSON(needs.release-plan.outputs.release_target_matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ needs.release-plan.outputs.rust_toolchain }}
           targets: ${{ matrix.target }}
 
       - name: Ensure cross-compilation target
         run: rustup target add ${{ matrix.target }}
 
+      - name: Install Linux native build deps
+        uses: ./.github/actions/install-linux-native-deps
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Build release binaries
         shell: bash
         run: |
           set -euo pipefail
-          bin_args="$(python3 scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          bin_args="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
           cargo build --release --target ${{ matrix.target }} ${bin_args}
 
-      - name: Validate static documentation bundle
+      - name: Package manifest-declared release archive
         shell: bash
         run: |
           set -euo pipefail
-          docs_source="$(python3 scripts/release_artifacts.py documentation-source-directory --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          python3 scripts/release_artifacts.py validate-documentation-bundle \
-            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-            --documentation-directory "${docs_source}"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          import tarfile
+          import zipfile
 
-      - name: Package (unix)
-        if: matrix.archive == 'tar.gz'
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION='${{ needs.gate-and-tag.outputs.release_version }}'
-          ARCHIVE_PREFIX="$(python3 scripts/release_artifacts.py primary-release-binary --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          ARCHIVE="${ARCHIVE_PREFIX}_${VERSION}_${{ matrix.target }}.tar.gz"
-          STAGING_DIR="${RUNNER_TEMP}/release-${{ matrix.target }}"
-          docs_source="$(python3 scripts/release_artifacts.py documentation-source-directory --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          python3 scripts/release_artifacts.py stage-release-archive \
-            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-            --binaries-directory "target/${{ matrix.target }}/release" \
-            --documentation-directory "${docs_source}" \
-            --staging-directory "${STAGING_DIR}"
-          # BSD tar on macOS otherwise emits AppleDouble `._*` metadata files;
-          # the archive contract intentionally rejects every undeclared file.
-          COPYFILE_DISABLE=1 tar czf "${ARCHIVE}" -C "${STAGING_DIR}" .
-          python3 scripts/release_artifacts.py validate-release-archive \
-            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-            --archive "${ARCHIVE}"
-          echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
-
-      - name: Package (windows)
-        if: matrix.archive == 'zip'
-        shell: pwsh
-        run: |
-          $VERSION = '${{ needs.gate-and-tag.outputs.release_version }}'
-          $ARCHIVE_PREFIX = python3 scripts/release_artifacts.py primary-release-binary --manifest "${env:RELEASE_ARTIFACT_MANIFEST}"
-          $ARCHIVE = "${ARCHIVE_PREFIX}_${VERSION}_${{ matrix.target }}.zip"
-          $STAGING_DIR = Join-Path $env:RUNNER_TEMP "release-${{ matrix.target }}"
-          $DocsSource = python3 scripts/release_artifacts.py documentation-source-directory --manifest "${env:RELEASE_ARTIFACT_MANIFEST}"
-          python3 scripts/release_artifacts.py stage-release-archive `
-            --manifest "${env:RELEASE_ARTIFACT_MANIFEST}" `
-            --binaries-directory "target/${{ matrix.target }}/release" `
-            --documentation-directory "${DocsSource}" `
-            --staging-directory "${STAGING_DIR}" `
-            --windows
-          Compress-Archive -Path (Join-Path $STAGING_DIR '*') -DestinationPath $ARCHIVE
-          python3 scripts/release_artifacts.py validate-release-archive `
-            --manifest "${env:RELEASE_ARTIFACT_MANIFEST}" `
-            --archive "${ARCHIVE}" `
-            --windows
-          echo "ARCHIVE=$ARCHIVE" | Out-File -FilePath $env:GITHUB_ENV -Append
+          target_name = "${{ matrix.target }}"
+          version = "${{ needs.gate-and-tag.outputs.release_version }}"
+          config = json.loads(
+              subprocess.check_output(
+                  [
+                      "python3",
+                      ".github/scripts/release_artifacts.py",
+                      "release-package-config",
+                      "--manifest",
+                      os.environ["RELEASE_ARTIFACT_MANIFEST"],
+                      "--target",
+                      target_name,
+                  ],
+                  text=True,
+              )
+          )
+          project = config["project"]
+          target = config["target"]
+          stage = Path(f"{project['archive_prefix']}_{version}_{target_name}")
+          if stage.exists():
+              shutil.rmtree(stage)
+          (stage / "bin").mkdir(parents=True)
+          for binary in config["binaries"]:
+              filename = binary["name"] + (".exe" if "windows" in target_name else "")
+              shutil.copy2(Path("target") / target_name / "release" / filename, stage / "bin" / filename)
+              for bundled_path in binary.get("bundled_paths", []):
+                  source = Path(bundled_path["source"])
+                  destination = stage / bundled_path["destination"]
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copytree(source, destination, dirs_exist_ok=True)
+          archive = Path(f"{stage}.{target['archive']}")
+          if target["archive"] == "tar.gz":
+              with tarfile.open(archive, "w:gz") as output:
+                  output.add(stage, arcname=stage.name)
+          elif target["archive"] == "zip":
+              with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as output:
+                  for item in stage.rglob("*"):
+                      if item.is_file():
+                          output.write(item, item.relative_to(stage.parent))
+          else:
+              raise SystemExit(f"unsupported archive type: {target['archive']}")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as env:
+              env.write(f"ARCHIVE={archive}\n")
+          PY
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
 
-  build-python-wheels:
+  publish:
+    if: ${{ needs.gate-and-tag.outputs.release_target == 'production' && needs.release-plan.outputs.has_crates == 'true' }}
+    needs: [gate-and-tag, release-plan]
+    runs-on: ubuntu-latest
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ needs.release-plan.outputs.rust_toolchain }}
+
+      - name: Install Linux native build deps
+        uses: ./.github/actions/install-linux-native-deps
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Publish crates in order (idempotent)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='${{ needs.gate-and-tag.outputs.release_version }}'
+          contracts="$(dirname "${RELEASE_ARTIFACT_MANIFEST}")/publish-channel-contracts.toml"
+
+          # Exact, contract-derived already-published lookup (200/404 state
+          # machine); fuzzy registry text search is index-lagged and ranked.
+          crate_exists() {
+            local crate="$1"
+            local version="$2"
+            local url status
+            url="$(python3 .github/scripts/release_artifacts.py public-registry-inquiry-plan \
+              --contracts "${contracts}" --channel crates_io --name "${crate}" --version "${version}" \
+              | jq -r '.checks[0].version_lookup_url')"
+            state="$(python3 .github/scripts/release_artifacts.py registry-status --url "${url}")"
+            case "${state}" in
+              published) return 0 ;;
+              absent) return 1 ;;
+              *)
+                echo "crates.io state for ${crate}@${version} is indeterminate (state ${state})" >&2
+                exit 1
+                ;;
+            esac
+          }
+
+          publish_if_missing() {
+            local crate="$1"
+            local wait_seconds="${2:-0}"
+            local cargo_manifest="$3"
+            if crate_exists "$crate" "$version"; then
+              echo "${crate} ${version} already published; skipping"
+              return 0
+            fi
+            cargo publish --manifest-path "$cargo_manifest" --locked
+            if [[ "$wait_seconds" != "0" ]]; then
+              sleep "$wait_seconds"
+            fi
+          }
+
+          while IFS='|' read -r package wait_secs cargo_manifest; do
+            publish_if_missing "$package" "${wait_secs:-0}" "$cargo_manifest"
+          done < <(python3 .github/scripts/release_artifacts.py list-publish-plan --include-manifest --manifest "${RELEASE_ARTIFACT_MANIFEST}")
+
+  release-plan:
     needs: gate-and-tag
+    runs-on: ubuntu-latest
+    outputs:
+      release_target_matrix: ${{ steps.manifest.outputs.release_target_matrix }}
+      python_wheel_matrix: ${{ steps.manifest.outputs.python_wheel_matrix }}
+      python_sdist_matrix: ${{ steps.manifest.outputs.python_sdist_matrix }}
+      has_crates: ${{ steps.manifest.outputs.has_crates }}
+      has_release_binaries: ${{ steps.manifest.outputs.has_release_binaries }}
+      has_python_wheels: ${{ steps.manifest.outputs.has_python_wheels }}
+      has_python_sdists: ${{ steps.manifest.outputs.has_python_sdists }}
+      python_upload_tool: ${{ steps.manifest.outputs.python_upload_tool }}
+      rust_toolchain: ${{ steps.manifest.outputs.rust_toolchain }}
+      workspace_toml: ${{ steps.manifest.outputs.workspace_toml }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+      - id: manifest
+        name: Read Python distribution matrices from release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "release_target_matrix=$(python3 .github/scripts/release_artifacts.py release-target-matrix --manifest "${RELEASE_ARTIFACT_MANIFEST}")" >> "$GITHUB_OUTPUT"
+          echo "python_wheel_matrix=$(python3 .github/scripts/release_artifacts.py python-wheel-matrix --manifest "${RELEASE_ARTIFACT_MANIFEST}")" >> "$GITHUB_OUTPUT"
+          echo "python_sdist_matrix=$(python3 .github/scripts/release_artifacts.py python-sdist-matrix --manifest "${RELEASE_ARTIFACT_MANIFEST}")" >> "$GITHUB_OUTPUT"
+          plan="$(python3 .github/scripts/release_artifacts.py build-plan --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          {
+            echo "has_crates=$(jq -r '.has_crates' <<<"${plan}")"
+            echo "has_release_binaries=$(jq -r '.has_release_binaries' <<<"${plan}")"
+            echo "has_python_wheels=$(jq -r '.has_python_wheels' <<<"${plan}")"
+            echo "has_python_sdists=$(jq -r '.has_python_sdists' <<<"${plan}")"
+            echo "python_upload_tool=$(jq -r '.python_upload_tool' <<<"${plan}")"
+            echo "rust_toolchain=$(jq -r '.rust_toolchain' <<<"${plan}")"
+            echo "workspace_toml=$(jq -r '.workspace_toml' <<<"${plan}")"
+          } >> "$GITHUB_OUTPUT"
+
+  build-python-wheels:
+    if: ${{ needs.release-plan.outputs.has_python_wheels == 'true' }}
+    needs: [gate-and-tag, release-plan]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            sdist: true
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            sdist: false
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            sdist: false
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            sdist: false
+      matrix: ${{ fromJSON(needs.release-plan.outputs.python_wheel_matrix) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+      - uses: ./.github/actions/setup-python-release-build
         with:
-          targets: ${{ matrix.target }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install maturin
-        run: python -m pip install maturin==1.9.4
-
-      - name: Build abi3 wheels for every manifest-declared Python distribution
+          release_ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+          release_version: ${{ needs.gate-and-tag.outputs.release_version }}
+          pyproject: ${{ matrix.pyproject }}
+          build_system: ${{ matrix.build_system }}
+          install_maturin_zig: ${{ matrix.os == 'ubuntu-24.04-arm' || (matrix.manylinux != '' && matrix.manylinux != 'off') }}
+          rust_toolchain: ${{ needs.release-plan.outputs.rust_toolchain }}
+          workspace_toml: ${{ needs.release-plan.outputs.workspace_toml }}
+      - name: Build wheels (maturin)
+        if: ${{ matrix.build_system == 'maturin' && matrix.target == '' && matrix.os != 'ubuntu-24.04-arm' }}
+        run: maturin build --release --manifest-path ${{ matrix.cargo_manifest }} --out dist
+      - name: Build ARM64 Linux wheel (maturin + Zig)
+        if: ${{ matrix.build_system == 'maturin' && matrix.target == '' && matrix.os == 'ubuntu-24.04-arm' }}
+        run: >-
+          maturin build --release --manifest-path ${{ matrix.cargo_manifest }} --out dist
+          --compatibility manylinux2014 --zig
+      - name: Build declared wheel target (maturin)
+        if: ${{ matrix.build_system == 'maturin' && matrix.target != '' }}
         shell: bash
+        env:
+          WHEEL_TARGET: ${{ matrix.target }}
+          WHEEL_MANYLINUX: ${{ matrix.manylinux }}
+          CARGO_MANIFEST: ${{ matrix.cargo_manifest }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
         run: |
           set -euo pipefail
-          mkdir -p dist
-          while IFS='|' read -r artifact package cargo_toml; do
-            [[ -n "$artifact" ]] || continue
-            maturin build --release --target ${{ matrix.target }} -m "$cargo_toml" --out dist
-            if [[ '${{ matrix.sdist }}' == 'true' ]]; then
-              maturin sdist -m "$cargo_toml" --out dist
-            fi
-          done < <(
-            python3 scripts/release_artifacts.py list-python-distributions \
-              --manifest "${RELEASE_ARTIFACT_MANIFEST}" --publishable-only
-          )
-          ls -la dist/
-
-      - name: Verify the wheel imports and reports the release version
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m venv "${RUNNER_TEMP}/wheel-check"
-          if [[ -x "${RUNNER_TEMP}/wheel-check/bin/python" ]]; then
-            py="${RUNNER_TEMP}/wheel-check/bin/python"
-          else
-            py="${RUNNER_TEMP}/wheel-check/Scripts/python.exe"
+          rustup target add "$WHEEL_TARGET"
+          args=(--release --locked --manifest-path "$CARGO_MANIFEST" --out dist --target "$WHEEL_TARGET")
+          if [[ "$WHEEL_MANYLINUX" != "off" ]]; then
+            args+=(--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig)
           fi
-          "$py" -m pip install --quiet --disable-pip-version-check --no-index --find-links dist sc-lint=='${{ needs.gate-and-tag.outputs.release_version }}' || \
-            "$py" -m pip install --quiet --disable-pip-version-check --find-links dist sc-lint=='${{ needs.gate-and-tag.outputs.release_version }}'
-          installed="$("$py" -c 'import sc_lint; print(sc_lint.__version__)')"
-          [[ "$installed" == '${{ needs.gate-and-tag.outputs.release_version }}' ]] || {
-            echo "wheel reports ${installed}, expected ${{ needs.gate-and-tag.outputs.release_version }}" >&2
-            exit 1
-          }
-
-      - name: Upload Python distributions
-        uses: actions/upload-artifact@v5
+          maturin build "${args[@]}"
+      - name: Build wheels (setuptools)
+        if: ${{ matrix.build_system == 'setuptools' }}
+        run: |
+          python -m pip install build==1.3.0
+          python -m build --wheel --outdir dist '${{ matrix.source }}'
+      - name: Verify declared wheel platform
+        shell: bash
+        if: ${{ matrix.platform != '' }}
+        env:
+          WHEEL_PLATFORM: ${{ matrix.platform }}
+        run: python3 .github/scripts/release_python.py --asset-dir dist --platform "$WHEEL_PLATFORM"
+      - uses: actions/upload-artifact@v6
         with:
-          name: python-${{ matrix.target }}
-          path: |
-            dist/*.whl
-            dist/*.tar.gz
+          name: python-wheel-${{ matrix.artifact }}-${{ matrix.id || matrix.os }}
+          path: dist/*.whl
 
-  release:
-    needs: [gate-and-tag, build, build-python-wheels, publish-crates]
+  build-python-sdists:
+    if: ${{ needs.release-plan.outputs.has_python_sdists == 'true' }}
+    needs: [gate-and-tag, release-plan]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.release-plan.outputs.python_sdist_matrix) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+      - uses: ./.github/actions/setup-python-release-build
+        with:
+          release_ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+          release_version: ${{ needs.gate-and-tag.outputs.release_version }}
+          pyproject: ${{ matrix.pyproject }}
+          build_system: ${{ matrix.build_system }}
+          rust_toolchain: ${{ needs.release-plan.outputs.rust_toolchain }}
+          workspace_toml: ${{ needs.release-plan.outputs.workspace_toml }}
+      - name: Build sdist (maturin)
+        if: ${{ matrix.build_system == 'maturin' }}
+        run: maturin sdist --manifest-path ${{ matrix.cargo_manifest }} --out dist
+      - name: Build sdist (setuptools)
+        if: ${{ matrix.build_system == 'setuptools' }}
+        run: |
+          python -m pip install build==1.3.0
+          python -m build --sdist --outdir dist '${{ matrix.source }}'
+      - uses: actions/upload-artifact@v6
+        with:
+          name: python-sdist-${{ matrix.artifact }}
+          path: dist/*.tar.gz
+
+  build-npm:
+    needs: gate-and-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Build manifest-declared npm archives
+        env:
+          RELEASE_TAG: ${{ needs.gate-and-tag.outputs.release_tag }}
+        run: python3 .github/scripts/npm_release.py build --tag "$RELEASE_TAG"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: npm-packages
+          path: npm-dist/*.tgz
+          if-no-files-found: ignore
+
+  publish-testpypi:
+    # TestPyPI remains part of the non-production rehearsal. Production PyPI
+    # publication is deliberately handled by pypi-publish.yml after the
+    # immutable GitHub Release exists. Wheel/sdist jobs may be skipped when
+    # the manifest declares no matching Python distributions.
+    if: >-
+      ${{ !failure() && !cancelled() &&
+          needs.gate-and-tag.outputs.release_target == 'testpypi' &&
+          (needs.build-python-wheels.result == 'success' || needs.build-python-sdists.result == 'success') }}
+    needs: [gate-and-tag, release-plan, build-python-wheels, build-python-sdists]
+    runs-on: ubuntu-latest
+    environment: testpypi
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: 'python-wheel-*'
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: 'python-sdist-*'
+          merge-multiple: true
+          path: dist
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install maturin
+        if: ${{ needs.release-plan.outputs.python_upload_tool == 'maturin' }}
+        run: python -m pip install maturin==1.9.4
+      - name: Install twine
+        if: ${{ needs.release-plan.outputs.python_upload_tool == 'twine' }}
+        run: python -m pip install twine==6.1.0
+      - name: Verify manifest-declared Python release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/release_artifacts.py verify-python-release-assets \
+            --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
+            --asset-dir dist
+      - name: Publish wheels and sdist to TestPyPI
+        if: ${{ needs.release-plan.outputs.python_upload_tool == 'maturin' }}
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          MATURIN_NON_INTERACTIVE: "1"
+        run: maturin upload --repository testpypi --non-interactive --skip-existing dist/*.whl dist/*.tar.gz
+      - name: Publish wheels and sdist to TestPyPI with twine
+        if: ${{ needs.release-plan.outputs.python_upload_tool == 'twine' }}
+        env:
+          TWINE_NON_INTERACTIVE: "1"
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: python -m twine upload --repository testpypi --skip-existing dist/*.whl dist/*.tar.gz
+
+  release:
+    # Runs whenever every needed job succeeded or was legitimately skipped
+    # (crates or Python legs may be absent for this consumer). The GitHub
+    # Release leg deliberately does not depend on crates.io publication: a
+    # failed crates leg is retried in isolation via crates-publish.yml while
+    # the release and its dependent post-release channels proceed.
+    if: >-
+      ${{ !failure() && !cancelled() &&
+          needs.gate-and-tag.outputs.release_target == 'production' &&
+          (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    needs: [gate-and-tag, build, build-python-wheels, build-python-sdists, build-npm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.gate-and-tag.outputs.build_ref }}
+
+      - id: immutable_release_state
+        name: Recheck immutable release prerequisite before asset upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.gate-and-tag.outputs.release_tag }}
+        run: |
+          result="$(python3 .github/scripts/release_immutability.py --tag "$RELEASE_TAG")"
+          echo "state=$(jq -r '.release_state' <<<"$result")" >> "$GITHUB_OUTPUT"
+
+      - id: expected_assets
+        name: Read expected release asset patterns from manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'patterns<<EOF'
+            python3 .github/scripts/release_artifacts.py release-asset-patterns --manifest "${RELEASE_ARTIFACT_MANIFEST}"
+            echo '^checksums\.txt$'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Detect-and-skip: rebuilt archives are not reproducible, so re-uploading
+      # over an existing complete release would silently change asset SHA256s
+      # that Homebrew/Scoop may already pin. The legacy replacement opt-in is
+      # rejected by gate-and-tag. The probe fails closed: only a
+      # confirmed-absent (or confirmed-incomplete) release proceeds to
+      # build/upload; an indeterminate probe result fails this job instead of
+      # silently rebuilding over already-digested assets.
+      - id: published_release_probe
+        name: Probe for an already-complete published release (fail closed)
+        uses: ./.github/actions/verify-published-release
+        with:
+          release_tag: ${{ needs.gate-and-tag.outputs.release_tag }}
+          asset_patterns: ${{ steps.expected_assets.outputs.patterns }}
+          probe: 'true'
+
+      - name: Deny modification of an incomplete immutable release
+        if: ${{ steps.immutable_release_state.outputs.state == 'immutable' && steps.published_release_probe.outputs.release_state != 'complete' }}
+        run: |
+          echo "Published immutable release is missing required assets; use a new version." >&2
+          exit 1
+
+      - name: Skip upload for the already-complete release
+        if: ${{ steps.published_release_probe.outputs.release_state == 'complete' && inputs.replace_release_assets != true }}
+        run: echo "GitHub Release ${{ needs.gate-and-tag.outputs.release_tag }} already exists with every expected asset; skipping upload. Immutable release assets cannot be replaced."
+
+      - name: Log explicit asset replacement opt-in
+        if: ${{ steps.published_release_probe.outputs.release_state == 'complete' && inputs.replace_release_assets == true }}
+        run: echo "replace_release_assets=true; deliberately replacing assets on published release ${{ needs.gate-and-tag.outputs.release_tag }} (their SHA256s will change)."
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v5
+        if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 
       - name: Collect archives
-        shell: bash
+        if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
         run: |
-          set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.whl' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.tgz' \) -exec mv {} release/ \;
+          find artifacts -type f -name '*.whl' -exec mv {} release/ \;
           ls -la release/
 
+      - name: Verify collected Python distributions
+        if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
+        run: python3 .github/scripts/release_artifacts.py verify-python-release-assets --manifest "$RELEASE_ARTIFACT_MANIFEST" --asset-dir release
+
       - name: Generate checksums
+        if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
         working-directory: release
         run: |
-          # This release job runs on ubuntu-latest, so sha256sum is the expected
-          # checksum tool here. If the runner OS changes, update this step.
-          sha256sum * > checksums.txt
+          files=()
+          for pattern in *.tar.gz *.zip *.whl *.tgz; do
+            for file in $pattern; do
+              [[ -e "$file" ]] || continue
+              files+=("$file")
+            done
+          done
+          sha256sum "${files[@]}" > checksums.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        if: ${{ steps.published_release_probe.outputs.release_state != 'complete' || inputs.replace_release_assets == true }}
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.gate-and-tag.outputs.release_tag }}
           generate_release_notes: true
           files: |
             release/*
 
-  publish-pypi:
-    # Production upload of the wheels/sdist attached to the release. Retry a
-    # failed upload with pypi-publish.yml; it never rebuilds or re-tags.
-    needs: [gate-and-tag, release]
-    runs-on: ubuntu-latest
-    environment: pypi
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
-
-      - uses: actions/download-artifact@v5
-        with:
-          pattern: python-*
-          merge-multiple: true
-          path: dist
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install maturin
-        run: python -m pip install maturin==1.9.4
-
-      - name: Upload wheels and sdist to PyPI (idempotent)
+      - name: Verify finalized release immutability before downstream publication
+        shell: bash
         env:
-          MATURIN_NON_INTERACTIVE: '1'
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: maturin upload --non-interactive --skip-existing dist/*.whl dist/*.tar.gz
-
-  publish-action-major-tag:
-    needs: [gate-and-tag, release]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
-          fetch-depth: 0
-      - name: Move the stable Action major tag after release publication
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_commit="$(git rev-parse HEAD)"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag --force -a v1 "$release_commit" -m "sc-lint GitHub Action v1"
-          git push --force origin refs/tags/v1
-
-  update-homebrew:
-    needs: [gate-and-tag, release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sc-lint
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.gate-and-tag.outputs.release_tag }}
-
-      - name: Checkout homebrew-tap
-        uses: actions/checkout@v5
-        with:
-          repository: randlee/homebrew-tap
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          path: homebrew-tap
-
-      - name: Compute release tarball SHA256 values
-        id: sha
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag='${{ needs.gate-and-tag.outputs.release_tag }}'
-          version='${{ needs.gate-and-tag.outputs.release_version }}'
-          archive_prefix="$(python3 scripts/release_artifacts.py primary-release-binary --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          for target in x86_64-apple-darwin aarch64-apple-darwin x86_64-unknown-linux-gnu; do
-            tarball_url="https://github.com/randlee/sc-lint/releases/download/${tag}/${archive_prefix}_${version}_${target}.tar.gz"
-            tarball_path="${RUNNER_TEMP}/${archive_prefix}_${target}.tar.gz"
-            curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors -o "${tarball_path}" "${tarball_url}"
-            sha256=$(sha256sum "${tarball_path}" | awk '{print $1}')
-            echo "sha256_${target//-/_}=${sha256}" >> "$GITHUB_OUTPUT"
-          done
-          echo "archive_prefix=${archive_prefix}" >> "$GITHUB_OUTPUT"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Render Homebrew formulas
-        shell: bash
-        run: |
-          set -euo pipefail
-          common_args=(
-            --manifest "${RELEASE_ARTIFACT_MANIFEST}"
-            --version '${{ steps.sha.outputs.version }}'
-            --tag '${{ steps.sha.outputs.tag }}'
-            --sha256-x86_64-apple-darwin '${{ steps.sha.outputs.sha256_x86_64_apple_darwin }}'
-            --sha256-aarch64-apple-darwin '${{ steps.sha.outputs.sha256_aarch64_apple_darwin }}'
-            --sha256-x86_64-unknown-linux-gnu '${{ steps.sha.outputs.sha256_x86_64_unknown_linux_gnu }}'
-          )
-          python3 scripts/release_artifacts.py render-homebrew-formula \
-            "${common_args[@]}" \
-            --formula sc-lint \
-            --output homebrew-tap/Formula/sc-lint.rb
-          # Keep the standalone boundary formula in sync as a legacy
-          # compatibility surface for existing installs and automation.
-          python3 scripts/release_artifacts.py render-homebrew-formula \
-            "${common_args[@]}" \
-            --formula sc-lint-boundary \
-            --output homebrew-tap/Formula/sc-lint-boundary.rb
-
-      - name: Verify formula syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          ruby -c homebrew-tap/Formula/sc-lint.rb
-          ruby -c homebrew-tap/Formula/sc-lint-boundary.rb
-
-      - name: Commit and push to homebrew-tap
-        shell: bash
-        run: |
-          set -euo pipefail
-          version='${{ steps.sha.outputs.version }}'
-          cd homebrew-tap
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/sc-lint.rb
-          git add Formula/sc-lint-boundary.rb
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-          git commit -m "chore: bump sc-lint formulas to v${version}"
-          git push
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.gate-and-tag.outputs.release_tag }}
+        run: python3 .github/scripts/release_immutability.py --tag "$RELEASE_TAG" --finalized

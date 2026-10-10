@@ -44,3 +44,5 @@ reports/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+.sc-publish-kit/
+.sc-publish-venv/

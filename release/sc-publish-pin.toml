@@ -1,0 +1,8 @@
+# sc-publish pin manifest. Records the exact upstream kit revision installed here.
+# Consumer tree is canonical-installer output of this revision; rendered
+# manifests come from release/sc-publish-consumer-input.json. No shared kit
+# file is hand-edited in this repository.
+
+[sc-publish]
+repository = "https://github.com/randlee/sc-publish"
+revision = "02ecc74a05a999f16121ecf0aa31b70dce1ebaf1"

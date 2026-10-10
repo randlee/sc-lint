@@ -420,9 +420,15 @@ class ConsumerLifecycleTests(unittest.TestCase):
             "macOS": ("aarch64-apple-darwin", ".tar.gz", "sc-lint"),
             "Windows": ("x86_64-pc-windows-msvc", ".zip", "sc-lint.exe"),
         }
-        release_workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+        # The sc-publish kit's release.yml is manifest-driven; release targets
+        # are declared in the consumer input that renders the manifest.
+        consumer_input = json.loads(
+            (ROOT / "release/sc-publish-consumer-input.json").read_text(encoding="utf-8")
+        )
+        declared = {entry["target"]: entry["archive"] for entry in consumer_input["release_targets"]}
         for platform, (target, extension, binary) in mappings.items():
-            self.assertIn(target, release_workflow, platform)
+            self.assertIn(target, declared, platform)
+            self.assertEqual("." + declared[target], extension, platform)
             self.assertTrue(extension.startswith("."), platform)
             self.assertTrue(binary.startswith("sc-lint"), platform)
 
