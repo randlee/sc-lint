@@ -209,7 +209,7 @@ pub(crate) fn log_dispatch_result(
 pub(crate) fn log_completion(
     logger: &Logger,
     observed: &ObservedCommand<'_>,
-    ok: bool,
+    exit_code: u8,
     summary: &str,
     elapsed: Duration,
 ) {
@@ -222,13 +222,14 @@ pub(crate) fn log_completion(
         FIELD_ELAPSED_MS.to_string(),
         Value::from(elapsed_ms(elapsed)),
     );
+    fields.insert(consts::FIELD_EXIT_CODE.to_string(), json!(exit_code));
 
     dispatch_event(
         logger,
         observed,
         Level::Info,
         completed_action().cloned(),
-        if ok {
+        if exit_code == consts::EXIT_SUCCESS {
             success_outcome().cloned().ok()
         } else {
             failure_outcome().cloned().ok()

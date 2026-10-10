@@ -34,6 +34,37 @@ use crate::config::LoadedConfig;
 use crate::workflow;
 
 const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
+const CLI_CONTRACT: &str = include_str!("../../../docs/sc-lint/cli-contract.md");
+
+#[test]
+fn cli_contract_exit_code_mapping_matches_code_constants() {
+    let mapping_start = CLI_CONTRACT
+        .split_once("## Exit-Code Mapping")
+        .expect("CLI contract has an Exit-Code Mapping section")
+        .1;
+    let mapping = mapping_start.split("\n## ").next().unwrap_or(mapping_start);
+    let documented: Vec<u8> = mapping
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("- `")
+                .and_then(|code| code.strip_suffix('`'))
+                .and_then(|code| code.parse().ok())
+        })
+        .collect();
+    let expected = [
+        crate::consts::EXIT_SUCCESS,
+        crate::consts::EXIT_INTERNAL,
+        crate::consts::EXIT_USAGE,
+        crate::consts::EXIT_CONFIG,
+        crate::consts::EXIT_CAPABILITY,
+        crate::consts::EXIT_BACKEND_FAILURE,
+        crate::consts::EXIT_BACKEND_PROTOCOL,
+        crate::consts::EXIT_VERDICT_FAIL,
+    ];
+
+    assert_eq!(documented, expected);
+}
 
 #[test]
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
