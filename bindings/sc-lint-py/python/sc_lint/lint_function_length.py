@@ -3,6 +3,8 @@
 
 Functions at or over FAIL_THRESHOLD code lines fail the gate only when they are
 new or grew past their baseline entry. Functions in the WARN band are advisory.
+Allowances ratchet down: a shrunk function is reported stale, and writing the
+baseline records its new length. Raising an allowance needs --allow-growth.
 Counting ignores comments and whitespace; literal text counts as code.
 """
 from __future__ import annotations
@@ -37,20 +39,23 @@ FUNCTION_RE = re.compile(
 )
 RAW_STRING_RE = re.compile(r"(?:br|r)(?P<hashes>#*)\"")
 CHAR_LITERAL_RE = re.compile(r"'(?:\\u\{[0-9A-Fa-f_]+\}|\\.|[^'\\\n])'")
-TEST_ATTRIBUTE_RE = re.compile(r"#\[(?:[A-Za-z_]\w*::)*test\]|#\[cfg\(test\)\]")
+TEST_ATTRIBUTE_RE = re.compile(r"#\[(?:[A-Za-z_]\w*::)*test(?:\(.*\))?\]|#\[cfg\(test\)\]")
+
+Key = tuple[str, str, int]
 
 
 @dataclass(frozen=True)
 class FunctionSpan:
     path: str
     name: str
+    occurrence: int
     start_line: int
     end_line: int
     code_lines: int
 
     @property
-    def key(self) -> tuple[str, str]:
-        return (self.path, self.name)
+    def key(self) -> Key:
+        return (self.path, self.name, self.occurrence)
 
 
 @dataclass(frozen=True)
@@ -67,7 +72,7 @@ class Violation:
 class Evaluation:
     advisories: tuple[FunctionSpan, ...]
     violations: tuple[Violation, ...]
-    stale: tuple[tuple[str, str], ...]
+    stale: tuple[Key, ...]
 
 
 def is_word(character: str) -> bool:
@@ -169,6 +174,7 @@ def find_functions(source: str, relative_path: Path) -> list[FunctionSpan]:
     code_lines, structure_lines = code_text.split("\n"), structure_text.split("\n")
     test_scope = rust_file_test_scope(Path("/" + relative_path.as_posix()), structure_lines)
     functions: list[FunctionSpan] = []
+    occurrences: dict[str, int] = {}
     pending: list[str] = []
     index = 0
     while index < len(structure_lines):
@@ -187,9 +193,12 @@ def find_functions(source: str, relative_path: Path) -> list[FunctionSpan]:
             index += 1
             continue
         if not any(TEST_ATTRIBUTE_RE.fullmatch(attribute) for attribute in pending):
+            name = match.group("name")
+            occurrence = occurrences.get(name, 0)
+            occurrences[name] = occurrence + 1
             code_count = sum(bool(line.strip()) for line in code_lines[index : end + 1])
             functions.append(
-                FunctionSpan(relative_path.as_posix(), match.group("name"), index + 1, end + 1, code_count)
+                FunctionSpan(relative_path.as_posix(), name, occurrence, index + 1, end + 1, code_count)
             )
         pending = []
         index = end + 1
@@ -203,46 +212,70 @@ def scan_repo(repo_root: Path) -> list[FunctionSpan]:
     return functions
 
 
-def over_cap_by_key(functions: list[FunctionSpan]) -> dict[tuple[str, str], FunctionSpan]:
-    """Keep the longest over-cap occurrence per (path, name), the baseline identity."""
-    over: dict[tuple[str, str], FunctionSpan] = {}
-    for function in functions:
-        current = over.get(function.key)
-        if function.code_lines >= FAIL_THRESHOLD and (current is None or function.code_lines > current.code_lines):
-            over[function.key] = function
-    return over
+def over_cap_by_key(functions: list[FunctionSpan]) -> dict[Key, FunctionSpan]:
+    """Map each over-cap function to its span. Identity is (path, name, occurrence in file)."""
+    return {function.key: function for function in functions if function.code_lines >= FAIL_THRESHOLD}
 
 
-def load_baseline(repo_root: Path) -> dict[tuple[str, str], int]:
+def read_baseline(repo_root: Path) -> dict[Key, int] | None:
+    """Return the recorded allowances, or None when the baseline file does not exist."""
     path = repo_root / BASELINE_PATH
     if not path.is_file():
-        raise AdapterError("config", f"missing {BASELINE_PATH.as_posix()}; generate it with --write-baseline")
-    entries: dict[tuple[str, str], int] = {}
+        return None
+    entries: dict[Key, int] = {}
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip() or line.startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) != 3 or not parts[2].isdigit() or (parts[0], parts[1]) in entries:
+        if len(parts) != 4 or not parts[2].isdigit() or not parts[3].isdigit():
             raise AdapterError(
                 "config",
-                f"{BASELINE_PATH.as_posix()}:{number}: expected a unique path<TAB>name<TAB>code_lines row",
+                f"{BASELINE_PATH.as_posix()}:{number}: expected a path<TAB>name<TAB>occurrence<TAB>code_lines row",
             )
-        entries[(parts[0], parts[1])] = int(parts[2])
+        key = (parts[0], parts[1], int(parts[2]))
+        if key in entries:
+            raise AdapterError("config", f"{BASELINE_PATH.as_posix()}:{number}: duplicate baseline row {key}")
+        entries[key] = int(parts[3])
     return entries
 
 
-def write_baseline(repo_root: Path, functions: list[FunctionSpan]) -> int:
+def load_baseline(repo_root: Path) -> dict[Key, int]:
+    entries = read_baseline(repo_root)
+    if entries is None:
+        raise AdapterError("config", f"missing {BASELINE_PATH.as_posix()}; generate it with --write-baseline")
+    return entries
+
+
+def write_baseline(repo_root: Path, functions: list[FunctionSpan], allow_growth: bool = False) -> int:
+    """Record every over-cap function at its current length.
+
+    Raising an existing allowance, or adding one, is refused unless allow_growth is set.
+    """
     over = over_cap_by_key(functions)
-    rows = [f"{function.path}\t{function.name}\t{function.code_lines}" for _, function in sorted(over.items())]
+    recorded = read_baseline(repo_root)
+    if recorded is not None and not allow_growth:
+        raised = [
+            key
+            for key, function in sorted(over.items())
+            if key not in recorded or function.code_lines > recorded[key]
+        ]
+        if raised:
+            names = ", ".join(f"{path}:{name}#{occurrence}" for path, name, occurrence in raised)
+            raise AdapterError(
+                "config",
+                f"refusing to raise {len(raised)} baseline allowance(s): {names}; pass --allow-growth to record them",
+            )
+    rows = [f"{path}\t{name}\t{occurrence}\t{function.code_lines}" for (path, name, occurrence), function in sorted(over.items())]
     header = [
         f"# function-length baseline: functions at or over {FAIL_THRESHOLD} code lines.",
+        "# columns: path, name, occurrence (0-based within the file), code_lines.",
         "# regenerate: python -m sc_lint.lint_function_length --write-baseline",
     ]
     (repo_root / BASELINE_PATH).write_text("\n".join([*header, *rows]) + "\n", encoding="utf-8")
     return len(rows)
 
 
-def evaluate(functions: list[FunctionSpan], baseline: dict[tuple[str, str], int]) -> Evaluation:
+def evaluate(functions: list[FunctionSpan], baseline: dict[Key, int]) -> Evaluation:
     over = over_cap_by_key(functions)
     violations = tuple(
         Violation(function, baseline.get(key))
@@ -250,7 +283,7 @@ def evaluate(functions: list[FunctionSpan], baseline: dict[tuple[str, str], int]
         if key not in baseline or function.code_lines > baseline[key]
     )
     advisories = tuple(f for f in functions if WARN_THRESHOLD <= f.code_lines < FAIL_THRESHOLD)
-    stale = tuple(key for key in sorted(baseline) if key not in over)
+    stale = tuple(key for key in sorted(baseline) if key not in over or over[key].code_lines < baseline[key])
     return Evaluation(advisories, violations, stale)
 
 
@@ -261,6 +294,11 @@ def render(function: FunctionSpan) -> str:
 def render_violation(violation: Violation) -> str:
     detail = "new, at or over the cap" if violation.reason == "new" else f"grew from {violation.recorded_lines}"
     return f"{render(violation.function)}: {detail}"
+
+
+def render_stale(key: Key) -> str:
+    path, name, occurrence = key
+    return f"{path} {name}#{occurrence}"
 
 
 def build_data(repo_root: Path, evaluation: Evaluation, elapsed_ms: int) -> dict:
@@ -280,12 +318,13 @@ def build_data(repo_root: Path, evaluation: Evaluation, elapsed_ms: int) -> dict
             for v in evaluation.violations
         ],
         "advisories": [asdict(f) for f in evaluation.advisories],
-        "stale_baseline": [f"{path}\t{name}" for path, name in evaluation.stale],
+        "stale_baseline": [render_stale(key) for key in evaluation.stale],
         "elapsed_ms": elapsed_ms,
     }
     lines = [summary]
     lines.extend(f"violation: {render_violation(v)}" for v in evaluation.violations)
     lines.extend(f"advisory: {render(f)}" for f in evaluation.advisories)
+    lines.extend(f"stale: {render_stale(key)}" for key in evaluation.stale)
     write_json(output_dir / "summary.json", data)
     write_text(output_dir / "summary.txt", "\n".join(lines) + "\n")
     data["artifact_dir"] = relative_artifact_path(repo_root, output_dir)
@@ -298,6 +337,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--config", help="Accepted for Python-adapter compatibility; the baseline path is fixed.")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write-baseline", action="store_true", help="Regenerate the baseline from the tree.")
+    parser.add_argument(
+        "--allow-growth",
+        action="store_true",
+        help="With --write-baseline, record raised or new allowances instead of refusing.",
+    )
     return parser.parse_args(argv[1:])
 
 
@@ -309,7 +353,8 @@ def main(argv: list[str]) -> int:
         started = monotonic_now()
         functions = scan_repo(repo_root)
         if args.write_baseline:
-            print(f"wrote {BASELINE_PATH.as_posix()} with {write_baseline(repo_root, functions)} entries")
+            count = write_baseline(repo_root, functions, allow_growth=args.allow_growth)
+            print(f"wrote {BASELINE_PATH.as_posix()} with {count} entries")
             return 0
         evaluation = evaluate(functions, load_baseline(repo_root))
         data = build_data(repo_root, evaluation, int((monotonic_now() - started) * 1000))
@@ -321,6 +366,8 @@ def main(argv: list[str]) -> int:
                 print(f"error: {render_violation(violation)}")
             for function in evaluation.advisories:
                 print(f"advisory: {render(function)}")
+            for key in evaluation.stale:
+                print(f"stale: {render_stale(key)}")
         return 1 if evaluation.violations else 0
     except AdapterError as error:
         if args is not None and args.json:

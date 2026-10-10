@@ -271,17 +271,6 @@ impl CommandId {
         }
     }
 
-    /// Commands whose human output is the Python adapter's one-line summary.
-    pub const fn renders_adapter_summary(self) -> bool {
-        matches!(
-            self,
-            Self::LintFunctionLength
-                | Self::LintLineCounts
-                | Self::LintIdentityLiterals
-                | Self::ViewFindings
-        )
-    }
-
     /// Python-backed tool behind this command, if any.
     pub const fn python_tool(self) -> Option<python_adapter::PythonTool> {
         match self {

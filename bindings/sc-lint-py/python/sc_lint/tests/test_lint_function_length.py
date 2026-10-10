@@ -18,7 +18,7 @@ from sc_lint.python_adapter import AdapterError
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 DEMO_PATH = Path("crates/demo/src/lib.rs")
-DEMO_KEY = ("crates/demo/src/lib.rs", "example")
+DEMO_KEY = ("crates/demo/src/lib.rs", "example", 0)
 
 
 def body_of(line_count: int) -> str:
@@ -95,6 +95,16 @@ class AttributeTests(unittest.TestCase):
         )
         self.assertEqual([function.name for function in kept], ["c", "d"])
 
+    def test_test_attributes_with_arguments_are_exempt_by_path(self) -> None:
+        body = body_of(FAIL_THRESHOLD - 2)
+        exempt = functions_in(
+            '#[tokio::test(flavor = "multi_thread")]\nasync fn a() {}\n'
+            "#[test(\n    ignore,\n)]\nfn b() {}\n"
+        )
+        self.assertEqual(exempt, [])
+        kept = functions_in(f"#[sc_lint_test(flavor)]\npub fn c() {{\n{body}\n}}\n#[testing]\npub fn d() {{\n{body}\n}}\n")
+        self.assertEqual([function.name for function in kept], ["c", "d"])
+
     def test_cfg_test_module_exempts_its_functions(self) -> None:
         body = body_of(FAIL_THRESHOLD)
         functions = functions_in(
@@ -119,6 +129,24 @@ class AttributeTests(unittest.TestCase):
         self.assertEqual([function.name for function in functions], ["example", "sized"])
 
 
+class OccurrenceTests(unittest.TestCase):
+    def test_same_named_functions_get_distinct_occurrences(self) -> None:
+        functions = functions_in(
+            "impl A {\n    fn new() {}\n}\nimpl B {\n    fn new() {}\n}\n"
+        )
+        self.assertEqual([(f.name, f.occurrence) for f in functions], [("new", 0), ("new", 1)])
+
+    def test_new_same_named_function_cannot_hide_behind_an_existing_entry(self) -> None:
+        body = body_of(FAIL_THRESHOLD - 2)
+        source = (
+            f"impl A {{\n    fn new() {{\n{body}\n    }}\n}}\n"
+            f"impl B {{\n    fn new() {{\n{body_of(FAIL_THRESHOLD + 5)}\n    }}\n}}\n"
+        )
+        functions = functions_in(source)
+        evaluation = evaluate(functions, {(DEMO_PATH.as_posix(), "new", 0): FAIL_THRESHOLD})
+        self.assertEqual([(v.reason, v.function.occurrence) for v in evaluation.violations], [("new", 1)])
+
+
 class BaselineTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
@@ -127,6 +155,9 @@ class BaselineTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
+
+    def write_text(self, text: str) -> None:
+        (self.root / BASELINE_PATH).write_text(text, encoding="utf-8")
 
     def test_unchanged_or_shrunk_over_cap_function_passes(self) -> None:
         function = sized("example", FAIL_THRESHOLD + 3)
@@ -146,21 +177,42 @@ class BaselineTests(unittest.TestCase):
         self.assertEqual(evaluation.violations, ())
         self.assertEqual(evaluation.stale, (DEMO_KEY,))
 
+    def test_shrunk_entry_is_stale_and_write_ratchets_it_down(self) -> None:
+        function = sized("example", FAIL_THRESHOLD + 5)
+        evaluation = evaluate([function], {DEMO_KEY: FAIL_THRESHOLD + 9})
+        self.assertEqual((evaluation.violations, evaluation.stale), ((), (DEMO_KEY,)))
+        self.assertEqual(write_baseline(self.root, [function]), 1)
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 5})
+
     def test_write_then_load_round_trips_over_cap_functions(self) -> None:
         function = sized("example", FAIL_THRESHOLD + 1)
         self.assertEqual(write_baseline(self.root, [function]), 1)
         self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 1})
 
+    def test_write_refuses_to_raise_an_existing_allowance(self) -> None:
+        self.write_text(f"crates/demo/src/lib.rs\texample\t0\t{FAIL_THRESHOLD + 1}\n")
+        function = sized("example", FAIL_THRESHOLD + 4)
+        with self.assertRaisesRegex(AdapterError, "--allow-growth"):
+            write_baseline(self.root, [function])
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 1})
+        self.assertEqual(write_baseline(self.root, [function], allow_growth=True), 1)
+        self.assertEqual(load_baseline(self.root), {DEMO_KEY: FAIL_THRESHOLD + 4})
+
+    def test_write_refuses_a_new_entry_next_to_an_existing_baseline(self) -> None:
+        self.write_text("# empty baseline\n")
+        with self.assertRaisesRegex(AdapterError, "--allow-growth"):
+            write_baseline(self.root, [sized("example", FAIL_THRESHOLD)])
+        self.assertEqual(load_baseline(self.root), {})
+
     def test_missing_malformed_and_duplicate_baselines_are_config_errors(self) -> None:
-        path = self.root / BASELINE_PATH
         with self.assertRaisesRegex(AdapterError, "--write-baseline"):
             load_baseline(self.root)
         for text, pattern in (
-            ("crates/demo/src/lib.rs\texample\n", "path<TAB>name<TAB>code_lines"),
-            ("crates/demo/src/lib.rs\texample\t80\n" * 2, "unique"),
+            ("crates/demo/src/lib.rs\texample\t80\n", "path<TAB>name<TAB>occurrence<TAB>code_lines"),
+            ("crates/demo/src/lib.rs\texample\t0\t80\n" * 2, "duplicate"),
         ):
             with self.subTest(pattern=pattern):
-                path.write_text(text, encoding="utf-8")
+                self.write_text(text)
                 with self.assertRaisesRegex(AdapterError, pattern):
                     load_baseline(self.root)
 
@@ -168,8 +220,9 @@ class BaselineTests(unittest.TestCase):
 class RepositoryTests(unittest.TestCase):
     @unittest.skipUnless((REPO_ROOT / "Cargo.toml").is_file(), "needs the source checkout")
     def test_current_tree_passes_the_recorded_baseline(self) -> None:
-        violations = evaluate(scan_repo(REPO_ROOT), load_baseline(REPO_ROOT)).violations
-        self.assertEqual([(v.function.path, v.function.name) for v in violations], [])
+        evaluation = evaluate(scan_repo(REPO_ROOT), load_baseline(REPO_ROOT))
+        self.assertEqual([(v.function.path, v.function.name) for v in evaluation.violations], [])
+        self.assertEqual(evaluation.stale, ())
 
 
 if __name__ == "__main__":

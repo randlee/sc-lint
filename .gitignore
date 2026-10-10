@@ -26,7 +26,7 @@ __pycache__
 # Local tooling and runtime artifacts
 .env
 .sc/
-.sc-compose/logs/
+**/.sc-compose/logs/
 reports/
 .claude/projects/
 .claude/scheduled_tasks.lock

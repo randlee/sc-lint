@@ -87,35 +87,54 @@ pub(crate) fn run_python_tool(
                 .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()))
         })?;
 
-    let parsed = parse_adapter_output(tool, &output.stdout)?;
-    match parsed.error {
-        Some(error) => Err(error),
-        None => {
-            let mut data = parsed.data.unwrap_or_else(|| json!({}));
-            if let Some(object) = data.as_object_mut() {
-                object
-                    .entry(consts::FIELD_ADAPTER.to_string())
-                    .or_insert_with(|| json!(ADAPTER_SCHEMA));
-                object
-                    .entry(consts::FIELD_CONFIG_SCOPE.to_string())
-                    .or_insert_with(|| json!(tool.config_scope()));
-                object
-                    .entry(consts::FIELD_SCRIPT.to_string())
-                    .or_insert_with(|| json!(tool.script_relative_path()));
-                object
-                    .entry(consts::FIELD_SUMMARY.to_string())
-                    .or_insert_with(|| json!(parsed.summary));
-            }
-            let finding_count = data
-                .get(consts::FIELD_FINDINGS)
-                .and_then(Value::as_array)
-                .map_or(0, std::vec::Vec::len);
-            Ok(CommandSuccess::with_dispatch(
-                data,
-                DispatchTelemetry::new(tool.tool_name(), finding_count),
-            ))
-        }
+    adapter_outcome(tool, output.status.code(), &output.stdout)
+}
+
+/// A non-zero exit or a `fail` status is a failed command, not a successful envelope.
+#[expect(
+    clippy::result_large_err,
+    reason = "Adapter verdicts must use the shared top-level CliError contract."
+)]
+fn adapter_outcome(
+    tool: PythonTool,
+    exit_code: Option<i32>,
+    stdout: &[u8],
+) -> Result<CommandSuccess, CliError> {
+    let parsed = parse_adapter_output(tool, stdout)?;
+    if let Some(error) = parsed.error {
+        return Err(error);
     }
+    let mut data = parsed.data.unwrap_or_else(|| json!({}));
+    let status = data.get(consts::FIELD_STATUS).and_then(Value::as_str);
+    if exit_code != Some(0) || status == Some("fail") {
+        return Err(CliError::backend_failure(parsed.summary)
+            .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
+            .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()))
+            .with_detail(consts::FIELD_STATUS, json!(status))
+            .with_detail(consts::FIELD_EXIT_CODE, json!(exit_code)));
+    }
+    if let Some(object) = data.as_object_mut() {
+        object
+            .entry(consts::FIELD_ADAPTER.to_string())
+            .or_insert_with(|| json!(ADAPTER_SCHEMA));
+        object
+            .entry(consts::FIELD_CONFIG_SCOPE.to_string())
+            .or_insert_with(|| json!(tool.config_scope()));
+        object
+            .entry(consts::FIELD_SCRIPT.to_string())
+            .or_insert_with(|| json!(tool.script_relative_path()));
+        object
+            .entry(consts::FIELD_SUMMARY.to_string())
+            .or_insert_with(|| json!(parsed.summary));
+    }
+    let finding_count = data
+        .get(consts::FIELD_FINDINGS)
+        .and_then(Value::as_array)
+        .map_or(0, std::vec::Vec::len);
+    Ok(CommandSuccess::with_dispatch(
+        data,
+        DispatchTelemetry::new(tool.tool_name(), finding_count),
+    ))
 }
 
 #[expect(
@@ -355,5 +374,56 @@ mod tests {
         assert_eq!(error.kind, CliErrorKind::Config);
         assert_eq!(error.details["key"], "identities");
         assert_eq!(error.suggested_action.as_deref(), Some("fix the config"));
+    }
+
+    fn adapter_payload(status: &str, summary: &str) -> String {
+        format!(
+            r#"{{
+              "adapter_schema": "{ADAPTER_SCHEMA}",
+              "ok": true,
+              "summary": "{summary}",
+              "data": {{"status": "{status}", "violations": [{{"name": "big"}}]}},
+              "diagnostics": []
+            }}"#
+        )
+    }
+
+    #[test]
+    fn function_length_violation_fails_the_command() {
+        let payload = adapter_payload(
+            "fail",
+            "function-length gate failed: 1 new or grown function(s)",
+        );
+        let error = adapter_outcome(PythonTool::FunctionLength, Some(1), payload.as_bytes())
+            .expect_err("a failing verdict must fail the command");
+
+        assert_eq!(error.kind, CliErrorKind::BackendFailure);
+        assert_eq!(error.exit_code(), 5);
+        assert_eq!(
+            error.message,
+            "function-length gate failed: 1 new or grown function(s)"
+        );
+        assert_eq!(error.details[consts::FIELD_STATUS], "fail");
+        assert_eq!(error.details[consts::FIELD_EXIT_CODE], 1);
+    }
+
+    #[test]
+    fn non_zero_exit_fails_even_when_the_payload_reports_pass() {
+        let payload = adapter_payload("pass", "line counts within limits");
+        let error = adapter_outcome(PythonTool::LineCounts, Some(1), payload.as_bytes())
+            .expect_err("a non-zero exit must fail the command");
+
+        assert_eq!(error.kind, CliErrorKind::BackendFailure);
+        assert_eq!(error.details[consts::FIELD_EXIT_CODE], 1);
+    }
+
+    #[test]
+    fn passing_verdict_keeps_the_success_envelope() {
+        let payload = adapter_payload("pass", "function-length gate passed");
+        let success = adapter_outcome(PythonTool::FunctionLength, Some(0), payload.as_bytes())
+            .expect("a passing verdict succeeds");
+
+        assert_eq!(success.data["adapter"], ADAPTER_SCHEMA);
+        assert_eq!(success.data["status"], "pass");
     }
 }

@@ -150,6 +150,7 @@ Current implementation status:
   - implemented top-level lint-plus-tests path
 - `lint.function-length`
   - implemented Python-adapter lint path
+  - not in the `Ci` profile (`lint.ci`), like `lint.line-counts` and `lint.identity-literals`; gated by `just lint` and the `Full` profile
 - `lint.line-counts`
   - implemented Python-adapter lint path
 - `lint.identity-literals`

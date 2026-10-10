@@ -128,7 +128,10 @@ pub(crate) fn render_success_human(
                 (None, None) => format!("{}: ok", context.command_id()),
             }
         }
-        command if command.renders_adapter_summary() => envelope
+        CommandId::LintFunctionLength
+        | CommandId::LintLineCounts
+        | CommandId::LintIdentityLiterals
+        | CommandId::ViewFindings => envelope
             .data
             .as_ref()
             .and_then(|value| value.get("summary"))
