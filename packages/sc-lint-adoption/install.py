@@ -8,19 +8,31 @@ import hashlib
 import json
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MARKER_START = "# >>> sc-lint managed integration >>>"
 MARKER_END = "# <<< sc-lint managed integration <<<"
 MANIFEST = Path(".sc-lint/installed.json")
-MERGED_SURFACES = {Path("Justfile"), Path(".sc-lint/install.json")}
+INSTALL_INPUT = Path(".sc-lint/install.json")
 RENAMED = {Path("README.md"): Path("README.sc-lint.md")}
 TEMPLATES = {
     Path("templates/sc-lint.toml.j2"): Path("sc-lint.toml"),
     Path("templates/Justfile.import.j2"): Path("Justfile"),
     Path("templates/sc-lint-workflow.yml.j2"): Path(".github/workflows/sc-lint.yml"),
 }
+
+
+@dataclass(frozen=True)
+class Desired:
+    files: dict[Path, bytes]
+    merged: frozenset[Path]
+    persisted: frozenset[Path]
+
+    @property
+    def special_targets(self) -> frozenset[Path]:
+        return self.merged | self.persisted
 
 
 def _schema_value(value: object, schema: dict, label: str) -> None:
@@ -63,7 +75,7 @@ def package_files() -> dict[Path, bytes]:
     return {Path("plugins/sc-lint") / source.relative_to(ROOT): source.read_bytes() for source in ROOT.rglob("*") if source.is_file()}
 
 
-def desired(data: dict, repo: Path) -> dict[Path, bytes]:
+def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     result = package_files()
     if not data["ci"]["enabled"]:
         result = {path: content for path, content in result.items() if path.parts[2] != ".github"}
@@ -73,12 +85,13 @@ def desired(data: dict, repo: Path) -> dict[Path, bytes]:
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.j2" and not data["ci"]["enabled"]: continue
         result[target] = render(ROOT / source, data).encode()
-    result[Path(".sc-lint/install.json")] = json.dumps(data, indent=2, sort_keys=True).encode() + b"\n"
+    result[INSTALL_INPUT] = json.dumps(data, indent=2, sort_keys=True).encode() + b"\n"
     justfile = repo / "Justfile"; original = justfile.read_text() if justfile.exists() else ""
     if original.count(MARKER_START) != original.count(MARKER_END) or original.count(MARKER_START) > 1: raise RuntimeError(f"{justfile}: marker conflict")
     block = render(ROOT / Path("templates/Justfile.import.j2"), data).strip()
     result[Path("Justfile")] = (re.sub(re.escape(MARKER_START) + r".*?" + re.escape(MARKER_END), block, original, flags=re.S) if MARKER_START in original else (original.rstrip() + "\n\n" + block).lstrip("\n")).encode()
-    return result
+    persisted = frozenset({INSTALL_INPUT}) if input_path.resolve() == (repo / INSTALL_INPUT).resolve() else frozenset()
+    return Desired(result, frozenset({Path("Justfile")}), persisted)
 
 
 def digest(content: bytes) -> str: return hashlib.sha256(content).hexdigest()
@@ -95,14 +108,14 @@ def load_manifest(repo: Path) -> dict[str, str] | None:
 def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--input", type=Path); parser.add_argument("--dry-run", action="store_true"); parser.add_argument("repo", type=Path); args = parser.parse_args()
     input_path = args.input or args.repo / ".sc-lint" / "install.json"
-    try: data = values(input_path); targets = desired(data, args.repo); prior = load_manifest(args.repo)
+    try: data = values(input_path); targets = desired(data, args.repo, input_path); prior = load_manifest(args.repo)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error: print(f"conflict: {error}", file=sys.stderr); return 2
     previously_managed = prior or {}
     clashes = []
-    for relative, expected in targets.items():
+    for relative, expected in targets.files.items():
         path = args.repo / relative
         if (
-            relative in MERGED_SURFACES
+            relative in targets.special_targets
             or relative.as_posix() in previously_managed
             or not path.exists()
         ):
@@ -117,15 +130,15 @@ def main() -> int:
         )
         return 2
     changes = []
-    for relative, expected in targets.items():
+    for relative, expected in targets.files.items():
         path = args.repo / relative; current = path.read_bytes() if path.exists() else b""
         if current != expected:
-            if not args.dry_run and prior and relative.as_posix() in prior and digest(current) != prior[relative.as_posix()]: print(f"conflict: {path} was modified outside sc-lint", file=sys.stderr); return 2
+            if not args.dry_run and prior and relative not in targets.special_targets and relative.as_posix() in prior and digest(current) != prior[relative.as_posix()]: print(f"conflict: {path} was modified outside sc-lint", file=sys.stderr); return 2
             changes.append((path, current, expected))
     if args.dry_run:
         for path, old, new in changes: print("".join(difflib.unified_diff(old.decode(errors="replace").splitlines(True), new.decode(errors="replace").splitlines(True), fromfile=str(path), tofile=str(path))))
         return 1 if changes else 0
-    manifest = {relative.as_posix(): digest(content) for relative, content in targets.items()}
+    manifest = {relative.as_posix(): digest(content) for relative, content in targets.files.items()}
     changes.append((args.repo / MANIFEST, (args.repo / MANIFEST).read_bytes() if (args.repo / MANIFEST).exists() else b"", json.dumps({"managed": manifest}, indent=2, sort_keys=True).encode() + b"\n"))
     for path, _, content in changes:
         path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(content)

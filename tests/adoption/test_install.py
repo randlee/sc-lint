@@ -178,6 +178,82 @@ def test_bare_rerun_reports_a_missing_persisted_input() -> None:
     assert ".sc-lint" in result.stderr and "install.json" in result.stderr
 
 
+def test_custom_input_refuses_to_overwrite_pre_existing_consumer_manifest() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = write_input(consumer, minimum_version="9.9.9")
+    existing = consumer / ".sc-lint" / "install.json"
+    existing.parent.mkdir(parents=True)
+    existing.write_text('{"consumer": true}\n')
+    before = existing.read_bytes()
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 2
+    assert str(existing) in result.stderr
+    assert existing.read_bytes() == before
+    assert not (consumer / "sc-lint.toml").exists()
+    assert not (consumer / "plugins" / "sc-lint").exists()
+
+
+def test_consumer_manifest_is_allowed_when_it_is_the_input() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = consumer / ".sc-lint" / "install.json"
+    input_path.parent.mkdir(parents=True)
+    input_path.write_bytes((FIXTURES / "install.json").read_bytes())
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 0, result.stderr
+    assert input_path.is_file()
+    assert (consumer / ".sc-lint" / "installed.json").is_file()
+
+
+def test_rerun_accepts_updated_input_manifest() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = consumer / ".sc-lint" / "install.json"
+    input_path.parent.mkdir(parents=True)
+    input_path.write_bytes((FIXTURES / "install.json").read_bytes())
+    assert run("--input", str(input_path), str(consumer)).returncode == 0
+    data = json.loads(input_path.read_text())
+    data["minimum_version"] = "9.9.9"
+    input_path.write_text(json.dumps(data))
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 0, result.stderr
+    assert 'minimum_version = "9.9.9"' in (consumer / "sc-lint.toml").read_text()
+
+
+def test_rerun_preserves_unmanaged_justfile_edits() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = FIXTURES / "install.json"
+    assert run("--input", str(input_path), str(consumer)).returncode == 0
+    justfile = consumer / "Justfile"
+    justfile.write_text(justfile.read_text() + "\nconsumer-task:\n    echo kept\n")
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 0, result.stderr
+    assert "consumer-task:\n    echo kept\n" in justfile.read_text()
+
+
+def test_rerun_repairs_merged_justfile_and_keeps_consumer_edits() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = FIXTURES / "install.json"
+    assert run("--input", str(input_path), str(consumer)).returncode == 0
+    justfile = consumer / "Justfile"
+    content = justfile.read_text()
+    justfile.write_text(content.replace("import '.sc-lint/justfile'", "import 'broken'") + "\nconsumer-task:\n    echo kept\n")
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 0, result.stderr
+    repaired = justfile.read_text()
+    assert "import '.sc-lint/justfile'" in repaired
+    assert "import 'broken'" not in repaired
+    assert "consumer-task:\n    echo kept\n" in repaired
+
+
 def test_duplicate_markers_are_conflicts_without_writes() -> None:
     consumer = copy_fixture("empty-workspace")
     justfile = consumer / "Justfile"
