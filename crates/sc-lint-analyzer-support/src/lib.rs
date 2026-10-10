@@ -10,7 +10,6 @@ pub use analyzer_config::RuleCatalog;
 pub use analyzer_config::analyzer_settings_from;
 pub use analyzer_config::load_analyzer_settings;
 pub use analyzer_config::read_config_document;
-pub use analyzer_config::relative_slash_path;
 pub use render::render_findings_report;
 pub use source_scan::FileContext;
 pub use source_scan::PackageName;
@@ -24,6 +23,7 @@ pub use source_scan::discover_source_files;
 pub use source_scan::item_attrs;
 pub use source_scan::item_identifier;
 pub use source_scan::item_name_hint_is_tests;
+pub use source_scan::relative_slash_path;
 pub use source_scan::span_start_line;
 
 #[cfg(test)]

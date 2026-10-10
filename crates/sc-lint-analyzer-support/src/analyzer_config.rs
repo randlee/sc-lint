@@ -332,15 +332,6 @@ impl AnalyzerSettings {
     }
 }
 
-pub fn relative_slash_path(root: &Path, path: &Path) -> String {
-    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    path.strip_prefix(&root)
-        .unwrap_or(&path)
-        .to_string_lossy()
-        .replace('\\', "/")
-}
-
 fn glob_match(pattern: &str, path: &str) -> bool {
     fn matches_segments(pattern: &[&str], path: &[&str]) -> bool {
         match pattern.split_first() {

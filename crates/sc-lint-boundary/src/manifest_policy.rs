@@ -220,14 +220,10 @@ fn dependency_sections(manifest: &Table) -> Vec<(String, &Table)> {
 }
 
 fn relative_manifest_display(root: &Path, manifest_path: &Path) -> Result<String> {
-    let relative = manifest_path.strip_prefix(root).with_context(|| {
-        format!(
-            "manifest `{}` is not under repo root `{}`",
-            manifest_path.display(),
-            root.display()
-        )
-    })?;
-    Ok(relative.to_string_lossy().replace('\\', "/"))
+    Ok(sc_lint_analyzer_support::relative_slash_path(
+        root,
+        manifest_path,
+    ))
 }
 
 fn canonical_manifest_dir(manifest_path: &Path) -> Result<PathBuf> {
