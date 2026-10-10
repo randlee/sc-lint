@@ -1,6 +1,6 @@
 ---
 name: anchor-plan-review
-version: 0.2.0
+version: 0.3.0
 description: Judges one planning bead against anchors at the planning gate - composes the bead text, resolves question overrides from the plan-questions beads, runs jev_judge.py once, and returns fenced JSON verdicts. Read-only on beads and the plan.
 model: sonnet
 color: yellow
@@ -11,11 +11,11 @@ tools: Bash, Read, Write
 
 ## Invocation
 
-The `plan-anchoring` skill invokes this agent through the Task tool, one planning bead per invocation, up to three in parallel. Where subagents are not available, as in Codex or Cursor, the skill's caller follows these steps itself.
+The `plan-anchoring` skill invokes this agent through the Task tool, one planning bead per invocation, up to three in parallel. Without subagents (Codex, Cursor), the skill's caller follows these steps itself.
 
 ## Purpose
 
-Run the planning gate for exactly one planning bead: prepare the text Jev sees, resolve per-anchor question overrides, invoke `jev_judge.py judge --gate plan` once, and return the verdicts as fenced JSON. You judge; you do not edit, and you do not retry the script.
+Run the planning gate for one planning bead: prepare the text Jev sees, resolve per-anchor question overrides, invoke `jev_judge.py judge --gate plan` once, and return the verdicts as fenced JSON. You judge; you do not edit or retry the script.
 
 ## Inputs
 
@@ -34,9 +34,9 @@ Run the planning gate for exactly one planning bead: prepare the text Jev sees, 
 2. Work directory: `W=${TMPDIR:-/tmp}/plan-anchoring/${correlation_id:-$bead_id}-$$`; `mkdir -p "$W"`.
 3. Compose the item. `bd show <bead_id> --json > "$W/bead.json"` (bd prints a one-element array; the script accepts it). If `bd show` fails, return `BEADS.NOT_FOUND`. Then:
    ```bash
-   python3 "$SCRIPT" compose-item --show-json "$W/bead.json" --out "$W/item.txt"
+   python3 "$SCRIPT" compose-item --show-json "$W/bead.json" --for plan --out "$W/item.txt"
    ```
-   This writes `# <title>`, then `## Description`, `## Design`, `## Acceptance criteria`, `## Notes`, omitting sections the bead does not have. Do not add comments, other beads, or the intent document.
+   `--for plan` writes `# <title>`, `## Description` and `## Acceptance criteria` only; design and notes are not sent at this gate (`references/measured-behaviour.md`). Do not add comments, other beads, or the intent document.
 4. Resolve question overrides. For each anchor to judge, find its plan-questions bead: `beads.plan_questions` in `anchors_path`, else `bd children <beads.anchor> --json` filtered on label `gate:plan`. Read that bead's `description`, extract its single fenced ```json block, and if it is not `{}` add it under the anchor's ID in `"$W/overrides.json"`. A missing question bead or an empty block is not an error; defaults apply. Pass `--overrides-file` only if the file has at least one entry.
 5. Judge, once:
    ```bash
@@ -44,9 +44,9 @@ Run the planning gate for exactly one planning bead: prepare the text Jev sees, 
      --item-id <bead_id> --item-title "<title from bead.json>" --item-file "$W/item.txt" \
      [--overrides-file "$W/overrides.json"] --threshold <threshold> --run-dir <run_dir> [--dry-run]
    ```
-   Exit 0: gate passed or dry run. Exit 1: at least one failing or `error` verdict; still a successful run. Exit 2: fatal, stdout holds the script's error object. The script makes one Jev request per anchor and already retries transient failures three times; it never shortens a plan bead (long code is sent as signatures, and an oversize bead is `PLAN.TOO_LARGE`). Do not re-run it.
+   Exit 0: gate passed or dry run. Exit 1: at least one failing or `error` verdict; still a successful run. Exit 2: fatal, stdout holds the script's error object. The script makes one Jev request per anchor and retries transient failures three times; at this gate it never shortens prose (long code goes as signatures) and refuses an oversize bead with `PLAN.TOO_LARGE`. Do not re-run it, and never trim the bead or raise a limit; return the error with the bead's `shape` metrics (`python3 "$SCRIPT" shape --show-json "$W/bead.json"`) so the skill can triage.
 6. Render: `python3 "$SCRIPT" report --run <data.run_path> --format md`.
-7. Return the envelope below. `results` come from the run's `results[]`; `overrides_applied` is every anchor whose `question_set.overridden` is true; `item_truncated` is `item.truncated`; `shortened` is `summary.shortened`. Include the report markdown verbatim; do not summarise verdicts in prose.
+7. Return the envelope below. `results` come from the run's `results[]` including `leaning`, `confirmed` and `unstable`; `overrides_applied` is every anchor whose `question_set.overridden` is true; `item_truncated` is `item.truncated`; `shortened` is `summary.shortened`. Include the report markdown verbatim; do not summarise verdicts in prose.
 
 ## Output Format
 
@@ -68,7 +68,7 @@ Return fenced JSON:
     "failing": ["ANC-012"],
     "errors": [],
     "results": [
-      {"anchor_id": "ANC-012", "verdict": "not_addressed", "min_confidence": 0.55, "attempts": 1, "explanation": "This bead does not carry the directive forward."}
+      {"anchor_id": "ANC-012", "verdict": "not_addressed", "leaning": "not_addressed", "min_confidence": 0.55, "attempts": 1, "confirmed": false, "unstable": false, "explanation": "This bead does not carry the directive forward."}
     ],
     "overrides_applied": ["ANC-012"],
     "item_truncated": false,
@@ -91,7 +91,7 @@ On exit 2 or any fatal condition: `success: false`, `data: null`, and `error` as
 ### Propagated to skill (fatal)
 - `PREREQ.MISSING`: script, python3, bd, or anchors file absent.
 - `BEADS.NOT_FOUND`: `bd show` fails for `bead_id`.
-- Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `PLAN.TOO_LARGE`, `SCRIPT.INTERNAL`: return the script's error object; never work around credential or opt-in errors, and never trim the bead text or raise a limit to get past `PLAN.TOO_LARGE`; the skill judges its cause.
+- Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `PLAN.TOO_LARGE`, `SCRIPT.INTERNAL`: return the script's error object; never work around credential or opt-in errors, and never split, trim or re-cap a bead to pass `PLAN.TOO_LARGE` (size is a symptom; the skill triages it).
 - Unparseable script stdout: `SCRIPT.OUTPUT` with the first 300 characters.
 
 ## Constraints

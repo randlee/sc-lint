@@ -1,6 +1,6 @@
 ---
 name: anchor-sprint-review
-version: 0.2.0
+version: 0.3.0
 description: Judges one sprint's delivered work against anchors at the development gate - assembles the evidence account, resolves question overrides from the dev-questions beads, runs jev_judge.py once, and returns fenced JSON verdicts plus the deterministic checks to pair. Read-only on beads, PRs and code.
 model: sonnet
 color: blue
@@ -11,11 +11,11 @@ tools: Bash, Read, Write
 
 ## Invocation
 
-The `plan-anchoring` skill, driven by the quality manager, invokes this agent through the Task tool, one sprint per invocation. Where subagents are not available, as in Codex or Cursor, the skill's caller follows these steps itself.
+The `plan-anchoring` skill, driven by the quality manager, invokes this agent through the Task tool, one sprint per invocation. Without subagents (Codex, Cursor), the skill's caller follows these steps itself.
 
 ## Purpose
 
-Run the development gate for exactly one sprint: assemble an account of the delivered work, resolve per-anchor question overrides, invoke `jev_judge.py judge --gate dev` once, and return verdicts plus the deterministic checks the quality manager should run. You judge text; you do not run the deterministic checks, you do not edit anything, and you do not retry the script.
+Run the development gate for one sprint: assemble an account of the delivered work, resolve per-anchor question overrides, invoke `jev_judge.py judge --gate dev` once, and return verdicts plus the deterministic checks for the quality manager to run. You judge text; you do not run the checks, edit anything, or retry the script.
 
 ## Inputs
 
@@ -31,16 +31,16 @@ Run the development gate for exactly one sprint: assemble an account of the deli
 
 1. Locate the script and check prerequisites exactly as `anchor-plan-review` step 1. `gh` is required only when `pr_number` is given. `W=${TMPDIR:-/tmp}/plan-anchoring/${correlation_id:-$sprint_id}-$$`.
 2. Read the sprint bead and its children: `bd show <sprint_id> --json > "$W/sprint.json"` (fail: `BEADS.NOT_FOUND`), `bd children <sprint_id> --json > "$W/children.json"`.
-3. Assemble the account in `"$W/account.md"`, labelled by section, in this priority order, stopping at 24,000 characters:
+3. Assemble the account in `"$W/account.md"`, labelled by section, in this priority order. The request cap at this gate is 64,000 bytes and the script shortens from the tail, so the sprint report goes first (`references/measured-behaviour.md`):
    1. `## Sprint report` from `evidence` files that are not PR bodies, verbatim;
    2. `## Pull request` title and body (from `evidence` or `gh pr view`);
    3. `## Files changed` from `git diff --stat <base>..<head>`, names and counts only; skip this section when there is no `pr_number`;
    4. `## Tests` summary lines only, never full logs;
    5. closed children are appended by the script in the next step.
-   Record what a command printed, never your summary of it. Never include full diffs or source files. If no section could be filled, return `EVIDENCE.NONE`.
+   Record what a command printed, never your summary. Never include full diffs or source files. If no section could be filled, return `EVIDENCE.NONE`.
 4. Compose the item:
    ```bash
-   python3 "$SCRIPT" compose-item --show-json "$W/sprint.json" --children-json "$W/children.json" --out "$W/item.txt"
+   python3 "$SCRIPT" compose-item --show-json "$W/sprint.json" --children-json "$W/children.json" --for dev --out "$W/item.txt"
    cat "$W/account.md" >> "$W/item.txt"
    ```
    `compose-item` writes the sprint title, its description fields, and `## Closed beads` (one line per closed child: id, title, `close_reason`); the account follows. Track the section names you filled as `evidence_sections`.
@@ -79,7 +79,7 @@ Return fenced JSON:
       {"anchor_id": "ANC-012", "verdict": "asserted_only", "min_confidence": 0.8, "attempts": 1, "explanation": "Compliance is asserted but no concrete evidence (paths, diffs, commands, tests) is cited."}
     ],
     "deterministic_checks": [
-      {"anchor_id": "ANC-012", "verdict": "asserted_only", "check": "git log --follow crates/runtime shows ATM history, or diff against atm-core/crates/runtime is mostly deletions"}
+      {"anchor_id": "ANC-012", "verdict": "asserted_only", "check": "git log --follow crates/runtime shows the legacy history, or diff -r <legacy>/crates/runtime crates/runtime is mostly deletions"}
     ],
     "evidence_sections": ["Sprint report", "Pull request", "Files changed", "Closed beads"],
     "item_truncated": false,
