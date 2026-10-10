@@ -27,20 +27,29 @@ Adoption itself never publishes a release and does not infer release channels.
 
 ## Consumer end state
 
-The kit owns only these generated surfaces:
+The installer writes or merges these consumer surfaces:
 
 ```text
 sc-lint.toml
 .sc-lint/bootstrap
 .sc-lint/bootstrap.ps1
 .sc-lint/justfile
+.sc-lint/install.json
+.sc-lint/installed.json
+plugins/sc-lint/install.py
 plugins/sc-lint/.github/actions/setup-sc-lint/action.yml
 .github/workflows/sc-lint.yml
 Justfile managed import block
 README.sc-lint.md
 ```
 
-The root `Justfile` keeps all text outside this block unchanged:
+`.sc-lint/install.json` stores the selected input in canonical JSON form;
+`.sc-lint/installed.json` records digests for installed kit files. The vendored
+`plugins/sc-lint/install.py` is the consumer-side installer for later checks
+and updates.
+
+The root `Justfile` is merged through this block and keeps all text outside it
+unchanged:
 
 ```text
 # >>> sc-lint managed integration >>>
@@ -50,6 +59,13 @@ import '.sc-lint/justfile'
 
 Do not edit text inside that block. Keep repository-specific recipes before or
 after it; that is the supported extension point.
+
+The pre-existing-file clash check applies on every install to kit targets
+absent from the prior installed manifest. It skips the merged `Justfile` and
+skips `.sc-lint/install.json` only when that file is the selected input. If
+`--input` points elsewhere, a different pre-existing `.sc-lint/install.json`
+is a conflict; all other untracked target paths whose contents differ from the
+kit are also reported before the installer writes anything.
 
 ## `install.json`
 
@@ -105,11 +121,12 @@ for every drifted managed file and returns:
 
 - `0` — the consumer already matches the kit;
 - `1` — safe proposed changes are present; review them, then apply;
-- `2` — malformed input, a managed-marker conflict, or, on a first install
-  (no `.sc-lint/installed.json`), a pre-existing file at a kit path whose
-  content differs from the kit. The installer lists each such path and writes
-  nothing. Stop and repair the conflict without overwriting consumer-owned
-  content.
+- `2` — malformed input, a managed-marker conflict, or a pre-existing
+  untracked kit path whose content differs from the desired output. The
+  installer lists each such path and writes nothing. The clash check runs on
+  every install; the merged `Justfile` and selected `.sc-lint/install.json`
+  input are exempt. Stop and repair the conflict without overwriting
+  consumer-owned content.
 
 After applying, rerun `--dry-run`. The consumer PR must include the literal
 `sc-lint adoption dry-run exit 0` line only when the final recheck converges.
