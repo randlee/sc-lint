@@ -253,6 +253,10 @@ Current command behavior:
   - succeeds through the shared config + dispatch + normalization seam
   - uses direct Rust-library dispatch in A.1b
   - emits dedicated dispatch-start and dispatch-normalized log events
+- `lint function-length`
+  - succeeds through the Python Adapter Protocol
+  - counts non-comment, non-whitespace code lines per production function; 70 to 79 lines is an advisory
+  - fails only when a function at or over 80 code lines is new, or grew past its entry in `.just/function-length-baseline.tsv`
 - `lint line-counts`
   - succeeds through the Python Adapter Protocol
   - loads line-count thresholds and exclusions from `.just/lint-config.toml`
@@ -268,7 +272,7 @@ Current command behavior:
   - collates generated findings artifacts into a stable findings index
 - `lint`
   - implemented for profiles, `sc-boundary`, `sc-portability`, `sc-runtime`,
-    `line-counts`, and `identity-literals`
+    `function-length`, `line-counts`, and `identity-literals`
 - `view`
   - `findings` is implemented
   - `graph` remains reserved until the graph contract is stable
