@@ -115,7 +115,9 @@ lint: _source-build _source-venv
 test: _source-build _source-venv
     .sc-lint/bootstrap test --config sc-lint.toml
 
-# Run the vendorable consumer-adoption kit integration suite.
+# Run the vendorable consumer-adoption kit integration suite. Requires pytest
+# in the host Python: `python3 -m pip install 'pytest>=8,<9'` (POSIX) or
+# `python -m pip install 'pytest>=8,<9'` (Windows).
 test-adoption:
     {{host_python}} -m pytest tests/adoption -q
 

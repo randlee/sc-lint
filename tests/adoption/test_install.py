@@ -187,7 +187,11 @@ def test_analyzer_worked_example_runs_all_declared_just_layers() -> None:
 
         pytest.skip("requires the source product binary and matching offline wheel set")
     consumer = copy_fixture("analyzer-worked-example")
-    result = run("--input", str(FIXTURES / "analyzer-worked-example" / "install.json"), str(consumer))
+    input_data = json.loads((FIXTURES / "analyzer-worked-example" / "install.json").read_text())
+    input_data["minimum_version"] = workspace_version
+    input_path = consumer.parent / "install.json"
+    input_path.write_text(json.dumps(input_data))
+    result = run("--input", str(input_path), str(consumer))
     assert result.returncode == 0, result.stderr
     environment = {**os.environ, "SC_LINT_BIN": str(binary), "SC_LINT_WHEEL_DIR": str(wheels)}
     for arguments in (("test",), ("test", "all"), ("test", "integrate"), ("lint",)):
