@@ -104,6 +104,8 @@ Initial convention:
   - `setup`
 - `sc-lint upgrade`
   - `upgrade`
+- `sc-lint provision`
+  - `provision`
 
 When parsing fails before a concrete command path is resolved, the CLI uses the
 fallback identifier:
@@ -336,14 +338,31 @@ Cargo manifest, or analyzer package:
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - selector commands are argv arrays, not shell strings. Each runs in the
-  configuration directory or its `cwd`, with `env` overlaid; its stdout is
-  copied to sc-lint's stderr and its stderr is inherited, so stdout carries
-  only the envelope. A step that exits nonzero is reported in `data.steps`
-  with `status: "fail"`; the envelope stays `ok: true` and the command exits
-  `7` (`verdict_fail`). A step that cannot start is a structured `CliError`.
+  configuration directory or its `cwd`, with `SC_LINT_BIN` (the running
+  sc-lint binary) and then its `env` overlaid; its stdout is copied to
+  sc-lint's stderr and its stderr is inherited, so stdout carries only the
+  envelope. Steps of a parallel batch are the exception: their stdout and
+  stderr are captured together and written to sc-lint's stderr between
+  ``sc-lint: begin output of step `<name>` `` and ``sc-lint: end output of
+  step `<name>`: <result>`` lines, one block per step in declaration order.
+  A step that exits nonzero is reported in `data.steps` with
+  `status: "fail"`; the envelope stays `ok: true` and the command exits `7`
+  (`verdict_fail`). A step that cannot start is a structured `CliError`; in
+  a batch it is returned after the other batch steps finish, for the
+  lowest-index step that could not start.
 - missing configured executables use
   `CLI.SC_LINT_BACKEND_NOT_FOUND` with installation recovery and the setup
   documentation reference.
+- a step whose program is exactly `sc-lint` runs the current sc-lint binary.
+  A step whose program is exactly `python` runs the interpreter of
+  `[tool.sc-lint.runner] python` when that table is set; a missing
+  interpreter uses `CLI.SC_LINT_RUNNER_PYTHON_MISSING`. A running step whose
+  `requires` tool is not installed uses `CLI.SC_LINT_TOOL_NOT_PROVISIONED`. A
+  running step that needs `cargo xwin` while it is unavailable uses
+  `CLI.CAPABILITY_ERROR`, except under `all` for a step whose `platforms`
+  exclude the host, which is reported `skipped`. All three are `capability`
+  errors (exit `4`) raised before any step runs. `data.steps[].command` is
+  the argv actually run, including `xwin` and `--target` added by `target`.
 
 The generated default configuration uses this shape:
 
@@ -395,6 +414,51 @@ platforms = ["linux", "macos"]
 group = ["unit", "e2e"]
 ```
 
+The table form also accepts `jobs`, `parallel`, `target` and `requires`, and
+the top-level `tools`, `setup` and `runner` tables (REQ-CLI-015,
+REQ-CLI-019, REQ-CLI-023):
+
+```toml
+[tool.sc-lint.lint]
+default = ["ci"]
+jobs = 4
+
+[tool.sc-lint.lint.selectors.version]
+command = ["python", "tools/check_version.py"]
+parallel = true
+
+[tool.sc-lint.lint.selectors.lines]
+command = ["python", "tools/check_lines.py"]
+parallel = true
+
+[tool.sc-lint.lint.selectors.clippy-windows]
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+platforms = ["windows"]
+target = "x86_64-pc-windows-msvc"
+requires = ["cargo-xwin", "x86_64-pc-windows-msvc"]
+
+[tool.sc-lint.lint.selectors.ci]
+group = ["version", "lines", "clippy-windows"]
+
+[tool.sc-lint.tools]
+rustup_targets = ["x86_64-pc-windows-msvc"]
+
+[tool.sc-lint.tools.cargo]
+cargo-xwin = "0.18.4"
+
+[tool.sc-lint.setup]
+pre = ["python3", "tools/setup.py"]
+
+[tool.sc-lint.runner]
+python = ".venv"
+```
+
+`version` and `lines` form one parallel batch. `tools.cargo` maps a crate
+name to an exact SemVer version, `rustup_targets` lists target triples, and
+`requires` names entries of either. `runner.python` is a virtual-environment
+directory relative to the configuration directory. `jobs` affects timing
+only, never the report.
+
 ### Consumer Step Payload
 
 `sc-lint --json lint --consumer ci all` on a Linux host without `cargo xwin`,
@@ -433,7 +497,9 @@ with `keep_going = true`, exits `7`:
 - `summary`: `"<pass> passed, <fail> failed, <skipped> skipped, <not_run> not run"`
 - `steps[]`: `name`, `kind` (`lint` or `test`), `command` (argv joined with
   spaces), `status` (`pass`, `fail`, `skipped`, `not_run`), `exit_code`
-  (`fail` with an exit code only), `reason` (`skipped` and `not_run` only)
+  (`fail` with an exit code only), `reason` (`skipped` and `not_run` only),
+  `parallel` (`true` only for a step that ran in a parallel batch; otherwise
+  absent)
 
 Step reasons (`{h}` is the host platform or `unknown`, `{p}` the requested
 platform, `{list}` the step's `platforms` joined with `, `, `{name}` the
@@ -447,10 +513,11 @@ stopped after failing step `{name}` (keep_going = false)
 ```
 
 The first is used under scope `host`, the second under an explicit
-`<platform>`, the third under `all` for a `cargo xwin` step, and the fourth
-for steps after a failure when `keep_going = false`. Under an explicit
-`<platform>`, a `cargo xwin` step without `cargo xwin` is a capability error
-(exit `4`) before any step runs.
+`<platform>`, the third under `all` for a step whose `platforms` exclude the
+host and that would run with `cargo xwin`, and the fourth for steps after a
+failure when `keep_going = false`. Any other running step that would run with
+`cargo xwin` while it is unavailable is a capability error (exit `4`) before
+any step runs (REQ-CLI-015).
 
 `sc-lint --json test --list` exits `0`:
 
@@ -459,16 +526,17 @@ for steps after a failure when `keep_going = false`. Under an explicit
  "status":"pass","profile":"test","mode":"list","form":"table","default":["unit","python"],
  "summary":"5 selectors",
  "selectors":[
-  {"name":"coverage","kind":"command","default":false,"description":null,"command":["cargo","llvm-cov","--workspace"],"platforms":[],"cwd":null,"env":{}},
-  {"name":"e2e","kind":"command","default":false,"description":null,"command":["cargo","test","--test","e2e"],"platforms":["linux","macos"],"cwd":null,"env":{}},
+  {"name":"coverage","kind":"command","default":false,"description":null,"command":["cargo","llvm-cov","--workspace"],"platforms":[],"cwd":null,"env":{},"parallel":false,"target":null,"requires":[]},
+  {"name":"e2e","kind":"command","default":false,"description":null,"command":["cargo","test","--test","e2e"],"platforms":["linux","macos"],"cwd":null,"env":{},"parallel":false,"target":null,"requires":[]},
   {"name":"full","kind":"group","default":false,"description":null,"members":["unit","python","e2e"]},
-  {"name":"python","kind":"command","default":true,"description":null,"command":["python","-m","unittest","discover","-s","tests"],"platforms":[],"cwd":null,"env":{}},
-  {"name":"unit","kind":"command","default":true,"description":"Rust unit tests","command":["cargo","test","--workspace"],"platforms":[],"cwd":null,"env":{}}]},
+  {"name":"python","kind":"command","default":true,"description":null,"command":["python","-m","unittest","discover","-s","tests"],"platforms":[],"cwd":null,"env":{},"parallel":false,"target":null,"requires":[]},
+  {"name":"unit","kind":"command","default":true,"description":"Rust unit tests","command":["cargo","test","--workspace"],"platforms":[],"cwd":null,"env":{},"parallel":false,"target":null,"requires":[]}]},
  "diagnostics":[]}
 ```
 
 Selectors are listed in lexicographic order for the table form and in
-declaration order for the legacy form.
+declaration order for the legacy form. Command selectors report `parallel`,
+`target` (string or `null`) and `requires` (array) after `env`.
 
 The only consumer minimum-version location is:
 
@@ -526,8 +594,9 @@ subprocess/install failure rather than the absence of an optional feature.
 
 ## Installation And Upgrade Contract
 
-`sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]` load
-the same `[tool.sc-lint].minimum_version` requirement as compatibility check.
+`sc-lint setup [--check] [--dry-run]` and `sc-lint upgrade [--check]
+[--dry-run]` load the same `[tool.sc-lint].minimum_version` requirement as
+compatibility check.
 That field remains an installed-version floor; the installer reports the exact
 `selected_release_version` separately for the immutable release artifact it
 downloads. They select the release workflow's host archive
@@ -539,7 +608,7 @@ post-install verification fails. If rollback cannot be verified, the command
 does not claim recovery succeeded: it returns the backup path and manual
 recovery instructions instead.
 
-`upgrade --check` never changes disk and reports `current` or
+`setup --check` and `upgrade --check` never change disk and report `current` or
 `update_required`; `--dry-run` reports the archive, checksum manifest, and
 managed target that would be used. A compatible newer binary is never
 downgraded. The managed directory is platform-local by default and may be set
@@ -555,10 +624,25 @@ fixture/enterprise mirror override.
 | `CLI.SC_LINT_POST_INSTALL_VERSION_FAILED` | A prior managed binary, if one existed, was restored; otherwise the failed candidate was removed. Repair the release and rerun setup. |
 | `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` | Inspect the reported target and backup path; restore the known-good backup manually before retrying. |
 | `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | The previous managed binary was retained; repair the target directory and retry. |
+| `CLI.SC_LINT_TOOL_INSTALL_FAILED` | Fix the reported tool error and rerun `just setup`. |
 
 Every installer failure uses `backend_failure`, a stable code, a cause,
 recovery guidance, and `docs: "sc-lint docs installation"`. The E.4 bundle
 will provide that offline guide; E.2 does not implement documentation delivery.
+
+`sc-lint provision [--check] [--dry-run]` loads the consumer configuration,
+runs `[tool.sc-lint.setup] pre` in the configuration directory (install mode
+only), then installs each missing `[tool.sc-lint.tools]` entry (`rustup
+target add <triple>`, then `cargo install --locked <name> --version
+<version>`) and re-verifies it. It reports `status` (`provisioned`,
+`current`, `update_required`, `dry_run`), `mode`, `config_path`, `pre`
+(`command`, `status`, `reason`, or null), `tools[]` (`kind`, `name`,
+`version`, `installed_version`, `status`: `present`|`installed`|`missing`),
+`counts` and `summary`. `--check` and `--dry-run` change nothing. A failing
+`setup.pre` is `backend_failure` (`CLI.BACKEND_EXEC_FAILURE`, message
+`setup.pre failed`); a failed install or re-verification is
+`backend_failure` with `CLI.SC_LINT_TOOL_INSTALL_FAILED`. The bootstrap's
+`setup` operation runs `provision` after the product `setup` (REQ-CLI-021).
 
 On Windows, an executable cannot reliably replace itself while still running.
 When the managed binary is the active `sc-lint.exe`, setup fails before moving

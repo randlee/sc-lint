@@ -7,7 +7,7 @@
 | Date | 2026-08-29 |
 | Deciders | user, flint, team-lead |
 | Approved by | user (Rand Lee), 2026-08-29 |
-| Amendment | 2026-10-10 phase-h: Decision 3 selector tables and verbatim `just lint`/`just test` arguments; How To Extend selector vocabulary; awaiting approval in PR #206 |
+| Amendment | 2026-10-10 phase-h: Decision 1 consumer step execution and tool provisioning are product execution; Decision 3 selector tables and verbatim `just lint`/`just test` arguments; resolution sequence `sc-lint provision`; How To Extend selector vocabulary (`parallel`, `target`, `requires`, `jobs`), `setup.pre`, `runner.python` and `[tool.sc-lint.tools]` pins; awaiting approval in PR #206 |
 | Related | ADR-012, ADR-015 |
 
 ## Context
@@ -27,7 +27,11 @@ same problem for `sc-compose` by provisioning a pinned wheel.
    (TOML/YAML/Justfile), skills, and prompts. A thin maturin bridge may
    expose existing CLI behavior to Python, but it adds no configuration
    policy or repository logic. A `configure`-style module in any crate is a
-   violation.
+   violation. Running consumer-declared steps and provisioning
+   consumer-declared tools (`[tool.sc-lint.tools]`, `[tool.sc-lint.setup]
+   pre`) is product execution, not configuration: the Rust CLI executes what
+   `sc-lint.toml` declares and decides nothing about it. (Amended 2026-10-10
+   for #196-#198; pending approval in PR #206.)
 2. **The `sc-lint` Python wheel is the runtime delivery for every
    consumer-run helper.** It is built with maturin from
    `bindings/sc-lint-py/` (pyo3 cdylib, ≤150 lines of bridge) plus the
@@ -63,6 +67,7 @@ Resolution sequence performed by `.sc-lint/bootstrap <op>`:
   ├─ ensure .sc-lint/venv (python3 -m venv, idempotent)
   ├─ pip install "sc-lint==<minimum_version>"   # maturin wheel from PyPI
   ├─ python -m sc_lint ensure-binary            # verified release archive
+  ├─ sc-lint provision                          # [tool.sc-lint.setup] pre, then [tool.sc-lint.tools]
   └─ export SC_LINT_BIN, PATH for this invocation
 
 .sc-lint/justfile (imported by the consumer Justfile):
@@ -75,9 +80,14 @@ upgrade:  .sc-lint/bootstrap upgrade --config sc-lint.toml
 ## How To Extend
 
 Use declarative `sc-lint.toml` lint profiles, test layers, per-analyzer tables,
-step argv/exclusions, selector groups, per-step `platforms`, `env`, and `cwd`.
-Pre/post work is an ordinary extra layer step, not a hook DSL. The kit pins only
-`sc-lint`; other toolchain pins remain consumer-owned. Validate/view/bench/fuzz
+step argv/exclusions, selector groups, per-step `platforms`, `env`, `cwd`,
+`parallel`, `target` and `requires`, the profile `jobs` limit, and
+`[tool.sc-lint.runner] python`. Exactly one setup command is allowed,
+`[tool.sc-lint.setup] pre`, which `just setup` runs before tool provisioning;
+any other pre/post work is an ordinary selector, not a hook DSL. The kit pins
+only `sc-lint`; other toolchain pins are consumer-owned exact versions in
+`[tool.sc-lint.tools]`, which `just setup` provisions and the kit renders but
+never chooses. Validate/view/bench/fuzz
 dispatchers are consumer-owned Justfile recipes outside the managed import
 block. Patterns observed independently in 2+ consumer repositories may be
 promoted into the kit under Locked Principle 9. Kit-rendered entries remain

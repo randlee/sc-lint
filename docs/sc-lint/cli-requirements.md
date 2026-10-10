@@ -285,9 +285,21 @@ specialized backend tools and mixed Rust/Python implementations.
   validation. A consumer selector may declare `platforms`; a step whose
   `platforms` exclude the host runs only under `sc-lint lint --consumer
   <selector> all` or `<platform>`, and is reported `skipped` with a reason
-  under the default `host` scope. Under `all`, a `cargo xwin` step is reported
-  `skipped` when `cargo xwin` is unavailable; under an explicit `<platform>` it
-  is a capability error before any step runs.
+  under the default `host` scope. A step whose argv starts `cargo xwin` is a
+  cargo-xwin step: run on a host outside its `platforms` it runs unchanged;
+  run on a host inside its `platforms` it runs natively as `cargo` with the
+  remaining arguments, without `xwin`. A command selector's `target` names a
+  rustc target triple: sc-lint runs `cargo xwin <subcommand> --target
+  <target> ...` when the target ends in `-windows-msvc` and the host is not
+  Windows, and `cargo <subcommand> --target <target> ...` otherwise. A step
+  that would run with `cargo xwin` while `cargo xwin` is unavailable is
+  reported `skipped` under `all` when the host is outside its `platforms`,
+  and is otherwise a capability error (exit `4`) before any step runs, under
+  every scope. The adoption kit's generated CI installs every
+  `[tool.sc-lint.tools]` cargo tool at its pinned version on every runner,
+  and installs `cargo-xwin` on its Linux runner when the CI lint selectors
+  include a step that needs it and `cargo-xwin` is not pinned, so `just lint
+  ci all` there runs it.
 
 - `REQ-CLI-016`
   `sc-lint compatibility check` must load exactly
@@ -310,15 +322,26 @@ specialized backend tools and mixed Rust/Python implementations.
   configuration path.
 
 - `REQ-CLI-019`
-  `sc-lint setup [--dry-run]` and `sc-lint upgrade [--check] [--dry-run]` must
-  load the canonical consumer SemVer floor, select the matching host release,
-  verify `checksums.txt` before activation, and atomically replace only the
-  managed product binary. A current or newer compatible installation is a
-  no-op. The selected immutable release version and the configured SemVer floor
-  are distinct values in machine output. Failed activation or post-install
-  verification must retain the last working managed binary; if restoration
-  itself cannot be verified, the command must report a distinct recovery error
-  identifying the manual backup location.
+  `sc-lint setup [--check] [--dry-run]` and `sc-lint upgrade [--check]
+  [--dry-run]` must load the canonical consumer SemVer floor, select the
+  matching host release, verify `checksums.txt` before activation, and
+  atomically replace only the managed product binary; `setup --check`
+  behaves as `upgrade --check`. A current or newer compatible installation is
+  a no-op. The selected immutable release version and the configured SemVer
+  floor are distinct values in machine output. Failed activation or
+  post-install verification must retain the last working managed binary; if
+  restoration itself cannot be verified, the command must report a distinct
+  recovery error identifying the manual backup location.
+  `sc-lint provision [--check] [--dry-run]` loads and validates the consumer
+  configuration, runs `[tool.sc-lint.setup] pre` in the configuration
+  directory (install mode only), then installs every missing
+  `[tool.sc-lint.tools]` entry (`rustup target add <triple>`, then `cargo
+  install --locked <name> --version <version>`) and re-verifies them.
+  `--check` reports `current` or `update_required` and `--dry-run` reports
+  what would run; neither changes anything. A failing `pre` is
+  `backend_failure` with the message `setup.pre failed`; an install or
+  re-verification failure is `backend_failure` with
+  `CLI.SC_LINT_TOOL_INSTALL_FAILED`.
 
 - `REQ-CLI-020`
   Installer failures must retain the standard `CliError` envelope and stable
@@ -334,7 +357,9 @@ specialized backend tools and mixed Rust/Python implementations.
   `<operation> --config <path> [arguments...]`: the operation (`setup`,
   `lint`, `test` or `upgrade`, case-sensitive) first and `--config <path>` as
   the second and third arguments. `setup` and `upgrade` accept only `--check`
-  and `--dry-run`. `lint` and `test` forward every remaining argument,
+  and `--dry-run`. `setup` runs the product `setup` and then `sc-lint
+  provision` with the same flags, before Python provisioning, and stops with
+  the first nonzero status. `lint` and `test` forward every remaining argument,
   including `--`, dash-prefixed tokens and arguments containing spaces,
   verbatim to `sc-lint lint --consumer --config <path>` and `sc-lint test
   --config <path>`, which validate them (`REQ-CLI-023`). Any other argument
@@ -366,23 +391,41 @@ specialized backend tools and mixed Rust/Python implementations.
   sc-lint.toml [SELECTOR] [SCOPE]` and `sc-lint test --config sc-lint.toml
   [SELECTOR...] [-- ARGS...]` run selectors from `[tool.sc-lint.lint]` and
   `[tool.sc-lint.test]`. Each table has `default` (selector names run when none
-  is given), optional `keep_going` (default `false`), and `selectors.<name>`
-  entries that set exactly one of `command` (non-empty argv array) or `group`
-  (names of other selectors), plus optional `description`; command selectors
-  may set `env`, `cwd` (relative, inside the configuration directory), and
-  `platforms` (`linux`, `macos`, `windows`). Unknown keys, group cycles, and
-  unknown names are configuration errors before any step runs. A group runs
-  each command once. `all` runs every command selector. `ci` with no `ci`
-  selector runs `default`. Arguments after `--` are appended to the single
-  named command selector. `sc-lint test --list` reports the selectors without
-  running them. The 0.5 `[[tool.sc-lint.lint|test]]` `name`/`command` array
-  remains valid and is equivalent to command selectors that are all in
-  `default`. A step that exits nonzero is reported `fail` in a success
-  envelope and the command exits `7`; a step that cannot start is a
-  structured error. These commands do not discover a source checkout or
-  execute `.just` scripts. Adoption-kit consumers declare the same `lint` and
-  `test` tables in `install.json`; the kit renders them one-to-one and
-  rejects invalid manifests at install time (`REQ-PRODUCT-019`).
+  is given), optional `keep_going` (default `false`), optional `jobs` (an
+  integer of at least `1`; default the host's available parallelism), and
+  `selectors.<name>` entries that set exactly one of `command` (non-empty argv
+  array) or `group` (names of other selectors), plus optional `description`;
+  command selectors may set `env`, `cwd` (relative, inside the configuration
+  directory), `platforms` (`linux`, `macos`, `windows`), `parallel`
+  (boolean), `target` (a rustc target triple, only on a `cargo
+  build|check|clippy|doc|test` command without `--target`; `REQ-CLI-015`)
+  and `requires` (names declared in `[tool.sc-lint.tools]`). Unknown keys,
+  group cycles, unknown names and undeclared `requires` entries are
+  configuration errors before any step runs. A group runs each command once.
+  `all` runs every command selector. `ci` with no `ci` selector runs
+  `default`. Arguments after `--` are appended to the single named command
+  selector. After group expansion and platform filtering, two or more
+  consecutive running `parallel` steps form a batch that runs concurrently,
+  at most `jobs` at a time; each batch step's combined output is captured
+  and written to stderr as one block per step in declaration order, and
+  every step of a started batch runs to completion before `keep_going =
+  false` stops the run. A running step whose required tool is not installed
+  is a capability error (`CLI.SC_LINT_TOOL_NOT_PROVISIONED`, exit `4`)
+  before any step runs. A step whose program is exactly `sc-lint` runs the
+  current sc-lint binary, and every step receives `SC_LINT_BIN` unless its
+  `env` sets it. When `[tool.sc-lint.runner] python` names a virtual
+  environment, a step whose program is exactly `python` runs that
+  environment's interpreter, and a missing interpreter is a capability error
+  (`CLI.SC_LINT_RUNNER_PYTHON_MISSING`, exit `4`) before any step runs.
+  `sc-lint test --list` reports the selectors without running them. The 0.5
+  `[[tool.sc-lint.lint|test]]` `name`/`command` array remains valid and is
+  equivalent to command selectors that are all in `default`. A step that
+  exits nonzero is reported `fail` in a success envelope and the command
+  exits `7`; a step that cannot start is a structured error. These commands
+  do not discover a source checkout or execute `.just` scripts. Adoption-kit
+  consumers declare the same `lint`, `test`, `tools`, `setup` and `runner`
+  tables in `install.json`; the kit renders them one-to-one and rejects
+  invalid manifests at install time (`REQ-PRODUCT-019`).
 
 - `REQ-CLI-024`
   `sc-lint docs` must discover the installed offline documentation bundle

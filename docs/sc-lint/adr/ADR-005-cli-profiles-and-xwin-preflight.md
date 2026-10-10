@@ -6,7 +6,7 @@
 | Status | Proposed (amendment 2026-10-10, phase-h) |
 | Date | 2026-05-08 |
 | Deciders | arch-inj, team-lead, clint |
-| Amendment | 2026-10-10 phase-h: consumer selectors are not built-in profiles; platform steps run only under an explicit scope (REQ-CLI-015, REQ-CLI-023); awaiting approval in PR #206 |
+| Amendment | 2026-10-10 phase-h: consumer selectors are not built-in profiles; platform steps run only under an explicit scope; `cargo xwin` consumer steps drop `xwin` natively; selector `target` runs `-windows-msvc` targets through `cargo xwin` off Windows; a running step that needs unavailable `cargo xwin` is a capability error except the `all` skip; kit Linux CI installs cargo-xwin (REQ-CLI-015, REQ-CLI-023); awaiting approval in PR #206 |
 | Relates to | REQ-PRODUCT-006C through REQ-PRODUCT-006E, REQ-PRODUCT-012A through REQ-PRODUCT-012E, REQ-PRODUCT-016A, REQ-CLI-007, REQ-CLI-007B through REQ-CLI-007E, REQ-CLI-014, REQ-CLI-015, REQ-CLI-023 |
 
 ---
@@ -68,7 +68,14 @@ Profile policy:
   - excludes `xwin`
 - consumer selectors (`sc-lint lint --consumer`) are not built-in profiles:
   a step whose `platforms` exclude the host runs only under scope `all` or
-  `<platform>` (REQ-CLI-015); the built-in `ci` profile is unchanged
+  `<platform>` (REQ-CLI-015); a `cargo xwin` consumer step uses this ADR's
+  xwin preflight when it runs as a cross step and drops `xwin` when it runs
+  natively; a selector `target` ending in `-windows-msvc` runs through
+  `cargo xwin` on non-Windows hosts and natively on Windows; a running step
+  that needs `cargo xwin` while it is unavailable is a capability error,
+  except under `all` for a step whose `platforms` exclude the host, which is
+  skipped; the adoption kit's Linux CI installs `cargo-xwin` so such steps
+  run there; the built-in `ci` profile is unchanged
 - top-level `ci`
   - runs lint plus tests
 
@@ -96,6 +103,6 @@ Profile policy:
 |---|---|---|
 | Implement the top-level `sc-lint` CLI crate with explicit `fast`, `full`, `ci`, and top-level `ci` command surfaces. | sc-lint implementation owner | Before release `0.1.x` CLI stabilization |
 | Add capability detection for `cargo xwin` and wire `xwin check` / `xwin clippy` into the appropriate local profiles. | sc-lint implementation owner | Before any `xwin` profile behavior becomes part of default local workflows |
-| Keep real Windows CI as the authoritative validation path; do not add xwin to the built-in ci lint profile. Consumer platform steps run only under an explicit scope (REQ-CLI-015). | repo owner | Ongoing |
+| Keep real Windows CI as the authoritative validation path; do not add xwin to the built-in ci lint profile. Consumer platform steps run only under an explicit scope; the adoption kit's Linux CI installs cargo-xwin for consumer steps that need it (REQ-CLI-015). | repo owner | Ongoing |
 
 *ADR-005 | sc-lint | 2026-05-08*

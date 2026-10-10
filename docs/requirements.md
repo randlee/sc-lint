@@ -578,14 +578,17 @@ The product should support both:
   A versioned, reusable, analyzer-agnostic adoption kit must install one
   drift-detectable consumer end state from one `install.json`, which is the
   JSON image of the rendered `sc-lint.toml`: `lint` and `test` (`keep_going`,
-  `default`, `selectors`) and `analyzers.<name>` render one-to-one into
-  `[tool.sc-lint.lint]`, `[tool.sc-lint.test]` and
-  `[tool.sc-lint.analyzers.<name>]`, with consumer-chosen selector names
-  emitted as quoted TOML keys. Analyzer selection and per-analyzer
-  configuration are the sole repo-specific analyzer input, in
-  `[tool.sc-lint.analyzers.<name>]` tables (`boundary`, `portability`,
-  `runtime`); lint and test selectors are consumer-owned declarations the kit
-  renders but never derives. Installation is idempotent and `--dry-run` is
+  `default`, `jobs`, `selectors`), `tools`, `setup`, `runner` and
+  `analyzers.<name>` render one-to-one into `[tool.sc-lint.lint]`,
+  `[tool.sc-lint.test]`, `[tool.sc-lint.tools]`, `[tool.sc-lint.setup]`,
+  `[tool.sc-lint.runner]` and `[tool.sc-lint.analyzers.<name>]`, with
+  consumer-chosen selector names emitted as quoted TOML keys. Analyzer
+  selection and per-analyzer configuration are the sole repo-specific
+  analyzer input, in `[tool.sc-lint.analyzers.<name>]` tables (`boundary`,
+  `portability`, `runtime`); lint and test selectors are consumer-owned
+  declarations the kit renders but never derives, and tool pins are
+  consumer-chosen exact versions the kit renders but never chooses.
+  Installation is idempotent and `--dry-run` is
   non-mutating, reporting drift or a managed-file conflict rather than
   writing. The kit serves its CI action from the vendored package
   (`./plugins/sc-lint/.github/actions/setup-sc-lint`) and installs no file

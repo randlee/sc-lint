@@ -6,7 +6,7 @@
 | Status | Proposed (amendment 2026-10-10, phase-h) |
 | Date | 2026-08-11 |
 | Deciders | team-lead, clint |
-| Amendment | 2026-10-10 phase-h: item 3 bootstrap argv grammar, `[script]`/`[positional-arguments]` recipes, absolute `SC_LINT_BIN` export and exit-status passthrough; 0.6.1 canonical template note; awaiting approval in PR #206 |
+| Amendment | 2026-10-10 phase-h: item 3 bootstrap argv grammar, `[script]`/`[positional-arguments]` recipes, absolute `SC_LINT_BIN` export and exit-status passthrough, `setup` runs `sc-lint provision`; 0.6.1 canonical template note; awaiting approval in PR #206 |
 
 ## Context
 
@@ -34,8 +34,10 @@ contract and is not an input to this decision.
    and make the result absolute; before `lint` and `test` they export that
    absolute `SC_LINT_BIN` and prepend its directory to `PATH` for the product
    run and every consumer step it starts. When no binary exists, `setup`
-   installs the verified configured release before product work starts. The
-   product exit status, including 7, is returned unchanged. (Amended 0.6.1.)
+   installs the verified configured release before product work starts.
+   `setup` then runs `sc-lint provision` (consumer `setup.pre` and declared
+   tools) with the same flags. The product exit status, including 7, is
+   returned unchanged. (Amended 0.6.1.)
 4. `sc-lint init --just` is the one-command consumer integration path. It
    creates or updates only `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`,
    and `.sc-lint/bootstrap.ps1`; it never writes a consumer `README.md` and

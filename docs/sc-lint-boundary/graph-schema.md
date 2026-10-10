@@ -112,6 +112,12 @@ Ambiguous candidates remain unresolved instead of being merged. Cycle rules
 still operate on the underlying type owner; distinct methods do not imply a
 waiver of owner-level cycle diagnostics.
 
+A method call whose receiver is `self` (also `(self)`, `&self`, `*self`)
+inside an impl is exported as a `receiver_call` edge to the resolved method
+of the same owner. Receiver calls that do not resolve to a unique method of
+that owner are omitted. A path whose final segment names an enum variant of
+the owner is never resolved to a method of the same name.
+
 ## Edge Model
 
 Current edge kinds:
@@ -123,6 +129,7 @@ Current edge kinds:
 - `references`
 - `references_type`
 - `references_expr`
+- `receiver_call`
 
 Notes:
 
@@ -130,6 +137,8 @@ Notes:
 - `references_type` and `references_expr` are the preferred semantic edges for
   new rule work.
 - `targets` connects an `impl` node to the type it implements for.
+- `receiver_call` is used only for cycle classification; it has no
+  `references` aggregate and does not feed boundary or caller rules.
 - `implements` connects an `impl` node to a `trait` or `trait_ref` node.
 
 ## Findings Model
@@ -153,6 +162,13 @@ Current implemented rule ids:
 - `PORT-001`
 - `PORT-002`
 - `PORT-003`
+
+`SCB-CYCLE-002` and `SCB-CYCLE-003` ignore delegation: a same-owner call from
+one method to another is not a self-loop when it is a `receiver_call`, or when
+the callee has a different name and is not `pub`, unless the call lies on a
+method-level cycle of that owner (the callee reaches the caller, or the call
+is direct recursion). A method on such a cycle is reported even when its
+signature names the owner type.
 
 ## Source-Level Allowances
 
