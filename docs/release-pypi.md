@@ -15,6 +15,16 @@ repository; the maintainer provisions them in GitHub.
 | Upload | `release.yml` job `publish-pypi` | Needs `release`, which needs `publish-crates`, so PyPI follows crates.io and the GitHub Release. Environment `pypi`, secret `PYPI_TOKEN`; `maturin upload --skip-existing`. |
 | Recovery | `pypi-publish.yml` (`workflow_dispatch`) | Downloads the wheels and sdist attached to an already published GitHub Release and uploads them. Never rebuilds or re-tags. |
 
+## Linux compatibility floor
+
+The Linux wheel is built with `maturin --compatibility manylinux2014 --zig`
+in both `release.yml` and `release-preflight.yml`, so it is tagged
+`manylinux_2_17_x86_64.manylinux2014_x86_64` and needs glibc 2.17 or newer
+(Ubuntu 20.04+, Debian 11+, RHEL/Rocky 8+). Building on the bare
+`ubuntu-latest` image would tag the wheel with that image's glibc
+(`manylinux_2_39`) and make pip fall back to the sdist on older hosts. The
+macOS and Windows wheels use maturin's defaults.
+
 The distribution list comes from `[[python_distributions]]` in
 `release/publish-artifacts.toml`.
 
