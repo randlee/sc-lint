@@ -84,11 +84,20 @@ class ConsumerContractTests(unittest.TestCase):
             self.assertIn("Invoke-VerifiedReleaseLauncher", contents)
             self.assertIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", contents)
             self.assertIn("compatibility check", contents)
+            self.assertIn("function Enter-ProductEnvironment {", contents)
+            self.assertEqual(contents.count("        Enter-ProductEnvironment\n"), 2)
             self.assertIn("$env:SC_LINT_BIN = $productBinary", contents)
             self.assertIn(
                 "$env:PATH = (Split-Path -Parent $productBinary) + [IO.Path]::PathSeparator + $env:PATH",
                 contents,
             )
+
+    def test_posix_lint_and_test_share_one_product_environment_helper(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
+        self.assertEqual(contents.count("activate_product_env() {"), 1)
+        self.assertEqual(contents.count("        activate_product_env\n"), 2)
+        self.assertIn('export SC_LINT_BIN="$product_binary"', contents)
+        self.assertIn('PATH="$(dirname "$product_binary"):$PATH"; export PATH', contents)
 
     def test_windows_bootstrap_consumes_gnu_style_flags_from_remaining_arguments(self) -> None:
         contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(

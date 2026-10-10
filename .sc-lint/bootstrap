@@ -190,6 +190,11 @@ ensure_product() {
     [ -x "$managed_binary" ] && product_binary="$managed_binary"
 }
 
+activate_product_env() {
+    export SC_LINT_BIN="$product_binary"
+    PATH="$(dirname "$product_binary"):$PATH"; export PATH
+}
+
 case "$operation" in
     setup)
         ensure_product "$@"
@@ -199,16 +204,14 @@ case "$operation" in
         ;;
     lint)
         ensure_product "$@"
-        export SC_LINT_BIN="$product_binary"
-        PATH="$(dirname "$product_binary"):$PATH"; export PATH
+        activate_product_env
         provision_venv install || exit $?
         if [ -n "$selector" ]; then exec "$product_binary" lint --consumer --config "$config" ci --profile "$selector"; fi
         exec "$product_binary" lint --consumer --config "$config" ci
         ;;
     test)
         ensure_product "$@"
-        export SC_LINT_BIN="$product_binary"
-        PATH="$(dirname "$product_binary"):$PATH"; export PATH
+        activate_product_env
         provision_venv install || exit $?
         if [ -n "$selector" ]; then exec "$product_binary" test --config "$config" "$selector"; fi
         exec "$product_binary" test --config "$config"
