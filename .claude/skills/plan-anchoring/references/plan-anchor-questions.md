@@ -19,7 +19,7 @@ One anchor and one planning bead, nothing else:
 }
 ```
 
-Jev's accuracy degrades when unrelated material sits in the state, so the agent never sends several beads, the intent document, or other anchors. The script keeps each request under 24,000 bytes by shortening the item from the tail, and halves it again if Jev reports its context window exceeded; the run records `item.truncated`, `item_chars_sent` and `item_shortened` (`jev-api.md`).
+Jev's accuracy degrades when unrelated material sits in the state, so the agent never sends several beads, the intent document, or other anchors. At the planning gate the bead is never shortened: long code blocks are sent as signatures with a redaction marker, and a bead that still does not fit one request is refused with `PLAN.TOO_LARGE` so it is split (`planning-gate.md`, "Plan size"). The run records `item.chars_before_reduction` and `item.code_reduced` (`jev-api.md`).
 
 ## The three questions
 

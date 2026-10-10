@@ -73,12 +73,14 @@ DEFAULT_THRESHOLD = _env_number("PLAN_ANCHOR_CONFIDENCE_THRESHOLD", 0.6, float)
 DEFAULT_MAX_ITEM_CHARS = _env_number("PLAN_ANCHOR_MAX_ITEM_CHARS", 24000, int)
 DEFAULT_MAX_REQUEST_BYTES = 24000  # conservative transport bound per request, as in process-porn's client
 DEFAULT_MIN_ITEM_CHARS = 2000      # below this the item is not shortened further on a context overflow
+DEFAULT_MAX_CODE_LINES = _env_number("PLAN_ANCHOR_MAX_CODE_LINES", 8, int)  # plan gate: longer code blocks go to signatures
 MAX_RESPONSE_BYTES = 1048576
 MAX_ATTEMPTS = 3                   # per anchor, for transport-level failures (429, 529, 5xx, network, bad response)
 RETRY_DELAYS = (1.0, 2.0)          # seconds before the second and third attempt; Retry-After overrides the first
 MAX_RETRY_AFTER = 30.0
 PROBABILITY_ROUNDING = 0.01        # Jev rounds each probability; the sum may be off by this per option
 TRUNCATION_MARKER = "\n[... truncated by jev_judge; keep the state small ...]"
+CODE_REDACTION_MARKER = "<redacted: {dropped} of {total} code lines are in the plan but were not sent to Jev>"
 HERE = pathlib.Path(__file__).resolve().parent
 QUESTIONS_DIR = HERE.parent / "assets" / "questions"
 
@@ -718,13 +720,15 @@ def fit_request(body: dict, max_request_bytes: int, min_item_chars: int, meta: d
     meta["request_bytes"] = size
 
 
-def judge_with_policy(body: dict, api_key: str, timeout: float, max_request_bytes: int, min_item_chars: int, questions: dict) -> tuple:
+def judge_with_policy(body: dict, api_key: str, timeout: float, max_request_bytes: int, min_item_chars: int, questions: dict,
+                      shorten: bool = True) -> tuple:
     """call_jev with the attempt policy and context handling. Returns (validated response, meta); raises JudgeError carrying .meta.
 
     - Transport-level failures (429, 529, 5xx, network, invalid response): up to MAX_ATTEMPTS attempts; the first
       retry waits Retry-After when given, else RETRY_DELAYS[0]; the next waits RETRY_DELAYS[1].
     - Context overflow (4xx mentioning max_tokens / token ... exceed): halve the item and retry until it fits or
-      the item is at min_item_chars, then give up with JEV.CONTEXT_EXCEEDED.
+      the item is at min_item_chars, then give up with JEV.CONTEXT_EXCEEDED. With shorten=False (plan gate) the
+      item is never cut: an overflow is recorded at once as PLAN.TOO_LARGE.
     - Everything else (401, 422) is raised at once.
     """
     item = body["state"]["item"]
@@ -739,6 +743,10 @@ def judge_with_policy(body: dict, api_key: str, timeout: float, max_request_byte
             return validate_response(resp, questions), meta
         except JudgeError as exc:
             exc.meta = meta
+            if exc.code == "JEV.CONTEXT_EXCEEDED" and not shorten:
+                final = plan_too_large(item, f"Jev rejected it for context size: {exc}")
+                final.meta = meta
+                raise final
             if exc.code == "JEV.CONTEXT_EXCEEDED":
                 if halve_item(item, min_item_chars, meta):
                     meta["request_bytes"] = len(encode_body(body))
@@ -870,6 +878,107 @@ def explain(verdict: str, min_conf: float, gate: str) -> str:
     }[verdict]
 
 
+# --------------------------------------------------------------------------- #
+# plan size (plan gate only)
+# --------------------------------------------------------------------------- #
+FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})")
+SIGNATURE_RES = tuple(re.compile(p) for p in (
+    r"^\s*(pub(\([^)]*\))?\s+)?((async|const|unsafe|default|extern(\s+\"[^\"]*\")?)\s+)*fn\s+\w+",   # Rust fn
+    r"^\s*(pub(\([^)]*\))?\s+)?(struct|enum|union|trait|type|mod)\s+\w+",                       # Rust items
+    r"^\s*(unsafe\s+)?impl\b",
+    r"^\s*(pub(\([^)]*\))?\s+)?(const|static)\s+(mut\s+)?[A-Z_][A-Z0-9_]*\s*:",
+    r"^\s*macro_rules!\s*\w+",
+    r"^\s*(async\s+)?def\s+\w+\s*\(",                                                           # Python
+    r"^\s*class\s+\w+",
+    r"^\s*(export\s+)?(default\s+)?(async\s+)?function\b",                                      # JS / TS
+    r"^\s*(export\s+)?(interface|type)\s+\w+",
+    r"^\s*(function\s+)?[\w-]+\s*\(\)\s*\{",                                                    # shell
+    r"^\s*\[\[?[^\]=]+\]\]?\s*$",                                                                  # TOML / INI table
+    r"^[@\w][\w-]*(\s+[^:=]*)?:(\s|$)(?!=)",                                                      # just recipe header
+))
+
+
+def signature_lines(body: list) -> list:
+    """Declaration lines of a code block; a signature whose parentheses are still open continues onto following lines."""
+    keep, i = [], 0
+    while i < len(body):
+        line = body[i]
+        if any(r.match(line) for r in SIGNATURE_RES):
+            keep.append(line)
+            depth = line.count("(") - line.count(")")
+            while depth > 0 and i + 1 < len(body) and len(keep) < len(body):
+                i += 1
+                keep.append(body[i])
+                depth += body[i].count("(") - body[i].count(")")
+        i += 1
+    return keep
+
+
+def reduce_code(text: str, max_lines: int) -> tuple:
+    """Replace each fenced code block longer than max_lines with its signature lines and a redaction marker.
+
+    The plan keeps the code; only the text sent to Jev is reduced, and the marker says so. Returns (text, stats).
+    """
+    lines = text.split("\n")
+    out, stats, i = [], {"blocks": 0, "lines": 0}, 0
+    while i < len(lines):
+        m = FENCE_RE.match(lines[i])
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        indent, fence = m.group(1), m.group(2)
+        j = i + 1
+        while j < len(lines) and not (lines[j].strip().startswith(fence[0] * len(fence)) and not lines[j].strip().strip(fence[0])):
+            j += 1
+        body = lines[i + 1:j]
+        closing = lines[j] if j < len(lines) else indent + fence
+        if len(body) <= max_lines:
+            out.extend(lines[i:j + 1] if j < len(lines) else lines[i:])
+        else:
+            sigs = signature_lines(body)
+            dropped = len(body) - len(sigs)
+            out.append(lines[i])
+            out.extend(sigs)
+            out.append(indent + CODE_REDACTION_MARKER.format(dropped=dropped, total=len(body)))
+            out.append(closing)
+            stats["blocks"] += 1
+            stats["lines"] += dropped
+        i = j + 1
+    return "\n".join(out), stats
+
+
+def size_breakdown(text: str) -> dict:
+    """Where an item's characters are: per '## ' section, and prose versus fenced code. Facts for a judgement, not a verdict."""
+    sections, current, code, in_code = {}, "(title)", 0, False
+    for line in text.split("\n"):
+        if FENCE_RE.match(line):
+            in_code = not in_code
+            code += len(line) + 1
+            continue
+        if not in_code and line.startswith("## "):
+            current = line[3:].strip()
+        sections[current] = sections.get(current, 0) + len(line) + 1
+        if in_code:
+            code += len(line) + 1
+    return {"sections": sections, "code_chars": code, "prose_chars": len(text) - code}
+
+
+def plan_too_large(item: dict, detail: str) -> JudgeError:
+    size = size_breakdown(item["text"])
+    where = ", ".join(f"{k} {v}" for k, v in sorted(size["sections"].items(), key=lambda kv: -kv[1]))
+    exc = JudgeError("PLAN.TOO_LARGE",
+                     f"plan bead {item['id']} is {len(item['text'])} characters after long code was reduced to signatures "
+                     f"({size['prose_chars']} prose, {size['code_chars']} code; by section: {where}); {detail}. "
+                     "A reasonable plan bead fits in one Jev request; this one is asking too much",
+                     action="Oversize is a symptom; judge its cause before changing the bead. First remove work that no anchor, "
+                            "requirement or user-approved issue asks for (ask the user when unsure). Then cut prose and process "
+                            "ceremony that does not serve a deliverable. Split only approved work that is still too large after "
+                            "that. Never split, trim or raise a limit just to pass the gate.")
+    exc.meta = {"size": size}
+    return exc
+
+
 def read_item(args) -> dict:
     if args.item_file:
         try:
@@ -882,12 +991,20 @@ def read_item(args) -> dict:
         text = sys.stdin.read()
     if not text.strip():
         raise JudgeError("INPUT.EMPTY", "item text is empty", action="Pass the bead or work description via --item-file.")
-    truncated = False
+    item = {"id": args.item_id, "title": args.item_title or "", "truncated": False, "source": args.item_file or "stdin"}
+    if getattr(args, "gate", "") == "plan":
+        # A plan bead is never truncated: one that does not fit is too large and must be split.
+        item["chars_before_reduction"] = len(text)
+        text, item["code_reduced"] = reduce_code(text, getattr(args, "max_code_lines", DEFAULT_MAX_CODE_LINES))
+        item["text"] = text
+        if len(text) > args.max_item_chars:
+            raise plan_too_large(item, f"the plan-gate item budget is {args.max_item_chars} characters")
+        return item
     if len(text) > args.max_item_chars:
         text = text[: args.max_item_chars] + TRUNCATION_MARKER
-        truncated = True
-    return {"id": args.item_id, "title": args.item_title or "", "text": text, "truncated": truncated,
-            "source": args.item_file or "stdin"}
+        item["truncated"] = True
+    item["text"] = text
+    return item
 
 
 def check_api_key(api_key: str) -> None:
@@ -911,7 +1028,8 @@ def judge_context(args, rec: dict) -> dict:
         "min_item_chars": getattr(args, "min_item_chars", DEFAULT_MIN_ITEM_CHARS),
         "dry_run": bool(getattr(args, "dry_run", False)),
     }
-    for name in ("max_item_chars", "max_request_bytes", "min_item_chars"):
+    ctx["max_code_lines"] = getattr(args, "max_code_lines", DEFAULT_MAX_CODE_LINES)
+    for name in ("max_item_chars", "max_request_bytes", "min_item_chars", "max_code_lines"):
         if ctx[name] < 1:
             raise JudgeError("VALIDATION.INPUT", f"--{name.replace('_', '-')} must be a positive integer, got {ctx[name]}")
     ctx["base_qs"] = load_question_set(args.gate, getattr(args, "questions", ""))
@@ -983,7 +1101,8 @@ def judge_entries(ctx: dict, prepared: list, item: dict, fixture_key) -> tuple:
                 meta["attempts"] = 1
                 resp = validate_response({"model": "fixture", "answers": fx}, qs["questions"])
             else:
-                resp, meta = judge_with_policy(body, ctx["api_key"], ctx["timeout"], ctx["max_request_bytes"], ctx["min_item_chars"], qs["questions"])
+                resp, meta = judge_with_policy(body, ctx["api_key"], ctx["timeout"], ctx["max_request_bytes"], ctx["min_item_chars"], qs["questions"],
+                                               shorten=ctx["gate"] != "plan")
             model_answered = resp.get("model", model_answered)
             verdict, min_conf = decide(resp["answers"], qs["roles"], ctx["threshold"])
             entry.update({"verdict": verdict, "answers": resp["answers"], "min_confidence": round(min_conf, 3),
@@ -1012,7 +1131,8 @@ def assemble_run(ctx: dict, rec: dict, anchors_path: str, item: dict, results: l
         "created_at": now_utc().isoformat(timespec="seconds"),
         "anchors_path": anchors_path,
         "plan": rec.get("plan"),
-        "item": {"id": item["id"], "title": item["title"], "source": item["source"], "chars": len(item["text"]), "truncated": item["truncated"]},
+        "item": {"id": item["id"], "title": item["title"], "source": item["source"], "chars": len(item["text"]), "truncated": item["truncated"],
+                 **{k: item[k] for k in ("chars_before_reduction", "code_reduced") if k in item}},
         "model_requested": ctx["model"],
         "model_answered": model_answered,
         "threshold": ctx["threshold"],
@@ -1073,6 +1193,12 @@ def cmd_judge(args) -> dict:
     ctx = judge_context(args, rec)
     item = read_item(args)
     prepared = prepare_question_sets(ctx, anchors)
+    if ctx["gate"] == "plan":
+        # Checked for every anchor before any request, so an oversize plan bead sends nothing.
+        for a, qs, _ in prepared:
+            size = len(encode_body({"model": ctx["model"], "state": build_state(a, item), "questions": qs["questions"]}))
+            if size > ctx["max_request_bytes"]:
+                raise plan_too_large(item, f"with {a['id']} and its questions the request is {size} bytes, over --max-request-bytes {ctx['max_request_bytes']}")
     results, requests_out, model_answered = judge_entries(ctx, prepared, item, lambda a: a["id"])
     run = assemble_run(ctx, rec, args.anchors, item, results, requests_out, model_answered)
     write_run(run, args.out, default_run_dir(args))
@@ -1272,7 +1398,10 @@ def add_judge_options(parser, with_item: bool) -> None:
         parser.add_argument("--item-id", required=True, help="bead id, PR number, or sprint id")
         parser.add_argument("--item-title", default="")
         parser.add_argument("--item-file", default="", help="file with the bead or work description; stdin if omitted")
-        parser.add_argument("--max-item-chars", type=int, default=DEFAULT_MAX_ITEM_CHARS)
+        parser.add_argument("--max-item-chars", type=int, default=DEFAULT_MAX_ITEM_CHARS,
+                            help="dev gate: truncate the item to this; plan gate: refuse a larger bead with PLAN.TOO_LARGE")
+        parser.add_argument("--max-code-lines", type=int, default=DEFAULT_MAX_CODE_LINES,
+                            help="plan gate: code blocks longer than this are sent as signatures plus a redaction marker")
         parser.add_argument("--out", default="", help="explicit run file path")
     else:
         parser.add_argument("--id", default="", help="one anchor id")
@@ -1282,7 +1411,7 @@ def add_judge_options(parser, with_item: bool) -> None:
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
     parser.add_argument("--max-request-bytes", type=int, default=DEFAULT_MAX_REQUEST_BYTES,
-                        help="shorten the item until each serialised request is under this many bytes")
+                        help="dev gate: shorten the item until each request is under this many bytes; plan gate: refuse a bead that does not fit")
     parser.add_argument("--min-item-chars", type=int, default=DEFAULT_MIN_ITEM_CHARS,
                         help="never shorten the item below this on a context overflow; record JEV.CONTEXT_EXCEEDED instead")
     parser.add_argument("--timeout", type=float, default=30.0)
