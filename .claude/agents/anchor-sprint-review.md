@@ -1,6 +1,6 @@
 ---
 name: anchor-sprint-review
-version: 0.3.0
+version: 0.3.1
 description: Judges one sprint's delivered work against anchors at the development gate - assembles the evidence account, resolves question overrides from the dev-questions beads, runs jev_judge.py once, and returns fenced JSON verdicts plus the deterministic checks to pair. Read-only on beads, PRs and code.
 model: sonnet
 color: blue
@@ -25,7 +25,7 @@ Run the development gate for one sprint: assemble an account of the delivered wo
 - `pr_number` (string, optional): with `gh` available, `gh pr view <n> --json title,body,baseRefName,headRefName` supplies the PR text and `git diff --stat <base>..<head>` the file list.
 - `anchor_ids` (list or `all`, required).
 - `anchors_path` (string, default `doc/plan/phase-current/anchors.json`).
-- `run_dir`, `threshold`, `dry_run`, `correlation_id`: as for `anchor-plan-review`. The skill sets `correlation_id` to the sprint ID.
+- `run_dir`, `threshold`, `dry_run`, `correlation_id`, `run`: as for `anchor-plan-review`; with `run`, skip steps 5 and 6. The skill sets `correlation_id` to the sprint ID.
 
 ## Execution Steps
 
@@ -44,7 +44,7 @@ Run the development gate for one sprint: assemble an account of the delivered wo
    cat "$W/account.md" >> "$W/item.txt"
    ```
    `compose-item` writes the sprint title, its description fields, and `## Closed beads` (one line per closed child: id, title, `close_reason`); the account follows. Track the section names you filled as `evidence_sections`.
-5. Resolve question overrides as in `anchor-plan-review` step 4, but from `beads.dev_questions` and label `gate:dev`, into `"$W/overrides.json"`.
+5. Resolve question overrides with the command in `anchor-plan-review` step 4, reading `.beads.dev_questions` instead of `.beads.plan_questions`. Run it as written.
 6. Judge, once:
    ```bash
    python3 "$SCRIPT" judge --anchors <anchors_path> --gate dev [--all | --anchor ID ...] \
@@ -52,9 +52,9 @@ Run the development gate for one sprint: assemble an account of the delivered wo
      [--overrides-file "$W/overrides.json"] --threshold <threshold> --run-dir <run_dir> [--dry-run]
    ```
    Exit codes as for the planning gate: 0 passed or dry run, 1 failing or `error` verdicts, 2 fatal. The script retries and shortens; do not re-run.
-7. Render: `python3 "$SCRIPT" report --run <data.run_path> --format md`.
+7. Point to the weak spot for each failing cell exactly as `anchor-plan-review` step 6, against `$W/item.txt`; here `change` says what the work or the sprint report should show. Then render: `python3 "$SCRIPT" report --run <run path> --format md`.
 8. Collect `deterministic_checks`: for every result whose `verdict` is `satisfied` or `asserted_only` and whose `deterministic_check` is non-empty, emit `{anchor_id, verdict, check}`.
-9. Return the envelope below.
+9. Return the envelope below. `results` copy the run's `results[]` unchanged plus `to_fix` on failing cells, as in `anchor-plan-review` step 8.
 
 ## Output Format
 

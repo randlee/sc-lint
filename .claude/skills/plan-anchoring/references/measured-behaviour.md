@@ -1,6 +1,6 @@
 ---
 name: measured-behaviour
-version: 0.3.0
+version: 0.3.1
 description: What Jev actually did on a real plan - request sizes it accepts, where in a long bead it stops reading reliably, how the default questions perform on real anchors, run-to-run noise, and the threshold - with the skill rules each number justifies.
 ---
 
@@ -17,7 +17,8 @@ Every numbered rule in this skill rests on a measurement recorded here: 245 live
 | Halve-and-retry fired | 0 of 245 requests | The development gate cap can be 64,000 bytes |
 | Verdict changes between full text, description + acceptance, description only, and code reduced to signatures | 0 of 6 pairs; p(addressed) moved at most 0.20, inside noise | The planning gate judges description + acceptance criteria; design text adds tokens, not verdicts |
 | Planted contradiction, p(contradicted) by position in one long bead | start of description 0.68 (full) / 0.79 (description + acceptance); 28k deep in design 0.46; end of acceptance 0.40; the sentence alone 0.96; unplanted baseline 0.29 | Jev reads the start reliably, the middle of a long bead poorly. What a bead says about an anchor goes first. The planning-gate cap of 24,000 bytes is "what Jev reads reliably" |
-| Code reduced to signatures (`--max-code-lines`) | changed no verdict | A size tool, not an accuracy lever |
+| Code reduced to signatures (`--max-code-lines`), six full-text pairs | changed no verdict | A size tool, not an accuracy lever |
+| Always reducing code longer than 8 lines versus sending it whole where the bead fit (13 plan beads by 6 anchors; 11 of 13 fit whole) | underspecified cells 15 → 8; beads passing 1 → 6; a "code for each deliverable" anchor cleared on 5 beads where its `addressed` confidence had been 0.28 to 0.59 when reduced | Code is reduced only when a bead would not otherwise fit, and then as little as possible (`plan-size-and-shape.md`, Long code) |
 
 ## Default questions on real anchors
 
@@ -49,5 +50,5 @@ Beads adding work outside the approved issues ("also closes <unapproved issue>",
 ## What did not matter
 
 - Which phase label the bead text carried: no effect.
-- Code-to-signature reduction: no verdict change on six pairs.
+- Code-to-signature reduction on six large full-text pairs: no verdict change. On beads that fit whole it did matter (Size table), so the gate no longer reduces them.
 - Model version drift within the day: none; noise was run-to-run, not version-to-version.
