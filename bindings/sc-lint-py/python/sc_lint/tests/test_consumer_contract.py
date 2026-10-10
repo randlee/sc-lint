@@ -45,13 +45,20 @@ class ConsumerContractTests(unittest.TestCase):
             "setup": "bootstrap setup --config sc-lint.toml --dry-run",
             "upgrade": "bootstrap upgrade --config sc-lint.toml --check --dry-run",
         }.items():
-            result = subprocess.run(
-                ["just", "--dry-run", recipe],
-                cwd=ROOT,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            try:
+                result = subprocess.run(
+                    ["just", "--dry-run", recipe],
+                    cwd=ROOT,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as error:
+                self.fail(
+                    f"just --dry-run {recipe} timed out after {error.timeout}s; "
+                    f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+                )
             rendered = result.stdout + result.stderr
             self.assertIn(required, rendered, recipe)
             self.assertIn(".sc-lint/bootstrap", rendered, recipe)
@@ -180,14 +187,21 @@ class PosixBootstrapNonMutatingSetupTests(unittest.TestCase):
             "HOME": str(tmp),
             "SC_LINT_INSTALL_DIR": str(install_dir),
         }
-        result = subprocess.run(
-            ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "setup", "--config", str(config), flag],
-            cwd=tmp,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "setup", "--config", str(config), flag],
+                cwd=tmp,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired as error:
+            self.fail(
+                f"bootstrap setup {flag} timed out after {error.timeout}s; "
+                f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+            )
         return result, log
 
     @unittest.skipIf(sys.platform == "win32", "POSIX bootstrap")
@@ -214,18 +228,25 @@ class PosixBootstrapNonMutatingSetupTests(unittest.TestCase):
             (venv_bin / "python3").chmod(0o755)
             config = consumer / "sc-lint.toml"
             config.write_text((ROOT / "sc-lint.toml").read_text(encoding="utf-8"), encoding="utf-8")
-            result = subprocess.run(
-                ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "lint", "--config", str(config)],
-                cwd=tmp,
-                env={
-                    "PATH": "/usr/bin:/bin",
-                    "HOME": str(tmp),
-                    "SC_LINT_INSTALL_DIR": str(install_dir),
-                },
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+            try:
+                result = subprocess.run(
+                    ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "lint", "--config", str(config)],
+                    cwd=tmp,
+                    env={
+                        "PATH": "/usr/bin:/bin",
+                        "HOME": str(tmp),
+                        "SC_LINT_INSTALL_DIR": str(install_dir),
+                    },
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as error:
+                self.fail(
+                    f"bootstrap lint timed out after {error.timeout}s; "
+                    f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+                )
             self.assertEqual(result.returncode, 0, result.stderr)
             last = log.read_text(encoding="utf-8").splitlines()[-1]
             self.assertEqual(last, f"bin={fake} path={fake}")
