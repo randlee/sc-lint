@@ -506,6 +506,10 @@ Recommended initial policy:
   - delegated backend execution failure
 - `6`
   - delegated backend protocol failure
+- `10`
+  - `lint sc-boundary`, `lint sc-portability` or `lint sc-runtime` completed
+    with `data.status = "fail"` (business verdict; the envelope stays
+    `ok: true`)
 
 These codes are owned by the CLI and must not drift per backend.
 

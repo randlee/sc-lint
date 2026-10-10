@@ -28,6 +28,7 @@ pub const FIELD_DOCS: &str = "docs";
 pub const FIELD_STEPS: &str = "steps";
 pub const FIELD_ROOT: &str = "root";
 pub const FIELD_EXIT_CODE: &str = "exit_code";
+pub const EXIT_VERDICT_FAIL: u8 = 10;
 pub const FIELD_BACKEND_PATH: &str = "backend_path";
 
 /// Repo-relative directory of the consumer-provisioned Python virtual environment.

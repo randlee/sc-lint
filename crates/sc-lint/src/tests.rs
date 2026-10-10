@@ -1334,6 +1334,71 @@ fn lint_sc_boundary_reports_dependency_policy_failures_through_dispatch() {
     }
 }
 
+fn lint_boundary_outcome(root: &Path, json_mode: bool) -> crate::entry::ExecutionOutcome {
+    let root = root.to_str().expect("root");
+    let cli = if json_mode {
+        Cli::parse_from(["sc-lint", "--json", "--root", root, "lint", "sc-boundary"])
+    } else {
+        Cli::parse_from(["sc-lint", "--root", root, "lint", "sc-boundary"])
+    };
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    crate::entry::execute(context, &loaded, json_mode)
+}
+
+#[test]
+fn lint_analyzer_fail_verdict_exits_ten() {
+    let fixture = AnalysisFixture::new();
+    fixture.configure_disallowed_dependency();
+    for json_mode in [true, false] {
+        let outcome = lint_boundary_outcome(fixture.root(), json_mode);
+        assert_eq!(
+            outcome.exit_code,
+            crate::consts::EXIT_VERDICT_FAIL,
+            "json_mode = {json_mode}"
+        );
+        assert!(outcome.ok, "json_mode = {json_mode}");
+        assert!(outcome.error.is_none(), "json_mode = {json_mode}");
+    }
+}
+
+#[test]
+fn lint_analyzer_pass_verdict_exits_zero() {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write(
+        "crates/example/Cargo.toml",
+        "[package]\nname = \"example\"\nversion.workspace = true\nedition.workspace = true\nrust-version.workspace = true\nauthors.workspace = true\nlicense.workspace = true\nrepository.workspace = true\nhomepage.workspace = true\n",
+    );
+    fixture.write_source("example", "lib.rs", "pub struct Example;\n");
+    let outcome = lint_boundary_outcome(fixture.root(), true);
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.ok);
+    assert!(outcome.error.is_none());
+}
+
+#[test]
+fn verdict_exit_code_covers_every_analyzer_target() {
+    use crate::entry::verdict_exit_code;
+
+    let fail = json!({ "status": "fail" });
+    let pass = json!({ "status": "pass" });
+    for id in [
+        crate::consts::CMD_BOUNDARY,
+        crate::consts::CMD_PORTABILITY,
+        crate::consts::CMD_RUNTIME,
+    ] {
+        assert_eq!(
+            verdict_exit_code(id, Some(&fail)),
+            crate::consts::EXIT_VERDICT_FAIL,
+            "{id}"
+        );
+        assert_eq!(verdict_exit_code(id, Some(&pass)), 0, "{id}");
+        assert_eq!(verdict_exit_code(id, None), 0, "{id}");
+    }
+    assert_eq!(verdict_exit_code("check.interfaces", Some(&fail)), 0);
+}
+
 #[test]
 #[serial]
 fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope() {
