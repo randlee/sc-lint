@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from release_documentation import package_config_with_bundle, register_documentation_commands
 from release_python import cmd_python_wheel_matrix, wheel_targets, verify_platforms, explicit_asset_patterns
 
 import re
@@ -494,12 +495,8 @@ def cmd_release_package_config(args: argparse.Namespace) -> int:
     except KeyError as error:
         raise SystemExit(f"unknown release target: {args.target}") from error
     binaries = _release_binaries(manifest)
-    print(
-        json.dumps(
-            {"project": _require_project(manifest), "target": target, "binaries": binaries},
-            separators=(",", ":"),
-        )
-    )
+    config = {"project": _require_project(manifest), "target": target, "binaries": binaries}
+    print(json.dumps(package_config_with_bundle(manifest, config), separators=(",", ":")))
     return 0
 
 
@@ -980,6 +977,8 @@ def main() -> int:
     p.add_argument("--workspace-toml", required=True)
     p.add_argument("--readme", required=True)
     p.set_defaults(func=cmd_sync_readme_version)
+
+    register_documentation_commands(sub, _release_binaries)
 
     p = sub.add_parser("cargo-build-bin-args")
     p.add_argument("--manifest", required=True)

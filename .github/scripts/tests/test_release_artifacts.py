@@ -455,6 +455,7 @@ def run_release_gate_readiness(
     scripts_dir.mkdir(parents=True, exist_ok=True)
     for script_name in (
         "release_artifacts.py",
+        "release_documentation.py",
         "release_manifest.py",
         "release_registry.py",
         "release_credentials.py",
@@ -1045,6 +1046,7 @@ def test_no_single_repo_concerns_leak_into_kit_workflows_actions_or_scripts() ->
         "bootstrap_sc_compose.py",
         "setup_sc_lint_source.py",
         "release_artifacts.py",
+        "release_documentation.py",
         "release_manifest.py",
         "release_registry.py",
         "release_credentials.py",

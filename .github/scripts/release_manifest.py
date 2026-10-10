@@ -67,6 +67,9 @@ def load_manifest(path: Path, *, with_channel_contracts: bool = False) -> dict:
     # Optional: the prerelease skill's table is validated only when declared.
     if "prerelease" in data:
         manifest["prerelease"] = data["prerelease"]
+    # Optional: a consumer-declared documentation bundle staged into archives.
+    if "documentation_bundle" in data:
+        manifest["documentation_bundle"] = data["documentation_bundle"]
     if with_channel_contracts:
         manifest["channel_contracts"] = load_channel_contracts(
             path.parent / CHANNEL_CONTRACTS_FILE

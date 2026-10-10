@@ -146,7 +146,15 @@
       "name": "sc-lint-runtime"
     }
   ],
-  "python_packages": [],
+  "python_packages": [
+    {
+      "artifact": "sc-lint-py",
+      "package": "sc-lint",
+      "manifest": "bindings/sc-lint-py/pyproject.toml",
+      "module": "sc_lint",
+      "publish": "pypi"
+    }
+  ],
   "python_distributions": [
     {
       "name": "sc-lint",
@@ -209,22 +217,30 @@
           "target": "x86_64-unknown-linux-gnu"
         }
       ]
-    },
-    "winget": {
-      "workflow": "winget-publish.yml",
-      "dispatch_inputs": {},
-      "identifier": "randlee.sc-lint",
-      "installer_target": "x86_64-pc-windows-msvc"
-    },
-    "scoop": {
-      "workflow": "scoop-publish.yml",
-      "dispatch_inputs": {},
-      "bucket_repository": "randlee/scoop-bucket",
-      "manifest_path": "bucket/sc-lint.json",
-      "manifest_template": "release/scoop/manifest.json.j2",
-      "installer_target": "x86_64-pc-windows-msvc",
-      "binary": "bin/sc-lint.exe",
-      "renderer_target": "x86_64-unknown-linux-gnu"
     }
+  },
+  "documentation_bundle": {
+    "source_directory": "docs-bundle",
+    "package_directory": "sc-lint-docs",
+    "required_files": [
+      "manifest.toml",
+      "README.md",
+      "installation.md",
+      "using-sc-lint.md",
+      "configuration.md",
+      "just-setup.md",
+      "ci.md",
+      "upgrade.md",
+      "troubleshooting.md",
+      "best-practices.md",
+      "packages/sc-lint.md",
+      "packages/sc-lint-attributes.md",
+      "packages/sc-lint-analyzer-support.md",
+      "packages/sc-lint-boundary.md",
+      "packages/sc-lint-directives.md",
+      "packages/sc-lint-portability.md",
+      "packages/sc-lint-runtime.md",
+      "packages/sc-lint-schema.md"
+    ]
   }
 }

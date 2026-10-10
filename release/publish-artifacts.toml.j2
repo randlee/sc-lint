@@ -61,6 +61,10 @@ required_variables:
   - has_rust_toolchain
   - has_sc_lint_source_revision
   - has_prerelease
+  - has_documentation_bundle
+  - documentation_bundle.source_directory
+  - documentation_bundle.package_directory
+  - documentation_bundle.required_files
   - has_channel_pypi
   - has_channel_homebrew
   - has_channel_winget
@@ -126,6 +130,13 @@ name = {{ binary.name }}
 bundled_paths = {{ binary.bundled_paths }}
 {% endif %}
 {% endfor %}
+
+{% if has_documentation_bundle %}
+[documentation_bundle]
+source_directory = {{ documentation_bundle.source_directory }}
+package_directory = {{ documentation_bundle.package_directory }}
+required_files = {{ documentation_bundle.required_files }}
+{% endif %}
 
 {% for package in python_packages %}
 [[python_packages]]

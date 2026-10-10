@@ -211,6 +211,14 @@ def load_install_values(path: Path) -> dict[str, object]:
                 "bundled_paths.homebrew_destination_components",
             )
 
+    if "documentation_bundle" in values:
+        bundle = _require_mapping(values["documentation_bundle"], "documentation_bundle")
+        for field in ("source_directory", "package_directory"):
+            _require_string(bundle.get(field), f"documentation_bundle.{field}")
+        files = _require_string_array(bundle.get("required_files"), "documentation_bundle.required_files")
+        if not files:
+            raise argparse.ArgumentTypeError("documentation_bundle.required_files must not be empty")
+
     if "prerelease" in values:
         prerelease = _require_mapping(values["prerelease"], "prerelease")
         for field in ("tag_prefix", "tag_script", "install_root", "post_install", "verify"):
@@ -428,6 +436,14 @@ def template_values(values: dict[str, object]) -> dict[str, object]:
     template_project.setdefault("workspace_toml", "")
     template_project.setdefault("rust_toolchain", "")
     template_project.setdefault("sc_lint_source_revision", "")
+    documentation_bundle = values.get("documentation_bundle")
+    template_documentation_bundle = (
+        _toml_scalars(
+            _require_mapping(documentation_bundle, "documentation_bundle"), ("required_files",)
+        )
+        if documentation_bundle
+        else {"source_directory": "", "package_directory": "", "required_files": "[]"}
+    )
     prerelease = values.get("prerelease")
     template_prerelease = (
         _toml_scalars(
@@ -463,6 +479,8 @@ def template_values(values: dict[str, object]) -> dict[str, object]:
         "has_workspace_toml": "workspace_toml" in project,
         "has_rust_toolchain": "rust_toolchain" in project,
         "has_sc_lint_source_revision": "sc_lint_source_revision" in project,
+        "documentation_bundle": template_documentation_bundle,
+        "has_documentation_bundle": "documentation_bundle" in values,
         "has_prerelease": "prerelease" in values,
         **{f"has_channel_{name}": name in channels for name in CHANNEL_NAMES},
     }

@@ -1,0 +1,47 @@
+name: Move Action major tag
+
+# sc-lint-owned (not a kit file). Moves the stable `v1` tag consumed as
+# `uses: randlee/sc-lint@v1` to a published release commit. The sc-publish kit
+# has no equivalent leg; like the kit's post-release channels this is
+# dispatched per published tag and may be re-run for the same tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Published GitHub Release tag to move v1 to (e.g. v0.6.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: action-major-tag
+  cancel-in-progress: false
+
+jobs:
+  move-major-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Require a published GitHub Release for the tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: gh release view "$RELEASE_TAG" --json tagName,isDraft --jq 'select(.isDraft | not) | .tagName'
+
+      - name: Move the stable Action major tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_commit="$(git rev-parse HEAD)"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag --force -a v1 "$release_commit" -m "sc-lint GitHub Action v1"
+          git push --force origin refs/tags/v1
