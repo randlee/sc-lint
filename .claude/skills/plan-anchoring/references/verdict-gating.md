@@ -1,6 +1,6 @@
 ---
 name: verdict-gating
-version: 0.3.0
+version: 0.3.1
 description: How jev_judge.py turns independent Jev answers into one verdict per anchor and item, the role contract, thresholds, severity order, pass criteria and exit codes, coverage, run diffs, and offline fixtures.
 ---
 
@@ -38,9 +38,9 @@ Each `choice` answer gives a `choice` and a `confidence` in [0, 1]. The threshol
 | 2 | conflict is `yes` with confidence >= t | `contradicted` |
 | 3 | relevance or compliance is `unclear`, or either confidence < t | `underspecified` |
 | 4 | compliance is `no` | `not_addressed` |
-| 5 | compliance is `yes` and an evidence role exists and evidence is `no` with confidence >= t | `asserted_only` |
-| 6 | compliance is `yes` | `satisfied` |
-| 7 | anything else | `underspecified` |
+| 5 | compliance is `yes`, conflict is `no`, and an evidence role exists and evidence is `no` with confidence >= t | `asserted_only` |
+| 6 | compliance is `yes` and conflict is `no` | `satisfied` |
+| 7 | anything else, including a low-confidence conflict `yes` or `unclear` | `underspecified` |
 
 Contradiction outranks underspecification: a confident conflict is actionable even when relevance was shaky. Lower `t` to 0.5 only after every anchor's questions have passed tuning (`question-tuning.md`, measured-behaviour.md). A `noul` answer maps to yes/no at 0.5 with confidence `abs(p - 0.5) * 2`. Responses that fail validation never reach this table; they are retried, then recorded as `verdict: error`.
 

@@ -948,6 +948,9 @@ class DecideTests(unittest.TestCase):
         self.assertEqual(self.decide(plan_answers(rel="unclear"))[0], "underspecified")
         self.assertEqual(self.decide(plan_answers(rel_p=0.59))[0], "underspecified")
         self.assertEqual(self.decide(plan_answers(comp="unclear"))[0], "underspecified")
+        # a low-confidence conflict yes (or unclear) never passes, even when compliance is a confident yes
+        self.assertEqual(self.decide(plan_answers(conf="yes", conf_p=0.4)), ("underspecified", 0.4))
+        self.assertEqual(self.decide(plan_answers(conf="unclear"))[0], "underspecified")
         verdict, min_conf = self.decide(plan_answers(comp_p=0.3))
         self.assertEqual((verdict, min_conf), ("underspecified", 0.3))
 

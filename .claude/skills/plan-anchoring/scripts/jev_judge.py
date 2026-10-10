@@ -1472,7 +1472,7 @@ def decide(answers: dict, roles: dict, threshold: float, kind: str = "directive"
         return "underspecified", min_conf
     if comp == "no":
         return "not_addressed", min_conf
-    if comp == "yes":
+    if comp == "yes" and conf == "no":  # a low-confidence conflict `yes` or `unclear` never passes
         if roles.get("evidence") and evid == "no" and evid_c >= threshold:
             return "asserted_only", min_conf
         return "satisfied", min_conf
