@@ -1032,6 +1032,25 @@ state = "concrete_landed"
 }
 
 #[test]
+fn rejects_duplicate_allowed_dev_dependency_names() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "allowed_dev_dependencies = [\"sc-lint-directives\", \"sc-lint-directives\"]\nforbidden_edges = []",
+        )
+    });
+
+    let error =
+        load_boundary_inventory(fixture.root()).expect_err("duplicate dev dependencies fail");
+    assert!(
+        format!("{error:#}")
+            .contains("duplicate package `sc-lint-directives` in `allowed_dev_dependencies`")
+    );
+}
+
+#[test]
 fn rejects_duplicate_forbidden_edges() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();

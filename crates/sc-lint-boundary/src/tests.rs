@@ -501,6 +501,52 @@ fn dependency_policy_flags_disallowed_direct_dependency() {
 }
 
 #[test]
+fn dependency_policy_checks_dev_edges_against_both_allow_lists() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "")
+            + "[dev-dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    let report = analyze_workspace(&options).unwrap();
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        report.findings[0].message,
+        "workspace package `app` directly dev-depends on `api` but `api` is not listed in `BOUNDARY-App` allowed_dependencies or allowed_dev_dependencies"
+    );
+
+    fixture.write_member_boundary_record("app", &["api"], &[], &[]);
+    assert_eq!(
+        analyze_workspace(&options).unwrap().status,
+        ReportStatus::Pass
+    );
+
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    let boundary = fixture.root().join("boundaries/app/boundary.toml");
+    let contents = fs::read_to_string(&boundary).unwrap().replace(
+        "forbidden_edges = []",
+        "allowed_dev_dependencies = [\"api\"]\nforbidden_edges = []",
+    );
+    fs::write(boundary, contents).unwrap();
+    assert_eq!(
+        analyze_workspace(&options).unwrap().status,
+        ReportStatus::Pass
+    );
+}
+
+#[test]
 fn dependency_policy_flags_disallowed_direct_dependent() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
