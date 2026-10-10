@@ -102,7 +102,7 @@
       "statement": "Each phase-i change lands in the lowest layer that can carry it, and each sprint bead names that layer.",
       "stated_by": "Rand Lee",
       "stated_at": "2026-10-10",
-      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"The intent is to make these changes at the appropriate layer\"",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"The intent is to make these changes at the appropriate layer\"",
       "summary": "Each change lands in the lowest capable layer; sprint names it",
       "scope": "every phase-i sprint bead and its delivered diff",
       "deterministic_check": "each sprint bead names one layer (a)-(d); git diff --stat of its PR touches only that layer's crates or kit files",
@@ -111,13 +111,13 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "lint-yn8",
+        "plan_questions": "lint-yn8.1",
+        "dev_questions": "lint-yn8.2"
       },
       "history": [
         {
@@ -130,6 +130,21 @@
           "event": "reworded",
           "status": "proposed",
           "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:18:55+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-yn8",
+            "plan_questions": "lint-yn8.1",
+            "dev_questions": "lint-yn8.2"
+          }
         }
       ]
     },
@@ -140,7 +155,7 @@
       "statement": "No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.",
       "stated_by": "Rand Lee",
       "stated_at": "2026-10-10",
-      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"any substantial redesign work is to be discussed w/ me before documented or planned.\"",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"any substantial redesign work is to be discussed w/ me before documented or planned.\"",
       "summary": "Redesign needs Rand's prior approval",
       "scope": "all phase-i documentation, ADR and plan-bead changes",
       "deterministic_check": "every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval",
@@ -149,13 +164,13 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "lint-zjw",
+        "plan_questions": "lint-zjw.1",
+        "dev_questions": "lint-zjw.2"
       },
       "history": [
         {
@@ -168,6 +183,21 @@
           "event": "reworded",
           "status": "proposed",
           "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:18:57+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-zjw",
+            "plan_questions": "lint-zjw.1",
+            "dev_questions": "lint-zjw.2"
+          }
         }
       ]
     },
@@ -178,7 +208,7 @@
       "statement": "Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.",
       "stated_by": "Rand Lee",
       "stated_at": "2026-10-10",
-      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign\"",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign\"",
       "summary": "Only targeted additions required by #193-#204",
       "scope": "every phase-i sprint bead and deliverable",
       "deterministic_check": "every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names",
@@ -187,13 +217,13 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "lint-7fs",
+        "plan_questions": "lint-7fs.1",
+        "dev_questions": "lint-7fs.2"
       },
       "history": [
         {
@@ -206,6 +236,21 @@
           "event": "reworded",
           "status": "proposed",
           "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:18:58+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-7fs",
+            "plan_questions": "lint-7fs.1",
+            "dev_questions": "lint-7fs.2"
+          }
         }
       ]
     },
@@ -216,7 +261,7 @@
       "statement": "Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.",
       "stated_by": "Rand Lee",
       "stated_at": "2026-10-10",
-      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: \"I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.\"",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.\"",
       "summary": "Sprint designs carry code for every deliverable",
       "scope": "every phase-i sprint bead's design field",
       "deterministic_check": "each sprint bead design contains a fenced code block for every numbered deliverable",
@@ -225,13 +270,13 @@
         "fail": []
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "locked",
       "promoted_to": null,
       "beads": {
-        "anchor": null,
-        "plan_questions": null,
-        "dev_questions": null
+        "anchor": "lint-57u",
+        "plan_questions": "lint-57u.1",
+        "dev_questions": "lint-57u.2"
       },
       "history": [
         {
@@ -244,6 +289,21 @@
           "event": "reworded",
           "status": "proposed",
           "note": "Rewritten for testability and to remove redundancy (old ANC-006 merged into ANC-005; old ANC-007 renumbered ANC-006)"
+        },
+        {
+          "at": "2026-10-10T17:45:00+00:00",
+          "event": "locked",
+          "status": "locked",
+          "note": "Rand approved the rewritten wording (\"those look better\") and confirmed the set"
+        },
+        {
+          "at": "2026-10-10T17:19:00+00:00",
+          "event": "beads_set",
+          "beads": {
+            "anchor": "lint-57u",
+            "plan_questions": "lint-57u.1",
+            "dev_questions": "lint-57u.2"
+          }
         }
       ]
     }

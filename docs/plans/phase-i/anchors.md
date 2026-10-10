@@ -8,10 +8,10 @@ Intent: `docs/plans/phase-i/intent.md`
 | --- | --- | --- | --- |
 | ANC-001 | locked | Four layers: shared types/attributes, cargo tools, CLI, just template | 2026-10-10 |
 | ANC-002 | locked | Repo owns just test; sc-lint supplies patterns and helpers | 2026-10-10 |
-| ANC-003 | proposed | Each change lands in the lowest capable layer; sprint names it | 2026-10-10 |
-| ANC-004 | proposed | Redesign needs Rand's prior approval | 2026-10-10 |
-| ANC-005 | proposed | Only targeted additions required by #193-#204 | 2026-10-10 |
-| ANC-006 | proposed | Sprint designs carry code for every deliverable | 2026-10-10 |
+| ANC-003 | locked | Each change lands in the lowest capable layer; sprint names it | 2026-10-10 |
+| ANC-004 | locked | Redesign needs Rand's prior approval | 2026-10-10 |
+| ANC-005 | locked | Only targeted additions required by #193-#204 | 2026-10-10 |
+| ANC-006 | locked | Sprint designs carry code for every deliverable | 2026-10-10 |
 
 ## ANC-001
 
@@ -45,7 +45,7 @@ Beads: anchor `lint-9lk`, plan questions `lint-9lk.1`, dev questions `lint-9lk.2
 
 > Each phase-i change lands in the lowest layer that can carry it, and each sprint bead names that layer.
 
-Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "The intent is to make these changes at the appropriate layer", 2026-10-10. Status: proposed. Version 2.
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: "The intent is to make these changes at the appropriate layer", 2026-10-10. Status: locked. Version 3.
 
 Summary: Each change lands in the lowest capable layer; sprint names it
 
@@ -53,11 +53,13 @@ Scope: every phase-i sprint bead and its delivered diff
 
 Deterministic check to pair with the development gate: each sprint bead names one layer (a)-(d); git diff --stat of its PR touches only that layer's crates or kit files
 
+Beads: anchor `lint-yn8`, plan questions `lint-yn8.1`, dev questions `lint-yn8.2`
+
 ## ANC-004
 
 > No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.
 
-Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "any substantial redesign work is to be discussed w/ me before documented or planned.", 2026-10-10. Status: proposed. Version 2.
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: "any substantial redesign work is to be discussed w/ me before documented or planned.", 2026-10-10. Status: locked. Version 3.
 
 Summary: Redesign needs Rand's prior approval
 
@@ -65,11 +67,13 @@ Scope: all phase-i documentation, ADR and plan-bead changes
 
 Deterministic check to pair with the development gate: every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval
 
+Beads: anchor `lint-zjw`, plan questions `lint-zjw.1`, dev questions `lint-zjw.2`
+
 ## ANC-005
 
 > Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.
 
-Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign", 2026-10-10. Status: proposed. Version 2.
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: "I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign", 2026-10-10. Status: locked. Version 3.
 
 Summary: Only targeted additions required by #193-#204
 
@@ -77,14 +81,18 @@ Scope: every phase-i sprint bead and deliverable
 
 Deterministic check to pair with the development gate: every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names
 
+Beads: anchor `lint-7fs`, plan questions `lint-7fs.1`, dev questions `lint-7fs.2`
+
 ## ANC-006
 
 > Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.
 
-Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; awaiting Rand approval; source words: "I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.", 2026-10-10. Status: proposed. Version 2.
+Said by Rand Lee, planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: "I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.", 2026-10-10. Status: locked. Version 3.
 
 Summary: Sprint designs carry code for every deliverable
 
 Scope: every phase-i sprint bead's design field
 
 Deterministic check to pair with the development gate: each sprint bead design contains a fenced code block for every numbered deliverable
+
+Beads: anchor `lint-57u`, plan questions `lint-57u.1`, dev questions `lint-57u.2`
