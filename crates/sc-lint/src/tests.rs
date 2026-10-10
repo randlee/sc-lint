@@ -1381,22 +1381,25 @@ fn lint_analyzer_pass_verdict_exits_zero() {
 fn verdict_exit_code_covers_every_analyzer_target() {
     use crate::entry::verdict_exit_code;
 
-    let fail = json!({ "status": "fail" });
+    let fail = json!({ crate::consts::FIELD_STATUS: crate::consts::STATUS_FAIL });
     let pass = json!({ "status": "pass" });
     for id in [
-        crate::consts::CMD_BOUNDARY,
-        crate::consts::CMD_PORTABILITY,
-        crate::consts::CMD_RUNTIME,
+        crate::command::CommandId::LintScBoundary,
+        crate::command::CommandId::LintScPortability,
+        crate::command::CommandId::LintScRuntime,
     ] {
         assert_eq!(
             verdict_exit_code(id, Some(&fail)),
             crate::consts::EXIT_VERDICT_FAIL,
-            "{id}"
+            "{id:?}"
         );
-        assert_eq!(verdict_exit_code(id, Some(&pass)), 0, "{id}");
-        assert_eq!(verdict_exit_code(id, None), 0, "{id}");
+        assert_eq!(verdict_exit_code(id, Some(&pass)), 0, "{id:?}");
+        assert_eq!(verdict_exit_code(id, None), 0, "{id:?}");
     }
-    assert_eq!(verdict_exit_code("check.interfaces", Some(&fail)), 0);
+    assert_eq!(
+        verdict_exit_code(crate::command::CommandId::CheckNative, Some(&fail)),
+        0
+    );
 }
 
 #[test]

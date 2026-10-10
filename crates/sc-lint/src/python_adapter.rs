@@ -125,7 +125,7 @@ fn adapter_outcome(
     }
     let mut data = parsed.data.unwrap_or_else(|| json!({}));
     let status = data.get(consts::FIELD_STATUS).and_then(Value::as_str);
-    if exit_code != Some(0) || status == Some("fail") {
+    if exit_code != Some(0) || status == Some(consts::STATUS_FAIL) {
         let error = CliError::backend_failure(parsed.summary)
             .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
             .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()))
@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn function_length_violation_fails_the_command() {
         let payload = adapter_payload(
-            "fail",
+            consts::STATUS_FAIL,
             "function-length gate failed: 1 new or grown function(s)",
         );
         let error = adapter_outcome(PythonTool::FunctionLength, Some(1), payload.as_bytes())
@@ -423,7 +423,7 @@ mod tests {
             error.message,
             "function-length gate failed: 1 new or grown function(s)"
         );
-        assert_eq!(error.details[consts::FIELD_STATUS], "fail");
+        assert_eq!(error.details[consts::FIELD_STATUS], consts::STATUS_FAIL);
         assert_eq!(error.details[consts::FIELD_EXIT_CODE], 1);
     }
 
@@ -455,7 +455,7 @@ mod tests {
             "ok": true,
             "summary": "function-length gate failed: 12 new or grown function(s), 0 stale allowance(s)",
             "data": {
-                "status": "fail",
+                consts::FIELD_STATUS: consts::STATUS_FAIL,
                 "violations": violations,
                 "stale_baseline": [],
                 "artifact_dir": "artifacts/findings/function-length",

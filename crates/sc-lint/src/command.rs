@@ -299,6 +299,13 @@ impl CommandId {
     pub const fn is_xwin_preflight(self) -> bool {
         matches!(self, Self::CheckXwin | Self::ClippyXwin)
     }
+
+    pub(crate) const fn is_analyzer_lint(self) -> bool {
+        matches!(
+            self,
+            Self::LintScBoundary | Self::LintScPortability | Self::LintScRuntime
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

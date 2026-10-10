@@ -154,7 +154,7 @@ pub(crate) fn execute(
                 .to_string();
             ExecutionOutcome {
                 rendered,
-                exit_code: verdict_exit_code(context.command_id(), envelope.data.as_ref()),
+                exit_code: verdict_exit_code(context.id(), envelope.data.as_ref()),
                 ok: true,
                 summary,
                 error: None,
@@ -178,16 +178,12 @@ pub(crate) fn execute(
 }
 
 /// Returns the business-verdict exit code for successful analyzer lint runs.
-pub(crate) fn verdict_exit_code(command_id: &str, data: Option<&Value>) -> u8 {
-    let analyzer = matches!(
-        command_id,
-        consts::CMD_BOUNDARY | consts::CMD_PORTABILITY | consts::CMD_RUNTIME
-    );
+pub(crate) fn verdict_exit_code(command_id: command::CommandId, data: Option<&Value>) -> u8 {
     let failed = data
         .and_then(|value| value.get(consts::FIELD_STATUS))
         .and_then(Value::as_str)
-        == Some("fail");
-    if analyzer && failed {
+        == Some(consts::STATUS_FAIL);
+    if command_id.is_analyzer_lint() && failed {
         consts::EXIT_VERDICT_FAIL
     } else {
         0

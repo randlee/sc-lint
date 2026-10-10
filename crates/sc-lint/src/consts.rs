@@ -14,6 +14,7 @@ pub const FIELD_SUMMARY: &str = "summary";
 pub const FIELD_TOOL: &str = "tool";
 pub const FIELD_FINDINGS: &str = "findings";
 pub const FIELD_STATUS: &str = "status";
+pub const STATUS_FAIL: &str = "fail";
 pub const FIELD_VERSION: &str = "version";
 pub const FIELD_CRATE_NAME: &str = "crate_name";
 pub const FIELD_CRATE_VERSION: &str = "crate_version";
