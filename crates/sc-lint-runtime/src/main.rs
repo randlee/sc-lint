@@ -4,7 +4,8 @@ use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
 use sc_lint_runtime::AnalyzeOptions;
-use sc_lint_runtime::analyze_workspace;
+use sc_lint_runtime::RuntimeError;
+use sc_lint_runtime::analyze_workspace_configured;
 use sc_lint_runtime::render_findings_report;
 use sc_lint_schema::OutputFormat;
 
@@ -23,6 +24,10 @@ enum Command {
         root: PathBuf,
         #[arg(long, default_value = "text")]
         format: FormatArg,
+        #[arg(long)]
+        config: Option<PathBuf>,
+        #[arg(long)]
+        rule_filter: Option<String>,
     },
 }
 
@@ -45,11 +50,28 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Analyze { root, format } => {
-            let report = analyze_workspace(&AnalyzeOptions {
+        Command::Analyze {
+            root,
+            format,
+            config,
+            rule_filter,
+        } => {
+            let options = AnalyzeOptions {
                 root,
                 format: format.clone().into(),
-            })?;
+            };
+            let report = match analyze_workspace_configured(
+                &options,
+                config.as_deref(),
+                rule_filter.as_deref(),
+            ) {
+                Ok(report) => report,
+                Err(RuntimeError::AnalyzerConfig(error)) => {
+                    eprintln!("error: {error}");
+                    std::process::exit(error.exit_code());
+                }
+                Err(error) => return Err(error.into()),
+            };
             match OutputFormat::from(format) {
                 OutputFormat::Text => println!("{}", render_findings_report(&report)),
                 OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),

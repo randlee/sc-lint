@@ -1,13 +1,16 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
+use sc_lint_analyzer_support::AnalyzerConfigError;
+use sc_lint_analyzer_support::RuleCatalog;
+use sc_lint_analyzer_support::load_analyzer_settings;
 use sc_lint_schema::CrateId;
 use sc_lint_schema::Finding as SchemaFinding;
 use sc_lint_schema::FindingsReport as SchemaFindingsReport;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::OwnerId;
-use sc_lint_schema::ReportStatus;
 use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
@@ -19,6 +22,14 @@ mod tests;
 const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
 const SC_LINT_RUNTIME_TOOL: &str = "sc-lint-runtime";
 const SC_LINT_RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
+    analyzer: "runtime",
+    rules: &["SCB-RUNTIME-001", "SCB-RUNTIME-002"],
+    families: &[],
+    default_fail: &["SCB-RUNTIME-001", "SCB-RUNTIME-002"],
+    own_keys: &[],
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnalyzeOptions {
@@ -78,29 +89,40 @@ pub enum RuntimeError {
         #[source]
         source: RuntimeErrorSource,
     },
+    #[error(transparent)]
+    AnalyzerConfig(#[from] AnalyzerConfigError),
 }
 
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, RuntimeError> {
-    let findings = runtime::analyze_runtime_liveness(&options.root).map_err(|source| {
-        RuntimeError::AnalyzeFindings {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
-    let scanned_crates =
-        sc_lint_analyzer_support::count_scanned_crates(&options.root).map_err(|source| {
-            RuntimeError::CountScannedCrates {
+    analyze_workspace_configured(options, None, None)
+}
+
+pub fn analyze_workspace_configured(
+    options: &AnalyzeOptions,
+    config: Option<&Path>,
+    rule_filter: Option<&str>,
+) -> std::result::Result<FindingsReport, RuntimeError> {
+    let settings = load_analyzer_settings(&RUNTIME_CATALOG, &options.root, config, rule_filter)?;
+    let (findings, scanned_crates) = if settings.enabled {
+        let findings =
+            runtime::analyze_runtime_liveness(&options.root, &settings).map_err(|source| {
+                RuntimeError::AnalyzeFindings {
+                    root: options.root.clone(),
+                    source: source.into(),
+                }
+            })?;
+        let scanned_crates = sc_lint_analyzer_support::count_scanned_crates(&options.root)
+            .map_err(|source| RuntimeError::CountScannedCrates {
                 root: options.root.clone(),
                 source: source.into(),
-            }
-        })?;
-    let status = if findings.is_empty() {
-        ReportStatus::Pass
+            })?;
+        (findings, scanned_crates)
     } else {
-        ReportStatus::Fail
+        (Vec::new(), 0)
     };
+    let (findings, status) = settings.apply(findings, |rule_id| rule_id.as_str());
     Ok(FindingsReport {
         tool: SC_LINT_RUNTIME_TOOL,
         version: SC_LINT_RUNTIME_VERSION,
