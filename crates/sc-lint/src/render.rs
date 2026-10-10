@@ -128,17 +128,15 @@ pub(crate) fn render_success_human(
                 (None, None) => format!("{}: ok", context.command_id()),
             }
         }
-        CommandId::LintLineCounts | CommandId::LintIdentityLiterals | CommandId::ViewFindings => {
-            envelope
-                .data
-                .as_ref()
-                .and_then(|value| value.get("summary"))
-                .and_then(Value::as_str)
-                .map_or_else(
-                    || format!("{}: ok", context.command_id()),
-                    |summary| format!("{}: {summary}", context.command_id()),
-                )
-        }
+        command if command.renders_adapter_summary() => envelope
+            .data
+            .as_ref()
+            .and_then(|value| value.get("summary"))
+            .and_then(Value::as_str)
+            .map_or_else(
+                || format!("{}: ok", context.command_id()),
+                |summary| format!("{}: {summary}", context.command_id()),
+            ),
         _ => format!("{}: ok", context.command_id()),
     }
 }

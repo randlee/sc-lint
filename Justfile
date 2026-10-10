@@ -46,6 +46,10 @@ _lint-shear:
     {{python_cmd}} -m sc_lint.lint_cargo_shear
 
 [private]
+_lint-function-length:
+    {{python_cmd}} -m sc_lint.lint_function_length
+
+[private]
 _lint-manifests:
     {{python_cmd}} -m sc_lint.lint_manifests
 

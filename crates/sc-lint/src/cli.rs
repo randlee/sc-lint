@@ -270,6 +270,8 @@ pub enum LintTarget {
     ScPortability,
     #[value(name = "sc-runtime")]
     ScRuntime,
+    #[value(name = "function-length")]
+    FunctionLength,
     #[value(name = "line-counts")]
     LineCounts,
     #[value(name = "identity-literals")]
@@ -288,6 +290,7 @@ impl LintTarget {
             Self::ScBoundary => "sc-boundary",
             Self::ScPortability => "sc-portability",
             Self::ScRuntime => "sc-runtime",
+            Self::FunctionLength => "function-length",
             Self::LineCounts => "line-counts",
             Self::IdentityLiterals => "identity-literals",
             Self::Fast => "fast",
@@ -304,6 +307,7 @@ impl LintTarget {
             Self::ScBoundary
             | Self::ScPortability
             | Self::ScRuntime
+            | Self::FunctionLength
             | Self::LineCounts
             | Self::IdentityLiterals => None,
         }

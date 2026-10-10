@@ -88,6 +88,15 @@ fn command_surface_parses_the_initial_grouped_shape() {
         })
     ));
 
+    let cli = Cli::parse_from(["sc-lint", "lint", "function-length"]);
+    assert!(matches!(
+        cli.command.as_ref(),
+        Some(Command::Lint {
+            target: LintTarget::FunctionLength,
+            ..
+        })
+    ));
+
     let cli = Cli::parse_from(["sc-lint", "lint", "line-counts"]);
     assert!(matches!(
         cli.command.as_ref(),
@@ -1191,6 +1200,7 @@ fn lint_targets_map_profile_values_stably() {
     );
     assert_eq!(LintTarget::Ci.profile(), Some(crate::cli::LintProfile::Ci));
     assert_eq!(LintTarget::ScBoundary.profile(), None);
+    assert_eq!(LintTarget::FunctionLength.profile(), None);
     assert_eq!(LintTarget::LineCounts.profile(), None);
     assert_eq!(crate::cli::LintProfile::Fast.command_suffix(), "fast");
     assert_eq!(crate::cli::LintProfile::Full.command_suffix(), "full");
@@ -1560,6 +1570,17 @@ fn python_backed_lints_and_views_normalize_through_the_top_level_envelope() {
                 "line-counts",
             ],
             "lint.line-counts",
+        ),
+        (
+            [
+                "sc-lint",
+                "--json",
+                "--root",
+                repo_root.to_str().expect("repo root"),
+                "lint",
+                "function-length",
+            ],
+            "lint.function-length",
         ),
         (
             [

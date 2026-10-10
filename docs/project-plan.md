@@ -266,6 +266,10 @@ The scheduled sprint plans are:
 
 ## Recent Sprint Deltas
 
+- `stack-214-L4` (lint-8qz.5)
+  - function-length lint: fails only on functions at or over 80 code lines
+    that are new or grew past `.just/function-length-baseline.tsv`
+  - sprint doc: `docs/plans/stack-214/function-length-lint.md`
 - `A.6`
   - Rust-native TOML boundary inventory loading, schema validation, and
     duplicate handling now live in `sc-lint-boundary`

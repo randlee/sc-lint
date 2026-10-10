@@ -67,6 +67,8 @@ Initial convention:
 
 - `sc-lint lint sc-boundary`
   - `lint.sc-boundary`
+- `sc-lint lint function-length`
+  - `lint.function-length`
 - `sc-lint lint line-counts`
   - `lint.line-counts`
 - `sc-lint lint identity-literals`
@@ -146,6 +148,8 @@ Current implementation status:
   - implemented capability-gated Windows clippy path
 - `ci`
   - implemented top-level lint-plus-tests path
+- `lint.function-length`
+  - implemented Python-adapter lint path
 - `lint.line-counts`
   - implemented Python-adapter lint path
 - `lint.identity-literals`
