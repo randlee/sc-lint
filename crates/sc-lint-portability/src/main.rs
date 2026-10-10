@@ -1,10 +1,11 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
 use sc_lint_portability::AnalyzeOptions;
-use sc_lint_portability::analyze_workspace;
+use sc_lint_portability::analyze_workspace_configured;
 use sc_lint_portability::render_findings_report;
 use sc_lint_schema::OutputFormat;
 
@@ -23,6 +24,10 @@ enum Command {
         root: PathBuf,
         #[arg(long, default_value = "text")]
         format: FormatArg,
+        #[arg(long)]
+        config: Option<PathBuf>,
+        #[arg(long)]
+        rule_filter: Option<String>,
     },
 }
 
@@ -41,15 +46,23 @@ impl From<FormatArg> for OutputFormat {
     }
 }
 
-fn main() -> Result<()> {
+fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Analyze { root, format } => {
-            let report = analyze_workspace(&AnalyzeOptions {
+        Command::Analyze { root, format, config, rule_filter } => {
+            let options = AnalyzeOptions {
                 root,
                 format: format.clone().into(),
-            })?;
+            };
+            let report = match analyze_workspace_configured(&options, config.as_deref(), rule_filter.as_deref()) {
+                Ok(report) => report,
+                Err(sc_lint_portability::PortabilityError::AnalyzerConfig(error)) => {
+                    eprintln!("{error}");
+                    return Ok(ExitCode::from(error.exit_code() as u8));
+                }
+                Err(error) => return Err(error.into()),
+            };
             match OutputFormat::from(format) {
                 OutputFormat::Text => println!("{}", render_findings_report(&report)),
                 OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
@@ -57,5 +70,5 @@ fn main() -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }

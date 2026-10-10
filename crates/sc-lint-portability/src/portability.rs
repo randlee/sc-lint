@@ -45,6 +45,8 @@ use crate::predicates::production_env_portability_variable;
 use crate::predicates::production_path_rule_id;
 use crate::predicates::use_tree_contains_std_os_unix;
 use sc_lint_analyzer_support::FileContext;
+use sc_lint_analyzer_support::AnalyzerConfigError;
+use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::PackageName;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
@@ -82,6 +84,34 @@ struct PortabilityConfig {
     unix_path_prefixes: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct AnalyzerPortabilityKeys {
+    config_home_env: Option<String>,
+    unix_path_prefixes: Vec<String>,
+}
+
+impl AnalyzerPortabilityKeys {
+    pub(crate) fn from_settings(settings: &AnalyzerSettings) -> std::result::Result<Self, AnalyzerConfigError> {
+        let wrong_type = |key: &str, expected: &'static str| AnalyzerConfigError::WrongType {
+            analyzer: "portability",
+            key: key.to_string(),
+            expected,
+        };
+        let strings = |key: &str| match settings.own.get(key) {
+            None => Ok(Vec::new()),
+            Some(toml::Value::Array(items)) => items.iter().map(|item| item.as_str().map(str::to_string)).collect::<Option<Vec<_>>>().ok_or_else(|| wrong_type(key, "an array of strings")),
+            Some(_) => Err(wrong_type(key, "an array of strings")),
+        };
+        let config_home_env = match settings.own.get("config_home_env") {
+            None => None,
+            Some(toml::Value::String(value)) => Some(value.clone()),
+            Some(_) => return Err(wrong_type("config_home_env", "a string")),
+        };
+        strings("targets")?;
+        Ok(Self { config_home_env, unix_path_prefixes: strings("unix_path_prefixes")? })
+    }
+}
+
 #[derive(Debug, Clone)]
 struct PortabilityFinding {
     rule_id: RuleId,
@@ -94,12 +124,12 @@ struct PortabilityFinding {
     node_label: String,
 }
 
-pub(crate) fn analyze_portability(root: &Path) -> Result<Vec<Finding>> {
-    let config = load_portability_config(root)?;
+pub(crate) fn analyze_portability(root: &Path, document: &toml::Table, settings: &AnalyzerSettings, analyzer_keys: &AnalyzerPortabilityKeys) -> Result<Vec<Finding>> {
+    let config = load_portability_config(document, analyzer_keys)?;
     let source_files = discover_source_files(root)?;
     let mut findings = Vec::new();
 
-    for file_context in source_files {
+    for file_context in source_files.into_iter().filter(|file| !settings.path_excluded(&sc_lint_analyzer_support::relative_slash_path(root, &file.source_path))) {
         let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
             || {
                 format!(
@@ -893,29 +923,15 @@ impl<'ast> Visit<'ast> for FunctionBodyVisitor {
     }
 }
 
-fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
+fn load_portability_config(document: &toml::Table, analyzer_keys: &AnalyzerPortabilityKeys) -> Result<PortabilityConfig> {
     let defaults = toml::from_str::<BuiltInDefaults>(crate::DEFAULT_RULES_TOML)
         .context("failed to parse built-in portability defaults")?;
-    let repo_config_path = Some(root.join("sc-lint.toml")).filter(|path| path.exists());
-    let repo_config = if let Some(repo_config_path) = repo_config_path {
-        let text = fs::read_to_string(&repo_config_path).with_context(|| {
-            format!(
-                "failed to read repo portability config: {}",
-                repo_config_path.display()
-            )
-        })?;
-        toml::from_str::<RepoLintConfig>(&text).with_context(|| {
-            format!(
-                "failed to parse repo portability config: {}",
-                repo_config_path.display()
-            )
-        })?
-    } else {
-        RepoLintConfig::default()
-    };
+    let repo_config: RepoLintConfig = toml::Value::Table(document.clone())
+        .try_into()
+        .context("failed to parse repo portability config")?;
 
     Ok(PortabilityConfig {
-        config_home_env: repo_config.portability.and_then(|cfg| cfg.config_home_env),
-        unix_path_prefixes: defaults.portability.unix_path_prefixes,
+        config_home_env: analyzer_keys.config_home_env.clone().or_else(|| repo_config.portability.and_then(|cfg| cfg.config_home_env)),
+        unix_path_prefixes: defaults.portability.unix_path_prefixes.into_iter().chain(analyzer_keys.unix_path_prefixes.iter().cloned()).collect(),
     })
 }
