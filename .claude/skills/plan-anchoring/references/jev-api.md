@@ -62,7 +62,8 @@ Without both, `judge` and `check-fixtures` return `AUTH.CREDENTIALS` or `POLICY.
 ## Size, context window, and shortening
 
 - Jev allows about 32k tokens for state plus the longest question and about 64k for state plus all questions.
-- Before the first call the script serialises the full body and shortens the item text (keeping the head, appending a truncation marker) until the request is under `--max-request-bytes` (default 24,000 bytes).
+- **Plan gate: a plan bead is never shortened.** The intent is that a reasonable plan bead fits within Jev's context in one request; a bead that does not is asking too much and must be split. First, every fenced code block longer than `--max-code-lines` (default 8) is reduced to its signature lines plus `<redacted: N of M code lines are in the plan but were not sent to Jev>`, so long code examples never count against the plan and Jev still sees that the code exists. If the reduced bead is over `--max-item-chars`, or any anchor's request would be over `--max-request-bytes`, the run stops with `PLAN.TOO_LARGE` (exit 2) before anything is sent. A token-limit 4xx from Jev on the plan gate is recorded as a per-anchor `PLAN.TOO_LARGE` error, never halved. The run's `item` records `chars_before_reduction` and `code_reduced` (`blocks`, `lines`).
+- Development gate: before the first call the script serialises the full body and shortens the item text (keeping the head, appending a truncation marker) until the request is under `--max-request-bytes` (default 24,000 bytes).
 - If Jev still answers with a 4xx whose body reports the token limit, the script halves the item and retries, down to `--min-item-chars` (default 2,000). Below that the anchor is recorded as `verdict: error` with `JEV.CONTEXT_EXCEEDED` and the advice to shorten the evidence.
 - Each result records `item_chars_sent`, `item_shortened`, `request_bytes`; the run's `summary.shortened` lists affected anchors.
 
@@ -92,7 +93,8 @@ Agents and the skill never add a retry loop around the script. `attempts` is rec
 | `POLICY.REMOTE_JUDGE_DISABLED` | pre-flight | Opt-in not set. Use `--dry-run` or set `PLAN_ANCHOR_ALLOW_REMOTE_JUDGE=1` |
 | `JEV.RATE_LIMITED`, `JEV.OVERLOADED`, `JEV.HTTP`, `JEV.NETWORK` | transport | Transient; retried 3 times, then per-anchor `error` |
 | `JEV.RESPONSE_INVALID` | validation | Malformed or oversized response; retried, then per-anchor `error` |
-| `JEV.CONTEXT_EXCEEDED` | 422 token limit | Item could not be shortened enough; shorten the evidence |
+| `JEV.CONTEXT_EXCEEDED` | 422 token limit | Development gate: item could not be shortened enough; shorten the evidence |
+| `PLAN.TOO_LARGE` | plan-gate pre-flight, 422 token limit | The plan bead does not fit one Jev request after long code was reduced to signatures. Split the bead; never trim it to pass |
 | `JEV.VALIDATION` | 422 other | Request rejected; usually a malformed override |
 | `VALIDATION.ANCHORS`, `VALIDATION.INPUT` | record / arguments | Fix `anchors.json` (`validate`) or the flags |
 | `QUESTIONS.ROLES` | question set | An override renamed a question ID; keep the default IDs |
@@ -120,8 +122,9 @@ Fatal codes abort with exit 2 and `success: false`. Transient codes end up in `r
 | `--threshold` | 0.6 | Confidence gate (see `verdict-gating.md`) |
 | `--questions` | `assets/questions/<gate>.json` | Alternative question-set file |
 | `--overrides-file` | none | Per-anchor overrides read from the question beads |
-| `--max-item-chars` | 24,000 | Hard cap on item characters before composing the request |
-| `--max-request-bytes` | 24,000 | Pre-flight cap on the serialised request |
+| `--max-item-chars` | 24,000 | Development gate: truncate the item to this. Plan gate: refuse a larger bead with `PLAN.TOO_LARGE` |
+| `--max-code-lines` | 8 | Plan gate: longer code blocks are sent as signatures plus a redaction marker |
+| `--max-request-bytes` | 24,000 | Pre-flight cap on the serialised request (plan gate: refuse, development gate: shorten) |
 | `--min-item-chars` | 2,000 | Floor for context shortening |
 | `--timeout` | 30 s | Per-request socket timeout |
 | `--run-dir` / `--out` | `<anchors dir>/anchor-runs` | Where the run file goes |
@@ -140,6 +143,7 @@ TypeSafe prices input tokens only (output is free) at a fraction of a cent per m
 | `PLAN_ANCHOR_JEV_MODEL` | `jev-latest` | Model alias or pinned version |
 | `PLAN_ANCHOR_JEV_URL` | TypeSafe endpoint | Proxy or mock server |
 | `PLAN_ANCHOR_CONFIDENCE_THRESHOLD` | `0.6` | Gating threshold |
-| `PLAN_ANCHOR_MAX_ITEM_CHARS` | `24000` | Item truncation |
+| `PLAN_ANCHOR_MAX_ITEM_CHARS` | `24000` | Item truncation (development gate) and plan-bead size limit (plan gate) |
+| `PLAN_ANCHOR_MAX_CODE_LINES` | `8` | Plan gate code-block reduction threshold |
 
 Under Codex, `TYPESAFE_API_KEY` matches its default `*KEY*` exclusion pattern for command environments: if you restrict `[shell_environment_policy]` in `config.toml`, keep `ignore_default_excludes = true`, and with an allowlist under `[shell_environment_policy.filters]` add `"TYPESAFE_API_KEY" = "include"`.

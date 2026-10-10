@@ -87,7 +87,7 @@ Then create the bead tree and record the bead IDs with `set-beads` (`references/
 
 ### C. Planning gate
 
-Read `references/planning-gate.md`. Enumerate the planning beads (the open children of the phase epic, `bd children <epic> --json`) and delegate each to `anchor-plan-review` (see Agent Delegation). It composes the bead text, resolves question overrides from the plan-questions beads, runs the script once (one Jev request per anchor, retries and shortening handled inside the script), and returns verdicts. Then compute coverage across beads in code, never by asking Jev:
+Read `references/planning-gate.md`. Enumerate the planning beads (the open children of the phase epic, `bd children <epic> --json`) and delegate each to `anchor-plan-review` (see Agent Delegation). It composes the bead text, resolves question overrides from the plan-questions beads, runs the script once (one Jev request per anchor, retries handled inside the script), and returns verdicts. A plan bead is never shortened: long code blocks are sent as signatures with a redaction marker, and a bead that still does not fit is refused with `PLAN.TOO_LARGE` and must be split (`references/planning-gate.md`, "Plan size"). Then compute coverage across beads in code, never by asking Jev:
 
 ```bash
 python3 "$S" coverage --runs doc/plan/phase-current/anchor-runs --gate plan --format md
@@ -118,7 +118,7 @@ Capture (A) and locking (B) are interactive and stay in the main session. The ga
 
 In Claude Code, invoke the agent with the Task tool: "Invoke `anchor-plan-review` with script `$S`, bead_id proj-a3f8, anchor_ids all, anchors_path doc/plan/phase-current/anchors.json, correlation_id proj-a3f8." Where no such agent is available, as in Codex or Cursor, follow `../../agents/anchor-plan-review.md` or `../../agents/anchor-sprint-review.md` (relative to this skill's directory) yourself.
 
-Parallel runs (Claude Code only): at most 3 beads at once, `correlation_id` set to the bead ID, 120 s timeout per agent. A timed-out agent is recorded as `{"success": false, "canceled": true, "aborted_by": "timeout", "error": {"code": "EXECUTION.TIMEOUT"}}`. Aggregate in bead-ID order and surface a summary of succeeded and failed beads; never drop a failed bead. Treat unfenced or malformed JSON from an agent as failure. Agents never retry the script; the script already makes three attempts per anchor and shortens oversize items itself.
+Parallel runs (Claude Code only): at most 3 beads at once, `correlation_id` set to the bead ID, 120 s timeout per agent. A timed-out agent is recorded as `{"success": false, "canceled": true, "aborted_by": "timeout", "error": {"code": "EXECUTION.TIMEOUT"}}`. Aggregate in bead-ID order and surface a summary of succeeded and failed beads; never drop a failed bead. Treat unfenced or malformed JSON from an agent as failure. Agents never retry the script; the script already makes three attempts per anchor, shortens oversize development-gate evidence itself, and refuses an oversize plan bead with `PLAN.TOO_LARGE`.
 
 ## Positions taken on the PRD's open questions
 
@@ -136,6 +136,7 @@ Parallel runs (Claude Code only): at most 3 beads at once, `correlation_id` set 
 - Never compute coverage, counts, or "satisfied anywhere" by asking Jev. The script does it.
 - Missing `bd`, `python3`, API key, or opt-in: surface and stop; do not degrade silently.
 - Three consecutive gate runs on the same bead with the same failing set: escalate to the user rather than editing the plan again.
+- A plan bead that does not fit one Jev request (`PLAN.TOO_LARGE`) is asking too much: split it. Never trim, truncate or raise the limits to make it fit. Long code examples are already reduced to signatures and do not count against it.
 
 ## References
 

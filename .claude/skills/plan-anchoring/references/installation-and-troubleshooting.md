@@ -87,6 +87,7 @@ The smoke `judge` exercises the full gating path with fixture answers and no net
 - `AUTH.CREDENTIALS` with the key set: it contains whitespace or a control character (a trailing newline from a copy-paste is the usual cause), or TypeSafe rejected it.
 - `QUESTIONS.ROLES`: a question override renamed a question ID. Keep the default IDs.
 - `ANCHOR.NOT_LOCKED`: `--anchor` named a proposed or retired anchor. Lock it, or use `--all`.
+- `PLAN.TOO_LARGE`: the plan bead does not fit one Jev request even with long code reduced to signatures. The bead is asking too much: split it. Do not trim it or raise the limits to pass.
 - `JEV.CONTEXT_EXCEEDED`: the item could not be shortened below 2,000 characters and still fit. Shorten the evidence account; for the development gate drop the test section first.
 - `JEV.RESPONSE_INVALID` repeatedly: TypeSafe changed the response shape or a proxy is mangling it. Check `PLAN_ANCHOR_JEV_URL`.
 - `VALIDATION.ANCHORS` from `judge`: run `validate` and fix the listed problems; the usual cause is a hand edit. Use `update`, `retire` and `promote` instead of hand edits.

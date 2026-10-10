@@ -21,6 +21,10 @@ Judges plan text. For each planning bead, every locked anchor is asked: relevant
 
 Exactly one anchor (`id`, verbatim `statement`, `scope`) and one bead's composed text (`# Title`, `## Description`, `## Design`, `## Acceptance criteria`, `## Notes`, as present), plus the three questions. The bead text is whatever `bd show --json` holds, composed by `compose-item`; never a summary written by the agent.
 
+## Plan size
+
+A reasonable plan bead fits within Jev's context in one request. A bead that does not is asking too much and is split, never trimmed or truncated to pass. The one exception is code: every fenced code block longer than `--max-code-lines` (default 8) is sent as its signature lines plus `<redacted: N of M code lines are in the plan but were not sent to Jev>`. The plan keeps the full code, and Jev still sees that the code is there. The limit is what remains after that reduction, `--max-item-chars` and `--max-request-bytes` (24,000 each by default). An oversize bead stops the run with `PLAN.TOO_LARGE` (exit 2) before anything is sent; split it into beads that each stand as a reasonable plan and judge each.
+
 ## Run
 
 Delegate per bead (Claude Code) or follow `../../agents/anchor-plan-review.md` inline (Codex, Cursor). The underlying command the agent runs once:
@@ -34,7 +38,7 @@ python3 "$S" judge --anchors "$A" --gate plan --all --item-id <bead> --item-titl
 | --- | --- |
 | 0 | Every anchor `satisfied` or `not_applicable`, or a dry run |
 | 1 | At least one `contradicted`, `not_addressed`, `underspecified` or `error` verdict; the run file was written |
-| 2 | Fatal before judging: credentials, opt-in, malformed record or override, unknown anchor |
+| 2 | Fatal before judging: credentials, opt-in, malformed record or override, unknown anchor, or `PLAN.TOO_LARGE` (split the bead) |
 
 Then, across all beads:
 
@@ -51,7 +55,7 @@ python3 "$S" coverage --runs doc/plan/phase-current/anchor-runs --gate plan --fo
 | `underspecified` | Confidence below threshold or `unclear` | `min_confidence` across beads: low on one bead means a vague bead, low on many means a vague anchor | Sharpen the bead, or the anchor's `scope` or question override |
 | `satisfied` | Directive present | Nothing | Nothing |
 | `not_applicable` | Anchor does not govern this bead | If it should have, the anchor's `scope` is too narrow | `update --scope` |
-| `error` | Jev could not be asked after retries | `results[].error.code` | Fix the cause; re-run that bead |
+| `error` | Jev could not be asked after retries | `results[].error.code` | Fix the cause; re-run that bead. `PLAN.TOO_LARGE`: split the bead |
 
 The gate passes when every bead's latest run exits 0 and `coverage` lists no uncovered locked anchor. An anchor uncovered everywhere means its scope is wrong or the plan lacks the bead that should carry it.
 

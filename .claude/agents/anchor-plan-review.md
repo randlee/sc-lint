@@ -44,7 +44,7 @@ Run the planning gate for exactly one planning bead: prepare the text Jev sees, 
      --item-id <bead_id> --item-title "<title from bead.json>" --item-file "$W/item.txt" \
      [--overrides-file "$W/overrides.json"] --threshold <threshold> --run-dir <run_dir> [--dry-run]
    ```
-   Exit 0: gate passed or dry run. Exit 1: at least one failing or `error` verdict; still a successful run. Exit 2: fatal, stdout holds the script's error object. The script makes one Jev request per anchor and already retries transient failures three times and shortens oversize items; do not re-run it.
+   Exit 0: gate passed or dry run. Exit 1: at least one failing or `error` verdict; still a successful run. Exit 2: fatal, stdout holds the script's error object. The script makes one Jev request per anchor and already retries transient failures three times; it never shortens a plan bead (long code is sent as signatures, and an oversize bead is `PLAN.TOO_LARGE`). Do not re-run it.
 6. Render: `python3 "$SCRIPT" report --run <data.run_path> --format md`.
 7. Return the envelope below. `results` come from the run's `results[]`; `overrides_applied` is every anchor whose `question_set.overridden` is true; `item_truncated` is `item.truncated`; `shortened` is `summary.shortened`. Include the report markdown verbatim; do not summarise verdicts in prose.
 
@@ -91,7 +91,7 @@ On exit 2 or any fatal condition: `success: false`, `data: null`, and `error` as
 ### Propagated to skill (fatal)
 - `PREREQ.MISSING`: script, python3, bd, or anchors file absent.
 - `BEADS.NOT_FOUND`: `bd show` fails for `bead_id`.
-- Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `SCRIPT.INTERNAL`: return the script's error object; never work around credential or opt-in errors.
+- Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `PLAN.TOO_LARGE`, `SCRIPT.INTERNAL`: return the script's error object; never work around credential or opt-in errors, and never trim the bead text or raise a limit to get past `PLAN.TOO_LARGE`.
 - Unparseable script stdout: `SCRIPT.OUTPUT` with the first 300 characters.
 
 ## Constraints
