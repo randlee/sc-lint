@@ -20,8 +20,11 @@ import jev_judge as jj  # noqa: E402
 PLAN_ROLES = {"relevance": "relevant", "compliance": "addressed", "conflict": "contradicted"}
 DEV_ROLES = {"relevance": "relevant", "compliance": "implemented", "conflict": "violated", "evidence": "evidenced"}
 OPTIONS = ("yes", "no", "unclear")
-STATEMENT = "copy the libraries from ATM as the starting point and remove the ATM-specific code"
+STATEMENT = "The runtime crates are created by copying the legacy repo's runtime crates and deleting the legacy-specific modules; no runtime crate is written from scratch."
+QUOTE = "copy the libraries from the legacy repo as the starting point and remove the legacy-specific code"
+REQ_STATEMENT = "All public CLI commands must support --json output with a stable schema."
 LIVE_ENV = {"TYPESAFE_API_KEY": "sk-test-0001", "PLAN_ANCHOR_ALLOW_REMOTE_JUDGE": "1"}
+ASSETS = Path(__file__).resolve().parents[1] / "assets"
 
 
 def answer(choice, p=0.9, options=OPTIONS):
@@ -41,11 +44,14 @@ def dev_answers(rel="yes", comp="yes", conf="no", evid="yes", p=0.9, evid_p=None
             "evidenced": answer(evid, evid_p if evid_p is not None else p)}
 
 
-def anchor(aid="ANC-001", status="locked", source_type="ANC", source_ref=None, statement=STATEMENT, **extra):
+def anchor(aid="ANC-001", status="locked", source_type="ANC", source_ref=None, statement=STATEMENT, quote=None, **extra):
+    """A valid anchor record. ANC anchors get the verbatim QUOTE; REQ/ADR anchors quote their register text."""
+    if quote is None:
+        quote = QUOTE if source_type == "ANC" else statement
     rec = {
-        "id": aid, "source_type": source_type, "source_ref": source_ref, "statement": statement,
-        "stated_by": "Rand", "stated_at": "2026-10-09", "context": "planning session",
-        "summary": "start from ATM", "scope": "the runtime crates", "deterministic_check": "",
+        "id": aid, "source_type": source_type, "source_ref": source_ref, "statement": statement, "quote": quote,
+        "stated_by": "the user", "stated_at": "2026-10-09", "context": "planning session",
+        "summary": "start from the legacy repo", "scope": "the runtime crates", "deterministic_check": "",
         "fixtures": {"pass": [], "fail": []}, "question_overrides": {}, "version": 1, "status": status,
         "promoted_to": None, "beads": {"anchor": None, "plan_questions": None, "dev_questions": None}, "history": [],
     }
@@ -107,7 +113,7 @@ def http(status, text="", retry_after=None):
 class Judged:
     """Run `judge` against a stubbed transport with the opt-in satisfied; exposes the run and call log."""
 
-    def __init__(self, d, transport, anchors=None, extra_args=(), item_text="Sprint 2 copies the ATM runtime crates.", env_values=None, gate="plan"):
+    def __init__(self, d, transport, anchors=None, extra_args=(), item_text="Sprint 2 copies the legacy runtime crates.", env_values=None, gate="plan"):
         self.anchors_path = write(d, "anchors.json", record(*(anchors or [anchor()])))
         self.item_path = write(d, "item.txt", item_text)
         self.sleeps = []
@@ -131,12 +137,14 @@ class AddTests(unittest.TestCase):
     def test_add_creates_file_and_allocates_ids(self):
         with tempfile.TemporaryDirectory() as d:
             path = str(Path(d) / "anchors.json")
-            code, out = run_cli(["add", "--anchors", path, "--statement", "  no new dependency for this  ", "--status", "locked"])
-            self.assertEqual(code, 0)
+            code, out = run_cli(["add", "--anchors", path, "--statement", "  The runtime crates must add no new dependency.  ", "--quote", " no new dependency for this ", "--status", "locked"])
+            self.assertEqual(code, 0, out)
             self.assertEqual(out["data"]["anchor"]["id"], "ANC-001")
-            self.assertEqual(out["data"]["anchor"]["statement"], "no new dependency for this")
+            self.assertEqual(out["data"]["anchor"]["statement"], "The runtime crates must add no new dependency.")
+            self.assertEqual(out["data"]["anchor"]["quote"], "no new dependency for this")
             self.assertEqual(out["data"]["anchor"]["stated_at"], _dt.date.today().isoformat())
-            code, out = run_cli(["add", "--anchors", path, "--statement", "keep the CLI thin"])
+            self.assertEqual((out["data"]["lint"], out["data"]["similar"]), ({"warnings": []}, []))
+            code, out = run_cli(["add", "--anchors", path, "--statement", "The CLI layer only parses arguments and prints JSON.", "--quote", "keep the CLI thin"])
             self.assertEqual(out["data"]["anchor"]["id"], "ANC-002")
             self.assertFalse(Path(path + ".tmp").exists())
             self.assertEqual(len(json.loads(Path(path).read_text())["anchors"]), 2)
@@ -160,6 +168,726 @@ class AddTests(unittest.TestCase):
             self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
 
 
+class QuoteTests(unittest.TestCase):
+    """The statement is authored and testable; the quote is the user's verbatim words."""
+
+    def test_anc_requires_a_quote(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "anchors.json")
+            code, out = run_cli(["add", "--anchors", path, "--statement", STATEMENT])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            self.assertIn("--quote is required", out["error"]["message"])
+            self.assertFalse(Path(path).exists())
+            code, out = run_cli(["add", "--anchors", path, "--statement", STATEMENT, "--quote", "   "])
+            self.assertEqual(out["error"]["code"], "VALIDATION.INPUT")
+            code, out = run_cli(["add", "--anchors", path, "--statement", STATEMENT, "--quote", QUOTE])
+            self.assertEqual((code, out["data"]["anchor"]["quote"]), (0, QUOTE))
+
+    def test_register_anchors_default_the_quote_to_the_statement(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "anchors.json")
+            code, out = run_cli(["add", "--anchors", path, "--statement", REQ_STATEMENT, "--source-type", "REQ", "--source-ref", "REQ-014"])
+            self.assertEqual((code, out["data"]["anchor"]["quote"], out["data"]["lint"]), (0, REQ_STATEMENT, {"warnings": []}))
+            code, out = run_cli(["add", "--anchors", path, "--statement", "The CLI layer only parses arguments and prints JSON.", "--quote", "The CLI stays thin",
+                                 "--source-type", "ADR", "--source-ref", "ADR-0007"])
+            self.assertEqual(out["data"]["anchor"]["quote"], "The CLI stays thin")
+            self.assertEqual(jj.validate_record(json.loads(Path(path).read_text())), [])
+
+    def test_statement_equal_to_quote_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "anchors.json")
+            for same in (QUOTE, QUOTE.upper(), "  " + QUOTE + ".  ", QUOTE.replace(" ", "   ") + "!"):
+                code, out = run_cli(["add", "--anchors", path, "--statement", same, "--quote", QUOTE])
+                self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"), same)
+                self.assertEqual(out["error"]["message"], "statement is the verbatim quote; write a testable anchor (see references/anchor-capture.md)")
+            self.assertFalse(Path(path).exists())
+            # the same words are fine for register anchors: the quote is the register text
+            code, out = run_cli(["add", "--anchors", path, "--statement", REQ_STATEMENT, "--quote", REQ_STATEMENT, "--source-type", "REQ", "--source-ref", "REQ-014"])
+            self.assertEqual(code, 0, out)
+
+    def test_validate_reports_missing_quote_and_verbatim_statement(self):
+        old = anchor()
+        del old["quote"]
+        verbatim = anchor("ANC-002", statement=QUOTE.capitalize() + ".")
+        reg = anchor("REQ-014", source_type="REQ", source_ref="REQ-014", statement=REQ_STATEMENT)
+        del reg["quote"]
+        problems = jj.validate_record(record(old, verbatim, reg, anchor("ANC-003", quote=7)))
+        self.assertIn("ANC-001: quote missing; record the user's verbatim words", problems)
+        self.assertIn("ANC-001: statement is the verbatim quote; write a testable anchor (see references/anchor-capture.md)", problems)
+        self.assertIn("ANC-002: statement is the verbatim quote; write a testable anchor (see references/anchor-capture.md)", problems)
+        self.assertIn("ANC-003: quote must be a string", problems)
+        self.assertEqual([p for p in problems if p.startswith("REQ-014")], [])  # register text needs no separate quote
+        self.assertEqual(jj.validate_record(record(anchor(), reg)), [])
+
+    def test_records_without_quote_are_read_as_quote_equals_statement(self):
+        old = anchor(statement=QUOTE)
+        del old["quote"]
+        self.assertEqual(jj.anchor_quote(old), QUOTE)
+        self.assertEqual(jj.anchor_quote({"statement": "s", "quote": "  "}), "s")
+        self.assertEqual(jj.anchor_quote(anchor()), QUOTE)
+        self.assertEqual(jj.render_md(record(old)).count(f"> {QUOTE}"), 1)
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(old))
+            code, out = run_cli(["lint", "--anchors", path])
+            self.assertEqual((code, out["data"]["anchors"][0]["warnings"][0]), (1, "statement is the verbatim quote"))
+            code, out = run_cli(["validate", "--anchors", path])
+            self.assertEqual((code, out["error"]["code"]), (1, "VALIDATION.ANCHORS"))
+            # an old run file: the report falls back to the statement as the quote
+            run = make_run(d, "old-run.json", "plan", "bd-1", "2026-10-09T10:00:00+00:00", {"ANC-001": "not_addressed", "REQ-014": "contradicted"}, with_quote=False)
+            code, md = run_cli(["report", "--run", run, "--format", "md"])
+            self.assertIn(f'Anchor: {STATEMENT} You said (planning session, Oct 9): "{STATEMENT}" This bead', md)
+            self.assertIn(f"Anchor: {REQ_STATEMENT} This bead proposes", md)
+            self.assertNotIn("says:", md)
+
+    def test_run_results_carry_the_quote(self):
+        with tempfile.TemporaryDirectory() as d:
+            j = Judged(d, Transport(), anchors=[anchor(), anchor("REQ-014", source_type="REQ", source_ref="REQ-014", statement=REQ_STATEMENT)])
+            by_id = {r["anchor_id"]: r for r in j.run["results"]}
+            self.assertEqual((by_id["ANC-001"]["statement"], by_id["ANC-001"]["quote"]), (STATEMENT, QUOTE))
+            self.assertEqual(by_id["REQ-014"]["quote"], REQ_STATEMENT)
+            # Jev still sees only the statement and scope
+            self.assertEqual(set(j.run["results"][0].keys()) >= {"statement", "quote"}, True)
+            fixture = write(d, "answers.json", {"*": plan_answers()})
+            anchors_path = write(d, "a.json", record(anchor()))
+            item = write(d, "item.txt", "Sprint 2 copies the legacy crates.")
+            with env():
+                code, out = run_cli(["judge", "--anchors", anchors_path, "--gate", "plan", "--all", "--item-id", "bd-1", "--item-file", item, "--dry-run",
+                                     "--out", str(Path(d) / "dry.json")])
+            self.assertEqual(out["data"]["requests"][0]["state"]["anchor"], {"id": "ANC-001", "statement": STATEMENT, "scope": "the runtime crates"})
+            with env():
+                code, out = run_cli(["check-fixtures", "--anchors", write(d, "f.json", record(anchor(fixtures={"pass": ["copies the legacy repo"], "fail": []}))),
+                                     "--gate", "plan", "--all", "--answers-file", fixture])
+            self.assertEqual(out["data"]["checks"][0]["verdict"], "satisfied")
+
+    def test_shipped_example_record_is_valid_lint_clean_and_renders(self):
+        example = json.loads((ASSETS / "examples" / "anchors.example.json").read_text())
+        self.assertEqual(jj.validate_record(example), [])
+        by_id = {a["id"]: a for a in example["anchors"]}
+        self.assertEqual(by_id["ANC-012"]["quote"], "copy the libraries from the legacy repo as the starting point and remove the legacy-specific code")
+        self.assertTrue(by_id["ANC-012"]["statement"].startswith("The runtime crates are created by copying the legacy repo's runtime crates"))
+        self.assertEqual(by_id["REQ-014"]["quote"], by_id["REQ-014"]["statement"])
+        for a in example["anchors"]:
+            self.assertEqual(jj.lint_statement(a["statement"], a["quote"], a["source_type"]), [], a["id"])
+        md = jj.render_md(example)
+        self.assertIn(f"Anchor: {by_id['ANC-012']['statement']}\n\n> {by_id['ANC-012']['quote']}", md)
+
+
+class LintTests(unittest.TestCase):
+    def lint(self, statement, quote=QUOTE, source_type="ANC"):
+        return jj.lint_statement(statement, quote, source_type)
+
+    def test_clean_statements_have_no_warnings(self):
+        for s in (STATEMENT, REQ_STATEMENT, "The CLI layer only parses arguments and prints JSON.",
+                  "crates/runtime is copied from the legacy repo/crates/runtime.", "The sprint never adds a dependency on tokio.",
+                  "The parser does not call the network.", "Sprint 2 requires the legacy crates as its starting point."):
+            self.assertEqual(self.lint(s), [], s)
+
+    def test_verbatim_quote_rule_is_anc_only(self):
+        self.assertEqual(self.lint(QUOTE)[0], "statement is the verbatim quote")
+        self.assertEqual(self.lint("  " + QUOTE.upper() + "?!")[0], "statement is the verbatim quote")
+        self.assertNotIn("statement is the verbatim quote", self.lint(REQ_STATEMENT, REQ_STATEMENT, "REQ"))
+        self.assertNotIn("statement is the verbatim quote", self.lint(REQ_STATEMENT, REQ_STATEMENT, "ADR"))
+        self.assertNotIn("statement is the verbatim quote", self.lint(STATEMENT, ""))
+
+    def test_too_long(self):
+        long = "The runtime crate is " + "x" * 230 + "."
+        self.assertIn("too long; split into one constraint per anchor", self.lint(long))
+        self.assertNotIn("too long; split into one constraint per anchor", self.lint("The runtime crate is " + "x" * 200 + "."))
+
+    def test_bundled_constraints(self):
+        self.assertIn("may bundle two constraints", self.lint("The crates must be copied and must never be rewritten."))
+        self.assertIn("may bundle two constraints", self.lint("The CLI only prints JSON and always exits 0."))
+        self.assertIn("may bundle two constraints", self.lint("The CLI must not fork; it shall exec."))
+        self.assertNotIn("may bundle two constraints", self.lint("The CLI must not fork."))
+        self.assertNotIn("may bundle two constraints", self.lint("The mustard module is copied."))  # word boundaries
+
+    def test_hedges(self):
+        for s in ("The crates should be copied.", "The crates could be copied.", "The crates are copied, maybe.", "The crates are probably copied.",
+                  "The build must try to use the cache.", "The build is cached as needed.", "The CLI is thin if possible.", "Tests are run where appropriate.",
+                  "The crate is copied from the legacy repo etc.", "The CLI must ideally print JSON."):
+            self.assertIn("hedged wording; state the requirement", self.lint(s), s)
+        self.assertNotIn("hedged wording; state the requirement", self.lint("The shoulder module is copied."))
+
+    def test_speech(self):
+        for s in ("We must copy the crates.", "You must copy the crates.", "I never rewrite crates.", "My crates are copied.", "Our CLI only prints JSON.",
+                  "The crates are copied for me.", "The crates are given to us.", "Your crates are copied."):
+            self.assertIn("written as speech, not as a requirement", self.lint(s), s)
+        self.assertNotIn("written as speech, not as a requirement", self.lint("The usb module is copied; the yourt crate is not."))  # boundaries
+        self.assertNotIn("written as speech, not as a requirement", self.lint("The weather service is never polled."))
+
+    def test_requirement_verb(self):
+        self.assertIn("not phrased as a testable requirement", self.lint("Copy the crates from the legacy repo."))
+        self.assertIn("not phrased as a testable requirement", self.lint("A thin CLI with JSON output."))
+        for s in ("The crates must be copied.", "Crates are copied.", "The CLI is thin.", "The CLI never forks.", "The CLI always exits 0.",
+                  "The CLI only prints JSON.", "The CLI shall print JSON.", "The build requires cargo.", "The build uses cargo.", "The CLI does not fork."):
+            self.assertNotIn("not phrased as a testable requirement", self.lint(s), s)
+
+    def test_vague_terms(self):
+        for s in ("The CLI must have appropriate output.", "The CLI must use proper JSON.", "Errors are properly reported.", "The code is clean.",
+                  "The tests are good.", "The output is nice.", "Latency is reasonable.", "The parser is robust.", "The design is simple."):
+            self.assertIn("vague term; name the observable outcome", self.lint(s), s)
+        self.assertNotIn("vague term; name the observable outcome", self.lint("The cleanup module is deleted; the goodwill crate is kept."))
+
+    def test_rules_fire_once_each_in_fixed_order(self):
+        warnings = self.lint("We should probably keep things clean and proper, etc. " + "x" * 240)
+        self.assertEqual(warnings, ["too long; split into one constraint per anchor", "hedged wording; state the requirement",
+                                    "written as speech, not as a requirement", "not phrased as a testable requirement", "vague term; name the observable outcome"])
+
+    def test_lint_subcommand_exit_codes_and_selection(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(anchor(), anchor("ANC-002", statement="We should keep it clean."),
+                                                    anchor("ANC-003", status="retired", statement="Copy stuff."),
+                                                    anchor("REQ-014", source_type="REQ", source_ref="REQ-014", statement=REQ_STATEMENT)))
+            code, out = run_cli(["lint", "--anchors", path, "--all"])
+            self.assertEqual(code, 1)
+            self.assertEqual([r["id"] for r in out["data"]["anchors"]], ["ANC-001", "ANC-002", "REQ-014"])  # retired skipped
+            self.assertEqual(out["data"]["anchors"][0]["warnings"], [])
+            self.assertEqual(out["data"]["anchors"][1]["warnings"], ["hedged wording; state the requirement", "written as speech, not as a requirement",
+                                                                      "not phrased as a testable requirement", "vague term; name the observable outcome"])
+            self.assertEqual(out["data"]["warning_count"], 4)
+            code, out = run_cli(["lint", "--anchors", path])  # neither flag: same as --all
+            self.assertEqual((code, out["data"]["warning_count"]), (1, 4))
+            code, out = run_cli(["lint", "--anchors", path, "--id", "ANC-001"])
+            self.assertEqual((code, out["data"]), (0, {"anchors": [{"id": "ANC-001", "warnings": []}], "warning_count": 0, "path": path}))
+            code, out = run_cli(["lint", "--anchors", path, "--id", "ANC-003"])  # --id reaches retired anchors
+            self.assertEqual((code, out["data"]["warning_count"]), (1, 1))
+            code, out = run_cli(["lint", "--anchors", path, "--id", "ANC-001", "--all"])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            code, out = run_cli(["lint", "--anchors", path, "--id", "ANC-999"])
+            self.assertEqual((code, out["error"]["code"]), (2, "ANCHOR.UNKNOWN"))
+
+    def test_add_reports_warnings_and_strict_refuses(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "anchors.json")
+            code, out = run_cli(["add", "--anchors", path, "--statement", "We should keep the CLI thin.", "--quote", "keep the CLI thin", "--strict"])
+            self.assertEqual((code, out["error"]["code"], out["error"]["recoverable"]), (2, "ANCHOR.LINT", True))
+            self.assertIn("hedged wording", out["error"]["message"])
+            self.assertFalse(Path(path).exists())
+            code, out = run_cli(["add", "--anchors", path, "--statement", "We should keep the CLI thin.", "--quote", "keep the CLI thin"])
+            self.assertEqual(code, 0)
+            self.assertEqual(out["data"]["lint"]["warnings"], ["hedged wording; state the requirement", "written as speech, not as a requirement",
+                                                               "not phrased as a testable requirement"])
+
+
+class DedupeTests(unittest.TestCase):
+    A = "The runtime crates are copied from the legacy repo's runtime crates with the legacy-specific modules deleted."
+
+    def test_tokens_and_jaccard(self):
+        self.assertEqual(jj.tokens("The CLI's --json output is stable, i.e. versioned."), {"cli", "json", "output", "stable", "versioned"})
+        self.assertEqual(jj.jaccard(set(), set()), 0.0)
+        self.assertEqual(jj.jaccard({"a", "b"}, {"b", "c"}), 1 / 3)
+        score, fa, fb = jj.best_similarity(STATEMENT, QUOTE, self.A, "copy the libraries from the legacy repo and remove the legacy-specific code")
+        self.assertEqual((fa, fb), ("quote", "quote"))
+        self.assertGreater(score, 0.7)
+        self.assertEqual(jj.best_similarity("", "", "", "")[0], 0.0)
+
+    def test_deterministic_pairs_and_exit_code(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(
+                anchor(),
+                anchor("ANC-002", statement=self.A, quote="copy the libraries from the legacy repo as a starting point and remove the legacy-specific code"),
+                anchor("ANC-003", statement="The CLI layer only parses arguments and prints JSON.", quote="keep the CLI thin"),
+                anchor("ANC-004", status="retired", statement=STATEMENT),
+                anchor("REQ-014", source_type="REQ", source_ref="REQ-014", statement=REQ_STATEMENT)))
+            code, out = run_cli(["dedupe", "--anchors", path])
+            self.assertEqual(code, 1, out)
+            data = out["data"]
+            self.assertEqual((data["threshold"], data["jev"], data["anchors"]), (0.5, False, 4))
+            self.assertEqual([(p["a"], p["b"]) for p in data["pairs"]], [("ANC-001", "ANC-002")])
+            pair = data["pairs"][0]
+            self.assertEqual((pair["field_a"], pair["field_b"]), ("quote", "quote"))
+            self.assertEqual(set(pair), {"a", "b", "jaccard", "field_a", "field_b"})
+            self.assertEqual(data["likely_duplicates"], data["pairs"])  # jaccard >= 0.8 without --jev
+            self.assertEqual(pair["jaccard"], 1.0)  # same tokens after stopwords ("the" vs "a")
+            distinct = write(d, "distinct.json", record(anchor(), anchor("ANC-003", statement="The CLI layer only parses arguments and prints JSON.", quote="keep the CLI thin")))
+            code, out = run_cli(["dedupe", "--anchors", distinct])
+            self.assertEqual((code, out["data"]["pairs"], out["data"]["likely_duplicates"]), (0, [], []))
+            code, out = run_cli(["dedupe", "--anchors", path, "--threshold", "0.2"])
+            self.assertEqual(code, 1)
+            self.assertGreaterEqual(len(out["data"]["pairs"]), 1)
+            self.assertEqual(len(out["data"]["likely_duplicates"]), 1)
+            self.assertEqual(out["data"]["pairs"][0]["jaccard"], max(p["jaccard"] for p in out["data"]["pairs"]))  # best first
+            code, out = run_cli(["dedupe", "--anchors", path, "--threshold", "1.5"])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+
+    def test_jev_pass_with_answers_file_dry_run_and_opt_in(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(
+                anchor(),
+                anchor("ANC-002", statement=self.A, quote="copy the libraries from the legacy repo as a starting point and remove the legacy-specific code"),
+                anchor("ANC-003", statement="The runtime crates are copied from the legacy repo.", quote="copy the runtime crates from the legacy repo")))
+            yes = {"same_constraint": answer("yes", 0.9)}
+            no = {"same_constraint": answer("no", 0.9)}
+            weak_yes = {"same_constraint": answer("yes", 0.55)}
+            fixture = write(d, "answers.json", {"ANC-001|ANC-002": yes, "ANC-001|ANC-003": no, "*": weak_yes})
+            with env():
+                code, out = run_cli(["dedupe", "--anchors", path, "--threshold", "0.25", "--answers-file", fixture])
+            self.assertEqual(code, 1, out)
+            data = out["data"]
+            self.assertTrue(data["jev"] and data["fixture"])
+            by_pair = {(p["a"], p["b"]): p for p in data["pairs"]}
+            self.assertEqual(by_pair[("ANC-001", "ANC-002")]["jev"], {"choice": "yes", "confidence": 0.9, "attempts": 1})
+            self.assertEqual(by_pair[("ANC-001", "ANC-003")]["jev"]["choice"], "no")
+            self.assertEqual(by_pair[("ANC-002", "ANC-003")]["jev"]["confidence"], 0.55)  # '*' fallback, below the confidence threshold
+            self.assertEqual([(p["a"], p["b"]) for p in data["likely_duplicates"]], [("ANC-001", "ANC-002")])
+            # a pair the fixture lacks is an error on that pair, not a crash
+            partial = write(d, "partial.json", {"ANC-001|ANC-002": no})
+            with env():
+                code, out = run_cli(["dedupe", "--anchors", path, "--threshold", "0.25", "--answers-file", partial])
+            self.assertEqual(code, 0)
+            errors = [p for p in out["data"]["pairs"] if p["jev"].get("error")]
+            self.assertEqual({e["jev"]["error"]["code"] for e in errors}, {"FIXTURE.MISSING"})
+            # dry run: requests are shown, nothing is called, the deterministic rule decides
+            with env():
+                code, out = run_cli(["dedupe", "--anchors", path, "--threshold", "0.25", "--jev", "--dry-run"])
+            self.assertEqual(code, 1)
+            req = out["data"]["requests"][0]
+            self.assertEqual(set(req), {"model", "questions", "state"})
+            self.assertEqual(set(req["state"]), {"a", "b"})
+            self.assertEqual(set(req["state"]["a"]), {"id", "statement", "quote"})
+            self.assertEqual(set(req["questions"]), {"same_constraint"})
+            self.assertEqual(out["data"]["totals"]["requests"], len(out["data"]["pairs"]))
+            self.assertEqual([(p["a"], p["b"]) for p in out["data"]["likely_duplicates"]], [("ANC-001", "ANC-002")])
+            self.assertTrue(all(p["jev"] is None for p in out["data"]["pairs"]))
+            self.assertEqual(sorted(Path(d).iterdir()), sorted(Path(d) / n for n in ("anchors.json", "answers.json", "partial.json")))  # no run files
+            # live: key and opt-in are enforced before anything is sent
+            with env():
+                code, out = run_cli(["dedupe", "--anchors", path, "--threshold", "0.25", "--jev"])
+            self.assertEqual((code, out["error"]["code"]), (2, "AUTH.CREDENTIALS"))
+            with env(TYPESAFE_API_KEY="sk-test"):
+                code, out = run_cli(["dedupe", "--anchors", path, "--threshold", "0.25", "--jev"])
+            self.assertEqual((code, out["error"]["code"]), (2, "POLICY.REMOTE_JUDGE_DISABLED"))
+            self.assertIn("statements and quotes", out["error"]["message"])
+            distinct = write(d, "distinct.json", record(anchor(), anchor("ANC-003", statement="The CLI layer only parses arguments and prints JSON.", quote="keep the CLI thin")))
+            with env():
+                code, out = run_cli(["dedupe", "--anchors", distinct, "--jev"])  # no pairs: nothing to send, no key needed
+            self.assertEqual((code, out["data"]["pairs"], out["data"]["jev"]), (0, [], True))
+
+    def test_jev_live_uses_the_transport_policy(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(anchor(), anchor("ANC-002", statement=self.A, quote="copy the libraries from the legacy repo and remove the legacy-specific code")))
+            t = Transport(http(429), {"model": "jev-1.13.0", "answers": {"same_constraint": answer("yes", 0.8)}})
+            sleeps = []
+            with env(**LIVE_ENV), mock.patch.object(jj, "call_jev", t), mock.patch.object(jj, "_sleep", sleeps.append):
+                code, out = run_cli(["dedupe", "--anchors", path, "--jev"])
+            self.assertEqual(code, 1)
+            self.assertEqual(out["data"]["pairs"][0]["jev"], {"choice": "yes", "confidence": 0.8, "attempts": 2})
+            self.assertEqual((len(t.bodies), sleeps), (2, [1.0]))
+            self.assertEqual(t.bodies[0]["state"]["a"]["id"], "ANC-001")
+            t = Transport(http(401))
+            with env(**LIVE_ENV), mock.patch.object(jj, "call_jev", t):
+                code, out = run_cli(["dedupe", "--anchors", path, "--jev"])
+            self.assertEqual((code, out["error"]["code"]), (2, "AUTH.CREDENTIALS"))
+            t = Transport(http(503), http(503), http(503))
+            with env(**LIVE_ENV), mock.patch.object(jj, "call_jev", t), mock.patch.object(jj, "_sleep", lambda s: None):
+                code, out = run_cli(["dedupe", "--anchors", path, "--jev"])
+            self.assertEqual(code, 0)
+            self.assertEqual((out["data"]["pairs"][0]["jev"]["error"]["code"], out["data"]["pairs"][0]["jev"]["attempts"]), ("JEV.HTTP", 3))
+
+    def test_add_refuses_duplicate_candidates_unless_allowed(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(anchor(), anchor("ANC-002", status="retired", statement="The CLI layer only parses arguments and prints JSON.", quote="keep the CLI thin")))
+            # similar quote to the locked anchor
+            code, out = run_cli(["add", "--anchors", path, "--statement", self.A, "--quote", "copy the libraries from the legacy repo and remove the legacy-specific code"])
+            self.assertEqual((code, out["error"]["code"], out["error"]["recoverable"]), (2, "ANCHOR.DUPLICATE_CANDIDATE", True))
+            self.assertIn("ANC-001", out["error"]["message"])
+            self.assertIn("ANC-001", out["error"]["suggested_action"])
+            self.assertIn("--allow-similar", out["error"]["suggested_action"])
+            self.assertEqual(len(json.loads(Path(path).read_text())["anchors"]), 2)
+            # similar statement to the locked anchor's statement, with an unrelated quote
+            code, out = run_cli(["add", "--anchors", path, "--statement", STATEMENT.replace("deleting", "removing"), "--quote", "take the legacy repo's code and strip it"])
+            self.assertEqual(out["error"]["code"], "ANCHOR.DUPLICATE_CANDIDATE")
+            # a retired anchor never blocks
+            code, out = run_cli(["add", "--anchors", path, "--statement", "The CLI layer only parses arguments and prints JSON.", "--quote", "keep the CLI thin"])
+            self.assertEqual((code, out["data"]["anchor"]["id"]), (0, "ANC-003"))
+            self.assertEqual(out["data"]["similar"], [])
+            # --allow-similar records it and reports the candidates
+            code, out = run_cli(["add", "--anchors", path, "--statement", self.A, "--quote", "copy the libraries from the legacy repo and remove the legacy-specific code", "--allow-similar"])
+            self.assertEqual((code, out["data"]["anchor"]["id"]), (0, "ANC-004"))
+            self.assertEqual(out["data"]["similar"][0]["id"], "ANC-001")
+            self.assertGreaterEqual(out["data"]["similar"][0]["jaccard"], 0.6)
+            self.assertEqual(set(out["data"]["similar"][0]), {"id", "jaccard", "field"})
+            self.assertEqual(out["data"]["similar"][0]["field"], "quote/quote")
+
+
+def rubric_answers(**overrides):
+    answers = {q: answer("yes", 0.9) for q in jj.RUBRIC_QUESTIONS}
+    for q, (choice, p) in overrides.items():
+        answers[q] = answer(choice, p)
+    return answers
+
+
+class RubricTests(unittest.TestCase):
+    def test_positive_form_is_the_sixth_question(self):
+        self.assertEqual(jj.RUBRIC_QUESTIONS, ("single_constraint", "observable", "requirement_form", "faithful", "scoped", "positive_form"))
+        q = jj.load_simple_question_set("testability", jj.RUBRIC_QUESTIONS)["questions"]["positive_form"]
+        self.assertIn("unless", q["instructions"])
+        self.assertIn("conditional", q["criteria"]["no"])
+        with tempfile.TemporaryDirectory() as d:
+            fixture = write(d, "answers.json", {"candidate": rubric_answers(positive_form=("no", 0.9))})
+            with env():
+                code, out = run_cli(["rubric", "--statement", "The build must not add a dependency unless the lead approved it.", "--quote", "no new deps unless I say so",
+                                     "--answers-file", fixture])
+            self.assertEqual((code, out["data"]["anchors"][0]["verdict"], out["data"]["anchors"][0]["failing"]), (1, "needs_work", ["positive_form"]))
+            five = {q: answer("yes", 0.9) for q in jj.RUBRIC_QUESTIONS[:5]}  # an old five-question fixture no longer validates
+            with env():
+                code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE, "--answers-file", write(d, "five.json", {"*": five})])
+            self.assertEqual((out["data"]["anchors"][0]["verdict"], out["data"]["anchors"][0]["error"]["code"]), ("error", "JEV.RESPONSE_INVALID"))
+
+    def test_shipped_question_sets_load_and_fixtures_validate(self):
+        for name, required in (("dedupe", (jj.DEDUPE_QUESTION,)), ("testability", jj.RUBRIC_QUESTIONS)):
+            qs = jj.load_simple_question_set(name, required)
+            self.assertEqual(qs["gate"], name)
+            self.assertEqual(set(qs["questions"]), set(required))
+            for q in qs["questions"].values():
+                self.assertEqual((q["type"], set(q["criteria"])), ("choice", set(OPTIONS)))
+                self.assertTrue(q["instructions"].strip())
+        jj.validate_response({"answers": rubric_answers()}, jj.load_simple_question_set("testability", jj.RUBRIC_QUESTIONS)["questions"])
+        with mock.patch.object(jj, "QUESTIONS_DIR", Path("/nonexistent")):
+            with self.assertRaises(jj.JudgeError) as cm:
+                jj.load_simple_question_set("dedupe", (jj.DEDUPE_QUESTION,))
+            self.assertEqual(cm.exception.code, "INPUT.MISSING")
+
+    def test_record_form_with_answers_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(anchor(), anchor("ANC-002", statement="We should keep it clean.", quote="keep it clean"),
+                                                    anchor("ANC-003", status="retired"), anchor("ANC-004", statement=QUOTE.capitalize())))
+            fixture = write(d, "answers.json", {"ANC-002": rubric_answers(observable=("no", 0.9), requirement_form=("yes", 0.5)), "*": rubric_answers()})
+            with env():
+                code, out = run_cli(["rubric", "--anchors", path, "--all", "--answers-file", fixture])
+            self.assertEqual(code, 1, out)
+            data = out["data"]
+            self.assertEqual((data["threshold"], data["dry_run"], data["fixture"], data["path"], data["pass"]), (0.6, False, True, path, False))
+            by_id = {e["id"]: e for e in data["anchors"]}
+            self.assertEqual(list(by_id), ["ANC-001", "ANC-002", "ANC-004"])
+            self.assertEqual((by_id["ANC-001"]["verdict"], by_id["ANC-001"]["failing"], by_id["ANC-001"]["statement"], by_id["ANC-001"]["lint"]),
+                             ("testable", [], STATEMENT, {"warnings": [], "errors": []}))
+            self.assertEqual(set(by_id["ANC-001"]["answers"]), set(jj.RUBRIC_QUESTIONS))
+            self.assertEqual((by_id["ANC-002"]["verdict"], by_id["ANC-002"]["failing"]), ("needs_work", ["observable", "requirement_form"]))
+            self.assertIn("hedged wording; state the requirement", by_id["ANC-002"]["lint"]["warnings"])  # warnings ride along without failing
+            # the verbatim rule is a lint error: it fails the rubric even when Jev says yes to everything
+            self.assertEqual((by_id["ANC-004"]["verdict"], by_id["ANC-004"]["failing"]), ("needs_work", ["statement is the verbatim quote"]))
+            self.assertEqual(data["needs_work"], ["ANC-002", "ANC-004"])
+            with env():
+                code, out = run_cli(["rubric", "--anchors", path, "--id", "ANC-001", "--answers-file", fixture])
+            self.assertEqual((code, out["data"]["pass"], [e["id"] for e in out["data"]["anchors"]]), (0, True, ["ANC-001"]))
+            with env():
+                code, out = run_cli(["rubric", "--anchors", path, "--id", "ANC-001", "--answers-file", fixture, "--threshold", "0.95"])
+            self.assertEqual((code, out["data"]["anchors"][0]["verdict"]), (1, "needs_work"))
+            self.assertEqual(out["data"]["anchors"][0]["failing"], list(jj.RUBRIC_QUESTIONS))
+            missing = write(d, "missing.json", {"ANC-002": rubric_answers()})
+            with env():
+                code, out = run_cli(["rubric", "--anchors", path, "--id", "ANC-001", "--answers-file", missing])
+            self.assertEqual((code, out["data"]["anchors"][0]["verdict"], out["data"]["anchors"][0]["error"]["code"]), (1, "error", "FIXTURE.MISSING"))
+            self.assertEqual(out["data"]["anchors"][0]["failing"], ["error: FIXTURE.MISSING"])
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["anchors.json", "answers.json", "missing.json"])  # no run files
+
+    def test_candidate_form_dry_run_and_opt_in(self):
+        with tempfile.TemporaryDirectory() as d:
+            fixture = write(d, "answers.json", {"candidate": rubric_answers(faithful=("no", 0.8))})
+            with env():
+                code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE, "--scope", "runtime crates", "--answers-file", fixture])
+            self.assertEqual(code, 1, out)
+            entry = out["data"]["anchors"][0]
+            self.assertEqual((entry["id"], entry["verdict"], entry["failing"], entry["scope"], out["data"]["path"]), ("candidate", "needs_work", ["faithful"], "runtime crates", None))
+            star = write(d, "star.json", {"*": rubric_answers()})
+            with env():
+                code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE, "--answers-file", star])
+            self.assertEqual((code, out["data"]["pass"]), (0, True))
+            with env():
+                code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE, "--dry-run"])
+            self.assertEqual(code, 0)
+            self.assertEqual((out["data"]["dry_run"], out["data"]["pass"], out["data"]["anchors"][0]["verdict"]), (True, False, None))
+            req = out["data"]["requests"][0]
+            self.assertEqual(req["state"], {"anchor": {"statement": STATEMENT, "quote": QUOTE, "scope": ""}})
+            self.assertEqual(set(req["questions"]), set(jj.RUBRIC_QUESTIONS))
+            self.assertEqual(out["data"]["totals"]["requests"], 1)
+            # input checks
+            with env():
+                code, out = run_cli(["rubric", "--statement", STATEMENT])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            with env():
+                code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE, "--anchors", "x.json"])
+            self.assertEqual(out["error"]["code"], "VALIDATION.INPUT")
+            with env():
+                code, out = run_cli(["rubric", "--dry-run"])
+            self.assertEqual(out["error"]["code"], "VALIDATION.INPUT")
+            with env():
+                code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE])
+            self.assertEqual((code, out["error"]["code"]), (2, "AUTH.CREDENTIALS"))
+            with env(TYPESAFE_API_KEY="sk-test"):
+                code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE])
+            self.assertEqual((code, out["error"]["code"]), (2, "POLICY.REMOTE_JUDGE_DISABLED"))
+
+    def test_live_candidate_uses_the_transport(self):
+        t = Transport({"model": "jev-1.13.0", "answers": rubric_answers(scoped=("unclear", 0.7))})
+        with env(**LIVE_ENV), mock.patch.object(jj, "call_jev", t):
+            code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE, "--scope", "runtime crates"])
+        self.assertEqual(code, 1)
+        self.assertEqual((out["data"]["anchors"][0]["verdict"], out["data"]["anchors"][0]["failing"], out["data"]["anchors"][0]["attempts"]), ("needs_work", ["scoped"], 1))
+        self.assertEqual(t.bodies[0]["state"]["anchor"]["scope"], "runtime crates")
+        self.assertNotIn("item", t.bodies[0]["state"])
+        # a state without an item cannot be shortened: over the cap it is refused before any call
+        with mock.patch.object(jj, "DEFAULT_MAX_REQUEST_BYTES", 200), env(**LIVE_ENV), mock.patch.object(jj, "call_jev", t):
+            code, out = run_cli(["rubric", "--statement", STATEMENT, "--quote", QUOTE])
+        self.assertEqual((code, out["data"]["anchors"][0]["verdict"], out["data"]["anchors"][0]["error"]["code"]), (1, "error", "JEV.CONTEXT_EXCEEDED"))
+        self.assertEqual(len(t.bodies), 1)
+
+    def test_add_rubric_gate(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "anchors.json")
+            bad = write(d, "bad.json", {"candidate": rubric_answers(single_constraint=("no", 0.9), observable=("yes", 0.3))})
+            good = write(d, "good.json", {"*": rubric_answers()})
+            with env():
+                code, out = run_cli(["add", "--anchors", path, "--statement", STATEMENT, "--quote", QUOTE, "--rubric", "--answers-file", bad])
+            self.assertEqual((code, out["error"]["code"], out["error"]["recoverable"]), (2, "ANCHOR.NOT_TESTABLE", True))
+            self.assertIn("single_constraint, observable", out["error"]["message"])
+            self.assertIn("--allow-untestable", out["error"]["suggested_action"])
+            self.assertFalse(Path(path).exists())
+            with env():
+                code, out = run_cli(["add", "--anchors", path, "--statement", STATEMENT, "--quote", QUOTE, "--rubric", "--answers-file", bad, "--allow-untestable"])
+            self.assertEqual((code, out["data"]["anchor"]["id"], out["data"]["rubric"]["verdict"]), (0, "ANC-001", "needs_work"))
+            self.assertEqual(out["data"]["rubric"]["failing"], ["single_constraint", "observable"])
+            with env():
+                code, out = run_cli(["add", "--anchors", path, "--statement", "The CLI layer only parses arguments and prints JSON.", "--quote", "keep the CLI thin",
+                                     "--rubric", "--answers-file", good])
+            self.assertEqual((code, out["data"]["anchor"]["id"], out["data"]["rubric"]["verdict"], out["data"]["rubric"]["id"]), (0, "ANC-002", "testable", "candidate"))
+            # without --rubric nothing is asked and no key is needed; with it, the opt-in applies
+            with env():
+                code, out = run_cli(["add", "--anchors", path, "--statement", "The parser does not call the network.", "--quote", "no network in the parser"])
+            self.assertEqual(code, 0)
+            self.assertNotIn("rubric", out["data"])
+            with env():
+                code, out = run_cli(["add", "--anchors", path, "--statement", "The build uses cargo only.", "--quote", "cargo only", "--rubric"])
+            self.assertEqual((code, out["error"]["code"]), (2, "AUTH.CREDENTIALS"))
+            self.assertEqual(len(json.loads(Path(path).read_text())["anchors"]), 3)
+            t = Transport({"model": "jev-1.13.0", "answers": rubric_answers()})
+            with env(**LIVE_ENV), mock.patch.object(jj, "call_jev", t):
+                code, out = run_cli(["add", "--anchors", path, "--statement", "The build uses cargo only.", "--quote", "cargo only", "--rubric"])
+            self.assertEqual((code, out["data"]["anchor"]["id"], out["data"]["rubric"]["verdict"]), (0, "ANC-004", "testable"))
+            self.assertEqual(t.bodies[0]["state"]["anchor"]["quote"], "cargo only")
+
+
+class KindTests(unittest.TestCase):
+    """Anchor kind: directive (default), prohibition (compliance role ignored), structural (plan gate skips Jev)."""
+
+    def test_add_update_validate_kind(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / "anchors.json")
+            code, out = run_cli(["add", "--anchors", path, "--statement", STATEMENT, "--quote", QUOTE])
+            self.assertEqual((code, out["data"]["anchor"]["kind"]), (0, "directive"))
+            code, out = run_cli(["add", "--anchors", path, "--statement", "The sprint never adds a dependency on tokio.", "--quote", "no tokio", "--kind", "prohibition"])
+            self.assertEqual((code, out["data"]["anchor"]["kind"]), (0, "prohibition"))
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--kind", "structural"])
+            self.assertEqual((code, out["data"]["changed"], out["data"]["version"]), (0, ["kind"], 2))
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--kind", "structural"])  # unchanged
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            rec = json.loads(Path(path).read_text())
+            self.assertEqual([a["kind"] for a in rec["anchors"]], ["structural", "prohibition"])
+            self.assertEqual(jj.validate_record(rec), [])
+            rec["anchors"][0]["kind"] = "vibe"
+            self.assertIn("ANC-001: kind must be one of ('directive', 'prohibition', 'structural')", jj.validate_record(rec))
+            old = anchor()
+            old.pop("kind", None)
+            self.assertEqual((jj.anchor_kind(old), jj.validate_record(record(old))), ("directive", []))  # records without kind are directives
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                jj.main(["add", "--anchors", path, "--statement", "x", "--quote", "y", "--kind", "vibe"])
+
+    def test_prohibition_gating_ignores_compliance(self):
+        def pro(**kw):
+            return jj.decide(plan_answers(**kw), PLAN_ROLES, 0.6, "prohibition")
+        self.assertEqual(pro(rel="yes", comp="no", conf="no"), ("satisfied", 0.9))        # refrains: the directive answer would be not_addressed
+        self.assertEqual(jj.decide(plan_answers(rel="yes", comp="no", conf="no"), PLAN_ROLES, 0.6), ("not_addressed", 0.9))
+        self.assertEqual(pro(rel="no", comp="no", conf="no")[0], "not_applicable")
+        self.assertEqual(pro(rel="yes", comp="no", conf="yes")[0], "contradicted")
+        self.assertEqual(pro(rel="unclear", comp="no", conf="no")[0], "underspecified")
+        self.assertEqual(pro(rel="yes", comp="no", conf="no", rel_p=0.5)[0], "underspecified")
+        self.assertEqual(pro(rel="yes", comp="no", conf="no", conf_p=0.5)[0], "underspecified")
+        self.assertEqual(pro(rel="yes", comp="no", conf="unclear")[0], "underspecified")
+        self.assertEqual(pro(rel="yes", comp="unclear", conf="no", comp_p=0.1), ("satisfied", 0.9))  # compliance confidence never enters min_conf
+        dev = jj.decide(dev_answers(comp="no", evid="no"), DEV_ROLES, 0.6, "prohibition")
+        self.assertEqual(dev[0], "asserted_only")
+        self.assertEqual(jj.decide(dev_answers(comp="no", evid="yes"), DEV_ROLES, 0.6, "prohibition")[0], "satisfied")
+        self.assertEqual(jj.decide(plan_answers(), PLAN_ROLES, 0.6, "structural")[0], "satisfied")  # structural gates like a directive when judged
+
+    def test_structural_skips_jev_at_the_plan_gate_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            anchors = [anchor(), anchor("ANC-002", kind="structural", statement="Every sprint bead names one architectural layer (a)-(d).", quote="one layer per bead",
+                                       deterministic_check="grep -c '^Layer:' on each bead")]
+            t = Transport()
+            j = Judged(d, t, anchors=anchors)
+            self.assertEqual(j.code, 0)
+            by_id = {r["anchor_id"]: r for r in j.run["results"]}
+            self.assertEqual((by_id["ANC-002"]["verdict"], by_id["ANC-002"]["kind"], by_id["ANC-002"]["answers"], by_id["ANC-002"]["attempts"]),
+                             ("deterministic_only", "structural", None, 0))
+            self.assertEqual(by_id["ANC-002"]["explanation"], "Structural anchor: verified by its deterministic_check, not by Jev")
+            self.assertEqual(by_id["ANC-001"]["kind"], "directive")
+            self.assertEqual([b["state"]["anchor"]["id"] for b in t.bodies], ["ANC-001"])  # one request, not two
+            self.assertEqual(j.run["summary"]["counts"], {"satisfied": 1, "deterministic_only": 1})
+            self.assertTrue(j.run["summary"]["pass"])
+            self.assertEqual([r["anchor_id"] for r in j.run["results"]], ["ANC-001", "ANC-002"])  # sorted after the passing verdicts
+            code, md = run_cli(["report", "--run", j.run["path"], "--format", "md"])
+            self.assertNotIn("ANC-002", md)  # non-failing: hidden without --all
+            code, md = run_cli(["report", "--run", j.run["path"], "--format", "md", "--all"])
+            self.assertIn("> **bd-42 · ANC-002 · deterministic only** Anchor: Every sprint bead names one architectural layer (a)-(d). You said", md)
+            # dry run sends nothing for it either
+            j = Judged(d, Transport(), anchors=anchors, extra_args=["--dry-run"])
+            self.assertEqual((len(j.run["requests"]), {r["anchor_id"]: r["verdict"] for r in j.run["results"]}), (1, {"ANC-001": None, "ANC-002": "deterministic_only"}))
+            # dev gate judges it normally
+            t = Transport(gate="dev")
+            j = Judged(d, t, anchors=anchors, gate="dev")
+            self.assertEqual({r["anchor_id"]: r["verdict"] for r in j.run["results"]}, {"ANC-001": "satisfied", "ANC-002": "satisfied"})
+            self.assertEqual(len(t.bodies), 2)
+            # check-fixtures: a structural anchor's plan-gate fixtures are not checked, not mismatched
+            fx = anchor("ANC-003", kind="structural", statement="The CLI layer only parses arguments and prints JSON.", quote="keep the CLI thin",
+                        fixtures={"pass": ["The CLI parses and prints."], "fail": ["The CLI runs the linter itself."]})
+            path = write(d, "fx.json", record(fx))
+            answers = write(d, "answers.json", {"*": plan_answers()})
+            with env():
+                code, out = run_cli(["check-fixtures", "--anchors", path, "--gate", "plan", "--all", "--answers-file", answers])
+            self.assertEqual((code, out["data"]["mismatches"], [c["verdict"] for c in out["data"]["checks"]], [c["expected_ok"] for c in out["data"]["checks"]]),
+                             (0, [], ["deterministic_only", "deterministic_only"], [None, None]))
+            self.assertEqual(jj.exit_code_for("judge", {"success": True, "data": {"dry_run": False, "summary": {"pass": True}}}), 0)
+            self.assertEqual(jj.SEVERITY["deterministic_only"], jj.SEVERITY["not_applicable"] + 1)
+            self.assertNotIn("deterministic_only", jj.FAILING)
+
+    def test_prohibition_via_record_and_fixture(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(anchor(kind="prohibition", statement="The sprint never adds a dependency on tokio.", quote="no tokio")))
+            item = write(d, "item.txt", "Sprint 2 copies the crates and adds no dependencies.")
+            answers = write(d, "answers.json", {"*": plan_answers(comp="no", conf="no")})
+            with env():
+                code, out = run_cli(["judge", "--anchors", path, "--gate", "plan", "--all", "--item-id", "bd-1", "--item-file", item, "--answers-file", answers,
+                                     "--run-dir", str(Path(d) / "runs")])
+            self.assertEqual((code, out["data"]["results"][0]["verdict"], out["data"]["results"][0]["kind"]), (0, "satisfied", "prohibition"))
+            with env():
+                code, out = run_cli(["check-fixtures", "--anchors", write(d, "f.json", record(anchor(kind="prohibition", fixtures={"pass": ["adds nothing"], "fail": ["adds tokio"]}))),
+                                     "--gate", "plan", "--all", "--answers-file", write(d, "a2.json", {"ANC-001:pass:1": plan_answers(comp="no", conf="no"), "ANC-001:fail:1": plan_answers(comp="no", conf="yes")})])
+            self.assertEqual((code, [c["verdict"] for c in out["data"]["checks"]]), (0, ["satisfied", "contradicted"]))
+
+
+class LeaningTests(unittest.TestCase):
+    def test_leaning_is_the_verdict_by_choices_alone(self):
+        self.assertEqual(jj.leaning_of(plan_answers(comp="no", p=0.3), PLAN_ROLES, "directive"), "not_addressed")
+        self.assertEqual(jj.leaning_of(plan_answers(conf="yes", p=0.2), PLAN_ROLES, "directive"), "contradicted")
+        self.assertEqual(jj.leaning_of(plan_answers(rel="no", p=0.1), PLAN_ROLES, "directive"), "not_applicable")
+        self.assertEqual(jj.leaning_of(plan_answers(rel="unclear"), PLAN_ROLES, "directive"), "underspecified")
+        self.assertEqual(jj.leaning_of(plan_answers(comp="no", p=0.3), PLAN_ROLES, "prohibition"), "satisfied")
+
+    def test_underspecified_rows_show_the_lean(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(anchor(), anchor("ANC-002", statement="The CLI layer only parses arguments and prints JSON.", quote="keep the CLI thin")))
+            item = write(d, "item.txt", "Sprint 2 copies the crates.")
+            answers = write(d, "answers.json", {"ANC-001": plan_answers(comp="no", comp_p=0.45), "ANC-002": plan_answers()})
+            with env():
+                code, out = run_cli(["judge", "--anchors", path, "--gate", "plan", "--all", "--item-id", "bd-1", "--item-file", item, "--answers-file", answers,
+                                     "--run-dir", str(Path(d) / "runs")])
+            run = out["data"]
+            by_id = {r["anchor_id"]: r for r in run["results"]}
+            self.assertEqual((by_id["ANC-001"]["verdict"], by_id["ANC-001"]["leaning"]), ("underspecified", "not_addressed"))
+            self.assertEqual((by_id["ANC-002"]["verdict"], by_id["ANC-002"]["leaning"]), ("satisfied", "satisfied"))
+            self.assertEqual(run["summary"]["leaning_counts"], {"not_addressed": 1, "satisfied": 1})
+            code, md = run_cli(["report", "--run", run["path"], "--format", "md", "--all"])
+            self.assertIn("the anchor or the bead may be underspecified. (leaning: not_addressed)", md)
+            self.assertNotIn("(leaning: satisfied)", md)
+            old = make_run(d, "old.json", "plan", "bd-1", "2026-10-09T10:00:00+00:00", {"ANC-001": "underspecified"})  # pre-leaning run files
+            code, md = run_cli(["report", "--run", old, "--format", "md"])
+            self.assertNotIn("leaning", md)
+
+
+class ConfirmTests(unittest.TestCase):
+    """Near the threshold one answer is noise: the identical request is sent again and must agree."""
+
+    def test_agreeing_rejudge_confirms(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.65)}, {"model": "jev", "answers": plan_answers(comp_p=0.72)})
+            j = Judged(d, t)
+        self.assertEqual((j.code, j.result["verdict"], j.result["attempts"], j.result["confirmed"], j.result["near_threshold"]), (0, "satisfied", 2, True, True))
+        self.assertEqual(j.result["answers"]["addressed"]["confidence"], 0.65)  # the first answers are kept
+        self.assertNotIn("answers_second", j.result)
+        self.assertEqual(len(t.bodies), 2)
+        self.assertEqual(t.bodies[0], t.bodies[1])  # identical request
+
+    def test_disagreeing_rejudge_is_underspecified_and_unstable(self):
+        with tempfile.TemporaryDirectory() as d:
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.62)}, {"model": "jev", "answers": plan_answers(comp="no", comp_p=0.7)})
+            j = Judged(d, t)
+            code, md = run_cli(["report", "--run", j.run["path"], "--format", "md"])
+        self.assertEqual((j.code, j.result["verdict"], j.result["attempts"], j.result["unstable"]), (1, "underspecified", 2, True))
+        self.assertEqual((j.result["verdict_first"], j.result["verdict_second"]), ("satisfied", "not_addressed"))
+        self.assertEqual(j.result["answers"]["addressed"]["choice"], "yes")
+        self.assertEqual(j.result["answers_second"]["addressed"]["choice"], "no")
+        self.assertEqual(j.result["leaning"], "satisfied")
+        self.assertEqual(j.run["summary"]["unstable"], ["ANC-001"])
+        self.assertNotIn("confirmed", j.result)
+        self.assertIn(">   Unstable: two identical requests gave satisfied then not_addressed.", md)
+        self.assertIn("(leaning: satisfied)", md)
+
+    def test_band_and_switches(self):
+        with tempfile.TemporaryDirectory() as d:  # 0.71 is outside the 0.10 band: no re-judge
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.71)})
+            j = Judged(d, t)
+        self.assertEqual((j.result["attempts"], len(t.bodies)), (1, 1))
+        self.assertNotIn("near_threshold", j.result)
+        with tempfile.TemporaryDirectory() as d:  # exactly 0.10 away counts
+            t = Transport({"model": "jev", "answers": plan_answers(rel_p=0.7)})
+            j = Judged(d, t)
+        self.assertEqual((j.result["attempts"], j.result["confirmed"]), (2, True))
+        with tempfile.TemporaryDirectory() as d:  # --no-confirm
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.65)})
+            j = Judged(d, t, extra_args=["--no-confirm"])
+        self.assertEqual((j.result["attempts"], j.result["verdict"]), (1, "satisfied"))
+        self.assertNotIn("near_threshold", j.result)
+        with tempfile.TemporaryDirectory() as d:  # env off, flag on wins
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.65)})
+            j = Judged(d, t, env_values=dict(LIVE_ENV, PLAN_ANCHOR_CONFIRM_NEAR="0"))
+            self.assertEqual(j.result["attempts"], 1)
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.65)})
+            j = Judged(d, t, env_values=dict(LIVE_ENV, PLAN_ANCHOR_CONFIRM_NEAR="0"), extra_args=["--confirm-near-threshold"])
+            self.assertEqual(j.result["attempts"], 2)
+        self.assertTrue(jj.confirm_enabled(jj.argparse.Namespace()))
+        self.assertFalse(jj.confirm_enabled(jj.argparse.Namespace(no_confirm=True, confirm_near_threshold=True)))
+        # a prohibition does not re-judge for a near-threshold compliance answer it ignores
+        self.assertFalse(jj.near_threshold(plan_answers(comp_p=0.62), PLAN_ROLES, 0.6, "prohibition"))
+        self.assertTrue(jj.near_threshold(plan_answers(comp_p=0.62), PLAN_ROLES, 0.6, "directive"))
+        self.assertTrue(jj.near_threshold(dev_answers(evid_p=0.55), DEV_ROLES, 0.6, "prohibition"))
+
+    def test_fixture_answers_are_never_rejudged_and_a_failed_rejudge_keeps_the_first(self):
+        with tempfile.TemporaryDirectory() as d:
+            fixture = write(d, "answers.json", {"*": plan_answers(comp_p=0.62)})
+            j = Judged(d, Transport(), env_values={}, extra_args=["--answers-file", fixture])
+            self.assertEqual((j.result["verdict"], j.result["attempts"]), ("satisfied", 1))
+            self.assertNotIn("near_threshold", j.result)
+        with tempfile.TemporaryDirectory() as d:
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.62)}, http(503), http(503), http(503))
+            j = Judged(d, t)
+        self.assertEqual((j.code, j.result["verdict"], j.result["attempts"], j.result["confirm_error"]["code"]), (0, "satisfied", 4, "JEV.HTTP"))
+        self.assertEqual(j.sleeps, [1.0, 2.0])
+        with tempfile.TemporaryDirectory() as d:  # the second call hitting 401 still aborts the run
+            t = Transport({"model": "jev", "answers": plan_answers(comp_p=0.62)}, http(401))
+            j = Judged(d, t)
+        self.assertEqual((j.code, j.out["error"]["code"]), (2, "AUTH.CREDENTIALS"))
+
+
+class RequestBytesDefaultTests(unittest.TestCase):
+    def test_default_depends_on_the_gate_and_the_flag_overrides(self):
+        with tempfile.TemporaryDirectory() as d:
+            j = Judged(d, Transport(), extra_args=["--dry-run"])
+            self.assertEqual((j.run["max_request_bytes"], j.run["totals"]["max_request_bytes"]), (24000, 24000))
+            j = Judged(d, Transport(gate="dev"), gate="dev", extra_args=["--dry-run"])
+            self.assertEqual(j.run["max_request_bytes"], 64000)
+            j = Judged(d, Transport(gate="dev"), gate="dev", extra_args=["--dry-run", "--max-request-bytes", "9000"])
+            self.assertEqual(j.run["max_request_bytes"], 9000)
+            # the dev default lets a 40k item through in one attempt; the plan default refuses it
+            t = Transport(gate="dev")
+            j = Judged(d, t, gate="dev", item_text="e" * 40000)
+            self.assertEqual((j.result["attempts"], j.result["item_shortened"]), (1, False))
+            j = Judged(d, Transport(), item_text="e" * 23000)
+            self.assertEqual((j.code, j.out["error"]["code"]), (2, "PLAN.TOO_LARGE"))
+        self.assertEqual((jj.DEFAULT_MAX_REQUEST_BYTES, jj.DEFAULT_MAX_REQUEST_BYTES_DEV), (24000, 64000))
+
+
 class ValidateTests(unittest.TestCase):
     def test_problems_are_listed(self):
         rec = record(
@@ -174,7 +902,7 @@ class ValidateTests(unittest.TestCase):
         rec["schema"] = "wrong"
         problems = jj.validate_record(rec)
         joined = "\n".join(problems)
-        for needle in ("schema must be", "ANC-1: ANC ids look like", "ANC-002: status must be", "ANC-002: statement (verbatim) is empty",
+        for needle in ("schema must be", "ANC-1: ANC ids look like", "ANC-002: status must be", "ANC-002: statement is empty",
                        "ANC-002: duplicate id", "REQ-014: REQ/ADR anchors need source_ref", "ANC-003: promoted anchors need promoted_to",
                        "ANC-004: source_type must be", "ANC-004: stated_at missing", "question_overrides key must be plan or dev",
                        "anchors[6]: must be an object"):
@@ -368,7 +1096,7 @@ class OverrideTests(unittest.TestCase):
             a = anchor(question_overrides={"plan": {"questions": {"addressed": {"type": "choice", "instructions": "from record", "criteria": {"yes": "", "no": "", "unclear": ""}}}}})
             anchors_path = write(d, "anchors.json", record(a))
             fixture_path = write(d, "answers.json", {"*": plan_answers()})
-            item_path = write(d, "item.txt", "Sprint 2 copies the ATM crates.")
+            item_path = write(d, "item.txt", "Sprint 2 copies the legacy crates.")
             common = ["judge", "--anchors", anchors_path, "--gate", "plan", "--all", "--item-id", "bd-42", "--item-file", item_path,
                       "--answers-file", fixture_path, "--dry-run"]
             code, out = run_cli(common + ["--out", str(Path(d) / "r1.json")])
@@ -398,7 +1126,7 @@ class JudgeFixtureTests(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.TemporaryDirectory()
         self.anchors = write(self.d.name, "anchors.json", record(anchor(), anchor("REQ-014", source_type="REQ", source_ref="REQ-014", statement="All public CLI commands must support --json output."), anchor("ANC-002", status="proposed")))
-        self.item = write(self.d.name, "item.txt", "Sprint 2 copies the ATM runtime crates into crates/runtime.")
+        self.item = write(self.d.name, "item.txt", "Sprint 2 copies the legacy runtime crates into crates/runtime.")
         self.run_dir = str(Path(self.d.name) / "runs")
 
     def tearDown(self):
@@ -417,7 +1145,8 @@ class JudgeFixtureTests(unittest.TestCase):
         verdicts = {r["anchor_id"]: r["verdict"] for r in run["results"]}
         self.assertEqual(verdicts, {"ANC-001": "not_addressed", "REQ-014": "not_applicable"})
         self.assertEqual(run["results"][0]["anchor_id"], "ANC-001")  # failing first
-        self.assertEqual(run["summary"], {"counts": {"not_addressed": 1, "not_applicable": 1}, "failing": ["ANC-001"], "errors": [], "shortened": [], "pass": False})
+        self.assertEqual(run["summary"], {"counts": {"not_addressed": 1, "not_applicable": 1}, "failing": ["ANC-001"],
+                                          "leaning_counts": {"not_addressed": 1, "not_applicable": 1}, "unstable": [], "errors": [], "shortened": [], "pass": False})
         self.assertTrue(run["fixture"])
         self.assertEqual(run["model_answered"], "fixture")
         self.assertEqual(run["results"][0]["attempts"], 1)
@@ -555,6 +1284,8 @@ class FailClosedTests(unittest.TestCase):
 
 
 class TransportPolicyTests(unittest.TestCase):
+    """Shortening (truncate, halve on overflow, pre-flight cap) is development-gate behaviour; the plan gate refuses instead (PlanSizeTests)."""
+
     def test_overflow_once_then_success_halves_the_item(self):
         text = "y" * 6000
         with tempfile.TemporaryDirectory() as d:
@@ -682,6 +1413,8 @@ impl StepSelector {
 
 
 class PlanSizeTests(unittest.TestCase):
+    """Ported from the plan-size fork branch: the plan gate reduces code and refuses, never shortens."""
+
     def test_long_code_block_is_reduced_to_signatures_with_a_marker(self):
         text, stats = jj.reduce_code("Design:\n\n" + RUST_BLOCK + "\n\nDone.", 8)
         self.assertIn("```rust\npub struct StepSelector {\nimpl StepSelector {\n    pub fn matches(\n        &self,\n        step: &Step,\n    ) -> bool {\n", text)
@@ -707,7 +1440,7 @@ class PlanSizeTests(unittest.TestCase):
         self.assertEqual(stats["blocks"], 1)
 
     def test_signatures_across_languages(self):
-        body = ["def run(argv):", "class Runner:", "lint *profile:", "[tool.sc-lint]", "export function main() {",
+        body = ["def run(argv):", "class Runner:", "lint *profile:", "[tool.lint]", "export function main() {",
                 "build() {", "pub(crate) const MAX_STEPS: usize = 8;", "x = 1", "    return x", "let y = 2;"]
         self.assertEqual(jj.signature_lines(body), body[:7])
 
@@ -721,6 +1454,7 @@ class PlanSizeTests(unittest.TestCase):
         self.assertEqual(j.run["item"]["chars"], len(sent))
         self.assertGreater(j.run["item"]["chars_before_reduction"], len(sent))
         self.assertFalse(j.result["item_shortened"])
+        self.assertNotIn("size", j.result)
 
     def test_dev_gate_does_not_reduce_code(self):
         with tempfile.TemporaryDirectory() as d:
@@ -728,23 +1462,37 @@ class PlanSizeTests(unittest.TestCase):
             j = Judged(d, t, item_text=RUST_BLOCK, gate="dev")
         self.assertEqual(t.bodies[0]["state"]["item"]["text"], RUST_BLOCK)
         self.assertNotIn("code_reduced", j.run["item"])
+        self.assertNotIn("chars_before_reduction", j.run["item"])
 
     def test_oversize_plan_bead_is_refused_and_nothing_is_sent(self):
         with tempfile.TemporaryDirectory() as d:
             t = Transport()
-            j = Judged(d, t, item_text="prose " * 5000)
+            j = Judged(d, t, item_text="# T\n\n## Description\n\n" + "prose " * 5000)
         self.assertEqual((j.code, j.out["error"]["code"]), (2, "PLAN.TOO_LARGE"))
+        self.assertTrue(j.out["error"]["message"].startswith("plan bead bd-42 is 30021 characters after long code was reduced to signatures (30021 prose, 0 code; by section: Description 30017, (title) 5); "))
+        self.assertIn("the plan-gate item budget is --max-item-chars 24000", j.out["error"]["message"])
         action = j.out["error"]["suggested_action"]
         self.assertIn("judge its cause", action)
         self.assertLess(action.index("no anchor, requirement or user-approved issue"), action.index("Split only approved work"))
-        self.assertIn("prose", j.out["error"]["message"])
+        self.assertTrue(action.endswith("See references/plan-size-and-shape.md"))
+        self.assertNotIn("split the bead", action)
         self.assertEqual(t.bodies, [])
+        # the error carries the same numbers `shape` would report
+        data = j.out["data"]
+        self.assertEqual(data["item_id"], "bd-42")
+        self.assertEqual(data["size"], jj.size_breakdown("# T\n\n## Description\n\n" + "prose " * 5000))
+        self.assertEqual((data["shape"]["sections"], data["shape"]["prose_chars"], data["shape"]["chars_before_reduction"]),
+                         ({"title": 5, "description": 30017}, 30021, 30021))
+        self.assertNotIn("paragraphs", data["shape"])
         with tempfile.TemporaryDirectory() as d:
             t = Transport()
             j = Judged(d, t, item_text="prose " * 1000, extra_args=["--max-request-bytes", "4000"])
         self.assertEqual((j.code, j.out["error"]["code"]), (2, "PLAN.TOO_LARGE"))
         self.assertIn("over --max-request-bytes 4000", j.out["error"]["message"])
         self.assertEqual(t.bodies, [])
+        with tempfile.TemporaryDirectory() as d:  # dry run is refused the same way: nothing would fit
+            j = Judged(d, Transport(), item_text="prose " * 1000, extra_args=["--max-request-bytes", "4000", "--dry-run"])
+        self.assertEqual((j.code, j.out["error"]["code"]), (2, "PLAN.TOO_LARGE"))
 
     def test_size_breakdown_separates_sections_prose_and_code(self):
         text = "# T\n\n## Description\n\nwhy\n\n## Design\n\n```rust\nfn a() {}\n```\n"
@@ -767,19 +1515,143 @@ class PlanSizeTests(unittest.TestCase):
             t = Transport(http(422, "max_tokens_exceeded"))
             j = Judged(d, t, item_text="y" * 6000)
         self.assertEqual((j.code, j.result["verdict"], j.result["error"]["code"]), (1, "error", "PLAN.TOO_LARGE"))
+        self.assertIn("Jev rejected it for context size", j.result["error"]["message"])
+        self.assertEqual(j.result["error"]["data"]["shape"]["chars"], 6000)
         self.assertEqual(len(t.bodies), 1)
         self.assertFalse(j.result["item_shortened"])
+        self.assertEqual(j.result["attempts"], 1)
+        self.assertEqual(j.run["summary"]["errors"], ["ANC-001"])
 
     def test_max_code_lines_must_be_positive(self):
         with tempfile.TemporaryDirectory() as d:
             j = Judged(d, Transport(), extra_args=["--max-code-lines", "0"])
         self.assertEqual(j.out["error"]["code"], "VALIDATION.INPUT")
+        with tempfile.TemporaryDirectory() as d:
+            t = Transport()
+            j = Judged(d, t, item_text="# S\n\n" + RUST_BLOCK, extra_args=["--max-code-lines", "20"])
+        self.assertEqual(j.run["item"]["code_reduced"], {"blocks": 0, "lines": 0})
+        self.assertIn("self.groups.iter()", t.bodies[0]["state"]["item"]["text"])
+
+
+SHARED_PARAGRAPH = ("All work in this sprint follows the repository conventions: every public command prints JSON by default, "
+                    "errors are typed and actionable, and no change lands without a passing CI run on the main branch.")
+
+
+def bead_json(bid, title, description="", design="", acceptance="", notes="", kind=None):
+    b = {"id": bid, "title": title, "description": description, "design": design, "acceptance_criteria": acceptance, "notes": notes}
+    if kind:
+        b["issue_type"] = kind
+    return [b]
+
+
+class ShapeTests(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.TemporaryDirectory()
+        beads = Path(self.d.name) / "beads"
+        self.b1 = write(beads, "bd-1.json", bead_json("bd-1", "Sprint 1 runtime crates", description="Copy the crates per ANC-001 and REQ-014.\n\n" + SHARED_PARAGRAPH,
+                                                      design="Design:\n\n" + RUST_BLOCK + "\n\n- copy\n- delete atm_* modules\n- run tests",
+                                                      acceptance="| Check | Result |\n| --- | --- |\n| builds | yes |\n| tests | yes |", kind="sprint"))
+        self.b2 = write(beads, "bd-2.json", bead_json("bd-2", "CLI thinning", description=SHARED_PARAGRAPH + "\n\nFixes #42 and ADR-0007; see github.com/acme/repo/issues/77.",
+                                                      acceptance="1. prints JSON\n2. exits 0"))
+        self.b3 = write(beads, "bd-3.json", bead_json("bd-3", "Docs pass", notes="Short note without any reference to an issue or an anchor."))
+        self.anchors = write(self.d.name, "anchors.json", record(anchor(), anchor("ANC-002", statement="The CLI layer only parses arguments and prints JSON.", quote="keep the CLI thin")))
+
+    def tearDown(self):
+        self.d.cleanup()
+
+    def test_shape_text_metrics(self):
+        text = jj.compose_item_text(json.loads(Path(self.b1).read_text()))["text"]
+        s = jj.shape_text(text, 8)
+        self.assertEqual(set(s["sections"]), {"title", "description", "design", "acceptance_criteria"})
+        self.assertEqual((s["fenced_blocks"], s["code_lines"], s["bullets"], s["table_rows"]), (1, 14, 3, 3))
+        self.assertEqual(s["code_reduced"], {"blocks": 1, "lines": 8})
+        self.assertLess(s["chars_after_reduction"], s["chars"])
+        self.assertEqual(s["references"], {"github": [], "req": ["REQ-014"], "adr": [], "anc": ["ANC-001"]})
+        self.assertFalse(s["no_issue_reference"])
+        self.assertIn(SHARED_PARAGRAPH, s["paragraphs"])
+        size = jj.size_breakdown(text)
+        self.assertEqual((s["code_chars"], s["prose_chars"]), (size["code_chars"], size["prose_chars"]))
+        self.assertEqual(sum(s["sections"].values()), sum(size["sections"].values()))
+        self.assertEqual(jj.find_references("Fixes #42 and ADR-0007; see github.com/acme/repo/issues/77 and #42 again, not C#4 or x/#9"),
+                         {"github": ["#42", "#77"], "req": [], "adr": ["ADR-0007"], "anc": []})
+
+    def test_shape_directory_json_and_duplicates(self):
+        code, out = run_cli(["shape", "--beads", str(Path(self.d.name) / "beads"), "--anchors", self.anchors])
+        self.assertEqual(code, 0, out)
+        data = out["data"]
+        self.assertEqual([b["id"] for b in data["beads"]], ["bd-1", "bd-2", "bd-3"])
+        by_id = {b["id"]: b for b in data["beads"]}
+        self.assertTrue(by_id["bd-1"]["is_sprint"] and not by_id["bd-2"]["is_sprint"])
+        self.assertEqual(by_id["bd-2"]["references"], {"github": ["#42", "#77"], "req": [], "adr": ["ADR-0007"], "anc": []})
+        self.assertEqual((by_id["bd-3"]["no_issue_reference"], by_id["bd-3"]["sections"]), (True, {"title": 13, "notes": 70}))
+        self.assertNotIn("paragraphs", by_id["bd-1"])
+        self.assertEqual(len(data["duplicated_paragraphs"]), 1)
+        dup = data["duplicated_paragraphs"][0]
+        self.assertEqual((dup["paragraph"], dup["chars"], dup["beads"]), (SHARED_PARAGRAPH.lower()[:80], len(SHARED_PARAGRAPH), ["bd-1", "bd-2"]))
+        t = data["totals"]
+        self.assertEqual((t["beads"], t["sprints"], t["fenced_blocks"], t["no_issue_reference"], t["duplicated_paragraphs"]), (3, 1, 1, 1, 1))
+        self.assertEqual(t["chars"], sum(b["chars"] for b in data["beads"]))
+        self.assertLess(t["chars_after_reduction"], t["chars"])
+        self.assertEqual((by_id["bd-1"]["unknown_anchor_references"], data["anchors_not_referenced"]), ([], ["ANC-002"]))
+
+    def test_sprint_detection_and_plan_gate_columns(self):
+        self.assertTrue(jj.is_sprint_bead({"issue_type": "sprint"}, "x", "y"))
+        self.assertTrue(jj.is_sprint_bead({"labels": ["stage:sprint", "area:cli"]}, "x", "y"))
+        self.assertTrue(jj.is_sprint_bead({}, "proj-h-3", "h-3: CLI thinning"))
+        self.assertTrue(jj.is_sprint_bead({}, "bd-77", "h-14: last one"))
+        self.assertTrue(jj.is_sprint_bead({}, "proj-h-3", "anything"))
+        self.assertTrue(jj.is_sprint_bead({}, "bd-1", "Sprint 1 runtime"))
+        self.assertFalse(jj.is_sprint_bead({"labels": ["stage:plan"]}, "bd-1", "CLI thinning"))
+        self.assertFalse(jj.is_sprint_bead({}, "bd-1", "h3 has no dash so it is a plain title"))
+        self.assertFalse(jj.is_sprint_bead({}, "bd-1", "Follow-up 3: the space before the number breaks the prefix rule"))
+        beads = [{"id": f"proj-h-{n}", "title": f"h-{n}: sprint {n}", "description": "d" * 100, "design": "x" * 300, "acceptance_criteria": "a" * 50} for n in range(1, 4)]
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "children.json", beads)
+            code, out = run_cli(["shape", "--children-json", path])
+            self.assertEqual((code, out["data"]["totals"]["sprints"]), (0, 3))
+            row = out["data"]["beads"][0]
+            self.assertTrue(row["is_sprint"])
+            self.assertEqual((row["description_chars"], row["acceptance_chars"]), (row["sections"]["description"], row["sections"]["acceptance_criteria"]))
+            self.assertEqual((row["description_chars"], row["acceptance_chars"]), (118, 76))  # heading line + blank + body + blank, each line counted with its newline
+            self.assertAlmostEqual(row["design_ratio"], round(row["sections"]["design"] / row["chars"], 2))
+            self.assertGreater(row["design_ratio"], 0.5)
+            code, md = run_cli(["shape", "--children-json", path, "--format", "md"])
+            self.assertIn("3 bead(s), 3 sprint(s)", md)
+            self.assertIn(f"| proj-h-1 | h-1: sprint 1 | {row['chars']} | {row['description_chars']} | {row['acceptance_chars']} | {row['design_ratio']:.2f} | ", md)
+
+    def test_shape_other_sources_markdown_and_errors(self):
+        children = write(self.d.name, "children.json", [json.loads(Path(self.b2).read_text())[0], json.loads(Path(self.b3).read_text())[0]])
+        code, out = run_cli(["shape", "--children-json", children, "--show-json", self.b1, "--max-code-lines", "20"])
+        self.assertEqual((code, [b["id"] for b in out["data"]["beads"]]), (0, ["bd-2", "bd-3", "bd-1"]))
+        self.assertEqual(out["data"]["beads"][2]["code_reduced"], {"blocks": 0, "lines": 0})
+        self.assertNotIn("anchors_not_referenced", out["data"])
+        code, md = run_cli(["shape", "--beads", str(Path(self.d.name) / "beads"), "--format", "md"])
+        self.assertEqual(code, 0)
+        self.assertIn("| Bead | Title | Chars | Desc chars | AC chars | Design ratio | After reduction | Code lines | Prose lines | Blocks | Bullets | Table rows | References |", md)
+        self.assertIn("| bd-1 | Sprint 1 runtime crates | ", md)
+        self.assertRegex(md, r"\| bd-3 \| Docs pass \| 82 \| 0 \| 0 \| 0\.00 \| 82 \| ")
+        self.assertIn("| bd-3 | Docs pass | ", md)
+        self.assertIn("REQ-014, ANC-001 |", md)
+        self.assertIn("### Paragraphs repeated across beads", md)
+        self.assertIn(f"| {SHARED_PARAGRAPH.lower()[:80]} | {len(SHARED_PARAGRAPH)} | bd-1, bd-2 |", md)
+        self.assertIn("3 bead(s), 1 sprint(s)", md)
+        code, out = run_cli(["shape", "--beads", str(Path(self.d.name) / "nowhere")])
+        self.assertEqual((code, out["error"]["code"]), (2, "INPUT.MISSING"))
+        code, out = run_cli(["shape", "--show-json", write(self.d.name, "bad.json", [1, 2])])
+        self.assertEqual((code, out["error"]["code"]), (2, "INPUT.MALFORMED"))
+        empty = Path(self.d.name) / "empty"
+        empty.mkdir()
+        code, out = run_cli(["shape", "--beads", str(empty)])
+        self.assertEqual((code, out["error"]["code"]), (2, "INPUT.EMPTY"))
+        code, out = run_cli(["shape", "--show-json", self.b1, "--max-code-lines", "0"])
+        self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+        self.assertEqual(sorted(p.name for p in Path(self.d.name).iterdir()), ["anchors.json", "bad.json", "beads", "children.json", "empty"])  # writes nothing
 
 
 class CheckFixturesTests(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.TemporaryDirectory()
-        a = anchor(fixtures={"pass": ["Sprint 2 copies atm-core/crates/runtime into crates/runtime."],
+        a = anchor(fixtures={"pass": ["Sprint 2 copies the legacy repo/crates/runtime into crates/runtime."],
                              "fail": ["Sprint 2 implements a new runtime crate from scratch.", "Sprint 2 defers the runtime."]})
         self.anchors = write(self.d.name, "anchors.json", record(a, anchor("ANC-002", status="proposed")))
 
@@ -863,11 +1735,11 @@ class RetireUpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = write(d, "anchors.json", record(anchor()))
             code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--scope", "runtime crates only",
-                                 "--deterministic-check", "git log --follow crates/runtime", "--fixture-pass", "copies ATM", "--fixture-fail", "rewrites"])
+                                 "--deterministic-check", "git log --follow crates/runtime", "--fixture-pass", "copies the legacy repo", "--fixture-fail", "rewrites"])
             self.assertEqual(code, 0)
             self.assertEqual(sorted(out["data"]["changed"]), ["deterministic_check", "fixtures", "scope"])
             a = json.loads(Path(path).read_text())["anchors"][0]
-            self.assertEqual((a["version"], a["scope"], a["fixtures"]), (2, "runtime crates only", {"pass": ["copies ATM"], "fail": ["rewrites"]}))
+            self.assertEqual((a["version"], a["scope"], a["fixtures"]), (2, "runtime crates only", {"pass": ["copies the legacy repo"], "fail": ["rewrites"]}))
             self.assertEqual((a["history"][-1]["event"], sorted(a["history"][-1]["fields"])), ("updated", ["deterministic_check", "fixtures", "scope"]))
             self.assertEqual(a["statement"], STATEMENT)
             code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--clear-fixtures", "--fixture-pass", "only this", "--summary", "s"])
@@ -875,9 +1747,37 @@ class RetireUpdateTests(unittest.TestCase):
             self.assertEqual((a["fixtures"], a["version"]), ({"pass": ["only this"], "fail": []}, 3))
             code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--summary", "s"])  # unchanged value
             self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
-            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--statement", "new words"])
+            self.assertIn("--statement", out["error"]["suggested_action"])
+
+    def test_update_statement_is_allowed_and_recorded(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = write(d, "anchors.json", record(anchor()))
+            new = "The runtime crates are copies of the legacy repo's runtime crates with the legacy-specific modules deleted."
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--statement", new])
+            self.assertEqual(code, 0, out)
+            self.assertEqual((out["data"]["changed"], out["data"]["version"], out["data"]["lint"]), (["statement"], 2, {"warnings": []}))
+            a = json.loads(Path(path).read_text())["anchors"][0]
+            self.assertEqual((a["statement"], a["quote"]), (new, QUOTE))
+            self.assertEqual(a["history"][-1]["event"], "updated")
+            self.assertEqual(a["history"][-1]["fields"], ["statement"])
+            self.assertEqual(a["history"][-1]["previous_statement"], STATEMENT)
+            # the same statement again is "nothing to update"
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--statement", new])
             self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
-            self.assertIn("immutable", out["error"]["message"])
+            # a hedged rewording is recorded with warnings, unless --strict
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--statement", "The crates are probably copied from the legacy repo.", "--strict"])
+            self.assertEqual((code, out["error"]["code"]), (2, "ANCHOR.LINT"))
+            self.assertIn("hedged wording", out["error"]["message"])
+            self.assertEqual(json.loads(Path(path).read_text())["anchors"][0]["statement"], new)  # nothing written
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--statement", "The crates are probably copied from the legacy repo."])
+            self.assertEqual((code, out["data"]["version"], out["data"]["lint"]["warnings"]), (0, 3, ["hedged wording; state the requirement"]))
+            # the statement may never become the quote, and the quote is immutable
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--statement", QUOTE.upper() + "."])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            self.assertIn("statement is the verbatim quote", out["error"]["message"])
+            code, out = run_cli(["update", "--anchors", path, "--id", "ANC-001", "--quote", "other words"])
+            self.assertEqual((code, out["error"]["code"], out["error"]["message"]), (2, "VALIDATION.INPUT", "quote is verbatim provenance and immutable"))
+            self.assertEqual(json.loads(Path(path).read_text())["anchors"][0]["quote"], QUOTE)
 
     def test_promote_and_set_beads(self):
         with tempfile.TemporaryDirectory() as d:
@@ -889,22 +1789,52 @@ class RetireUpdateTests(unittest.TestCase):
             self.assertEqual((a["status"], a["promoted_to"], a["version"]), ("promoted", "ADR-0007", 2))
             code, out = run_cli(["render", "--anchors", path])
             md = Path(out["data"]["path"]).read_text()
-            self.assertIn(f"> {STATEMENT}", md)
+            self.assertIn(f"Anchor: {STATEMENT}\n\n> {QUOTE}\n\nSaid by the user, planning session, 2026-10-09.", md)
+            self.assertIn("| ID | Status | Summary | Stated |", md)
             self.assertIn("promoted to ADR-0007", md)
             self.assertIn("Beads: anchor `bd-10`", md)
 
 
 class ComposeItemTests(unittest.TestCase):
-    SHOW = [{"id": "bd-42", "title": "Sprint 2 runtime", "description": "Copy the ATM crates.", "acceptance_criteria": "- builds\n- tests pass", "notes": ""}]
+    SHOW = [{"id": "bd-42", "title": "Sprint 2 runtime", "description": "Copy the legacy crates.", "acceptance_criteria": "- builds\n- tests pass", "notes": ""}]
 
     def test_sections_in_order_and_empty_omitted(self):
         composed = jj.compose_item_text(self.SHOW)
         self.assertEqual(composed["sections"], ["Description", "Acceptance criteria"])
-        self.assertEqual(composed["text"], "# Sprint 2 runtime\n\n## Description\n\nCopy the ATM crates.\n\n## Acceptance criteria\n\n- builds\n- tests pass\n")
+        self.assertEqual(composed["text"], "# Sprint 2 runtime\n\n## Description\n\nCopy the legacy crates.\n\n## Acceptance criteria\n\n- builds\n- tests pass\n")
         self.assertEqual((composed["item_id"], composed["chars"]), ("bd-42", len(composed["text"])))
         self.assertEqual(jj.compose_item_text(self.SHOW[0])["title"], "Sprint 2 runtime")  # bare object accepted
         with_design = dict(self.SHOW[0], design="Keep the trait object-safe.")
         self.assertEqual(jj.compose_item_text(with_design)["sections"], ["Description", "Design", "Acceptance criteria"])
+
+    def test_sections_and_for_gate(self):
+        full = dict(self.SHOW[0], design="Keep the trait object-safe.", notes="Ask the lead about naming.")
+        self.assertEqual(jj.compose_item_text(full, sections=["description", "acceptance_criteria"])["sections"], ["Description", "Acceptance criteria"])
+        self.assertEqual(jj.compose_item_text(full, sections=["notes"])["text"], "# Sprint 2 runtime\n\n## Notes\n\nAsk the lead about naming.\n")
+        self.assertEqual(jj.compose_item_text(full, sections=[])["text"], "# Sprint 2 runtime\n")
+        with self.assertRaises(jj.JudgeError) as cm:
+            jj.compose_item_text(full, sections=["design", "closing"])
+        self.assertEqual(cm.exception.code, "VALIDATION.INPUT")
+        with tempfile.TemporaryDirectory() as d:
+            show = write(d, "show.json", [full])
+            children = write(d, "children.json", [{"id": "bd-43", "title": "t", "status": "closed", "close_reason": "r"}])
+            code, out = run_cli(["compose-item", "--show-json", show, "--children-json", children, "--for", "plan"])
+            self.assertEqual((code, out["data"]["sections"]), (0, ["Description", "Acceptance criteria"]))
+            self.assertEqual(out["data"]["composition"], {"for": "plan", "sections_requested": ["description", "acceptance_criteria"], "children": False})
+            self.assertNotIn("Closed beads", out["data"]["text"])
+            code, out = run_cli(["compose-item", "--show-json", show, "--children-json", children, "--for", "dev"])
+            self.assertEqual(out["data"]["sections"], ["Description", "Design", "Acceptance criteria", "Notes", "Closed beads"])
+            self.assertEqual(out["data"]["composition"], {"for": "dev", "sections_requested": ["description", "design", "acceptance_criteria", "notes"], "children": True})
+            code, out = run_cli(["compose-item", "--show-json", show, "--sections", "design, notes"])
+            self.assertEqual((out["data"]["sections"], out["data"]["composition"]["sections_requested"]), (["Design", "Notes"], ["design", "notes"]))
+            code, out = run_cli(["compose-item", "--show-json", show])
+            self.assertEqual(out["data"]["composition"], {"for": None, "sections_requested": "all", "children": False})
+            code, out = run_cli(["compose-item", "--show-json", show, "--sections", "design", "--for", "plan"])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            code, out = run_cli(["compose-item", "--show-json", show, "--sections", "summary"])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            code, out = run_cli(["compose-item", "--show-json", show, "--sections", " , "])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
 
     def test_closed_children_appended(self):
         children = [{"id": "bd-43", "title": "copy crates", "status": "closed", "close_reason": "done in 3f2a"},
@@ -940,14 +1870,17 @@ class ComposeItemTests(unittest.TestCase):
             self.assertEqual((code, out["error"]["code"]), (2, "INPUT.MALFORMED"))  # children must be an array
 
 
-def make_run(d, name, gate, item, created_at, verdicts, title=""):
+def make_run(d, name, gate, item, created_at, verdicts, title="", with_quote=True):
+    """A run file; with_quote=False imitates a run written before the quote field existed."""
     results = [{"anchor_id": aid, "source_type": "ANC" if aid.startswith("ANC") else aid[:3], "source_ref": None if aid.startswith("ANC") else aid,
-                "statement": STATEMENT if aid.startswith("ANC") else "All public CLI commands must support --json output with a stable schema.",
-                "stated_by": "Rand", "stated_at": "2026-10-09", "context": "planning session", "anchor_version": 1,
+                "statement": STATEMENT if aid.startswith("ANC") else REQ_STATEMENT,
+                "stated_by": "the user", "stated_at": "2026-10-09", "context": "planning session", "anchor_version": 1,
                 "question_set": {"gate": gate, "version": 1, "overridden": False}, "deterministic_check": "git log --follow crates/runtime",
                 "verdict": v, "answers": {}, "min_confidence": 0.9, "explanation": jj.explain(v, 0.9, gate) if v else "dry run"}
                for aid, v in verdicts.items()]
     for r in results:
+        if with_quote:
+            r["quote"] = QUOTE if r["source_type"] == "ANC" else r["statement"]
         if r["verdict"] == "error":
             r["error"] = {"code": "JEV.OVERLOADED", "message": "Jev HTTP 529; response body withheld", "recoverable": True, "suggested_action": "Retry"}
     failing = [a for a, v in verdicts.items() if v in jj.FAILING]
@@ -969,9 +1902,10 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertIn("## Anchor gate: plan · bd-42 - Sprint 2 runtime", md)
             self.assertIn("Run `plan-2026-10-09T18:30:00+00:00-bd-42`, model `jev-1.13.0`, threshold 0.6.", md)
-            self.assertIn(f'> **bd-42 · ANC-012 · not addressed** You said (planning session, Oct 9): "{STATEMENT}." This bead does not carry the directive forward.', md)
-            self.assertIn('> **bd-42 · REQ-014 · contradicted** REQ-014 (requirements register) says: "All public CLI commands must support --json output with a stable schema." This bead proposes something the anchor rules out.', md)
-            self.assertNotIn("schema.\"", md.replace('schema." This', ""))  # no double period
+            self.assertIn(f'> **bd-42 · ANC-012 · not addressed** Anchor: {STATEMENT} You said (planning session, Oct 9): "{QUOTE}." This bead does not carry the directive forward.', md)
+            # register text: the quote is the statement, so the says-clause is skipped
+            self.assertIn(f'> **bd-42 · REQ-014 · contradicted** Anchor: {REQ_STATEMENT} This bead proposes something the anchor rules out.', md)
+            self.assertNotIn("says:", md)
             self.assertNotIn("ANC-013", md)
             code, out = run_cli(["report", "--run", path])
             self.assertEqual((out["data"]["pass"], out["data"]["failing"]), (False, ["ANC-012", "REQ-014"]))
@@ -983,15 +1917,18 @@ class ReportTests(unittest.TestCase):
     def test_register_names_dev_checks_and_errors(self):
         self.assertEqual(jj.quote_statement("ends with ?"), '"ends with ?"')
         self.assertEqual(jj.quote_statement(" plain "), '"plain."')
+        self.assertEqual((jj.sentence(" plain "), jj.sentence("done!")), ("plain.", "done!"))
         with tempfile.TemporaryDirectory() as d:
             path = make_run(d, "r.json", "dev", "sprint-2", "2026-10-22T10:15:00+00:00", {"ANC-012": "asserted_only", "ADR-0007": "satisfied", "ANC-020": "error"})
             run = json.loads(Path(path).read_text())
-            run["results"][1]["statement"] = "The CLI stays thin"
+            run["results"][1]["statement"] = "The CLI layer only parses arguments and prints JSON."
+            run["results"][1]["quote"] = "The CLI stays thin"
             Path(path).write_text(json.dumps(run))
             code, md = run_cli(["report", "--run", path, "--format", "md", "--all"])
-            self.assertIn("> **sprint-2 · ANC-012 · asserted only** You said", md)
+            self.assertIn(f'> **sprint-2 · ANC-012 · asserted only** Anchor: {STATEMENT} You said (planning session, Oct 9): "{QUOTE}." Compliance is asserted', md)
             self.assertIn(">   Pair with the deterministic check: git log --follow crates/runtime", md)
-            self.assertIn('ADR-0007 (ADR register) says: "The CLI stays thin."', md)
+            # a register anchor whose quote differs from its statement shows both
+            self.assertIn('Anchor: The CLI layer only parses arguments and prints JSON. ADR-0007 (ADR register) says: "The CLI stays thin." The directive was followed and evidenced.', md)
             self.assertIn("> **sprint-2 · ANC-020 · error**", md)
             self.assertIn(">   Error JEV.OVERLOADED: Jev HTTP 529; response body withheld", md)
             self.assertEqual(code, 0)
@@ -1060,9 +1997,33 @@ class DiffTests(unittest.TestCase):
             self.assertFalse(changes["ANC-003"]["improved"])  # satisfied -> error is a regression, not an improvement
             self.assertFalse(changes["ANC-004"]["improved"])  # losing a verdict is never an improvement
             self.assertEqual(data["regressions"], ["ANC-001", "ANC-003", "ANC-004"])
+            self.assertEqual(data["pass_to_fail"], ["ANC-001", "ANC-003"])  # ANC-004 was already failing: a regression in severity, not a pass lost
+            self.assertEqual(data["fail_to_pass"], ["ANC-002"])
+            self.assertNotIn("expected", data)
             self.assertEqual(data["added"], [{"anchor_id": "ANC-006", "verdict": "satisfied"}])
             self.assertEqual(data["removed"], [{"anchor_id": "ANC-005", "verdict": "satisfied"}])
             self.assertEqual((data["pass_before"], data["pass_after"], data["item"]), (False, False, "bd-1"))
+
+    def test_expected_verdicts_tell_corrections_from_regressions(self):
+        with tempfile.TemporaryDirectory() as d:
+            prev = make_run(d, "p.json", "plan", "bd-1", "2026-10-09T10:00:00+00:00", {"ANC-001": "satisfied", "ANC-002": "satisfied", "ANC-003": "not_addressed", "ANC-004": "satisfied"})
+            nxt = make_run(d, "n.json", "plan", "bd-1", "2026-10-09T11:00:00+00:00", {"ANC-001": "not_addressed", "ANC-002": "not_addressed", "ANC-003": "not_addressed", "ANC-004": "satisfied"})
+            expected = write(d, "expected.json", {"ANC-001": "not_addressed", "ANC-002": "satisfied", "ANC-003": "satisfied", "ANC-004": "satisfied", "ANC-009": "not_applicable"})
+            code, out = run_cli(["diff", "--prev", prev, "--next", nxt, "--expected", expected])
+            self.assertEqual(code, 0, out)
+            data = out["data"]
+            self.assertEqual(data["pass_to_fail"], ["ANC-001", "ANC-002"])  # a human reading says ANC-001's flip was right
+            e = data["expected"]
+            self.assertEqual((e["corrections"], e["regressions"], e["still_off"], e["all_match"]), (["ANC-001"], ["ANC-002"], ["ANC-003", "ANC-009"], False))
+            cells = {c["anchor_id"]: c for c in e["cells"]}
+            self.assertEqual(cells["ANC-009"], {"anchor_id": "ANC-009", "expected": "not_applicable", "prev": None, "next": None, "prev_matches": False, "next_matches": False})
+            self.assertEqual((cells["ANC-004"]["prev_matches"], cells["ANC-004"]["next_matches"]), (True, True))
+            code, out = run_cli(["diff", "--prev", prev, "--next", nxt, "--expected", write(d, "bad.json", {"ANC-001": "maybe"})])
+            self.assertEqual((code, out["error"]["code"]), (2, "VALIDATION.INPUT"))
+            code, out = run_cli(["diff", "--prev", prev, "--next", nxt, "--expected", write(d, "list.json", ["x"])])
+            self.assertEqual((code, out["error"]["code"]), (2, "INPUT.MALFORMED"))
+            code, out = run_cli(["diff", "--prev", prev, "--next", nxt, "--expected", str(Path(d) / "none.json")])
+            self.assertEqual((code, out["error"]["code"]), (2, "INPUT.MISSING"))
 
     def test_mismatched_runs_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1154,3 +2115,26 @@ class ErrorHandlingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ComposeHeadingTests(unittest.TestCase):
+    def test_internal_headings_are_demoted_so_sections_count_whole_fields(self):
+        show = [{"id": "x-1", "title": "x-1: t", "description": "## Goal\n\nbody " * 1 + "\n\n```\n## not a heading\n```\n\n# Deep\n\nmore", "acceptance_criteria": "### Must\n\nok"}]
+        text = jj.compose_item_text(show)["text"]
+        self.assertIn("## Description", text)
+        self.assertIn("### Goal", text)
+        self.assertNotIn("\n## Deep", text)
+        self.assertIn("### Deep", text)         # a level-1 heading inside a field lands at level 3, never 2
+        self.assertIn("```\n## not a heading\n```", text)
+        self.assertIn("#### Must", text)
+        size = jj.size_breakdown(text)
+        self.assertNotIn("Goal", size["sections"])
+        self.assertIn("Description", size["sections"])
+
+    def test_no_redaction_marker_when_nothing_dropped(self):
+        body = "\n".join(f"fn f{i}() {{}}" for i in range(12))
+        text = f"# t\n\n## Design\n\n```rust\n{body}\n```\n"
+        reduced, stats = jj.reduce_code(text, 8)
+        self.assertNotIn("<redacted", reduced)
+        self.assertEqual(stats["lines"], 0)
+

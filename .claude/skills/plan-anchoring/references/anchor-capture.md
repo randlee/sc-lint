@@ -1,63 +1,125 @@
 ---
 name: anchor-capture
-version: 0.2.0
-description: How the planning orchestrator detects, proposes, confirms, and words anchors while a plan is being discussed.
+version: 0.3.0
+description: How the planning orchestrator detects candidate anchors, writes each one as a clear testable requirement with the user's verbatim words kept as provenance, deduplicates, and gets the user's approval before locking.
 ---
 
 # Capturing anchors
 
-An anchor is a fact the user stated while planning that roots the plan and keeps it from drifting. Capture happens in the main planning session because it is interactive; it is the one part of this skill that does not delegate.
+An anchor is a fact the user stated while planning, written as a requirement a plan bead or sprint report can be judged against. It keeps two texts:
+
+| Field | What it is | Who writes it | Used for |
+| --- | --- | --- | --- |
+| `quote` | The user's exact words | nobody; copied verbatim | Provenance; quoted in every failing verdict. Immutable |
+| `statement` | One clear, testable requirement | the orchestrator; approved by the user | What Jev judges. Reworded with `update --statement` |
+
+**The quote is not the anchor.** Speech is compressed, deictic ("these crates", "like the legacy repo") and bundled; Jev reads literally, so a statement that is just the quote yields `underspecified` and false `not_addressed` verdicts. `validate` and `add` refuse it. Capture is interactive and stays in the main session.
 
 ## What counts as an anchor candidate
 
-Listen for directives about how the work must be done, not what the work is. The plan already says what; anchors preserve the how and the why-not. Signals:
+Listen for directives about how the work must be done, not what it is:
 
-- A starting point: "copy the libraries from ATM as the starting point", "fork X", "reuse the existing parser".
-- A prohibition: "don't add a new dependency for this", "no new crate", "never write to the DB from the CLI layer".
+- A starting point: "copy the libraries from the legacy repo as the starting point", "reuse the existing parser".
+- A prohibition: "don't add a new dependency for this", "never write to the DB from the CLI layer".
 - A method or order: "migrate the schema first, then the API", "keep the trait object-safe".
 - A boundary: "the CLI must stay thin; business logic lives in the library".
-- A comparison to an existing system the user wants reproduced or avoided: "exactly what we have in ATM but general-purpose".
-- A correction: when the user says "no, I said ..." the thing they said is an anchor candidate, because it has already drifted once.
+- A comparison to an existing system to reproduce or avoid.
+- A correction: "no, I said ..." means the fact has already drifted once.
 
-Things that are not anchors: task lists, deliverables, estimates, or anything already numbered in the requirement or ADR register. Those are referenced as REQ or ADR anchors, not restated.
+Not anchors: task lists, deliverables, estimates, restatements of the intent, agreement ("yes, do that"), or anything already in the requirement or ADR register (add those as REQ or ADR anchors).
+
+## Be selective
+
+A phase needs five to fifteen anchors, not one per sentence. Before proposing, ask:
+
+1. Would a bead that ignores this be wrong, or merely different? Only the first is an anchor.
+2. Is it covered by an existing anchor, REQ or ADR? Then it is a duplicate (see Deduplication).
+3. Can it be one requirement with an observable outcome? If not, ask the user one clarifying question first.
+
+## Three kinds of anchor
+
+Each anchor carries a `kind` (`add --kind`, default `directive`); Jev cannot judge every fact the same way:
+
+| Kind | Example | How it is judged |
+| --- | --- | --- |
+| `directive` | "The runtime crates are created by copying the legacy repo's runtime crates ..." | relevant, addressed, contradicted |
+| `prohibition` | "No bead in this phase changes a layer's responsibilities, an ADR decision, or the crate set." | relevant and contradicted only; silence is compliance (measured-behaviour.md) |
+| `structural` | "Every sprint bead's design gives the code for each deliverable." | its `deterministic_check` only (`shape` metrics, a grep, a count); Jev is not asked at the planning gate |
+
+A conditional prohibition ("... unless the user approved it first") cannot be contradicted by Jev, even when the contradicting sentence is the whole item (measured-behaviour.md). Split it: the prohibition as one anchor, the approval record as a directive ("a bead that changes a layer's responsibilities names the discussion where the user approved it").
+
+## Writing a testable statement
+
+Write a requirement about the system or the work: third person, one constraint, the artifact named, the outcome observable. Prefer the positive form with concrete tokens: crate names, paths, commands, issue numbers. Such anchors got the highest relevance confidence and the only correct `satisfied` verdicts (measured-behaviour.md).
+
+Pattern: `<subject> <must | must not | is | are | never | only> <action or property> [<scope or condition>]`.
+
+| Quote (verbatim) | Weak statement | Testable statement |
+| --- | --- | --- |
+| "copy the libraries from the legacy repo as the starting point and remove the legacy-specific code" | "Copy the libraries from the legacy repo as the starting point" | "The runtime crates are created by copying the legacy repo's runtime crates and deleting the legacy-specific modules; no runtime crate is written from scratch." |
+| "don't add a new dependency for this" | "Don't add dependencies" | "Sprint 2 adds no new `[dependencies]` entry to any Cargo.toml." |
+| "the CLI should stay thin" | "The CLI should stay thin" | "Business logic lives in the library crates; `src/cli/` contains argument parsing and output formatting only." |
+
+Rules `lint` enforces:
+
+- Not identical to the quote (error).
+- One constraint. Two requirement modals ("must ... and must never ...") means two anchors.
+- No hedges: should, could, maybe, probably, try to, as needed, if possible.
+- No first or second person. "We copy ..." is speech; "The crates are copied ..." is a requirement.
+- Name the thing: a crate, path, command, file, table; not "the code" or "this".
+- State the observable outcome, not a quality: "mostly deletions against <legacy>/crates/runtime", not "clean".
+- Under about 240 characters. Longer means it bundles.
+
+Run `python3 "$S" lint --anchors "$A" --id ANC-012` after writing; fix warnings before asking for approval.
 
 ## Proposing and confirming
 
-When you detect a candidate, propose it immediately and briefly, quoting the exact words:
+Propose at once, with both texts:
 
-> Anchor candidate: "copy the libraries from ATM as the starting point and remove the ATM-specific code". Lock it as ANC-012?
+> Anchor candidate ANC-012. You said: "copy the libraries from the legacy repo as the starting point and remove the legacy-specific code". Proposed anchor: "The runtime crates are created by copying the legacy repo's runtime crates and deleting the legacy-specific modules; no runtime crate is written from scratch." Lock it?
 
-Record it only when the user confirms, or when they say "lock this", "anchor this", or an equivalent. If the user says "lock this" about something they said several turns ago, quote back what you believe they mean and confirm before recording. Until confirmed, a candidate may be recorded with `--status proposed` so it is not lost, and it is not judged at any gate until locked.
+Record only when the user confirms or says "lock this" or "anchor this". If "lock this" refers to something said turns ago, quote back what you believe they mean and confirm. `--status proposed` records a candidate so it survives compression; it is not judged until locked. Never batch candidates to the end of the conversation; a proposal that waits gets compressed. If the user corrects the wording, that is the statement being authored; the quote never changes.
 
-Do not batch candidates to the end of the conversation. The point of the skill is that facts survive context compression, and a proposal that waits is a proposal that gets compressed.
+## Deduplication
 
-## Verbatim rules
+Before `add`, compare the candidate against every anchor in `anchors.md`, including REQ and ADR entries. Two anchors are duplicates when a plan that satisfies one necessarily satisfies the other. `add` refuses a candidate lexically close to an existing anchor (`ANCHOR.DUPLICATE_CANDIDATE`) and names the match; pass `--allow-similar` only after reading the match and finding a different constraint.
 
-The statement field is the anchor point. Paraphrase is exactly where meaning gets lost, so:
+For a set that has grown:
 
-- Store the user's words as typed or transcribed, including informal grammar.
-- Trim only leading and trailing filler ("so basically", "ok"). Mark any interior elision with `[...]`, and prefer not to elide at all.
-- When a directive sits inside a long message, quote the minimal sentence or sentences that carry it, not the whole message.
-- Never "clean up" the statement later. A changed directive is a new anchor; the old one is retired.
-- The `summary` field is yours to write and is for tables only. Jev never sees it.
+```bash
+python3 "$S" dedupe --anchors "$A"            # lexical pairs
+python3 "$S" dedupe --anchors "$A" --jev      # asks Jev per candidate pair: same constraint?
+```
+
+For each confirmed pair, keep the better statement, fold any missing condition into it with `update --statement`, and `retire --id ANC-0xx --replaced-by ANC-0yy --reason duplicate` the other. Two anchors for one constraint double-count in coverage and reports.
 
 ## Granularity
 
-One testable constraint per anchor. "Copy the ATM crates and strip the ATM-specific code" is one constraint (the starting point and the cleanup are one act). "Copy the ATM crates and keep the CLI thin" is two: record two anchors, each quoting the sentence that carries its constraint, even if that means both quote part of the same message.
-
-The test for granularity: can Jev answer "does this bead address the directive" with one yes or no? If a bead could address half of it, split.
+One testable constraint per anchor. "Copy the legacy crates and strip the legacy-specific code" is one act, one constraint. "Copy the legacy crates and keep the CLI thin" is two anchors, each quoting the sentence that carries it. The test: can Jev answer "does this bead address the directive" with one yes or no? If a bead could address half of it, split.
 
 ## Fields you write at lock time
 
 | Field | Purpose | How to write it |
 | --- | --- | --- |
-| `scope` | Feeds the relevance question so unrelated beads are `not_applicable` rather than failures | Name the area or kind of work the anchor governs: "the runtime crates sprint and anything that creates the core library implementation" |
+| `statement` | What Jev judges | As above; lint clean; approved by the user |
+| `quote` | Provenance | Verbatim, trimmed of leading and trailing filler only; interior elisions marked `[...]` and avoided |
+| `scope` | Feeds the relevance question so unrelated beads are `not_applicable`, not failures | Bead-level signals, not a topic sentence: "adds or changes a CLI subcommand", "edits a Cargo.toml", "touches crates/<name>" (measured-behaviour.md) |
+| `kind` | Chooses the gating | `directive` unless the statement forbids something (`prohibition`) or describes the shape of every bead (`structural`) |
 | `summary` | Table label | Under 12 words |
-| `deterministic_check` | The code-level proof the development gate should pair with | A diff, git log, grep, or test that would show the directive was literally followed |
-| `fixtures.pass` / `fixtures.fail` | One sentence each that a bead would say if it satisfied or violated the anchor | Draft them, read them back, get the user's approval, then record with `update --fixture-pass/--fixture-fail`. `check-fixtures` sends them to Jev (same opt-in) to confirm the question wording lands them as expected |
+| `deterministic_check` | Code-level proof paired at the development gate | A diff, git log, grep, or test showing the statement literally holds |
+| `fixtures.pass` / `fixtures.fail` | What a bead would say if it satisfied or violated the anchor | One sentence each; draft, get approval, record with `update --fixture-pass/--fixture-fail`; `check-fixtures` confirms they land |
 
-Record with `add`; the script allocates the next ANC number so two sessions never collide on an ID. `scope`, `summary`, the deterministic check and fixtures can be set on `add` or later with `update`. Then `validate`, `render`, and create the bead tree per `bead-layout.md`.
+```bash
+python3 "$S" add --anchors "$A" \
+  --quote "copy the libraries from the legacy repo as the starting point and remove the legacy-specific code" \
+  --statement "The runtime crates are created by copying the legacy repo's runtime crates and deleting the legacy-specific modules; no runtime crate is written from scratch." \
+  --stated-by "<name>" --context "planning session" --summary "Runtime crates copied from the legacy repo, not rewritten" \
+  --scope "the runtime crates sprint and any bead that creates the core library implementation" \
+  --deterministic-check "diff -r <legacy>/crates/runtime crates/runtime is mostly deletions" --status locked
+```
+
+`add` allocates the next ANC number, runs the lint and duplicate check, and refuses on an error. Then `validate`, `render`, create the bead tree (`bead-layout.md`), and spin off the question tuner (`question-tuning.md`); an anchor is not gate-ready until its own `addressed` and `relevant` wording is tested. Watch for homonyms: if the plan uses a key word of the statement in another sense ("layer" as stacked-PR position versus architectural layer), say so in the summary and the override; that homonym caused false passes (measured-behaviour.md).
 
 ## Re-opening a plan
 
-When a planning session resumes, read `anchors.md` before reading the plan, and say so: "Loaded 14 anchors for phase-current." The user should never have to re-state a locked fact. If they do re-state one, check whether the existing anchor's wording matches; if it differs materially, propose a new anchor and retire the old.
+When a planning session resumes, read `anchors.md` before the plan and say so: "Loaded 14 anchors for phase-current." The user never re-states a locked fact; if they do, it is the same anchor, not a second. If their wording now implies a different constraint, `update --statement`; if the directive itself changed, add a new anchor and retire the old.

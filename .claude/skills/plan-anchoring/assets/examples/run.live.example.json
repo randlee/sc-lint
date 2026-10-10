@@ -8,7 +8,7 @@
   "item": {
     "id": "live-1",
     "title": "Sprint 2 runtime (from scratch)",
-    "source": "/private/tmp/claude-501/-Users-randlee-github-plan-anchor/c9832bea-6dfa-4242-8353-987767203f4f/scratchpad/live/bead1.txt",
+    "source": "<scratch>/live/bead1.txt",
     "chars": 128,
     "truncated": false
   },
@@ -24,8 +24,8 @@
       "anchor_id": "ANC-012",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "copy the libraries from ATM as the starting point and remove the ATM-specific code",
-      "stated_by": "Rand",
+      "statement": "copy the libraries from the legacy repo as the starting point and remove the legacy-specific code",
+      "stated_by": "the user",
       "stated_at": "2026-10-09",
       "context": "planning session",
       "anchor_version": 1,
@@ -35,7 +35,7 @@
         "overridden": false
       },
       "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
-      "deterministic_check": "git log --follow on the new crates should show ATM's history, or a diff against the ATM crates should be mostly deletions",
+      "deterministic_check": "diff -r <legacy>/crates/runtime crates/runtime is mostly deletions",
       "verdict": "contradicted",
       "answers": {
         "relevant": {

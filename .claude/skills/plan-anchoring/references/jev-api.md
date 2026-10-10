@@ -1,21 +1,21 @@
 ---
 name: jev-api
-version: 0.2.0
+version: 0.3.0
 description: How jev_judge.py talks to TypeSafe's Jev - endpoint, auth, request and response shape, validation, limits, the retry and context-shortening policy, every error code and flag, model pinning, and the privacy opt-in that gates every call.
 ---
 
 # Jev API as used by this skill
 
-Jev is TypeSafe's decision model: it answers typed questions about a piece of state with probabilities and confidence, in parallel, and does not generate text. That is exactly the adversarial-reviewer role this skill needs. Everything below is implemented in `scripts/jev_judge.py`; this document is for understanding and troubleshooting, not for hand-rolling requests.
+Jev is TypeSafe's decision model: it answers typed questions about a piece of state with probabilities and confidence, in parallel, and generates no text. `scripts/jev_judge.py` implements everything below; this document is for troubleshooting, not for hand-rolling requests.
 
 ## Privacy opt-in (read first)
 
-A gate run sends two things off the machine: the anchor statement (the user's words) and the item text (a plan bead or an account of delivered work). Whether proprietary plans may be sent to TypeSafe is an open question in the PRD, so the script fails closed:
+A gate run sends the anchor statement and scope and the item text (a plan bead or an account of delivered work) off the machine. `rubric` also sends the verbatim quote; `dedupe --jev` sends pairs of statements and quotes. Sending a plan to TypeSafe is the user's decision, so the script fails closed:
 
 - `TYPESAFE_API_KEY` must be set and well-formed (non-empty, ASCII, no control characters), and
 - `PLAN_ANCHOR_ALLOW_REMOTE_JUDGE=1` must be set for the session (or `--allow-remote` passed).
 
-Without both, `judge` and `check-fixtures` return `AUTH.CREDENTIALS` or `POLICY.REMOTE_JUDGE_DISABLED` and send nothing. `--dry-run` writes the exact request bodies and `totals {requests, bytes}` to the run directory for review. `--answers-file` runs the gating logic with fixture answers and never touches the network. The key is never printed, logged, or written to a run file; error messages never include it. Set the opt-in per plan, not globally, until retention is settled.
+Without both, `judge`, `check-fixtures`, `rubric` and `dedupe --jev` return `AUTH.CREDENTIALS` or `POLICY.REMOTE_JUDGE_DISABLED` and send nothing. `--dry-run` writes the exact request bodies and `totals {requests, bytes}` to the run directory. `--answers-file` runs the gating with fixture answers, offline. The key is never printed, logged, written to a run file, or included in an error. Set the opt-in per plan, not globally.
 
 ## Endpoint and auth
 
@@ -40,8 +40,8 @@ Without both, `judge` and `check-fixtures` return `AUTH.CREDENTIALS` or `POLICY.
 ```
 
 - `state` may be a string, object, or array; questions reference fields with backticked paths such as `item.text`.
-- `questions` is keyed by your own IDs; the ID is not sent to the model, the `instructions` are.
-- Types: `choice` (criteria is a map of option to description; up to 255 options), `score` (ordered list of 2 to 10 level descriptions), `noul` (probability of yes, no separate confidence). This skill uses `choice` so every answer carries a confidence.
+- `questions` is keyed by your own IDs; the `instructions` are sent, the ID is not.
+- Types: `choice` (criteria map option to description; up to 255 options), `score` (2 to 10 ordered level descriptions), `noul` (probability of yes, no confidence). This skill uses `choice` so every answer carries a confidence.
 
 ## Response
 
@@ -57,14 +57,13 @@ Without both, `judge` and `check-fixtures` return `AUTH.CREDENTIALS` or `POLICY.
 }
 ```
 
-`probabilities` says which option; `confidence` says whether to trust the call at all. The script validates every response before gating: answer IDs must equal the question IDs, each `choice` must be one of the criteria options, `confidence` and every probability must be in [0, 1], and probabilities must sum to 1 within rounding. Anything else is `JEV.RESPONSE_INVALID`, retried as a transient failure. The response read is bounded at 1 MiB. The run file stores the full answers so thresholds can be re-tuned later without re-judging.
+`probabilities` says which option; `confidence` says whether to trust the call. Near-threshold cells are re-asked because of run-to-run noise (measured-behaviour.md). The script validates every response before gating: answer IDs equal the question IDs, each `choice` is a criteria option, `confidence` and every probability lie in [0, 1], and probabilities sum to 1 within rounding. Anything else is `JEV.RESPONSE_INVALID`, retried as transient. The response read is bounded at 1 MiB. The run file stores the full answers so thresholds can be re-tuned without re-judging.
 
 ## Size, context window, and shortening
 
 - Jev allows about 32k tokens for state plus the longest question and about 64k for state plus all questions.
-- **Plan gate: a plan bead is never shortened.** The intent is that a reasonable plan bead fits within Jev's context in one request; a bead that does not is asking too much and must be split. First, every fenced code block longer than `--max-code-lines` (default 8) is reduced to its signature lines plus `<redacted: N of M code lines are in the plan but were not sent to Jev>`, so long code examples never count against the plan and Jev still sees that the code exists. If the reduced bead is over `--max-item-chars`, or any anchor's request would be over `--max-request-bytes`, the run stops with `PLAN.TOO_LARGE` (exit 2) before anything is sent. A token-limit 4xx from Jev on the plan gate is recorded as a per-anchor `PLAN.TOO_LARGE` error, never halved. The run's `item` records `chars_before_reduction` and `code_reduced` (`blocks`, `lines`).
-- Development gate: before the first call the script serialises the full body and shortens the item text (keeping the head, appending a truncation marker) until the request is under `--max-request-bytes` (default 24,000 bytes).
-- If Jev still answers with a 4xx whose body reports the token limit, the script halves the item and retries, down to `--min-item-chars` (default 2,000). Below that the anchor is recorded as `verdict: error` with `JEV.CONTEXT_EXCEEDED` and the advice to shorten the evidence.
+- **Planning gate: a plan bead is never shortened.** Fenced code blocks longer than `--max-code-lines` (default 8) are sent as their signature lines plus a marker saying how many lines were not sent; prose is never cut. If the reduced bead exceeds `--max-item-chars`, or any anchor's request exceeds `--max-request-bytes`, the run stops before sending with `PLAN.TOO_LARGE` (exit 2). A token-limit 422 at this gate is recorded per anchor as `PLAN.TOO_LARGE`, never halved (`plan-size-and-shape.md`). The run records `item.chars_before_reduction` and `item.code_reduced`.
+- **Development gate:** before the first call the script shortens the evidence account (keeping the head, appending a truncation marker) until the serialised request is under `--max-request-bytes` (default 64,000 bytes at this gate; measured-behaviour.md). If Jev still answers a 4xx reporting the token limit, the script halves the account and retries, down to `--min-item-chars` (default 2,000). Below that the anchor is `verdict: error` with `JEV.CONTEXT_EXCEEDED`.
 - Each result records `item_chars_sent`, `item_shortened`, `request_bytes`; the run's `summary.shortened` lists affected anchors.
 
 ## Attempt policy
@@ -73,17 +72,17 @@ Per anchor, per request:
 
 | Situation | Behaviour |
 | --- | --- |
-| 429, 529, any 5xx, timeout, network error, invalid response | Up to 3 attempts. Delay before the second: `Retry-After` if present (capped at 30 s), else 1 s; before the third: 2 s. After the third failure the anchor is `verdict: error` with the last code; other anchors continue |
+| 429, 529, any 5xx, timeout, network error, invalid response | Up to 3 attempts. Delay before the second: `Retry-After` if present (capped at 30 s), else 1 s; before the third: 2 s. Then `verdict: error` with the last code; other anchors continue |
 | 422 token limit | Shorten and retry as above (counts toward the 3 attempts) |
 | 422 other | Not retried; `JEV.VALIDATION` with up to 300 characters of the body, which names the bad field |
 | 401 | Not retried; the whole run aborts with `AUTH.CREDENTIALS` (body withheld) |
 | Missing opt-in or key | Checked before any request; the run aborts |
 
-Agents and the skill never add a retry loop around the script. `attempts` is recorded on every result. Questions in one request are answered independently and in parallel, so the three or four questions cost one round trip.
+Agents and the skill never add a retry loop around the script. `attempts` is recorded on every result. Questions in one request are answered independently and in parallel: one round trip per anchor.
 
 ## Models
 
-`jev-latest` moves with releases. Once thresholds are tuned for a plan, pin the versioned model the response reported (`model_answered` in the run file) via `PLAN_ANCHOR_JEV_MODEL=jev-1.13.0` or `--model`.
+`jev-latest` moves with releases. Once thresholds are tuned, pin the version the response reported (`model_answered` in the run file) via `PLAN_ANCHOR_JEV_MODEL=jev-1.13.0` or `--model`.
 
 ## Error codes
 
@@ -93,46 +92,61 @@ Agents and the skill never add a retry loop around the script. `attempts` is rec
 | `POLICY.REMOTE_JUDGE_DISABLED` | pre-flight | Opt-in not set. Use `--dry-run` or set `PLAN_ANCHOR_ALLOW_REMOTE_JUDGE=1` |
 | `JEV.RATE_LIMITED`, `JEV.OVERLOADED`, `JEV.HTTP`, `JEV.NETWORK` | transport | Transient; retried 3 times, then per-anchor `error` |
 | `JEV.RESPONSE_INVALID` | validation | Malformed or oversized response; retried, then per-anchor `error` |
-| `JEV.CONTEXT_EXCEEDED` | 422 token limit | Development gate: item could not be shortened enough; shorten the evidence |
-| `PLAN.TOO_LARGE` | plan-gate pre-flight, 422 token limit | The plan bead does not fit one Jev request after long code was reduced to signatures. The message gives size by section and prose versus code. Judge the cause (unapproved work, prose and ceremony, too much approved work) per `planning-gate.md`, "Plan size"; never split or trim just to pass |
+| `JEV.CONTEXT_EXCEEDED` | 422 token limit (development gate) | Evidence could not be shortened enough; shorten it |
+| `PLAN.TOO_LARGE` | planning-gate pre-flight or 422 | The bead does not fit one request after code reduction; triage per `plan-size-and-shape.md`. Never trim or raise the cap to pass |
 | `JEV.VALIDATION` | 422 other | Request rejected; usually a malformed override |
 | `VALIDATION.ANCHORS`, `VALIDATION.INPUT` | record / arguments | Fix `anchors.json` (`validate`) or the flags |
 | `QUESTIONS.ROLES` | question set | An override renamed a question ID; keep the default IDs |
-| `ANCHOR.UNKNOWN`, `ANCHOR.DUPLICATE`, `ANCHOR.NONE`, `ANCHOR.NOT_LOCKED` | record | Wrong ID; already recorded; nothing locked; `--anchor` named a proposed or retired anchor (use `--include-unlocked` only for fixtures) |
+| `ANCHOR.UNKNOWN`, `ANCHOR.DUPLICATE`, `ANCHOR.NONE`, `ANCHOR.NOT_LOCKED` | record | Wrong ID; already recorded; nothing locked; `--anchor` named a proposed or retired anchor (`--include-unlocked` is for fixtures only) |
+| `ANCHOR.DUPLICATE_CANDIDATE` | `add` | Statement or quote lexically close to an existing anchor; read the match, then `--allow-similar` only for a different constraint |
+| `ANCHOR.NOT_TESTABLE` | `add --rubric`, tuner | The statement failed the testability rubric or lint; rewrite it (`anchor-capture.md`) |
+| `ANCHOR.LINT` | `add --strict`, `update --strict` | The statement has lint warnings and strict mode was requested |
+| `FIXTURES.MISSING` | tuner | No pass or fail fixture sentence; draft them with the user (`update --fixture-pass/--fixture-fail`) |
 | `INPUT.MISSING`, `INPUT.MALFORMED`, `INPUT.EMPTY` | files | A path is not a file, not JSON, or the item text is empty |
 | `FIXTURE.MISSING`, `FIXTURE.NONE` | `--answers-file`, `check-fixtures` | No fixture answer for an anchor; no anchor has fixtures |
 | `RUNS.NONE`, `RUNS.MISMATCH` | `coverage`, `diff` | No run files; runs for different gates or items |
 | `SCRIPT.INTERNAL` | anywhere | Unexpected exception, reported as JSON with exit 2 |
 
-Fatal codes abort with exit 2 and `success: false`. Transient codes end up in `results[].error` inside a successful run that exits 1.
+Fatal codes abort with exit 2 and `success: false`. Transient codes land in `results[].error` inside a successful run that exits 1.
 
 ## Exit codes
 
-| Code | `judge` | `check-fixtures` | `validate` |
+| Code | `judge` | `check-fixtures` | `validate` | `lint` | `rubric` | `dedupe` | `shape` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | gate passed, or dry run | every fixture landed as expected | no problems | no warnings | all testable | no likely duplicates | always |
+| 1 | a failing or `error` verdict; run file written | a mismatch | problems listed | warnings | some `needs_work` | likely duplicates | never |
+| 2 | fatal `JudgeError` or `SCRIPT.INTERNAL` | same | same | same | same | same | fatal only |
+
+## Other Jev-backed subcommands
+
+| Subcommand | Sends | Question set | Verdict |
 | --- | --- | --- | --- |
-| 0 | gate passed, or dry run | every fixture landed as expected | no problems |
-| 1 | a failing or `error` verdict; run file written | a mismatch | problems listed |
-| 2 | fatal `JudgeError` or `SCRIPT.INTERNAL` | same | same |
+| `rubric` | one anchor's statement, quote and scope | `assets/questions/testability.json` (single constraint, observable, requirement form, faithful to quote, scoped, positive form) | `testable` when every answer is yes at `--threshold` (default 0.6) and the lint has no error; else `needs_work` with the failing criteria; exit 1 on any `needs_work` |
+| `dedupe --jev` | one pair of anchors (statements and quotes) per request, only for pairs the lexical pass flagged at `--threshold` (Jaccard, default 0.5) | `assets/questions/dedupe.json` (same constraint?) | pairs with `jev.choice` and confidence; likely duplicates are `yes` at the global confidence threshold, or Jaccard >= 0.8 without Jev; exit 1 when any remain. `--answers-file` implies `--jev` |
+| `check-fixtures` | one fixture sentence as the item | the gate's set | pass -> `satisfied`, fail -> `not_addressed` or `contradicted` |
+
+`lint` and `shape` are deterministic and never contact Jev. `lint` with neither `--id` nor `--all` lints every non-retired anchor.
 
 ## Judging flags
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
 | `--model` | `jev-latest` | Model alias or pinned version |
-| `--threshold` | 0.6 | Confidence gate (see `verdict-gating.md`) |
+| `--threshold` | 0.6 | Confidence gate (`verdict-gating.md`) |
 | `--questions` | `assets/questions/<gate>.json` | Alternative question-set file |
 | `--overrides-file` | none | Per-anchor overrides read from the question beads |
-| `--max-item-chars` | 24,000 | Development gate: truncate the item to this. Plan gate: refuse a larger bead with `PLAN.TOO_LARGE` |
-| `--max-code-lines` | 8 | Plan gate: longer code blocks are sent as signatures plus a redaction marker |
-| `--max-request-bytes` | 24,000 | Pre-flight cap on the serialised request (plan gate: refuse, development gate: shorten) |
-| `--min-item-chars` | 2,000 | Floor for context shortening |
+| `--max-item-chars` | 24,000 | Development gate: truncate the evidence to this. Planning gate: refuse a larger bead with `PLAN.TOO_LARGE` |
+| `--max-request-bytes` | 24,000 plan / 64,000 dev | Pre-flight cap on the serialised request (planning gate: refuse; development gate: shorten) |
+| `--confirm-near-threshold` | on | Re-ask once when a required-role confidence is within 0.10 of the threshold; disagreement makes the cell `underspecified` with `unstable: true` (`--no-confirm`, `PLAN_ANCHOR_CONFIRM_NEAR=0`) |
+| `--max-code-lines` | 8 | Planning gate: longer fenced code blocks are sent as signatures plus a redaction marker |
+| `--min-item-chars` | 2,000 | Development gate: floor for context shortening |
 | `--timeout` | 30 s | Per-request socket timeout |
 | `--run-dir` / `--out` | `<anchors dir>/anchor-runs` | Where the run file goes |
 | `--dry-run`, `--answers-file`, `--allow-remote`, `--include-unlocked` | | See above |
 
 ## Cost and latency
 
-TypeSafe prices input tokens only (output is free) at a fraction of a cent per million tokens, and quotes roughly 100 ms per request. A planning gate over 15 beads and 20 anchors is 300 requests and costs effectively nothing; re-running after every plan edit is the intended usage. `--dry-run` reports `totals.bytes` so a run can be sized without a key.
+TypeSafe prices input tokens only (output is free) at a fraction of a cent per million tokens and quotes roughly 100 ms per request. A planning gate over 15 beads and 20 anchors is 300 requests and costs effectively nothing; re-run after every plan edit. `--dry-run` reports `totals.bytes` to size a run without a key.
 
 ## Environment variables
 
@@ -143,7 +157,7 @@ TypeSafe prices input tokens only (output is free) at a fraction of a cent per m
 | `PLAN_ANCHOR_JEV_MODEL` | `jev-latest` | Model alias or pinned version |
 | `PLAN_ANCHOR_JEV_URL` | TypeSafe endpoint | Proxy or mock server |
 | `PLAN_ANCHOR_CONFIDENCE_THRESHOLD` | `0.6` | Gating threshold |
-| `PLAN_ANCHOR_MAX_ITEM_CHARS` | `24000` | Item truncation (development gate) and plan-bead size limit (plan gate) |
-| `PLAN_ANCHOR_MAX_CODE_LINES` | `8` | Plan gate code-block reduction threshold |
+| `PLAN_ANCHOR_MAX_ITEM_CHARS` | `24000` | Evidence truncation (development gate) and bead size limit (planning gate) |
+| `PLAN_ANCHOR_MAX_CODE_LINES` | `8` | Planning gate code-block reduction threshold |
 
-Under Codex, `TYPESAFE_API_KEY` matches its default `*KEY*` exclusion pattern for command environments: if you restrict `[shell_environment_policy]` in `config.toml`, keep `ignore_default_excludes = true`, and with an allowlist under `[shell_environment_policy.filters]` add `"TYPESAFE_API_KEY" = "include"`.
+Codex environment policy for `TYPESAFE_API_KEY`: `installation-and-troubleshooting.md`.
