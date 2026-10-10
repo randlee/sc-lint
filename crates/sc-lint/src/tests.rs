@@ -1450,6 +1450,68 @@ fn verdict_exit_code_covers_every_analyzer_target() {
     );
 }
 
+fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub fn example() {}\n");
+    let mock_backend = MockBackend::install(
+        tool,
+        &json!({
+            "tool": tool,
+            "findings": [],
+            "status": crate::consts::STATUS_FAIL,
+        }),
+    );
+    let test_executable = std::env::current_exe().expect("test executable path");
+    let cli_name = if cfg!(windows) {
+        "sc-lint.exe"
+    } else {
+        "sc-lint"
+    };
+    let cli_source = test_executable
+        .parent()
+        .and_then(Path::parent)
+        .map(|target_dir| target_dir.join(cli_name))
+        .expect("sc-lint executable path");
+    let cli_copy = mock_backend._tempdir.path().join(cli_name);
+    fs::copy(cli_source, &cli_copy).expect("copy sc-lint beside mock backend");
+
+    // The backend resolver prefers binaries next to sc-lint over PATH. Running
+    // this copy makes the mocked sibling binary the one the CLI dispatches to.
+    let output = ProcessCommand::new(cli_copy)
+        .args(["--json", "--root"])
+        .arg(fixture.root())
+        .args(["lint", target])
+        .output()
+        .expect("run mocked analyzer command");
+    let exit_code = output.status.code().expect("process exit code");
+    let envelope = serde_json::from_slice(&output.stdout).expect("success envelope JSON");
+    (exit_code, envelope)
+}
+
+#[test]
+#[serial]
+fn lint_sc_portability_fail_verdict_exits_ten_with_success_envelope() {
+    let (exit_code, envelope) =
+        lint_mocked_analyzer_fail_outcome("sc-portability", crate::consts::TOOL_PORTABILITY);
+
+    assert_eq!(exit_code, i32::from(crate::consts::EXIT_VERDICT_FAIL));
+    assert_eq!(envelope["ok"], true);
+    assert!(envelope.get("error").is_none());
+}
+
+#[test]
+#[serial]
+fn lint_sc_runtime_fail_verdict_exits_ten_with_success_envelope() {
+    let (exit_code, envelope) =
+        lint_mocked_analyzer_fail_outcome("sc-runtime", crate::consts::TOOL_RUNTIME);
+
+    assert_eq!(exit_code, i32::from(crate::consts::EXIT_VERDICT_FAIL));
+    assert_eq!(envelope["ok"], true);
+    assert!(envelope.get("error").is_none());
+}
+
 #[test]
 #[serial]
 fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope() {
