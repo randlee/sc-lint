@@ -27,6 +27,7 @@ roots = [
   "load_analyzer_settings",
   "read_config_document",
   "analyzer_settings_from",
+  "relative_slash_path",
 ]
 
 [dependencies]
