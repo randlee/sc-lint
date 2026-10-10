@@ -3,3 +3,5 @@ ser
 de
 
 # Add project-specific false positives here if codespell reports any.
+# Plan-anchor ids (ANC-001) in docs/plans/*/anchors.json and anchor-runs.
+anc
