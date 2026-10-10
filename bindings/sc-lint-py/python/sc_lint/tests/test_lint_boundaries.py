@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -153,7 +154,7 @@ class LintBoundariesTests(unittest.TestCase):
                     "--root",
                     str(repo_root),
                     "--rule",
-                    "manifests",
+                    "dependencies",
                     "--format",
                     "json",
                 ],
@@ -163,6 +164,27 @@ class LintBoundariesTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["status"], "pass")
+
+            boundary.write_text(
+                boundary.read_text(encoding="utf-8").replace(
+                    'owner_crate_path = "cli_core"', 'owner_crate_path = "wrong_name"'
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(validate_inventory(repo_root))
+            result = subprocess.run(
+                [
+                    "cargo", "run", "--quiet", "--manifest-path", str(REPO_ROOT / "Cargo.toml"),
+                    "-p", "sc-lint-boundary", "--", "analyze", "--root", str(repo_root),
+                    "--rule", "dependencies", "--format", "json",
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
 
     def test_validate_inventory_rejects_both_public_surface(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
