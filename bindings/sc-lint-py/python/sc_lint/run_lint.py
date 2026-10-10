@@ -30,10 +30,17 @@ EXTRA_LINTS = (
     "modules",
     "sc-boundary",
     "sc-portability",
+    "function-length",
     "line-counts",
     "identity-literals",
 )
-DEFAULT_EXTRA_LINTS = ("sc-boundary", "sc-portability", "line-counts", "identity-literals")
+DEFAULT_EXTRA_LINTS = (
+    "sc-boundary",
+    "sc-portability",
+    "function-length",
+    "line-counts",
+    "identity-literals",
+)
 CARGO_LINT_ORDER = ("fmt", "clippy", "deny", "shear")
 FAST_LINT_ORDER = ("fmt", "version", "manifests", "spell", "pytests")
 CRATE_INVENTORY_LINTS = {"fmt", "clippy", "modules", "sc-boundary", "sc-portability", "manifests"}
@@ -77,6 +84,10 @@ def build_tasks(repo_root: Path) -> dict[str, LintTask]:
         "version": LintTask("version", [python_executable, "-m", "sc_lint.check_version_sync"]),
         "sc-boundary": LintTask("sc-boundary", [product_binary, "lint", "sc-boundary"]),
         "sc-portability": LintTask("sc-portability", [product_binary, "lint", "sc-portability"]),
+        "function-length": LintTask(
+            "function-length",
+            [python_executable, "-m", "sc_lint.lint_function_length"],
+        ),
         "line-counts": LintTask(
             "line-counts",
             [python_executable, "-m", "sc_lint.lint_line_counts"],

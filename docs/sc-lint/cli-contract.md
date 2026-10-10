@@ -67,6 +67,8 @@ Initial convention:
 
 - `sc-lint lint sc-boundary`
   - `lint.sc-boundary`
+- `sc-lint lint function-length`
+  - `lint.function-length`
 - `sc-lint lint line-counts`
   - `lint.line-counts`
 - `sc-lint lint identity-literals`
@@ -146,6 +148,10 @@ Current implementation status:
   - implemented capability-gated Windows clippy path
 - `ci`
   - implemented top-level lint-plus-tests path
+- `lint.function-length`
+  - implemented Python-adapter lint path
+  - not in the `Ci` profile (`lint.ci`), like `lint.line-counts` and `lint.identity-literals`; gated by `just lint` and the `Full` profile
+  - a stale baseline allowance (its function shrank or went away) fails the gate until `--write-baseline` ratchets it down, so a recorded allowance never permits regrowth
 - `lint.line-counts`
   - implemented Python-adapter lint path
 - `lint.identity-literals`
