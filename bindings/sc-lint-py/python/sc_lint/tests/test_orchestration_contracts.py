@@ -298,6 +298,38 @@ class TemplateContractTests(unittest.TestCase):
                 payload = json.loads(self.compose(template, vars_path))
                 self.assertEqual(payload["carry_forward_findings"], expected)
 
+    def test_scope_lock_ignores_empty_array_spelling(self) -> None:
+        names = (
+            "ruthless-boundary-qa-assignment.json.j2",
+            "rust-best-practices-assignment.json.j2",
+        )
+        cases = (
+            ("[]", False),
+            ("[ ]", False),
+            ("[\n]", False),
+            ("[\t\r\n ]", False),
+            ('["F-1"]', True),
+            ('[\n"F-1"\n]', True),
+        )
+        for template_name in names:
+            template = next(
+                directory / template_name
+                for directory in self.TEMPLATE_DIRS
+                if (directory / template_name).is_file()
+            )
+            sample = template.parent / "vars" / template.name.removesuffix(".j2")
+            base = json.loads(sample.read_text(encoding="utf-8"))
+            for carry, locked in cases:
+                with self.subTest(template=template.name, carry=carry), tempfile.TemporaryDirectory() as directory:
+                    vars_path = Path(directory) / "vars.json"
+                    vars_path.write_text(
+                        json.dumps({**base, "carry_forward_findings_json": carry}),
+                        encoding="utf-8",
+                    )
+                    payload = json.loads(self.compose(template, vars_path))
+                    self.assertIs(payload["findings_scope_locked"], locked)
+                    self.assertEqual("SCOPE LOCK" in payload["notes"], locked)
+
     def test_quality_report_machine_json_round_trips_strings(self) -> None:
         adversarial = 'quoted "value" \\ path\nline <tag>&'
         common = {
@@ -390,6 +422,7 @@ class TemplateContractTests(unittest.TestCase):
                     capture_output=True,
                     text=True,
                     check=False,
+                    cwd=REPO,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 envelope = json.loads(result.stdout)
