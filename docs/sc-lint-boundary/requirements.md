@@ -45,7 +45,11 @@ family.
 - `REQ-SCB-016`
   A direct workspace package dependency from owner package `X` to workspace
   package `Y` that is not listed in `dependencies.allowed_dependencies` for the
-  owner record must fail with `SCB-DEPENDENCY-001`.
+  owner record must fail with `SCB-DEPENDENCY-001`. A dev-dependency edge is
+  allowed when `Y` is listed in `dependencies.allowed_dependencies` or
+  `dependencies.allowed_dev_dependencies`; an edge that is both a normal and a
+  dev dependency is checked as a normal edge.
+  (Amended 2026-10-10, Proposed, #203.)
 
 - `REQ-SCB-017`
   A direct workspace package dependency from workspace package `Y` to owner
@@ -67,13 +71,19 @@ family.
   target-specific dependency sections when they name another current workspace
   member. Transitive reachability and third-party crates.io or git
   dependencies outside the workspace-member set are out of scope until a later
-  scheduled sprint adds them explicitly.
+  scheduled sprint adds them explicitly. `[dev-dependencies]` edges may also be
+  allowed by `dependencies.allowed_dev_dependencies` (REQ-SCB-016); normal and
+  build edges are unchanged.
+  (Amended 2026-10-10, Proposed, #203.)
 
 - `REQ-SCB-020`
   Package dependency policy entries must be validated at inventory load.
   Malformed forbidden-edge strings, duplicate forbidden edges, duplicate
   package names inside one dependency-policy record, and unknown fields under
-  `[dependencies]` are hard errors.
+  `[dependencies]` are hard errors. A boundary record may carry one opaque
+  `extensions` table (`[extensions.<namespace>]`), which is parsed as TOML and
+  ignored; every other unknown record field is still a hard error.
+  (Amended 2026-10-10, Proposed, #203.)
 
 - `REQ-SCB-021`
   Package dependency policy is a boundary-inventory rule family owned by
@@ -115,8 +125,9 @@ family.
   warn.
 
 - `REQ-SCB-022`
-  Every boundary record's `owner_crate_path` must equal
-  `owner_package` with `-` replaced by `_`.
+  Every boundary record's `owner_crate_path` must equal the lib target name
+  that `cargo metadata` reports for `owner_package`.
+  (Amended 2026-10-10, Proposed, #203.)
 
 - `REQ-SCB-023`
   A boundary's `[public]` section must define exactly one non-empty `facade` or

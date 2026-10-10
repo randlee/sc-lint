@@ -79,7 +79,11 @@ planned.
   [Top-level CLI Role](#top-level-cli-role)), and the (d) kit justfile
   routes `setup`, `lint`, `test` and `upgrade` through the bootstrap into (c).
   The layering leaves `just test` to the consumer repository, with `sc-lint`
-  supplying patterns and general helper functions.
+  supplying patterns and general helper functions. The ADR-012 and ADR-016
+  amendments of 2026-10-10 (Proposed, #194) remove this departure: the kit
+  justfile routes only `setup`, `lint` and `upgrade`, and the installer adds
+  sc-lint's recommended `test` recipe outside the managed block only when the
+  consumer `Justfile` has none, after which the consumer owns it.
 - (c) embeds a copy of the (d) bootstrap assets
   (`crates/sc-lint/assets/bootstrap{,.ps1}`, included by `installer.rs`),
   byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap{,.ps1}`.
@@ -235,7 +239,9 @@ departs from the layering; see
 [Where the current code departs from the layering](#where-the-current-code-departs-from-the-layering)):
 
 - installed `sc-lint` owns setup, compatibility, complete lint, complete test,
-  and upgrade behavior
+  and upgrade behavior (amended 2026-10-10, Proposed, #194: "complete test" is
+  dropped; installed `sc-lint` provides `sc-lint test` and a recommended
+  `test` recipe, and the consumer owns `just test`)
 - `sc-lint init --just` writes only product-owned integration files and never
   a consumer README
 - a generated `Justfile` is a thin interface with four public recipes and a
@@ -301,7 +307,9 @@ Allowed shared support:
 
 - `sc-lint-directives`
 - `sc-lint-schema`
-- `sc-lint-analyzer-support` for rule-neutral AST scanning and report rendering
+- `sc-lint-analyzer-support` for rule-neutral AST scanning, report rendering
+  and the `[tool.sc-lint.analyzers.<name>]` configuration parser (ADR-013
+  amendment 2026-10-10, Proposed, #201)
 - future shared support crates only after explicit design approval
 
 For release `0.2.x`, this means:
@@ -310,6 +318,9 @@ For release `0.2.x`, this means:
   `sc-lint-directives` when shared directive parsing/types are needed, and on
   `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
   implementation
+- `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend
+  on `sc-lint-analyzer-support` for the rule-neutral analyzer configuration
+  parser (ADR-013 amendment 2026-10-10, Proposed, #201)
 - `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`, and the
   top-level `sc-lint` CLI may depend on `sc-lint-schema` for the canonical
   machine-schema types

@@ -34,3 +34,25 @@ machine-report contracts remain in their existing crates.
 - Shared support additions require this crate's release/doc registration but
   do not create a new user-facing lint target.
 
+## Amendment 2026-10-10 — shared analyzer configuration parser
+
+| Field | Value |
+| --- | --- |
+| Status | Proposed |
+| Source | #201, as narrowed by Rand's 2026-10-10 comment on #201 |
+
+1. Extends "It owns only rule-neutral AST discovery, scope classification, and
+   text-report rendering" with: and the rule-neutral analyzer configuration
+   parser. The parser reads `[tool.sc-lint.analyzers.<name>]` from the
+   `--config` file (default `sc-lint.toml` at the root), checks the common keys
+   `enabled`, `reason`, `exclude_rules`, `fail_rules` and `exclude_paths`,
+   resolves `--rule-filter` selections, rejects any key that is neither common
+   nor declared by the analyzer, and applies the settings to findings. It works
+   only from the rule ids, rule families, default fail rules and own keys that
+   each analyzer passes in.
+2. Replaces "`sc-lint-portability` and `sc-lint-runtime` may depend on it" with:
+   `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend
+   on it.
+3. The second paragraph stands: the support crate defines no rule ids and no
+   analyzer-specific policy.
+
