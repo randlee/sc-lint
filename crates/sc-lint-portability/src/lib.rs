@@ -2,14 +2,14 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
-use sc_lint_schema::CrateId;
-use sc_lint_schema::NodeId;
-use sc_lint_schema::OutputFormat;
-use sc_lint_schema::OwnerId;
 use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::RuleCatalog;
 use sc_lint_analyzer_support::analyzer_settings_from;
 use sc_lint_analyzer_support::read_config_document;
+use sc_lint_schema::CrateId;
+use sc_lint_schema::NodeId;
+use sc_lint_schema::OutputFormat;
+use sc_lint_schema::OwnerId;
 use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
@@ -22,8 +22,8 @@ mod tests;
 const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 const ALL_PORT_IDS: &[&str] = &[
-    "PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007",
-    "PORT-008", "PORT-009", "PORT-010",
+    "PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007", "PORT-008",
+    "PORT-009", "PORT-010",
 ];
 
 pub const PORTABILITY_CATALOG: RuleCatalog = RuleCatalog {
@@ -127,18 +127,19 @@ pub fn analyze_workspace_configured(
     let settings = analyzer_settings_from(&PORTABILITY_CATALOG, &document, rule_filter)?;
     let analyzer_keys = portability::AnalyzerPortabilityKeys::from_settings(&settings)?;
     let (findings, scanned_crates) = if settings.enabled {
-        let findings = portability::analyze_portability(&options.root, &document, &settings, &analyzer_keys).map_err(|source| {
-        PortabilityError::AnalyzeFindings {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-        })?;
-        let scanned_crates = portability::count_scanned_crates(&options.root).map_err(|source| {
-            PortabilityError::CountScannedCrates {
+        let findings =
+            portability::analyze_portability(&options.root, &document, &settings, &analyzer_keys)
+                .map_err(|source| PortabilityError::AnalyzeFindings {
                 root: options.root.clone(),
                 source: source.into(),
-            }
-        })?;
+            })?;
+        let scanned_crates =
+            portability::count_scanned_crates(&options.root).map_err(|source| {
+                PortabilityError::CountScannedCrates {
+                    root: options.root.clone(),
+                    source: source.into(),
+                }
+            })?;
         (findings, scanned_crates)
     } else {
         (Vec::new(), 0)

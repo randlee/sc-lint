@@ -50,12 +50,21 @@ fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Analyze { root, format, config, rule_filter } => {
+        Command::Analyze {
+            root,
+            format,
+            config,
+            rule_filter,
+        } => {
             let options = AnalyzeOptions {
                 root,
                 format: format.clone().into(),
             };
-            let report = match analyze_workspace_configured(&options, config.as_deref(), rule_filter.as_deref()) {
+            let report = match analyze_workspace_configured(
+                &options,
+                config.as_deref(),
+                rule_filter.as_deref(),
+            ) {
                 Ok(report) => report,
                 Err(sc_lint_portability::PortabilityError::AnalyzerConfig(error)) => {
                     eprintln!("{error}");
