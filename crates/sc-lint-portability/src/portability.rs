@@ -116,9 +116,19 @@ impl AnalyzerPortabilityKeys {
             Some(_) => return Err(wrong_type("config_home_env", "a string")),
         };
         strings("targets")?;
+        let unix_path_prefixes = strings("unix_path_prefixes")?;
+        if unix_path_prefixes
+            .iter()
+            .any(|prefix| prefix.is_empty() || !prefix.starts_with('/'))
+        {
+            return Err(wrong_type(
+                "unix_path_prefixes",
+                "an array of non-empty strings starting with `/`",
+            ));
+        }
         Ok(Self {
             config_home_env,
-            unix_path_prefixes: strings("unix_path_prefixes")?,
+            unix_path_prefixes,
         })
     }
 }

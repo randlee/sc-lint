@@ -304,6 +304,51 @@ fn explicit_config_path_is_read() {
     assert!(report.findings.is_empty());
 }
 
+fn analyze_with_unix_path_prefix(prefix: &str) -> Result<FindingsReport, PortabilityError> {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(&format!(
+        "[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"{prefix}\"]\n"
+    ));
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/opt/tool/data\"; }",
+    );
+
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+}
+
+#[test]
+fn empty_unix_path_prefix_is_config_error() {
+    let Err(PortabilityError::AnalyzerConfig(error)) = analyze_with_unix_path_prefix("") else {
+        panic!("expected an analyzer config error");
+    };
+
+    assert_eq!(error.exit_code(), 3);
+    assert_eq!(
+        error.to_string(),
+        "portability: `unix_path_prefixes` in [tool.sc-lint.analyzers.portability] must be an array of non-empty strings starting with `/`"
+    );
+}
+
+#[test]
+fn relative_unix_path_prefix_is_config_error() {
+    let Err(PortabilityError::AnalyzerConfig(error)) = analyze_with_unix_path_prefix("opt") else {
+        panic!("expected an analyzer config error");
+    };
+
+    assert_eq!(error.exit_code(), 3);
+    assert_eq!(
+        error.to_string(),
+        "portability: `unix_path_prefixes` in [tool.sc-lint.analyzers.portability] must be an array of non-empty strings starting with `/`"
+    );
+}
+
 #[test]
 fn defaults_only_temp_prefix_does_not_flag_production_path() {
     let fixture = WorkspaceFixture::new();
