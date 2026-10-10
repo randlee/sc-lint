@@ -38,6 +38,21 @@ agents:
   rust-service-hardening-agent:
     version: 0.11.0
     path: .claude/agents/rust-service-hardening-agent.md
+  dev-sanity:
+    version: 0.11.9  # atm-bd-orchestration package
+    path: .claude/agents/dev-sanity.md
+  sc-sanity-llm:
+    version: 0.11.9  # atm-bd-orchestration package
+    path: .claude/agents/sc-sanity-llm.md
+  sc-sanity-jev:
+    version: 0.11.9  # atm-bd-orchestration package
+    path: .claude/agents/sc-sanity-jev.md
+  ceremony-qa:
+    version: 0.11.9  # atm-bd-orchestration package
+    path: .claude/agents/ceremony-qa.md
+  parallax:
+    version: 0.11.9  # atm-bd-orchestration package
+    path: .claude/agents/parallax.md
 skills:
   codex-orchestration:
     version: 0.1.0
@@ -61,7 +76,17 @@ skills:
   quality-management-gh:
     version: 1.0.0
   sprint-report:
-    version: 3.1.0
+    version: 0.11.9  # atm-bd-orchestration package
+  atm-beads:
+    version: 0.11.9  # atm-bd-orchestration package
+  atm-bd-orchestration:
+    version: 0.11.9  # atm-bd-orchestration package
+  sprint-review:
+    version: 0.11.9  # atm-bd-orchestration package
+  qa-report:
+    version: 0.11.9  # atm-bd-orchestration package
+  prompt-rewrite-judge:
+    version: 0.11.9  # atm-bd-orchestration package
   rust-development:
     version: 0.11.0
     depends_on:
@@ -84,3 +109,23 @@ skills:
       rust-code-reviewer: 0.x
       rust-code-explorer: 0.x
       rust-qa-agent: 0.x
+# atm-bd-orchestration configuration (read by its install.py; no defaults)
+roles:
+  lead: team-lead
+  dev-sanity: dev-sanity
+  quality-mgr: quality-mgr
+bead_prefix: lint
+worktree_base: ../sc-lint-worktrees
+test_command: just test
+lint_command: just lint
+integration_branch_pattern: integrate/phase-{phase}
+plans_dir: docs/plans
+requirements_globs:
+  - docs/requirements.md
+  - docs/*/requirements.md
+adr_globs:
+  - docs/sc-lint/adr/*.md
+policy_path: .claude/project/quality-policy.md
+reviewers_round1:
+  - req-qa
+  - arch-qa
