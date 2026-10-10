@@ -34,7 +34,7 @@ sc-lint.toml
 .sc-lint/bootstrap
 .sc-lint/bootstrap.ps1
 .sc-lint/justfile
-.github/actions/setup-sc-lint/action.yml
+plugins/sc-lint/.github/actions/setup-sc-lint/action.yml
 .github/workflows/sc-lint.yml
 Justfile managed import block
 README.sc-lint.md
@@ -105,8 +105,11 @@ for every drifted managed file and returns:
 
 - `0` — the consumer already matches the kit;
 - `1` — safe proposed changes are present; review them, then apply;
-- `2` — malformed input or a managed-marker conflict; stop and repair the
-  conflict without overwriting consumer-owned content.
+- `2` — malformed input, a managed-marker conflict, or, on a first install
+  (no `.sc-lint/installed.json`), a pre-existing file at a kit path whose
+  content differs from the kit. The installer lists each such path and writes
+  nothing. Stop and repair the conflict without overwriting consumer-owned
+  content.
 
 After applying, rerun `--dry-run`. The consumer PR must include the literal
 `sc-lint adoption dry-run exit 0` line only when the final recheck converges.

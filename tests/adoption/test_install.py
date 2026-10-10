@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -25,6 +26,14 @@ def run(*arguments: str, cwd: Path | None = None) -> subprocess.CompletedProcess
     return subprocess.run(
         ["python3", str(INSTALL), *arguments], cwd=cwd, text=True, capture_output=True, check=False
     )
+
+
+def write_input(consumer: Path, **overrides: object) -> Path:
+    data = json.loads((FIXTURES / "install.json").read_text())
+    data.update(overrides)
+    path = consumer.parent / "install.json"
+    path.write_text(json.dumps(data))
+    return path
 
 
 def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> None:
@@ -83,6 +92,43 @@ def test_install_rejects_a_modified_managed_asset_without_writing() -> None:
     assert result.returncode == 2
     assert str(managed) in result.stderr
     assert managed.read_bytes() == before
+
+
+def test_first_install_refuses_pre_existing_kit_file_without_writing() -> None:
+    for dry_run in (False, True):
+        consumer = copy_fixture("empty-workspace")
+        existing = [consumer / ".sc-lint" / "justfile", consumer / "README.sc-lint.md"]
+        existing[0].parent.mkdir()
+        for path in existing:
+            path.write_text("consumer-owned content\n")
+        arguments = ["--input", str(FIXTURES / "install.json"), str(consumer)]
+        if dry_run:
+            arguments.insert(0, "--dry-run")
+
+        result = run(*arguments)
+        assert result.returncode == 2
+        assert all(str(path) in result.stderr for path in existing)
+        assert all(path.read_text() == "consumer-owned content\n" for path in existing)
+        assert not (consumer / ".sc-lint" / "installed.json").exists()
+        assert not (consumer / "sc-lint.toml").exists()
+        assert not (consumer / "plugins" / "sc-lint").exists()
+
+
+def test_workflow_uses_vendored_action_and_root_has_no_action() -> None:
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    workflow = (consumer / ".github" / "workflows" / "sc-lint.yml").read_text()
+    assert "uses: ./plugins/sc-lint/.github/actions/setup-sc-lint\n" in workflow
+    assert (consumer / "plugins/sc-lint/.github/actions/setup-sc-lint/action.yml").is_file()
+    assert not (consumer / ".github" / "actions").exists()
+
+
+def test_ci_disabled_writes_no_workflow_or_action_files() -> None:
+    consumer = copy_fixture("empty-workspace")
+    input_path = write_input(consumer, ci={"os": ["linux"], "enabled": False})
+    assert run("--input", str(input_path), str(consumer)).returncode == 0
+    assert not (consumer / ".github").exists()
+    assert not (consumer / "plugins" / "sc-lint" / ".github").exists()
 
 
 def test_vendored_kit_can_recheck_and_schema_stays_vendored() -> None:

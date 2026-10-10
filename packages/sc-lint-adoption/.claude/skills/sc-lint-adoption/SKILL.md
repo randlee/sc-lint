@@ -68,7 +68,9 @@ repository-relative script is not authorized in a kit-rendered step.
 
 Run the installer without writes first and retain both its output and exit code
 in the PR body. Exit 0 means already converged; exit 1 means a safe proposed
-change; exit 2 means an input or managed-marker conflict that must be resolved.
+change; exit 2 means an input, managed-marker or pre-existing-file conflict that
+must be resolved. On a first install, every pre-existing file at a kit path
+whose content differs from the kit is listed, and nothing is written.
 
 ```bash
 set +e; python3 "$SC_LINT_ADOPTION_ROOT/install.py" --dry-run --input install.json .; dry_run_exit=$?; set -e; printf 'sc-lint adoption dry-run exit %s\n' "$dry_run_exit"; test "$dry_run_exit" -le 1
