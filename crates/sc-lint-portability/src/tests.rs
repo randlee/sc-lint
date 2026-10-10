@@ -1295,6 +1295,22 @@ fn flags_cfg_attr_not_unix_allow_dead_code_in_production_code() {
     );
 }
 
+#[test]
+fn catalog_lists_every_rule_id() {
+    use RuleId::*;
+
+    let every = [
+        Port001, Port002, Port003, Port004, Port005, Port006, Port007, Port008, Port009, Port010,
+    ];
+    for id in every {
+        match id {
+            Port001 | Port002 | Port003 | Port004 | Port005 | Port006 | Port007 | Port008
+            | Port009 | Port010 => {}
+        }
+    }
+    assert_eq!(ALL_PORT_IDS, every.map(RuleId::as_str));
+}
+
 struct WorkspaceFixture {
     tempdir: TempDir,
 }
