@@ -948,12 +948,35 @@ def reduce_code(text: str, max_lines: int) -> tuple:
     return "\n".join(out), stats
 
 
+def size_breakdown(text: str) -> dict:
+    """Where an item's characters are: per '## ' section, and prose versus fenced code. Facts for a judgement, not a verdict."""
+    sections, current, code, in_code = {}, "(title)", 0, False
+    for line in text.split("\n"):
+        if FENCE_RE.match(line):
+            in_code = not in_code
+            code += len(line) + 1
+            continue
+        if not in_code and line.startswith("## "):
+            current = line[3:].strip()
+        sections[current] = sections.get(current, 0) + len(line) + 1
+        if in_code:
+            code += len(line) + 1
+    return {"sections": sections, "code_chars": code, "prose_chars": len(text) - code}
+
+
 def plan_too_large(item: dict, detail: str) -> JudgeError:
-    return JudgeError("PLAN.TOO_LARGE",
-                      f"plan bead {item['id']} is {len(item['text'])} characters after long code was reduced to signatures; {detail}. "
-                      "A reasonable plan bead fits in one Jev request; this one is asking too much",
-                      action="Split the bead into smaller beads that each stand as a reasonable plan. Long code is already reduced to "
-                             "signatures, so what remains is prose and short code.")
+    size = size_breakdown(item["text"])
+    where = ", ".join(f"{k} {v}" for k, v in sorted(size["sections"].items(), key=lambda kv: -kv[1]))
+    exc = JudgeError("PLAN.TOO_LARGE",
+                     f"plan bead {item['id']} is {len(item['text'])} characters after long code was reduced to signatures "
+                     f"({size['prose_chars']} prose, {size['code_chars']} code; by section: {where}); {detail}. "
+                     "A reasonable plan bead fits in one Jev request; this one is asking too much",
+                     action="Oversize is a symptom; judge its cause before changing the bead. First remove work that no anchor, "
+                            "requirement or user-approved issue asks for (ask the user when unsure). Then cut prose and process "
+                            "ceremony that does not serve a deliverable. Split only approved work that is still too large after "
+                            "that. Never split, trim or raise a limit just to pass the gate.")
+    exc.meta = {"size": size}
+    return exc
 
 
 def read_item(args) -> dict:

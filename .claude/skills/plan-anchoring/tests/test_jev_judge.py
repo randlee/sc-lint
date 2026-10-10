@@ -734,7 +734,10 @@ class PlanSizeTests(unittest.TestCase):
             t = Transport()
             j = Judged(d, t, item_text="prose " * 5000)
         self.assertEqual((j.code, j.out["error"]["code"]), (2, "PLAN.TOO_LARGE"))
-        self.assertIn("Split the bead", j.out["error"]["suggested_action"])
+        action = j.out["error"]["suggested_action"]
+        self.assertIn("judge its cause", action)
+        self.assertLess(action.index("no anchor, requirement or user-approved issue"), action.index("Split only approved work"))
+        self.assertIn("prose", j.out["error"]["message"])
         self.assertEqual(t.bodies, [])
         with tempfile.TemporaryDirectory() as d:
             t = Transport()
@@ -742,6 +745,14 @@ class PlanSizeTests(unittest.TestCase):
         self.assertEqual((j.code, j.out["error"]["code"]), (2, "PLAN.TOO_LARGE"))
         self.assertIn("over --max-request-bytes 4000", j.out["error"]["message"])
         self.assertEqual(t.bodies, [])
+
+    def test_size_breakdown_separates_sections_prose_and_code(self):
+        text = "# T\n\n## Description\n\nwhy\n\n## Design\n\n```rust\nfn a() {}\n```\n"
+        size = jj.size_breakdown(text)
+        self.assertEqual(set(size["sections"]), {"(title)", "Description", "Design"})
+        self.assertEqual(size["code_chars"], len("```rust\nfn a() {}\n```\n"))
+        self.assertEqual(size["prose_chars"] + size["code_chars"], len(text))
+        self.assertEqual(sum(size["sections"].values()) + len("```rust\n") + len("```\n"), len(text) + 1)
 
     def test_long_code_does_not_make_a_plan_bead_oversize(self):
         code = "```rust\npub fn big() {\n" + "    step();\n" * 3000 + "}\n```"

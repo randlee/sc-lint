@@ -87,7 +87,7 @@ Then create the bead tree and record the bead IDs with `set-beads` (`references/
 
 ### C. Planning gate
 
-Read `references/planning-gate.md`. Enumerate the planning beads (the open children of the phase epic, `bd children <epic> --json`) and delegate each to `anchor-plan-review` (see Agent Delegation). It composes the bead text, resolves question overrides from the plan-questions beads, runs the script once (one Jev request per anchor, retries handled inside the script), and returns verdicts. A plan bead is never shortened: long code blocks are sent as signatures with a redaction marker, and a bead that still does not fit is refused with `PLAN.TOO_LARGE` and must be split (`references/planning-gate.md`, "Plan size"). Then compute coverage across beads in code, never by asking Jev:
+Read `references/planning-gate.md`. Enumerate the planning beads (the open children of the phase epic, `bd children <epic> --json`) and delegate each to `anchor-plan-review` (see Agent Delegation). It composes the bead text, resolves question overrides from the plan-questions beads, runs the script once (one Jev request per anchor, retries handled inside the script), and returns verdicts. A plan bead is never shortened: long code blocks are sent as signatures with a redaction marker, and a bead that still does not fit is refused with `PLAN.TOO_LARGE`, whose cause is judged before the bead changes (`references/planning-gate.md`, "Plan size"). Then compute coverage across beads in code, never by asking Jev:
 
 ```bash
 python3 "$S" coverage --runs doc/plan/phase-current/anchor-runs --gate plan --format md
@@ -136,7 +136,7 @@ Parallel runs (Claude Code only): at most 3 beads at once, `correlation_id` set 
 - Never compute coverage, counts, or "satisfied anywhere" by asking Jev. The script does it.
 - Missing `bd`, `python3`, API key, or opt-in: surface and stop; do not degrade silently.
 - Three consecutive gate runs on the same bead with the same failing set: escalate to the user rather than editing the plan again.
-- A plan bead that does not fit one Jev request (`PLAN.TOO_LARGE`) is asking too much: split it. Never trim, truncate or raise the limits to make it fit. Long code examples are already reduced to signatures and do not count against it.
+- A plan bead that does not fit one Jev request (`PLAN.TOO_LARGE`) is asking too much. Judge the cause before changing it: remove unapproved work first, then prose and ceremony, and split only approved work that is still too large (`references/planning-gate.md`, "Plan size"). Never split, trim, truncate or raise the limits just to make it fit. Long code examples are already reduced to signatures and do not count against it.
 
 ## References
 

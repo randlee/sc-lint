@@ -94,7 +94,7 @@ Agents and the skill never add a retry loop around the script. `attempts` is rec
 | `JEV.RATE_LIMITED`, `JEV.OVERLOADED`, `JEV.HTTP`, `JEV.NETWORK` | transport | Transient; retried 3 times, then per-anchor `error` |
 | `JEV.RESPONSE_INVALID` | validation | Malformed or oversized response; retried, then per-anchor `error` |
 | `JEV.CONTEXT_EXCEEDED` | 422 token limit | Development gate: item could not be shortened enough; shorten the evidence |
-| `PLAN.TOO_LARGE` | plan-gate pre-flight, 422 token limit | The plan bead does not fit one Jev request after long code was reduced to signatures. Split the bead; never trim it to pass |
+| `PLAN.TOO_LARGE` | plan-gate pre-flight, 422 token limit | The plan bead does not fit one Jev request after long code was reduced to signatures. The message gives size by section and prose versus code. Judge the cause (unapproved work, prose and ceremony, too much approved work) per `planning-gate.md`, "Plan size"; never split or trim just to pass |
 | `JEV.VALIDATION` | 422 other | Request rejected; usually a malformed override |
 | `VALIDATION.ANCHORS`, `VALIDATION.INPUT` | record / arguments | Fix `anchors.json` (`validate`) or the flags |
 | `QUESTIONS.ROLES` | question set | An override renamed a question ID; keep the default IDs |

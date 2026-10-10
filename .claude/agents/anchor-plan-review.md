@@ -91,7 +91,7 @@ On exit 2 or any fatal condition: `success: false`, `data: null`, and `error` as
 ### Propagated to skill (fatal)
 - `PREREQ.MISSING`: script, python3, bd, or anchors file absent.
 - `BEADS.NOT_FOUND`: `bd show` fails for `bead_id`.
-- Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `PLAN.TOO_LARGE`, `SCRIPT.INTERNAL`: return the script's error object; never work around credential or opt-in errors, and never trim the bead text or raise a limit to get past `PLAN.TOO_LARGE`.
+- Script exit 2 with `AUTH.CREDENTIALS`, `POLICY.REMOTE_JUDGE_DISABLED`, `VALIDATION.ANCHORS`, `QUESTIONS.ROLES`, `ANCHOR.NOT_LOCKED`, `ANCHOR.UNKNOWN`, `PLAN.TOO_LARGE`, `SCRIPT.INTERNAL`: return the script's error object; never work around credential or opt-in errors, and never trim the bead text or raise a limit to get past `PLAN.TOO_LARGE`; the skill judges its cause.
 - Unparseable script stdout: `SCRIPT.OUTPUT` with the first 300 characters.
 
 ## Constraints
