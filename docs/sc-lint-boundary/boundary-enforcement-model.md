@@ -125,7 +125,7 @@ Operational rules:
 - `allowed_dependencies` is the complete allowlist of direct outgoing
   workspace-member dependencies for the owner package, except dev-only edges,
   which may instead be listed in `allowed_dev_dependencies` (Amended
-  2026-10-10, Proposed, #203)
+  2026-10-10, Accepted, #203)
 - `allowed_dependents` is the complete allowlist of direct incoming
   workspace-member dependents for the owner package
 - direct workspace package edges include `[dependencies]`,
@@ -142,7 +142,7 @@ Operational rules:
   loading immediately
 - `SCB-DEPENDENCY-001` reports direct outgoing workspace edges not present in
   `allowed_dependencies`; a dev-dependency edge also passes when its target is
-  in `allowed_dev_dependencies` (REQ-SCB-016, amended 2026-10-10, Proposed,
+  in `allowed_dev_dependencies` (REQ-SCB-016, amended 2026-10-10, Accepted,
   #203)
 - `SCB-DEPENDENCY-002` reports direct incoming workspace edges not present in
   `allowed_dependents`
@@ -347,7 +347,7 @@ Boundary records must satisfy these identity rules:
 
 - `[public]` defines exactly one non-empty `facade` or `trait` value
 - `owner_crate_path` equals the lib target name that `cargo metadata` reports
-  for `owner_package` (REQ-SCB-022, amended 2026-10-10, Proposed, #203)
+  for `owner_package` (REQ-SCB-022, amended 2026-10-10, Accepted, #203)
 
 ## Sprint Evaluation Rule
 

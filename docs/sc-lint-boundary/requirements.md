@@ -49,7 +49,7 @@ family.
   allowed when `Y` is listed in `dependencies.allowed_dependencies` or
   `dependencies.allowed_dev_dependencies`; an edge that is both a normal and a
   dev dependency is checked as a normal edge.
-  (Amended 2026-10-10, Proposed, #203.)
+  (Amended 2026-10-10, Accepted, #203.)
 
 - `REQ-SCB-017`
   A direct workspace package dependency from workspace package `Y` to owner
@@ -74,7 +74,7 @@ family.
   scheduled sprint adds them explicitly. `[dev-dependencies]` edges may also be
   allowed by `dependencies.allowed_dev_dependencies` (REQ-SCB-016); normal and
   build edges are unchanged.
-  (Amended 2026-10-10, Proposed, #203.)
+  (Amended 2026-10-10, Accepted, #203.)
 
 - `REQ-SCB-020`
   Package dependency policy entries must be validated at inventory load.
@@ -83,7 +83,7 @@ family.
   `[dependencies]` are hard errors. A boundary record may carry one opaque
   `extensions` table (`[extensions.<namespace>]`), which is parsed as TOML and
   ignored; every other unknown record field is still a hard error.
-  (Amended 2026-10-10, Proposed, #203.)
+  (Amended 2026-10-10, Accepted, #203.)
 
 - `REQ-SCB-021`
   Package dependency policy is a boundary-inventory rule family owned by
@@ -127,7 +127,7 @@ family.
 - `REQ-SCB-022`
   Every boundary record's `owner_crate_path` must equal the lib target name
   that `cargo metadata` reports for `owner_package`.
-  (Amended 2026-10-10, Proposed, #203.)
+  (Amended 2026-10-10, Accepted, #203.)
 
 - `REQ-SCB-023`
   A boundary's `[public]` section must define exactly one non-empty `facade` or

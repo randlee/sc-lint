@@ -38,7 +38,7 @@ machine-report contracts remain in their existing crates.
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted (Rand, 2026-10-10) |
 | Source | #201, as narrowed by Rand's 2026-10-10 comment on #201 |
 
 1. Extends "It owns only rule-neutral AST discovery, scope classification, and

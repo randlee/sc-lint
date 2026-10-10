@@ -114,7 +114,7 @@ enum-variant expression (`Self::A`, `E::A`) resolves to the variant node
 the owner graph. Cycle rules still operate on the underlying type owner;
 distinct methods do not imply a waiver of owner-level cycle diagnostics,
 except for delegation edges (see SCB-CYCLE-002/003 below).
-(Amended 2026-10-10, Proposed, #204.)
+(Amended 2026-10-10, Accepted, #204.)
 
 ## Edge Model
 
@@ -165,7 +165,7 @@ method-to-method expression edge within one owner where the callee's name
 differs from the caller's, and either the callee is not public (private
 helper) or the caller is a trait-impl method (receiver call). A trait-impl
 method that forwards to a method of the same name stays a self-loop.
-(Amended 2026-10-10, Proposed, #204.)
+(Amended 2026-10-10, Accepted, #204.)
 
 ## Source-Level Allowances
 

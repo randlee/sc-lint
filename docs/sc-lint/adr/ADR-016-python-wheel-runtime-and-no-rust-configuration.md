@@ -97,7 +97,7 @@ extension point for repo-specific enforcement.
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted (Rand, 2026-10-10) |
 | Source | Rand's ruling quoted in the ADR-012 amendment 2026-10-10; #194; #201 |
 
 1. Replaces "The four ADR-012 recipe names are the standard kit-owned entry

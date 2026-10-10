@@ -79,7 +79,7 @@ now defines how shared tooling is vendored into consumers.
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted (Rand, 2026-10-10) |
 | Source | #201, as narrowed by Rand's 2026-10-10 comment on #201; #202 |
 
 1. Extends Decision 7: each `[tool.sc-lint.analyzers.<name>]` entry carries the

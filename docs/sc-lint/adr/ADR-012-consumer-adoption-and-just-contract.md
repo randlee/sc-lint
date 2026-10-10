@@ -85,7 +85,7 @@ Recipe arguments per ADR-016 Decision 3 (2026-08-30).
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted (Rand, 2026-10-10) |
 | Decider | Rand |
 
 Rand's rulings, verbatim: "sc-lint does not 'own' just test. sc-lint will have

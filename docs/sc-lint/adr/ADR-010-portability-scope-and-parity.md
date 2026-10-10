@@ -65,7 +65,7 @@ consumer-local.
 
 | Field | Value |
 | --- | --- |
-| Status | Proposed |
+| Status | Accepted (Rand, 2026-10-10) |
 | Source | #202 |
 
 1. Extends Decision 5: `PORT-001` and `PORT-006` share one Unix path prefix

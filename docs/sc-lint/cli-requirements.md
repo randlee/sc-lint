@@ -90,7 +90,7 @@ specialized backend tools and mixed Rust/Python implementations.
   failures. `sc-lint lint sc-boundary`, `sc-lint lint sc-portability` and
   `sc-lint lint sc-runtime` are also such commands: each exits 10 when its
   result has `data.status = "fail"`, and the envelope stays `ok: true`.
-  (Amended 2026-10-10, Proposed, #200.)
+  (Amended 2026-10-10, Accepted, #200.)
 
 - `REQ-CLI-005I`
   Before a command family is considered implementation-ready, the contract docs
@@ -166,7 +166,7 @@ specialized backend tools and mixed Rust/Python implementations.
   <RULE-ID|family>[,...]`, which the CLI forwards unchanged to the backend
   with the resolved `--config` path; the CLI does not interpret selectors.
   `--rule-filter` on any other `lint` target is a usage error (exit 2).
-  (Amended 2026-10-10, Proposed, #201.)
+  (Amended 2026-10-10, Accepted, #201.)
 
 - `REQ-CLI-007G`
   Narrower grouped aliases such as `unix-gating` or `runtime-waits` may exist
