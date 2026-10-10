@@ -544,6 +544,19 @@ fn dependency_policy_checks_dev_edges_against_both_allow_lists() {
         analyze_workspace(&options).unwrap().status,
         ReportStatus::Pass
     );
+
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "")
+            + "[dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n\
+               [dev-dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n"),
+    );
+    let report = analyze_workspace(&options).unwrap();
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        report.findings[0].message,
+        "workspace package `app` directly depends on `api` but `api` is not listed in `BOUNDARY-App` allowed_dependencies"
+    );
 }
 
 #[test]

@@ -1032,6 +1032,20 @@ state = "concrete_landed"
 }
 
 #[test]
+fn loads_allowed_dev_dependencies() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "allowed_dev_dependencies = [\"sc-lint-directives\"]\nforbidden_edges = []",
+        )
+    });
+
+    load_boundary_inventory(fixture.root()).expect("allowed dev dependencies load");
+}
+
+#[test]
 fn rejects_duplicate_allowed_dev_dependency_names() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
