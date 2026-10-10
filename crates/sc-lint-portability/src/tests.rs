@@ -305,6 +305,31 @@ fn explicit_config_path_is_read() {
 }
 
 #[test]
+fn defaults_only_temp_prefix_does_not_flag_production_path() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/private/tmp/cache\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id != RuleId::Port006)
+    );
+}
+
+#[test]
 fn analyzer_config_home_env_overrides_legacy_table() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

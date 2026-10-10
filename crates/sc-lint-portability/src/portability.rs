@@ -41,6 +41,7 @@ use crate::predicates::is_path_like_constructor;
 use crate::predicates::is_set_var_call;
 use crate::predicates::is_shell_command_call;
 use crate::predicates::is_unix_shell_path_literal;
+use crate::predicates::path_prefix_match;
 use crate::predicates::production_env_portability_variable;
 use crate::predicates::production_path_rule_id;
 use crate::predicates::use_tree_contains_std_os_unix;
@@ -81,7 +82,8 @@ struct BuiltInDefaults {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PortabilityConfig {
     config_home_env: Option<String>,
-    unix_path_prefixes: Vec<String>,
+    builtin_temp_prefixes: Vec<String>,
+    configured_unix_path_prefixes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -729,10 +731,8 @@ impl<'a> PortabilityCollector<'a> {
     }
 
     fn path_prefix_match(&self, value: &str) -> bool {
-        self.config
-            .unix_path_prefixes
-            .iter()
-            .any(|prefix| value.starts_with(prefix))
+        path_prefix_match(value, &self.config.builtin_temp_prefixes)
+            || path_prefix_match(value, &self.config.configured_unix_path_prefixes)
     }
 }
 
@@ -937,12 +937,7 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
         {
             if is_unix_shell_path_literal(&lit.value()) {
                 self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
-            } else if self
-                .config
-                .unix_path_prefixes
-                .iter()
-                .any(|prefix| lit.value().starts_with(prefix))
-            {
+            } else if path_prefix_match(&lit.value(), &self.config.configured_unix_path_prefixes) {
                 self.push_path_finding(RuleId::Port006, &lit.value(), span_start_line(lit.span()));
             } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
                 self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
@@ -990,11 +985,7 @@ fn load_portability_config(
             .config_home_env
             .clone()
             .or_else(|| repo_config.portability.and_then(|cfg| cfg.config_home_env)),
-        unix_path_prefixes: defaults
-            .portability
-            .unix_path_prefixes
-            .into_iter()
-            .chain(analyzer_keys.unix_path_prefixes.iter().cloned())
-            .collect(),
+        builtin_temp_prefixes: defaults.portability.unix_path_prefixes,
+        configured_unix_path_prefixes: analyzer_keys.unix_path_prefixes.clone(),
     })
 }
