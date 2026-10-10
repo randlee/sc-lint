@@ -788,8 +788,12 @@ class LeaningTests(unittest.TestCase):
             self.assertEqual((by_id["ANC-001"]["verdict"], by_id["ANC-001"]["leaning"]), ("underspecified", "not_addressed"))
             self.assertEqual((by_id["ANC-002"]["verdict"], by_id["ANC-002"]["leaning"]), ("satisfied", "satisfied"))
             self.assertEqual(run["summary"]["leaning_counts"], {"not_addressed": 1, "satisfied": 1})
+            self.assertEqual(by_id["ANC-001"]["low_questions"],
+                             [{"ask": "first", "role": "compliance", "question_id": "addressed", "choice": "no", "confidence": 0.45}])
+            self.assertNotIn("low_questions", by_id["ANC-002"])
             code, md = run_cli(["report", "--run", run["path"], "--format", "md", "--all"])
             self.assertIn("the anchor or the bead may be underspecified. (leaning: not_addressed)", md)
+            self.assertIn(">   Low: compliance `addressed` answered no at 0.45.", md)
             self.assertNotIn("(leaning: satisfied)", md)
             old = make_run(d, "old.json", "plan", "bd-1", "2026-10-09T10:00:00+00:00", {"ANC-001": "underspecified"})  # pre-leaning run files
             code, md = run_cli(["report", "--run", old, "--format", "md"])

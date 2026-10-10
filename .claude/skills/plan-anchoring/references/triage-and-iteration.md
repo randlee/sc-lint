@@ -1,6 +1,6 @@
 ---
 name: triage-and-iteration
-version: 0.3.0
+version: 0.3.1
 description: The loop at both gates - run, triage every failing verdict into plan defect, anchor defect, question defect or Jev error, apply the fix in the right place, re-run only what changed, diff, and stop conditions.
 ---
 
@@ -35,7 +35,8 @@ Rules of triage:
 
 - Do not reword a bead until the statement and the question are ruled out; fixing the plan to satisfy a bad question entrenches it.
 - Do not reword the statement to match a bead. Only the user changes what it requires; rewording for clarity (`update --statement`) keeps the quote.
-- If Jev looks wrong and no defect applies, say so in the posted report and ask the user. Do not iterate until Jev agrees.
+- Low confidence is a plan-quality signal: the bead is unclear, excessive or missing something. Fix the bead, preferring cuts to additions; do not explain the score away.
+- Work the change cannot succeed without stays in the plan even when Jev flags it as extra: add one line to the bead saying why it is required, and list the cell with that line in the planning-complete summary.
 - If two anchors fail together on every bead, run `dedupe` first.
 
 ## 3. Apply
@@ -61,7 +62,6 @@ python3 "$S" coverage --runs anchor-runs --gate plan --format md
 
 - **Pass.** Every bead's latest run exits 0 and `coverage` lists no uncovered locked anchor (planning gate); the sprint's latest run exits 0 and every deterministic check is recorded (development gate).
 - **Hard stop: three identical failures.** Three consecutive runs of one bead with the same failing set. Stop editing; post the report and ask the user.
-- **Hard stop: scope disagreement.** A `contradicted` verdict where the bead's author says the user asked for the change. Only the user resolves it, by retiring the anchor (`retire --replaced-by`) or rejecting the bead.
 - **Hard stop: anchor churn.** A statement updated three times. Retire the anchor and lock a new one with the user.
 
 ## Recording the iteration

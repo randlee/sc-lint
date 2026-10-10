@@ -1,6 +1,6 @@
 ---
 name: plan-anchoring
-version: 0.3.1
+version: 0.3.2
 description: Capture the facts a user states while planning as numbered anchors (ANC-001...), one clear, testable requirement each, with the user's verbatim words kept as provenance, alongside existing requirements (REQ) and ADRs. Turn them into Jev-judged questions, tune and test the questions per anchor, and enforce them at two gates with a triage-apply-rerun loop. The planning gate checks each plan bead still says what the user said; the development gate checks the delivered sprint work followed it. Use when planning a phase or sprint with beads, when the user says "anchor this", "lock this", "don't let this drift", or "remember I said", when re-opening a plan after context compression, or when reviewing a sprint against its plan. Not for general code review, and not a replacement for plan hardening.
 ---
 
@@ -94,18 +94,17 @@ Read `references/question-tuning.md`. Each anchor's plan-questions and dev-quest
 
 ### C. Planning gate
 
-Read `references/planning-gate.md` and `references/triage-and-iteration.md`. This is a loop:
+Read `references/planning-gate.md` and `references/triage-and-iteration.md`. Jev's feedback is the measure of plan quality, and this loop is how the planner raises it: run Jev, fix the plan, run again, until every bead passes. A failing verdict or a low confidence means the bead is unclear, excessive or missing something, and the planner acts on it; it is never explained away. The usual fix is to simplify: cut work no anchor asks for, cut prose and ceremony, and state what remains plainly. Add text only where Jev found something missing.
 
-1. **Run.** Enumerate the planning beads (`bd children <epic> --json`) and delegate each to `anchor-plan-review` (see Agent Delegation). It composes the bead's title, description and acceptance criteria (design is measured by `shape`, not judged), resolves overrides from the plan-questions beads, runs the script once (one Jev request per anchor; retries and near-threshold confirmation inside), and returns verdicts with each cell's `leaning`. Post each report on its bead.
-2. **Triage** every failing verdict: re-read the sent text, then decide whether it is a plan defect (the bead), an anchor defect (statement or scope), a question defect (wording), or a Jev error. Only the first is fixed in the plan. `PLAN.TOO_LARGE` is a symptom: run `shape`, remove unapproved work, cut prose and ceremony, and split only what is still too large (`references/plan-size-and-shape.md`). Never split or trim to pass the gate.
-3. **Apply** one class of fix per iteration: edit the bead, or `update --statement/--scope` and re-test fixtures, or tune the question bead and re-run `check-fixtures`.
-4. **Re-run** only the affected beads, `diff` each against its previous run, and recompute coverage in code, never by asking Jev:
+1. **Run.** Enumerate the planning beads (`bd children <epic> --json`) and delegate each to `anchor-plan-review` (see Agent Delegation). It composes the bead's title, description and acceptance criteria (design is measured by `shape`, not judged), resolves overrides from the plan-questions beads, runs the script once (one Jev request per anchor; retries and the near-threshold re-ask inside), and returns Jev's verdicts unchanged, each failing cell with `to_fix` (the sentence the weak answer concerns and the change to make). Post each report on its bead.
+2. **Fix the plan.** For each failing cell, read `to_fix` and the cell's `low_questions`, then change the bead: cut, clarify, or add what is missing. `PLAN.TOO_LARGE` is a symptom: run `shape`, remove unapproved work, cut prose and ceremony, and split only what is still too large (`references/plan-size-and-shape.md`). Never split, pad or trim to pass the gate. Work the change cannot succeed without stays in the plan even when Jev flags it as extra: add one line to the bead saying why it is required, and list the cell with that line in the planning-complete summary. Change an anchor's statement or scope, or a question bead, only when the same cell fails on beads that plainly do the right thing (`references/triage-and-iteration.md`).
+3. **Re-run** the beads you changed, `diff` each against its previous run (verdicts and `min_confidence` should rise), and recompute coverage in code, never by asking Jev:
 
 ```bash
 python3 "$S" coverage --runs doc/plan/phase-current/anchor-runs --gate plan --format md
 ```
 
-5. **Stop** when every bead's latest run has no `contradicted`, `not_addressed`, `underspecified` or `error` verdict (the script exits 1 otherwise) and every locked anchor is `satisfied` by at least one bead; or on a hard stop: three identical failing runs of one bead, a scope disagreement only the user can settle, or an anchor reworded three times. If Jev looks wrong and no defect applies, say so in the posted report and ask the user. Question design: `references/plan-anchor-questions.md`. Verdict logic: `references/verdict-gating.md`.
+4. **Stop** when every bead's latest run passes, other than required-work cells justified under step 2, and every locked anchor is `satisfied` by at least one bead. Report the required-work cells with their justification when planning is complete. A hard stop also ends the loop: three identical failing runs of one bead, or an anchor reworded three times. Question design: `references/plan-anchor-questions.md`. Verdict logic: `references/verdict-gating.md`.
 
 ### D. Development gate (sprint review)
 
@@ -131,7 +130,7 @@ Capture (A) and locking (B) stay in the main session. Question tuning (B2) and t
 
 In Claude Code, invoke with the Task tool: "Invoke `anchor-plan-review` with script `$S`, bead_id proj-a3f8, anchor_ids all, anchors_path doc/plan/phase-current/anchors.json, correlation_id proj-a3f8." Without agents (Codex, Cursor), follow `../../agents/anchor-plan-review.md` or `../../agents/anchor-sprint-review.md` (relative to this skill's directory) yourself.
 
-Parallel runs (Claude Code only): at most 3 agents at once, `correlation_id` set to the bead ID, 120 s timeout per agent. A timed-out agent is recorded as `{"success": false, "canceled": true, "aborted_by": "timeout", "error": {"code": "EXECUTION.TIMEOUT"}}`. Aggregate in bead-ID order and summarise succeeded and failed beads; never drop a failed bead. Unfenced or malformed JSON from an agent is a failure. Agents never retry the script; it already makes three attempts per anchor and shortens oversize items itself.
+Parallel runs (Claude Code only): at most 3 agents at once, `correlation_id` set to the bead ID, 300 s timeout per agent (Jev takes seconds; the budget is the agent's own turns). An agent that times out or returns unfenced or malformed JSON has produced no result: re-dispatch that bead once, passing as `run` any run file it already wrote, so Jev is not asked again. Only when the retry also fails, record `{"success": false, "canceled": true, "aborted_by": "timeout", "retried": true, "error": {"code": "EXECUTION.TIMEOUT"}}`. Aggregate in bead-ID order; never drop a failed bead. Agents never retry the script; it already makes three attempts per anchor and shortens oversize items itself.
 
 ## Design positions
 

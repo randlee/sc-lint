@@ -1,6 +1,6 @@
 ---
 name: planning-gate
-version: 0.3.0
+version: 0.3.1
 description: Running the planning gate end to end - what to pass, what Jev sees, the command and exit codes, and how to read the results for one bead and for the whole plan.
 ---
 
@@ -48,7 +48,7 @@ python3 "$S" coverage --runs doc/plan/phase-current/anchor-runs --gate plan --fo
 | --- | --- | --- | --- |
 | `contradicted` | The bead proposes what the directive rules out | Re-read the sent text (`$W/item.txt`) at the governed section | Change the approach, or if the directive has changed, `retire` and lock a new anchor |
 | `not_addressed` | The bead is silent on the directive | Same | Add the directive's specific content: starting point, constraint, step |
-| `underspecified` | Confidence below threshold or `unclear` | The row's `leaning` and `min_confidence`: low on one bead means a vague bead; low on many, untuned questions or a vague anchor | Tune the questions (`question-tuning.md`), then the anchor's `scope`, then the bead |
+| `underspecified` | Confidence below threshold or `unclear` | The row's `leaning` and `min_confidence`: low on one bead means a vague bead; low on many, untuned questions or a vague anchor | Fix the bead where `to_fix` points, preferring cuts; tune the questions (`question-tuning.md`) or the anchor's `scope` only when it is low on many beads that plainly comply |
 | `deterministic_only` | Structural anchor; Jev not asked | The anchor's `deterministic_check` | Run the check and record it |
 | `satisfied` | Directive present | Nothing | Nothing |
 | `not_applicable` | Anchor does not govern this bead | If it should have, the anchor's `scope` is too narrow | `update --scope` |

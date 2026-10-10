@@ -986,7 +986,7 @@ def plan_too_large(item: dict, detail: str, max_code_lines: int = DEFAULT_MAX_CO
                      f"({size['prose_chars']} prose, {size['code_chars']} code; by section: {where}); {detail}. "
                      "A reasonable plan bead fits in one Jev request; this one is asking too much",
                      action="Oversize is a symptom; judge its cause before changing the bead. First remove work that no anchor, "
-                            "requirement or user-approved issue asks for (ask the user when unsure). Then cut prose and process "
+                            "requirement or user-approved issue asks for and the change does not need. Then cut prose and process "
                             "ceremony that does not serve a deliverable. Split only approved work that is still too large after "
                             "that. Never split, trim or raise a limit just to pass the gate. See references/plan-size-and-shape.md")
     shape = shape_text(item["text"], max_code_lines)
@@ -1479,6 +1479,29 @@ def decide(answers: dict, roles: dict, threshold: float, kind: str = "directive"
     return "underspecified", min_conf
 
 
+def low_questions_of(entry: dict, roles: dict, threshold: float) -> list:
+    """The gating answers that made a cell underspecified: an `unclear` choice or a confidence under the threshold.
+
+    One entry per low answer, tagged with the ask ("second" is an unstable cell's re-ask). They tell the planner
+    which question Jev could not answer firmly, so the bead is sharpened where it is weak.
+    """
+    out = []
+    for ask, key in (("first", "answers"), ("second", "answers_second")):
+        answers = entry.get(key)
+        if not isinstance(answers, dict):
+            continue
+        for role in ("relevance", "compliance", "conflict"):
+            if role == "compliance" and entry.get("kind") == "prohibition":
+                continue
+            qid = (roles or {}).get(role)
+            if not qid or qid not in answers:
+                continue
+            choice, conf = answer_choice(answers[qid])
+            if choice == "unclear" or conf < threshold:
+                out.append({"ask": ask, "role": role, "question_id": qid, "choice": choice, "confidence": round(conf, 3)})
+    return out
+
+
 def leaning_of(answers: dict, roles: dict, kind: str) -> str:
     """The verdict by choices alone (threshold 0), so an underspecified cell still shows which way it leans."""
     return decide(answers, roles, 0.0, kind)[0]
@@ -1708,6 +1731,8 @@ def judge_entries(ctx: dict, prepared: list, item: dict, fixture_key) -> tuple:
                     entry["confirm_error"] = exc2.to_json()["error"]
             entry.update({"verdict": verdict, "answers": resp["answers"], "min_confidence": round(min_conf, 3),
                           "explanation": explain(verdict, min_conf, ctx["gate"]), "usage": resp.get("usage")})
+            if verdict == "underspecified":
+                entry["low_questions"] = low_questions_of(entry, qs["roles"], ctx["threshold"])
         except JudgeError as exc:
             if exc.code in ABORT_CODES:
                 raise
@@ -2083,6 +2108,9 @@ def report_lines(run: dict, include_passing: bool = False) -> list:
         if v == "underspecified" and r.get("leaning"):
             parts.append(f"(leaning: {r['leaning']})")
         lines.append(" ".join(p for p in parts if p).rstrip())
+        for q in r.get("low_questions") or []:
+            ask = " (second ask)" if q.get("ask") == "second" else ""
+            lines.append(f">   Low: {q['role']} `{q['question_id']}` answered {q['choice']} at {q['confidence']:.2f}{ask}.")
         if r.get("unstable"):
             lines.append(f">   Unstable: two identical requests gave {r.get('verdict_first')} then {r.get('verdict_second')}.")
         if v == "error" and isinstance(r.get("error"), dict) and r["error"].get("code"):

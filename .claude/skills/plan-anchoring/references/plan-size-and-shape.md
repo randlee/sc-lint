@@ -1,6 +1,6 @@
 ---
 name: plan-size-and-shape
-version: 0.3.1
+version: 0.3.2
 description: What to do when a plan bead or a phase is too large - size is a symptom, not a verdict; the triage order is unapproved work, then prose and ceremony, then split last; deterministic shape metrics measure it before anyone decides.
 ---
 
@@ -14,7 +14,7 @@ Oversize is a symptom, not an instruction to split. The causes are work nobody a
 
 | Step | Remove | How you tell | Who decides |
 | --- | --- | --- | --- |
-| 1 | **Unapproved work**: anything no anchor, requirement, ADR, or user-approved issue asks for | Planning-gate verdicts on the scope anchors (for example "every deliverable addresses a named issue from the approved list"), the `shape` metrics' issue references, and the deliverables list | Remove it; ask the user when unsure. Never keep it because it seems useful |
+| 1 | **Unapproved work**: anything no anchor, requirement, ADR, or user-approved issue asks for | Planning-gate verdicts on the scope anchors (for example "every deliverable addresses a named issue from the approved list"), the `shape` metrics' issue references, and the deliverables list | Remove it. Never keep it because it seems useful; keep it only if the change cannot succeed without it, justified in one line and listed in the planning-complete summary |
 | 2 | **Prose and ceremony**: restated rules, cross-reference tables, approval qualifiers, process artifacts, rationale that repeats the intent, text duplicated across beads | `shape` (its repeated-paragraphs table), prose-to-deliverable ratio, and the reviewing-ceremony skill when installed, which locates ceremony item by item with Jev | Cut it. A bead describes deliverables and the design to build them; the rules live in the intent, the anchors, and the repo's guidelines |
 | 3 | **Split**: approved work still too large after 1 and 2 | Only now | Split along deliverables, never along the size cap, and re-run 1 and 2 on each piece |
 
