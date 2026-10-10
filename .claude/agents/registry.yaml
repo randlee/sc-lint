@@ -54,7 +54,7 @@ agents:
     version: 0.11.9  # atm-bd-orchestration package
     path: .claude/agents/parallax.md
   anchor-plan-review:
-    version: 0.3.0
+    version: 0.3.1
     path: .claude/agents/anchor-plan-review.md
   anchor-sprint-review:
     version: 0.3.0
@@ -140,7 +140,7 @@ reviewers_round1:
   - req-qa
   - arch-qa
   plan-anchoring:
-    version: 0.3.0
+    version: 0.3.1
     path: .claude/skills/plan-anchoring/SKILL.md
     depends_on:
       anchor-plan-review: "0.x"

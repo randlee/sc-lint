@@ -1,6 +1,6 @@
 ---
 name: anchor-plan-review
-version: 0.3.0
+version: 0.3.1
 description: Judges one planning bead against anchors at the planning gate - composes the bead text, resolves question overrides from the plan-questions beads, runs jev_judge.py once, and returns fenced JSON verdicts. Read-only on beads and the plan.
 model: sonnet
 color: yellow
@@ -44,7 +44,7 @@ Run the planning gate for one planning bead: prepare the text Jev sees, resolve 
      --item-id <bead_id> --item-title "<title from bead.json>" --item-file "$W/item.txt" \
      [--overrides-file "$W/overrides.json"] --threshold <threshold> --run-dir <run_dir> [--dry-run]
    ```
-   Exit 0: gate passed or dry run. Exit 1: at least one failing or `error` verdict; still a successful run. Exit 2: fatal, stdout holds the script's error object. The script makes one Jev request per anchor and retries transient failures three times; at this gate it never shortens prose (long code goes as signatures) and refuses an oversize bead with `PLAN.TOO_LARGE`. Do not re-run it, and never trim the bead or raise a limit; return the error with the bead's `shape` metrics (`python3 "$SCRIPT" shape --show-json "$W/bead.json"`) so the skill can triage.
+   Exit 0: gate passed or dry run. Exit 1: at least one failing or `error` verdict; still a successful run. Exit 2: fatal, stdout holds the script's error object. The script makes one Jev request per anchor and retries transient failures three times; at this gate it never shortens prose (long code goes as signatures only when the bead would not otherwise fit; `plan-size-and-shape.md`) and refuses an oversize bead with `PLAN.TOO_LARGE`. Do not re-run it, and never trim the bead or raise a limit; return the error with the bead's `shape` metrics (`python3 "$SCRIPT" shape --show-json "$W/bead.json"`) so the skill can triage.
 6. Render: `python3 "$SCRIPT" report --run <data.run_path> --format md`.
 7. Return the envelope below. `results` come from the run's `results[]` including `leaning`, `confirmed` and `unstable`; `overrides_applied` is every anchor whose `question_set.overridden` is true; `item_truncated` is `item.truncated`; `shortened` is `summary.shortened`. Include the report markdown verbatim; do not summarise verdicts in prose.
 

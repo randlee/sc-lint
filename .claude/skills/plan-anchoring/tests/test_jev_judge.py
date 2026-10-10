@@ -1444,17 +1444,89 @@ class PlanSizeTests(unittest.TestCase):
                 "build() {", "pub(crate) const MAX_STEPS: usize = 8;", "x = 1", "    return x", "let y = 2;"]
         self.assertEqual(jj.signature_lines(body), body[:7])
 
-    def test_plan_gate_sends_the_reduced_text_and_records_it(self):
+    def test_plan_gate_sends_a_fitting_bead_whole(self):
+        text = "# Sprint\n\n" + RUST_BLOCK + "\n"
         with tempfile.TemporaryDirectory() as d:
             t = Transport()
-            j = Judged(d, t, item_text="# Sprint\n\n" + RUST_BLOCK + "\n")
+            j = Judged(d, t, item_text=text)
         sent = t.bodies[0]["state"]["item"]["text"]
-        self.assertIn("<redacted: 8 of 14 code lines", sent)
-        self.assertEqual(j.run["item"]["code_reduced"], {"blocks": 1, "lines": 8})
-        self.assertEqual(j.run["item"]["chars"], len(sent))
-        self.assertGreater(j.run["item"]["chars_before_reduction"], len(sent))
+        self.assertEqual(sent, text)  # a 14-line block is longer than --max-code-lines 8, but the bead fits
+        self.assertNotIn("<redacted", sent)
+        self.assertEqual(j.run["item"]["code_reduced"], {"blocks": 0, "lines": 0})
+        self.assertEqual((j.run["item"]["chars"], j.run["item"]["chars_before_reduction"]), (len(text), len(text)))
         self.assertFalse(j.result["item_shortened"])
         self.assertNotIn("size", j.result)
+        with tempfile.TemporaryDirectory() as d:  # the dry-run request carries the full code too
+            j = Judged(d, Transport(), item_text=text, extra_args=["--dry-run"])
+        self.assertEqual(j.run["requests"][0]["state"]["item"]["text"], text)
+        self.assertEqual(j.run["item"]["code_reduced"], {"blocks": 0, "lines": 0})
+
+    def test_oversize_plan_bead_reduces_only_its_longest_blocks(self):
+        medium = "```rust\npub fn medium() {\n" + "    step();\n" * 200 + "}\n```"   # 202 lines, first in the bead
+        large = "```rust\npub fn large() {\n" + "    step();\n" * 400 + "}\n```"     # 402 lines, the longest
+        text = "# Sprint\n\n## Design\n\n" + medium + "\n\n" + RUST_BLOCK + "\n\n" + large + "\n"
+        after_large = jj.reduce_code(text, 8, {2})[0]
+        after_both = jj.reduce_code(text, 8, {0, 2})[0]
+        self.assertGreater(len(after_large), 2000)
+        self.assertLess(len(after_both), 2000)
+        with tempfile.TemporaryDirectory() as d:
+            t = Transport()
+            j = Judged(d, t, item_text=text, extra_args=["--max-item-chars", "2000"])
+        sent = t.bodies[0]["state"]["item"]["text"]
+        self.assertEqual(sent, after_both)
+        self.assertIn("self.groups.iter()", sent)  # the 14-line block is long too, but was not needed
+        self.assertEqual(sent.count("<redacted: "), 2)
+        self.assertEqual(j.run["item"]["code_reduced"], {"blocks": 2, "lines": 201 + 401})
+        self.assertEqual(j.run["item"]["chars_before_reduction"], len(text))
+        self.assertEqual(j.run["item"]["chars"], len(after_both))
+        with tempfile.TemporaryDirectory() as d:  # a looser budget stops after the longest block
+            t = Transport()
+            j = Judged(d, t, item_text=text, extra_args=["--max-item-chars", str(len(after_large))])
+        self.assertEqual(t.bodies[0]["state"]["item"]["text"], after_large)
+        self.assertEqual(j.run["item"]["code_reduced"], {"blocks": 1, "lines": 401})
+
+    def test_request_bytes_limit_alone_triggers_reduction(self):
+        large = "```rust\npub fn large() {\n" + "    step();\n" * 400 + "}\n```"
+        text = "# Sprint\n\n" + large + "\n\n" + RUST_BLOCK + "\n"
+        self.assertLess(len(text), jj.DEFAULT_MAX_ITEM_CHARS)
+        with tempfile.TemporaryDirectory() as d:
+            j = Judged(d, Transport(), item_text=text, extra_args=["--max-request-bytes", "4000", "--dry-run"])
+        self.assertEqual(j.code, 0, j.out)
+        request = j.run["requests"][0]
+        self.assertLessEqual(len(jj.encode_body(request)), 4000)
+        self.assertEqual(request["state"]["item"]["text"], jj.reduce_code(text, 8, {0})[0])
+        self.assertIn("self.groups.iter()", request["state"]["item"]["text"])
+        self.assertEqual(j.run["item"]["code_reduced"], {"blocks": 1, "lines": 401})
+        with tempfile.TemporaryDirectory() as d:  # same bead, default request budget: sent whole
+            j = Judged(d, Transport(), item_text=text, extra_args=["--dry-run"])
+        self.assertEqual(j.run["requests"][0]["state"]["item"]["text"], text)
+
+    def test_bead_still_too_large_after_every_long_block_is_reduced(self):
+        large = "```rust\npub fn large() {\n" + "    step();\n" * 400 + "}\n```"
+        text = "# T\n\n## Description\n\n" + "prose " * 600 + "\n\n" + large + "\n\n" + RUST_BLOCK + "\n"
+        with tempfile.TemporaryDirectory() as d:
+            t = Transport()
+            j = Judged(d, t, item_text=text, extra_args=["--max-item-chars", "3000"])
+        self.assertEqual((j.code, j.out["error"]["code"]), (2, "PLAN.TOO_LARGE"))
+        self.assertIn("the plan-gate item budget is --max-item-chars 3000", j.out["error"]["message"])
+        self.assertEqual(t.bodies, [])
+        shape = j.out["data"]["shape"]
+        self.assertEqual(shape["code_reduced"], {"blocks": 2, "lines": 401 + 8})
+        self.assertEqual(shape["chars_before_reduction"], len(text))
+        self.assertEqual(shape["chars"], len(jj.reduce_code(text, 8)[0]))
+
+    def test_reduce_code_default_selection_is_unchanged(self):
+        text = "a\n" + RUST_BLOCK + "\nb\n```text\n" + "\n".join(f"l{n}" for n in range(12)) + "\n```\nc\n```toml\nx = 1\n```"
+        full = jj.reduce_code(text, 8)
+        self.assertEqual(full[1], {"blocks": 2, "lines": 8 + 12})
+        self.assertEqual(jj.reduce_code(text, 8, None), full)
+        self.assertEqual(jj.reduce_code(text, 8, {0, 1, 2}), full)
+        self.assertEqual(jj.reduce_code(text, 8, set()), (text, {"blocks": 0, "lines": 0}))
+        only_second = jj.reduce_code(text, 8, {1})
+        self.assertIn("self.groups.iter()", only_second[0])
+        self.assertEqual(only_second[1], {"blocks": 1, "lines": 12})
+        self.assertEqual(jj.long_code_blocks(text, 8), [0, 1])
+        self.assertEqual(jj.long_code_blocks(text, 12), [0])
 
     def test_dev_gate_does_not_reduce_code(self):
         with tempfile.TemporaryDirectory() as d:

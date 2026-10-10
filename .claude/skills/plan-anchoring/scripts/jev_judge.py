@@ -50,10 +50,12 @@ Exit codes
      verdict, or an internal error as SCRIPT.INTERNAL)
 
 Plan-gate size handling
-  The plan gate never shortens prose. Fenced code blocks longer than
-  --max-code-lines are sent as their signature lines plus a redaction marker;
-  a bead that still exceeds --max-item-chars, or whose request exceeds
-  --max-request-bytes, is refused before anything is sent (PLAN.TOO_LARGE), and
+  The plan gate never shortens prose. A bead that fits (--max-item-chars, and
+  --max-request-bytes for every anchor) is sent whole. Otherwise fenced code
+  blocks longer than --max-code-lines are reduced to their signature lines plus
+  a redaction marker, longest first and one at a time, until it fits; a bead
+  that does not fit with all of them reduced is refused before anything is
+  sent (PLAN.TOO_LARGE), and
   a context overflow from Jev is recorded per anchor as PLAN.TOO_LARGE. The
   development gate keeps the truncate-and-halve behaviour.
   130 interrupted by the user
@@ -93,7 +95,7 @@ JEV_URL = os.environ.get("PLAN_ANCHOR_JEV_URL", "https://api.typesafe.ai/v1/syst
 DEFAULT_MODEL = os.environ.get("PLAN_ANCHOR_JEV_MODEL", "jev-latest")
 DEFAULT_THRESHOLD = _env_number("PLAN_ANCHOR_CONFIDENCE_THRESHOLD", 0.6, float)
 DEFAULT_MAX_ITEM_CHARS = _env_number("PLAN_ANCHOR_MAX_ITEM_CHARS", 24000, int)
-DEFAULT_MAX_CODE_LINES = _env_number("PLAN_ANCHOR_MAX_CODE_LINES", 8, int)  # plan gate: longer fenced code blocks go to Jev as signatures
+DEFAULT_MAX_CODE_LINES = _env_number("PLAN_ANCHOR_MAX_CODE_LINES", 8, int)  # plan gate: shortest fenced block that may go to Jev as signatures when a bead does not fit
 CODE_REDACTION_MARKER = "<redacted: {dropped} of {total} code lines are in the plan but were not sent to Jev>"
 DEFAULT_MAX_REQUEST_BYTES = 24000  # plan gate: what Jev reads reliably (a planted contradiction 28k deep scored 0.46 vs 0.79 near the top)
 DEFAULT_MAX_REQUEST_BYTES_DEV = 64000  # dev gate: evidence is long; Jev accepted 107k bytes in one attempt, halving never fired in 245 requests
@@ -845,27 +847,43 @@ def signature_lines(body: list) -> list:
     return keep
 
 
-def reduce_code(text: str, max_lines: int) -> tuple:
-    """Replace each fenced code block longer than max_lines with its signature lines and a redaction marker.
-
-    The plan keeps the code; only the text sent to Jev is reduced, and the marker says so. Returns (text, stats).
-    """
-    lines = text.split("\n")
-    out, stats, i = [], {"blocks": 0, "lines": 0}, 0
+def fenced_blocks(lines: list):
+    """Yield (open, close, indent, fence) line indexes for each fenced code block in order; close == len(lines) when unterminated."""
+    i = 0
     while i < len(lines):
         m = FENCE_RE.match(lines[i])
         if not m:
-            out.append(lines[i])
             i += 1
             continue
         indent, fence = m.group(1), m.group(2)
         j = i + 1
         while j < len(lines) and not (lines[j].strip().startswith(fence[0] * len(fence)) and not lines[j].strip().strip(fence[0])):
             j += 1
+        yield i, j, indent, fence
+        i = j + 1
+
+
+def long_code_blocks(text: str, max_lines: int) -> list:
+    """Ordinals of the fenced blocks longer than max_lines, longest first (ties in document order)."""
+    lines = text.split("\n")
+    sizes = [(n, j - i - 1) for n, (i, j, _, _) in enumerate(fenced_blocks(lines))]
+    return [n for n, size in sorted(sizes, key=lambda s: (-s[1], s[0])) if size > max_lines]
+
+
+def reduce_code(text: str, max_lines: int, only=None) -> tuple:
+    """Replace each fenced code block longer than max_lines with its signature lines and a redaction marker.
+
+    `only`, a set of fenced-block ordinals (0-based, in document order), limits the reduction to those blocks; None
+    reduces every long block. The plan keeps the code; only the text sent to Jev is reduced, and the marker says so.
+    Returns (text, stats).
+    """
+    lines = text.split("\n")
+    out, stats, prev = [], {"blocks": 0, "lines": 0}, 0
+    for n, (i, j, indent, fence) in enumerate(fenced_blocks(lines)):
+        out.extend(lines[prev:i])
         body = lines[i + 1:j]
-        closing = lines[j] if j < len(lines) else indent + fence
-        if len(body) <= max_lines:
-            out.extend(lines[i:j + 1] if j < len(lines) else lines[i:])
+        if len(body) <= max_lines or (only is not None and n not in only):
+            out.extend(lines[i:j + 1])
         else:
             sigs = signature_lines(body)
             dropped = len(body) - len(sigs)
@@ -873,10 +891,11 @@ def reduce_code(text: str, max_lines: int) -> tuple:
             out.extend(sigs)
             if dropped > 0:
                 out.append(indent + CODE_REDACTION_MARKER.format(dropped=dropped, total=len(body)))
-            out.append(closing)
+            out.append(lines[j] if j < len(lines) else indent + fence)
             stats["blocks"] += 1
             stats["lines"] += dropped
-        i = j + 1
+        prev = j + 1
+    out.extend(lines[prev:])
     return "\n".join(out), stats
 
 
@@ -978,6 +997,29 @@ def plan_too_large(item: dict, detail: str, max_code_lines: int = DEFAULT_MAX_CO
     exc.data = {"item_id": item["id"], "size": size, "shape": shape}
     exc.meta = {"size": size}
     return exc
+
+
+def fit_plan_item(item: dict, misfit, max_code_lines: int) -> dict:
+    """Plan gate: send the bead whole when it fits; otherwise reduce code as little as possible.
+
+    `misfit(text)` returns None when the text fits one Jev request, else why not. Fenced blocks longer than
+    max_code_lines are reduced to signatures one more at a time, longest first, until the bead fits. Prose is never
+    cut; a bead that does not fit with every long block reduced is PLAN.TOO_LARGE. Records chars_before_reduction and
+    code_reduced (what was actually reduced).
+    """
+    text = item["text"]
+    item["chars_before_reduction"] = len(text)
+    item["code_reduced"] = {"blocks": 0, "lines": 0}
+    detail, chosen = misfit(text), set()
+    for n in long_code_blocks(text, max_code_lines):
+        if detail is None:
+            break
+        chosen.add(n)
+        item["text"], item["code_reduced"] = reduce_code(text, max_code_lines, chosen)
+        detail = misfit(item["text"])
+    if detail is not None:
+        raise plan_too_large(item, detail, max_code_lines)
+    return item
 
 
 def beads_from_json(obj, what: str) -> list:
@@ -1477,12 +1519,8 @@ def read_item(args) -> dict:
         raise JudgeError("INPUT.EMPTY", "item text is empty", action="Pass the bead or work description via --item-file.")
     item = {"id": args.item_id, "title": args.item_title or "", "truncated": False, "source": args.item_file or "stdin"}
     if getattr(args, "gate", "") == "plan":
-        # A plan bead is never truncated: long code goes as signatures, and a bead that still does not fit is refused.
-        max_code_lines = getattr(args, "max_code_lines", DEFAULT_MAX_CODE_LINES)
-        item["chars_before_reduction"] = len(text)
-        item["text"], item["code_reduced"] = reduce_code(text, max_code_lines)
-        if len(item["text"]) > args.max_item_chars:
-            raise plan_too_large(item, f"the plan-gate item budget is --max-item-chars {args.max_item_chars}", max_code_lines)
+        # A plan bead is never truncated; cmd_judge fits it (fit_plan_item) once the anchors and questions are known.
+        item["text"] = text
         return item
     if len(text) > args.max_item_chars:
         text = text[: args.max_item_chars] + TRUNCATION_MARKER
@@ -1763,11 +1801,16 @@ def cmd_judge(args) -> dict:
     prepared = prepare_question_sets(ctx, anchors)
     if ctx["gate"] == "plan":
         # Checked for every anchor before any request, so an oversize plan bead sends nothing and is never shortened.
-        for a, qs, _ in prepared:
-            size = len(encode_body({"model": ctx["model"], "state": build_state(a, item), "questions": qs["questions"]}))
-            if size > ctx["max_request_bytes"]:
-                raise plan_too_large(item, f"with {a['id']} and its questions the request is {size} bytes, over --max-request-bytes {ctx['max_request_bytes']}",
-                                     ctx["max_code_lines"])
+        def misfit(text):
+            if len(text) > ctx["max_item_chars"]:
+                return f"the plan-gate item budget is --max-item-chars {ctx['max_item_chars']}"
+            trial = dict(item, text=text)
+            for a, qs, _ in prepared:
+                size = len(encode_body({"model": ctx["model"], "state": build_state(a, trial), "questions": qs["questions"]}))
+                if size > ctx["max_request_bytes"]:
+                    return f"with {a['id']} and its questions the request is {size} bytes, over --max-request-bytes {ctx['max_request_bytes']}"
+            return None
+        fit_plan_item(item, misfit, ctx["max_code_lines"])
     results, requests_out, model_answered = judge_entries(ctx, prepared, item, lambda a: a["id"])
     run = assemble_run(ctx, rec, args.anchors, item, results, requests_out, model_answered)
     write_run(run, args.out, default_run_dir(args))
@@ -2192,7 +2235,8 @@ def add_judge_options(parser, with_item: bool) -> None:
         parser.add_argument("--max-item-chars", type=int, default=DEFAULT_MAX_ITEM_CHARS,
                             help="dev gate: truncate the item to this; plan gate: refuse a larger bead with PLAN.TOO_LARGE")
         parser.add_argument("--max-code-lines", type=int, default=DEFAULT_MAX_CODE_LINES,
-                            help="plan gate: fenced code blocks longer than this are sent as signatures plus a redaction marker")
+                            help="plan gate: only fenced code blocks longer than this may be sent as signatures plus a redaction "
+                                 "marker, and only when the bead would not otherwise fit (longest first, as few as needed)")
         parser.add_argument("--out", default="", help="explicit run file path")
     else:
         parser.add_argument("--id", default="", help="one anchor id")
@@ -2342,7 +2386,7 @@ def build_parser() -> argparse.ArgumentParser:
     sh.add_argument("--children-json", default="", help="output of `bd children <id> --json`: every child is shaped")
     sh.add_argument("--show-json", action="append", help="output of `bd show <id> --json`; repeatable")
     sh.add_argument("--anchors", default="", help="anchors.json: report unknown ANC references and anchors no bead references")
-    sh.add_argument("--max-code-lines", type=int, default=DEFAULT_MAX_CODE_LINES, help="code reduction used for chars_after_reduction")
+    sh.add_argument("--max-code-lines", type=int, default=DEFAULT_MAX_CODE_LINES, help="chars_after_reduction reduces every fenced block longer than this (the plan gate's floor)")
     sh.add_argument("--format", choices=("json", "md"), default="json")
     sh.set_defaults(func=cmd_shape)
 

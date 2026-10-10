@@ -1,6 +1,6 @@
 ---
 name: plan-size-and-shape
-version: 0.3.0
+version: 0.3.1
 description: What to do when a plan bead or a phase is too large - size is a symptom, not a verdict; the triage order is unapproved work, then prose and ceremony, then split last; deterministic shape metrics measure it before anyone decides.
 ---
 
@@ -10,7 +10,7 @@ Oversize is a symptom, not an instruction to split. The causes are work nobody a
 
 ## The rule
 
-`PLAN.TOO_LARGE` (a bead whose request would not fit one Jev call after long code is reduced to signatures) stops the gate for that bead and reports its size by section and prose versus code. Judge in this order only:
+`PLAN.TOO_LARGE` (a bead whose request would not fit one Jev call even with every long code block reduced to signatures; see Long code) stops the gate for that bead and reports its size by section and prose versus code. Judge in this order only:
 
 | Step | Remove | How you tell | Who decides |
 | --- | --- | --- | --- |
@@ -41,8 +41,8 @@ python3 "$S" shape --beads <dir of bd show --json files | --children-json <file>
 
 | Metric | Why it matters |
 | --- | --- |
-| characters per section (description, design, acceptance, notes), total, after code reduction, and the design ratio | Where the bulk is; designs of 40k to 70k characters are design documents, not sprint beads. Description plus acceptance is what the gate judges |
-| code lines versus prose lines | Code is cheap for Jev once reduced to signatures; prose costs judgment |
+| characters per section (description, design, acceptance, notes), total, after code reduction (every long block reduced: the smallest the gate can send), and the design ratio | Where the bulk is; designs of 40k to 70k characters are design documents, not sprint beads. Description plus acceptance is what the gate judges |
+| code lines versus prose lines | Long code can be reduced to signatures when a bead does not fit (Long code); prose is never cut and costs judgment |
 | bullets and table rows | Ceremony arrives as tables and checklists |
 | GitHub issue, REQ, ADR and anchor references | A bead naming no approved issue is the first candidate for step 1 |
 | paragraphs duplicated across two or more beads (normalised) | Ceremony restated in every bead; cut it once from all |
@@ -56,7 +56,7 @@ The gate helps with step 1: a scope anchor such as "Every phase deliverable is a
 
 ## Long code
 
-Code examples in a design do not count against the plan. Fenced blocks longer than `--max-code-lines` (default 8) are sent as their signature lines plus a marker saying how many lines were not sent; Jev sees that the code exists without reading it, and the plan keeps the full code. This is the only reduction the planning gate applies; nothing said in prose is removed.
+Long code in a design is never by itself a reason to refuse a bead. A bead that fits one Jev request (`--max-item-chars`, and `--max-request-bytes` for every anchor judged) is sent whole, code included: Jev judges code it can read better than code it cannot (measured-behaviour.md). Only a bead that would not otherwise fit has code reduced, and as little as possible: fenced blocks longer than `--max-code-lines` (default 8) are sent as their signature lines plus a marker saying how many lines were not sent, one more block at a time, longest first, until the bead fits. Jev sees that the reduced code exists without reading it, and the plan keeps the full code. A bead that does not fit with every such block reduced is `PLAN.TOO_LARGE`. This is the only reduction the planning gate applies; nothing said in prose is removed. The run records `item.chars_before_reduction` and `item.code_reduced` (the blocks and lines actually reduced; 0/0 when the bead was sent whole).
 
 ## Where the cap comes from
 

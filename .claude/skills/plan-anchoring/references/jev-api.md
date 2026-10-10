@@ -1,6 +1,6 @@
 ---
 name: jev-api
-version: 0.3.0
+version: 0.3.1
 description: How jev_judge.py talks to TypeSafe's Jev - endpoint, auth, request and response shape, validation, limits, the retry and context-shortening policy, every error code and flag, model pinning, and the privacy opt-in that gates every call.
 ---
 
@@ -62,7 +62,7 @@ Without both, `judge`, `check-fixtures`, `rubric` and `dedupe --jev` return `AUT
 ## Size, context window, and shortening
 
 - Jev allows about 32k tokens for state plus the longest question and about 64k for state plus all questions.
-- **Planning gate: a plan bead is never shortened.** Fenced code blocks longer than `--max-code-lines` (default 8) are sent as their signature lines plus a marker saying how many lines were not sent; prose is never cut. If the reduced bead exceeds `--max-item-chars`, or any anchor's request exceeds `--max-request-bytes`, the run stops before sending with `PLAN.TOO_LARGE` (exit 2). A token-limit 422 at this gate is recorded per anchor as `PLAN.TOO_LARGE`, never halved (`plan-size-and-shape.md`). The run records `item.chars_before_reduction` and `item.code_reduced`.
+- **Planning gate: a plan bead is never shortened.** A bead that fits `--max-item-chars` and, for every anchor, `--max-request-bytes` is sent whole; otherwise long code is reduced to signatures only as far as needed to fit (the rule is in `plan-size-and-shape.md`, Long code). Prose is never cut. A bead that does not fit with every long block reduced stops the run before sending with `PLAN.TOO_LARGE` (exit 2). A token-limit 422 at this gate is recorded per anchor as `PLAN.TOO_LARGE`, never halved (`plan-size-and-shape.md`). The run records `item.chars_before_reduction` and `item.code_reduced`.
 - **Development gate:** before the first call the script shortens the evidence account (keeping the head, appending a truncation marker) until the serialised request is under `--max-request-bytes` (default 64,000 bytes at this gate; measured-behaviour.md). If Jev still answers a 4xx reporting the token limit, the script halves the account and retries, down to `--min-item-chars` (default 2,000). Below that the anchor is `verdict: error` with `JEV.CONTEXT_EXCEEDED`.
 - Each result records `item_chars_sent`, `item_shortened`, `request_bytes`; the run's `summary.shortened` lists affected anchors.
 
@@ -138,7 +138,7 @@ Fatal codes abort with exit 2 and `success: false`. Transient codes land in `res
 | `--max-item-chars` | 24,000 | Development gate: truncate the evidence to this. Planning gate: refuse a larger bead with `PLAN.TOO_LARGE` |
 | `--max-request-bytes` | 24,000 plan / 64,000 dev | Pre-flight cap on the serialised request (planning gate: refuse; development gate: shorten) |
 | `--confirm-near-threshold` | on | Re-ask once when a required-role confidence is within 0.10 of the threshold; disagreement makes the cell `underspecified` with `unstable: true` (`--no-confirm`, `PLAN_ANCHOR_CONFIRM_NEAR=0`) |
-| `--max-code-lines` | 8 | Planning gate: longer fenced code blocks are sent as signatures plus a redaction marker |
+| `--max-code-lines` | 8 | Planning gate: the shortest fenced block that may be sent as signatures plus a redaction marker, only when the bead would not otherwise fit (`plan-size-and-shape.md`) |
 | `--min-item-chars` | 2,000 | Development gate: floor for context shortening |
 | `--timeout` | 30 s | Per-request socket timeout |
 | `--run-dir` / `--out` | `<anchors dir>/anchor-runs` | Where the run file goes |
@@ -158,6 +158,6 @@ TypeSafe prices input tokens only (output is free) at a fraction of a cent per m
 | `PLAN_ANCHOR_JEV_URL` | TypeSafe endpoint | Proxy or mock server |
 | `PLAN_ANCHOR_CONFIDENCE_THRESHOLD` | `0.6` | Gating threshold |
 | `PLAN_ANCHOR_MAX_ITEM_CHARS` | `24000` | Evidence truncation (development gate) and bead size limit (planning gate) |
-| `PLAN_ANCHOR_MAX_CODE_LINES` | `8` | Planning gate code-block reduction threshold |
+| `PLAN_ANCHOR_MAX_CODE_LINES` | `8` | Default for `--max-code-lines` |
 
 Codex environment policy for `TYPESAFE_API_KEY`: `installation-and-troubleshooting.md`.
