@@ -6,7 +6,7 @@
 | Status | Proposed (amendment 2026-10-10, phase-h) |
 | Date | 2026-08-29 |
 | Deciders | user, flint, team-lead |
-| Approved by | user (Rand Lee), 2026-08-29 |
+| Original decision approved by | user (Rand Lee), 2026-08-29 (the 2026-10-10 amendment is pending in PR #206) |
 | Amendment | 2026-10-10 phase-h: Decision 1 conflict/delete rules, Decision 4 selector arguments and import-only `.sc-lint/justfile`, Decision 7 per-analyzer table contract in `sc-lint-schema`; awaiting approval in PR #206 |
 | Supersedes | ADR-014 (Phase F, rejected, never merged) |
 

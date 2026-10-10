@@ -6,7 +6,7 @@
 | Status | Proposed (amendment 2026-10-10, phase-h) |
 | Date | 2026-08-29 |
 | Deciders | user, flint, team-lead |
-| Approved by | user (Rand Lee), 2026-08-29 |
+| Original decision approved by | user (Rand Lee), 2026-08-29 (the 2026-10-10 amendment is pending in PR #206) |
 | Amendment | 2026-10-10 phase-h: Decision 1 consumer step execution and tool provisioning are product execution; Decision 3 selector tables and verbatim `just lint`/`just test` arguments; resolution sequence `sc-lint provision`; How To Extend selector vocabulary (`parallel`, `target`, `requires`, `jobs`), `setup.pre`, `runner.python` and `[tool.sc-lint.tools]` pins; awaiting approval in PR #206 |
 | Related | ADR-012, ADR-015 |
 

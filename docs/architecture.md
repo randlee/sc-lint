@@ -512,6 +512,12 @@ versioned adoption kit is the sole generic installation path. Its runtime
 delivery and the prohibition on Rust configuration logic are specified by
 [ADR-016](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md).
 
+Phase h (0.6.1) keeps this boundary and extends what the product executes:
+consumer lint/test selectors, per-analyzer configuration tables in
+`sc-lint-schema` (ADR-015 Decision 7) and `sc-lint provision` for pinned
+consumer tools (ADR-016 Decision 1). The plan is `lint-phase-h`
+([docs/plans/phase-h.jsonl](./plans/phase-h.jsonl)).
+
 ## Release Distribution
 
 For release `0.2.x`, release packaging and distributor updates should remain

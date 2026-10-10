@@ -373,6 +373,11 @@ never merged; `archive/phase-F` preserves the rejected planning line.
 Phase `G` is the standard repo-tools adoption-kit line. Its authoritative plan
 is [docs/plans/phase-G/phase-G-plan.md](./plans/phase-G/phase-G-plan.md).
 
+Phase `h` is sc-lint 0.6.1 (GitHub #193-#204), shipped together with 0.6.0.
+Its plan is the bead graph rooted at `lint-phase-h` (`bd show lint-phase-h`),
+exported to [docs/plans/phase-h.jsonl](./plans/phase-h.jsonl); its ADR and
+requirement amendments land through PR #206.
+
 ## Planning Conventions
 
 - This file tracks project-level phases and priorities.
