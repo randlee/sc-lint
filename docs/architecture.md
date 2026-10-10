@@ -31,15 +31,56 @@ The `sc-lint` architecture should:
 - support a prove-then-promote flow where reusable lint families can mature in
   a consumer repo before they are backported into `sc-lint`
 
-## Product Topology
+## Layered Architecture
 
-The product is organized into five layers:
+`sc-lint` is a layered design. From lowest to highest:
 
-1. top-level CLI
-2. backend crates
-3. repo-local Python utilities
-4. structured boundary definitions and planning metadata
-5. repo-local development/CI automation
+| Layer | Role | Members today |
+| --- | --- | --- |
+| (a) shared types and attributes | types and the `#[sc_lint(...)]` attribute surface shared by every tool | `sc-lint-schema` (shared types), `sc-lint-directives`, `sc-lint-analyzer-support`, `sc-lint-attributes` |
+| (b) independent cargo tools | one self-contained analyzer per rule family, each with its own binary and library | `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime` |
+| (c) `sc-lint` CLI | the single user-facing command; calls into (b) | `crates/sc-lint` |
+| (d) just template | the recommended just command layout, with recommended recipe mappings to (b) and (c) | `packages/sc-lint-adoption` (`.sc-lint/justfile`), bootstrap assets |
+
+Dependency rules:
+
+- a layer depends only on layers below it
+- (b) tools depend only on (a); they never depend on each other
+  (see [Backend Crate Isolation](#backend-crate-isolation))
+- (c) calls into (b), as a library or as the tool's binary, and adds no lint
+  rules of its own
+- (d) is a recommendation the consumer repository owns and edits. It maps
+  recipes onto (b) and (c); recipes such as `just test` are, for the most
+  part, customized by the consumer repository rather than implemented in (c)
+
+Each change in a phase lands in the lowest layer that can carry it.
+
+Supporting surfaces outside the four layers:
+
+- `boundaries/` structured boundary definitions and planning metadata
+  (see [Boundary and Planning Data](#boundary-and-planning-data))
+- this repository's own `Justfile` and `.just/` development automation
+  (see [Repo-local Automation](#repo-local-automation))
+- `bindings/sc-lint-py`, a distribution wheel over (b) and (c) that contains
+  no lint logic (ADR-016)
+
+### Where the current code departs from the layering
+
+These are recorded facts, not planned work. Changing any of them is a
+redesign and is discussed with the project owner before it is documented or
+planned.
+
+- (c) carries consumer workflow beyond calling into (b): the `test`, `ci`,
+  `clippy`, `check`, `setup`, `upgrade`, `init` and `compatibility`
+  commands, with `workflow.rs`, `consumer_integration.rs`, `installer.rs` and
+  `python_adapter.rs` behind them.
+- ADR-012 assigns "complete test" to installed `sc-lint` (see
+  [Top-level CLI Role](#top-level-cli-role)), and the (d) kit justfile
+  routes `setup`, `lint`, `test` and `upgrade` through the bootstrap into (c).
+  The layering leaves `just test` to the consumer repository.
+- (c) embeds a copy of the (d) bootstrap assets
+  (`crates/sc-lint/assets/bootstrap{,.ps1}`, included by `installer.rs`),
+  byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap{,.ps1}`.
 
 ## Planned Interface Versioning Layer
 
@@ -187,7 +228,9 @@ The top-level CLI should standardize on:
   - `full`
   - `ci`
 
-For consumer repositories, ADR-012 additionally fixes command ownership:
+For consumer repositories, ADR-012 additionally fixes command ownership (this
+departs from the layering; see
+[Where the current code departs from the layering](#where-the-current-code-departs-from-the-layering)):
 
 - installed `sc-lint` owns setup, compatibility, complete lint, complete test,
   and upgrade behavior
