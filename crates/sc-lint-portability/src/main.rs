@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
@@ -67,8 +68,10 @@ fn main() -> Result<ExitCode> {
             ) {
                 Ok(report) => report,
                 Err(sc_lint_portability::PortabilityError::AnalyzerConfig(error)) => {
-                    eprintln!("{error}");
-                    return Ok(ExitCode::from(error.exit_code() as u8));
+                    eprintln!("error: {error}");
+                    let exit_code = u8::try_from(error.exit_code())
+                        .context("analyzer config exit code does not fit in u8")?;
+                    return Ok(ExitCode::from(exit_code));
                 }
                 Err(error) => return Err(error.into()),
             };
