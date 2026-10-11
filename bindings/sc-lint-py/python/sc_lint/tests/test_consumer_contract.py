@@ -77,6 +77,11 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn("github.base_ref == 'develop'", workflow)
         self.assertIn("github.base_ref == 'main'", workflow)
         self.assertIn("sc_lint.run", workflow)
+        self.assertIn("Run adoption kit integration tests", workflow)
+        self.assertIn("Run archive and docs smoke", workflow)
+        self.assertIn("Run full release-archive smoke test", workflow)
+        self.assertIn("offline native artifact", workflow)
+        self.assertGreaterEqual(workflow.count("github.event_name == 'push'"), 4)
 
     def test_windows_companion_is_a_managed_part_of_the_model_contract(self) -> None:
         # This is a content guard; the PowerShell integration path is not run here.

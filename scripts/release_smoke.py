@@ -5,9 +5,10 @@ Extracts a staged release archive, installs it into a temporary copy of
 ``tests/fixtures/adoption/empty-workspace`` with ``sc-lint init --just``, and
 runs the documentation bundle integrity check plus the consumer kit recipes
 (``just setup``, ``just lint``, ``just test``, plus the bootstrap
-``upgrade --check --dry-run`` path) with
-``SC_LINT_SOURCE_ROOT`` unset and no ``.just/`` directory present. Every step
-must succeed using only the archive binaries and the ``sc_lint`` wheel.
+``upgrade --check --dry-run`` path) with ``SC_LINT_SOURCE_ROOT`` unset and no
+``.just/`` directory present. Without ``--wheel-dir``, it still verifies the
+archive, its self-contained binary, and its documentation bundle; with a
+wheel directory, it additionally exercises the consumer recipes.
 """
 from __future__ import annotations
 
@@ -200,16 +201,19 @@ def main() -> int:
         if (workspace / ".just").exists():
             raise SystemExit("release-smoke: `sc-lint init --just` materialized a .just/ directory")
 
-        for recipe in ("setup", "lint", "test"):
-            run(recipe, ["just", recipe], workspace, env)
-        run(
-            "upgrade",
-            [*bootstrap_command(workspace), "upgrade", "--config", "sc-lint.toml", "--check", "--dry-run"],
-            workspace,
-            env,
-        )
-        if (workspace / ".just").exists():
-            raise SystemExit("release-smoke: a kit recipe created a .just/ directory")
+        if args.wheel_dir is None:
+            print("release-smoke: wheel-free archive and docs verification complete")
+        else:
+            for recipe in ("setup", "lint", "test"):
+                run(recipe, ["just", recipe], workspace, env)
+            run(
+                "upgrade",
+                [*bootstrap_command(workspace), "upgrade", "--config", "sc-lint.toml", "--check", "--dry-run"],
+                workspace,
+                env,
+            )
+            if (workspace / ".just").exists():
+                raise SystemExit("release-smoke: a kit recipe created a .just/ directory")
     print("release-smoke: ok")
     return 0
 

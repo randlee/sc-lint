@@ -6,6 +6,9 @@ on:
     branches: [develop, main]
 
 jobs:
+  # The maintainer jobs retain source_venv's local wheel because consumer
+  # lifecycle tests require an offline native artifact on every platform. This
+  # is test-fixture construction, not distributable release-wheel validation.
   just-lint:
     name: Just lint (${{ matrix.os }})
     strategy:
@@ -127,6 +130,7 @@ jobs:
           toolchain: "1.94.1"
 
       - name: Run adoption kit integration tests
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
         run: just test-adoption-integration
 
   wheel-runtime:
@@ -151,6 +155,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Build the sc_lint wheel and its dependencies for offline install
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -220,6 +225,7 @@ jobs:
           cargo build --release --target "${target}" ${bin_args}
 
       - name: Build the sc_lint wheel and its dependencies for offline install
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -278,7 +284,16 @@ jobs:
               env.write(f"SMOKE_VERSION={version}\n")
           PY
 
-      - name: Run the release-archive smoke test
+      - name: Run archive and docs smoke
+        if: ${{ github.event_name != 'push' && github.base_ref != 'develop' && github.base_ref != 'main' }}
+        shell: bash
+        run: >-
+          python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}"
+          --manifest "${RELEASE_ARTIFACT_MANIFEST}" --version "${SMOKE_VERSION}"
+          --target "${SMOKE_TARGET}"
+
+      - name: Run full release-archive smoke test
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
         shell: bash
         run: >-
           python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}"
