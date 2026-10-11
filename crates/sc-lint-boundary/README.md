@@ -13,7 +13,7 @@ Use `sc-boundary` to check:
 - direct workspace package dependency policy from boundary inventory
 - Rust-native manifest-policy checks added in A.7
 
-Current rule families include:
+Rule IDs include:
 
 - `SCB-CYCLE-001`
 - `SCB-CYCLE-002`
@@ -27,6 +27,15 @@ Current rule families include:
 - `SCB-DEPENDENCY-003`
 - `SCB-MANIFEST-001`
 - `SCB-MANIFEST-002`
+
+Rule filters accept individual rule IDs and these kebab-case family names:
+
+- `cycles`
+- `boundaries`
+- `internal-only`
+- `forbid-external-impls`
+- `dependencies`
+- `manifests`
 
 ## Invocation
 
@@ -54,9 +63,34 @@ Backend-local filtered analysis:
 
 ```bash
 cargo run -p sc-lint-boundary -- analyze --root . --rule-filter cycles --format text
-cargo run -p sc-lint-boundary -- analyze --root . --rule-filter boundaries --format text
-cargo run -p sc-lint-boundary -- analyze --root . --rule-filter dependencies --format text
+cargo run -p sc-lint-boundary -- analyze --root . --rule-filter SCB-DEPENDENCY-001 --format text
+cargo run -p sc-lint-boundary -- analyze --root . --config sc-lint.toml --rule-filter manifests --format text
 ```
+
+## Analyzer Configuration
+
+`--config <path>` selects the TOML file used for analyzer settings. When it is
+omitted, `sc-boundary` reads `sc-lint.toml` from the workspace root. Boundary
+settings live under `[tool.sc-lint.analyzers.boundary]`:
+
+```toml
+[tool.sc-lint.analyzers.boundary]
+enabled = true
+reason = "boundary checks apply to this workspace"
+exclude_rules = ["SCB-MANIFEST-001"]
+fail_rules = ["cycles", "SCB-DEPENDENCY-001"]
+exclude_paths = ["crates/generated/**"]
+```
+
+The table supports the common keys `enabled`, `reason`, `exclude_rules`,
+`fail_rules`, and `exclude_paths`; boundary has no analyzer-specific keys.
+Rule IDs and family names can be used in `--rule-filter`, `exclude_rules`,
+and `fail_rules`.
+
+An unknown `--rule-filter` selector is a usage error and exits with code `2`.
+Invalid configuration, including an unknown table key or an invalid key
+value, exits with code `3`. These match the top-level CLI's normalized usage
+and configuration exit codes.
 
 Graph export stays backend-local and is adjacent to, but not part of, the
 top-level `lint sc-boundary` contract:
