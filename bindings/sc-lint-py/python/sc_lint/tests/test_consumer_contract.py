@@ -107,6 +107,11 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn('[string[]]$Rest', contents)
         self.assertIn('[Array]::IndexOf($Rest, "--config")', contents)
         self.assertNotIn('[Array]::IndexOf($args, "--config")', contents)
+        self.assertIn('$candidate = Join-Path $extract "sc-lint.exe"', contents)
+        self.assertIn(
+            'Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"',
+            contents,
+        )
 
     def test_posix_bootstrap_leaves_managed_activation_to_the_rust_installer(self) -> None:
         contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")

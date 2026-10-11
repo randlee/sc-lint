@@ -135,7 +135,14 @@ class ConsumerLifecycleTests(unittest.TestCase):
         )
         return environment
 
-    def write_release_archive(self, root: Path, binary: Path) -> Path:
+    def write_release_archive(
+        self,
+        root: Path,
+        binary: Path,
+        *,
+        layout: str = "nested",
+        include_binary: bool = True,
+    ) -> Path:
         binary_name = self.product_binary.name
         release_dir = root / "published" / f"v{VERSION}"
         release_dir.mkdir(parents=True)
@@ -148,12 +155,21 @@ class ConsumerLifecycleTests(unittest.TestCase):
             triple, extension = "x86_64-unknown-linux-gnu", "tar.gz"
         archive = release_dir / f"sc-lint_{VERSION}_{triple}.{extension}"
         archive_root = f"sc-lint_{VERSION}_{triple}"
+        archive_entry = (
+            binary_name if layout == "flat" else f"{archive_root}/bin/{binary_name}"
+        )
         if extension == "zip":
             with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
-                package.write(binary, arcname=f"{archive_root}/bin/{binary_name}")
+                if include_binary:
+                    package.write(binary, arcname=archive_entry)
+                else:
+                    package.writestr(f"{archive_root}/missing-binary", "fixture")
         else:
             with tarfile.open(archive, "w:gz") as package:
-                package.add(binary, arcname=f"{archive_root}/bin/{binary_name}")
+                if include_binary:
+                    package.add(binary, arcname=archive_entry)
+                else:
+                    package.addfile(tarfile.TarInfo(f"{archive_root}/missing-binary"))
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         (release_dir / "checksums.txt").write_text(
             f"{digest} {archive.name}\n", encoding="utf-8"
@@ -371,6 +387,82 @@ class ConsumerLifecycleTests(unittest.TestCase):
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+
+    @unittest.skipUnless(os.name == "nt", "Windows legacy archive compatibility")
+    def test_windows_managed_old_binary_accepts_legacy_flat_archive(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            managed_binary = managed / self.product_binary.name
+            self.write_old_probe(managed_binary)
+            self.write_release_archive(
+                Path(temporary.name), release / self.product_binary.name, layout="flat"
+            )
+
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            command_dirs = []
+            for command in ("just", "pwsh", "curl"):
+                resolved = shutil.which(command)
+                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
+                command_dirs.append(str(Path(resolved).parent))
+            command_dirs.append(str(Path(sys.executable).parent))
+            environment["PATH"] = os.pathsep.join(command_dirs)
+
+            with self.release_server(Path(temporary.name)) as release_base:
+                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
+                result = self.run_command(["just", "setup"], cwd=consumer, environment=environment)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("verified sc-lint", result.stdout)
+
+    @unittest.skipUnless(os.name == "nt", "Windows malformed archive rejection")
+    def test_windows_bootstrap_rejects_archive_without_executable(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            self.write_release_archive(
+                Path(temporary.name),
+                release / self.product_binary.name,
+                include_binary=False,
+            )
+
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            command_dirs = []
+            for command in ("pwsh", "curl"):
+                resolved = shutil.which(command)
+                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
+                command_dirs.append(str(Path(resolved).parent))
+            command_dirs.append(str(Path(sys.executable).parent))
+            environment["PATH"] = os.pathsep.join(command_dirs)
+
+            with self.release_server(Path(temporary.name)) as release_base:
+                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
+                result = self.run_command(
+                    [
+                        "pwsh",
+                        "-NoLogo",
+                        "-NonInteractive",
+                        "-File",
+                        str(consumer / ".sc-lint/bootstrap.ps1"),
+                        "setup",
+                        "--config",
+                        "sc-lint.toml",
+                    ],
+                    cwd=consumer,
+                    environment=environment,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", result.stdout + result.stderr)
+            self.assertIn("did not contain sc-lint.exe", result.stdout + result.stderr)
 
     @unittest.skipUnless(os.name == "nt", "Windows managed-binary dry-run contract")
     def test_windows_stale_managed_upgrade_dry_run_does_not_replace_or_download(self) -> None:
