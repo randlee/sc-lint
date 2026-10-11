@@ -155,6 +155,7 @@ annotations:
 [dependencies]
 allowed_dependents = ["sc-lint"]
 allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
+allowed_dev_dependencies = ["sc-lint-test-support"]
 forbidden_edges = [
   { from = "sc-lint-boundary", to = "sc-lint-attributes" },
   { from = "sc-lint-boundary", to = "sc-observability" },
@@ -168,6 +169,12 @@ SCB-DEPENDENCY-001 package dependency not allowed:
 workspace package `sc-lint-boundary` directly depends on `sc-lint-attributes` but `sc-lint-attributes` is not listed in `BOUNDARY-ScLintBoundaryAnalyzer` allowed_dependencies
 ```
 
+`allowed_dependencies` permits direct workspace-package dependencies of any
+kind. A dev-dependency is also permitted when its target appears in
+`allowed_dev_dependencies`; normal and build dependencies still require
+`allowed_dependencies`. If an edge is both a normal dependency and a
+dev-dependency, it is checked as a normal dependency.
+
 Boundary inventory records may use either structured or arrow-delimited
 forbidden edges:
 
@@ -179,9 +186,22 @@ forbidden_edges = [
 ```
 
 Boundary records define exactly one non-empty `[public].facade` or
-`[public].trait`; `owner_crate_path` equals `owner_package` with hyphens
-replaced by underscores. For example, `sc-lint-boundary` maps to
-`sc_lint_boundary`.
+`[public].trait`. `owner_crate_path` must equal the library target name for
+`owner_package` reported by `cargo metadata`, including an explicitly named
+`[lib]` target. Do not derive it by replacing hyphens in the package name. For
+example, `sc-lint-boundary` has the default library target name
+`sc_lint_boundary`, but a package with `[lib] name = "boundary_api"` must use
+`boundary_api`.
+
+A boundary record may also carry one opaque `extensions` table, whose
+namespaced entries are parsed as TOML and ignored by `sc-lint`:
+
+```toml
+[extensions.example]
+consumer_metadata = "consumer-defined metadata"
+```
+
+Other unknown fields in a boundary record remain errors.
 
 Operator guidance:
 
