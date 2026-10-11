@@ -2,7 +2,8 @@
 
 The `sc-lint` Python distribution (`bindings/sc-lint-py`, abi3 wheel for
 CPython >= 3.9 plus an sdist) is published by the existing release pipeline.
-The adoption kit bootstrap installs `sc-lint==<version>` from PyPI, so 0.6.0
+Version 0.6.0 was cut but never published; 0.7.0 is the first PyPI release.
+The adoption kit bootstrap installs `sc-lint==0.7.0` from PyPI, so 0.7.0
 cannot be adopted until the wheel is uploaded. No secret lives in this
 repository; the maintainer provisions them in GitHub.
 
@@ -61,17 +62,17 @@ the uploading account.
 3. Run `Release Preflight` via `workflow_dispatch`; confirm
    `testpypi-rehearsal` uploads and `pip install --index-url
    https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/
-   sc-lint==0.6.0` works in a clean venv (the extra index supplies
+   sc-lint==0.7.0` works in a clean venv (the extra index supplies
    `codespell`).
-4. Run the production `Release` workflow for `0.6.0`. After `publish-pypi`
-   succeeds, verify `pip install sc-lint==0.6.0` in a clean venv and that
-   `python -c "import sc_lint; print(sc_lint.__version__)"` prints `0.6.0`.
+4. Run the production `Release` workflow for `0.7.0`. After `publish-pypi`
+   succeeds, verify `pip install sc-lint==0.7.0` in a clean venv and that
+   `python -c "import sc_lint; print(sc_lint.__version__)"` prints `0.7.0`.
 5. PyPI files are immutable: a bad upload needs a new version, not a re-upload.
 
 ## Re-running a failed upload
 
 Run `pypi-publish.yml` from the Actions tab with `tag` (for example
-`v0.6.0`) and `target` (`testpypi` or `production`). It reuses the assets on
+`v0.7.0`) and `target` (`testpypi` or `production`). It reuses the assets on
 that GitHub Release and `--skip-existing` makes it safe to repeat.
 
 ## Local checks before a release
@@ -80,7 +81,7 @@ that GitHub Release and `--skip-existing` makes it safe to repeat.
 maturin build --release -m bindings/sc-lint-py/Cargo.toml --out dist
 maturin sdist -m bindings/sc-lint-py/Cargo.toml --out dist
 python3 -m pip install twine && twine check dist/*
-python3 -m venv /tmp/clean && /tmp/clean/bin/pip install --find-links dist sc-lint==0.6.0
+python3 -m venv /tmp/clean && /tmp/clean/bin/pip install --find-links dist sc-lint==0.7.0
 ```
 
 To exercise the adoption bootstrap offline, put the wheel and its

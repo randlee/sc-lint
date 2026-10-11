@@ -2,7 +2,7 @@
 
 All notable changes to sc-lint are documented here.
 
-## [Unreleased]
+## [0.7.0] — 2026-10-11
 
 ### Added
 
@@ -11,14 +11,21 @@ All notable changes to sc-lint are documented here.
   portability also takes `config_home_env`, `unix_path_prefixes` and the
   existing `targets` (#201, #202).
 - `sc-lint lint sc-boundary|sc-portability|sc-runtime --rule-filter` (#201).
+- `unix_path_prefixes` extends the always-enabled built-in portability prefix
+  list for PORT-001 and PORT-006; configuration adds detection without
+  suppressing defaults.
 
 ### Changed
 
 - A key an analyzer table does not define is now a configuration error
   (exit 3) naming the analyzer and the key. Existing kit-rendered configs,
   including `targets`, are unaffected.
+- The boundary, portability, and runtime lint commands now exit 10 for a
+  lint-fail verdict while retaining their diagnostic output.
+- Consumer Justfiles, including `just test`, remain consumer-owned; adoption
+  adds its recommended test recipe only when one does not already exist.
 
-## [0.6.0] — 2026-08-30
+## [0.6.0] — 2026-08-30 (cut; unpublished)
 
 ### Features
 
