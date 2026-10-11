@@ -21,6 +21,10 @@ fn candidate_roots_for_executable(executable: &Path) -> Vec<PathBuf> {
     candidates
 }
 
+pub(crate) fn installed_bundle_root_for_executable(executable: &Path) -> Option<PathBuf> {
+    bundle_root_from_candidates(&candidate_roots_for_executable(executable)).ok()
+}
+
 fn candidate_roots() -> Vec<PathBuf> {
     let mut candidates = std::env::current_exe()
         .map(|executable| candidate_roots_for_executable(&executable))
@@ -40,7 +44,7 @@ fn unavailable(path: &Path, cause: impl Into<String>) -> CliError {
     .with_cause(cause)
     .with_detail("bundle_path", json!(path.display().to_string()))
     .with_suggested_action(
-        "Install the matching sc-lint-docs bundle beside sc-lint, then rerun `sc-lint docs`.",
+        "Install the matching sc-lint-docs bundle in a supported install layout, then rerun `sc-lint docs`.",
     )
     .with_documentation("sc-lint docs installation")
 }
