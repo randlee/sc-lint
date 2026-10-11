@@ -1,5 +1,7 @@
 use std::collections::BTreeSet;
+use std::error::Error;
 use std::fs;
+use std::io::ErrorKind;
 
 use serde::Serialize;
 use tempfile::TempDir;
@@ -117,6 +119,24 @@ fn explicit_missing_config_is_a_read_error() {
         load_analyzer_settings(&CATALOG, directory.path(), Some(&missing), None).unwrap_err();
 
     assert_eq!(error.code(), "ANALYZER_CONFIG.READ");
+    assert!(Error::source(&error).is_some());
+    let AnalyzerConfigError::Read { source, .. } = error else {
+        panic!("expected a read error");
+    };
+    assert_eq!(source.kind(), ErrorKind::NotFound);
+}
+
+#[test]
+fn malformed_config_preserves_toml_parse_source() {
+    let directory = config_dir("[tool.sc-lint.analyzers.example");
+    let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.PARSE");
+    assert!(Error::source(&error).is_some());
+    let AnalyzerConfigError::Parse { source, .. } = error else {
+        panic!("expected a parse error");
+    };
+    assert!(!source.to_string().is_empty());
 }
 
 #[test]
@@ -173,14 +193,12 @@ fn bad_rule_filter_is_a_selector_error() {
     let error =
         load_analyzer_settings(&CATALOG, directory.path(), None, Some("unknown")).unwrap_err();
 
-    assert_eq!(
-        error,
-        AnalyzerConfigError::Selector {
-            analyzer: "example",
-            selector: "unknown".to_owned(),
-        }
-    );
     assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
+    let AnalyzerConfigError::Selector { analyzer, selector } = error else {
+        panic!("expected a selector error");
+    };
+    assert_eq!(analyzer, "example");
+    assert_eq!(selector, "unknown");
 }
 
 #[test]

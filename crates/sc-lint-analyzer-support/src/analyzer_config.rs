@@ -35,24 +35,26 @@ pub struct AnalyzerSettings {
     pub own: toml::Table,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Error)]
 pub enum AnalyzerConfigError {
     #[error("{analyzer}: unknown rule selector `{selector}`")]
     Selector {
         analyzer: &'static str,
         selector: String,
     },
-    #[error("{analyzer}: failed to read {path}: {reason}")]
+    #[error("{analyzer}: failed to read {path}: {source}")]
     Read {
         analyzer: &'static str,
         path: String,
-        reason: String,
+        #[source]
+        source: std::io::Error,
     },
-    #[error("{analyzer}: failed to parse {path}: {reason}")]
+    #[error("{analyzer}: failed to parse {path}: {source}")]
     Parse {
         analyzer: &'static str,
         path: String,
-        reason: String,
+        #[source]
+        source: Box<toml::de::Error>,
     },
     #[error("{analyzer}: [tool.sc-lint.analyzers.{analyzer}] must be a table")]
     NotATable { analyzer: &'static str },
@@ -101,12 +103,12 @@ pub fn read_config_document(
     let text = fs::read_to_string(&path).map_err(|error| AnalyzerConfigError::Read {
         analyzer,
         path: path.display().to_string(),
-        reason: error.to_string(),
+        source: error,
     })?;
     toml::from_str::<toml::Table>(&text).map_err(|error| AnalyzerConfigError::Parse {
         analyzer,
         path: path.display().to_string(),
-        reason: error.to_string(),
+        source: Box::new(error),
     })
 }
 
