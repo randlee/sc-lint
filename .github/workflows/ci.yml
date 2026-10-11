@@ -6,6 +6,9 @@ on:
     branches: [develop, main]
 
 jobs:
+  # The maintainer jobs retain source_venv's local wheel because consumer
+  # lifecycle tests require an offline native artifact on every platform. This
+  # is test-fixture construction, not distributable release-wheel validation.
   just-lint:
     name: Just lint (${{ matrix.os }})
     strategy:
@@ -127,13 +130,61 @@ jobs:
           toolchain: "1.94.1"
 
       - name: Run adoption kit integration tests
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
         run: just test-adoption-integration
 
+  wheel-runtime:
+    if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
+    name: Wheel runtime (Python ${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Build the sc_lint wheel and its dependencies for offline install
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet maturin==1.15.0
+          python -m pip wheel --wheel-dir "${RUNNER_TEMP}/wheels" bindings/sc-lint-py
+
+      - name: Install and exercise the built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="${RUNNER_TEMP}/wheel-runtime"
+          python -m venv "${runtime}"
+          py="${runtime}/bin/python"
+          "${py}" -m pip install --quiet --disable-pip-version-check --no-index --find-links "${RUNNER_TEMP}/wheels" sc-lint
+          "${py}" -m pip check
+          cd "${RUNNER_TEMP}"
+          "${py}" - <<'PY'
+          import json
+          import sc_lint
+
+          assert sc_lint.__version__ != "0.0.0+source"
+          assert json.loads(sc_lint.version_json())["version"] == sc_lint.__version__
+          assert sc_lint.run(["sc-lint", "version", "--json"]) == 0
+          PY
+
   release-smoke:
-    # G.3b: the released archive must run every kit recipe with no source-tree
-    # helper. Stages the archive exactly like release.yml, then drives
-    # tests/fixtures/adoption/empty-workspace through `sc-lint init --just`,
-    # `just setup/lint/test`, and the bootstrap upgrade check with no `.just/`.
+    # Exercise the pinned publish-kit archive layout from publish-artifacts.toml:
+    # a version/target root with binaries in bin/ and bundled_paths at their
+    # declared destinations. Then run the consumer recipes without source files.
     name: Release smoke (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -169,45 +220,82 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bin_args="$(python3 scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          cargo build --release ${bin_args}
+          target="$(rustc -vV | sed -n 's/^host: //p')"
+          bin_args="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
+          cargo build --release --target "${target}" ${bin_args}
 
       - name: Build the sc_lint wheel and its dependencies for offline install
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --quiet maturin==1.9.4
+          python -m pip install --quiet maturin==1.15.0
           python -m pip wheel --wheel-dir "${RUNNER_TEMP}/wheels" bindings/sc-lint-py
 
-      - name: Stage and package the release archive
+      - name: Package the manifest-declared publish-kit archive
         shell: bash
         run: |
           set -euo pipefail
-          docs_source="$(python3 scripts/release_artifacts.py documentation-source-directory --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          staging="${RUNNER_TEMP}/release-staging"
-          if [[ "${RUNNER_OS}" == "Windows" ]]; then
-            python3 scripts/release_artifacts.py stage-release-archive \
-              --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-              --binaries-directory target/release \
-              --documentation-directory "${docs_source}" \
-              --staging-directory "${staging}" --windows
-            archive="${RUNNER_TEMP}/sc-lint-smoke.zip"
-            python3 -c "import shutil,sys; shutil.make_archive(sys.argv[1][:-4], 'zip', sys.argv[2])" "${archive}" "${staging}"
-          else
-            python3 scripts/release_artifacts.py stage-release-archive \
-              --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
-              --binaries-directory target/release \
-              --documentation-directory "${docs_source}" \
-              --staging-directory "${staging}"
-            archive="${RUNNER_TEMP}/sc-lint-smoke.tar.gz"
-            COPYFILE_DISABLE=1 tar czf "${archive}" -C "${staging}" .
-          fi
-          windows_flag=""
-          [[ "${RUNNER_OS}" == "Windows" ]] && windows_flag="--windows"
-          python3 scripts/release_artifacts.py validate-release-archive \
-            --manifest "${RELEASE_ARTIFACT_MANIFEST}" --archive "${archive}" ${windows_flag}
-          echo "SMOKE_ARCHIVE=${archive}" >> "$GITHUB_ENV"
+          target="$(rustc -vV | sed -n 's/^host: //p')"
+          version="$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')"
+          RELEASE_SMOKE_TARGET="${target}" RELEASE_SMOKE_VERSION="${version}" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          import tarfile
+          import zipfile
 
-      - name: Run the release-archive smoke test
+          target_name = os.environ["RELEASE_SMOKE_TARGET"]
+          version = os.environ["RELEASE_SMOKE_VERSION"]
+          config = json.loads(subprocess.check_output([
+              "python3", ".github/scripts/release_artifacts.py", "release-package-config",
+              "--manifest", os.environ["RELEASE_ARTIFACT_MANIFEST"], "--target", target_name,
+          ], text=True))
+          project = config["project"]
+          target = config["target"]
+          stage = Path(f"{project['archive_prefix']}_{version}_{target_name}")
+          if stage.exists():
+              shutil.rmtree(stage)
+          (stage / "bin").mkdir(parents=True)
+          for binary in config["binaries"]:
+              filename = binary["name"] + (".exe" if "windows" in target_name else "")
+              shutil.copy2(Path("target") / target_name / "release" / filename, stage / "bin" / filename)
+              for bundled_path in binary.get("bundled_paths", []):
+                  source = Path(bundled_path["source"])
+                  destination = stage / bundled_path["destination"]
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copytree(source, destination, dirs_exist_ok=True)
+          archive = Path(f"{stage}.{target['archive']}")
+          if target["archive"] == "tar.gz":
+              with tarfile.open(archive, "w:gz") as output:
+                  output.add(stage, arcname=stage.name)
+          elif target["archive"] == "zip":
+              with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as output:
+                  for item in stage.rglob("*"):
+                      if item.is_file():
+                          output.write(item, item.relative_to(stage.parent))
+          else:
+              raise SystemExit(f"unsupported release archive type: {target['archive']}")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as env:
+              env.write(f"SMOKE_ARCHIVE={archive.resolve()}\n")
+              env.write(f"SMOKE_TARGET={target_name}\n")
+              env.write(f"SMOKE_VERSION={version}\n")
+          PY
+
+      - name: Run archive and docs smoke
+        if: ${{ github.event_name != 'push' && github.base_ref != 'develop' && github.base_ref != 'main' }}
         shell: bash
-        run: python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}" --wheel-dir "${RUNNER_TEMP}/wheels"
+        run: >-
+          python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}"
+          --manifest "${RELEASE_ARTIFACT_MANIFEST}" --version "${SMOKE_VERSION}"
+          --target "${SMOKE_TARGET}"
+
+      - name: Run full release-archive smoke test
+        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
+        shell: bash
+        run: >-
+          python3 scripts/release_smoke.py --archive "${SMOKE_ARCHIVE}"
+          --manifest "${RELEASE_ARTIFACT_MANIFEST}" --version "${SMOKE_VERSION}"
+          --target "${SMOKE_TARGET}" --wheel-dir "${RUNNER_TEMP}/wheels"

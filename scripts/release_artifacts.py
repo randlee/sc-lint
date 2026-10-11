@@ -25,24 +25,30 @@ HOMEBREW_TARGETS = (
     "x86_64-unknown-linux-gnu",
 )
 DOCUMENTATION_BUNDLE_REQUIRED_FIELDS = {
-    "source_directory",
-    "package_directory",
     "required_files",
     "package_guides",
 }
 
 
-def load_manifest(path: Path) -> dict:
+def load_manifest(path: Path, publish_manifest_path: Path | None = None) -> dict:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     if data.get("schema_version") != 1:
         raise SystemExit("unsupported manifest schema_version")
 
-    crates = data.get("crates")
+    publish_manifest_path = publish_manifest_path or path.with_name("publish-artifacts.toml")
+    try:
+        publish_data = tomllib.loads(publish_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise SystemExit(f"invalid rendered publish manifest: {error}") from error
+    if publish_data.get("schema_version") != 1:
+        raise SystemExit("unsupported publish manifest schema_version")
+
+    crates = publish_data.get("crates")
     if not isinstance(crates, list) or not crates:
-        raise SystemExit("manifest must define non-empty [[crates]]")
-    binaries = data.get("release_binaries")
+        raise SystemExit("publish manifest must define non-empty [[crates]]")
+    binaries = publish_data.get("release_binaries")
     if not isinstance(binaries, list) or not binaries:
-        raise SystemExit("manifest must define non-empty [[release_binaries]]")
+        raise SystemExit("publish manifest must define non-empty [[release_binaries]]")
     documentation_bundle = data.get("documentation_bundle")
     if not isinstance(documentation_bundle, dict):
         raise SystemExit("manifest must define [documentation_bundle]")
@@ -51,8 +57,6 @@ def load_manifest(path: Path) -> dict:
         raise SystemExit(
             "documentation_bundle missing fields: " + ", ".join(missing_bundle_fields)
         )
-    require_str(documentation_bundle, "source_directory", "documentation_bundle")
-    require_str(documentation_bundle, "package_directory", "documentation_bundle")
     for key in ("required_files", "package_guides"):
         values = documentation_bundle[key]
         if not isinstance(values, list) or not values:
@@ -62,31 +66,18 @@ def load_manifest(path: Path) -> dict:
         if len(values) != len(set(values)):
             raise SystemExit(f"documentation_bundle.{key} contains duplicates")
 
-    required = {
-        "artifact",
-        "package",
-        "cargo_toml",
-        "required",
-        "publish",
-        "publish_order",
-        "preflight_check",
-        "wait_after_publish_seconds",
-        "verify_install",
-    }
     seen_artifacts: set[str] = set()
     seen_packages: set[str] = set()
     for idx, crate in enumerate(crates):
         if not isinstance(crate, dict):
-            raise SystemExit(f"crates[{idx}] must be a table")
-        missing = sorted(required - set(crate))
-        if missing:
-            raise SystemExit(f"crates[{idx}] missing fields: {', '.join(missing)}")
+            raise SystemExit(f"publish manifest crates[{idx}] must be a table")
         artifact = require_str(crate, "artifact", f"crates[{idx}]")
         package = require_str(crate, "package", f"crates[{idx}]")
         require_str(crate, "cargo_toml", f"crates[{idx}]")
-        mode = require_str(crate, "preflight_check", f"crates[{idx}]")
-        if mode not in {PREFLIGHT_FULL, PREFLIGHT_LOCKED}:
-            raise SystemExit(f"{artifact}: invalid preflight_check {mode!r}")
+        if not isinstance(crate.get("publish"), bool):
+            raise SystemExit(f"crates[{idx}].publish must be a boolean")
+        if not isinstance(crate.get("publish_order"), int):
+            raise SystemExit(f"crates[{idx}].publish_order must be an integer")
         if artifact in seen_artifacts:
             raise SystemExit(f"duplicate artifact {artifact}")
         if package in seen_packages:
@@ -97,38 +88,69 @@ def load_manifest(path: Path) -> dict:
     seen_bins: set[str] = set()
     for idx, entry in enumerate(binaries):
         if not isinstance(entry, dict):
-            raise SystemExit(f"release_binaries[{idx}] must be a table")
+            raise SystemExit(f"publish manifest release_binaries[{idx}] must be a table")
         name = require_str(entry, "name", f"release_binaries[{idx}]")
         if name in seen_bins:
             raise SystemExit(f"duplicate release binary {name}")
         seen_bins.add(name)
 
-    python_distributions = data.get("python_distributions", [])
-    if not isinstance(python_distributions, list):
-        raise SystemExit("[[python_distributions]] must be an array of tables")
-    python_required = {"artifact", "package", "pyproject", "cargo_toml", "build_system", "required", "publish"}
-    for idx, entry in enumerate(python_distributions):
-        if not isinstance(entry, dict):
-            raise SystemExit(f"python_distributions[{idx}] must be a table")
-        missing = sorted(python_required - set(entry))
-        if missing:
-            raise SystemExit(f"python_distributions[{idx}] missing fields: {', '.join(missing)}")
-        artifact = require_str(entry, "artifact", f"python_distributions[{idx}]")
-        require_str(entry, "package", f"python_distributions[{idx}]")
-        require_str(entry, "pyproject", f"python_distributions[{idx}]")
-        require_str(entry, "cargo_toml", f"python_distributions[{idx}]")
-        if require_str(entry, "build_system", f"python_distributions[{idx}]") != "maturin":
-            raise SystemExit(f"{artifact}: only build_system = \"maturin\" is supported")
+    published_python_packages = publish_data.get("python_packages", [])
+    python_distributions = publish_data.get("python_distributions", [])
+    if not isinstance(published_python_packages, list) or not isinstance(python_distributions, list):
+        raise SystemExit("publish manifest Python package and distribution entries must be arrays")
+    distributions_by_name = {
+        require_str(entry, "name", f"python_distributions[{idx}]" ): entry
+        for idx, entry in enumerate(python_distributions)
+        if isinstance(entry, dict)
+    }
+    legacy_python_distributions = []
+    for idx, package_entry in enumerate(published_python_packages):
+        if not isinstance(package_entry, dict):
+            raise SystemExit(f"publish manifest python_packages[{idx}] must be a table")
+        package = require_str(package_entry, "package", f"python_packages[{idx}]")
+        distribution = distributions_by_name.get(package)
+        if distribution is None:
+            raise SystemExit(f"python package {package!r} has no rendered distribution entry")
+        legacy_python_distributions.append(
+            {
+                "artifact": require_str(package_entry, "artifact", f"python_packages[{idx}]"),
+                "package": package,
+                "pyproject": require_str(package_entry, "manifest", f"python_packages[{idx}]"),
+                "cargo_toml": require_str(distribution, "cargo_manifest", f"python_distributions[{package}]"),
+                "build_system": "maturin",
+                "required": bool(package_entry.get("publish")),
+                "publish": bool(package_entry.get("publish")),
+            }
+        )
+    for entry in legacy_python_distributions:
+        artifact = entry["artifact"]
         if artifact in seen_artifacts:
             raise SystemExit(f"duplicate artifact {artifact}")
         seen_artifacts.add(artifact)
+
+    docs_binary = next((entry for entry in binaries if entry.get("name") == "sc-lint"), None)
+    if docs_binary is None:
+        raise SystemExit("publish manifest must define the sc-lint release binary")
+    docs_bundle = next(
+        (entry for entry in docs_binary.get("bundled_paths", []) if entry.get("source") == "docs-bundle"),
+        None,
+    )
+    if docs_bundle is None:
+        raise SystemExit("publish manifest must define the docs-bundle path for sc-lint")
+    source_directory = require_str(docs_bundle, "source", "docs-bundle bundled path")
+    archive_destination = require_str(docs_bundle, "destination", "docs-bundle bundled path")
 
     crates.sort(key=lambda item: (item["publish_order"], item["artifact"]))
     return {
         "crates": crates,
         "release_binaries": binaries,
-        "documentation_bundle": documentation_bundle,
-        "python_distributions": python_distributions,
+        "documentation_bundle": {
+            **documentation_bundle,
+            "source_directory": source_directory,
+            "package_directory": Path(archive_destination).name,
+            "archive_destination": archive_destination,
+        },
+        "python_distributions": legacy_python_distributions,
     }
 
 
@@ -243,7 +265,8 @@ def validate_documentation_bundle_package_manifest(
 
 
 def validate_documentation_bundle_command(args: argparse.Namespace) -> int:
-    manifest = load_manifest(Path(args.manifest))
+    publish_manifest = Path(args.publish_manifest) if args.publish_manifest else None
+    manifest = load_manifest(Path(args.manifest), publish_manifest)
     validate_documentation_bundle(manifest, Path(args.documentation_directory))
     print("ok: documentation bundle contains exactly the release manifest files")
     return 0
@@ -312,6 +335,7 @@ def render_homebrew_formula_text(
     tag: str,
     sha_map: dict[str, str],
 ) -> str:
+    """Render the retired local formula format; release uses the pinned kit renderer."""
     if formula_name == HOMEBREW_PRIMARY_FORMULA:
         desc = "Top-level sc-lint CLI and analyzer toolset for Rust workspaces"
         installed_binaries = release_binary_names(manifest)
@@ -614,6 +638,7 @@ def validate_release_archive(args: argparse.Namespace) -> int:
 
 
 def stage_homebrew_layout(args: argparse.Namespace) -> int:
+    """Stage the retired local flat archive layout for legacy helper tests only."""
     manifest = load_manifest(Path(args.manifest))
     archive_directory = Path(args.archive_directory)
     prefix = Path(args.prefix)
@@ -878,6 +903,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate_docs = subparsers.add_parser("validate-documentation-bundle")
     validate_docs.add_argument("--manifest", required=True)
+    validate_docs.add_argument("--publish-manifest")
     validate_docs.add_argument("--documentation-directory", required=True)
     validate_docs.set_defaults(func=validate_documentation_bundle_command)
 

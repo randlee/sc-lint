@@ -55,14 +55,18 @@ without a venv.
 ## Release channel
 
 - `release/publish-artifacts.toml` declares the distribution under
-  `[[python_distributions]]`; `scripts/release_artifacts.py
-  list-python-distributions` drives the workflows and `emit-inventory`
-  records it with `publishTarget = "pypi"`.
-- `release.yml` job `build-python-wheels` builds abi3 wheels for
-  Linux x86_64, macOS x86_64/arm64, and Windows x86_64 (plus the sdist),
-  verifies `sc_lint.__version__`, attaches them to the GitHub Release, and
-  `publish-pypi` uploads them (environment `pypi`, secret `PYPI_TOKEN`).
-- `release-preflight.yml` job `testpypi-rehearsal` uploads the Linux wheel and
-  sdist to TestPyPI (environment `testpypi`, secret `TEST_PYPI_TOKEN`).
-- `pypi-publish.yml` re-uploads the assets of an already published release
-  when an upload needs retrying.
+  `[[python_distributions]]`; `release/publish-channel-contracts.toml` is the
+  source of truth for the PyPI environments and credential names. The release
+  workflows resolve channel settings with
+  `.github/scripts/release_artifacts.py channel-config --manifest
+  release/publish-artifacts.toml --channel pypi`.
+- `release.yml` synchronizes Python package metadata from the workspace
+  version, validates that version against the release version, builds wheels
+  and an sdist, and attaches them to the GitHub Release. It does not install a
+  built wheel to inspect `sc_lint.__version__`.
+- `release.yml` job `publish-testpypi` uploads configured distributions when
+  `target=testpypi` (environment `testpypi`, secret
+  `TEST_PYPI_API_TOKEN`).
+- `pypi-publish.yml` job `publish` uploads assets of an already published
+  release (environment `pypi`, secret `PYPI_API_TOKEN`); rerun it to retry an
+  upload.

@@ -199,8 +199,16 @@ async function runAction(options = {}) {
   fs.mkdirSync(installRoot, { recursive: true });
   if (target.extension === "tar.gz") extractTarGz(archive, installRoot);
   else extractZip(archive, installRoot);
-  const binary = path.join(installRoot, options.platform === "win32" || (!options.platform && process.platform === "win32") ? "sc-lint.exe" : "sc-lint");
-  const docs = path.join(installRoot, "sc-lint-docs");
+  const binaryName = options.platform === "win32" || (!options.platform && process.platform === "win32") ? "sc-lint.exe" : "sc-lint";
+  const flatBinary = path.join(installRoot, binaryName);
+  const flatDocs = path.join(installRoot, "sc-lint-docs");
+  const nestedRoot = path.join(installRoot, `sc-lint_${version}_${target.triple}`);
+  const nestedDocs = path.join(nestedRoot, "share", "sc-lint", "sc-lint-docs");
+  const hasFlatLayout = fs.existsSync(flatBinary) && fs.existsSync(flatDocs);
+  const binary = hasFlatLayout
+    ? flatBinary
+    : path.join(nestedRoot, "bin", binaryName);
+  const docs = hasFlatLayout ? flatDocs : nestedDocs;
   if (!fs.existsSync(binary) || !fs.existsSync(docs)) {
     throw new ActionError(ERROR.artifact, "Verified release layout is missing sc-lint or sc-lint-docs.", "Use an E.5 release archive with the complete published layout.");
   }

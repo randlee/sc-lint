@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "sc-lint",
+    "archive_prefix": "sc-lint",
+    "description": "Reusable repository policy enforcement lint tools for Rust workspaces",
+    "homepage": "https://github.com/randlee/sc-lint",
+    "license": "MIT",
+    "workspace_toml": "Cargo.toml",
+    "rust_toolchain": "1.94.1",
+    "readme_dependency_crate": "sc-lint",
+    "renderer_archive_path": "sc-lint"
+  },
+  "release_targets": [
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "os": "ubuntu-latest",
+      "archive": "tar.gz"
+    },
+    {
+      "target": "x86_64-apple-darwin",
+      "os": "macos-latest",
+      "archive": "tar.gz"
+    },
+    {
+      "target": "aarch64-apple-darwin",
+      "os": "macos-latest",
+      "archive": "tar.gz"
+    },
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "os": "windows-latest",
+      "archive": "zip"
+    }
+  ],
+  "crates": [
+    {
+      "artifact": "sc-lint-directives",
+      "package": "sc-lint-directives",
+      "cargo_toml": "crates/sc-lint-directives/Cargo.toml",
+      "publish": true,
+      "publish_order": 1,
+      "wait_after_publish_seconds": 15
+    },
+    {
+      "artifact": "sc-lint-schema",
+      "package": "sc-lint-schema",
+      "cargo_toml": "crates/sc-lint-schema/Cargo.toml",
+      "publish": true,
+      "publish_order": 2,
+      "wait_after_publish_seconds": 15
+    },
+    {
+      "artifact": "sc-lint-analyzer-support",
+      "package": "sc-lint-analyzer-support",
+      "cargo_toml": "crates/sc-lint-analyzer-support/Cargo.toml",
+      "publish": true,
+      "publish_order": 3,
+      "wait_after_publish_seconds": 15
+    },
+    {
+      "artifact": "sc-lint-attributes",
+      "package": "sc-lint-attributes",
+      "cargo_toml": "crates/sc-lint-attributes/Cargo.toml",
+      "publish": true,
+      "publish_order": 4,
+      "wait_after_publish_seconds": 0
+    },
+    {
+      "artifact": "sc-lint-boundary",
+      "package": "sc-lint-boundary",
+      "cargo_toml": "crates/sc-lint-boundary/Cargo.toml",
+      "publish": true,
+      "publish_order": 5,
+      "wait_after_publish_seconds": 15
+    },
+    {
+      "artifact": "sc-lint-portability",
+      "package": "sc-lint-portability",
+      "cargo_toml": "crates/sc-lint-portability/Cargo.toml",
+      "publish": true,
+      "publish_order": 6,
+      "wait_after_publish_seconds": 0
+    },
+    {
+      "artifact": "sc-lint-runtime",
+      "package": "sc-lint-runtime",
+      "cargo_toml": "crates/sc-lint-runtime/Cargo.toml",
+      "publish": true,
+      "publish_order": 7,
+      "wait_after_publish_seconds": 0
+    },
+    {
+      "artifact": "sc-lint",
+      "package": "sc-lint",
+      "cargo_toml": "crates/sc-lint/Cargo.toml",
+      "publish": true,
+      "publish_order": 8,
+      "wait_after_publish_seconds": 0
+    }
+  ],
+  "release_binaries": [
+    {
+      "name": "sc-lint",
+      "bundled_paths": [
+        {
+          "source": "docs-bundle",
+          "destination": "share/sc-lint/sc-lint-docs",
+          "homebrew_destination_components": [
+            "pkgshare",
+            "sc-lint-docs"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sc-lint-boundary"
+    },
+    {
+      "name": "sc-lint-portability"
+    },
+    {
+      "name": "sc-lint-runtime"
+    }
+  ],
+  "python_packages": [
+    {
+      "artifact": "sc-lint-py",
+      "package": "sc-lint",
+      "manifest": "bindings/sc-lint-py/pyproject.toml",
+      "module": "sc_lint",
+      "publish": "pypi"
+    }
+  ],
+  "python_distributions": [
+    {
+      "name": "sc-lint",
+      "source": "bindings/sc-lint-py",
+      "cargo_manifest": "bindings/sc-lint-py/Cargo.toml",
+      "module_path": "bindings/sc-lint-py/python/sc_lint",
+      "sdist": true,
+      "wheels": [
+        {
+          "id": "linux-x86_64",
+          "os": "ubuntu-latest",
+          "target": "x86_64-unknown-linux-gnu",
+          "platform": "manylinux_2_28_x86_64",
+          "manylinux": "2_28"
+        },
+        "macos-latest",
+        "windows-latest"
+      ]
+    }
+  ],
+  "channels": {
+    "pypi": {
+      "workflow": "pypi-publish.yml",
+      "dispatch_inputs": {
+        "target": "production"
+      },
+      "credential_rehearsal_inputs": {
+        "target": "testpypi"
+      },
+      "test_repository": "testpypi",
+      "production_repository": "pypi"
+    },
+    "homebrew": {
+      "workflow": "homebrew-publish.yml",
+      "dispatch_inputs": {},
+      "tap_repository": "randlee/homebrew-tap",
+      "renderer_target": "x86_64-unknown-linux-gnu",
+      "formulas": [
+        {
+          "path": "Formula/sc-lint.rb",
+          "template": "release/homebrew/formula.rb.j2",
+          "class": "ScLint",
+          "binaries": [
+            "sc-lint",
+            "sc-lint-boundary",
+            "sc-lint-portability",
+            "sc-lint-runtime"
+          ],
+          "test_binary": "sc-lint",
+          "test_command": "--version",
+          "test_output": "sc-lint",
+          "release_track": "stable"
+        },
+        {
+          "path": "Formula/sc-lint-boundary.rb",
+          "template": "release/homebrew/formula.rb.j2",
+          "class": "ScLintBoundary",
+          "binaries": [
+            "sc-lint-boundary"
+          ],
+          "test_binary": "sc-lint-boundary",
+          "test_command": "--version",
+          "test_output": "sc-lint-boundary",
+          "release_track": "stable"
+        }
+      ],
+      "assets": [
+        {
+          "key": "macos_arm",
+          "target": "aarch64-apple-darwin"
+        },
+        {
+          "key": "macos_intel",
+          "target": "x86_64-apple-darwin"
+        },
+        {
+          "key": "linux",
+          "target": "x86_64-unknown-linux-gnu"
+        }
+      ]
+    },
+    "scoop": {
+      "workflow": "scoop-publish.yml",
+      "dispatch_inputs": {},
+      "bucket_repository": "randlee/scoop-bucket",
+      "manifest_path": "bucket/sc-lint.json",
+      "manifest_template": "release/scoop/manifest.json.j2",
+      "installer_target": "x86_64-pc-windows-msvc",
+      "binary": "bin/sc-lint.exe",
+      "renderer_target": "x86_64-unknown-linux-gnu"
+    },
+    "winget": {
+      "workflow": "winget-publish.yml",
+      "dispatch_inputs": {},
+      "identifier": "randlee.sc-lint",
+      "installer_target": "x86_64-pc-windows-msvc"
+    }
+  }
+}

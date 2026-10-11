@@ -1,142 +1,170 @@
 schema_version = 1
 
-[documentation_bundle]
-# E.4 owns this source directory and its contents. E.5 validates and packages
-# this logical layout as a release artifact; it is never copied into consumers.
-source_directory = "docs-bundle"
-package_directory = "sc-lint-docs"
-required_files = [
-  "manifest.toml",
-  "README.md",
-  "installation.md",
-  "using-sc-lint.md",
-  "configuration.md",
-  "just-setup.md",
-  "ci.md",
-  "upgrade.md",
-  "troubleshooting.md",
-  "best-practices.md",
-]
-package_guides = [
-  "sc-lint.md",
-  "sc-lint-attributes.md",
-  "sc-lint-analyzer-support.md",
-  "sc-lint-boundary.md",
-  "sc-lint-directives.md",
-  "sc-lint-portability.md",
-  "sc-lint-runtime.md",
-  "sc-lint-schema.md",
-]
+[project]
+name = "sc-lint"
+archive_prefix = "sc-lint"
+description = "Reusable repository policy enforcement lint tools for Rust workspaces"
+homepage = "https://github.com/randlee/sc-lint"
+license = "MIT"
+readme_dependency_crate = "sc-lint"
+renderer_archive_path = "sc-lint"
+workspace_toml = "Cargo.toml"
+rust_toolchain = "1.94.1"
+
+
+[[release_targets]]
+target = "x86_64-unknown-linux-gnu"
+os = "ubuntu-latest"
+archive = "tar.gz"
+[[release_targets]]
+target = "x86_64-apple-darwin"
+os = "macos-latest"
+archive = "tar.gz"
+[[release_targets]]
+target = "aarch64-apple-darwin"
+os = "macos-latest"
+archive = "tar.gz"
+[[release_targets]]
+target = "x86_64-pc-windows-msvc"
+os = "windows-latest"
+archive = "zip"
 
 [[crates]]
 artifact = "sc-lint-directives"
 package = "sc-lint-directives"
 cargo_toml = "crates/sc-lint-directives/Cargo.toml"
-required = true
 publish = true
 publish_order = 1
-preflight_check = "full"
 wait_after_publish_seconds = 15
-verify_install = false
-
 [[crates]]
 artifact = "sc-lint-schema"
 package = "sc-lint-schema"
 cargo_toml = "crates/sc-lint-schema/Cargo.toml"
-required = true
 publish = true
 publish_order = 2
-preflight_check = "full"
 wait_after_publish_seconds = 15
-verify_install = false
-
 [[crates]]
 artifact = "sc-lint-analyzer-support"
 package = "sc-lint-analyzer-support"
 cargo_toml = "crates/sc-lint-analyzer-support/Cargo.toml"
-required = true
 publish = true
 publish_order = 3
-preflight_check = "locked"
 wait_after_publish_seconds = 15
-verify_install = false
-
 [[crates]]
 artifact = "sc-lint-attributes"
 package = "sc-lint-attributes"
 cargo_toml = "crates/sc-lint-attributes/Cargo.toml"
-required = true
 publish = true
 publish_order = 4
-preflight_check = "locked"
 wait_after_publish_seconds = 0
-verify_install = false
-
 [[crates]]
 artifact = "sc-lint-boundary"
 package = "sc-lint-boundary"
 cargo_toml = "crates/sc-lint-boundary/Cargo.toml"
-required = true
 publish = true
 publish_order = 5
-preflight_check = "locked"
 wait_after_publish_seconds = 15
-verify_install = true
-
 [[crates]]
 artifact = "sc-lint-portability"
 package = "sc-lint-portability"
 cargo_toml = "crates/sc-lint-portability/Cargo.toml"
-required = true
 publish = true
 publish_order = 6
-preflight_check = "locked"
 wait_after_publish_seconds = 0
-verify_install = true
-
 [[crates]]
 artifact = "sc-lint-runtime"
 package = "sc-lint-runtime"
 cargo_toml = "crates/sc-lint-runtime/Cargo.toml"
-required = true
 publish = true
 publish_order = 7
-preflight_check = "locked"
 wait_after_publish_seconds = 0
-verify_install = true
-
 [[crates]]
 artifact = "sc-lint"
 package = "sc-lint"
 cargo_toml = "crates/sc-lint/Cargo.toml"
-required = true
 publish = true
 publish_order = 8
-preflight_check = "locked"
 wait_after_publish_seconds = 0
-verify_install = true
 
 [[release_binaries]]
 name = "sc-lint"
-
+bundled_paths = [{ source = "docs-bundle", destination = "share/sc-lint/sc-lint-docs", homebrew_destination_components = ["pkgshare", "sc-lint-docs"] }]
 [[release_binaries]]
 name = "sc-lint-boundary"
-
 [[release_binaries]]
 name = "sc-lint-portability"
-
 [[release_binaries]]
 name = "sc-lint-runtime"
 
-# Python distributions are built by maturin from the pyproject below, attached
-# to the GitHub Release as wheels + sdist, and uploaded to PyPI by the
-# `publish-pypi` job (environment `pypi`, secret `PYPI_TOKEN`); the release
-# preflight rehearses the upload against TestPyPI (`testpypi`, `TEST_PYPI_TOKEN`).
-[[python_distributions]]
+[[python_packages]]
 artifact = "sc-lint-py"
 package = "sc-lint"
-pyproject = "bindings/sc-lint-py/pyproject.toml"
-cargo_toml = "bindings/sc-lint-py/Cargo.toml"
-build_system = "maturin"
-required = true
-publish = true
+manifest = "bindings/sc-lint-py/pyproject.toml"
+module = "sc_lint"
+publish = "pypi"
+
+[[python_distributions]]
+name = "sc-lint"
+source = "bindings/sc-lint-py"
+cargo_manifest = "bindings/sc-lint-py/Cargo.toml"
+module_path = "bindings/sc-lint-py/python/sc_lint"
+sdist = true
+wheels = [{ id = "linux-x86_64", os = "ubuntu-latest", target = "x86_64-unknown-linux-gnu", platform = "manylinux_2_28_x86_64", manylinux = "2_28" }, "macos-latest", "windows-latest"]
+
+[channels.pypi]
+workflow = "pypi-publish.yml"
+dispatch_inputs = { target = "production" }
+credential_rehearsal_inputs = { target = "testpypi" }
+test_repository = "testpypi"
+production_repository = "pypi"
+
+[channels.homebrew]
+workflow = "homebrew-publish.yml"
+dispatch_inputs = {  }
+tap_repository = "randlee/homebrew-tap"
+renderer_target = "x86_64-unknown-linux-gnu"
+
+[[channels.homebrew.formulas]]
+path = "Formula/sc-lint.rb"
+template = "release/homebrew/formula.rb.j2"
+class = "ScLint"
+binaries = ["sc-lint", "sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]
+test_binary = "sc-lint"
+test_command = "--version"
+test_output = "sc-lint"
+release_track = "stable"
+[[channels.homebrew.formulas]]
+path = "Formula/sc-lint-boundary.rb"
+template = "release/homebrew/formula.rb.j2"
+class = "ScLintBoundary"
+binaries = ["sc-lint-boundary"]
+test_binary = "sc-lint-boundary"
+test_command = "--version"
+test_output = "sc-lint-boundary"
+release_track = "stable"
+
+[[channels.homebrew.assets]]
+key = "macos_arm"
+target = "aarch64-apple-darwin"
+[[channels.homebrew.assets]]
+key = "macos_intel"
+target = "x86_64-apple-darwin"
+[[channels.homebrew.assets]]
+key = "linux"
+target = "x86_64-unknown-linux-gnu"
+
+[channels.winget]
+workflow = "winget-publish.yml"
+dispatch_inputs = {  }
+identifier = "randlee.sc-lint"
+installer_target = "x86_64-pc-windows-msvc"
+
+[channels.scoop]
+workflow = "scoop-publish.yml"
+dispatch_inputs = {  }
+bucket_repository = "randlee/scoop-bucket"
+manifest_path = "bucket/sc-lint.json"
+manifest_template = "release/scoop/manifest.json.j2"
+installer_target = "x86_64-pc-windows-msvc"
+binary = "bin/sc-lint.exe"
+renderer_target = "x86_64-unknown-linux-gnu"

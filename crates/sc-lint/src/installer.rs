@@ -359,7 +359,7 @@ fn install_into_staging(
     let extract_dir = staging.join("extracted");
     fs::create_dir(&extract_dir).map_err(|error| permission_error(&extract_dir, error))?;
     extract_archive(&archive, &extract_dir)?;
-    let candidate = extract_dir.join(ReleaseTarget::binary_name());
+    let candidate = release_binary_candidate(&extract_dir, release_version, target);
     if !candidate.is_file() {
         return Err(install_error(
             InstallerErrorCode::ReleaseUnavailable,
@@ -378,6 +378,21 @@ fn install_into_staging(
         ));
     }
     activate_candidate(&candidate, managed_binary, minimum_version)
+}
+
+fn release_binary_candidate(
+    extract_dir: &Path,
+    release_version: &ResolvedReleaseVersion,
+    target: ReleaseTarget,
+) -> PathBuf {
+    let flat = extract_dir.join(ReleaseTarget::binary_name());
+    if flat.is_file() {
+        return flat;
+    }
+    extract_dir
+        .join(format!("sc-lint_{release_version}_{}", target.triple))
+        .join("bin")
+        .join(ReleaseTarget::binary_name())
 }
 
 fn download(url: &str, destination: &Path) -> Result<(), CliError> {
@@ -949,6 +964,33 @@ mod tests {
     }
 
     #[test]
+    fn release_binary_candidate_accepts_nested_and_prefers_legacy_flat_layouts() {
+        let fixture = TempDir::new().expect("fixture");
+        let minimum = MinimumVersion::from_str("0.7.0").expect("minimum");
+        let release_version = ResolvedReleaseVersion::for_minimum(&minimum);
+        let target = ReleaseTarget::detect().expect("current test host is supported");
+        let nested = fixture
+            .path()
+            .join(format!("sc-lint_{release_version}_{}", target.triple))
+            .join("bin")
+            .join(ReleaseTarget::binary_name());
+        fs::create_dir_all(nested.parent().expect("nested parent")).expect("nested directory");
+        fs::write(&nested, "nested release launcher").expect("nested launcher");
+
+        assert_eq!(
+            release_binary_candidate(fixture.path(), &release_version, target),
+            nested
+        );
+
+        let flat = fixture.path().join(ReleaseTarget::binary_name());
+        fs::write(&flat, "legacy flat release launcher").expect("flat launcher");
+        assert_eq!(
+            release_binary_candidate(fixture.path(), &release_version, target),
+            flat
+        );
+    }
+
+    #[test]
     fn consumer_bootstrap_exposes_only_product_owned_operations() {
         for operation in ["setup", "lint", "test", "upgrade"] {
             assert!(
@@ -1302,15 +1344,19 @@ mod tests {
         let release_dir = root.join("release").join(format!("v{version}"));
         let payload_dir = root.join("payload");
         fs::create_dir_all(&release_dir).expect("release directory");
-        fs::create_dir(&payload_dir).expect("payload directory");
-        write_probe(&payload_dir.join(ReleaseTarget::binary_name()), version);
+        let archive_root = payload_dir.join(format!("sc-lint_{version}_{}", release_target.triple));
+        fs::create_dir_all(archive_root.join("bin")).expect("published archive bin directory");
+        write_probe(
+            &archive_root.join("bin").join(ReleaseTarget::binary_name()),
+            version,
+        );
         let archive = release_dir.join(&archive_name);
         let tar_status = Command::new("tar")
             .args(["-czf"])
             .arg(&archive)
             .args(["-C"])
             .arg(&payload_dir)
-            .arg(ReleaseTarget::binary_name())
+            .arg(".")
             .status()
             .expect("tar starts");
         assert!(tar_status.success(), "tar produced fixture archive");

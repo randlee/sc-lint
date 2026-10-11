@@ -72,6 +72,16 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn("run: just setup", workflow)
         self.assertIn("run: just test", workflow)
         self.assertNotIn("run: cargo test --verbose", workflow)
+        self.assertIn("wheel-runtime:", workflow)
+        self.assertIn('python: ["3.11", "3.14"]', workflow)
+        self.assertIn("github.base_ref == 'develop'", workflow)
+        self.assertIn("github.base_ref == 'main'", workflow)
+        self.assertIn("sc_lint.run", workflow)
+        self.assertIn("Run adoption kit integration tests", workflow)
+        self.assertIn("Run archive and docs smoke", workflow)
+        self.assertIn("Run full release-archive smoke test", workflow)
+        self.assertIn("offline native artifact", workflow)
+        self.assertGreaterEqual(workflow.count("github.event_name == 'push'"), 4)
 
     def test_windows_companion_is_a_managed_part_of_the_model_contract(self) -> None:
         # This is a content guard; the PowerShell integration path is not run here.
@@ -107,10 +117,27 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn('[string[]]$Rest', contents)
         self.assertIn('[Array]::IndexOf($Rest, "--config")', contents)
         self.assertNotIn('[Array]::IndexOf($args, "--config")', contents)
+        self.assertIn('$candidate = Join-Path $extract "sc-lint.exe"', contents)
+        self.assertIn(
+            'Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"',
+            contents,
+        )
+        self.assertLess(
+            contents.index('$candidate = Join-Path $extract "sc-lint.exe"'),
+            contents.index(
+                'Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"'
+            ),
+        )
 
     def test_posix_bootstrap_leaves_managed_activation_to_the_rust_installer(self) -> None:
         contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
-        self.assertIn('"$staging/extract/sc-lint" --config "$config" "$command" "$@"', contents)
+        self.assertIn('launcher="$staging/extract/sc-lint"', contents)
+        self.assertIn('launcher="$staging/extract/sc-lint_${version}_${target}/bin/sc-lint"', contents)
+        self.assertLess(
+            contents.index('launcher="$staging/extract/sc-lint"'),
+            contents.index('launcher="$staging/extract/sc-lint_${version}_${target}/bin/sc-lint"'),
+        )
+        self.assertIn('"$launcher" --config "$config" "$command" "$@"', contents)
         self.assertNotIn('mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new"', contents)
 
     def test_root_helpers_match_the_generated_product_assets(self) -> None:
