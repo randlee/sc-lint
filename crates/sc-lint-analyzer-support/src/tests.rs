@@ -257,10 +257,11 @@ fn non_table_analyzer_entry_is_not_a_table() {
     let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
 
     assert!(matches!(
-        error,
+        &error,
         AnalyzerConfigError::NotATable {
-            analyzer: "example"
-        }
+            analyzer: "example",
+            table,
+        } if table == "tool.sc-lint.analyzers.example"
     ));
     assert_eq!(error.code(), "ANALYZER_CONFIG.NOT_A_TABLE");
     assert_eq!(
