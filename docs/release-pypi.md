@@ -12,7 +12,7 @@ repository; the maintainer provisions them in GitHub.
 | Stage | Where | Notes |
 |---|---|---|
 | Rehearsal | `release.yml` job `publish-testpypi` when dispatch input `target` is `testpypi` | Uploads the configured Python distributions to TestPyPI with `--skip-existing`. Environment `testpypi`; the channel contract names the credential `TEST_PYPI_API_TOKEN`. |
-| Build | `release.yml` jobs `build-python-wheels` and `build-python-sdists` | Builds the manifest-declared wheels and sdist; wheel jobs verify that the workspace and `pyproject.toml` package version metadata match the release version. They do not install the built wheel or check `sc_lint.__version__`. |
+| Build | `release.yml` jobs `build-python-wheels` and `build-python-sdists` | The shared workflow synchronizes Python package metadata from the workspace version, validates that version against the release version, builds wheels and an sdist, and attaches them to the GitHub Release. It does not install a built wheel to inspect `sc_lint.__version__`. |
 | Upload | `pypi-publish.yml` workflow (`workflow_dispatch`), job `publish`, with target `production` | Uploads verified wheels and sdist from an already published GitHub Release. Environment `pypi`; the channel contract names the credential `PYPI_API_TOKEN`. The workflow selects maturin or twine from the manifest. |
 | Recovery | Re-run `pypi-publish.yml` with the same tag and target | Reuses the immutable GitHub Release assets. It never rebuilds or re-tags. |
 
