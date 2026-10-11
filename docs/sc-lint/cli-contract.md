@@ -515,6 +515,12 @@ Current CLI exit-code mapping:
     with `data.status = "fail"` (business verdict; the envelope stays
     `ok: true`)
 
+During `sc-boundary` analysis, failure to load the boundary inventory or the
+Cargo workspace metadata required to validate it is a configuration failure:
+the CLI returns `CLI.CONFIG_ERROR` with exit code `3`. A later failure while
+building the workspace graph remains a delegated backend execution failure
+(`CLI.BACKEND_EXEC_FAILURE`, exit code `5`).
+
 These codes are owned by the CLI and must not drift per backend.
 
 For Python-adapter command paths in A.3:
