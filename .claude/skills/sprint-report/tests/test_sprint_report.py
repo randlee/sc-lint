@@ -25,10 +25,10 @@ class SprintReportTests(unittest.TestCase):
                     return report.main(), stderr.getvalue()
 
     def test_report_template_and_skill_keep_current_usage_text(self):
-        repo = Path(__file__).resolve().parents[4]
-        template = (repo / '.claude/skills/sprint-report/report.md.j2').read_text()
-        skill = (repo / '.claude/skills/sprint-report/SKILL.md').read_text()
-        script = (repo / '.claude/skills/sprint-report/scripts/sprint-report').read_text()
+        skill_dir = Path(__file__).resolve().parents[1]  # .claude/skills/sprint-report installed, skills/sprint-report in the package
+        template = (skill_dir / 'report.md.j2').read_text()
+        skill = (skill_dir / 'SKILL.md').read_text()
+        script = (skill_dir / 'scripts/sprint-report').read_text()
         self.assertIn('Sprint status report for phase plans.', template)
         self.assertNotIn('agent-team-mail', template)
         self.assertIn('`--table` is the default mode', skill)
@@ -69,14 +69,14 @@ class SprintReportTests(unittest.TestCase):
             self.assertEqual(index['root_bead_id'], 'lint-phase-x')
 
     def test_root_lookup_executes_phase_id_fallback_end_to_end(self):
-        checkout = Path(__file__).resolve().parents[4]
+        skills = Path(__file__).resolve().parents[2]  # .claude/skills installed, skills/ in the package
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             subprocess.run(['git', 'init', '-q'], cwd=repo, check=True)
             helper_dir = repo / '.claude/skills/atm-beads/scripts'
             helper_dir.mkdir(parents=True)
             for name in ('phase-index-path', 'sprint_index_common.py', 'repo_config.py'):
-                shutil.copy2(checkout / '.claude/skills/atm-beads/scripts' / name, helper_dir / name)
+                shutil.copy2(skills / 'atm-beads/scripts' / name, helper_dir / name)
             config = repo / '.claude/project/atm-bd-orchestration.yaml'
             config.parent.mkdir(parents=True)
             config.write_text('plans_dir: docs/plans\n')
