@@ -456,6 +456,22 @@ fn analyzer_config_home_env_overrides_legacy_table() {
 }
 
 #[test]
+fn malformed_legacy_config_home_env_is_analyzer_config_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config("[portability]\nconfig_home_env = []\n");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap_err();
+    assert!(matches!(error, PortabilityError::AnalyzerConfig(_)));
+}
+
+#[test]
 fn flags_hardcoded_tmp_path_in_test_scope() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
