@@ -147,6 +147,49 @@ mod tests {
     use super::*;
 
     #[test]
+    fn analyze_cli_parses_rule_alias_rule_filter_and_config() {
+        let alias = Cli::try_parse_from([
+            "sc-lint-boundary",
+            "analyze",
+            "--rule",
+            "cycles",
+            "--config",
+            "sc-lint.toml",
+        ])
+        .expect("--rule and --config should parse");
+        let Command::Analyze {
+            rule_filter,
+            config,
+            ..
+        } = alias.command
+        else {
+            panic!("analyze command should parse");
+        };
+        assert_eq!(rule_filter.as_deref(), Some("cycles"));
+        assert_eq!(config, Some(PathBuf::from("sc-lint.toml")));
+
+        let canonical = Cli::try_parse_from([
+            "sc-lint-boundary",
+            "analyze",
+            "--rule-filter",
+            "SCB-CYCLE-001",
+            "--config",
+            "boundary.toml",
+        ])
+        .expect("--rule-filter and --config should parse");
+        let Command::Analyze {
+            rule_filter,
+            config,
+            ..
+        } = canonical.command
+        else {
+            panic!("analyze command should parse");
+        };
+        assert_eq!(rule_filter.as_deref(), Some("SCB-CYCLE-001"));
+        assert_eq!(config, Some(PathBuf::from("boundary.toml")));
+    }
+
+    #[test]
     fn analyzer_config_exit_codes_are_cli_owned() {
         assert_eq!(
             analyzer_config_exit_code(&AnalyzerConfigError::Selector {
