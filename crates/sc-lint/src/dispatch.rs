@@ -350,14 +350,68 @@ fn find_backend_binary_in_dir(dir: &Path, tool: &str) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use super::BoundaryDispatchError;
     use super::backend_args;
     use super::backend_rejection;
     use super::find_backend_binary_from_exe;
     use super::self_contained_layout_in_dir;
+    use crate::consts;
+    use crate::error::CliErrorKind;
+    use sc_lint_boundary::AnalyzeOptions;
+    use sc_lint_boundary::analyze_workspace_configured;
+    use sc_lint_schema::OutputFormat;
     use std::ffi::OsString;
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
+
+    fn assert_analyzer_config_error(
+        error: sc_lint_boundary::BoundaryError,
+        expected_kind: CliErrorKind,
+        expected_code: &str,
+    ) {
+        let cli_error = BoundaryDispatchError::Analysis(Box::new(error))
+            .into_cli_error(consts::TOOL_BOUNDARY, None);
+
+        assert_eq!(cli_error.kind, expected_kind);
+        assert_eq!(
+            cli_error.details.get("analyzer_config_code"),
+            Some(&serde_json::json!(expected_code))
+        );
+    }
+
+    #[test]
+    fn analyzer_config_errors_map_selector_to_usage_and_unknown_key_to_config() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let options = AnalyzeOptions {
+            root: root.to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        };
+
+        let selector_error = analyze_workspace_configured(&options, None, Some("SCB-NOPE-001"))
+            .expect_err("unknown selector is rejected before workspace analysis");
+        assert_analyzer_config_error(
+            selector_error,
+            CliErrorKind::Usage,
+            "ANALYZER_CONFIG.SELECTOR",
+        );
+
+        let config_path = root.join("sc-lint.toml");
+        fs::write(
+            &config_path,
+            "[tool.sc-lint.analyzers.boundary]\nunknown = true\n",
+        )
+        .expect("config");
+        let config_error = analyze_workspace_configured(&options, Some(&config_path), None)
+            .expect_err("unknown analyzer key is rejected before workspace analysis");
+        assert_analyzer_config_error(
+            config_error,
+            CliErrorKind::Config,
+            "ANALYZER_CONFIG.UNKNOWN_KEY",
+        );
+    }
 
     #[test]
     fn backend_args_forward_config_and_rule_filter() {
