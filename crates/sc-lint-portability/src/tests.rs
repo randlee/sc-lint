@@ -254,11 +254,13 @@ fn unknown_rule_filter_is_a_selector_error() {
 }
 
 #[test]
-fn exclude_paths_and_rules_apply_to_portability_findings() {
+fn exclude_paths_drops_findings_from_matching_files() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
-    fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"crates/example/src/**\"]\nexclude_rules = [\"PORT-006\"]\nfail_rules = []\n");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"crates/example/src/**\"]\n",
+    );
     fixture.write_source(
         "example",
         "lib.rs",
@@ -273,6 +275,53 @@ fn exclude_paths_and_rules_apply_to_portability_findings() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn exclude_rules_drops_matching_findings() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nexclude_rules = [\"PORT-006\"]\n",
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/home/user/file\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn fail_rules_makes_findings_report_only() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\nfail_rules = []\n");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/home/user/file\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port006);
 }
 
 #[test]
