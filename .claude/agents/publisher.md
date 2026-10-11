@@ -200,7 +200,9 @@ Before declaring success, verify:
 - the release tag exists and points to the intended `main` commit
 - all required crates are published at the released version
 - the GitHub Release exists for the tag
-- the GitHub Release contains the expected `sc-lint-boundary` archives
+- the GitHub Release contains archives for `sc-lint`, `sc-lint-boundary`,
+  `sc-lint-portability`, and `sc-lint-runtime`, plus the Python wheels, sdist,
+  and `checksums.txt`
 - the `sc-lint` PyPI distribution is available at the released version
 - the `randlee/tap` Homebrew formulas reference the released artifacts
 - the reusable Action's `v1` alias points to the released commit
