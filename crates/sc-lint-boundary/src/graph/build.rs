@@ -931,7 +931,7 @@ fn workspace_dependency_roots(
         let Some(library_target) = workspace_package
             .targets
             .iter()
-            .find(|target| crate::is_library_target(target))
+            .find(|target| target.is_lib())
         else {
             continue;
         };

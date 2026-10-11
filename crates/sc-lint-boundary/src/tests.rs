@@ -2377,6 +2377,32 @@ fn bin_only_owner_package_skips_lib_target_validation() {
     assert_eq!(report.status, ReportStatus::Pass);
 }
 
+#[test]
+fn graph_ignores_proc_macro_only_workspace_dependencies() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/macros"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "macros", "../macros", "0.1.0"),
+    );
+    fixture.write(
+        "crates/macros/Cargo.toml",
+        &(good_member_manifest("macros", "") + "[lib]\nproc-macro = true\n"),
+    );
+    fixture.write_source("app", "lib.rs", "pub fn uses(_: macros::Marker) {}");
+    fixture.write_source("macros", "lib.rs", "extern crate proc_macro;");
+
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .expect("graph export succeeds");
+
+    assert!(graph.edges.iter().all(|edge| {
+        graph.nodes.iter().any(|node| node.id == edge.from)
+            && graph.nodes.iter().any(|node| node.id == edge.to)
+    }));
+}
+
 struct WorkspaceFixture {
     tempdir: TempDir,
 }
