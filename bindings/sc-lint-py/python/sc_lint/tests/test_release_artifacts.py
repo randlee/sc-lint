@@ -3,6 +3,7 @@ from __future__ import annotations
 from sc_lint.lint_common import discover_repo_root
 
 import argparse
+import io
 import importlib.util
 import json
 import re
@@ -14,6 +15,7 @@ import tarfile
 import tempfile
 import tomllib
 import unittest
+import zipfile
 
 
 REPO_ROOT = discover_repo_root()
@@ -104,6 +106,65 @@ class ReleaseArtifactsTests(unittest.TestCase):
         )
         self.assertEqual(verify.returncode, 0, verify.stderr)
         self.assertIn("python version verification passed", verify.stdout)
+
+    def test_python_release_verifier_requires_all_declared_wheel_platforms(self) -> None:
+        assets = self.root / "python-release-assets"
+        assets.mkdir()
+        wheel_names = (
+            "sc_lint-0.7.0-cp39-abi3-manylinux_2_28_x86_64.whl",
+            "sc_lint-0.7.0-cp39-abi3-macosx_11_0_arm64.whl",
+            "sc_lint-0.7.0-cp39-abi3-win_amd64.whl",
+        )
+        wheel_metadata = "Metadata-Version: 2.1\nName: sc-lint\nVersion: 0.7.0\n\n"
+        for wheel_name in wheel_names:
+            with zipfile.ZipFile(assets / wheel_name, "w") as wheel:
+                wheel.writestr("sc_lint-0.7.0.dist-info/METADATA", wheel_metadata)
+
+        sdist_metadata = b"Metadata-Version: 2.1\nName: sc-lint\nVersion: 0.7.0\n\n"
+        with tarfile.open(assets / "sc_lint-0.7.0.tar.gz", "w:gz") as sdist:
+            package_info = tarfile.TarInfo("sc_lint-0.7.0/PKG-INFO")
+            package_info.size = len(sdist_metadata)
+            sdist.addfile(package_info, io.BytesIO(sdist_metadata))
+
+        def verify(manifest: Path) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    str(PUBLISH_KIT_SCRIPT),
+                    "verify-python-release-assets",
+                    "--manifest",
+                    str(manifest),
+                    "--asset-dir",
+                    str(assets),
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=30,
+            )
+
+        result = verify(PUBLISH_MANIFEST_PATH)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("'sc-lint': {'wheel': 3, 'sdist': 1}", result.stdout)
+
+        current_manifest = PUBLISH_MANIFEST_PATH.read_text(encoding="utf-8")
+        current_wheels_line = next(
+            line for line in current_manifest.splitlines() if line.startswith("wheels = ")
+        )
+        old_wheels_line = (
+            'wheels = [{ id = "linux-x86_64", os = "ubuntu-latest", '
+            'target = "x86_64-unknown-linux-gnu", platform = "manylinux_2_28_x86_64", '
+            'manylinux = "2_28" }, "macos-latest", "windows-latest"]'
+        )
+        old_manifest = self.root / "old-publish-artifacts.toml"
+        old_manifest.write_text(
+            current_manifest.replace(current_wheels_line, old_wheels_line, 1),
+            encoding="utf-8",
+        )
+        old_result = verify(old_manifest)
+        self.assertNotEqual(old_result.returncode, 0)
+        self.assertIn("Python wheel platforms do not match declared unique targets", old_result.stderr)
 
     def stage_archive(self, name: str = "archive") -> Path:
         staging = self.root / name
