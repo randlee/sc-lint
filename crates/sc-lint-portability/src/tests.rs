@@ -12,6 +12,59 @@ use sc_lint_schema::NodeId;
 use sc_lint_schema::OwnerId;
 
 #[test]
+fn portability_string_literal_visitor_arms_decode_once() {
+    fn method<'a>(file: &'a syn::File, name: &str) -> &'a syn::ImplItemFn {
+        file.items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Impl(item_impl) => Some(&item_impl.items),
+                _ => None,
+            })
+            .flatten()
+            .find_map(|item| match item {
+                syn::ImplItem::Fn(method) if method.sig.ident == name => Some(method),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("missing method {name}"))
+    }
+
+    fn literal_value_call_count(method: &syn::ImplItemFn) -> usize {
+        struct LiteralValueCalls(usize);
+
+        impl<'ast> syn::visit::Visit<'ast> for LiteralValueCalls {
+            fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+                if call.method == "value"
+                    && matches!(
+                        &*call.receiver,
+                        syn::Expr::Path(path) if path.path.is_ident("lit")
+                    )
+                {
+                    self.0 += 1;
+                }
+                syn::visit::visit_expr_method_call(self, call);
+            }
+        }
+
+        let mut calls = LiteralValueCalls(0);
+        syn::visit::Visit::visit_block(&mut calls, &method.block);
+        calls.0
+    }
+
+    let source = syn::parse_file(include_str!("portability.rs")).unwrap();
+
+    assert_eq!(
+        literal_value_call_count(method(&source, "visit_expr_for_portability")),
+        1,
+        "the test-code portability visitor should decode each string literal once"
+    );
+    assert_eq!(
+        literal_value_call_count(method(&source, "visit_expr_lit")),
+        1,
+        "the production portability visitor should decode each string literal once"
+    );
+}
+
+#[test]
 fn findings_report_text_is_stable() {
     let report = FindingsReport {
         tool: "sc-lint-portability",
@@ -404,28 +457,81 @@ fn relative_unix_path_prefix_is_config_error() {
     );
 }
 
-#[test]
-fn defaults_only_temp_prefix_does_not_flag_production_path() {
+fn prefix_findings(config: Option<&str>, source: &str) -> Vec<(RuleId, String)> {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
-    fixture.write_source(
-        "example",
-        "lib.rs",
-        "pub fn path() { let _ = \"/private/tmp/cache\"; }",
-    );
+    if let Some(config) = config {
+        fixture.write_lint_config(config);
+    }
+    fixture.write_source("example", "lib.rs", source);
 
-    let report = analyze_workspace(&AnalyzeOptions {
+    analyze_workspace(&AnalyzeOptions {
         root: fixture.root().to_path_buf(),
         format: OutputFormat::Json,
     })
-    .unwrap();
+    .unwrap()
+    .findings
+    .into_iter()
+    .filter(|finding| matches!(finding.rule_id, RuleId::Port001 | RuleId::Port006))
+    .map(|finding| {
+        let literal = finding
+            .message
+            .split('`')
+            .nth(1)
+            .unwrap_or_default()
+            .to_string();
+        (finding.rule_id, literal)
+    })
+    .collect()
+}
+
+const SHARED_BUILTIN_SOURCE: &str = "pub fn production() { let _ = \"/private/tmp/prod\"; let _ = \"/var/tmp/prod\"; }\n#[cfg(test)] mod tests { fn fixture() { let _ = \"/private/tmp/test\"; let _ = \"/var/tmp/test\"; } }";
+
+fn assert_shared_builtins_flagged(findings: &[(RuleId, String)]) {
+    for (rule_id, literal) in [
+        (RuleId::Port006, concat!("/private", "/tmp/prod")),
+        (RuleId::Port006, concat!("/var", "/tmp/prod")),
+        (RuleId::Port001, concat!("/private", "/tmp/test")),
+        (RuleId::Port001, concat!("/var", "/tmp/test")),
+    ] {
+        assert!(
+            findings.contains(&(rule_id, literal.to_string())),
+            "{rule_id:?} {literal} missing from {findings:?}"
+        );
+    }
+}
+
+#[test]
+fn defaults_only_shared_builtin_prefixes_flag_both_rules() {
+    assert_shared_builtins_flagged(&prefix_findings(None, SHARED_BUILTIN_SOURCE));
+}
+
+#[test]
+fn configured_prefixes_do_not_suppress_shared_builtin_detection() {
+    let configured = prefix_findings(
+        Some("[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"/opt/\"]\n"),
+        SHARED_BUILTIN_SOURCE,
+    );
+
+    assert_shared_builtins_flagged(&configured);
+    assert_eq!(configured, prefix_findings(None, SHARED_BUILTIN_SOURCE));
+}
+
+#[test]
+fn configured_prefixes_extend_both_rules() {
+    let findings = prefix_findings(
+        Some("[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"/opt/\"]\n"),
+        "pub fn production() { let _ = \"/opt/prod\"; }\n#[cfg(test)] mod tests { fn fixture() { let _ = \"/opt/test\"; } }",
+    );
 
     assert!(
-        report
-            .findings
-            .iter()
-            .all(|finding| finding.rule_id != RuleId::Port006)
+        findings.contains(&(RuleId::Port006, "/opt/prod".to_string())),
+        "{findings:?}"
+    );
+    assert!(
+        findings.contains(&(RuleId::Port001, "/opt/test".to_string())),
+        "{findings:?}"
     );
 }
 

@@ -104,8 +104,17 @@ struct BuiltInDefaults {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PortabilityConfig {
     config_home_env: Option<String>,
+    /// The Unix path prefixes PORT-001 and PORT-006 share (ADR-010): the
+    /// built-in list, extended by any configured `unix_path_prefixes`.
     unix_path_prefixes: Vec<String>,
-    configured_unix_path_prefixes: Vec<String>,
+}
+
+impl PortabilityConfig {
+    fn unix_path_prefix_match(&self, value: &str) -> bool {
+        self.unix_path_prefixes
+            .iter()
+            .any(|prefix| value.starts_with(prefix))
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -674,13 +683,14 @@ impl<'a> PortabilityCollector<'a> {
             Expr::Lit(ExprLit {
                 lit: Lit::Str(lit), ..
             }) => {
-                if self.path_prefix_match(&lit.value()) {
+                let value = lit.value();
+                if self.config.unix_path_prefix_match(&value) {
                     self.findings.push(PortabilityFinding {
                         rule_id: RuleId::Port001,
                         kind: "hardcoded_unix_path_literal",
                         message: format!(
                             "PORT-001 hardcoded Unix-only absolute path literal `{}` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source",
-                            lit.value()
+                            value
                         ),
                         source_path: self.file_context.source_path.clone(),
                         line: span_start_line(lit.span()),
@@ -711,7 +721,7 @@ impl<'a> PortabilityCollector<'a> {
             return false;
         };
         let value = lit.value();
-        if !self.path_prefix_match(&value) {
+        if !self.config.unix_path_prefix_match(&value) {
             return false;
         }
         self.findings.push(PortabilityFinding {
@@ -749,13 +759,6 @@ impl<'a> PortabilityCollector<'a> {
                 self.file_context.package, self.file_context.target, label
             ),
         });
-    }
-
-    fn path_prefix_match(&self, value: &str) -> bool {
-        self.config
-            .unix_path_prefixes
-            .iter()
-            .any(|prefix| value.starts_with(prefix))
     }
 }
 
@@ -958,17 +961,13 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
         if self.platform_gated_depth == 0
             && let Lit::Str(lit) = &node.lit
         {
-            if is_unix_shell_path_literal(&lit.value()) {
-                self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
-            } else if self
-                .config
-                .configured_unix_path_prefixes
-                .iter()
-                .any(|prefix| lit.value().starts_with(prefix))
-            {
-                self.push_path_finding(RuleId::Port006, &lit.value(), span_start_line(lit.span()));
-            } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
-                self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            let value = lit.value();
+            if is_unix_shell_path_literal(&value) {
+                self.push_shell_finding(&value, span_start_line(lit.span()));
+            } else if self.config.unix_path_prefix_match(&value) {
+                self.push_path_finding(RuleId::Port006, &value, span_start_line(lit.span()));
+            } else if let Some(rule_id) = production_path_rule_id(&value) {
+                self.push_path_finding(rule_id, &value, span_start_line(lit.span()));
             }
         }
         syn::visit::visit_expr_lit(self, node);
@@ -1019,6 +1018,5 @@ fn load_portability_config(
             .into_iter()
             .chain(analyzer_keys.unix_path_prefixes.iter().cloned())
             .collect(),
-        configured_unix_path_prefixes: analyzer_keys.unix_path_prefixes.clone(),
     })
 }
