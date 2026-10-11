@@ -61,8 +61,10 @@ without a venv.
   `.github/scripts/release_artifacts.py channel-config --manifest
   release/publish-artifacts.toml --channel pypi`.
 - `release.yml` jobs `build-python-wheels` and `build-python-sdists` build the
-  declared distributions; wheel jobs verify `sc_lint.__version__` and attach
-  their wheels to the GitHub Release.
+  declared distributions; wheel jobs verify the workspace and `pyproject.toml`
+  package version metadata against the release version, then attach their
+  wheels to the GitHub Release. They do not install the built wheel or check
+  `sc_lint.__version__`.
 - `release.yml` job `publish-testpypi` uploads configured distributions when
   `target=testpypi` (environment `testpypi`, secret
   `TEST_PYPI_API_TOKEN`).
