@@ -359,18 +359,31 @@ fn glob_match(pattern: &str, path: &str) -> bool {
         }
     }
     fn matches_segment(pattern: &[u8], text: &[u8]) -> bool {
-        match (pattern.split_first(), text.split_first()) {
-            (None, None) => true,
-            (Some((b'*', rest)), _) => {
-                matches_segment(rest, text)
-                    || (!text.is_empty() && matches_segment(pattern, &text[1..]))
+        let mut previous = vec![false; text.len() + 1];
+        previous[0] = true;
+
+        for &token in pattern {
+            let mut current = vec![false; text.len() + 1];
+            match token {
+                b'*' => {
+                    current[0] = previous[0];
+                    for index in 1..=text.len() {
+                        current[index] = previous[index] || current[index - 1];
+                    }
+                }
+                b'?' => {
+                    current[1..].copy_from_slice(&previous[..text.len()]);
+                }
+                expected => {
+                    for index in 1..=text.len() {
+                        current[index] = previous[index - 1] && expected == text[index - 1];
+                    }
+                }
             }
-            (Some((b'?', rest)), Some((_, text_rest))) => matches_segment(rest, text_rest),
-            (Some((expected, rest)), Some((actual, text_rest))) => {
-                expected == actual && matches_segment(rest, text_rest)
-            }
-            _ => false,
+            previous = current;
         }
+
+        previous[text.len()]
     }
 
     matches_segments(

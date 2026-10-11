@@ -280,6 +280,17 @@ fn exclude_paths_support_segment_and_recursive_wildcards() {
 }
 
 #[test]
+fn exclude_paths_handle_dense_segment_wildcards_without_backtracking() {
+    let pattern = format!("{}b", "*a".repeat(64));
+    let directory = config_dir(&format!(
+        "[tool.sc-lint.analyzers.example]\nexclude_paths = [\"{pattern}\"]\n"
+    ));
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert!(!settings.path_excluded(&format!("{}c", "a".repeat(64))));
+}
+
+#[test]
 fn settings_from_document_matches_file_loading() {
     let text = "[tool.sc-lint.analyzers.example]\nexclude_paths = [\"tests/**\"]\n";
     let directory = config_dir(text);
