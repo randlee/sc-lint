@@ -101,7 +101,7 @@ impl AnalyzerPortabilityKeys {
             key: key.to_string(),
             expected,
         };
-        let strings = |key: &str| match settings.own.get(key) {
+        let strings = |key: &str| match settings.own_value(key) {
             None => Ok(Vec::new()),
             Some(toml::Value::Array(items)) => items
                 .iter()
@@ -110,7 +110,7 @@ impl AnalyzerPortabilityKeys {
                 .ok_or_else(|| wrong_type(key, "an array of strings")),
             Some(_) => Err(wrong_type(key, "an array of strings")),
         };
-        let config_home_env = match settings.own.get("config_home_env") {
+        let config_home_env = match settings.own_value("config_home_env") {
             None => None,
             Some(toml::Value::String(value)) => Some(value.clone()),
             Some(_) => return Err(wrong_type("config_home_env", "a string")),

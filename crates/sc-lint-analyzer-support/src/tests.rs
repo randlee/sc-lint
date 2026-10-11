@@ -99,7 +99,7 @@ fn missing_config_yields_defaults() {
     assert!(settings.exclude_rules.is_empty());
     assert!(settings.exclude_paths.is_empty());
     assert_eq!(settings.rule_filter, None);
-    assert!(settings.own.is_empty());
+    assert!(settings.own_value("extension").is_none());
 }
 
 #[test]
@@ -161,7 +161,7 @@ fn own_keys_are_preserved_and_common_keys_are_consumed() {
     assert!(!settings.enabled);
     assert_eq!(settings.exclude_paths, ["tests/**"]);
     assert_eq!(
-        settings.own.get("extension"),
+        settings.own_value("extension"),
         Some(&toml::Value::Integer(1))
     );
 }

@@ -32,7 +32,13 @@ pub struct AnalyzerSettings {
     pub fail_rules: BTreeSet<&'static str>,
     pub exclude_paths: Vec<String>,
     pub rule_filter: Option<BTreeSet<&'static str>>,
-    pub own: toml::Table,
+    own: toml::Table,
+}
+
+impl AnalyzerSettings {
+    pub fn own_value(&self, key: &str) -> Option<&toml::Value> {
+        self.own.get(key)
+    }
 }
 
 #[derive(Debug, Error)]
