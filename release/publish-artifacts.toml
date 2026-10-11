@@ -109,7 +109,7 @@ source = "bindings/sc-lint-py"
 cargo_manifest = "bindings/sc-lint-py/Cargo.toml"
 module_path = "bindings/sc-lint-py/python/sc_lint"
 sdist = true
-wheels = [{ id = "linux-x86_64", os = "ubuntu-latest", target = "x86_64-unknown-linux-gnu", platform = "manylinux_2_28_x86_64", manylinux = "2_28" }, "macos-latest", "windows-latest"]
+wheels = [{ id = "linux-x86_64", os = "ubuntu-latest", target = "x86_64-unknown-linux-gnu", platform = "manylinux_2_28_x86_64", manylinux = "2_28" }, { id = "macos-arm64", os = "macos-latest", target = "aarch64-apple-darwin", platform = "macosx_11_0_arm64", deployment_target = "11.0" }, { id = "windows-x86_64", os = "windows-latest", target = "x86_64-pc-windows-msvc", platform = "win_amd64" }]
 
 [channels.pypi]
 workflow = "pypi-publish.yml"
