@@ -13,6 +13,7 @@ import http.server
 import json
 import tarfile
 import threading
+import tomllib
 import unittest
 from unittest import mock
 import zipfile
@@ -420,9 +421,12 @@ class ConsumerLifecycleTests(unittest.TestCase):
             "macOS": ("aarch64-apple-darwin", ".tar.gz", "sc-lint"),
             "Windows": ("x86_64-pc-windows-msvc", ".zip", "sc-lint.exe"),
         }
-        release_workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+        manifest = tomllib.loads(
+            (ROOT / "release/publish-artifacts.toml").read_text(encoding="utf-8")
+        )
+        release_targets = {entry["target"] for entry in manifest["release_targets"]}
         for platform, (target, extension, binary) in mappings.items():
-            self.assertIn(target, release_workflow, platform)
+            self.assertIn(target, release_targets, platform)
             self.assertTrue(extension.startswith("."), platform)
             self.assertTrue(binary.startswith("sc-lint"), platform)
 

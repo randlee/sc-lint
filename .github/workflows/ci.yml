@@ -141,7 +141,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
-      RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml
+      RELEASE_ARTIFACT_MANIFEST: release/sc-lint-release-checks.toml
     steps:
       - uses: actions/checkout@v5
 

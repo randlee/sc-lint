@@ -13,7 +13,7 @@ import unittest
 
 REPO_ROOT = discover_repo_root()
 SCRIPT_PATH = REPO_ROOT / "scripts/release_artifacts.py"
-MANIFEST_PATH = REPO_ROOT / "release/publish-artifacts.toml"
+MANIFEST_PATH = REPO_ROOT / "release/sc-lint-release-checks.toml"
 
 spec = importlib.util.spec_from_file_location("release_artifacts", SCRIPT_PATH)
 assert spec is not None and spec.loader is not None
