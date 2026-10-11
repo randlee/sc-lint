@@ -37,7 +37,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
-        self.manifest = release_artifacts.load_manifest(MANIFEST_PATH)
+        self.manifest = release_artifacts.load_manifest(MANIFEST_PATH, PUBLISH_MANIFEST_PATH)
         self.docs = self.root / "docs-bundle"
         self.docs.mkdir()
         for relative_path in release_artifacts.documentation_bundle_files(self.manifest):
@@ -193,6 +193,24 @@ class ReleaseArtifactsTests(unittest.TestCase):
         self.assertEqual(package_root, extracted / stage.name)
         self.assertEqual(docs_bundle, package_root / docs_destination)
         self.assertTrue((docs_bundle / "README.md").is_file())
+        release_smoke.assert_documentation_integrity(docs_bundle, PUBLISH_MANIFEST_PATH)
+
+    def test_release_smoke_rejects_missing_guide_in_extracted_bundle(self) -> None:
+        docs_bundle = self.root / "missing-guide-bundle"
+        shutil.copytree(REPO_ROOT / "docs-bundle", docs_bundle)
+        guide = self.manifest["documentation_bundle"]["package_guides"][0]
+        (docs_bundle / "packages" / guide).unlink()
+
+        with self.assertRaisesRegex(SystemExit, "missing documentation files: packages/"):
+            release_smoke.assert_documentation_integrity(docs_bundle, PUBLISH_MANIFEST_PATH)
+
+    def test_release_smoke_rejects_broken_relative_link_in_extracted_bundle(self) -> None:
+        docs_bundle = self.root / "broken-link-bundle"
+        shutil.copytree(REPO_ROOT / "docs-bundle", docs_bundle)
+        (docs_bundle / "README.md").write_text("[missing](missing.md)\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(SystemExit, "broken documentation link: README.md -> missing.md"):
+            release_smoke.assert_documentation_integrity(docs_bundle, PUBLISH_MANIFEST_PATH)
 
     def test_legacy_formula_renderer_installs_docs_to_pkgshare_and_passes_ruby_syntax(self) -> None:
         # This local renderer is retained as legacy helper coverage. The release

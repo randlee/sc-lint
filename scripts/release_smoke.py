@@ -3,8 +3,9 @@
 
 Extracts a staged release archive, installs it into a temporary copy of
 ``tests/fixtures/adoption/empty-workspace`` with ``sc-lint init --just``, and
-runs the consumer kit recipes (``just setup``, ``just lint``, ``just test``,
-plus the bootstrap ``upgrade --check --dry-run`` path) with
+runs the documentation bundle integrity check plus the consumer kit recipes
+(``just setup``, ``just lint``, ``just test``, plus the bootstrap
+``upgrade --check --dry-run`` path) with
 ``SC_LINT_SOURCE_ROOT`` unset and no ``.just/`` directory present. Every step
 must succeed using only the archive binaries and the ``sc_lint`` wheel.
 """
@@ -117,6 +118,29 @@ def assert_published_docs(binary: Path, expected_bundle: Path, workspace: Path, 
         )
 
 
+def assert_documentation_integrity(docs_bundle: Path, publish_manifest: Path) -> None:
+    command = [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "release_artifacts.py"),
+        "validate-documentation-bundle",
+        "--manifest",
+        str(REPO_ROOT / "release" / "sc-lint-release-checks.toml"),
+        "--publish-manifest",
+        str(publish_manifest.resolve()),
+        "--documentation-directory",
+        str(docs_bundle.resolve()),
+    ]
+    print(f"release-smoke: docs-integrity: {' '.join(command)}", flush=True)
+    result = subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        raise SystemExit(
+            f"release-smoke: docs-integrity failed with exit code {result.returncode}: {detail}"
+        )
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+
+
 def run(step: str, command: list[str], cwd: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     print(f"release-smoke: {step}: {' '.join(command)}", flush=True)
     result = subprocess.run(command, cwd=cwd, env=env, text=True, capture_output=True)
@@ -166,6 +190,7 @@ def main() -> int:
             version=args.version,
             target=args.target,
         )
+        assert_documentation_integrity(docs_bundle, args.manifest)
         shutil.copytree(FIXTURE, workspace)
         env = consumer_env(binary, args.wheel_dir.resolve() if args.wheel_dir else None)
 
