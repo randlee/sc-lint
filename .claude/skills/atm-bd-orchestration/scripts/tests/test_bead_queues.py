@@ -23,13 +23,17 @@ FAKE_ATM = """#!/usr/bin/env python3
 import json, os, sys
 if os.environ.get("FAKE_ATM_ARGV"):
     open(os.environ["FAKE_ATM_ARGV"], "w").write(json.dumps(sys.argv[1:]))
+if os.environ.get("FAKE_ATM_FAIL"):
+    sys.exit("atm: daemon unavailable")
 sys.stdout.write(open(os.environ["FAKE_ATM_TASKS"]).read())
 """
 FAKE_GH = """#!/usr/bin/env python3
 import os, sys
+with open(os.environ["FAKE_GH_LOG"], "a") as log:
+    log.write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")
 if os.environ.get("FAKE_GH_FAIL"):
     sys.exit("gh: HTTP 502")
-key = "FAKE_GH_STACKS" if "api" in sys.argv[1:] else "FAKE_GH_PRS"
+key = {"api": "FAKE_GH_STACKS", "stack": "FAKE_GH_VIEW"}[sys.argv[1]]
 sys.stdout.write(open(os.environ[key]).read())
 """
 
@@ -47,6 +51,8 @@ class Queues:
         toml = ws.root / ".atm-bd" / f"phase-{phase}.toml"
         toml.parent.mkdir(exist_ok=True)
         toml.write_text(f'plan = "docs/plans/phase-{phase}.jsonl"\nroot = "{self.root}"\nintegration_branch = "{self.trunk}"\n')
+        self.worktree = ws.root / f"wt-{phase}"
+        subprocess.run(["git", "worktree", "add", "-q", "-b", self.trunk, str(self.worktree)], cwd=ws.root, check=True)
         self.tasks([])
         self.github([], [])
         self.state = self.dir / "state.json"
@@ -62,15 +68,16 @@ class Queues:
                  "reminder_count": reminders} for t in task_ids]
         (self.dir / "tasks.json").write_text(json.dumps(rows))
 
-    def github(self, stacks: list[dict], prs: list[dict]) -> None:
+    def github(self, stacks: list[dict], layers: list[dict], trunk: str | None = None) -> None:
         (self.dir / "stacks.json").write_text(json.dumps([stacks]))   # --paginate --slurp: a list of pages
-        (self.dir / "prs.json").write_text(json.dumps(prs))
+        view = {"trunk": trunk or self.trunk, "currentBranch": self.trunk, "branches": layers}
+        (self.dir / "view.json").write_text(json.dumps(view))
 
     def run(self, *args: str, env: dict | None = None) -> subprocess.CompletedProcess:
         bin_dir = self.ws.root / "fake-bin"
         e = {**self.ws.env, "PATH": f"{bin_dir}{os.pathsep}{self.ws.env['PATH']}", "ATM_IDENTITY": "lead1",
              "FAKE_ATM_TASKS": str(self.dir / "tasks.json"), "FAKE_GH_STACKS": str(self.dir / "stacks.json"),
-             "FAKE_GH_PRS": str(self.dir / "prs.json"), **(env or {})}
+             "FAKE_GH_VIEW": str(self.dir / "view.json"), "FAKE_GH_LOG": str(self.dir / "gh.log"), **(env or {})}
         return subprocess.run([sys.executable, str(self.ws.scripts / "bead-queues"), "--phase", self.phase, *args],
                               cwd=self.ws.root, env=e, text=True, capture_output=True)
 
@@ -97,14 +104,17 @@ def child(ws: Workspace, bead: str, parent: str, *args: str) -> None:
     ws.bd("update", bead, "--parent", parent)
 
 
-def pr(number: int, base: str, head: str) -> dict:
-    return {"number": number, "baseRefName": base, "headRefName": head, "isDraft": False,
-            "createdAt": "2026-01-01T00:00:00Z", "title": f"pr {number}"}
+def layer(number: int | None, name: str, rebase: bool = False) -> dict:
+    """One branch of `gh stack view --json`."""
+    pr_ = {"number": number, "url": f"https://x/pull/{number}", "state": "OPEN"} if number else None
+    return {"name": name, "head": "0" * 40, "base": "0" * 40, "isCurrent": False, "isMerged": False,
+            "isQueued": False, "needsRebase": rebase, "pr": pr_}
 
 
-def stack(number: int, base: str, *prs_: dict) -> dict:
-    return {"number": number, "open": True, "base": {"ref": base}, "created_at": "2026-01-01T00:00:00Z",
-            "pull_requests": [{"number": p["number"], "state": "open", "head": {"ref": p["headRefName"]}} for p in prs_]}
+def stack(number: int, *layers_: dict) -> dict:
+    """One open stack of `gh api .../stacks` (the list endpoint carries no base)."""
+    return {"number": number, "open": True, "base": None, "created_at": "2026-01-01T00:00:00Z",
+            "pull_requests": [{"number": b["pr"]["number"], "state": "open", "head": {"ref": b["name"]}} for b in layers_]}
 
 
 @unittest.skipUnless(not MISSING, SKIP_REASON)
@@ -116,6 +126,8 @@ class BeadQueuesTests(unittest.TestCase):
         cls.addClassCleanup(shutil.rmtree, root, ignore_errors=True)
         cls.addClassCleanup(stop_server, root)
         init_workspace(cls.ws)
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "init"], cwd=root, check=True)
         bin_dir = root / "fake-bin"
         bin_dir.mkdir()
         for name, body in (("atm", FAKE_ATM), ("gh", FAKE_GH)):
@@ -207,17 +219,34 @@ class BeadQueuesTests(unittest.TestCase):
 
     def test_stack_rows(self):
         q = Queues(self.ws, "st")
-        t = q.trunk
-        p1, p2, p3, p4 = pr(1, t, "a"), pr(2, "a", "b"), pr(3, "x", "c"), pr(4, "b", "d")
-        q.github([stack(10, t, p1, p2, p3)], [p1, p2, p3, p4, pr(9, "develop", "z")])
-        got = q.queues()
-        assert got == {"stack_incoherent": {"stack#10"}, "pr_unlinked": {"pr#4"}}
-        q.github([stack(10, t, p1, p2), stack(11, t, p4)], [p1, p2, p4])
+        l1, l2, l3, l4 = layer(1, "a"), layer(2, "b"), layer(3, "c", rebase=True), layer(4, "d")
+        q.github([stack(10, l1, l2, l3), stack(12, layer(9, "z"))], [l1, l2, l3, l4])
+        assert q.queues() == {"stack_incoherent": {"stack#10"}, "pr_unlinked": {"pr#4"}}   # stack 12 is elsewhere
+        q.github([stack(10, l1, layer(5, "e"))], [l1])
+        assert q.queues() == {"stack_incoherent": {"stack#10"}}      # #5 is on the stack, not in the local stack
+        q.github([stack(10, l1, l2), stack(11, l4)], [l1, l2, l4])
         assert q.queues() == {"stack_incoherent": {"stack#10", "stack#11"}}   # two stacks: not one merge
-        q.github([], [p1])                                           # layer 0 waits unlinked on the trunk
+        q.github([stack(10, l1, l2)], [l1, l2, layer(None, "f")])
+        assert q.queues() == {"stack_incoherent": {"stack#10"}}      # a layer with no PR
+        q.github([], [l1])                                           # layer 0 waits unlinked on the trunk
         assert q.queues() == {}
-        q.github([], [p1, p2])
+        q.github([], [l1, l2])
         assert q.queues() == {"pr_unlinked": {"pr#1", "pr#2"}}
+        calls = (q.dir / "gh.log").read_text().splitlines()
+        assert all(c.startswith(f"{q.worktree} ") for c in calls)    # run in the trunk worktree
+        assert {c.split()[1] for c in calls} == {"stack", "api"}      # never `gh pr ...`
+
+    def test_stack_not_checked_keeps_the_report(self):
+        q = Queues(self.ws, "nc")
+        dev = group(q.sprint(1))[0]
+        for env, why in (({"FAKE_GH_FAIL": "1"}, "gh: HTTP 502"), ({}, "has trunk develop")):
+            q.github([], [layer(1, "a"), layer(2, "b")], trunk="develop")
+            proc = q.run(env=env)
+            assert proc.returncode == 0, proc.stderr
+            assert "stack not checked:" in proc.stdout and why in proc.stdout and dev in proc.stdout
+        subprocess.run(["git", "worktree", "remove", str(q.worktree)], cwd=self.ws.root, check=True)
+        proc = q.run()
+        assert proc.returncode == 0 and f"stack not checked: no worktree on {q.trunk}" in proc.stdout
 
     def test_cron_contract(self):
         q = Queues(self.ws, "cr")
@@ -238,8 +267,8 @@ class BeadQueuesTests(unittest.TestCase):
 
     def test_errors_exit_nonzero_with_empty_stdout(self):
         q = Queues(self.ws, "er")
-        proc = q.run("--json", env={"FAKE_GH_FAIL": "1"})
-        assert proc.returncode == 2 and proc.stdout == "" and "gh" in proc.stderr
+        proc = q.run("--json", env={"FAKE_ATM_FAIL": "1"})
+        assert proc.returncode == 2 and proc.stdout == "" and "atm" in proc.stderr
         proc = q.run("--json", env={"ATM_IDENTITY": ""})   # the workspace config has no lead
         assert proc.returncode == 3 and proc.stdout == "" and "roles.lead" in proc.stderr
         self.ws.bd("delete", q.root, "--force")
