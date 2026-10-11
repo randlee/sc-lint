@@ -1,0 +1,124 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261010T183345Z-fixture_ANC-005_fail_3",
+  "gate": "plan",
+  "created_at": "2026-10-10T18:33:45+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-i/docs/plans/phase-i/anchors.json",
+  "plan": "phase-i",
+  "item": {
+    "id": "fixture:ANC-005:fail:3",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 103,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.13.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign\"",
+      "anchor_version": 4,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "4104b2d35e1af65d4896d781066b57f886573b26877a0b11d9984825ae29ce15",
+      "deterministic_check": "every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+          "criteria": {
+            "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.",
+            "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+            "unclear": "The item text is too vague to tell what part of the system it touches."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "What each issue asks: #193 first install never overwrites a consumer file (exit 2 with the paths); CI uses the vendored action ./plugins/sc-lint/.github/actions/setup-sc-lint; no action files when ci.enabled is false. #194 kit justfile has no set/default; install key justfile.windows_shell renders set windows-shell only if the consumer has none; install.py --dry-run runs just --list and exits 2 naming collisions; the kit skill's migration covers lint/test/default/set. #200 sc-lint lint <analyzer> exits nonzero on status fail; the bootstrap exports SC_LINT_BIN and puts the managed binary first on PATH. #201 each analyzer reads [tool.sc-lint.analyzers.<name>] with enabled, reason, exclude_rules, fail_rules, exclude_paths plus its own keys, unknown keys are errors; --rule-filter on every backend, forwarded by sc-lint lint; the kit renders and publishes the keys. #202 portability reads config_home_env and unix_path_prefixes (shared by PORT-001 and PORT-006) from [tool.sc-lint.analyzers.portability]. #203 boundary inventory: lib target name from cargo metadata, opaque [extensions.<namespace>] per record, allowed_dev_dependencies. #204 SCB-CYCLE-002/003: record the callee, exclude private-helper and receiver delegation unless in a multi-node cycle, exclude enum-variant expressions. Does `item.text` name the issue or issues it addresses (in its heading or per deliverable), and is every deliverable either something those issues ask for or something the change strictly needs (tests, the one doc that states the changed contract, a compile fix)? A test deliverable does not need its own issue number.",
+          "criteria": {
+            "yes": "The item names its issue(s), and every deliverable is required by them or strictly needed to implement them.",
+            "no": "The item names no issue, or at least one deliverable does something none of the issues asks for and the change does not need.",
+            "unclear": "The deliverables are too vague to compare with the issues."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` add work none of #193-#204 asks for? Examples: refactors or renames not needed by the change; new traits, registries or abstractions beyond what the change needs; a flag, option or configuration key the issue does not name (for example a --fail-on flag for #200, whose fix is a fixed nonzero exit code); process artifacts (gate matrices, ledgers, approval rows, certificates); documentation beyond the contract the change alters. A test, a compile-required edit, or a helper the issue's change directly calls is not extra work. Silence is not a contradiction.",
+          "criteria": {
+            "yes": "The item plans at least one such addition.",
+            "no": "The item plans no such addition.",
+            "unclear": "The item might plan such an addition but the text is ambiguous."
+          }
+        }
+      },
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.96,
+            "no": 0.03,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.83,
+          "probabilities": {
+            "yes": 0.89,
+            "no": 0.01,
+            "unclear": 0.1
+          }
+        }
+      },
+      "min_confidence": 0.83,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1326,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 103,
+      "item_shortened": false,
+      "request_bytes": 4088
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-005"
+    ],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

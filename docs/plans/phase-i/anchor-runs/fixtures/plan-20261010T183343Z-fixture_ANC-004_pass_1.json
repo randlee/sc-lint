@@ -1,0 +1,122 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261010T183343Z-fixture_ANC-004_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-10T18:33:43+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-i/docs/plans/phase-i/anchors.json",
+  "plan": "phase-i",
+  "item": {
+    "id": "fixture:ANC-004:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 89,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.13.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"any substantial redesign work is to be discussed w/ me before documented or planned.\"",
+      "anchor_version": 4,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "940fd2fdf9cacece6e42bf34926a8ad9add33741e259dca1ed8c519f421ac31e",
+      "deterministic_check": "every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Does `item.text` plan any change to the sc-lint repository: Rust code, the adoption kit (install.py, install.schema.json, templates, justfile), bootstrap scripts, configuration keys, CLI flags, documentation, ADRs or crates? Answer yes for any item that adds, changes or removes anything there; a rule against unapproved redesign applies to every change. Judge only whether it plans a change.",
+          "criteria": {
+            "yes": "The item plans at least one change to sc-lint.",
+            "no": "The item plans no change to sc-lint at all.",
+            "unclear": "The item text does not show whether it changes anything."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "`anchor.statement` forbids unapproved redesign. Does `item.text` comply: it leaves every ADR decision, the crate set (no crate added or removed), and each layer's responsibilities as they are, or it cites Rand's approval for each such change? An item that makes none of these changes complies even if it never mentions the rule. Adding code inside an existing crate, a new module, a new function, a new CLI flag or a new config key is not a redesign.",
+          "criteria": {
+            "yes": "The item makes no ADR, crate-set or layer-responsibility change, or cites Rand's approval for each one it makes.",
+            "no": "The item makes such a change without citing Rand's approval.",
+            "unclear": "The item text does not say enough to tell whether it changes an ADR, the crate set or a layer's responsibilities."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` amend or supersede an ADR, add or remove a crate, or move a responsibility from one layer to another (for example consumer workflow into the CLI), without citing Rand's approval? Silence is not a contradiction. Adding code inside an existing crate, a new module, a new function, a new CLI flag or a new configuration key is not a redesign.",
+          "criteria": {
+            "yes": "The item plans at least one such change with no cited approval.",
+            "no": "The item plans no such change, or cites approval for each.",
+            "unclear": "The item might plan such a change but the text is ambiguous."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.96,
+            "no": 0.04,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "yes": 0.09,
+            "no": 0.91,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.86,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 948,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 89,
+      "item_shortened": false,
+      "request_bytes": 2599
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

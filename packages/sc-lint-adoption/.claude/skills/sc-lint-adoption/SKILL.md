@@ -48,11 +48,23 @@ alias for the declared layer. Keep all consumer-owned recipes that are not
 tests unchanged. This is a scoped consumer-PR migration; the kit does not
 guess commands, scan arbitrary scripts, or delete recipes.
 
+### Resolve recipe and setting collisions
+
+The kit defines `setup`, `lint` and `upgrade`, and no `default`, `test` or `set`.
+Rename or remove any root `lint`, `setup` or `upgrade` recipe, moving its command
+into `profiles.<name>`. The repository owns `just test`: a root `test` recipe
+is kept as is; if there is none, the installer adds sc-lint's recommended one
+(`plugins/sc-lint/templates/test.just`) outside the managed block. Keep a consumer `default` recipe;
+none is added to an existing Justfile. If the root `Justfile` sets `windows-shell`, the kit does not add one;
+set `"justfile": {"windows_shell": false}` to omit it entirely. Never duplicate a `set`.
+
 ## 2. Write and validate `install.json`
 
 Create `install.json` at the consumer root. It has `minimum_version`,
-`profiles`, `ci`, `analyzers`, and optional `test` fields. The dry-run in step
-3 validates this input against the packaged `install.schema.json` before it
+`profiles`, `ci`, `analyzers`, and optional `test` and `justfile` fields.
+`justfile.windows_shell` is a boolean that defaults to `true`; set it to
+`false` to omit the kit's `set windows-shell` line. The dry-run in step 3
+validates this input against the packaged `install.schema.json` before it
 renders any file.
 
 ```bash
@@ -68,7 +80,13 @@ repository-relative script is not authorized in a kit-rendered step.
 
 Run the installer without writes first and retain both its output and exit code
 in the PR body. Exit 0 means already converged; exit 1 means a safe proposed
-change; exit 2 means an input or managed-marker conflict that must be resolved.
+change; exit 2 means an input, managed-marker, pre-existing-file or Justfile
+recipe/setting collision conflict that must be resolved. On every install,
+differing pre-existing kit targets absent from the prior installed manifest are
+listed, and nothing is written. The merged root `Justfile` and `.sc-lint/install.json` when selected as the input
+are exempt from that clash check. When CI is enabled, the generated workflow
+uses `./plugins/sc-lint/.github/actions/setup-sc-lint`, vendored at
+`plugins/sc-lint/.github/actions/setup-sc-lint/action.yml`.
 
 ```bash
 set +e; python3 "$SC_LINT_ADOPTION_ROOT/install.py" --dry-run --input install.json .; dry_run_exit=$?; set -e; printf 'sc-lint adoption dry-run exit %s\n' "$dry_run_exit"; test "$dry_run_exit" -le 1
@@ -118,8 +136,9 @@ drift remains, include the new dry-run output instead of claiming convergence.
 
 ## How to extend
 
-- **Analyzers:** add `[tool.sc-lint.analyzers.<name>]` entries with `enabled`,
-  `reason`, target facts, and analyzer-specific settings.
+- **Analyzers:** set `analyzers.<name>` in `install.json`; the kit renders it as
+  `[tool.sc-lint.analyzers.<name>]`. The keys are listed in `configuration.md`,
+  "Analyzer tables"; any other key fails the install.
 - **Test layers:** declare ordered `[tool.sc-lint.test.<layer>]` lists. `unit`
   is the default; `just test <layer> *args` passes through and `just test all`
   follows declared order.

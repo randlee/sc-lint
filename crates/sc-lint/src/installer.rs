@@ -1084,8 +1084,11 @@ mod tests {
     fn setup_and_upgrade_command_dispatch_covers_all_installation_states_on_every_platform() {
         let fixture = TempDir::new().expect("fixture");
         let config_path = fixture.path().join("sc-lint.toml");
-        let install_dir = fixture.path().join("managed");
-        fs::create_dir_all(&install_dir).expect("managed directory");
+        let built_binary = built_cli_binary();
+        let built_binary_dir = built_binary.parent().expect("built CLI directory");
+        let install_fixture = TempDir::new_in(built_binary_dir).expect("same-filesystem fixture");
+        let install_dir = install_fixture.path().join("managed");
+        fs::create_dir(&install_dir).expect("managed directory");
         let _environment = InstallerEnvironment::set(&[(INSTALL_DIR_ENV, install_dir.as_os_str())]);
         let package_version = Version::parse(env!("CARGO_PKG_VERSION")).expect("package version");
         // No managed binary: setup's dry-run follows the real dispatch path,
@@ -1110,12 +1113,12 @@ mod tests {
         // version states exercise the actual installer command path without a
         // Unix shell fixture or platform-specific permission assumptions. CI
         // may reuse a cached executable from a preceding workspace build, so
-        // derive the compatible floor from the binary we actually copied
+        // derive the compatible floor from the binary we actually link
         // rather than assuming it is this test crate's package version.
-        let built_binary = built_cli_binary();
         let managed_binary = install_dir.join(ReleaseTarget::binary_name());
-        fs::copy(&built_binary, &managed_binary).expect("copy native CLI probe");
-        let current = probe_version(&managed_binary).expect("probe copied native CLI");
+        // Keep the test process from holding a write fd for the executable it probes.
+        fs::hard_link(&built_binary, &managed_binary).expect("hard link native CLI probe");
+        let current = probe_version(&managed_binary).expect("probe linked native CLI");
 
         let mut old_floor = current.clone();
         old_floor.patch += 1;
@@ -1322,16 +1325,22 @@ mod tests {
 
     #[cfg(unix)]
     fn write_probe(path: &Path, version: &str) {
-        use std::os::unix::fs::PermissionsExt;
-
-        let mut file = fs::File::create(path).expect("probe script");
-        writeln!(
-            file,
+        let script = format!(
             "#!/bin/sh\nprintf '%s\\n' '{{\"ok\":true,\"command\":\"version\",\"data\":{{\"tool\":\"sc-lint\",\"version\":\"{version}\",\"contract_schema\":\"sc-lint-version-v1\"}}}}'"
-        )
-        .expect("script text");
-        let mut permissions = file.metadata().expect("metadata").permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(path, permissions).expect("executable");
+        );
+        // Write the executable in a child so the test process never owns its write fd.
+        let mut child = Command::new("sh")
+            .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "write-probe"])
+            .arg(path)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .expect("probe writer starts");
+        child
+            .stdin
+            .take()
+            .expect("probe writer stdin")
+            .write_all(script.as_bytes())
+            .expect("script text");
+        assert!(child.wait().expect("probe writer waits").success());
     }
 }

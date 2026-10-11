@@ -14,6 +14,7 @@ pub const FIELD_SUMMARY: &str = "summary";
 pub const FIELD_TOOL: &str = "tool";
 pub const FIELD_FINDINGS: &str = "findings";
 pub const FIELD_STATUS: &str = "status";
+pub const STATUS_FAIL: &str = "fail";
 pub const FIELD_VERSION: &str = "version";
 pub const FIELD_CRATE_NAME: &str = "crate_name";
 pub const FIELD_CRATE_VERSION: &str = "crate_version";
@@ -28,6 +29,16 @@ pub const FIELD_DOCS: &str = "docs";
 pub const FIELD_STEPS: &str = "steps";
 pub const FIELD_ROOT: &str = "root";
 pub const FIELD_EXIT_CODE: &str = "exit_code";
+
+/// Top-level CLI exit codes. Error kinds use 1–6; business verdict 10 is disjoint.
+pub const EXIT_SUCCESS: u8 = 0;
+pub const EXIT_INTERNAL: u8 = 1;
+pub const EXIT_USAGE: u8 = 2;
+pub const EXIT_CONFIG: u8 = 3;
+pub const EXIT_CAPABILITY: u8 = 4;
+pub const EXIT_BACKEND_FAILURE: u8 = 5;
+pub const EXIT_BACKEND_PROTOCOL: u8 = 6;
+pub const EXIT_VERDICT_FAIL: u8 = 10;
 pub const FIELD_BACKEND_PATH: &str = "backend_path";
 
 /// Repo-relative directory of the consumer-provisioned Python virtual environment.

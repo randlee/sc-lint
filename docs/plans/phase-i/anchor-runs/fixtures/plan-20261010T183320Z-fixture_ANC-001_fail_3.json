@@ -1,0 +1,124 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261010T183320Z-fixture_ANC-001_fail_3",
+  "gate": "plan",
+  "created_at": "2026-10-10T18:33:20+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-i/docs/plans/phase-i/anchors.json",
+  "plan": "phase-i",
+  "item": {
+    "id": "fixture:ANC-001:fail:3",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 110,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.13.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must be a layered design.  w/ layers (lowest to highest):  a) sc-lint-types (shared types) and sc-lint-attribute (shared attributes)  b) independent cargo tools (i.e. sc-lint-boundary)  c) sc-lint cli which calls into (b)  d) just template (recommended just command layout w/ recommended mapping to (b) and (c) )",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "27c14a8fca9ba48399c8486de9f96781c94ff1a5d6e8ff180ed7accd39d06187",
+      "deterministic_check": "cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; docs/architecture.md has a Layered Architecture section naming layers (a)-(d)",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+          "criteria": {
+            "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.",
+            "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+            "unclear": "The item text is too vague to tell what part of the system it touches."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "The layers of `anchor.statement`, by crate: (a) shared crates sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; (b) independent analyzers sc-lint-boundary, sc-lint-portability, sc-lint-runtime, which depend only on (a); (c) the sc-lint CLI crate, which calls into (b) and only forwards; (d) the adoption kit, bootstrap scripts and just template, which call (b) and (c). Does `item.text` keep its changes inside this layering: each change in a named layer, and every dependency it adds pointing from a higher layer to a lower one? Count it as yes when the item's changes fit the layering, even if the item does not restate the layering.",
+          "criteria": {
+            "yes": "Every change the item plans sits in one of the named layers, and any edit outside its main layer is stated as a compile requirement or a call from a higher layer into a lower one.",
+            "no": "The item plans a change that does not fit any layer, adds a dependency between analyzers or from a lower layer to a higher one, or changes code without saying which layer it belongs to.",
+            "unclear": "The item does not say enough about which crates or files it changes to tell."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` plan something the layering in `anchor.statement` rules out? Violations, each one enough on its own: any of sc-lint-boundary, sc-lint-portability and sc-lint-runtime gaining a dependency on another of those three crates (for example sc-lint-portability depending on sc-lint-boundary); any of sc-lint-boundary, sc-lint-portability and sc-lint-runtime depending on the sc-lint CLI crate; sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support or sc-lint-attributes depending on an analyzer or on the CLI; analyzer rule logic placed in the CLI crate or in a shared crate; the CLI interpreting analyzer configuration instead of forwarding it. Silence is not a contradiction.",
+          "criteria": {
+            "yes": "The item plans at least one of the listed violations.",
+            "no": "Nothing in the item plans a listed violation.",
+            "unclear": "The item might plan a listed violation but the text is ambiguous."
+          }
+        }
+      },
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.02,
+            "no": 0.98,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.98,
+            "no": 0.01,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1256,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 110,
+      "item_shortened": false,
+      "request_bytes": 3685
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-001"
+    ],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

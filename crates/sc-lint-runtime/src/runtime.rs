@@ -22,12 +22,14 @@ use crate::Finding;
 use crate::NodeId;
 use crate::OwnerId;
 use crate::RuleId;
+use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageName;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::classify_scope;
 use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
 
 #[derive(Debug, Clone)]
@@ -42,11 +44,17 @@ struct RuntimeFinding {
     node_label: String,
 }
 
-pub(crate) fn analyze_runtime_liveness(root: &Path) -> Result<Vec<Finding>> {
+pub(crate) fn analyze_runtime_liveness(
+    root: &Path,
+    settings: &AnalyzerSettings,
+) -> Result<Vec<Finding>> {
     let source_files = discover_source_files(root)?;
     let mut findings = Vec::new();
 
     for file_context in source_files {
+        if settings.path_excluded(&relative_slash_path(root, &file_context.source_path)) {
+            continue;
+        }
         let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
             || {
                 format!(

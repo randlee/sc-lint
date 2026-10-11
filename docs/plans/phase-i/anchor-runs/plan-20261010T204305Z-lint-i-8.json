@@ -1,0 +1,532 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261010T204305Z-lint-i-8",
+  "gate": "plan",
+  "created_at": "2026-10-10T20:43:05+00:00",
+  "anchors_path": "/private/tmp/claude-501/-Users-randlee-github-sc-lint/0ffddd7f-a34f-42d8-9a4a-9dbba6ca5493/scratchpad/phase-i/v030/anchors.json",
+  "plan": "phase-i",
+  "item": {
+    "id": "lint-i-8",
+    "title": "i-8: portability reads its analyzer table (#202, #201)",
+    "source": "/var/folders/3q/0f7c3v_j6ps28gtz8xfz99km0000gn/T//plan-anchoring/lint-i-8-41873/item.txt",
+    "chars": 1624,
+    "truncated": false,
+    "chars_before_reduction": 1624,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.13.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each change sits in the layer that owns it: (a) shared types and attributes, (b) independent cargo analyzer tools, (c) the sc-lint CLI, which calls (b), (d) the just template; no layer depends on a higher one and no (b) tool depends on another (b) tool.",
+      "quote": "sc-lint must be a layered design.  w/ layers (lowest to highest):  a) sc-lint-types (shared types) and sc-lint-attribute (shared attributes)  b) independent cargo tools (i.e. sc-lint-boundary)  c) sc-lint cli which calls into (b)  d) just template (recommended just command layout w/ recommended mapping to (b) and (c) )",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "aae858b2e8631b6cb67c4c1780307eeb28a11e59975da5fdbd6b190ddfcbae9d",
+      "deterministic_check": "cargo metadata --format-version 1 --no-deps: sc-lint-boundary, sc-lint-portability and sc-lint-runtime depend on no sc-lint-* crate outside sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; those (a) crates depend on no (b) or (c) crate; docs/architecture.md has a Layered Architecture section naming layers (a)-(d)",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+          "criteria": {
+            "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.",
+            "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+            "unclear": "The item text is too vague to tell what part of the system it touches."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "The layers of `anchor.statement`, by crate: (a) shared crates sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support, sc-lint-attributes; (b) independent analyzers sc-lint-boundary, sc-lint-portability, sc-lint-runtime, which depend only on (a); (c) the sc-lint CLI crate, which calls into (b) and only forwards; (d) the adoption kit, bootstrap scripts and just template, which call (b) and (c). Does `item.text` keep its changes inside this layering: each change in a named layer, and every dependency it adds pointing from a higher layer to a lower one? Count it as yes when the item's changes fit the layering, even if the item does not restate the layering.",
+          "criteria": {
+            "yes": "Every change the item plans sits in one of the named layers, and any edit outside its main layer is stated as a compile requirement or a call from a higher layer into a lower one.",
+            "no": "The item plans a change that does not fit any layer, adds a dependency between analyzers or from a lower layer to a higher one, or changes code without saying which layer it belongs to.",
+            "unclear": "The item does not say enough about which crates or files it changes to tell."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` plan something the layering in `anchor.statement` rules out? Violations, each one enough on its own: any of sc-lint-boundary, sc-lint-portability and sc-lint-runtime gaining a dependency on another of those three crates (for example sc-lint-portability depending on sc-lint-boundary); any of sc-lint-boundary, sc-lint-portability and sc-lint-runtime depending on the sc-lint CLI crate; sc-lint-schema, sc-lint-directives, sc-lint-analyzer-support or sc-lint-attributes depending on an analyzer or on the CLI; analyzer rule logic (matching, filtering or deciding findings, for example PORT-006 prefix checks) placed in the CLI crate (crates/sc-lint, including dispatch.rs) or in a shared crate; the CLI interpreting analyzer configuration instead of forwarding it. Silence is not a contradiction.",
+          "criteria": {
+            "yes": "The item plans at least one of the listed violations.",
+            "no": "Nothing in the item plans a listed violation.",
+            "unclear": "The item might plan a listed violation but the text is ambiguous."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.96,
+            "no": 0.04,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.03,
+            "no": 0.96,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.94,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1722,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1624,
+      "item_shortened": false,
+      "request_bytes": 5311
+    },
+    {
+      "anchor_id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each phase-i change lands in the lowest layer that can carry it, and each sprint bead names that layer.",
+      "quote": "The intent is to make these changes at the appropriate layer",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"The intent is to make these changes at the appropriate layer\"",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "each sprint bead names one layer (a)-(d); git diff --stat of its PR touches only that layer's crates or kit files",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.89,
+          "probabilities": {
+            "yes": 0.93,
+            "no": 0.06,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.89,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1473,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1624,
+      "item_shortened": false,
+      "request_bytes": 4606
+    },
+    {
+      "anchor_id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "No phase-i document or plan bead changes a layer's responsibilities, an ADR decision, or the crate set unless Rand approved that change in discussion first.",
+      "quote": "any substantial redesign work is to be discussed w/ me before documented or planned.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"any substantial redesign work is to be discussed w/ me before documented or planned.\"",
+      "anchor_version": 4,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "940fd2fdf9cacece6e42bf34926a8ad9add33741e259dca1ed8c519f421ac31e",
+      "deterministic_check": "every diff to docs/architecture.md, docs/requirements.md or docs/sc-lint/adr/ on plan/phase-i, and every sprint bead that changes a layer responsibility, cites a recorded Rand approval",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Does `item.text` plan any change to the sc-lint repository: Rust code, the adoption kit (install.py, install.schema.json, templates, justfile), bootstrap scripts, configuration keys, CLI flags, documentation, ADRs or crates? Answer yes for any item that adds, changes or removes anything there; a rule against unapproved redesign applies to every change. Judge only whether it plans a change.",
+          "criteria": {
+            "yes": "The item plans at least one change to sc-lint.",
+            "no": "The item plans no change to sc-lint at all.",
+            "unclear": "The item text does not show whether it changes anything."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "`anchor.statement` forbids unapproved redesign. Does `item.text` comply: it leaves every ADR decision, the crate set (no crate added or removed), and each layer's responsibilities as they are, or it cites Rand's approval for each such change? An item that makes none of these changes complies even if it never mentions the rule. Adding code inside an existing crate, a new module, a new function, a new CLI flag or a new config key is not a redesign.",
+          "criteria": {
+            "yes": "The item makes no ADR, crate-set or layer-responsibility change, or cites Rand's approval for each one it makes.",
+            "no": "The item makes such a change without citing Rand's approval.",
+            "unclear": "The item text does not say enough to tell whether it changes an ADR, the crate set or a layer's responsibilities."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` amend or supersede an ADR, add or remove a crate, or move a responsibility from one layer to another (for example consumer workflow into the CLI), without citing Rand's approval? Silence is not a contradiction. Adding code inside an existing crate, a new module, a new function, a new CLI flag or a new configuration key is not a redesign.",
+          "criteria": {
+            "yes": "The item plans at least one such change with no cited approval.",
+            "no": "The item plans no such change, or cites approval for each.",
+            "unclear": "The item might plan such a change but the text is ambiguous."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.04,
+            "no": 0.96,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.94,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1412,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1624,
+      "item_shortened": false,
+      "request_bytes": 4194
+    },
+    {
+      "anchor_id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every phase-i deliverable is a targeted addition that addresses a named GitHub issue from #193-#204; nothing is added that those issues do not require.",
+      "quote": "I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I do NOT want unauthorized additions beyond what is required to address the issues filed. / These should all be line item targeted additions not redesign\"",
+      "anchor_version": 4,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "4104b2d35e1af65d4896d781066b57f886573b26877a0b11d9984825ae29ce15",
+      "deterministic_check": "every deliverable in every sprint bead cites one issue from #193-#204; each sprint PR diff is additive and confined to what that issue names",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+          "criteria": {
+            "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.",
+            "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+            "unclear": "The item text is too vague to tell what part of the system it touches."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "What each issue asks: #193 first install never overwrites a consumer file (exit 2 with the paths); CI uses the vendored action ./plugins/sc-lint/.github/actions/setup-sc-lint; no action files when ci.enabled is false. #194 kit justfile has no set/default; install key justfile.windows_shell renders set windows-shell only if the consumer has none; install.py --dry-run runs just --list and exits 2 naming collisions; the kit skill's migration covers lint/test/default/set. #200 sc-lint lint <analyzer> exits nonzero on status fail; the bootstrap exports SC_LINT_BIN and puts the managed binary first on PATH. #201 each analyzer reads [tool.sc-lint.analyzers.<name>] with enabled, reason, exclude_rules, fail_rules, exclude_paths plus its own keys, unknown keys are errors; --rule-filter on every backend, forwarded by sc-lint lint; the kit renders and publishes the keys. #202 portability reads config_home_env and unix_path_prefixes (shared by PORT-001 and PORT-006) from [tool.sc-lint.analyzers.portability]. #203 boundary inventory: lib target name from cargo metadata, opaque [extensions.<namespace>] per record, allowed_dev_dependencies. #204 SCB-CYCLE-002/003: record the callee, exclude private-helper and receiver delegation unless in a multi-node cycle, exclude enum-variant expressions. Does `item.text` name the issue or issues it addresses (in its heading or per deliverable), and is every deliverable either something those issues ask for or something the change strictly needs (tests, the one doc that states the changed contract, a compile fix)? A test deliverable does not need its own issue number.",
+          "criteria": {
+            "yes": "The item names its issue(s), and every deliverable is required by them or strictly needed to implement them.",
+            "no": "The item names no issue, or at least one deliverable does something none of the issues asks for and the change does not need.",
+            "unclear": "The deliverables are too vague to compare with the issues."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` add work none of #193-#204 asks for? Examples: refactors or renames not needed by the change; new traits, registries or abstractions beyond what the change needs; a flag, option or configuration key the issue does not name (for example a --fail-on flag for #200, whose fix is a fixed nonzero exit code); process artifacts (gate matrices, ledgers, approval rows, certificates); documentation beyond the contract the change alters. A test, a compile-required edit, or a helper the issue's change directly calls is not extra work. Silence is not a contradiction.",
+          "criteria": {
+            "yes": "The item plans at least one such addition.",
+            "no": "The item plans no such addition.",
+            "unclear": "The item might plan such an addition but the text is ambiguous."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.89,
+          "probabilities": {
+            "yes": 0.93,
+            "no": 0.07,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.8,
+          "probabilities": {
+            "yes": 0.11,
+            "no": 0.87,
+            "unclear": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.8,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1789,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 1624,
+      "item_shortened": false,
+      "request_bytes": 5669
+    },
+    {
+      "anchor_id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A consumer's `just test` stays defined and customized in the consumer repository; sc-lint ships only recipe patterns and general helper functions, never test orchestration.",
+      "quote": "I expect 'just test' to be managed and customized by the repo.  sc-lint supplies patterns and general helper functions",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session",
+      "anchor_version": 5,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "b1a3e726534a67d72569ea5b9f6e3f700839b274bb0367e43a4c5d27d3188802",
+      "deterministic_check": "git diff of the phase adds no consumer test orchestration to crates/sc-lint; the kit's test recipe is a consumer-editable pattern; any sc-lint addition for testing is a general helper the recipe calls",
+      "kind": "prohibition",
+      "leaning": "not_applicable",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Does the work in `item.text` touch how a consumer repository's `just test` is defined or run? This includes the kit's `test` recipe or a recommended test recipe pattern, test selectors or manifests, test step runners, sc-lint code that runs a consumer's tests, and helper commands sc-lint ships for consumer test recipes to call. Exporting environment variables or fixing exit codes that every recipe uses does not count. Judge subject overlap only.",
+          "criteria": {
+            "yes": "The item plans or changes how consumer tests are defined, selected, orchestrated or run.",
+            "no": "The item does not touch consumer test definition, selection, orchestration or execution.",
+            "unclear": "The item text is too vague to tell."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does `item.text` leave `just test` managed and customized by the consumer repository, with sc-lint supplying only patterns (an editable recipe) or general helper functions the recipe calls?",
+          "criteria": {
+            "yes": "The item keeps test orchestration in the consumer's Justfile and adds at most patterns or general helpers.",
+            "no": "The item moves test orchestration into sc-lint or makes the consumer's test recipe non-editable.",
+            "unclear": "The item does not say where test orchestration lives."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` plan to implement consumer test orchestration inside the sc-lint CLI or another sc-lint crate (test manifests, selectors, step groups, test runners), or make the kit's `test` recipe something the consumer cannot edit? Silence is not a contradiction.",
+          "criteria": {
+            "yes": "The item plans one of those.",
+            "no": "The item plans none of those.",
+            "unclear": "The item might plan one of those but the text is ambiguous."
+          }
+        }
+      },
+      "verdict": "not_applicable",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "unclear",
+          "confidence": 0.62,
+          "probabilities": {
+            "yes": 0.24,
+            "no": 0.01,
+            "unclear": 0.75
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The anchor does not govern this bead.",
+      "usage": {
+        "input_tokens": 1350,
+        "output_tokens": 118
+      },
+      "attempts": 1,
+      "item_chars_sent": 1624,
+      "item_shortened": false,
+      "request_bytes": 3951
+    },
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.",
+      "quote": "I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.\"",
+      "anchor_version": 4,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "384e381771ee331178a476f1edeab20db280063f85c16fd3d23261d53c90dfe0",
+      "deterministic_check": "each sprint bead design contains a fenced code block for every numbered deliverable",
+      "kind": "structural",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Is the item a sprint bead: a unit of development work with numbered deliverables and a Design section describing code to write? A phase root or epic that lists sprints and decisions, with no code of its own to implement, is not a sprint bead.",
+          "criteria": {
+            "yes": "The item is a sprint bead with deliverables to implement.",
+            "no": "The item is a phase root, epic or other non-sprint bead.",
+            "unclear": "The item text does not show whether it is a sprint bead."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "For each numbered deliverable in `item.text`, does the Design give the code or the exact edit: a fenced code block, an exact file/line replacement, or a signature followed by a `<redacted: N of M code lines are in the plan but were not sent to Jev>` marker? The redaction marker means the full code is in the plan and counts as code present. A one-line exact instruction (delete lines 1-4; replace X with Y in file F) counts as an exact edit.",
+          "criteria": {
+            "yes": "Every numbered deliverable has code, an exact edit, or a redacted code block in the Design.",
+            "no": "At least one numbered deliverable has only prose with no code and no exact edit.",
+            "unclear": "The deliverables and the Design cannot be matched up."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` leave a design decision to the developer? Signs: 'choose', 'decide', 'TBD', 'as appropriate', 'if needed', 'either ... or ...' about how to build something, or a deliverable described only by its goal. A redaction marker is not a missing decision. Silence is not a contradiction.",
+          "criteria": {
+            "yes": "The item leaves at least one design decision to the developer.",
+            "no": "The item leaves no design decision to the developer.",
+            "unclear": "The text might leave a decision open but is ambiguous."
+          }
+        }
+      },
+      "verdict": "deterministic_only",
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "Structural anchor: verified by its deterministic_check, not by Jev",
+      "attempts": 0,
+      "item_chars_sent": 1624,
+      "item_shortened": false
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 4,
+      "not_applicable": 1,
+      "deterministic_only": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "not_applicable": 1,
+      "satisfied": 4
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

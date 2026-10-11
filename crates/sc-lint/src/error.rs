@@ -36,12 +36,12 @@ impl CliErrorKind {
 
     pub const fn exit_code(self) -> u8 {
         match self {
-            Self::Usage => 2,
-            Self::Config => 3,
-            Self::Capability => 4,
-            Self::BackendFailure => 5,
-            Self::BackendProtocol => 6,
-            Self::Internal => 1,
+            Self::Usage => consts::EXIT_USAGE,
+            Self::Config => consts::EXIT_CONFIG,
+            Self::Capability => consts::EXIT_CAPABILITY,
+            Self::BackendFailure => consts::EXIT_BACKEND_FAILURE,
+            Self::BackendProtocol => consts::EXIT_BACKEND_PROTOCOL,
+            Self::Internal => consts::EXIT_INTERNAL,
         }
     }
 }

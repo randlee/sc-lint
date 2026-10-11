@@ -30,6 +30,10 @@ roots = [
   "ImplKind",
   "LintAttribute",
   "analyze_workspace",
+  "analyze_workspace_configured",
+  "BOUNDARY_CATALOG",
+  "ALL_BOUNDARY_IDS",
+  "DEFAULT_FAIL_IDS",
   "export_workspace_graph",
   "render_findings_report",
   "render_graph_export",
@@ -39,7 +43,7 @@ roots = [
 
 [dependencies]
 allowed_dependents = ["sc-lint"]
-allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
+allowed_dependencies = ["sc-lint-analyzer-support", "sc-lint-directives", "sc-lint-schema"]
 forbidden_edges = [
   { from = "sc-lint-boundary", to = "sc-lint-attributes" },
   { from = "sc-lint-boundary", to = "sc-observability" },

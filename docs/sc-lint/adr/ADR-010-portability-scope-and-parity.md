@@ -60,3 +60,22 @@ consumer-local.
   family rather than ad hoc rule-local config
 - consumer repos may adapt wrappers such as `unix-gating`, but those wrappers
   do not redefine the core product boundary or ownership model
+
+## Amendment 2026-10-10 — portability keys in the analyzer table
+
+| Field | Value |
+| --- | --- |
+| Status | Accepted (Rand, 2026-10-10) |
+| Source | #202 |
+
+1. Extends Decision 5: `PORT-001` and `PORT-006` share one Unix path prefix
+   list. `unix_path_prefixes` in `[tool.sc-lint.analyzers.portability]`
+   extends the built-in list; the built-in prefixes always apply. A configured
+   prefix adds detection and never suppresses a finding.
+2. Extends Decision 5: `PORT-002` reads `config_home_env` from the same
+   `[tool.sc-lint.analyzers.portability]` table.
+3. The legacy top-level `[portability]` table remains a compatibility fallback
+   only for `config_home_env`; a value in the analyzer table takes precedence.
+   Both tables require `config_home_env` to be a string and reject a wrong type
+   through the analyzer configuration error path.
+4. The rest of Decision 5 stands.

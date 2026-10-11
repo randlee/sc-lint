@@ -1,11 +1,17 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
+use sc_lint_analyzer_support::AnalyzerConfigError;
+use sc_lint_analyzer_support::AnalyzerName;
+use sc_lint_analyzer_support::CatalogRuleId;
+use sc_lint_analyzer_support::RuleCatalog;
+use sc_lint_analyzer_support::analyzer_settings_from;
+use sc_lint_analyzer_support::read_config_document;
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::OwnerId;
-use sc_lint_schema::ReportStatus;
 use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
@@ -17,6 +23,26 @@ mod tests;
 
 const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
+const ALL_PORT_IDS: &[CatalogRuleId] = &[
+    CatalogRuleId::new("PORT-001"),
+    CatalogRuleId::new("PORT-002"),
+    CatalogRuleId::new("PORT-003"),
+    CatalogRuleId::new("PORT-004"),
+    CatalogRuleId::new("PORT-005"),
+    CatalogRuleId::new("PORT-006"),
+    CatalogRuleId::new("PORT-007"),
+    CatalogRuleId::new("PORT-008"),
+    CatalogRuleId::new("PORT-009"),
+    CatalogRuleId::new("PORT-010"),
+];
+
+pub const PORTABILITY_CATALOG: RuleCatalog = RuleCatalog {
+    analyzer: AnalyzerName::new("portability"),
+    rules: ALL_PORT_IDS,
+    families: &[],
+    default_fail: ALL_PORT_IDS,
+    own_keys: &["config_home_env", "unix_path_prefixes", "targets"],
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnalyzeOptions {
@@ -92,28 +118,45 @@ pub enum PortabilityError {
         #[source]
         source: PortabilityErrorSource,
     },
+    #[error(transparent)]
+    AnalyzerConfig(#[from] AnalyzerConfigError),
 }
 
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, PortabilityError> {
-    let findings = portability::analyze_portability(&options.root).map_err(|source| {
-        PortabilityError::AnalyzeFindings {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
-    let scanned_crates = portability::count_scanned_crates(&options.root).map_err(|source| {
-        PortabilityError::CountScannedCrates {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
-    let status = if findings.is_empty() {
-        ReportStatus::Pass
+    analyze_workspace_configured(options, None, None)
+}
+
+pub fn analyze_workspace_configured(
+    options: &AnalyzeOptions,
+    config: Option<&Path>,
+    rule_filter: Option<&str>,
+) -> std::result::Result<FindingsReport, PortabilityError> {
+    let document =
+        read_config_document(PORTABILITY_CATALOG.analyzer.as_str(), &options.root, config)?;
+    let settings = analyzer_settings_from(&PORTABILITY_CATALOG, &document, rule_filter)?;
+    let analyzer_keys = portability::AnalyzerPortabilityKeys::from_settings(&settings)?;
+    portability::validate_legacy_portability_config(&document)?;
+    let (findings, scanned_crates) = if settings.enabled {
+        let findings =
+            portability::analyze_portability(&options.root, &document, &settings, &analyzer_keys)
+                .map_err(|source| PortabilityError::AnalyzeFindings {
+                root: options.root.clone(),
+                source: source.into(),
+            })?;
+        let scanned_crates =
+            portability::count_scanned_crates(&options.root).map_err(|source| {
+                PortabilityError::CountScannedCrates {
+                    root: options.root.clone(),
+                    source: source.into(),
+                }
+            })?;
+        (findings, scanned_crates)
     } else {
-        ReportStatus::Fail
+        (Vec::new(), 0)
     };
+    let (findings, status) = settings.apply(findings, |rule_id| rule_id.as_str());
     Ok(FindingsReport {
         tool: "sc-lint-portability",
         version: env!("CARGO_PKG_VERSION"),

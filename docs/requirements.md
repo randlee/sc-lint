@@ -153,8 +153,13 @@ The product should support both:
 
 - `REQ-PRODUCT-004D`
   `sc-lint-analyzer-support` owns only shared rule-neutral AST source
-  discovery, scope classification, and report rendering. Analyzer rule ids and
-  CLI ownership remain in their dedicated analyzer crates (ADR-013).
+  discovery, scope classification, report rendering, and the rule-neutral
+  `[tool.sc-lint.analyzers.<name>]` configuration parser that applies the
+  common keys and `--rule-filter` using the rule ids and families each analyzer
+  passes in. `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime`
+  may depend on it. Analyzer rule ids, analyzer-specific policy and CLI
+  ownership remain in their dedicated analyzer crates (ADR-013).
+  (Amended 2026-10-10, Accepted, #201.)
 
 - `REQ-PRODUCT-005`
   Generic, non-AST-sensitive utilities may remain Python-based when Rust does
@@ -481,14 +486,18 @@ The product should support both:
   non-executable binaries, invalid probes, and insufficient versions must stop
   work with a structured stable code, cause, recovery action, and documentation
   reference. Consumers must be able to invoke product-owned setup, complete
-  lint, complete test, and upgrade entry points without choosing a Cargo
-  package or copying source-repository orchestration. The product-owned
+  lint, and upgrade entry points, and the product-owned `sc-lint test` runner,
+  without choosing a Cargo package or copying source-repository
+  orchestration. The product-owned
   installation must create an idempotent `sc-lint.toml`, thin Just
   integration, `.sc-lint/bootstrap`, and Windows `.sc-lint/bootstrap.ps1`
   helpers with non-mutating `--check`/`--dry-run` modes; it must never
   overwrite a consumer README or user-owned integration file. Consumer `just
   setup`, `just lint`, `just test`, and `just upgrade` all depend on the same
   compatibility preflight; lint and test execute complete configured profiles.
+  The consumer repository owns `just test`; sc-lint provides a recommended
+  `test` recipe, which the installer adds only when the consumer has none.
+  (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
 
   Supersession (Phase G, ADR-015 Decision 1–2 and 4): the consumer-facing
   installation mechanism is the adoption kit (`packages/sc-lint-adoption`
@@ -553,13 +562,22 @@ The product should support both:
   A versioned, reusable, analyzer-agnostic adoption kit must install one
   drift-detectable consumer end state. Analyzer selection is the sole
   repo-specific declarative input in `[tool.sc-lint.analyzers]`; profiles
-  select applicable analyzers. Installation is idempotent and `--dry-run` is
+  select applicable analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry
+  carries the common keys `enabled`, `reason`, `exclude_rules`, `fail_rules`
+  and `exclude_paths` plus that analyzer's own keys (portability:
+  `config_home_env`, `unix_path_prefixes`); each analyzer reads only its own
+  table, and an unknown key is rejected by the analyzer (exit 3) and by the kit
+  installer. Installation is idempotent and `--dry-run` is
   non-mutating, reporting drift or a managed-file conflict rather than writing.
+  (Amended 2026-10-10, Accepted, #201, #202.)
 
 - `REQ-PRODUCT-024`
   The version-matched `sc-lint` wheel delivers every consumer-run helper and
   supports declared test layers and lint profiles through `just test [layer]`
   and `just lint [profile]`; it is never copied from a source checkout.
+  `just test [layer]` is sc-lint's recommended `test` recipe, owned by the
+  consumer once installed.
+  (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
 
 ## Current Detailed Requirement Areas
 

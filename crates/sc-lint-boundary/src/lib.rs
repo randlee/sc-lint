@@ -10,6 +10,10 @@ use anyhow as anyhow_crate;
 use anyhow::Context;
 use anyhow::Result;
 use quote::ToTokens;
+use sc_lint_analyzer_support::AnalyzerName;
+use sc_lint_analyzer_support::CatalogRuleId;
+use sc_lint_analyzer_support::RuleCatalog;
+use sc_lint_analyzer_support::load_analyzer_settings;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
 pub use sc_lint_schema::CrateId;
@@ -39,7 +43,7 @@ mod render;
 #[cfg(test)]
 mod tests;
 
-const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
+const SC_LINT_SCHEMA_VERSION: &str = "0.2.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 const SC_LINT_BOUNDARY_TOOL: &str = "sc-lint-boundary";
 const SC_LINT_BOUNDARY_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -80,6 +84,38 @@ pub enum BoundaryError {
         #[source]
         source: BoundaryErrorSource,
     },
+    #[error(transparent)]
+    AnalyzerConfig(#[from] sc_lint_analyzer_support::AnalyzerConfigError),
+}
+
+impl BoundaryError {
+    fn inventory_load(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::InventoryLoad {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
+
+    fn manifest_policy(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::ManifestPolicyAnalysis {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
+
+    fn package_policy(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::PackagePolicyAnalysis {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
+
+    fn graph_build(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::WorkspaceGraphBuild {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -232,6 +268,95 @@ impl TryFrom<&str> for RuleFilter {
     }
 }
 
+const fn rule(id: RuleId) -> CatalogRuleId {
+    CatalogRuleId::new(id.as_str())
+}
+
+pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
+    rule(RuleId::ScbCycle001),
+    rule(RuleId::ScbCycle002),
+    rule(RuleId::ScbCycle003),
+    rule(RuleId::ScbBoundary001),
+    rule(RuleId::ScbBoundary002),
+    rule(RuleId::ScbBoundary003),
+    rule(RuleId::ScbCaller001),
+    rule(RuleId::ScbDependency001),
+    rule(RuleId::ScbDependency002),
+    rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbManifest001),
+    rule(RuleId::ScbManifest002),
+];
+
+/// Every id except SCB-CYCLE-002/003: the set `analysis::finding_is_failure` fails on.
+pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
+    rule(RuleId::ScbCycle001),
+    rule(RuleId::ScbBoundary001),
+    rule(RuleId::ScbBoundary002),
+    rule(RuleId::ScbBoundary003),
+    rule(RuleId::ScbCaller001),
+    rule(RuleId::ScbDependency001),
+    rule(RuleId::ScbDependency002),
+    rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbManifest001),
+    rule(RuleId::ScbManifest002),
+];
+
+/// Families keep today's CLI spellings (kebab-case, as clap rendered the old
+/// `RuleFilterArg`); members are what each `RuleFilter` arm runs.
+pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
+    analyzer: AnalyzerName::new("boundary"),
+    rules: ALL_BOUNDARY_IDS,
+    families: &[
+        (
+            "cycles",
+            &[
+                rule(RuleId::ScbCycle001),
+                rule(RuleId::ScbCycle002),
+                rule(RuleId::ScbCycle003),
+            ],
+        ),
+        (
+            "boundaries",
+            &[
+                rule(RuleId::ScbBoundary001),
+                rule(RuleId::ScbBoundary002),
+                rule(RuleId::ScbBoundary003),
+                rule(RuleId::ScbCaller001),
+            ],
+        ),
+        (
+            "internal-only",
+            &[rule(RuleId::ScbBoundary001), rule(RuleId::ScbBoundary002)],
+        ),
+        ("forbid-external-impls", &[rule(RuleId::ScbBoundary003)]),
+        (
+            "dependencies",
+            &[
+                rule(RuleId::ScbDependency001),
+                rule(RuleId::ScbDependency002),
+                rule(RuleId::ScbDependency003),
+            ],
+        ),
+        (
+            "manifests",
+            &[rule(RuleId::ScbManifest001), rule(RuleId::ScbManifest002)],
+        ),
+    ],
+    default_fail: DEFAULT_FAIL_IDS,
+    own_keys: &[],
+};
+
+fn disabled_report() -> FindingsReport {
+    FindingsReport {
+        tool: SC_LINT_BOUNDARY_TOOL,
+        version: SC_LINT_BOUNDARY_VERSION,
+        schema_version: SC_LINT_SCHEMA_VERSION,
+        status: ReportStatus::Pass,
+        scanned_crates: 0,
+        findings: Vec::new(),
+    }
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct GraphExport {
     pub tool: &'static str,
@@ -262,6 +387,26 @@ pub struct GraphEdge {
     pub kind: &'static str,
     pub from: NodeId,
     pub to: NodeId,
+}
+
+pub(crate) fn workspace_packages(
+    metadata: &cargo_metadata::Metadata,
+) -> Vec<&cargo_metadata::Package> {
+    let workspace_members = metadata.workspace_members.iter().collect::<BTreeSet<_>>();
+    metadata
+        .packages
+        .iter()
+        .filter(|package| workspace_members.contains(&package.id))
+        .collect()
+}
+
+pub(crate) fn is_library_target(target: &cargo_metadata::Target) -> bool {
+    target.is_lib()
+        || target.is_rlib()
+        || target.is_dylib()
+        || target.is_cdylib()
+        || target.is_staticlib()
+        || target.is_proc_macro()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -395,6 +540,7 @@ impl ItemVisibility {
 struct GraphBuilder {
     nodes: Vec<GraphNode>,
     edges: Vec<GraphEdge>,
+    reference_impl_ids: BTreeSet<NodeId>,
 }
 
 impl GraphBuilder {
@@ -451,6 +597,8 @@ impl GraphBuilder {
                 .then_with(|| left.from.cmp(&right.from))
                 .then_with(|| left.to.cmp(&right.to))
         });
+        // Deferred method resolution can make previously distinct edges equal.
+        self.edges.dedup();
 
         GraphExport {
             tool: SC_LINT_BOUNDARY_TOOL,
@@ -466,120 +614,48 @@ pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
     if options.rule == Some(RuleFilter::Manifests) {
-        let manifest_report =
-            manifest_policy::analyze_manifest_policy(&options.root).map_err(|source| {
-                BoundaryError::ManifestPolicyAnalysis {
-                    root: options.root.clone(),
-                    source: source.into(),
-                }
-            })?;
-        let status = if manifest_report
-            .findings
-            .iter()
-            .any(analysis::finding_is_failure)
-        {
-            ReportStatus::Fail
-        } else {
-            ReportStatus::Pass
-        };
-        return Ok(FindingsReport {
-            tool: SC_LINT_BOUNDARY_TOOL,
-            version: SC_LINT_BOUNDARY_VERSION,
-            schema_version: SC_LINT_SCHEMA_VERSION,
-            status,
-            scanned_crates: manifest_report.scanned_crates,
-            findings: manifest_report.findings,
-        });
+        return analyze_manifests_only(options);
     }
 
-    let inventory = inventory::load_boundary_inventory(&options.root).map_err(|source| {
-        BoundaryError::InventoryLoad {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
+    let root = options.root.as_path();
+    let inventory = inventory::load_boundary_inventory(root)
+        .map_err(|e| BoundaryError::inventory_load(root, e))?;
+    let metadata =
+        graph::load_metadata(root).map_err(|e| BoundaryError::inventory_load(root, e))?;
+    inventory::validate_owner_crate_paths(&inventory, &metadata)
+        .map_err(|e| BoundaryError::inventory_load(root, e))?;
     if options.rule == Some(RuleFilter::Dependencies) {
-        let metadata = graph::load_metadata(&options.root).map_err(|source| {
-            BoundaryError::PackagePolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            }
-        })?;
         let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
-            .map_err(|source| BoundaryError::PackagePolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            })?;
-        let status = if dependency_report
-            .findings
-            .iter()
-            .any(analysis::finding_is_failure)
-        {
-            ReportStatus::Fail
-        } else {
-            ReportStatus::Pass
-        };
-        return Ok(FindingsReport {
-            tool: SC_LINT_BOUNDARY_TOOL,
-            version: SC_LINT_BOUNDARY_VERSION,
-            schema_version: SC_LINT_SCHEMA_VERSION,
-            status,
-            scanned_crates: dependency_report.scanned_crates,
-            findings: dependency_report.findings,
-        });
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
+        return Ok(findings_report(
+            dependency_report.scanned_crates,
+            dependency_report.findings,
+        ));
     }
-    let graph = graph::build_workspace_graph(&options.root).map_err(|source| {
-        BoundaryError::WorkspaceGraphBuild {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
-    let inventory_summary = inventory.summary();
-    let mut findings = Vec::with_capacity(inventory_summary.recommended_finding_capacity());
+    let graph = graph::build_workspace_graph_from(&metadata)
+        .map_err(|e| BoundaryError::graph_build(root, e))?;
+    let mut findings = Vec::with_capacity(inventory.summary().recommended_finding_capacity());
     let filter = options.rule;
-    if filter.is_none() || filter == Some(RuleFilter::Cycles) {
+    use RuleFilter::{Boundaries, Cycles, ForbidExternalImpls, InternalOnly};
+    if rule_selected(filter, &[Cycles]) {
         findings.extend(analysis::analyze_cycles(&graph));
     }
-    if filter.is_none()
-        || filter == Some(RuleFilter::Boundaries)
-        || filter == Some(RuleFilter::InternalOnly)
-    {
+    if rule_selected(filter, &[Boundaries, InternalOnly]) {
         findings.extend(analysis::analyze_internal_only(&graph));
     }
-    if filter.is_none()
-        || filter == Some(RuleFilter::Boundaries)
-        || filter == Some(RuleFilter::ForbidExternalImpls)
-    {
+    if rule_selected(filter, &[Boundaries, ForbidExternalImpls]) {
         findings.extend(analysis::analyze_forbid_external_impls(&graph));
     }
-    if filter.is_none() || filter == Some(RuleFilter::Boundaries) {
+    if rule_selected(filter, &[Boundaries]) {
         findings.extend(analysis::analyze_named_callers(&graph, &inventory));
     }
     if filter.is_none() {
-        let metadata = graph::load_metadata(&options.root).map_err(|source| {
-            BoundaryError::PackagePolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            }
-        })?;
-        findings.extend(
-            package_policy::analyze_package_policy(&metadata, &inventory)
-                .map_err(|source| BoundaryError::PackagePolicyAnalysis {
-                    root: options.root.clone(),
-                    source: source.into(),
-                })?
-                .findings,
-        );
-    }
-    if filter.is_none() {
-        findings.extend(
-            manifest_policy::analyze_manifest_policy(&options.root)
-                .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
-                    root: options.root.clone(),
-                    source: source.into(),
-                })?
-                .findings,
-        );
+        let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
+        findings.extend(package_report.findings);
+        let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
+            .map_err(|e| BoundaryError::manifest_policy(root, e))?;
+        findings.extend(manifest_report.findings);
     }
     findings.sort_by(|left, right| {
         analysis::finding_sort_key(left)
@@ -591,31 +667,108 @@ pub fn analyze_workspace(
         .iter()
         .filter(|node| node.kind == "crate")
         .count();
+    Ok(findings_report(scanned_crates, findings))
+}
+
+/// An unfiltered run selects every rule; `--rule X` selects the passes that accept X.
+fn rule_selected(filter: Option<RuleFilter>, accepted: &[RuleFilter]) -> bool {
+    filter.is_none_or(|rule| accepted.contains(&rule))
+}
+
+/// `--rule manifests` needs only package metadata, not the inventory or graph.
+fn analyze_manifests_only(
+    options: &AnalyzeOptions,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    let root = options.root.as_path();
+    let metadata = graph::load_metadata_without_deps(root)
+        .map_err(|e| BoundaryError::manifest_policy(root, e))?;
+    let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
+        .map_err(|e| BoundaryError::manifest_policy(root, e))?;
+    Ok(findings_report(
+        manifest_report.scanned_crates,
+        manifest_report.findings,
+    ))
+}
+
+fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsReport {
     let status = if findings.iter().any(analysis::finding_is_failure) {
         ReportStatus::Fail
     } else {
         ReportStatus::Pass
     };
-
-    Ok(FindingsReport {
+    FindingsReport {
         tool: SC_LINT_BOUNDARY_TOOL,
         version: SC_LINT_BOUNDARY_VERSION,
         schema_version: SC_LINT_SCHEMA_VERSION,
         status,
         scanned_crates,
         findings,
+    }
+}
+
+/// Reads `[tool.sc-lint.analyzers.boundary]` and `--rule-filter` (rule ids or
+/// family names). Exact full-family selections preserve legacy fast paths;
+/// mixed and subset selections use full analysis before findings are filtered.
+pub fn analyze_workspace_configured(
+    options: &AnalyzeOptions,
+    config: Option<&Path>,
+    rule_filter: Option<&str>,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    let settings = load_analyzer_settings(&BOUNDARY_CATALOG, &options.root, config, rule_filter)?;
+    if !settings.enabled {
+        return Ok(disabled_report());
+    }
+    let mut options = options.clone();
+    options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
+    let mut report = analyze_workspace(&options)?;
+    let findings: Vec<Finding> = std::mem::take(&mut report.findings)
+        .into_iter()
+        .filter(|finding| {
+            // Only manifest findings carry a path: their first owner id is the
+            // repo-relative manifest path.
+            !(matches!(
+                finding.rule_id,
+                RuleId::ScbManifest001 | RuleId::ScbManifest002
+            ) && finding
+                .owner_ids
+                .first()
+                .is_some_and(|owner| settings.path_excluded(owner.as_str())))
+        })
+        .collect();
+    let (findings, status) = settings.apply(findings, |rule| rule.as_str());
+    report.findings = findings;
+    report.status = status;
+    Ok(report)
+}
+
+fn legacy_family_rule_filter(selected: Option<&BTreeSet<CatalogRuleId>>) -> Option<RuleFilter> {
+    let selected = selected?;
+    [
+        (RuleFilter::Cycles, "cycles"),
+        (RuleFilter::Boundaries, "boundaries"),
+        (RuleFilter::InternalOnly, "internal-only"),
+        (RuleFilter::ForbidExternalImpls, "forbid-external-impls"),
+        (RuleFilter::Dependencies, "dependencies"),
+        (RuleFilter::Manifests, "manifests"),
+    ]
+    .into_iter()
+    .find_map(|(filter, family)| {
+        BOUNDARY_CATALOG
+            .families
+            .iter()
+            .find(|(name, _)| *name == family)
+            .filter(|(_, rules)| {
+                selected.len() == rules.len() && rules.iter().all(|rule| selected.contains(rule))
+            })
+            .map(|_| filter)
     })
 }
 
 pub fn export_workspace_graph(
     options: &ExportGraphOptions,
 ) -> std::result::Result<GraphExport, BoundaryError> {
-    graph::build_workspace_graph(&options.root).map_err(|source| {
-        BoundaryError::WorkspaceGraphBuild {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })
+    graph::build_workspace_graph(&options.root)
+        .map_err(|e| BoundaryError::graph_build(&options.root, e))
 }
 
 pub fn render_findings_report(report: &FindingsReport) -> String {

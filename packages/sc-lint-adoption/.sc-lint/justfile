@@ -1,7 +1,3 @@
-set windows-shell := ["pwsh", "-NoLogo", "-Command"]
-
-default: lint
-
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
 
 setup:
@@ -9,9 +5,6 @@ setup:
 
 lint *profile:
     {{bootstrap_command}} lint --config sc-lint.toml {{profile}}
-
-test *layer:
-    {{bootstrap_command}} test --config sc-lint.toml {{layer}}
 
 upgrade:
     {{bootstrap_command}} upgrade --config sc-lint.toml

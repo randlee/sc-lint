@@ -40,6 +40,9 @@ pub enum Command {
         /// Run only the named consumer lint profile step (`all` runs every step in declaration order).
         #[arg(long, requires = "consumer")]
         profile: Option<String>,
+        /// Run only these rules (`<RULE-ID|family>[,...]`); forwarded unchanged to sc-boundary, sc-portability or sc-runtime.
+        #[arg(long = "rule-filter", conflicts_with = "consumer")]
+        rule_filter: Option<String>,
     },
     View {
         #[arg(value_enum)]
@@ -270,6 +273,8 @@ pub enum LintTarget {
     ScPortability,
     #[value(name = "sc-runtime")]
     ScRuntime,
+    #[value(name = "function-length")]
+    FunctionLength,
     #[value(name = "line-counts")]
     LineCounts,
     #[value(name = "identity-literals")]
@@ -288,6 +293,7 @@ impl LintTarget {
             Self::ScBoundary => "sc-boundary",
             Self::ScPortability => "sc-portability",
             Self::ScRuntime => "sc-runtime",
+            Self::FunctionLength => "function-length",
             Self::LineCounts => "line-counts",
             Self::IdentityLiterals => "identity-literals",
             Self::Fast => "fast",
@@ -304,6 +310,7 @@ impl LintTarget {
             Self::ScBoundary
             | Self::ScPortability
             | Self::ScRuntime
+            | Self::FunctionLength
             | Self::LineCounts
             | Self::IdentityLiterals => None,
         }

@@ -1,0 +1,122 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261010T183345Z-fixture_ANC-006_pass_3",
+  "gate": "plan",
+  "created_at": "2026-10-10T18:33:45+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-i/docs/plans/phase-i/anchors.json",
+  "plan": "phase-i",
+  "item": {
+    "id": "fixture:ANC-006:pass:3",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 116,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.13.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Every sprint bead's design gives the code for each deliverable, so the developer makes no design decisions.",
+      "stated_by": "Rand Lee",
+      "stated_at": "2026-10-10",
+      "context": "planning session; Draft wording by flint from Rand directive 2026-10-10; wording approved by Rand 2026-10-10; source words: \"I want the plans to be rich with code samples so that the agent doesn't need to make decisions when developing.\"",
+      "anchor_version": 4,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "384e381771ee331178a476f1edeab20db280063f85c16fd3d23261d53c90dfe0",
+      "deterministic_check": "each sprint bead design contains a fenced code block for every numbered deliverable",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Is the item a sprint bead: a unit of development work with numbered deliverables and a Design section describing code to write? A phase root or epic that lists sprints and decisions, with no code of its own to implement, is not a sprint bead.",
+          "criteria": {
+            "yes": "The item is a sprint bead with deliverables to implement.",
+            "no": "The item is a phase root, epic or other non-sprint bead.",
+            "unclear": "The item text does not show whether it is a sprint bead."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "For each numbered deliverable in `item.text`, does the Design give the code or the exact edit: a fenced code block, an exact file/line replacement, or a signature followed by a `<redacted: N of M code lines are in the plan but were not sent to Jev>` marker? The redaction marker means the full code is in the plan and counts as code present. A one-line exact instruction (delete lines 1-4; replace X with Y in file F) counts as an exact edit.",
+          "criteria": {
+            "yes": "Every numbered deliverable has code, an exact edit, or a redacted code block in the Design.",
+            "no": "At least one numbered deliverable has only prose with no code and no exact edit.",
+            "unclear": "The deliverables and the Design cannot be matched up."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` leave a design decision to the developer? Signs: 'choose', 'decide', 'TBD', 'as appropriate', 'if needed', 'either ... or ...' about how to build something, or a deliverable described only by its goal. A redaction marker is not a missing decision. Silence is not a contradiction.",
+          "criteria": {
+            "yes": "The item leaves at least one design decision to the developer.",
+            "no": "The item leaves no design decision to the developer.",
+            "unclear": "The text might leave a decision open but is ambiguous."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.04,
+            "no": 0.96,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.94,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 910,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 116,
+      "item_shortened": false,
+      "request_bytes": 2297
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

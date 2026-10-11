@@ -59,8 +59,13 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
     }
 
     let planning_path = boundaries_root.join("planning.toml");
+    if !planning_path.exists() {
+        anyhow::bail!(
+            "boundary inventory requires authoritative planning metadata at `{}`; add [planning].current_sprint",
+            planning_path.display()
+        );
+    }
     let planning: types::PlanningMetadata = parse_toml_file(&planning_path)?;
-    validate_planning_metadata(&planning, &planning_path)?;
 
     Ok(BoundaryInventory { records, planning })
 }
@@ -128,16 +133,6 @@ fn validate_boundary_path(
         );
     }
 
-    let expected_owner_crate_path = record.owner_package.replace('-', "_");
-    if record.owner_crate_path.as_str() != expected_owner_crate_path {
-        anyhow::bail!(
-            "boundary `{}` declares owner_crate_path `{}` but expected `{expected_owner_crate_path}` from owner_package `{}`",
-            record.boundary_id,
-            record.owner_crate_path,
-            record.owner_package
-        );
-    }
-
     let relative = path.strip_prefix(boundaries_root).with_context(|| {
         format!(
             "boundary file `{}` is outside boundaries root",
@@ -154,17 +149,77 @@ fn validate_boundary_path(
     Ok(())
 }
 
+pub(crate) fn validate_owner_crate_paths(
+    inventory: &BoundaryInventory,
+    metadata: &cargo_metadata::Metadata,
+) -> Result<()> {
+    let workspace_packages = crate::workspace_packages(metadata);
+    for record in &inventory.records {
+        let Some(package) = workspace_packages
+            .iter()
+            .find(|package| package.name.as_str() == record.owner_package.as_str())
+        else {
+            continue;
+        };
+        let Some(library) = package
+            .targets
+            .iter()
+            .find(|target| crate::is_library_target(target))
+        else {
+            continue;
+        };
+        if record.owner_crate_path.as_str() != library.name {
+            anyhow::bail!(
+                "boundary `{}` declares owner_crate_path `{}` but expected `{}` from the lib target of owner_package `{}`",
+                record.boundary_id,
+                record.owner_crate_path,
+                library.name,
+                record.owner_package
+            );
+        }
+    }
+    Ok(())
+}
+
 fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> {
-    if record.public.facade.trim().is_empty() {
+    let has_public_surface = [
+        ("public.facade", record.public.facade.as_deref()),
+        ("public.trait", record.public.trait_name.as_deref()),
+    ]
+    .into_iter()
+    .map(|(field, value)| {
+        let value = value.map(str::trim);
+        if value.is_some_and(str::is_empty) {
+            anyhow::bail!(
+                "boundary `{}` in `{}` defines an empty {field}",
+                record.boundary_id,
+                path.display()
+            );
+        }
+        Ok(value.is_some())
+    })
+    .collect::<Result<Vec<_>>>()?
+    .into_iter()
+    .any(|present| present);
+
+    if record.public.facade.is_some() && record.public.trait_name.is_some() {
         anyhow::bail!(
-            "boundary `{}` in `{}` must define a non-empty public.facade",
+            "boundary `{}` in `{}` must define exactly one of public.facade or public.trait",
+            record.boundary_id,
+            path.display()
+        );
+    }
+
+    if !has_public_surface {
+        anyhow::bail!(
+            "boundary `{}` in `{}` must define a non-empty public.facade or public.trait",
             record.boundary_id,
             path.display()
         );
     }
 
     match record.implementation.visibility {
-        types::Visibility::Public => {
+        types::Visibility::Public | types::Visibility::Private | types::Visibility::PubCrate => {
             if record
                 .implementation
                 .implementation_type
@@ -172,7 +227,7 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
                 .is_none_or(|value| value.trim().is_empty())
             {
                 anyhow::bail!(
-                    "boundary `{}` in `{}` must define implementation.type for public visibility",
+                    "boundary `{}` in `{}` must define implementation.type for public, private, or pub(crate) visibility",
                     record.boundary_id,
                     path.display()
                 );
@@ -184,14 +239,14 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
                 .is_none_or(|value| value.trim().is_empty())
             {
                 anyhow::bail!(
-                    "boundary `{}` in `{}` must define implementation.module for public visibility",
+                    "boundary `{}` in `{}` must define implementation.module for public, private, or pub(crate) visibility",
                     record.boundary_id,
                     path.display()
                 );
             }
             if record.implementation.constructor.is_none() {
                 anyhow::bail!(
-                    "boundary `{}` in `{}` must define implementation.constructor for public visibility",
+                    "boundary `{}` in `{}` must define implementation.constructor for public, private, or pub(crate) visibility",
                     record.boundary_id,
                     path.display()
                 );
@@ -246,22 +301,6 @@ fn validate_boundary_schema(record: &BoundaryRecord, path: &Path) -> Result<()> 
                     );
                 }
             }
-        }
-    }
-
-    Ok(())
-}
-
-fn validate_planning_metadata(
-    planning: &types::PlanningMetadata,
-    planning_path: &Path,
-) -> Result<()> {
-    for key in planning.planned_items.keys() {
-        if !key.starts_with("BOUNDARY-") || !key.contains('.') {
-            anyhow::bail!(
-                "planning item key `{key}` in `{}` must use <boundary_id>.<section>.<field>[.<subfield>] shape",
-                planning_path.display()
-            );
         }
     }
 

@@ -34,6 +34,54 @@ use crate::config::LoadedConfig;
 use crate::workflow;
 
 const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
+const CLI_CONTRACT: &str = include_str!("../../../docs/sc-lint/cli-contract.md");
+
+#[test]
+fn cli_contract_exit_code_mapping_matches_code_constants() {
+    let mapping_start = CLI_CONTRACT
+        .split_once("## Exit-Code Mapping")
+        .expect("CLI contract has an Exit-Code Mapping section")
+        .1;
+    let mapping = mapping_start.split("\n## ").next().unwrap_or(mapping_start);
+    let documented: Vec<u8> = mapping
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("- `")
+                .and_then(|code| code.strip_suffix('`'))
+                .and_then(|code| code.parse().ok())
+        })
+        .collect();
+    let expected = [
+        crate::consts::EXIT_SUCCESS,
+        crate::consts::EXIT_INTERNAL,
+        crate::consts::EXIT_USAGE,
+        crate::consts::EXIT_CONFIG,
+        crate::consts::EXIT_CAPABILITY,
+        crate::consts::EXIT_BACKEND_FAILURE,
+        crate::consts::EXIT_BACKEND_PROTOCOL,
+        crate::consts::EXIT_VERDICT_FAIL,
+    ];
+
+    assert_eq!(documented, expected);
+}
+
+#[test]
+fn cli_contract_documents_current_business_verdict_exit_codes() {
+    let contract = CLI_CONTRACT
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(contract.contains(
+        "`sc-lint check interfaces` currently exits `0` for a completed comparison, including one with a breaking-change verdict"
+    ));
+    assert!(contract.contains(
+        "`lint sc-boundary`, `lint sc-portability` and `lint sc-runtime` now exit `10` when `data.status = \"fail\"`; the envelope remains `ok: true`"
+    ));
+    assert!(contract.contains(
+        "command completed successfully; analyzer lint commands use this for a passing verdict, while a failed analyzer verdict uses code `10`"
+    ));
+}
 
 #[test]
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
@@ -85,6 +133,15 @@ fn command_surface_parses_the_initial_grouped_shape() {
         cli.command.as_ref(),
         Some(Command::View {
             target: ViewTarget::Graph
+        })
+    ));
+
+    let cli = Cli::parse_from(["sc-lint", "lint", "function-length"]);
+    assert!(matches!(
+        cli.command.as_ref(),
+        Some(Command::Lint {
+            target: LintTarget::FunctionLength,
+            ..
         })
     ));
 
@@ -257,6 +314,7 @@ fn consumer_commands_require_an_explicit_consumer_mode() {
             target: LintTarget::Ci,
             consumer: true,
             profile: None,
+            rule_filter: None,
         })
     ));
     let test = Cli::parse_from(["sc-lint", "test"]);
@@ -1191,6 +1249,7 @@ fn lint_targets_map_profile_values_stably() {
     );
     assert_eq!(LintTarget::Ci.profile(), Some(crate::cli::LintProfile::Ci));
     assert_eq!(LintTarget::ScBoundary.profile(), None);
+    assert_eq!(LintTarget::FunctionLength.profile(), None);
     assert_eq!(LintTarget::LineCounts.profile(), None);
     assert_eq!(crate::cli::LintProfile::Fast.command_suffix(), "fast");
     assert_eq!(crate::cli::LintProfile::Full.command_suffix(), "full");
@@ -1325,6 +1384,215 @@ fn lint_sc_boundary_reports_dependency_policy_failures_through_dispatch() {
 }
 
 #[test]
+fn lint_rule_filter_parses_for_analyzer_targets() {
+    for target in ["sc-boundary", "sc-portability", "sc-runtime"] {
+        let cli = Cli::parse_from([
+            "sc-lint",
+            "lint",
+            target,
+            "--rule-filter",
+            "PORT-001,PORT-006",
+        ]);
+        let context = CommandContext::from_cli(&cli).expect("analyzer context");
+        assert_eq!(context.rule_filter(), Some("PORT-001,PORT-006"), "{target}");
+    }
+    let cli = Cli::parse_from(["sc-lint", "lint", "sc-portability"]);
+    let context = CommandContext::from_cli(&cli).expect("analyzer context");
+    assert_eq!(context.rule_filter(), None);
+}
+
+#[test]
+fn lint_rule_filter_rejected_for_non_analyzer_target() {
+    let cli = Cli::parse_from(["sc-lint", "lint", "fast", "--rule-filter", "PORT-001"]);
+    let error = CommandContext::from_cli(&cli).expect_err("rule filter on fast");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert_eq!(error.exit_code(), 2);
+    assert!(error.message.contains("--rule-filter"));
+
+    assert!(
+        Cli::try_parse_from(["sc-lint", "lint", "ci", "--consumer", "--rule-filter", "X"]).is_err()
+    );
+}
+
+#[test]
+fn lint_sc_boundary_rule_filter_selects_the_rule() {
+    let fixture = AnalysisFixture::new();
+    fixture.configure_disallowed_dependency();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        fixture.root().to_str().expect("root"),
+        "lint",
+        "sc-boundary",
+        "--rule-filter",
+        "SCB-DEPENDENCY-001",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let findings = success.data["findings"].as_array().expect("findings array");
+    assert!(!findings.is_empty());
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding["rule_id"] == "SCB-DEPENDENCY-001")
+    );
+}
+
+#[test]
+fn lint_sc_boundary_unknown_rule_filter_is_usage_error() {
+    let fixture = AnalysisFixture::new();
+    fixture.configure_disallowed_dependency();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        fixture.root().to_str().expect("root"),
+        "lint",
+        "sc-boundary",
+        "--rule-filter",
+        "NOPE",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let error = crate::command::execute(&context, &loaded).expect_err("unknown selector");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert_eq!(error.exit_code(), 2);
+    assert!(error.message.contains("rejected --rule-filter"));
+}
+
+fn lint_boundary_outcome(root: &Path, json_mode: bool) -> crate::entry::ExecutionOutcome {
+    let root = root.to_str().expect("root");
+    let cli = if json_mode {
+        Cli::parse_from(["sc-lint", "--json", "--root", root, "lint", "sc-boundary"])
+    } else {
+        Cli::parse_from(["sc-lint", "--root", root, "lint", "sc-boundary"])
+    };
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    crate::entry::execute(context, &loaded, json_mode)
+}
+
+#[test]
+fn lint_analyzer_fail_verdict_exits_ten() {
+    let fixture = AnalysisFixture::new();
+    fixture.configure_disallowed_dependency();
+    for json_mode in [true, false] {
+        let outcome = lint_boundary_outcome(fixture.root(), json_mode);
+        assert_eq!(
+            outcome.exit_code,
+            crate::consts::EXIT_VERDICT_FAIL,
+            "json_mode = {json_mode}"
+        );
+        assert!(outcome.ok, "json_mode = {json_mode}");
+        assert!(outcome.error.is_none(), "json_mode = {json_mode}");
+    }
+}
+
+#[test]
+fn lint_analyzer_pass_verdict_exits_zero() {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write(
+        "crates/example/Cargo.toml",
+        "[package]\nname = \"example\"\nversion.workspace = true\nedition.workspace = true\nrust-version.workspace = true\nauthors.workspace = true\nlicense.workspace = true\nrepository.workspace = true\nhomepage.workspace = true\n",
+    );
+    fixture.write_source("example", "lib.rs", "pub struct Example;\n");
+    let outcome = lint_boundary_outcome(fixture.root(), true);
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.ok);
+    assert!(outcome.error.is_none());
+}
+
+#[test]
+fn verdict_exit_code_covers_every_analyzer_target() {
+    use crate::entry::verdict_exit_code;
+
+    let fail = json!({ crate::consts::FIELD_STATUS: crate::consts::STATUS_FAIL });
+    let pass = json!({ "status": "pass" });
+    for id in [
+        crate::command::CommandId::LintScBoundary,
+        crate::command::CommandId::LintScPortability,
+        crate::command::CommandId::LintScRuntime,
+    ] {
+        assert_eq!(
+            verdict_exit_code(id, Some(&fail)),
+            crate::consts::EXIT_VERDICT_FAIL,
+            "{id:?}"
+        );
+        assert_eq!(verdict_exit_code(id, Some(&pass)), 0, "{id:?}");
+        assert_eq!(verdict_exit_code(id, None), 0, "{id:?}");
+    }
+    assert_eq!(
+        verdict_exit_code(crate::command::CommandId::CheckNative, Some(&fail)),
+        0
+    );
+}
+
+fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub fn example() {}\n");
+    let mock_backend = MockBackend::install_native(
+        tool,
+        &json!({
+            "tool": tool,
+            "findings": [],
+            "status": crate::consts::STATUS_FAIL,
+        }),
+    );
+    let test_executable = std::env::current_exe().expect("test executable path");
+    let cli_name = if cfg!(windows) {
+        "sc-lint.exe"
+    } else {
+        "sc-lint"
+    };
+    let cli_source = test_executable
+        .parent()
+        .and_then(Path::parent)
+        .map(|target_dir| target_dir.join(cli_name))
+        .expect("sc-lint executable path");
+    let cli_copy = mock_backend._tempdir.path().join(cli_name);
+    fs::copy(cli_source, &cli_copy).expect("copy sc-lint beside mock backend");
+
+    // The backend resolver prefers binaries next to sc-lint over PATH. Running
+    // this copy makes the mocked sibling binary the one the CLI dispatches to.
+    let output = ProcessCommand::new(cli_copy)
+        .args(["--json", "--root"])
+        .arg(fixture.root())
+        .args(["lint", target])
+        .output()
+        .expect("run mocked analyzer command");
+    let exit_code = output.status.code().expect("process exit code");
+    let envelope = serde_json::from_slice(&output.stdout).expect("success envelope JSON");
+    (exit_code, envelope)
+}
+
+#[test]
+#[serial]
+fn lint_sc_portability_fail_verdict_exits_ten_with_success_envelope() {
+    let (exit_code, envelope) =
+        lint_mocked_analyzer_fail_outcome("sc-portability", crate::consts::TOOL_PORTABILITY);
+
+    assert_eq!(exit_code, i32::from(crate::consts::EXIT_VERDICT_FAIL));
+    assert_eq!(envelope["ok"], true);
+    assert!(envelope.get("error").is_none());
+}
+
+#[test]
+#[serial]
+fn lint_sc_runtime_fail_verdict_exits_ten_with_success_envelope() {
+    let (exit_code, envelope) =
+        lint_mocked_analyzer_fail_outcome("sc-runtime", crate::consts::TOOL_RUNTIME);
+
+    assert_eq!(exit_code, i32::from(crate::consts::EXIT_VERDICT_FAIL));
+    assert_eq!(envelope["ok"], true);
+    assert!(envelope.get("error").is_none());
+}
+
+#[test]
 #[serial]
 fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope() {
     let fixture = AnalysisFixture::new();
@@ -1453,7 +1721,7 @@ fn malformed_backend_json_maps_to_backend_protocol_error() {
 }
 
 #[test]
-fn backend_execution_failure_maps_to_backend_failure_error() {
+fn missing_boundary_planning_maps_to_cli_config_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     std::fs::write(
         temp_dir.path().join("Cargo.toml"),
@@ -1461,6 +1729,44 @@ fn backend_execution_failure_maps_to_backend_failure_error() {
     )
     .expect("write manifest");
     std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::create_dir_all(temp_dir.path().join("empty")).expect("empty dir");
+
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        temp_dir.path().join("empty").to_str().expect("empty path"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("dispatch context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let error = crate::command::execute(&context, &loaded).expect_err("missing planning fails");
+
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert_eq!(error.code(), "CLI.CONFIG_ERROR");
+    assert!(error.cause.is_some());
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.contains("planning.toml"))
+    );
+}
+
+#[test]
+fn empty_boundary_inventory_metadata_load_maps_to_config_error() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    std::fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        "[workspace]\nmembers=[]\nresolver=\"2\"\n",
+    )
+    .expect("write manifest");
+    std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::write(
+        temp_dir.path().join("boundaries").join("planning.toml"),
+        "[planning]\ncurrent_sprint = \"A.0\"\n",
+    )
+    .expect("write planning metadata");
     std::fs::create_dir_all(temp_dir.path().join("empty")).expect("empty dir");
 
     let cli = Cli::parse_from([
@@ -1522,6 +1828,17 @@ fn python_backed_lints_and_views_normalize_through_the_top_level_envelope() {
                 "line-counts",
             ],
             "lint.line-counts",
+        ),
+        (
+            [
+                "sc-lint",
+                "--json",
+                "--root",
+                repo_root.to_str().expect("repo root"),
+                "lint",
+                "function-length",
+            ],
+            "lint.function-length",
         ),
         (
             [
@@ -1974,6 +2291,11 @@ homepage = "https://example.invalid/sc-lint"
         allowed_dependents: &[&str],
         forbidden_edges: &[(&str, &str)],
     ) {
+        let owner_crate_path = match owner_package {
+            "app" => "app",
+            "api" => "api",
+            other => panic!("unexpected fixture package {other}"),
+        };
         let boundary_id = owner_package
             .split('-')
             .map(|segment| {
@@ -2013,8 +2335,8 @@ homepage = "https://example.invalid/sc-lint"
             &format!("boundaries/{owner_package}/boundary.toml"),
             &format!(
                 "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
-                owner_package.replace('-', "_"),
-                owner_package.replace('-', "_"),
+                owner_crate_path,
+                owner_package,
             ),
         );
     }
@@ -2073,6 +2395,40 @@ impl MockBackend {
         std::fs::write(&script_path, script).expect("mock backend script");
         set_mock_backend_permissions(&script_path);
 
+        Self::with_path(tempdir, script_path)
+    }
+
+    fn install_native(tool: &str, payload: &Value) -> Self {
+        let tempdir = TempDir::new().expect("temp dir");
+        let source_path = tempdir.path().join("mock_backend.rs");
+        let executable_name = if cfg!(windows) {
+            format!("{tool}.exe")
+        } else {
+            tool.to_string()
+        };
+        let executable_path = tempdir.path().join(executable_name);
+        let source = format!(
+            "fn main() {{ use std::io::Write; std::io::stdout().write_all(&{:?}).unwrap(); }}\n",
+            payload.to_string().as_bytes()
+        );
+        fs::write(&source_path, source).expect("mock backend Rust source");
+        let compilation = ProcessCommand::new("rustc")
+            .args(["--edition=2024"])
+            .arg(&source_path)
+            .arg("-o")
+            .arg(&executable_path)
+            .output()
+            .expect("compile native mock backend");
+        assert!(
+            compilation.status.success(),
+            "native mock backend compilation failed: {}",
+            String::from_utf8_lossy(&compilation.stderr)
+        );
+
+        Self::with_path(tempdir, executable_path)
+    }
+
+    fn with_path(tempdir: TempDir, executable: PathBuf) -> Self {
         let original_path = std::env::var_os("PATH");
         let updated_path = std::env::join_paths(
             std::iter::once(tempdir.path().to_path_buf()).chain(
@@ -2090,7 +2446,7 @@ impl MockBackend {
 
         Self {
             _tempdir: tempdir,
-            executable: script_path,
+            executable,
             original_path,
         }
     }

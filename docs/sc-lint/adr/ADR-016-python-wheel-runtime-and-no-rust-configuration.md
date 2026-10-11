@@ -92,3 +92,33 @@ extension point for repo-specific enforcement.
 - Rejected alternatives: keep copying `.just/*.py` from the archive (version
   drift, sc-lint#84 class of bugs); write helpers in Rust as subcommands
   (moves configuration policy into a release cycle, contradicts decision 1).
+
+## Amendment 2026-10-10 — `test` is consumer-owned; analyzer tables
+
+| Field | Value |
+| --- | --- |
+| Status | Accepted (Rand, 2026-10-10) |
+| Source | Rand's ruling quoted in the ADR-012 amendment 2026-10-10; #194; #201 |
+
+1. Replaces "The four ADR-012 recipe names are the standard kit-owned entry
+   points" and "ADR-012's four recipes are thus exactly four kit-owned names"
+   in Decision 3: the kit owns `setup`, `lint`, `upgrade` and the managed
+   import block. The installer adds sc-lint's recommended `test` recipe
+   outside the block only when the consumer `Justfile` has none; after that the
+   consumer owns it. The rest of Decision 3 stands.
+2. Replaces the `.sc-lint/justfile` lines of the resolution sequence with:
+
+   ```text
+   .sc-lint/justfile (imported by the consumer Justfile):
+   setup:    .sc-lint/bootstrap setup   --config sc-lint.toml
+   lint:     .sc-lint/bootstrap lint    --config sc-lint.toml
+   upgrade:  .sc-lint/bootstrap upgrade --config sc-lint.toml
+
+   Recommended test recipe (consumer Justfile, outside the block, added only
+   when absent):
+   test:     .sc-lint/bootstrap test    --config sc-lint.toml
+   ```
+
+3. Extends Decision 1: an analyzer reading its own
+   `[tool.sc-lint.analyzers.<name>]` table at run time (#201) is analyzer
+   behaviour, not installation configuration.

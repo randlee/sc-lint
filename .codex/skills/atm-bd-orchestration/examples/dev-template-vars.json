@@ -1,0 +1,12 @@
+{
+  "task_id": "lint-d-4",
+  "sprint": "d-4",
+  "stack": "phase-d",
+  "pr_target": "integrate/phase-d",
+  "worktree_path": "../sc-lint-worktrees/sprint/d-4-otlp-sync-exporter",
+  "branch": "sprint/d-4-otlp-sync-exporter",
+  "primary_checkout": "/path/to/sc-lint",
+  "phase_root": "lint-phase-d",
+  "test_command": "make test",
+  "policy_path": ".claude/project/quality-policy.md"
+}

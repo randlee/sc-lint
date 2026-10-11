@@ -67,6 +67,8 @@ Initial convention:
 
 - `sc-lint lint sc-boundary`
   - `lint.sc-boundary`
+- `sc-lint lint function-length`
+  - `lint.function-length`
 - `sc-lint lint line-counts`
   - `lint.line-counts`
 - `sc-lint lint identity-literals`
@@ -146,6 +148,10 @@ Current implementation status:
   - implemented capability-gated Windows clippy path
 - `ci`
   - implemented top-level lint-plus-tests path
+- `lint.function-length`
+  - implemented Python-adapter lint path
+  - not in the `Ci` profile (`lint.ci`), like `lint.line-counts` and `lint.identity-literals`; gated by `just lint` and the `Full` profile
+  - a stale baseline allowance (its function shrank or went away) fails the gate until `--write-baseline` ratchets it down, so a recorded allowance never permits regrowth
 - `lint.line-counts`
   - implemented Python-adapter lint path
 - `lint.identity-literals`
@@ -189,14 +195,17 @@ Required properties:
   JSON shape per backend
 - diagnostics are additive and do not replace the business payload
 
-Planned Phase `C` business-verdict rule:
+Business-verdict behavior:
 
 - `sc-lint check interfaces` is a business-verdict command rather than a
   transport or protocol failure surface
 - a completed comparison that detects breaking changes remains a
   `CommandEnvelope<T>` result with the negative verdict carried inside `data`
-- nonzero exit for that negative verdict is planned policy behavior, not a
-  `CliError` reclassification
+- `sc-lint check interfaces` currently exits `0` for a completed comparison,
+  including one with a breaking-change verdict; a nonzero exit for that verdict
+  remains planned policy behavior, not a `CliError` reclassification
+- `lint sc-boundary`, `lint sc-portability` and `lint sc-runtime` now exit `10`
+  when `data.status = "fail"`; the envelope remains `ok: true`
 
 The implemented field names are stable for the Phase A bootstrap line.
 
@@ -451,6 +460,9 @@ If the delegated binary:
   - emit `CLI.BACKEND_EXEC_FAILURE`
 - exits zero with malformed machine-readable output
   - emit `CLI.BACKEND_PROTOCOL_ERROR`
+- `sc-lint lint sc-boundary|sc-portability|sc-runtime` forwards `--config` and
+  `--rule-filter` unchanged; a backend exit 2 becomes a usage error and exit 3
+  a config error.
 
 ### Python adapter backend
 
@@ -484,10 +496,11 @@ boundary rather than leaking raw Python stderr.
 
 Exit codes remain top-level CLI concerns.
 
-Recommended initial policy:
+Current CLI exit-code mapping:
 
 - `0`
-  - command succeeded
+  - command completed successfully; analyzer lint commands use this for a
+    passing verdict, while a failed analyzer verdict uses code `10`
 - `1`
   - top-level internal failure
 - `2`
@@ -500,6 +513,16 @@ Recommended initial policy:
   - delegated backend execution failure
 - `6`
   - delegated backend protocol failure
+- `10`
+  - `lint sc-boundary`, `lint sc-portability` or `lint sc-runtime` completed
+    with `data.status = "fail"` (business verdict; the envelope stays
+    `ok: true`)
+
+During `sc-boundary` analysis, failure to load the boundary inventory or the
+Cargo workspace metadata required to validate it is a configuration failure:
+the CLI returns `CLI.CONFIG_ERROR` with exit code `3`. A later failure while
+building the workspace graph remains a delegated backend execution failure
+(`CLI.BACKEND_EXEC_FAILURE`, exit code `5`).
 
 These codes are owned by the CLI and must not drift per backend.
 

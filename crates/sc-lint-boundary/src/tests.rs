@@ -1,6 +1,7 @@
 #![cfg(test)]
 
 use super::*;
+use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
 use std::fs;
@@ -23,7 +24,7 @@ fn findings_report_text_is_stable() {
     let report = super::FindingsReport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         status: ReportStatus::Pass,
         scanned_crates: 2,
         findings: Vec::new(),
@@ -39,14 +40,14 @@ fn graph_export_serializes_tool_metadata() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         nodes: Vec::new(),
         edges: Vec::new(),
     };
     let json = serde_json::to_string(&graph).unwrap();
     assert!(json.contains("\"tool\":\"sc-lint-boundary\""));
     assert!(json.contains("\"version\":\"0.1.0\""));
-    assert!(json.contains("\"schema_version\":\"0.1.0\""));
+    assert!(json.contains("\"schema_version\":\"0.2.0\""));
 }
 
 #[test]
@@ -54,7 +55,7 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         nodes: vec![GraphNode {
             id: NodeId::new("crate::example::example"),
             kind: "type",
@@ -96,7 +97,7 @@ fn render_graph_export_turtle_escapes_special_characters_and_attributes() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: "0.2.0",
         nodes: vec![GraphNode {
             id: NodeId::new("crate::example::example"),
             kind: "type",
@@ -325,7 +326,7 @@ fn renders_graph_as_turtle() {
     assert!(turtle.contains("rdf:type sc:type ."));
     assert!(turtle.contains("sc:visibility \"public\" ."));
     assert!(turtle.contains("sc:label \"Example\" ."));
-    assert!(turtle.contains("sc:schemaVersion \"0.1.0\" ."));
+    assert!(turtle.contains("sc:schemaVersion \"0.2.0\" ."));
 }
 
 #[test]
@@ -493,6 +494,65 @@ fn dependency_policy_flags_disallowed_direct_dependency() {
     assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(report.findings.len(), 1);
     assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+    assert_eq!(
+        report.findings[0].message,
+        "workspace package `app` directly depends on `api` but `api` is not listed in `BOUNDARY-App` allowed_dependencies"
+    );
+}
+
+#[test]
+fn dependency_policy_checks_dev_edges_against_both_allow_lists() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "")
+            + "[dev-dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    let report = analyze_workspace(&options).unwrap();
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        report.findings[0].message,
+        "workspace package `app` directly dev-depends on `api` but `api` is not listed in `BOUNDARY-App` allowed_dependencies or allowed_dev_dependencies"
+    );
+
+    fixture.write_member_boundary_record("app", &["api"], &[], &[]);
+    assert_eq!(
+        analyze_workspace(&options).unwrap().status,
+        ReportStatus::Pass
+    );
+
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    let boundary = fixture.root().join("boundaries/app/boundary.toml");
+    let contents = fs::read_to_string(&boundary).unwrap().replace(
+        "forbidden_edges = []",
+        "allowed_dev_dependencies = [\"api\"]\nforbidden_edges = []",
+    );
+    fs::write(boundary, contents).unwrap();
+    assert_eq!(
+        analyze_workspace(&options).unwrap().status,
+        ReportStatus::Pass
+    );
+
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "")
+            + "[dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n\
+               [dev-dependencies]\napi = { path = \"../api\", version = \"0.1.0\" }\n"),
+    );
+    let report = analyze_workspace(&options).unwrap();
+    assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(
         report.findings[0].message,
         "workspace package `app` directly depends on `api` but `api` is not listed in `BOUNDARY-App` allowed_dependencies"
@@ -869,6 +929,61 @@ fn manifest_policy_matches_python_oracle_on_representative_fixtures() {
             assert_eq!(finding_messages(&report), expected_messages);
         }
     }
+}
+
+fn cycle_rule_ids(source: &str) -> Vec<RuleId> {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", source);
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap()
+    .findings
+    .iter()
+    .map(|finding| finding.rule_id)
+    .collect()
+}
+
+#[test]
+fn private_helper_delegation_is_not_a_type_method_self_loop() {
+    assert!(
+        cycle_rule_ids("pub struct T; impl T { pub fn a(&self) { self.b() } fn b(&self) {} }")
+            .is_empty()
+    );
+    assert!(
+        cycle_rule_ids("pub struct T; impl T { pub fn a(&self) { Self::b(self) } fn b(&self) {} }")
+            .is_empty()
+    );
+}
+
+#[test]
+fn mutual_method_recursion_is_a_type_method_self_loop() {
+    assert_eq!(
+        cycle_rule_ids(
+            "pub struct T; impl T { pub fn a(&self) { Self::b(self) } fn b(&self) { Self::a(self) } }"
+        ),
+        vec![RuleId::ScbCycle002]
+    );
+}
+
+#[test]
+fn trait_impl_receiver_call_is_not_a_trait_self_loop() {
+    assert!(cycle_rule_ids(
+        "pub struct T; pub trait Run { fn run(&self); } impl Run for T { fn run(&self) { Self::step(self) } } impl T { pub fn step(&self) {} }"
+    )
+    .is_empty());
+}
+
+#[test]
+fn enum_variant_expressions_do_not_resolve_to_methods() {
+    assert!(cycle_rule_ids(
+        "pub enum E { A } impl E { pub fn get(&self) { let _ = Self::A; } #[allow(non_snake_case)] pub fn A() {} }"
+    )
+    .is_empty());
 }
 
 #[test]
@@ -2041,7 +2156,7 @@ fn preserves_full_trait_path_in_trait_impl_self_loop_messages() {
 }
 
 #[test]
-fn rejects_non_path_impl_owners() {
+fn rejects_impl_owners_without_a_named_target() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -2051,7 +2166,7 @@ fn rejects_non_path_impl_owners() {
         r#"
                 pub struct Loop;
 
-                impl core::fmt::Display for &Loop {
+                impl core::fmt::Display for (Loop, Loop) {
                     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                         write!(f, "loop")
                     }
@@ -2066,7 +2181,7 @@ fn rejects_non_path_impl_owners() {
 
     let message = format!("{error:#}");
     assert!(message.contains("unsupported impl owner type"));
-    assert!(message.contains("&Loop") || message.contains("& Loop"));
+    assert!(message.contains("(Loop , Loop)"));
 }
 
 #[test]
@@ -2199,6 +2314,93 @@ fn fails_when_sc_lint_attribute_has_mixed_valid_and_invalid_directives() {
     .unwrap_err();
 
     assert!(format!("{error:#}").contains("unsupported boundary directive"));
+}
+
+fn lib_name_fixture(owner_crate_path: &str) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "") + "[lib]\nname = \"app_core\"\npath = \"src/lib.rs\"\n"),
+    );
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    let boundary_path = fixture.root().join("boundaries/app/boundary.toml");
+    let boundary = fs::read_to_string(&boundary_path).unwrap().replace(
+        "owner_crate_path = \"app\"",
+        &format!("owner_crate_path = \"{owner_crate_path}\""),
+    );
+    fs::write(boundary_path, boundary).unwrap();
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture
+}
+
+#[test]
+fn owner_crate_path_uses_cargo_lib_target_name() {
+    let options = |fixture: &WorkspaceFixture| AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    let lib_named = lib_name_fixture("app_core");
+    assert_eq!(
+        analyze_workspace(&options(&lib_named)).unwrap().status,
+        ReportStatus::Pass
+    );
+
+    let package_named = lib_name_fixture("app");
+    let error = analyze_workspace(&options(&package_named)).unwrap_err();
+    assert!(matches!(error, BoundaryError::InventoryLoad { .. }));
+    assert!(
+        error
+            .to_string()
+            .contains("expected `app_core` from the lib target")
+    );
+}
+
+#[test]
+fn bin_only_owner_package_skips_lib_target_validation() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "")
+            + "[[bin]]\nname = \"app_bin\"\npath = \"src/main.rs\"\n"),
+    );
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_source("app", "main.rs", "fn main() {}");
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .unwrap();
+    assert_eq!(report.status, ReportStatus::Pass);
+}
+
+#[test]
+fn graph_ignores_proc_macro_only_workspace_dependencies() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/macros"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "macros", "../macros", "0.1.0"),
+    );
+    fixture.write(
+        "crates/macros/Cargo.toml",
+        &(good_member_manifest("macros", "") + "[lib]\nproc-macro = true\n"),
+    );
+    fixture.write_source("app", "lib.rs", "pub fn uses(_: macros::Marker) {}");
+    fixture.write_source("macros", "lib.rs", "extern crate proc_macro;");
+
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .expect("graph export succeeds");
+
+    assert!(graph.edges.iter().all(|edge| {
+        graph.nodes.iter().any(|node| node.id == edge.from)
+            && graph.nodes.iter().any(|node| node.id == edge.to)
+    }));
 }
 
 struct WorkspaceFixture {
@@ -2631,4 +2833,899 @@ fn trim_indentation(input: &str) -> String {
         output.push('\n');
     }
     output
+}
+
+#[test]
+fn supports_generic_field_value_reference_impl_owner() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        mod serde { pub trait Serialize {} }
+        pub struct FieldValue<'a, T: ?Sized>(&'a T);
+        pub trait SerializeKindTag {}
+        impl<T: ?Sized + serde::Serialize> SerializeKindTag for &FieldValue<'_, T> {}
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let owner = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "FieldValue")
+        .unwrap();
+    let implementation = graph
+        .nodes
+        .iter()
+        .find(|node| node.impl_trait.as_deref() == Some("SerializeKindTag"))
+        .unwrap();
+    assert!(implementation.label.contains("&FieldValue"));
+    assert!(
+        graph
+            .edges
+            .iter()
+            .any(|edge| edge.kind == EdgeKind::Targets.as_str()
+                && edge.from == implementation.id
+                && edge.to == owner.id)
+    );
+}
+
+#[test]
+fn reference_impls_and_methods_do_not_collide_with_owned_impls() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Owner;
+        pub trait Action { fn act(&self); }
+        impl Action for Owner { fn act(&self) {} }
+        impl Action for &Owner { fn act(&self) {} }
+        impl Action for &mut Owner { fn act(&self) {} }
+        impl Action for &&Owner { fn act(&self) {} }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let owner = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "Owner")
+        .unwrap();
+    let implementations: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "impl")
+        .collect();
+    let methods: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "method" && node.impl_trait.as_deref() == Some("Action"))
+        .collect();
+    assert_eq!(implementations.len(), 4);
+    assert_eq!(methods.len(), 4);
+    let owned = implementations
+        .iter()
+        .find(|node| node.label == "impl Action for Owner")
+        .unwrap();
+    assert_eq!(
+        owned.id.as_str(),
+        format!("{}::impl::416374696f6e", owner.id)
+    );
+    assert!(
+        methods
+            .iter()
+            .any(|node| node.id.as_str() == format!("{}::impl::416374696f6e::act", owner.id))
+    );
+    for implementation in implementations {
+        assert!(
+            graph
+                .edges
+                .iter()
+                .any(|edge| edge.kind == EdgeKind::Targets.as_str()
+                    && edge.from == implementation.id
+                    && edge.to == owner.id)
+        );
+        let method_edges: Vec<_> = graph
+            .edges
+            .iter()
+            .filter(|edge| {
+                edge.kind == EdgeKind::Contains.as_str()
+                    && edge.from == implementation.id
+                    && methods.iter().any(|method| method.id == edge.to)
+            })
+            .collect();
+        assert_eq!(method_edges.len(), 1);
+    }
+}
+
+#[test]
+fn reference_method_cycles_keep_the_underlying_type_owner() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Owner;
+        pub trait Action { fn act(&self); }
+        impl Action for &Owner { fn act(&self) { let _ = Owner; } }
+    "#,
+    );
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap();
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbCycle003);
+    assert!(
+        report.findings[0]
+            .owner_ids
+            .iter()
+            .all(|owner| owner.ends_with("::Owner"))
+    );
+}
+
+#[test]
+fn trait_adapters_preserve_distinct_methods_and_forwarding_edges() {
+    for reverse_order in [false, true] {
+        let fixture = WorkspaceFixture::new();
+        fixture.write_workspace_root();
+        fixture.write_package_manifest("example");
+        let definitions = "pub struct Adapter; pub trait Typed { fn write(&self); } pub trait Legacy { fn write(&self); }";
+        let inherent = "impl Adapter { pub fn write(&self) {} }";
+        let traits = "impl Typed for Adapter { fn write(&self) { Adapter::write(self); } } impl Legacy for Adapter { fn write(&self) { <Self as Typed>::write(self); } }";
+        let source = if reverse_order {
+            format!("{definitions} {traits} {inherent}")
+        } else {
+            format!("{definitions} {inherent} {traits}")
+        };
+        fixture.write_source("example", "lib.rs", &source);
+        let graph = export_workspace_graph(&ExportGraphOptions {
+            root: fixture.root().to_path_buf(),
+        })
+        .unwrap();
+        let owner = graph
+            .nodes
+            .iter()
+            .find(|node| node.label == "Adapter")
+            .unwrap();
+        let methods: Vec<_> = graph
+            .nodes
+            .iter()
+            .filter(|node| {
+                node.kind == "method"
+                    && node.label == "write"
+                    && node.id.starts_with(owner.id.as_str())
+            })
+            .collect();
+        assert_eq!(methods.len(), 3);
+        let inherent = methods
+            .iter()
+            .find(|node| node.impl_kind == Some(ImplKind::Inherent))
+            .unwrap();
+        let typed = methods
+            .iter()
+            .find(|node| node.impl_trait.as_deref() == Some("Typed"))
+            .unwrap();
+        let legacy = methods
+            .iter()
+            .find(|node| node.impl_trait.as_deref() == Some("Legacy"))
+            .unwrap();
+        assert_eq!(inherent.id.as_str(), format!("{}::write", owner.id));
+        for (from, to) in [
+            (typed.id.clone(), inherent.id.clone()),
+            (legacy.id.clone(), typed.id.clone()),
+        ] {
+            assert_ne!(from, to);
+            assert!(
+                graph.edges.iter().any(|edge| edge.kind == "references_expr"
+                    && edge.from == from
+                    && edge.to == to)
+            );
+        }
+        assert!(
+            !graph
+                .edges
+                .iter()
+                .any(|edge| edge.kind == "references_expr" && edge.from == edge.to)
+        );
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Cycles),
+        })
+        .unwrap();
+        assert!(
+            !report.findings.is_empty(),
+            "identity correction must not suppress owner-level cycle policy"
+        );
+        assert!(report.findings.iter().all(|finding| {
+            finding
+                .owner_ids
+                .iter()
+                .all(|id| id.as_str() == owner.id.as_str())
+        }));
+    }
+}
+
+#[test]
+fn schema_v02_fixture_captures_trait_method_id_migration_in_json_and_turtle() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub struct Adapter; pub trait Typed { fn write(&self); } pub trait Legacy { fn write(&self); } impl Adapter { pub fn write(&self) {} } impl Typed for Adapter { fn write(&self) {} } impl Legacy for Adapter { fn write(&self) {} }",
+    );
+
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let owner = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "Adapter" && node.kind == "type")
+        .unwrap();
+    let owner_id = owner.id.clone();
+    let inherent_id = NodeId::new(format!("{owner_id}::write"));
+    let typed_id = NodeId::new(format!("{owner_id}::impl::{}::write", hex_encode(b"Typed")));
+    let legacy_id = NodeId::new(format!(
+        "{owner_id}::impl::{}::write",
+        hex_encode(b"Legacy")
+    ));
+
+    assert_eq!(graph.schema_version, "0.2.0");
+    assert!(graph.nodes.iter().any(|node| node.id == owner_id));
+    assert!(graph.nodes.iter().any(|node| node.id == inherent_id));
+    assert!(graph.nodes.iter().any(|node| node.id == typed_id));
+    assert!(graph.nodes.iter().any(|node| node.id == legacy_id));
+    assert_eq!(
+        graph
+            .nodes
+            .iter()
+            .filter(|node| node.kind == "method" && node.label == "write")
+            .count(),
+        3
+    );
+
+    let graph_json: serde_json::Value =
+        serde_json::from_str(&render_graph_export_json(&graph)).unwrap();
+    assert_eq!(graph_json["schema_version"], "0.2.0");
+    assert!(graph_json.to_string().contains(typed_id.as_str()));
+    assert!(graph_json.to_string().contains(legacy_id.as_str()));
+
+    let turtle = render_graph_export_turtle(&graph);
+    assert!(turtle.contains("sc:schemaVersion \"0.2.0\" ."));
+    assert!(turtle.contains(&typed_id.to_string()));
+    assert!(turtle.contains(&legacy_id.to_string()));
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap();
+    let findings_json = serde_json::to_value(&report).unwrap();
+    assert_eq!(findings_json["schema_version"], "0.2.0");
+}
+
+#[test]
+fn generic_trait_and_self_arguments_distinguish_impl_methods() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Adapter<T>(T);
+        pub trait Convert<T> { fn convert(&self); }
+        impl Convert<u8> for Adapter<u8> { fn convert(&self) {} }
+        impl Convert<u16> for Adapter<u8> { fn convert(&self) {} }
+        impl Convert<u8> for Adapter<u16> { fn convert(&self) {} }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let implementations: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "impl" && node.impl_trait.as_deref() == Some("Convert"))
+        .collect();
+    let methods: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "method" && node.impl_trait.as_deref() == Some("Convert"))
+        .collect();
+    assert_eq!(implementations.len(), 3);
+    assert_eq!(methods.len(), 3);
+    for implementation in implementations {
+        assert_eq!(
+            graph
+                .edges
+                .iter()
+                .filter(|edge| edge.kind == "contains"
+                    && edge.from == implementation.id
+                    && methods.iter().any(|method| method.id == edge.to))
+                .count(),
+            1
+        );
+    }
+}
+
+#[test]
+fn trait_self_calls_resolve_without_inventing_inherent_methods() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Adapter;
+        pub trait Action { fn first(); fn second(); }
+        impl Action for Adapter { fn first() { Self::second(); <Self as Action>::second(); } fn second() {} }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let first = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "first" && node.impl_trait.as_deref() == Some("Action"))
+        .unwrap();
+    let second = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "second" && node.impl_trait.as_deref() == Some("Action"))
+        .unwrap();
+    assert_eq!(
+        graph
+            .edges
+            .iter()
+            .filter(|edge| edge.kind == "references_expr"
+                && edge.from == first.id
+                && edge.to == second.id)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn qualified_generic_reference_trait_calls_resolve_to_the_matching_impl_method() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Adapter;
+        pub trait Convert<T> { fn first(); fn second(); }
+        impl Convert<u8> for &Adapter {
+            fn first() { <&Adapter as Convert<u8>>::second(); }
+            fn second() {}
+        }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let first = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "first" && node.impl_trait.as_deref() == Some("Convert"))
+        .unwrap();
+    let second = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "second" && node.impl_trait.as_deref() == Some("Convert"))
+        .unwrap();
+    assert!(graph.edges.iter().any(|edge| {
+        edge.kind == "references_expr" && edge.from == first.id && edge.to == second.id
+    }));
+}
+
+#[test]
+fn generic_reference_impls_keep_separate_nodes_and_do_not_capture_owned_calls() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Foo<T>(T);
+        pub trait Convert<T> { fn convert(); }
+        impl Convert<u8> for &Foo<u8> { fn convert() {} }
+        impl Convert<u16> for &Foo<u8> { fn convert() {} }
+        impl Convert<u8> for &Foo<u16> { fn convert() {} }
+        pub fn unresolved() { Foo::convert(); }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let methods: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|node| node.kind == "method" && node.impl_trait.as_deref() == Some("Convert"))
+        .collect();
+    assert_eq!(methods.len(), 3);
+    assert_eq!(
+        methods
+            .iter()
+            .map(|node| &node.id)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        3
+    );
+    let unresolved = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == "function" && node.label == "unresolved")
+        .unwrap();
+    let expected_target = format!(
+        "{}::Foo::convert",
+        unresolved.id.rsplit_once("::").unwrap().0
+    );
+    assert!(graph.edges.iter().any(|edge| {
+        edge.kind == "references_expr" && edge.from == unresolved.id && edge.to == expected_target
+    }));
+    assert!(!graph.edges.iter().any(|edge| {
+        edge.kind == "references_expr"
+            && edge.from == unresolved.id
+            && methods.iter().any(|method| edge.to == method.id)
+    }));
+}
+
+#[test]
+fn ambiguous_unqualified_trait_method_call_remains_unresolved() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Foo;
+        pub trait First { fn call(); }
+        pub trait Second { fn call(); }
+        impl First for Foo { fn call() {} }
+        impl Second for Foo { fn call() {} }
+        pub fn unresolved() { Foo::call(); }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let unresolved = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == "function" && node.label == "unresolved")
+        .unwrap();
+    let expected_target = format!("{}::Foo::call", unresolved.id.rsplit_once("::").unwrap().0);
+    assert!(graph.edges.iter().any(|edge| {
+        edge.kind == "references_expr" && edge.from == unresolved.id && edge.to == expected_target
+    }));
+}
+
+#[test]
+fn self_method_prefers_inherent_dispatch_while_ufcs_dispatches_to_the_trait_impl() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Adapter;
+        pub trait Action { fn first(); fn second(); }
+        impl Adapter { fn second() {} }
+        impl Action for Adapter {
+            fn first() { Self::second(); <Self as Action>::second(); }
+            fn second() {}
+        }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let first = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "first" && node.impl_trait.as_deref() == Some("Action"))
+        .unwrap();
+    let inherent_second = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "second" && node.impl_kind == Some(ImplKind::Inherent))
+        .unwrap();
+    let trait_second = graph
+        .nodes
+        .iter()
+        .find(|node| node.label == "second" && node.impl_trait.as_deref() == Some("Action"))
+        .unwrap();
+    for target in [&inherent_second.id, &trait_second.id] {
+        assert!(graph.edges.iter().any(|edge| {
+            edge.kind == "references_expr" && edge.from == first.id && edge.to == *target
+        }));
+    }
+}
+
+#[test]
+fn qualified_non_generic_self_path_keeps_the_established_trait_impl_id() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Foo;
+        pub trait Action { fn act(); }
+        impl Action for crate::Foo { fn act() {} }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let owner = graph.nodes.iter().find(|node| node.label == "Foo").unwrap();
+    let implementation = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == "impl" && node.impl_trait.as_deref() == Some("Action"))
+        .unwrap();
+    assert_eq!(
+        implementation.id.as_str(),
+        format!("{}::impl::416374696f6e", owner.id)
+    );
+    assert!(!implementation.id.as_str().contains("::self::"));
+}
+
+#[test]
+fn non_reference_generic_trait_impl_remains_an_unqualified_method_candidate() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        pub struct Foo;
+        pub trait Borrowed<T> { fn call(); }
+        impl Borrowed<&'static str> for Foo { fn call() {} }
+        pub fn resolved() { Foo::call(); }
+    "#,
+    );
+    let graph = export_workspace_graph(&ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    })
+    .unwrap();
+    let resolved = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == "function" && node.label == "resolved")
+        .unwrap();
+    let method = graph
+        .nodes
+        .iter()
+        .find(|node| node.kind == "method" && node.impl_trait.as_deref() == Some("Borrowed"))
+        .unwrap();
+    assert!(graph.edges.iter().any(|edge| {
+        edge.kind == "references_expr" && edge.from == resolved.id && edge.to == method.id
+    }));
+}
+
+fn configured(
+    root: &Path,
+    rule_filter: Option<&str>,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: root.to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        rule_filter,
+    )
+}
+
+/// `app` depends on `api`; neither record allows the edge, so the
+/// dependencies pass reports SCB-DEPENDENCY-001 and SCB-DEPENDENCY-002.
+fn undeclared_dependency_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &[], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+    fixture
+}
+
+fn cycle_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub struct Alpha { pub beta: Beta }\npub struct Beta { pub alpha: Alpha }\n",
+    );
+    fixture
+}
+
+#[test]
+fn disabled_table_reports_pass_without_findings() {
+    let fixture = undeclared_dependency_fixture();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            enabled = false
+            reason = "boundary policy adopted later"
+        "#,
+    );
+
+    let report = configured(fixture.root(), None).expect("disabled analyzer succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert_eq!(report.scanned_crates, 0);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn unknown_table_key_is_config_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            targets = ["linux"]
+        "#,
+    );
+
+    match configured(fixture.root(), None) {
+        Err(BoundaryError::AnalyzerConfig(error)) => {
+            assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_KEY");
+            assert_eq!(
+                error.to_string(),
+                "boundary: unknown key `targets` in [tool.sc-lint.analyzers.boundary]"
+            );
+        }
+        other => panic!("expected AnalyzerConfig, got {other:?}"),
+    }
+}
+
+#[test]
+fn unknown_rule_filter_is_selector_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+
+    match configured(fixture.root(), Some("SCB-NOPE-001")) {
+        Err(BoundaryError::AnalyzerConfig(error)) => {
+            assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
+            assert_eq!(
+                error.to_string(),
+                "boundary: unknown rule selector `SCB-NOPE-001`"
+            );
+        }
+        other => panic!("expected AnalyzerConfig, got {other:?}"),
+    }
+}
+
+#[test]
+fn rule_filter_selects_exactly_the_rule() {
+    let fixture = undeclared_dependency_fixture();
+
+    let all =
+        configured(fixture.root(), Some("dependencies")).expect("dependency analysis succeeds");
+    let mut all_ids: Vec<RuleId> = all.findings.iter().map(|finding| finding.rule_id).collect();
+    all_ids.sort();
+    assert_eq!(
+        all_ids,
+        vec![RuleId::ScbDependency001, RuleId::ScbDependency002]
+    );
+
+    let report = configured(fixture.root(), Some("SCB-DEPENDENCY-001"))
+        .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+}
+
+#[test]
+fn rule_filter_family_keeps_existing_cycles_behaviour() {
+    let fixture = cycle_fixture();
+
+    let legacy = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .expect("legacy cycles analysis succeeds");
+    let report = configured(fixture.root(), Some("cycles")).expect("cycles family succeeds");
+
+    assert_eq!(report, legacy);
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbCycle001);
+}
+
+#[test]
+fn every_family_matches_its_legacy_rule_filter() {
+    let cycle = cycle_fixture();
+    let dependency = undeclared_dependency_fixture();
+    let multi_target = multi_target_fixture();
+    let invalid_inventory = invalid_inventory_fixture();
+    let manifest_policy_error = manifest_policy_error_fixture();
+    analyze_workspace(&AnalyzeOptions {
+        root: manifest_policy_error.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .expect("legacy cycles analysis skips manifest policy");
+    let pairs = [
+        (RuleFilter::Cycles, "cycles"),
+        (RuleFilter::Boundaries, "boundaries"),
+        (RuleFilter::InternalOnly, "internal-only"),
+        (RuleFilter::ForbidExternalImpls, "forbid-external-impls"),
+        (RuleFilter::Dependencies, "dependencies"),
+        (RuleFilter::Manifests, "manifests"),
+    ];
+    assert_eq!(pairs.len(), BOUNDARY_CATALOG.families.len());
+    for root in [
+        cycle.root(),
+        dependency.root(),
+        multi_target.root(),
+        invalid_inventory.root(),
+        manifest_policy_error.root(),
+    ] {
+        for (filter, family) in pairs {
+            let legacy = analyze_workspace(&AnalyzeOptions {
+                root: root.to_path_buf(),
+                format: OutputFormat::Json,
+                rule: Some(filter),
+            });
+            let configured = configured(root, Some(family));
+            match (legacy, configured) {
+                (Ok(legacy), Ok(configured)) => assert_eq!(configured, legacy, "{family}"),
+                (Err(legacy), Err(configured)) => {
+                    assert_eq!(configured.to_string(), legacy.to_string(), "{family}");
+                }
+                (legacy, configured) => panic!(
+                    "{family}: configured and legacy results differ: {configured:?} versus {legacy:?}"
+                ),
+            }
+        }
+    }
+}
+
+fn multi_target_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+    fixture.write_source("example", "main.rs", "fn main() {}");
+    fixture.write_source("example", "bin/extra.rs", "fn main() {}");
+    fixture
+}
+
+fn invalid_inventory_fixture() -> WorkspaceFixture {
+    let fixture = multi_target_fixture();
+    fixture.write("boundaries/planning.toml", "not_planning = true\n");
+    fixture
+}
+
+fn manifest_policy_error_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write(
+        "Cargo.toml",
+        r#"
+            [workspace]
+            members = ["crates/example"]
+            resolver = "2"
+
+            [workspace.package]
+            edition = "2024"
+            rust-version = "1.94.1"
+            authors = ["sc-lint contributors"]
+            license = "MIT OR Apache-2.0"
+            repository = "https://example.invalid/sc-lint"
+            homepage = "https://example.invalid/sc-lint"
+        "#,
+    );
+    fixture.write(
+        "crates/example/Cargo.toml",
+        &good_member_manifest("example", "").replacen(
+            "version.workspace = true\n",
+            "version = \"0.1.0\"\n",
+            1,
+        ),
+    );
+    fixture.write_member_boundary_record("example", &[], &[], &[]);
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+    fixture
+}
+
+#[test]
+fn kebab_case_family_is_accepted() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+
+    let report = configured(fixture.root(), Some("forbid-external-impls"))
+        .expect("kebab-case family is a valid selector");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn exclude_paths_drops_manifest_findings() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+
+    let before = configured(fixture.root(), Some("manifests")).expect("manifest analysis succeeds");
+    assert_eq!(
+        finding_messages(&before),
+        vec!["crates/example/Cargo.toml: set [package].homepage.workspace = true".to_string()]
+    );
+    assert_eq!(
+        before.findings[0].owner_ids[0].as_str(),
+        "crates/example/Cargo.toml"
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            exclude_paths = ["crates/example/**"]
+        "#,
+    );
+    let report = configured(fixture.root(), Some("manifests")).expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
 }
