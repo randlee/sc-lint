@@ -441,3 +441,42 @@ fn selector_error_is_usage_with_code() {
         }
     ));
 }
+
+#[test]
+fn non_table_analyzer_entry_names_its_table() {
+    let directory = config_dir("[tool.sc-lint.analyzers]\nexample = 1\n");
+    let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.NOT_A_TABLE");
+    assert_eq!(
+        error.to_string(),
+        "example: [tool.sc-lint.analyzers.example] must be a table"
+    );
+}
+
+#[test]
+fn non_table_intermediate_node_names_the_offending_path() {
+    for (contents, table) in [
+        ("tool = \"x\"\n", "tool"),
+        ("[tool]\nsc-lint = 1\n", "tool.sc-lint"),
+        ("[tool.sc-lint]\nanalyzers = 3\n", "tool.sc-lint.analyzers"),
+    ] {
+        let directory = config_dir(contents);
+        let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+
+        assert_eq!(error.code(), "ANALYZER_CONFIG.NOT_A_TABLE");
+        let AnalyzerConfigError::NotATable {
+            analyzer,
+            table: named,
+        } = &error
+        else {
+            panic!("expected a not-a-table error for {contents:?}");
+        };
+        assert_eq!(*analyzer, "example");
+        assert_eq!(named, table);
+        assert_eq!(
+            error.to_string(),
+            format!("example: [{table}] must be a table")
+        );
+    }
+}

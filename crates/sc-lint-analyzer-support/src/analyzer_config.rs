@@ -85,8 +85,11 @@ pub enum AnalyzerConfigError {
         #[source]
         source: Box<toml::de::Error>,
     },
-    #[error("{analyzer}: [tool.sc-lint.analyzers.{analyzer}] must be a table")]
-    NotATable { analyzer: &'static str },
+    #[error("{analyzer}: [{table}] must be a table")]
+    NotATable {
+        analyzer: &'static str,
+        table: String,
+    },
     #[error("{analyzer}: unknown key `{key}` in [tool.sc-lint.analyzers.{analyzer}]")]
     UnknownKey { analyzer: &'static str, key: String },
     #[error("{analyzer}: `{key}` in [tool.sc-lint.analyzers.{analyzer}] must be {expected}")]
@@ -202,16 +205,25 @@ fn analyzer_table<'a>(
     document: &'a toml::Table,
     analyzer: &'static str,
 ) -> Result<Option<&'a toml::Table>, AnalyzerConfigError> {
-    match document
-        .get("tool")
-        .and_then(|tool| tool.get("sc-lint"))
-        .and_then(|sc_lint| sc_lint.get("analyzers"))
-        .and_then(|analyzers| analyzers.get(analyzer))
-    {
-        None => Ok(None),
-        Some(toml::Value::Table(table)) => Ok(Some(table)),
-        Some(_) => Err(AnalyzerConfigError::NotATable { analyzer }),
+    let mut current = document;
+    let mut path = String::new();
+    for segment in ["tool", "sc-lint", "analyzers", analyzer] {
+        if !path.is_empty() {
+            path.push('.');
+        }
+        path.push_str(segment);
+        match current.get(segment) {
+            None => return Ok(None),
+            Some(toml::Value::Table(table)) => current = table,
+            Some(_) => {
+                return Err(AnalyzerConfigError::NotATable {
+                    analyzer,
+                    table: path,
+                });
+            }
+        }
     }
+    Ok(Some(current))
 }
 
 fn validate_keys(table: &toml::Table, catalog: &RuleCatalog) -> Result<(), AnalyzerConfigError> {
