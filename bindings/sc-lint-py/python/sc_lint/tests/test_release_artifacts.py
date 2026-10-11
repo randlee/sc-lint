@@ -5,6 +5,7 @@ from sc_lint.lint_common import discover_repo_root
 import argparse
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -201,7 +202,8 @@ class ReleaseArtifactsTests(unittest.TestCase):
         guide = self.manifest["documentation_bundle"]["package_guides"][0]
         (docs_bundle / "packages" / guide).unlink()
 
-        with self.assertRaisesRegex(SystemExit, "missing documentation files: packages/"):
+        missing_guide = re.escape(str(Path("packages") / guide))
+        with self.assertRaisesRegex(SystemExit, f"missing documentation files: {missing_guide}"):
             release_smoke.assert_documentation_integrity(docs_bundle, PUBLISH_MANIFEST_PATH)
 
     def test_release_smoke_rejects_broken_relative_link_in_extracted_bundle(self) -> None:
