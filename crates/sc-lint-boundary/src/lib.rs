@@ -82,6 +82,36 @@ pub enum BoundaryError {
     },
 }
 
+impl BoundaryError {
+    fn inventory_load(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::InventoryLoad {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
+
+    fn manifest_policy(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::ManifestPolicyAnalysis {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
+
+    fn package_policy(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::PackagePolicyAnalysis {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
+
+    fn graph_build(root: &Path, source: impl Into<BoundaryErrorSource>) -> Self {
+        Self::WorkspaceGraphBuild {
+            root: root.to_path_buf(),
+            source: source.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 struct RuleDefaults {
     trait_self_loop: TraitSelfLoopDefaults,
@@ -492,80 +522,45 @@ pub fn analyze_workspace(
         return analyze_manifests_only(options);
     }
 
-    let inventory = inventory::load_boundary_inventory(&options.root).map_err(|source| {
-        BoundaryError::InventoryLoad {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
+    let root = options.root.as_path();
+    let inventory = inventory::load_boundary_inventory(root)
+        .map_err(|e| BoundaryError::inventory_load(root, e))?;
     let metadata =
-        graph::load_metadata(&options.root).map_err(|source| BoundaryError::InventoryLoad {
-            root: options.root.clone(),
-            source: source.into(),
-        })?;
-    inventory::validate_owner_crate_paths(&inventory, &metadata).map_err(|source| {
-        BoundaryError::InventoryLoad {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
+        graph::load_metadata(root).map_err(|e| BoundaryError::inventory_load(root, e))?;
+    inventory::validate_owner_crate_paths(&inventory, &metadata)
+        .map_err(|e| BoundaryError::inventory_load(root, e))?;
     if options.rule == Some(RuleFilter::Dependencies) {
         let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
-            .map_err(|source| BoundaryError::PackagePolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            })?;
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
         return Ok(findings_report(
             dependency_report.scanned_crates,
             dependency_report.findings,
         ));
     }
-    let graph = graph::build_workspace_graph_from(&metadata).map_err(|source| {
-        BoundaryError::WorkspaceGraphBuild {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
-    let inventory_summary = inventory.summary();
-    let mut findings = Vec::with_capacity(inventory_summary.recommended_finding_capacity());
+    let graph = graph::build_workspace_graph_from(&metadata)
+        .map_err(|e| BoundaryError::graph_build(root, e))?;
+    let mut findings = Vec::with_capacity(inventory.summary().recommended_finding_capacity());
     let filter = options.rule;
-    if filter.is_none() || filter == Some(RuleFilter::Cycles) {
+    use RuleFilter::{Boundaries, Cycles, ForbidExternalImpls, InternalOnly};
+    if rule_selected(filter, &[Cycles]) {
         findings.extend(analysis::analyze_cycles(&graph));
     }
-    if filter.is_none()
-        || filter == Some(RuleFilter::Boundaries)
-        || filter == Some(RuleFilter::InternalOnly)
-    {
+    if rule_selected(filter, &[Boundaries, InternalOnly]) {
         findings.extend(analysis::analyze_internal_only(&graph));
     }
-    if filter.is_none()
-        || filter == Some(RuleFilter::Boundaries)
-        || filter == Some(RuleFilter::ForbidExternalImpls)
-    {
+    if rule_selected(filter, &[Boundaries, ForbidExternalImpls]) {
         findings.extend(analysis::analyze_forbid_external_impls(&graph));
     }
-    if filter.is_none() || filter == Some(RuleFilter::Boundaries) {
+    if rule_selected(filter, &[Boundaries]) {
         findings.extend(analysis::analyze_named_callers(&graph, &inventory));
     }
     if filter.is_none() {
-        findings.extend(
-            package_policy::analyze_package_policy(&metadata, &inventory)
-                .map_err(|source| BoundaryError::PackagePolicyAnalysis {
-                    root: options.root.clone(),
-                    source: source.into(),
-                })?
-                .findings,
-        );
-    }
-    if filter.is_none() {
-        findings.extend(
-            manifest_policy::analyze_manifest_policy(&options.root, &metadata)
-                .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
-                    root: options.root.clone(),
-                    source: source.into(),
-                })?
-                .findings,
-        );
+        let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
+        findings.extend(package_report.findings);
+        let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
+            .map_err(|e| BoundaryError::manifest_policy(root, e))?;
+        findings.extend(manifest_report.findings);
     }
     findings.sort_by(|left, right| {
         analysis::finding_sort_key(left)
@@ -580,21 +575,20 @@ pub fn analyze_workspace(
     Ok(findings_report(scanned_crates, findings))
 }
 
+/// An unfiltered run selects every rule; `--rule X` selects the passes that accept X.
+fn rule_selected(filter: Option<RuleFilter>, accepted: &[RuleFilter]) -> bool {
+    filter.is_none_or(|rule| accepted.contains(&rule))
+}
+
 /// `--rule manifests` needs only package metadata, not the inventory or graph.
 fn analyze_manifests_only(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
-    let metadata = graph::load_metadata_without_deps(&options.root).map_err(|source| {
-        BoundaryError::ManifestPolicyAnalysis {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })?;
-    let manifest_report = manifest_policy::analyze_manifest_policy(&options.root, &metadata)
-        .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
-            root: options.root.clone(),
-            source: source.into(),
-        })?;
+    let root = options.root.as_path();
+    let metadata = graph::load_metadata_without_deps(root)
+        .map_err(|e| BoundaryError::manifest_policy(root, e))?;
+    let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
+        .map_err(|e| BoundaryError::manifest_policy(root, e))?;
     Ok(findings_report(
         manifest_report.scanned_crates,
         manifest_report.findings,
@@ -620,12 +614,8 @@ fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsRep
 pub fn export_workspace_graph(
     options: &ExportGraphOptions,
 ) -> std::result::Result<GraphExport, BoundaryError> {
-    graph::build_workspace_graph(&options.root).map_err(|source| {
-        BoundaryError::WorkspaceGraphBuild {
-            root: options.root.clone(),
-            source: source.into(),
-        }
-    })
+    graph::build_workspace_graph(&options.root)
+        .map_err(|e| BoundaryError::graph_build(&options.root, e))
 }
 
 pub fn render_findings_report(report: &FindingsReport) -> String {
