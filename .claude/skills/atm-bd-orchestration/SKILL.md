@@ -223,8 +223,7 @@ on every restack and show up as out-of-scope work in that sprint's PR.
    from that QA has closed, one more quick-fix QA bead as in this step. When every roster agent is mid-task,
    the lead assigns the finding's task to itself (`atm task assign
    "$ATM_IDENTITY" --task-id <finding bead> --template fix-assignment.xml.j2
-   --vars <vars>`) when its own roster model fits the finding's `difficulty`
-   (gate (5)); it runs the template's gate, claim, start and close steps
+   --vars <vars>`) when the finding's `difficulty` suits it; it runs the template's gate, claim, start and close steps
    itself, acts on the subagent's report for steps c and f1, and a background
    developer subagent does the fix steps (b to e),
    since a background agent never writes to beads or ATM. When the lead's
@@ -315,10 +314,14 @@ For each ready bead:
 | sanity check (`stage:dev-sanity`) | [`dev-sanity-template.xml.j2`](templates/dev-sanity-template.xml.j2) | `.claude/skills/atm-beads/scripts/resolve-role dev-sanity` |
 | QA (`stage:qa`) | [`qa-template.xml.j2`](templates/qa-template.xml.j2) | quality-mgr |
 | fix (`stage:fix`) | [`fix-assignment.xml.j2`](templates/fix-assignment.xml.j2) | the member the lead picks for its `difficulty` |
-| finding from a quick-fix QA (its `discovered-from` QA bead has `metadata.quick_fix` true) | [`fix-assignment.xml.j2`](templates/fix-assignment.xml.j2), no sanity bead; once every finding from that failed QA has closed, one more quick-fix QA bead (Parallel Quick Fix step 4) | an idle dev whose model fits its `difficulty`, by priority |
+| finding from a quick-fix QA (its `discovered-from` QA bead has `metadata.quick_fix` true) | [`fix-assignment.xml.j2`](templates/fix-assignment.xml.j2), no sanity bead; once every finding from that failed QA has closed, one more quick-fix QA bead (Parallel Quick Fix step 4) | an idle dev picked for its `difficulty`, by priority |
 | important or minor finding (`stage:finding`, no `metadata.sanity_finding`, not from a quick-fix QA) | [`fix-assignment.xml.j2`](templates/fix-assignment.xml.j2), in the same step as one `bd import` of its sanity bead (`atm-beads` [`dev-sanity-bead.json.j2`](../atm-beads/templates/dev-sanity-bead.json.j2), `dev_bead` = the finding) and its QA bead ([`qa-bead.json.j2`](templates/qa-bead.json.j2), `checked_bead` = the finding, `blocked_by` = the sanity bead), each with `parent` = the finding's parent; a minor finding left in the backlog gets neither until it is assigned | an idle dev, by priority |
 | sanity finding (`stage:finding` with `metadata.sanity_finding`) | its checked bead's [`dev-fix.xml.j2`](templates/dev-fix.xml.j2), once per checked bead | the checked bead's assignee |
 | review (`stage:review`) | [`review-template.xml.j2`](templates/review-template.xml.j2) | the phase-end reviewer |
+
+`difficulty` is a minimum. Pick a dev at that tier, or one tier up when none is idle (fast to terra/sonnet); never far
+above it (fast to a frontier model). `sprint-report --dispatch` recommends idle roster members of type `dev`; the
+choice is the lead's.
 
 Then, on each task close:
 

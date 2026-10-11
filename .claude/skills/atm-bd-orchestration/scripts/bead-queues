@@ -13,9 +13,11 @@ Scope: the parent-child descendants of the phase root (`root` in
 `.atm-bd/phase-P.toml`, or --root). Each open bead with no open ATM task lands
 in one action queue once its prerequisite is met; pairing is by metadata
 (`dev_bead`, `checked_bead`) and dependency edges, never by bead-id patterns.
-Stack rows come from `gh api repos/{owner}/{repo}/stacks` and the open PRs of
-the phase integration branch (`integration_branch` in the phase file, or the
-root's metadata).
+Stack rows come from `gh stack view --json`, run in the worktree of the phase
+integration branch (`integration_branch` in the phase file, or the root's
+metadata), and `gh api repos/{owner}/{repo}/stacks` for the open stacks; no
+other PR read. A stack that cannot be read is reported as "stack not checked:
+<reason>" and the rest of the report still prints.
 
 Human mode prints every queue. --json is the cron contract: empty stdout when
 nothing new is dropped, one JSON object when something is, exit 0 either way.
@@ -87,9 +89,9 @@ class Usage(Exception):
     """The caller cannot be resolved; exit 3."""
 
 
-def run_json(cmd: list[str]):
+def run_json(cmd: list[str], cwd: str | None = None):
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True)
+        out = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
     except OSError as exc:
         raise Fail(f"{cmd[0]}: {exc}") from exc
     if out.returncode != 0:
@@ -316,44 +318,56 @@ def build(args, repo: Path) -> dict:
             "integration_branch": branch, "stack": stack_note, "queues": queues}
 
 
+def trunk_worktree(trunk: str) -> str | None:
+    """The local worktree checked out on the trunk; `gh stack view` reads the stack from there."""
+    out = subprocess.run(["git", "worktree", "list", "--porcelain"], capture_output=True, text=True)
+    path = None
+    for line in out.stdout.splitlines():
+        if line.startswith("worktree "):
+            path = line[len("worktree "):]
+        elif line == f"branch refs/heads/{trunk}":
+            return path
+    return None
+
+
 def stacks(trunk: str, queues: dict, now: datetime) -> str:
-    """Stack rows for the phase trunk: open phase PRs on no open stack, and open stacks that are not coherent."""
-    pages = run_json(["gh", "api", "--paginate", "--slurp", "repos/{owner}/{repo}/stacks?per_page=100"])
-    on_trunk = [s for page in pages for s in page if s.get("open") and s.get("base", {}).get("ref") == trunk]
-    prs = {p["number"]: p for p in run_json(["gh", "pr", "list", "--state", "open", "--limit", "1000",
-                                              "--json", "number,baseRefName,headRefName,isDraft,createdAt,title"])}
+    """Stack rows for the phase trunk: stack PRs on no open stack, and open stacks that are not coherent."""
+    where = trunk_worktree(trunk)
+    if where is None:
+        return f"stack not checked: no worktree on {trunk}"
+    try:
+        view = run_json(["gh", "stack", "view", "--json"], cwd=where)
+        pages = run_json(["gh", "api", "--paginate", "--slurp", "repos/{owner}/{repo}/stacks?per_page=100"], cwd=where)
+    except Fail as exc:
+        return f"stack not checked: {exc}"
+    if view.get("trunk") != trunk:
+        return f"stack not checked: gh stack view in {where} has trunk {view.get('trunk')}, expected {trunk}"
+    layers = [b for b in view.get("branches") or [] if not b.get("isMerged") and b.get("name") != trunk]
+    numbers = {(b.get("pr") or {}).get("number") for b in layers} - {None}
+    on_trunk = sorted((s for page in pages for s in page if s.get("open") and (
+        (s.get("base") or {}).get("ref") == trunk or numbers & {p["number"] for p in s.get("pull_requests") or []})),
+        key=lambda s: s["number"])
 
-    def row(key, rid, when, title, detail):
+    def row(key, rid, title, detail):
         queues[key].append({"queue": key, "id": rid, "stage": "stack", "status": "open", "assignee": "-",
-                            "priority": None, "since": when, "age": age(when, now), "title": title, "detail": detail})
+                            "priority": None, "since": None, "age": age(None, now), "title": title, "detail": detail})
 
-    linked: set[int] = set()
+    linked = {p["number"] for s in on_trunk for p in s.get("pull_requests") or []}
     for s in on_trunk:
-        expect, problems = trunk, []
-        for p in s.get("pull_requests") or []:
-            linked.add(p["number"])
-            if p.get("state") != "open":
-                continue
-            base = prs.get(p["number"], {}).get("baseRefName")
-            if base != expect:
-                problems.append(f"#{p['number']} base {base}, expected {expect}")
-            expect = p["head"]["ref"]
+        mine = {p["number"] for p in s.get("pull_requests") or [] if p.get("state") == "open"}
+        problems = [f"{b['name']} needs rebase" for b in layers if b.get("needsRebase")]
+        problems += [f"{b['name']} has no PR" for b in layers if not b.get("pr")]
+        problems += [f"#{n} not in the local stack" for n in sorted(mine - numbers)]
         if len(on_trunk) > 1:
             problems.append(f"{len(on_trunk)} open stacks on {trunk}: not landable in one merge")
         if problems:
-            row("stack_incoherent", f"stack#{s['number']}", s.get("created_at"), f"stack #{s['number']} on {trunk}", "; ".join(problems))
-    # open PRs reachable from the trunk by base chains
-    phase, frontier = {}, {trunk}
-    while frontier:
-        nxt = {p["headRefName"] for p in prs.values() if p["baseRefName"] in frontier and p["number"] not in phase}
-        phase.update({n: p for n, p in prs.items() if p["baseRefName"] in frontier})
-        frontier = nxt - frontier
-    loose = [p for n, p in phase.items() if n not in linked]
-    if not on_trunk and len(loose) == 1 and loose[0]["baseRefName"] == trunk:
+            row("stack_incoherent", f"stack#{s['number']}", f"stack #{s['number']} on {trunk}", "; ".join(problems))
+    loose = [b for b in layers if b.get("pr") and b["pr"]["number"] not in linked]
+    if not on_trunk and len(layers) == 1:
         loose = []  # layer 0 waits unlinked on the trunk until layer 1 opens
-    for p in loose:
-        row("pr_unlinked", f"pr#{p['number']}", p.get("createdAt"), p.get("title", ""), f"{p['headRefName']} -> {p['baseRefName']}")
-    return f"{len(on_trunk)} open stack(s) on {trunk}, {len(phase)} open PR(s) on the phase"
+    for b in loose:
+        row("pr_unlinked", f"pr#{b['pr']['number']}", b["name"], f"{b['name']} on the {trunk} stack")
+    return f"{len(on_trunk)} open stack(s) on {trunk}, {len(layers)} unmerged layer(s) in the local stack"
 
 
 def cron(report: dict, state_file: Path, min_age: int) -> dict | None:
