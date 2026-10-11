@@ -232,6 +232,40 @@ fn invalid_common_key_type_is_a_structured_error() {
     let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
 
     assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    assert_eq!(
+        error.to_string(),
+        "example: `exclude_rules` in [tool.sc-lint.analyzers.example] must be an array of strings"
+    );
+}
+
+#[test]
+fn unknown_fail_rule_is_exit_3() {
+    let directory = config_dir("[tool.sc-lint.analyzers.example]\nfail_rules = [\"NOPE\"]\n");
+    let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_RULE");
+    assert_eq!(
+        error.to_string(),
+        "example: unknown rule `NOPE` in fail_rules"
+    );
+}
+
+#[test]
+fn non_table_analyzer_entry_is_not_a_table() {
+    let directory = config_dir("[tool.sc-lint.analyzers]\nexample = 1\n");
+    let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+
+    assert!(matches!(
+        error,
+        AnalyzerConfigError::NotATable {
+            analyzer: "example"
+        }
+    ));
+    assert_eq!(error.code(), "ANALYZER_CONFIG.NOT_A_TABLE");
+    assert_eq!(
+        error.to_string(),
+        "example: [tool.sc-lint.analyzers.example] must be a table"
+    );
 }
 
 #[test]
@@ -322,9 +356,12 @@ fn exclude_paths_support_segment_and_recursive_wildcards() {
     let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
 
     assert!(settings.path_excluded("tests/fixtures/a/b.rs"));
+    assert!(settings.path_excluded("tests/fixtures/a.rs"));
     assert!(settings.path_excluded("crates/app/src/gen1.rs"));
     assert!(!settings.path_excluded("crates/app/src/gen10.rs"));
     assert!(!settings.path_excluded("crates/app/src/nested/gen1.rs"));
+    assert!(!settings.path_excluded("src/a.rs"));
+    assert!(!settings.path_excluded("tests/a.rs"));
 }
 
 #[test]
@@ -388,4 +425,19 @@ fn relative_slash_path_is_root_relative() {
         relative_slash_path(directory.path(), &file),
         "crates/example/src/lib.rs"
     );
+}
+
+#[test]
+fn selector_error_is_usage_with_code() {
+    let directory = config_dir("");
+    let error = load_analyzer_settings(&CATALOG, directory.path(), None, Some("NOPE")).unwrap_err();
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
+    assert!(matches!(
+        error,
+        AnalyzerConfigError::Selector {
+            analyzer: "example",
+            ..
+        }
+    ));
 }
