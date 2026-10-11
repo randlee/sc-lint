@@ -4,7 +4,7 @@
 crates/sc-lint-boundary/src/analysis.rs	analyze_named_callers	86
 crates/sc-lint-boundary/src/graph/build.rs	ingest_module_items	484
 crates/sc-lint-boundary/src/inventory/mod.rs	validate_boundary_schema	120
-crates/sc-lint-boundary/src/lib.rs	analyze_workspace	141
+crates/sc-lint-boundary/src/lib.rs	analyze_workspace	93
 crates/sc-lint-boundary/src/render.rs	render_graph_export_turtle	88
 crates/sc-lint/src/command.rs	from_cli	90
 crates/sc-lint/src/config.rs	evaluate_compatibility	97

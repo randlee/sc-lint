@@ -489,34 +489,7 @@ pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
     if options.rule == Some(RuleFilter::Manifests) {
-        let metadata = graph::load_metadata_without_deps(&options.root).map_err(|source| {
-            BoundaryError::ManifestPolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            }
-        })?;
-        let manifest_report = manifest_policy::analyze_manifest_policy(&options.root, &metadata)
-            .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
-                root: options.root.clone(),
-                source: source.into(),
-            })?;
-        let status = if manifest_report
-            .findings
-            .iter()
-            .any(analysis::finding_is_failure)
-        {
-            ReportStatus::Fail
-        } else {
-            ReportStatus::Pass
-        };
-        return Ok(FindingsReport {
-            tool: SC_LINT_BOUNDARY_TOOL,
-            version: SC_LINT_BOUNDARY_VERSION,
-            schema_version: SC_LINT_SCHEMA_VERSION,
-            status,
-            scanned_crates: manifest_report.scanned_crates,
-            findings: manifest_report.findings,
-        });
+        return analyze_manifests_only(options);
     }
 
     let inventory = inventory::load_boundary_inventory(&options.root).map_err(|source| {
@@ -542,23 +515,10 @@ pub fn analyze_workspace(
                 root: options.root.clone(),
                 source: source.into(),
             })?;
-        let status = if dependency_report
-            .findings
-            .iter()
-            .any(analysis::finding_is_failure)
-        {
-            ReportStatus::Fail
-        } else {
-            ReportStatus::Pass
-        };
-        return Ok(FindingsReport {
-            tool: SC_LINT_BOUNDARY_TOOL,
-            version: SC_LINT_BOUNDARY_VERSION,
-            schema_version: SC_LINT_SCHEMA_VERSION,
-            status,
-            scanned_crates: dependency_report.scanned_crates,
-            findings: dependency_report.findings,
-        });
+        return Ok(findings_report(
+            dependency_report.scanned_crates,
+            dependency_report.findings,
+        ));
     }
     let graph = graph::build_workspace_graph_from(&metadata).map_err(|source| {
         BoundaryError::WorkspaceGraphBuild {
@@ -617,20 +577,44 @@ pub fn analyze_workspace(
         .iter()
         .filter(|node| node.kind == "crate")
         .count();
+    Ok(findings_report(scanned_crates, findings))
+}
+
+/// `--rule manifests` needs only package metadata, not the inventory or graph.
+fn analyze_manifests_only(
+    options: &AnalyzeOptions,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    let metadata = graph::load_metadata_without_deps(&options.root).map_err(|source| {
+        BoundaryError::ManifestPolicyAnalysis {
+            root: options.root.clone(),
+            source: source.into(),
+        }
+    })?;
+    let manifest_report = manifest_policy::analyze_manifest_policy(&options.root, &metadata)
+        .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
+            root: options.root.clone(),
+            source: source.into(),
+        })?;
+    Ok(findings_report(
+        manifest_report.scanned_crates,
+        manifest_report.findings,
+    ))
+}
+
+fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsReport {
     let status = if findings.iter().any(analysis::finding_is_failure) {
         ReportStatus::Fail
     } else {
         ReportStatus::Pass
     };
-
-    Ok(FindingsReport {
+    FindingsReport {
         tool: SC_LINT_BOUNDARY_TOOL,
         version: SC_LINT_BOUNDARY_VERSION,
         schema_version: SC_LINT_SCHEMA_VERSION,
         status,
         scanned_crates,
         findings,
-    })
+    }
 }
 
 pub fn export_workspace_graph(
