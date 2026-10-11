@@ -457,28 +457,81 @@ fn relative_unix_path_prefix_is_config_error() {
     );
 }
 
-#[test]
-fn defaults_only_temp_prefix_does_not_flag_production_path() {
+fn prefix_findings(config: Option<&str>, source: &str) -> Vec<(RuleId, String)> {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
-    fixture.write_source(
-        "example",
-        "lib.rs",
-        "pub fn path() { let _ = \"/private/tmp/cache\"; }",
-    );
+    if let Some(config) = config {
+        fixture.write_lint_config(config);
+    }
+    fixture.write_source("example", "lib.rs", source);
 
-    let report = analyze_workspace(&AnalyzeOptions {
+    analyze_workspace(&AnalyzeOptions {
         root: fixture.root().to_path_buf(),
         format: OutputFormat::Json,
     })
-    .unwrap();
+    .unwrap()
+    .findings
+    .into_iter()
+    .filter(|finding| matches!(finding.rule_id, RuleId::Port001 | RuleId::Port006))
+    .map(|finding| {
+        let literal = finding
+            .message
+            .split('`')
+            .nth(1)
+            .unwrap_or_default()
+            .to_string();
+        (finding.rule_id, literal)
+    })
+    .collect()
+}
+
+const SHARED_BUILTIN_SOURCE: &str = "pub fn production() { let _ = \"/private/tmp/prod\"; let _ = \"/var/tmp/prod\"; }\n#[cfg(test)] mod tests { fn fixture() { let _ = \"/private/tmp/test\"; let _ = \"/var/tmp/test\"; } }";
+
+fn assert_shared_builtins_flagged(findings: &[(RuleId, String)]) {
+    for (rule_id, literal) in [
+        (RuleId::Port006, concat!("/private", "/tmp/prod")),
+        (RuleId::Port006, concat!("/var", "/tmp/prod")),
+        (RuleId::Port001, concat!("/private", "/tmp/test")),
+        (RuleId::Port001, concat!("/var", "/tmp/test")),
+    ] {
+        assert!(
+            findings.contains(&(rule_id, literal.to_string())),
+            "{rule_id:?} {literal} missing from {findings:?}"
+        );
+    }
+}
+
+#[test]
+fn defaults_only_shared_builtin_prefixes_flag_both_rules() {
+    assert_shared_builtins_flagged(&prefix_findings(None, SHARED_BUILTIN_SOURCE));
+}
+
+#[test]
+fn configured_prefixes_do_not_suppress_shared_builtin_detection() {
+    let configured = prefix_findings(
+        Some("[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"/opt/\"]\n"),
+        SHARED_BUILTIN_SOURCE,
+    );
+
+    assert_shared_builtins_flagged(&configured);
+    assert_eq!(configured, prefix_findings(None, SHARED_BUILTIN_SOURCE));
+}
+
+#[test]
+fn configured_prefixes_extend_both_rules() {
+    let findings = prefix_findings(
+        Some("[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"/opt/\"]\n"),
+        "pub fn production() { let _ = \"/opt/prod\"; }\n#[cfg(test)] mod tests { fn fixture() { let _ = \"/opt/test\"; } }",
+    );
 
     assert!(
-        report
-            .findings
-            .iter()
-            .all(|finding| finding.rule_id != RuleId::Port006)
+        findings.contains(&(RuleId::Port006, "/opt/prod".to_string())),
+        "{findings:?}"
+    );
+    assert!(
+        findings.contains(&(RuleId::Port001, "/opt/test".to_string())),
+        "{findings:?}"
     );
 }
 
