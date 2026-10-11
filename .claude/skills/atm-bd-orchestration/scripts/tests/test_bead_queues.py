@@ -33,6 +33,8 @@ with open(os.environ["FAKE_GH_LOG"], "a") as log:
     log.write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")
 if os.environ.get("FAKE_GH_FAIL"):
     sys.exit("gh: HTTP 502")
+if sys.argv[1] == "stack" and os.getcwd() in os.environ.get("FAKE_GH_NOT_STACK", "").split(os.pathsep):
+    sys.exit("current branch is not part of a stack")
 key = {"api": "FAKE_GH_STACKS", "stack": "FAKE_GH_VIEW"}[sys.argv[1]]
 sys.stdout.write(open(os.environ[key]).read())
 """
@@ -46,7 +48,7 @@ class Queues:
         self.dir = ws.root / f"q-{phase}"
         self.dir.mkdir()
         self.trunk = f"integrate/phase-{phase}"
-        ws.bd("create", f"phase {phase}", "--id", self.root, "--type", "epic",
+        ws.bd("create", f"phase {phase}", "--id", self.root, "--type", "epic", "-l", f"phase-{phase}",
               "--metadata", json.dumps({"integration_branch": self.trunk}), "--silent")
         toml = ws.root / ".atm-bd" / f"phase-{phase}.toml"
         toml.parent.mkdir(exist_ok=True)
@@ -217,6 +219,17 @@ class BeadQueuesTests(unittest.TestCase):
         self.ws.close(sanity, "PASS at 1234567")
         assert q.queues().get("no_qa_record") == {sanity}
 
+    def test_a_descendant_without_the_phase_label_is_not_read(self):
+        q = Queues(self.ws, "nl")
+        sprint = q.sprint(1)
+        dev, sanity, qa = group(sprint)
+        self.ws.bd("delete", qa, "--force")
+        self.ws.close(dev, "dev complete (PR #6)")
+        self.ws.close(sanity, "PASS at 1234567")
+        assert q.queues().get("no_qa_record") == {sanity}
+        self.ws.bd("update", sanity, "--remove-label", "phase-nl")
+        assert sanity not in str(q.queues())
+
     def test_stack_rows(self):
         q = Queues(self.ws, "st")
         l1, l2, l3, l4 = layer(1, "a"), layer(2, "b"), layer(3, "c", rebase=True), layer(4, "d")
@@ -233,20 +246,38 @@ class BeadQueuesTests(unittest.TestCase):
         q.github([], [l1, l2])
         assert q.queues() == {"pr_unlinked": {"pr#1", "pr#2"}}
         calls = (q.dir / "gh.log").read_text().splitlines()
-        assert all(c.startswith(f"{q.worktree} ") for c in calls)    # run in the trunk worktree
+        assert all(c.startswith(f"{q.worktree} ") for c in calls if c.split()[1] == "stack")   # the trunk worktree
         assert {c.split()[1] for c in calls} == {"stack", "api"}      # never `gh pr ...`
+
+    def test_stack_view_falls_back_to_a_layer_worktree(self):
+        """gh-stack 0.1 does not count the trunk as a stack member: view from a worktree on an open stack's layer."""
+        q = Queues(self.ws, "lw")
+        l1, l2 = layer(1, "lw-a"), layer(2, "lw-b", rebase=True)
+        q.github([stack(10, l1, l2)], [l1, l2])
+        env = {"FAKE_GH_NOT_STACK": str(q.worktree)}
+        proc = q.run(env=env)
+        assert "stack not checked: integrate/phase-lw: " in proc.stdout and "not part of a stack" in proc.stdout, proc.stdout
+        top = self.ws.root / "wt-lw-b"
+        subprocess.run(["git", "worktree", "add", "-q", "-b", "lw-b", str(top)], cwd=self.ws.root, check=True)
+        (q.dir / "gh.log").unlink()
+        fresh = q.dir / "fresh.json"
+        proc = q.run("--json", "--min-age", "0", "--state-file", str(fresh), env=env)
+        assert proc.returncode == 0 and proc.stdout, (proc.stderr, q.run(env=env).stdout)
+        assert {(r["queue"], r["id"]) for r in json.loads(proc.stdout)["rows"]} == {("stack_incoherent", "stack#10")}
+        views = [c.split()[0] for c in (q.dir / "gh.log").read_text().splitlines() if c.split()[1] == "stack"]
+        assert views == [str(q.worktree), str(top)], views         # trunk first, then the top layer
 
     def test_stack_not_checked_keeps_the_report(self):
         q = Queues(self.ws, "nc")
         dev = group(q.sprint(1))[0]
-        for env, why in (({"FAKE_GH_FAIL": "1"}, "gh: HTTP 502"), ({}, "has trunk develop")):
+        for env, why in (({"FAKE_GH_FAIL": "1"}, "gh: HTTP 502"), ({}, "trunk develop")):
             q.github([], [layer(1, "a"), layer(2, "b")], trunk="develop")
             proc = q.run(env=env)
             assert proc.returncode == 0, proc.stderr
             assert "stack not checked:" in proc.stdout and why in proc.stdout and dev in proc.stdout
         subprocess.run(["git", "worktree", "remove", str(q.worktree)], cwd=self.ws.root, check=True)
         proc = q.run()
-        assert proc.returncode == 0 and f"stack not checked: no worktree on {q.trunk}" in proc.stdout
+        assert proc.returncode == 0 and f"stack not checked: no worktree on {q.trunk} or on an open stack's layer" in proc.stdout
 
     def test_cron_contract(self):
         q = Queues(self.ws, "cr")
