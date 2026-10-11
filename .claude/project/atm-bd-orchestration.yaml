@@ -3,7 +3,7 @@
 # .claude/skills/atm-beads/scripts/repo_config.py (load()).
 bead_prefix: "lint"
 lead: "team-lead"
-dev_sanity_member: "dev-sanity"
+dev_sanity_member: "lint-sanity"
 qa_member: "quality-mgr"
 worktree_base: "../sc-lint-worktrees"
 test_command: "just test"
