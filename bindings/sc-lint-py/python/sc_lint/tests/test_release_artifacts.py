@@ -4,21 +4,33 @@ from sc_lint.lint_common import discover_repo_root
 
 import argparse
 import importlib.util
+import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
+import tarfile
 import tempfile
+import tomllib
 import unittest
 
 
 REPO_ROOT = discover_repo_root()
 SCRIPT_PATH = REPO_ROOT / "scripts/release_artifacts.py"
 MANIFEST_PATH = REPO_ROOT / "release/sc-lint-release-checks.toml"
+PUBLISH_MANIFEST_PATH = REPO_ROOT / "release/publish-artifacts.toml"
+PUBLISH_KIT_SCRIPT = REPO_ROOT / ".github/scripts/release_artifacts.py"
+RELEASE_SMOKE_PATH = REPO_ROOT / "scripts/release_smoke.py"
 
 spec = importlib.util.spec_from_file_location("release_artifacts", SCRIPT_PATH)
 assert spec is not None and spec.loader is not None
 release_artifacts = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release_artifacts)
+
+smoke_spec = importlib.util.spec_from_file_location("release_smoke", RELEASE_SMOKE_PATH)
+assert smoke_spec is not None and smoke_spec.loader is not None
+release_smoke = importlib.util.module_from_spec(smoke_spec)
+smoke_spec.loader.exec_module(release_smoke)
 
 
 class ReleaseArtifactsTests(unittest.TestCase):
@@ -125,7 +137,66 @@ class ReleaseArtifactsTests(unittest.TestCase):
                 argparse.Namespace(manifest=str(MANIFEST_PATH), archive=str(unexpected_tar), windows=False)
             )
 
-    def test_primary_formula_installs_docs_to_pkgshare_and_passes_ruby_syntax(self) -> None:
+    def test_release_smoke_reads_the_pinned_kit_archive_layout_from_publish_manifest(self) -> None:
+        manifest = tomllib.loads(PUBLISH_MANIFEST_PATH.read_text(encoding="utf-8"))
+        workspace = tomllib.loads((REPO_ROOT / "Cargo.toml").read_text(encoding="utf-8"))
+        version = workspace["workspace"]["package"]["version"]
+        target = "x86_64-unknown-linux-gnu"
+        config = json.loads(
+            subprocess.check_output(
+                [
+                    sys.executable,
+                    str(PUBLISH_KIT_SCRIPT),
+                    "release-package-config",
+                    "--manifest",
+                    str(PUBLISH_MANIFEST_PATH),
+                    "--target",
+                    target,
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+            )
+        )
+
+        stage = self.root / f"{config['project']['archive_prefix']}_{version}_{target}"
+        binary_directory = stage / "bin"
+        binary_directory.mkdir(parents=True)
+        for binary in config["binaries"]:
+            name = binary["name"]
+            (binary_directory / name).write_text(name, encoding="utf-8")
+            for bundled_path in binary.get("bundled_paths", []):
+                shutil.copytree(
+                    REPO_ROOT / bundled_path["source"],
+                    stage / bundled_path["destination"],
+                    dirs_exist_ok=True,
+                )
+
+        archive = self.root / f"{stage.name}.tar.gz"
+        with tarfile.open(archive, "w:gz") as output:
+            output.add(stage, arcname=stage.name)
+        extracted = self.root / "extracted"
+        binary_path, package_root, docs_bundle = release_smoke.extract_archive(
+            archive,
+            extracted,
+            manifest=PUBLISH_MANIFEST_PATH,
+            version=version,
+            target=target,
+        )
+
+        sc_lint = next(entry for entry in manifest["release_binaries"] if entry["name"] == "sc-lint")
+        docs_destination = next(
+            entry["destination"]
+            for entry in sc_lint["bundled_paths"]
+            if entry["source"] == "docs-bundle"
+        )
+        self.assertEqual(binary_path, package_root / "bin" / "sc-lint")
+        self.assertEqual(package_root, extracted / stage.name)
+        self.assertEqual(docs_bundle, package_root / docs_destination)
+        self.assertTrue((docs_bundle / "README.md").is_file())
+
+    def test_legacy_formula_renderer_installs_docs_to_pkgshare_and_passes_ruby_syntax(self) -> None:
+        # This local renderer is retained as legacy helper coverage. The release
+        # workflow renders formulas through the pinned publish kit.
         sha_map = {target: "a" * 64 for target in release_artifacts.HOMEBREW_TARGETS}
         formula = release_artifacts.render_homebrew_formula_text(
             self.manifest,
@@ -143,7 +214,8 @@ class ReleaseArtifactsTests(unittest.TestCase):
             completed = subprocess.run([ruby, "-c", str(formula_path)], capture_output=True, text=True)
             self.assertEqual(completed.returncode, 0, completed.stderr)
 
-    def test_homebrew_layout_installs_bins_and_docs_under_formula_owned_paths(self) -> None:
+    def test_legacy_homebrew_layout_helper_stages_bins_and_docs(self) -> None:
+        # This local staging helper does not model the current publish workflow.
         archive = self.stage_archive()
         prefix = self.root / "homebrew-prefix"
         release_artifacts.stage_homebrew_layout(

@@ -312,6 +312,7 @@ def render_homebrew_formula_text(
     tag: str,
     sha_map: dict[str, str],
 ) -> str:
+    """Render the retired local formula format; release uses the pinned kit renderer."""
     if formula_name == HOMEBREW_PRIMARY_FORMULA:
         desc = "Top-level sc-lint CLI and analyzer toolset for Rust workspaces"
         installed_binaries = release_binary_names(manifest)
@@ -614,6 +615,7 @@ def validate_release_archive(args: argparse.Namespace) -> int:
 
 
 def stage_homebrew_layout(args: argparse.Namespace) -> int:
+    """Stage the retired local flat archive layout for legacy helper tests only."""
     manifest = load_manifest(Path(args.manifest))
     archive_directory = Path(args.archive_directory)
     prefix = Path(args.prefix)
