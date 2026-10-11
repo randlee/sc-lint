@@ -41,7 +41,6 @@ use crate::predicates::is_path_like_constructor;
 use crate::predicates::is_set_var_call;
 use crate::predicates::is_shell_command_call;
 use crate::predicates::is_unix_shell_path_literal;
-use crate::predicates::path_prefix_match;
 use crate::predicates::production_env_portability_variable;
 use crate::predicates::production_path_rule_id;
 use crate::predicates::use_tree_contains_std_os_unix;
@@ -60,13 +59,36 @@ use sc_lint_analyzer_support::item_name_hint_is_tests;
 use sc_lint_analyzer_support::span_start_line;
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
-struct RepoLintConfig {
-    portability: Option<RepoPortabilityConfig>,
-}
-
-#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 struct RepoPortabilityConfig {
     config_home_env: Option<String>,
+}
+
+fn legacy_portability_config(
+    document: &toml::Table,
+) -> std::result::Result<RepoPortabilityConfig, AnalyzerConfigError> {
+    let wrong_type = |key: &str, expected: &'static str| AnalyzerConfigError::WrongType {
+        analyzer: "portability",
+        key: key.to_string(),
+        expected,
+    };
+    let Some(value) = document.get("portability") else {
+        return Ok(RepoPortabilityConfig::default());
+    };
+    let table = value
+        .as_table()
+        .ok_or_else(|| wrong_type("portability", "a table"))?;
+    let config_home_env = match table.get("config_home_env") {
+        None => None,
+        Some(toml::Value::String(value)) => Some(value.clone()),
+        Some(_) => return Err(wrong_type("config_home_env", "a string")),
+    };
+    Ok(RepoPortabilityConfig { config_home_env })
+}
+
+pub(crate) fn validate_legacy_portability_config(
+    document: &toml::Table,
+) -> std::result::Result<(), AnalyzerConfigError> {
+    legacy_portability_config(document).map(|_| ())
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -82,8 +104,7 @@ struct BuiltInDefaults {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PortabilityConfig {
     config_home_env: Option<String>,
-    builtin_temp_prefixes: Vec<String>,
-    configured_unix_path_prefixes: Vec<String>,
+    unix_path_prefixes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -101,7 +122,7 @@ impl AnalyzerPortabilityKeys {
             key: key.to_string(),
             expected,
         };
-        let strings = |key: &str| match settings.own_value(key) {
+        let strings = |key: &str| match settings.own.get(key) {
             None => Ok(Vec::new()),
             Some(toml::Value::Array(items)) => items
                 .iter()
@@ -110,25 +131,15 @@ impl AnalyzerPortabilityKeys {
                 .ok_or_else(|| wrong_type(key, "an array of strings")),
             Some(_) => Err(wrong_type(key, "an array of strings")),
         };
-        let config_home_env = match settings.own_value("config_home_env") {
+        let config_home_env = match settings.own.get("config_home_env") {
             None => None,
             Some(toml::Value::String(value)) => Some(value.clone()),
             Some(_) => return Err(wrong_type("config_home_env", "a string")),
         };
         strings("targets")?;
-        let unix_path_prefixes = strings("unix_path_prefixes")?;
-        if unix_path_prefixes
-            .iter()
-            .any(|prefix| prefix.is_empty() || !prefix.starts_with('/'))
-        {
-            return Err(wrong_type(
-                "unix_path_prefixes",
-                "an array of non-empty strings starting with `/`",
-            ));
-        }
         Ok(Self {
             config_home_env,
-            unix_path_prefixes,
+            unix_path_prefixes: strings("unix_path_prefixes")?,
         })
     }
 }
@@ -663,13 +674,13 @@ impl<'a> PortabilityCollector<'a> {
             Expr::Lit(ExprLit {
                 lit: Lit::Str(lit), ..
             }) => {
-                let value = lit.value();
-                if self.path_prefix_match(&value) {
+                if self.path_prefix_match(&lit.value()) {
                     self.findings.push(PortabilityFinding {
                         rule_id: RuleId::Port001,
                         kind: "hardcoded_unix_path_literal",
                         message: format!(
-                            "PORT-001 hardcoded Unix-only absolute path literal `{value}` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source"
+                            "PORT-001 hardcoded Unix-only absolute path literal `{}` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source",
+                            lit.value()
                         ),
                         source_path: self.file_context.source_path.clone(),
                         line: span_start_line(lit.span()),
@@ -741,8 +752,10 @@ impl<'a> PortabilityCollector<'a> {
     }
 
     fn path_prefix_match(&self, value: &str) -> bool {
-        path_prefix_match(value, &self.config.builtin_temp_prefixes)
-            || path_prefix_match(value, &self.config.configured_unix_path_prefixes)
+        self.config
+            .unix_path_prefixes
+            .iter()
+            .any(|prefix| value.starts_with(prefix))
     }
 }
 
@@ -945,13 +958,17 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
         if self.platform_gated_depth == 0
             && let Lit::Str(lit) = &node.lit
         {
-            let value = lit.value();
-            if is_unix_shell_path_literal(&value) {
-                self.push_shell_finding(&value, span_start_line(lit.span()));
-            } else if path_prefix_match(&value, &self.config.configured_unix_path_prefixes) {
-                self.push_path_finding(RuleId::Port006, &value, span_start_line(lit.span()));
-            } else if let Some(rule_id) = production_path_rule_id(&value) {
-                self.push_path_finding(rule_id, &value, span_start_line(lit.span()));
+            if is_unix_shell_path_literal(&lit.value()) {
+                self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
+            } else if self
+                .config
+                .unix_path_prefixes
+                .iter()
+                .any(|prefix| lit.value().starts_with(prefix))
+            {
+                self.push_path_finding(RuleId::Port006, &lit.value(), span_start_line(lit.span()));
+            } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
+                self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
             }
         }
         syn::visit::visit_expr_lit(self, node);
@@ -987,16 +1004,20 @@ fn load_portability_config(
 ) -> Result<PortabilityConfig> {
     let defaults = toml::from_str::<BuiltInDefaults>(crate::DEFAULT_RULES_TOML)
         .context("failed to parse built-in portability defaults")?;
-    let repo_config: RepoLintConfig = toml::Value::Table(document.clone())
-        .try_into()
+    let repo_config = legacy_portability_config(document)
+        .map_err(anyhow::Error::from)
         .context("failed to parse repo portability config")?;
 
     Ok(PortabilityConfig {
         config_home_env: analyzer_keys
             .config_home_env
             .clone()
-            .or_else(|| repo_config.portability.and_then(|cfg| cfg.config_home_env)),
-        builtin_temp_prefixes: defaults.portability.unix_path_prefixes,
-        configured_unix_path_prefixes: analyzer_keys.unix_path_prefixes.clone(),
+            .or(repo_config.config_home_env),
+        unix_path_prefixes: defaults
+            .portability
+            .unix_path_prefixes
+            .into_iter()
+            .chain(analyzer_keys.unix_path_prefixes.iter().cloned())
+            .collect(),
     })
 }

@@ -137,6 +137,7 @@ pub fn analyze_workspace_configured(
         read_config_document(PORTABILITY_CATALOG.analyzer.as_str(), &options.root, config)?;
     let settings = analyzer_settings_from(&PORTABILITY_CATALOG, &document, rule_filter)?;
     let analyzer_keys = portability::AnalyzerPortabilityKeys::from_settings(&settings)?;
+    portability::validate_legacy_portability_config(&document)?;
     let (findings, scanned_crates) = if settings.enabled {
         let findings =
             portability::analyze_portability(&options.root, &document, &settings, &analyzer_keys)
