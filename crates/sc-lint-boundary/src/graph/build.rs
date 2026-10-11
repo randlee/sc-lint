@@ -40,12 +40,7 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
 pub(crate) fn build_workspace_graph_from(
     metadata: &cargo_metadata::Metadata,
 ) -> Result<GraphExport> {
-    let workspace_members = metadata.workspace_members.clone();
-    let workspace_packages = metadata
-        .packages
-        .iter()
-        .filter(|package| workspace_members.iter().any(|id| id == &package.id))
-        .collect::<Vec<_>>();
+    let workspace_packages = crate::workspace_packages(metadata);
     let mut builder = GraphBuilder::default();
 
     for package in &workspace_packages {

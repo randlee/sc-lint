@@ -249,6 +249,14 @@ pub(crate) fn load_metadata(root: &Path) -> Result<cargo_metadata::Metadata> {
         .with_context(|| format!("failed to load cargo metadata for {}", root.display()))
 }
 
+pub(crate) fn load_metadata_without_deps(root: &Path) -> Result<cargo_metadata::Metadata> {
+    MetadataCommand::new()
+        .current_dir(root)
+        .no_deps()
+        .exec()
+        .with_context(|| format!("failed to load cargo metadata for {}", root.display()))
+}
+
 #[cfg(test)]
 mod owner_tests {
     use super::*;

@@ -161,14 +161,11 @@ pub(crate) fn validate_owner_crate_paths(
         else {
             continue;
         };
-        let Some(library) = package.targets.iter().find(|target| {
-            target.is_lib()
-                || target.is_rlib()
-                || target.is_dylib()
-                || target.is_cdylib()
-                || target.is_staticlib()
-                || target.is_proc_macro()
-        }) else {
+        let Some(library) = package
+            .targets
+            .iter()
+            .find(|target| crate::is_library_target(target))
+        else {
             continue;
         };
         if record.owner_crate_path.as_str() != library.name {

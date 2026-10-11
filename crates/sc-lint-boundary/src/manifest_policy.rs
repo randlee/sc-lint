@@ -5,7 +5,6 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
-use cargo_metadata::MetadataCommand;
 use toml::Table;
 use toml::Value;
 
@@ -27,11 +26,14 @@ pub(crate) struct ManifestPolicyReport {
     pub(crate) scanned_crates: usize,
 }
 
-pub(crate) fn analyze_manifest_policy(root: &Path) -> Result<ManifestPolicyReport> {
+pub(crate) fn analyze_manifest_policy(
+    root: &Path,
+    metadata: &cargo_metadata::Metadata,
+) -> Result<ManifestPolicyReport> {
     let root = fs::canonicalize(root)
         .with_context(|| format!("failed to canonicalize repo root `{}`", root.display()))?;
     let workspace_version = workspace_version(&root)?;
-    let manifests = member_manifests(&root)?;
+    let manifests = member_manifests(&root, metadata)?;
     let mut expected_versions = BTreeMap::new();
 
     for manifest_path in &manifests {
@@ -119,19 +121,10 @@ fn workspace_version(root: &Path) -> Result<String> {
         .context("workspace.package.version missing from Cargo.toml")
 }
 
-fn member_manifests(root: &Path) -> Result<Vec<PathBuf>> {
-    let metadata = MetadataCommand::new()
-        .current_dir(root)
-        .manifest_path(root.join("Cargo.toml"))
-        .no_deps()
-        .exec()
-        .context("failed to load workspace metadata for manifest policy")?;
-    let workspace_members = metadata.workspace_members;
-    let mut manifests = metadata
-        .packages
+fn member_manifests(root: &Path, metadata: &cargo_metadata::Metadata) -> Result<Vec<PathBuf>> {
+    let mut manifests = crate::workspace_packages(metadata)
         .into_iter()
-        .filter(|package| workspace_members.iter().any(|id| id == &package.id))
-        .map(|package| package.manifest_path.into_std_path_buf())
+        .map(|package| package.manifest_path.clone().into_std_path_buf())
         .collect::<Vec<_>>();
     manifests.sort_by(|left, right| {
         relative_manifest_display(root, left)

@@ -60,12 +60,7 @@ pub(crate) fn analyze_package_policy(
     metadata: &cargo_metadata::Metadata,
     inventory: &BoundaryInventory,
 ) -> Result<PackagePolicyReport> {
-    let workspace_members = metadata.workspace_members.iter().collect::<BTreeSet<_>>();
-    let workspace_packages = metadata
-        .packages
-        .iter()
-        .filter(|package| workspace_members.contains(&package.id))
-        .collect::<Vec<_>>();
+    let workspace_packages = crate::workspace_packages(metadata);
     let workspace_package_names = workspace_packages
         .iter()
         .map(|package| package.name.to_string())

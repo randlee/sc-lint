@@ -264,6 +264,26 @@ pub struct GraphEdge {
     pub to: NodeId,
 }
 
+pub(crate) fn workspace_packages(
+    metadata: &cargo_metadata::Metadata,
+) -> Vec<&cargo_metadata::Package> {
+    let workspace_members = metadata.workspace_members.iter().collect::<BTreeSet<_>>();
+    metadata
+        .packages
+        .iter()
+        .filter(|package| workspace_members.contains(&package.id))
+        .collect()
+}
+
+pub(crate) fn is_library_target(target: &cargo_metadata::Target) -> bool {
+    target.is_lib()
+        || target.is_rlib()
+        || target.is_dylib()
+        || target.is_cdylib()
+        || target.is_staticlib()
+        || target.is_proc_macro()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EdgeKind {
     Contains,
@@ -469,12 +489,16 @@ pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
     if options.rule == Some(RuleFilter::Manifests) {
-        let manifest_report =
-            manifest_policy::analyze_manifest_policy(&options.root).map_err(|source| {
-                BoundaryError::ManifestPolicyAnalysis {
-                    root: options.root.clone(),
-                    source: source.into(),
-                }
+        let metadata = graph::load_metadata_without_deps(&options.root).map_err(|source| {
+            BoundaryError::ManifestPolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
+            }
+        })?;
+        let manifest_report = manifest_policy::analyze_manifest_policy(&options.root, &metadata)
+            .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
+                root: options.root.clone(),
+                source: source.into(),
             })?;
         let status = if manifest_report
             .findings
@@ -575,7 +599,7 @@ pub fn analyze_workspace(
     }
     if filter.is_none() {
         findings.extend(
-            manifest_policy::analyze_manifest_policy(&options.root)
+            manifest_policy::analyze_manifest_policy(&options.root, &metadata)
                 .map_err(|source| BoundaryError::ManifestPolicyAnalysis {
                     root: options.root.clone(),
                     source: source.into(),
