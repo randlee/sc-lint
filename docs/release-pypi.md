@@ -18,13 +18,12 @@ repository; the maintainer provisions them in GitHub.
 
 ## Linux compatibility floor
 
-The Linux wheel is built with `maturin --compatibility manylinux2014 --zig`
-in `release.yml`, so it is tagged
-`manylinux_2_17_x86_64.manylinux2014_x86_64` and needs glibc 2.17 or newer
-(Ubuntu 20.04+, Debian 11+, RHEL/Rocky 8+). Building on the bare
-`ubuntu-latest` image would tag the wheel with that image's glibc
-(`manylinux_2_39`) and make pip fall back to the sdist on older hosts. The
-macOS and Windows wheels use maturin's defaults.
+The Linux wheel is declared as an explicit `x86_64-unknown-linux-gnu` target
+with `manylinux = "2_28"` in the consumer input. The installed release
+workflow builds it with Zig and `--compatibility manylinux_2_28`, and verifies
+the resulting `manylinux_2_28_x86_64` tag. It therefore requires glibc 2.28 or
+newer (for example, Ubuntu 20.04+, Debian 10+, or RHEL/Rocky 8+). The macOS
+and Windows wheels continue to use native maturin builds.
 
 The distribution list comes from `[[python_distributions]]` in
 `release/publish-artifacts.toml`. The standard PyPI environments and secret
