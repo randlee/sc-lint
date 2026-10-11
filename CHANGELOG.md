@@ -2,6 +2,22 @@
 
 All notable changes to sc-lint are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Analyzer tables (`[tool.sc-lint.analyzers.<name>]`): every analyzer takes
+  `enabled`, `reason`, `exclude_rules`, `fail_rules` and `exclude_paths`;
+  portability also takes `config_home_env`, `unix_path_prefixes` and the
+  existing `targets` (#201, #202).
+- `sc-lint lint sc-boundary|sc-portability|sc-runtime --rule-filter` (#201).
+
+### Changed
+
+- A key an analyzer table does not define is now a configuration error
+  (exit 3) naming the analyzer and the key. Existing kit-rendered configs,
+  including `targets`, are unaffected.
+
 ## [0.6.0] — 2026-08-30
 
 ### Features

@@ -118,6 +118,8 @@ enum CommandRequest {
     Docs(DocsRequest),
     /// Optional lint profile step or test layer selector for consumer profile commands.
     ConsumerSelector(Option<String>),
+    /// `--rule-filter` value forwarded unchanged to an analyzer backend.
+    RuleFilter(String),
 }
 
 impl CommandId {
@@ -299,6 +301,13 @@ impl CommandId {
     pub const fn is_xwin_preflight(self) -> bool {
         matches!(self, Self::CheckXwin | Self::ClippyXwin)
     }
+
+    pub(crate) const fn is_analyzer_lint(self) -> bool {
+        matches!(
+            self,
+            Self::LintScBoundary | Self::LintScPortability | Self::LintScRuntime
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -324,60 +333,14 @@ impl CommandContext {
     pub fn from_cli(cli: &Cli) -> Result<Self, CliError> {
         let (command_id, compatibility_binary, request) = match (&cli.command, cli.version) {
             (Some(command), false) => {
-                if matches!(command, Command::Init { .. })
-                    && (cli.config.is_some() || cli.root.is_some())
-                {
-                    return Err(CliError::usage(
-                        "`sc-lint init --just` does not accept `--config` or `--root`",
-                    )
-                    .with_suggested_action(
-                        "Run it from the consumer repository root; it always manages `sc-lint.toml` there.",
-                    ));
-                }
-                if matches!(command, Command::Lint { consumer: true, target, .. } if !matches!(target, crate::LintTarget::Ci))
-                {
-                    return Err(CliError::usage(
-                            "`--consumer` is only supported by `sc-lint lint ci`",
-                        )
-                        .with_suggested_action(
-                            "Use `sc-lint lint --consumer --config sc-lint.toml ci` for a consumer repository.",
-                        ));
-                }
+                validate_command_flags(cli, command)?;
                 let compatibility_binary = match command {
                     Command::Compatibility {
                         command: crate::CompatibilityCommand::Check { binary },
                     } => binary.clone(),
                     _ => None,
                 };
-                let request = match command {
-                    Command::Setup { dry_run } => Some(CommandRequest::Setup { dry_run: *dry_run }),
-                    Command::Upgrade { check, dry_run } => Some(CommandRequest::Upgrade {
-                        check: *check,
-                        dry_run: *dry_run,
-                    }),
-                    Command::Init {
-                        just,
-                        check,
-                        dry_run,
-                    } => Some(CommandRequest::Init(ConsumerInitRequest {
-                        just: *just,
-                        check: *check,
-                        dry_run: *dry_run,
-                    })),
-                    Command::Docs { guide, path } => Some(CommandRequest::Docs(DocsRequest {
-                        guide: *guide,
-                        path: *path,
-                    })),
-                    Command::Lint {
-                        consumer: true,
-                        profile,
-                        ..
-                    } => Some(CommandRequest::ConsumerSelector(profile.clone())),
-                    Command::Test { layer } => {
-                        Some(CommandRequest::ConsumerSelector(layer.clone()))
-                    }
-                    _ => None,
-                };
+                let request = command_request(command);
                 (
                     CommandId::from_cli_command(command),
                     compatibility_binary,
@@ -481,6 +444,14 @@ impl CommandContext {
         }
     }
 
+    /// `--rule-filter` value for `lint sc-boundary|sc-portability|sc-runtime`.
+    pub(crate) fn rule_filter(&self) -> Option<&str> {
+        match &self.request {
+            Some(CommandRequest::RuleFilter(filter)) => Some(filter),
+            _ => None,
+        }
+    }
+
     pub(crate) fn docs_request(&self) -> DocsRequest {
         match self.request {
             Some(CommandRequest::Docs(request)) => request,
@@ -521,6 +492,74 @@ impl CommandContext {
 
     pub const fn is_xwin_preflight(&self) -> bool {
         self.command_id.is_xwin_preflight()
+    }
+}
+
+/// Rejects flag combinations clap cannot express: `init` with `--config` or
+/// `--root`, `--consumer` off `lint ci`, and `--rule-filter` off the analyzers.
+#[expect(
+    clippy::result_large_err,
+    reason = "Context construction preserves the shared top-level CliError contract before command dispatch starts."
+)]
+fn validate_command_flags(cli: &Cli, command: &Command) -> Result<(), CliError> {
+    if matches!(command, Command::Init { .. }) && (cli.config.is_some() || cli.root.is_some()) {
+        return Err(CliError::usage(
+            "`sc-lint init --just` does not accept `--config` or `--root`",
+        )
+        .with_suggested_action(
+            "Run it from the consumer repository root; it always manages `sc-lint.toml` there.",
+        ));
+    }
+    if matches!(command, Command::Lint { consumer: true, target, .. } if !matches!(target, crate::LintTarget::Ci))
+    {
+        return Err(CliError::usage(
+                "`--consumer` is only supported by `sc-lint lint ci`",
+            )
+            .with_suggested_action(
+                "Use `sc-lint lint --consumer --config sc-lint.toml ci` for a consumer repository.",
+            ));
+    }
+    if matches!(command, Command::Lint { rule_filter: Some(_), target, .. } if !matches!(target, crate::LintTarget::ScBoundary | crate::LintTarget::ScPortability | crate::LintTarget::ScRuntime))
+    {
+        return Err(CliError::usage(
+            "`--rule-filter` applies only to sc-boundary, sc-portability and sc-runtime",
+        ));
+    }
+    Ok(())
+}
+
+/// The per-command payload a dispatched command reads from its context.
+fn command_request(command: &Command) -> Option<CommandRequest> {
+    match command {
+        Command::Setup { dry_run } => Some(CommandRequest::Setup { dry_run: *dry_run }),
+        Command::Upgrade { check, dry_run } => Some(CommandRequest::Upgrade {
+            check: *check,
+            dry_run: *dry_run,
+        }),
+        Command::Init {
+            just,
+            check,
+            dry_run,
+        } => Some(CommandRequest::Init(ConsumerInitRequest {
+            just: *just,
+            check: *check,
+            dry_run: *dry_run,
+        })),
+        Command::Docs { guide, path } => Some(CommandRequest::Docs(DocsRequest {
+            guide: *guide,
+            path: *path,
+        })),
+        Command::Lint {
+            consumer: true,
+            profile,
+            ..
+        } => Some(CommandRequest::ConsumerSelector(profile.clone())),
+        Command::Lint {
+            rule_filter: Some(filter),
+            ..
+        } => Some(CommandRequest::RuleFilter(filter.clone())),
+        Command::Test { layer } => Some(CommandRequest::ConsumerSelector(layer.clone())),
+        _ => None,
     }
 }
 

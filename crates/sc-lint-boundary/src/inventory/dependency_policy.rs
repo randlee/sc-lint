@@ -70,6 +70,8 @@ pub(crate) struct RawStructuredForbiddenPackageEdge {
 pub(crate) struct RawDependenciesSection {
     pub(crate) allowed_dependents: Vec<String>,
     pub(crate) allowed_dependencies: Vec<String>,
+    #[serde(default)]
+    pub(crate) allowed_dev_dependencies: Vec<String>,
     pub(crate) forbidden_edges: Vec<RawForbiddenPackageEdge>,
 }
 
@@ -108,6 +110,7 @@ pub(crate) struct ForbiddenPackageEdge {
 pub(crate) struct PackageDependencyPolicy {
     pub(crate) allowed_dependents: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dependencies: BTreeSet<WorkspacePackageName>,
+    pub(crate) allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
     pub(crate) forbidden_edges: Vec<ForbiddenPackageEdge>,
 }
 
@@ -155,6 +158,11 @@ impl RawDependenciesSection {
             "allowed_dependencies",
             self.allowed_dependencies,
         )?;
+        let allowed_dev_dependencies = validate_package_list(
+            boundary_id,
+            "allowed_dev_dependencies",
+            self.allowed_dev_dependencies,
+        )?;
 
         let mut forbidden_edges = Vec::with_capacity(self.forbidden_edges.len());
         let mut seen_edges = BTreeSet::new();
@@ -187,6 +195,7 @@ impl RawDependenciesSection {
         Ok(PackageDependencyPolicy {
             allowed_dependents,
             allowed_dependencies,
+            allowed_dev_dependencies,
             forbidden_edges,
         })
     }

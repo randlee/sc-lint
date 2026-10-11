@@ -9,10 +9,6 @@ use super::dependency_policy::RawDependenciesSection;
 
 pub(crate) const BOUNDARY_ID_PREFIX: &str = "BOUNDARY-";
 
-pub(crate) fn owner_crate_path_for_package(owner_package: &str) -> String {
-    owner_package.replace('-', "_")
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum InventoryParseError {
     BoundaryId(String),
@@ -428,7 +424,7 @@ impl InventorySummary {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawBoundaryRecord {
     pub(crate) boundary_id: BoundaryId,
@@ -446,6 +442,8 @@ pub(crate) struct RawBoundaryRecord {
     pub(crate) testing: TestingSection,
     pub(crate) enforcement: EnforcementSection,
     pub(crate) status: StatusSection,
+    #[serde(default, rename = "extensions")]
+    _extensions: Option<toml::Table>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

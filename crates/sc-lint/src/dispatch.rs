@@ -1,10 +1,11 @@
+use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
 use sc_lint_boundary::AnalyzeOptions;
 use sc_lint_boundary::BoundaryError as BoundaryBackendError;
-use sc_lint_boundary::analyze_workspace;
+use sc_lint_boundary::analyze_workspace_configured;
 use sc_lint_schema::OutputFormat;
 use serde_json::Error as JsonError;
 use serde_json::Value;
@@ -54,6 +55,24 @@ impl BoundaryDispatchError {
                             "Check the boundary inventory and workspace sources, then rerun `sc-lint lint sc-boundary` for a focused failure report.",
                         )
                 }
+                BoundaryBackendError::AnalyzerConfig(ref config_error) => {
+                    let code = config_error.code();
+                    // A bad selector is a usage error (exit 2); every other
+                    // config error is a configuration error (exit 3).
+                    let err = if config_error.is_selector() {
+                        CliError::usage(format!("{tool} rejected --rule-filter"))
+                    } else {
+                        CliError::config(format!(
+                            "{tool} rejected [tool.sc-lint.analyzers.boundary]"
+                        ))
+                    };
+                    err.with_source(error)
+                        .with_detail(consts::FIELD_TOOL, json!(tool))
+                        .with_detail("analyzer_config_code", json!(code))
+                        .with_suggested_action(
+                            "Fix the [tool.sc-lint.analyzers.boundary] table or the rule selector named in the error, then rerun `sc-lint lint sc-boundary`.",
+                        )
+                }
             },
             Self::Serialize(error) => CliError::backend_protocol(format!(
                 "{tool} produced a report that could not be encoded as machine JSON"
@@ -80,16 +99,20 @@ impl BoundaryDispatchError {
     reason = "Dispatch failures must remain in the shared top-level CliError contract."
 )]
 pub fn run_sc_boundary(
-    _context: &CommandContext,
+    context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
     let tool = consts::TOOL_BOUNDARY;
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: repo_root.to_path_buf(),
-        format: OutputFormat::Json,
-        rule: None,
-    })
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: repo_root.to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        loaded_config.config_path(),
+        context.rule_filter(),
+    )
     .map_err(|error| BoundaryDispatchError::Analysis(Box::new(error)))
     .map_err(|error| error.into_cli_error(tool, Some(repo_root)))?;
 
@@ -113,10 +136,14 @@ pub fn run_sc_boundary(
     reason = "Delegated backend failures must remain in the shared top-level CliError contract."
 )]
 pub fn run_sc_portability(
-    _context: &CommandContext,
+    context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
-    run_delegated_backend(loaded_config, consts::TOOL_PORTABILITY)
+    run_delegated_backend(
+        loaded_config,
+        consts::TOOL_PORTABILITY,
+        context.rule_filter(),
+    )
 }
 
 #[expect(
@@ -124,10 +151,10 @@ pub fn run_sc_portability(
     reason = "Delegated backend failures must remain in the shared top-level CliError contract."
 )]
 pub fn run_sc_runtime(
-    _context: &CommandContext,
+    context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
-    run_delegated_backend(loaded_config, consts::TOOL_RUNTIME)
+    run_delegated_backend(loaded_config, consts::TOOL_RUNTIME, context.rule_filter())
 }
 
 #[expect(
@@ -147,13 +174,16 @@ pub fn normalize_backend_json(tool: &str, raw: &str) -> Result<Value, CliError> 
 fn run_delegated_backend(
     loaded_config: &LoadedConfig,
     tool: &'static str,
+    rule_filter: Option<&str>,
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
     let backend_binary = find_backend_binary(tool);
     let output = ProcessCommand::new(&backend_binary)
-        .args(["analyze", "--root"])
-        .arg(repo_root)
-        .args(["--format", "json"])
+        .args(backend_args(
+            repo_root,
+            loaded_config.config_path(),
+            rule_filter,
+        ))
         .output()
         .map_err(|error| {
             CliError::backend_failure(format!(
@@ -183,6 +213,9 @@ fn run_delegated_backend(
         } else {
             format!("delegated backend `{tool}` exited non-zero")
         };
+        if let Some(error) = backend_rejection(tool, output.status.code(), &cause) {
+            return Err(error);
+        }
         return Err(CliError::backend_failure(format!(
             "{tool} failed to analyze `{}`",
             repo_root.display()
@@ -218,6 +251,41 @@ fn run_delegated_backend(
         normalized,
         DispatchTelemetry::new(tool, finding_count),
     ))
+}
+
+fn backend_args(root: &Path, config: Option<&Path>, rule_filter: Option<&str>) -> Vec<OsString> {
+    let mut args: Vec<OsString> = vec![
+        "analyze".into(),
+        "--root".into(),
+        root.into(),
+        "--format".into(),
+        "json".into(),
+    ];
+    if let Some(config) = config {
+        args.extend(["--config".into(), config.into()]);
+    }
+    if let Some(filter) = rule_filter {
+        args.extend(["--rule-filter".into(), filter.into()]);
+    }
+    args
+}
+
+/// Backend exit 2 rejected its arguments (`--rule-filter`); exit 3 rejected
+/// its `[tool.sc-lint.analyzers.<name>]` table.
+fn backend_rejection(tool: &str, code: Option<i32>, cause: &str) -> Option<CliError> {
+    let error = match code {
+        Some(2) => CliError::usage(format!("{tool} rejected arguments")),
+        Some(3) => CliError::config(format!("{tool} rejected [tool.sc-lint.analyzers.*]")),
+        _ => return None,
+    };
+    Some(
+        error
+            .with_cause(cause)
+            .with_detail(consts::FIELD_TOOL, json!(tool))
+            .with_suggested_action(
+                "Fix the named key in [tool.sc-lint.analyzers.<name>] or the --rule-filter selector, then rerun the lint target.",
+            ),
+    )
 }
 
 /// The running `sc-lint` executable, used when a profile step re-enters the
@@ -282,10 +350,118 @@ fn find_backend_binary_in_dir(dir: &Path, tool: &str) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use super::BoundaryDispatchError;
+    use super::backend_args;
+    use super::backend_rejection;
     use super::find_backend_binary_from_exe;
     use super::self_contained_layout_in_dir;
+    use crate::consts;
+    use crate::error::CliErrorKind;
+    use sc_lint_boundary::AnalyzeOptions;
+    use sc_lint_boundary::analyze_workspace_configured;
+    use sc_lint_schema::OutputFormat;
+    use std::ffi::OsString;
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
+
+    fn assert_analyzer_config_error(
+        error: sc_lint_boundary::BoundaryError,
+        expected_kind: CliErrorKind,
+        expected_code: &str,
+    ) {
+        let cli_error = BoundaryDispatchError::Analysis(Box::new(error))
+            .into_cli_error(consts::TOOL_BOUNDARY, None);
+
+        assert_eq!(cli_error.kind, expected_kind);
+        assert_eq!(
+            cli_error.details.get("analyzer_config_code"),
+            Some(&serde_json::json!(expected_code))
+        );
+    }
+
+    #[test]
+    fn analyzer_config_errors_map_selector_to_usage_and_unknown_key_to_config() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let options = AnalyzeOptions {
+            root: root.to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        };
+
+        let selector_error = analyze_workspace_configured(&options, None, Some("SCB-NOPE-001"))
+            .expect_err("unknown selector is rejected before workspace analysis");
+        assert_analyzer_config_error(
+            selector_error,
+            CliErrorKind::Usage,
+            "ANALYZER_CONFIG.SELECTOR",
+        );
+
+        let config_path = root.join("sc-lint.toml");
+        fs::write(
+            &config_path,
+            "[tool.sc-lint.analyzers.boundary]\nunknown = true\n",
+        )
+        .expect("config");
+        let config_error = analyze_workspace_configured(&options, Some(&config_path), None)
+            .expect_err("unknown analyzer key is rejected before workspace analysis");
+        assert_analyzer_config_error(
+            config_error,
+            CliErrorKind::Config,
+            "ANALYZER_CONFIG.UNKNOWN_KEY",
+        );
+    }
+
+    #[test]
+    fn backend_args_forward_config_and_rule_filter() {
+        let args = backend_args(
+            Path::new("/r"),
+            Some(Path::new("/r/sc-lint.toml")),
+            Some("PORT-001,PORT-006"),
+        );
+        assert_eq!(
+            args,
+            [
+                "analyze",
+                "--root",
+                "/r",
+                "--format",
+                "json",
+                "--config",
+                "/r/sc-lint.toml",
+                "--rule-filter",
+                "PORT-001,PORT-006",
+            ]
+            .map(OsString::from)
+        );
+    }
+
+    #[test]
+    fn backend_args_omit_absent_options() {
+        assert_eq!(
+            backend_args(Path::new("/r"), None, None),
+            ["analyze", "--root", "/r", "--format", "json"].map(OsString::from)
+        );
+    }
+
+    #[test]
+    fn backend_exit_two_is_usage_and_exit_three_is_config() {
+        let usage = backend_rejection("sc-lint-portability", Some(2), "unknown rule `NOPE`")
+            .expect("exit 2 maps");
+        assert_eq!(usage.kind, crate::CliErrorKind::Usage);
+        assert_eq!(usage.exit_code(), 2);
+        assert!(usage.message.contains("rejected arguments"));
+        assert_eq!(usage.cause.as_deref(), Some("unknown rule `NOPE`"));
+
+        let config = backend_rejection("sc-lint-runtime", Some(3), "unknown key `targets`")
+            .expect("exit 3 maps");
+        assert_eq!(config.kind, crate::CliErrorKind::Config);
+        assert_eq!(config.exit_code(), 3);
+
+        assert!(backend_rejection("sc-lint-runtime", Some(1), "boom").is_none());
+        assert!(backend_rejection("sc-lint-runtime", None, "signal").is_none());
+    }
 
     #[test]
     fn self_contained_layout_requires_every_backend_and_the_docs_bundle() {

@@ -17,7 +17,6 @@ pub(crate) use types::BoundaryInventory;
 pub(crate) use types::BoundaryRecord;
 pub(crate) use types::CallersSection;
 pub(crate) use types::ReferenceScope;
-pub(crate) use types::owner_crate_path_for_package;
 
 pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> {
     let boundaries_root = root.join("boundaries");
@@ -134,16 +133,6 @@ fn validate_boundary_path(
         );
     }
 
-    let expected_owner_crate_path = owner_crate_path_for_package(record.owner_package.as_str());
-    if record.owner_crate_path.as_str() != expected_owner_crate_path {
-        anyhow::bail!(
-            "boundary `{}` declares owner_crate_path `{}` but expected `{expected_owner_crate_path}` from owner_package `{}`",
-            record.boundary_id,
-            record.owner_crate_path,
-            record.owner_package
-        );
-    }
-
     let relative = path.strip_prefix(boundaries_root).with_context(|| {
         format!(
             "boundary file `{}` is outside boundaries root",
@@ -157,6 +146,38 @@ fn validate_boundary_path(
         );
     }
 
+    Ok(())
+}
+
+pub(crate) fn validate_owner_crate_paths(
+    inventory: &BoundaryInventory,
+    metadata: &cargo_metadata::Metadata,
+) -> Result<()> {
+    let workspace_packages = crate::workspace_packages(metadata);
+    for record in &inventory.records {
+        let Some(package) = workspace_packages
+            .iter()
+            .find(|package| package.name.as_str() == record.owner_package.as_str())
+        else {
+            continue;
+        };
+        let Some(library) = package
+            .targets
+            .iter()
+            .find(|target| crate::is_library_target(target))
+        else {
+            continue;
+        };
+        if record.owner_crate_path.as_str() != library.name {
+            anyhow::bail!(
+                "boundary `{}` declares owner_crate_path `{}` but expected `{}` from the lib target of owner_package `{}`",
+                record.boundary_id,
+                record.owner_crate_path,
+                library.name,
+                record.owner_package
+            );
+        }
+    }
     Ok(())
 }
 

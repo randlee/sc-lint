@@ -34,13 +34,13 @@ impl NodeKind {
 }
 
 pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
-    let metadata = load_metadata(root)?;
-    let workspace_members = metadata.workspace_members.clone();
-    let workspace_packages = metadata
-        .packages
-        .iter()
-        .filter(|package| workspace_members.iter().any(|id| id == &package.id))
-        .collect::<Vec<_>>();
+    build_workspace_graph_from(&load_metadata(root)?)
+}
+
+pub(crate) fn build_workspace_graph_from(
+    metadata: &cargo_metadata::Metadata,
+) -> Result<GraphExport> {
+    let workspace_packages = crate::workspace_packages(metadata);
     let mut builder = GraphBuilder::default();
 
     for package in &workspace_packages {
@@ -125,12 +125,20 @@ fn resolve_trait_method_edges(builder: &mut GraphBuilder) {
     let known: BTreeSet<_> = builder.nodes.iter().map(|node| node.id.clone()).collect();
     let reference_impl_ids = &builder.reference_impl_ids;
     for edge in &mut builder.edges {
-        if !matches!(edge.kind, "references" | "references_expr") || known.contains(&edge.to) {
+        if !matches!(edge.kind, "references" | "references_expr") {
             continue;
         }
         let Some((owner, method)) = edge.to.rsplit_once("::") else {
             continue;
         };
+        let variant = NodeId::new(format!("{owner}::variant::{method}"));
+        if known.contains(&variant) {
+            edge.to = variant;
+            continue;
+        }
+        if known.contains(&edge.to) {
+            continue;
+        }
         // Self::method inside a trait impl resolves to that impl when no
         // inherent method exists. Otherwise accept only an unambiguous impl.
         if let Some((source_owner, _)) = edge.from.split_once("::impl::")
@@ -920,12 +928,11 @@ fn workspace_dependency_roots(
         else {
             continue;
         };
-        let Some(library_target) = workspace_package.targets.iter().find(|target| {
-            target
-                .kind
-                .iter()
-                .any(|kind| matches!(kind, cargo_metadata::TargetKind::Lib))
-        }) else {
+        let Some(library_target) = workspace_package
+            .targets
+            .iter()
+            .find(|target| target.is_lib())
+        else {
             continue;
         };
         let dependency_root = dependency

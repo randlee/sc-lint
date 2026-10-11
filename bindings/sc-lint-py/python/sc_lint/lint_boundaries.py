@@ -29,13 +29,19 @@ TOP_LEVEL_KEYS = {
     "contracts",
     "testing",
     "enforcement",
+    "extensions",
     "status",
 }
-REQUIRED_TOP_LEVEL_KEYS = TOP_LEVEL_KEYS - {"ownership", "callers", "contracts"}
+REQUIRED_TOP_LEVEL_KEYS = TOP_LEVEL_KEYS - {"ownership", "callers", "contracts", "extensions"}
 PUBLIC_KEYS = {"facade", "trait", "notes"}
 IMPLEMENTATION_KEYS = {"type", "module", "visibility", "constructor"}
 COMPOSITION_KEYS = {"roots"}
-DEPENDENCIES_KEYS = {"allowed_dependents", "allowed_dependencies", "forbidden_edges"}
+DEPENDENCIES_KEYS = {
+    "allowed_dependents",
+    "allowed_dependencies",
+    "allowed_dev_dependencies",
+    "forbidden_edges",
+}
 REFERENCES_KEYS = {"scope", "forbidden"}
 TESTING_KEYS = {"allowed_test_double_paths", "forbidden_test_bypasses"}
 ENFORCEMENT_KEYS = {"lint_rules", "review_gates"}
@@ -64,6 +70,20 @@ def ensure_exact_keys(
     extra = sorted(set(table) - expected)
     if extra:
         errors.append(f"{path}: unexpected {label} keys: {', '.join(extra)}")
+
+
+def owner_lib_target_name(repo_root: Path, owner_package: str) -> str | None:
+    for manifest_path in repo_root.rglob("Cargo.toml"):
+        manifest = load_toml(manifest_path)
+        package = manifest.get("package")
+        if not isinstance(package, dict) or package.get("name") != owner_package:
+            continue
+        library = manifest.get("lib")
+        if isinstance(library, dict) and isinstance(library.get("name"), str):
+            return library["name"]
+        if isinstance(library, dict) or (manifest_path.parent / "src" / "lib.rs").is_file():
+            return owner_package.replace("-", "_")
+    return None
 
 
 def validate_boundary_file(
@@ -96,8 +116,8 @@ def validate_boundary_file(
             f"{path}: owner directory `{owner_dir}` does not match owner_package `{owner_package}`"
         )
 
-    expected_crate_path = owner_package.replace("-", "_")
-    if owner_crate_path != expected_crate_path:
+    expected_crate_path = owner_lib_target_name(boundaries_root.parent, owner_package)
+    if expected_crate_path is not None and owner_crate_path != expected_crate_path:
         errors.append(
             f"{path}: owner_crate_path `{owner_crate_path}` does not match `{expected_crate_path}`"
         )

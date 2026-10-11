@@ -45,13 +45,20 @@ class ConsumerContractTests(unittest.TestCase):
             "setup": "bootstrap setup --config sc-lint.toml --dry-run",
             "upgrade": "bootstrap upgrade --config sc-lint.toml --check --dry-run",
         }.items():
-            result = subprocess.run(
-                ["just", "--dry-run", recipe],
-                cwd=ROOT,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            try:
+                result = subprocess.run(
+                    ["just", "--dry-run", recipe],
+                    cwd=ROOT,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as error:
+                self.fail(
+                    f"just --dry-run {recipe} timed out after {error.timeout}s; "
+                    f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+                )
             rendered = result.stdout + result.stderr
             self.assertIn(required, rendered, recipe)
             self.assertIn(".sc-lint/bootstrap", rendered, recipe)
@@ -67,6 +74,7 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertNotIn("run: cargo test --verbose", workflow)
 
     def test_windows_companion_is_a_managed_part_of_the_model_contract(self) -> None:
+        # This is a content guard; the PowerShell integration path is not run here.
         for path in (
             ROOT / ".sc-lint/bootstrap.ps1",
             ROOT / "crates/sc-lint/assets/bootstrap.ps1",
@@ -77,6 +85,20 @@ class ConsumerContractTests(unittest.TestCase):
             self.assertIn("Invoke-VerifiedReleaseLauncher", contents)
             self.assertIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", contents)
             self.assertIn("compatibility check", contents)
+            self.assertIn("function Enter-ProductEnvironment {", contents)
+            self.assertEqual(contents.count("        Enter-ProductEnvironment\n"), 2)
+            self.assertIn("$env:SC_LINT_BIN = $productBinary", contents)
+            self.assertIn(
+                "$env:PATH = (Split-Path -Parent $productBinary) + [IO.Path]::PathSeparator + $env:PATH",
+                contents,
+            )
+
+    def test_posix_lint_and_test_share_one_product_environment_helper(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
+        self.assertEqual(contents.count("activate_product_env() {"), 1)
+        self.assertEqual(contents.count("        activate_product_env\n"), 2)
+        self.assertIn('export SC_LINT_BIN="$product_binary"', contents)
+        self.assertIn('PATH="$(dirname "$product_binary"):$PATH"; export PATH', contents)
 
     def test_windows_bootstrap_consumes_gnu_style_flags_from_remaining_arguments(self) -> None:
         contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(
@@ -175,14 +197,21 @@ class PosixBootstrapNonMutatingSetupTests(unittest.TestCase):
             "HOME": str(tmp),
             "SC_LINT_INSTALL_DIR": str(install_dir),
         }
-        result = subprocess.run(
-            ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "setup", "--config", str(config), flag],
-            cwd=tmp,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "setup", "--config", str(config), flag],
+                cwd=tmp,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired as error:
+            self.fail(
+                f"bootstrap setup {flag} timed out after {error.timeout}s; "
+                f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+            )
         return result, log
 
     def test_setup_check_and_dry_run_reuse_an_incompatible_managed_binary_without_fetching(self) -> None:
@@ -200,6 +229,56 @@ class PosixBootstrapNonMutatingSetupTests(unittest.TestCase):
                 self.assertNotIn("RELEASE_UNAVAILABLE", result.stderr, (flag, result.stderr))
                 self.assertNotIn("curl", calls, (flag, calls))
                 self.assertIn(f"setup {flag}", calls, (flag, calls))
+
+
+class PosixBootstrapConsumerStepEnvironmentTests(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "POSIX bootstrap")
+    def test_lint_and_test_export_managed_binary_to_consumer_steps(self) -> None:
+        import tempfile
+
+        for operation in ("lint", "test"):
+            with self.subTest(operation=operation), tempfile.TemporaryDirectory() as raw:
+                tmp = Path(raw)
+                install_dir = tmp / "managed"
+                install_dir.mkdir()
+                log = tmp / "env.log"
+                fake = install_dir / "sc-lint"
+                fake.write_text(
+                    "#!/bin/sh\n"
+                    f"printf 'bin=%s path=%s\\n' \"$SC_LINT_BIN\" \"$(command -v sc-lint)\" >> '{log}'\n"
+                    "exit 0\n",
+                    encoding="utf-8",
+                )
+                fake.chmod(0o755)
+                consumer = tmp / "consumer"
+                venv_bin = consumer / ".sc-lint/venv/bin"
+                venv_bin.mkdir(parents=True)
+                (venv_bin / "python3").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                (venv_bin / "python3").chmod(0o755)
+                config = consumer / "sc-lint.toml"
+                config.write_text((ROOT / "sc-lint.toml").read_text(encoding="utf-8"), encoding="utf-8")
+                try:
+                    result = subprocess.run(
+                        ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), operation, "--config", str(config)],
+                        cwd=tmp,
+                        env={
+                            "PATH": "/usr/bin:/bin",
+                            "HOME": str(tmp),
+                            "SC_LINT_INSTALL_DIR": str(install_dir),
+                        },
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                        timeout=30,
+                    )
+                except subprocess.TimeoutExpired as error:
+                    self.fail(
+                        f"bootstrap {operation} timed out after {error.timeout}s; "
+                        f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+                    )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                last = log.read_text(encoding="utf-8").splitlines()[-1]
+                self.assertEqual(last, f"bin={fake} path={fake}")
 
 
 if __name__ == "__main__":

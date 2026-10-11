@@ -4,7 +4,7 @@ owner_crate_path = "sc_lint_analyzer_support"
 name = "ScLintAnalyzerSupport"
 
 [public]
-facade = "discover_source_files"
+facade = "discover_source_files, load_analyzer_settings"
 
 [implementation]
 type = "FileContext"
@@ -21,10 +21,17 @@ roots = [
   "discover_source_files",
   "count_scanned_crates",
   "render_findings_report",
+  "RuleCatalog",
+  "AnalyzerSettings",
+  "AnalyzerConfigError",
+  "load_analyzer_settings",
+  "read_config_document",
+  "analyzer_settings_from",
+  "relative_slash_path",
 ]
 
 [dependencies]
-allowed_dependents = ["sc-lint-portability", "sc-lint-runtime"]
+allowed_dependents = ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]
 allowed_dependencies = ["sc-lint-schema"]
 forbidden_edges = [
   { from = "sc-lint-analyzer-support", to = "sc-lint" },

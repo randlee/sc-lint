@@ -736,6 +736,9 @@ dependencies = [
  "sc-lint-schema",
  "serde",
  "syn",
+ "tempfile",
+ "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]
@@ -756,6 +759,7 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "quote",
+ "sc-lint-analyzer-support",
  "sc-lint-directives",
  "sc-lint-schema",
  "serde",

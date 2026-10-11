@@ -69,6 +69,409 @@ fn analyze_workspace_counts_crate_targets() {
 }
 
 #[test]
+fn analyzer_table_can_disable_portability() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\nenabled = false\n");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/tmp/file\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+    assert_eq!(report.scanned_crates, 0);
+}
+
+#[test]
+fn rule_filter_selects_portability_rule() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/home/user/file\"; let _ = \"/bin/sh\"; }",
+    );
+
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-006"),
+    )
+    .unwrap();
+
+    assert!(!report.findings.is_empty());
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id == RuleId::Port006)
+    );
+
+    let unfiltered = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+    assert!(
+        unfiltered
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id != RuleId::Port006)
+    );
+}
+
+#[test]
+fn configured_unix_prefix_flags_production_path() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"/opt/\"]\n",
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/opt/tool/data\"; }\n#[cfg(test)] mod tests { fn path() { let _ = \"/opt/test/data\"; } }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port006)
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port001)
+    );
+}
+
+#[test]
+fn builtin_prefixes_still_apply_when_configured_list_is_set() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"/opt/\"]\n",
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn production_path() { let _ = \"/var/lib/cache\"; }\n#[cfg(test)] mod tests { fn path() { let _ = \"/private/tmp/cache\"; } }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port001)
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port006)
+    );
+}
+
+#[test]
+fn unknown_table_key_is_config_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\nunknown = true\n");
+
+    let Err(PortabilityError::AnalyzerConfig(error)) = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    }) else {
+        panic!("expected analyzer config error");
+    };
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_KEY");
+    assert!(error.to_string().contains("unknown"));
+}
+
+#[test]
+fn wrong_prefix_type_is_config_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = \"/opt/\"\n",
+    );
+
+    let Err(PortabilityError::AnalyzerConfig(error)) = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    }) else {
+        panic!("expected analyzer config error");
+    };
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    assert!(error.to_string().contains("unix_path_prefixes"));
+}
+
+#[test]
+fn unknown_rule_filter_is_a_selector_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+
+    let Err(PortabilityError::AnalyzerConfig(error)) = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-999"),
+    ) else {
+        panic!("expected analyzer config error");
+    };
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
+}
+
+#[test]
+fn exclude_paths_drops_findings_from_matching_files() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"crates/example/src/**\"]\n",
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/home/user/file\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn exclude_rules_drops_matching_findings() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nexclude_rules = [\"PORT-006\"]\n",
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/home/user/file\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn fail_rules_makes_findings_report_only() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\nfail_rules = []\n");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/home/user/file\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port006);
+}
+
+#[test]
+fn explicit_config_path_is_read() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/home/user/file\"; }",
+    );
+    fixture.write(
+        "config/lint.toml",
+        "[tool.sc-lint.analyzers.portability]\nexclude_rules = [\"PORT-006\"]\n",
+    );
+    let config = fixture.root().join("config/lint.toml");
+
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        Some(&config),
+        None,
+    )
+    .unwrap();
+
+    assert!(report.findings.is_empty());
+}
+
+fn analyze_with_unix_path_prefix(prefix: &str) -> Result<FindingsReport, PortabilityError> {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(&format!(
+        "[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = [\"{prefix}\"]\n"
+    ));
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/opt/tool/data\"; }",
+    );
+
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+}
+
+#[test]
+fn empty_unix_path_prefix_is_config_error() {
+    let Err(PortabilityError::AnalyzerConfig(error)) = analyze_with_unix_path_prefix("") else {
+        panic!("expected an analyzer config error");
+    };
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    assert_eq!(
+        error.to_string(),
+        "portability: `unix_path_prefixes` in [tool.sc-lint.analyzers.portability] must be an array of non-empty strings starting with `/`"
+    );
+}
+
+#[test]
+fn relative_unix_path_prefix_is_config_error() {
+    let Err(PortabilityError::AnalyzerConfig(error)) = analyze_with_unix_path_prefix("opt") else {
+        panic!("expected an analyzer config error");
+    };
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    assert_eq!(
+        error.to_string(),
+        "portability: `unix_path_prefixes` in [tool.sc-lint.analyzers.portability] must be an array of non-empty strings starting with `/`"
+    );
+}
+
+#[test]
+fn defaults_only_temp_prefix_does_not_flag_production_path() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub fn path() { let _ = \"/private/tmp/cache\"; }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id != RuleId::Port006)
+    );
+}
+
+#[test]
+fn analyzer_config_home_env_overrides_legacy_table() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config("[portability]\nconfig_home_env = \"LEGACY_HOME\"\n\n[tool.sc-lint.analyzers.portability]\nconfig_home_env = \"ANALYZER_HOME\"\n");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(test)] mod tests { fn config() { let _ = dirs::home_dir(); } }",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.message.contains("ANALYZER_HOME"))
+    );
+}
+
+#[test]
+fn malformed_legacy_config_home_env_is_analyzer_config_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config("[portability]\nconfig_home_env = []\n");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap_err();
+    assert!(matches!(error, PortabilityError::AnalyzerConfig(_)));
+}
+
+#[test]
 fn flags_hardcoded_tmp_path_in_test_scope() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
@@ -1186,6 +1589,28 @@ fn flags_cfg_attr_not_unix_allow_dead_code_in_production_code() {
             .findings
             .iter()
             .any(|finding| finding.rule_id == RuleId::Port005)
+    );
+}
+
+#[test]
+fn catalog_lists_every_rule_id() {
+    use RuleId::*;
+
+    let every = [
+        Port001, Port002, Port003, Port004, Port005, Port006, Port007, Port008, Port009, Port010,
+    ];
+    for id in every {
+        match id {
+            Port001 | Port002 | Port003 | Port004 | Port005 | Port006 | Port007 | Port008
+            | Port009 | Port010 => {}
+        }
+    }
+    assert_eq!(
+        ALL_PORT_IDS
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>(),
+        every.map(RuleId::as_str).to_vec()
     );
 }
 

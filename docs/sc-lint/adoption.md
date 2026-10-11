@@ -10,9 +10,12 @@ just test
 ```
 
 `just setup` checks or provisions the minimum compatible `sc-lint` release.
-`just lint` runs the selected required lint profile. `just test` runs the
-declared test contract. Consumer-specific recipes remain ordinary recipes
-outside the managed `Justfile` import block.
+`just lint` runs the selected required lint profile. `just test` is the
+repository's own recipe. When the `Justfile` has none, the installer adds
+sc-lint's recommended `test` recipe, which runs the declared test layers; an
+existing `test` recipe is kept. A repository with no `Justfile` starts from
+`plugins/sc-lint/templates/Justfile.default`. Consumer-specific recipes remain
+ordinary recipes outside the managed `Justfile` import block.
 
 ## Install the package and start the skill
 
@@ -27,29 +30,55 @@ Adoption itself never publishes a release and does not infer release channels.
 
 ## Consumer end state
 
-The kit owns only these generated surfaces:
+The installer writes or merges these consumer surfaces:
 
 ```text
 sc-lint.toml
 .sc-lint/bootstrap
 .sc-lint/bootstrap.ps1
 .sc-lint/justfile
-.github/actions/setup-sc-lint/action.yml
+.sc-lint/install.json
+.sc-lint/installed.json
+plugins/sc-lint/install.py
+plugins/sc-lint/.github/actions/setup-sc-lint/action.yml
 .github/workflows/sc-lint.yml
 Justfile managed import block
 README.sc-lint.md
 ```
 
-The root `Justfile` keeps all text outside this block unchanged:
+`.sc-lint/install.json` stores the selected input in canonical JSON form;
+`.sc-lint/installed.json` records digests for installed kit files. The vendored
+`plugins/sc-lint/install.py` is the consumer-side installer for later checks
+and updates.
 
-```text
+The root `Justfile` is merged through this block and keeps all text outside it
+unchanged. When `justfile.windows_shell` is enabled and the consumer has no
+`windows-shell` setting, the installer includes that setting in the managed
+block:
+
+```just
 # >>> sc-lint managed integration >>>
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
 import '.sc-lint/justfile'
 # <<< sc-lint managed integration <<<
 ```
 
+The setting is omitted when the consumer already defines `windows-shell` or
+`justfile.windows_shell` is false.
+
 Do not edit text inside that block. Keep repository-specific recipes before or
 after it; that is the supported extension point.
+
+If an existing `Justfile` has no `test` recipe, the installer adds sc-lint's
+recommended recipe outside the managed block. A repository with no `Justfile`
+starts from `plugins/sc-lint/templates/Justfile.default`.
+
+The pre-existing-file clash check applies on every install to kit targets
+absent from the prior installed manifest. It skips the merged `Justfile` and
+skips `.sc-lint/install.json` only when that file is the selected input. If
+`--input` points elsewhere, a different pre-existing `.sc-lint/install.json`
+is a conflict; all other untracked target paths whose contents differ from the
+kit are also reported before the installer writes anything.
 
 ## `install.json`
 
@@ -64,6 +93,7 @@ The installer input describes consumer facts, not imperative setup code:
     "runtime": {"enabled": false, "reason": "no async runtime"},
     "portability": {"enabled": true, "targets": ["linux", "macos", "windows"]}
   },
+  "justfile": {"windows_shell": true},
   "test": {"unit": ["cargo", "test"]}
 }
 ```
@@ -73,7 +103,10 @@ profiles. `ci` records the intended platform matrix. `analyzers` records each
 choice with an explicit enablement reason; derive it from observed async-runtime
 and target-platform facts. Analyzers are the sole repository-specific *policy*
 input. `profiles`, `ci`, and `test` are consumer-owned recipe declarations,
-not policy. `test` optionally declares ordered test layers.
+not policy. `test` optionally declares ordered test layers. The optional
+`justfile` object accepts `windows_shell`, a boolean that defaults to `true`;
+set it to `false` to omit the kit's `set windows-shell` line. A consumer-owned
+`set windows-shell` is never duplicated.
 
 ## Migrate existing named test recipes
 
@@ -105,8 +138,13 @@ for every drifted managed file and returns:
 
 - `0` — the consumer already matches the kit;
 - `1` — safe proposed changes are present; review them, then apply;
-- `2` — malformed input or a managed-marker conflict; stop and repair the
-  conflict without overwriting consumer-owned content.
+- `2` — malformed input, a managed-marker conflict, or a pre-existing
+  untracked kit path whose content differs from the desired output. The
+  installer lists each such path and writes nothing. The clash check runs on
+  every install; the merged `Justfile` and selected `.sc-lint/install.json`
+  input are exempt. `--dry-run` also exits 2 when the consumer Justfile and
+  the kit justfile define the same recipe or setting, and names each one.
+  Stop and repair the conflict without overwriting consumer-owned content.
 
 After applying, rerun `--dry-run`. The consumer PR must include the literal
 `sc-lint adoption dry-run exit 0` line only when the final recheck converges.
@@ -122,8 +160,9 @@ checkout for this product-owned bundle.
 
 ## How to extend
 
-- **Analyzers:** add `[tool.sc-lint.analyzers.<name>]` with `enabled`, `reason`,
-  target facts, and analyzer-specific keys.
+- **Analyzers:** set `analyzers.<name>` in `install.json`; the kit renders it as
+  `[tool.sc-lint.analyzers.<name>]`. The keys are listed in `configuration.md`,
+  "Analyzer tables"; any other key fails the install.
 - **Test layers:** add ordered `[tool.sc-lint.test.<layer>]` lists. `unit` is
   default; `just test <layer> *args` passes through and `just test all` follows
   declared order.

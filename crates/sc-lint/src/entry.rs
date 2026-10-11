@@ -154,7 +154,7 @@ pub(crate) fn execute(
                 .to_string();
             ExecutionOutcome {
                 rendered,
-                exit_code: 0,
+                exit_code: verdict_exit_code(context.id(), envelope.data.as_ref()),
                 ok: true,
                 summary,
                 error: None,
@@ -177,6 +177,19 @@ pub(crate) fn execute(
     }
 }
 
+/// Returns the business-verdict exit code for successful analyzer lint runs.
+pub(crate) fn verdict_exit_code(command_id: command::CommandId, data: Option<&Value>) -> u8 {
+    let failed = data
+        .and_then(|value| value.get(consts::FIELD_STATUS))
+        .and_then(Value::as_str)
+        == Some(consts::STATUS_FAIL);
+    if command_id.is_analyzer_lint() && failed {
+        consts::EXIT_VERDICT_FAIL
+    } else {
+        consts::EXIT_SUCCESS
+    }
+}
+
 fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome {
     use clap::error::ErrorKind;
 
@@ -184,7 +197,7 @@ fn handle_parse_error(argv: &[OsString], error: clap::Error) -> ImmediateOutcome
     match error.kind() {
         ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => ImmediateOutcome {
             rendered: render::RenderedOutput::stdout(error.to_string()),
-            exit_code: 0,
+            exit_code: consts::EXIT_SUCCESS,
         },
         _ => {
             let cli_error = CliError::usage(error.render().to_string()).with_suggested_action(

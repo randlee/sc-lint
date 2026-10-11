@@ -72,7 +72,7 @@ fn run_with_logging(cli: sc_lint::Cli) -> ExitCode {
     logging::log_completion(
         &logger,
         &observed,
-        outcome.ok,
+        outcome.exit_code,
         &outcome.summary,
         started_at.elapsed(),
     );

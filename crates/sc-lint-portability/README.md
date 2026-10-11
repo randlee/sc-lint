@@ -141,20 +141,39 @@ Test-only path literals are also flagged:
 PORT-001 hardcoded Unix-only absolute path `/tmp/example` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source
 ```
 
-## Disable Model
+## Configuration
 
-There is currently no approved rule-disable path in the shipped
-`sc-lint lint sc-portability` surface.
+`sc-lint-portability` reads `[tool.sc-lint.analyzers.portability]` from
+`<root>/sc-lint.toml` by default. If that file is absent, the analyzer uses its
+built-in defaults. Pass `--config PATH` to read a different TOML file; an
+explicit path must exist and be readable.
 
-Important limits:
+The analyzer table accepts common settings and portability-specific settings:
 
-- no top-level CLI rule-disable flags
-- no backend-specific allowlist flags documented for release `0.1.x`
-- repo-local Python lint directives are not the product contract for this Rust
-  analyzer
+```toml
+[tool.sc-lint.analyzers.portability]
+enabled = true
+reason = "This repository uses the portability analyzer"
+exclude_rules = ["PORT-002"]
+fail_rules = ["PORT-001", "PORT-006"]
+exclude_paths = ["examples/legacy/**"]
+config_home_env = "XDG_CONFIG_HOME"
+unix_path_prefixes = ["/srv/"]
+targets = ["linux", "macos", "windows"]
+```
 
-If a rule needs policy exceptions later, that must be added explicitly in the
-owning backend contract and documented there first.
+`enabled`, `reason`, `exclude_rules`, `fail_rules`, and `exclude_paths` are
+common settings. `config_home_env`, `unix_path_prefixes`, and `targets` are
+portability-specific. When both are present, `config_home_env` in the analyzer
+table takes precedence over the legacy `[portability].config_home_env` value.
+`unix_path_prefixes` adds prefixes to the built-in lists used by both PORT-001
+and PORT-006; configured prefixes never replace or disable the built-ins.
+`targets` is accepted for adopted configurations but is not interpreted by a
+rule yet.
+
+Pass `--rule-filter PORT-001,PORT-006` to select rules. When provided, the
+filter determines the selected rules instead of `exclude_rules`. Invalid
+configuration exits with code 3; an invalid rule filter exits with code 2.
 
 ## Output And Logging
 
