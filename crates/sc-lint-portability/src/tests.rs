@@ -12,6 +12,59 @@ use sc_lint_schema::NodeId;
 use sc_lint_schema::OwnerId;
 
 #[test]
+fn portability_string_literal_visitor_arms_decode_once() {
+    fn method<'a>(file: &'a syn::File, name: &str) -> &'a syn::ImplItemFn {
+        file.items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Impl(item_impl) => Some(&item_impl.items),
+                _ => None,
+            })
+            .flatten()
+            .find_map(|item| match item {
+                syn::ImplItem::Fn(method) if method.sig.ident == name => Some(method),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("missing method {name}"))
+    }
+
+    fn literal_value_call_count(method: &syn::ImplItemFn) -> usize {
+        struct LiteralValueCalls(usize);
+
+        impl<'ast> syn::visit::Visit<'ast> for LiteralValueCalls {
+            fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+                if call.method == "value"
+                    && matches!(
+                        &*call.receiver,
+                        syn::Expr::Path(path) if path.path.is_ident("lit")
+                    )
+                {
+                    self.0 += 1;
+                }
+                syn::visit::visit_expr_method_call(self, call);
+            }
+        }
+
+        let mut calls = LiteralValueCalls(0);
+        syn::visit::Visit::visit_block(&mut calls, &method.block);
+        calls.0
+    }
+
+    let source = syn::parse_file(include_str!("portability.rs")).unwrap();
+
+    assert_eq!(
+        literal_value_call_count(method(&source, "visit_expr_for_portability")),
+        1,
+        "the test-code portability visitor should decode each string literal once"
+    );
+    assert_eq!(
+        literal_value_call_count(method(&source, "visit_expr_lit")),
+        1,
+        "the production portability visitor should decode each string literal once"
+    );
+}
+
+#[test]
 fn findings_report_text_is_stable() {
     let report = FindingsReport {
         tool: "sc-lint-portability",
