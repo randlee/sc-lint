@@ -4,7 +4,7 @@ owner_crate_path = "sc_lint_analyzer_support"
 name = "ScLintAnalyzerSupport"
 
 [public]
-facade = "discover_source_files"
+facade = "discover_source_files, load_analyzer_settings"
 
 [implementation]
 type = "FileContext"
