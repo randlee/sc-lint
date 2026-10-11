@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from conftest import ProductArtifacts
@@ -17,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "packages" / "sc-lint-adoption"
 INSTALL = KIT / "install.py"
 FIXTURES = ROOT / "tests" / "fixtures" / "adoption"
+SUBPROCESS_TIMEOUT_SECONDS = 60
+WORKED_EXAMPLE_TIMEOUT_SECONDS = 300
 
 
 def copy_fixture(name: str) -> Path:
@@ -26,10 +29,51 @@ def copy_fixture(name: str) -> Path:
     return destination
 
 
-def run(*arguments: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["python3", str(INSTALL), *arguments], cwd=cwd, text=True, capture_output=True, check=False
+def run_subprocess(
+    arguments: list[str],
+    *,
+    timeout: float = SUBPROCESS_TIMEOUT_SECONDS,
+    **options: Any,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(arguments, timeout=timeout, **options)
+    except subprocess.TimeoutExpired as error:
+        raise AssertionError(
+            f"subprocess timed out after {timeout}s: {arguments!r}\n"
+            f"stdout: {error.stdout!r}\nstderr: {error.stderr!r}"
+        ) from error
+
+
+def run(
+    *arguments: str,
+    cwd: Path | None = None,
+    timeout: float = SUBPROCESS_TIMEOUT_SECONDS,
+) -> subprocess.CompletedProcess[str]:
+    return run_subprocess(
+        ["python3", str(INSTALL), *arguments],
+        cwd=cwd,
+        timeout=timeout,
+        text=True,
+        capture_output=True,
+        check=False,
     )
+
+
+def test_run_subprocess_timeout_reports_command_and_output() -> None:
+    command = [
+        "python3",
+        "-c",
+        "import sys, time; print('ready', flush=True); "
+        "print('warning', file=sys.stderr, flush=True); time.sleep(5)",
+    ]
+    with pytest.raises(AssertionError) as error:
+        run_subprocess(command, timeout=0.1, text=True, capture_output=True, check=False)
+
+    message = str(error.value)
+    assert "timed out after 0.1s" in message
+    assert repr(command) in message
+    assert "ready" in message
+    assert "warning" in message
 
 
 def write_input(consumer: Path, **overrides: object) -> Path:
@@ -47,7 +91,9 @@ def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> No
     clean = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
     assert clean.returncode == 0, clean.stdout
     assert os.access(consumer / ".sc-lint" / "bootstrap", os.X_OK)
-    recipes = subprocess.run(["just", "--list"], cwd=consumer, text=True, capture_output=True, check=False)
+    recipes = run_subprocess(
+        ["just", "--list"], cwd=consumer, text=True, capture_output=True, check=False
+    )
     assert recipes.returncode == 0, recipes.stderr
     for recipe in ("default", "setup", "lint", "test", "upgrade"):
         assert f"    {recipe}" in recipes.stdout
@@ -166,9 +212,21 @@ def test_vendored_kit_can_recheck_and_schema_stays_vendored() -> None:
     installer = consumer / "plugins" / "sc-lint" / "install.py"
     assert installer.is_file()
     assert not (consumer / "install.schema.json").exists()
-    result = subprocess.run(["python3", "plugins/sc-lint/install.py", "."], cwd=consumer, text=True, capture_output=True, check=False)
+    result = run_subprocess(
+        ["python3", "plugins/sc-lint/install.py", "."],
+        cwd=consumer,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
     assert result.returncode == 0, result.stderr
-    result = subprocess.run(["python3", "plugins/sc-lint/install.py", "--dry-run", "."], cwd=consumer, text=True, capture_output=True, check=False)
+    result = run_subprocess(
+        ["python3", "plugins/sc-lint/install.py", "--dry-run", "."],
+        cwd=consumer,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
     assert result.returncode == 0, result.stderr
     assert (consumer / ".sc-lint" / "install.json").is_file()
 
@@ -177,7 +235,13 @@ def test_bare_rerun_reports_a_missing_persisted_input() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     (consumer / ".sc-lint" / "install.json").unlink()
-    result = subprocess.run(["python3", "plugins/sc-lint/install.py", "."], cwd=consumer, text=True, capture_output=True, check=False)
+    result = run_subprocess(
+        ["python3", "plugins/sc-lint/install.py", "."],
+        cwd=consumer,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
     assert result.returncode == 2
     assert ".sc-lint" in result.stderr and "install.json" in result.stderr
 
@@ -332,8 +396,12 @@ def install_worked_example(version: str | None = None) -> Path:
 def test_analyzer_worked_example_declares_all_just_layers() -> None:
     consumer = install_worked_example()
     for arguments in LAYER_INVOCATIONS:
-        command = subprocess.run(
-            ["just", "--dry-run", *arguments], cwd=consumer, text=True, capture_output=True, check=False
+        command = run_subprocess(
+            ["just", "--dry-run", *arguments],
+            cwd=consumer,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         assert command.returncode == 0, command.stderr
         forwarded = " ".join([arguments[0], "--config", "sc-lint.toml", *arguments[1:]])
@@ -349,7 +417,15 @@ def test_analyzer_worked_example_runs_all_declared_just_layers(product_artifacts
         "SC_LINT_WHEEL_DIR": str(product_artifacts.wheel_dir),
     }
     for arguments in LAYER_INVOCATIONS:
-        command = subprocess.run(["just", *arguments], cwd=consumer, env=environment, text=True, capture_output=True, check=False)
+        command = run_subprocess(
+            ["just", *arguments],
+            cwd=consumer,
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
+        )
         assert command.returncode == 0, command.stderr
 
 
@@ -395,7 +471,9 @@ def test_consumer_windows_shell_is_not_duplicated() -> None:
     (consumer / "Justfile").write_text('set windows-shell := ["cmd", "/c"]\n\nhello:\n    @echo hi\n')
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     assert (consumer / "Justfile").read_text().count("set windows-shell") == 1
-    assert subprocess.run(["just", "--list"], cwd=consumer, capture_output=True, check=False).returncode == 0
+    assert run_subprocess(
+        ["just", "--list"], cwd=consumer, capture_output=True, check=False
+    ).returncode == 0
 
 
 def test_windows_shell_false_omits_setting() -> None:
@@ -434,9 +512,21 @@ def test_dry_run_names_colliding_recipes_without_writing() -> None:
 def test_dry_run_without_just_on_path_exits_2_and_says_so() -> None:
     consumer = copy_fixture("empty-workspace")
     environment = {**os.environ, "PATH": str(consumer / "src")}
-    result = subprocess.run(
-        [shutil.which("python3"), str(INSTALL), "--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer)],
-        env=environment, text=True, capture_output=True, check=False,
+    python = shutil.which("python3")
+    assert python is not None
+    result = run_subprocess(
+        [
+            python,
+            str(INSTALL),
+            "--dry-run",
+            "--input",
+            str(FIXTURES / "install.json"),
+            str(consumer),
+        ],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
     )
     assert result.returncode == 2
     assert "--dry-run needs `just` on PATH" in result.stderr
