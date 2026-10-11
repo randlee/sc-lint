@@ -1,0 +1,2 @@
+# ADR acceptance fixtures change only with the ADR owner's review.
+/tests/adr/** @randlee
