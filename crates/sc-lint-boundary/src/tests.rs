@@ -3591,6 +3591,8 @@ fn rule_filter_family_keeps_existing_cycles_behaviour() {
 fn every_family_matches_its_legacy_rule_filter() {
     let cycle = cycle_fixture();
     let dependency = undeclared_dependency_fixture();
+    let multi_target = multi_target_fixture();
+    let invalid_inventory = invalid_inventory_fixture();
     let pairs = [
         (RuleFilter::Cycles, "cycles"),
         (RuleFilter::Boundaries, "boundaries"),
@@ -3600,21 +3602,45 @@ fn every_family_matches_its_legacy_rule_filter() {
         (RuleFilter::Manifests, "manifests"),
     ];
     assert_eq!(pairs.len(), BOUNDARY_CATALOG.families.len());
-    for root in [cycle.root(), dependency.root()] {
+    for root in [
+        cycle.root(),
+        dependency.root(),
+        multi_target.root(),
+        invalid_inventory.root(),
+    ] {
         for (filter, family) in pairs {
             let legacy = analyze_workspace(&AnalyzeOptions {
                 root: root.to_path_buf(),
                 format: OutputFormat::Json,
                 rule: Some(filter),
-            })
-            .expect("legacy analysis succeeds");
-            assert_eq!(
-                configured(root, Some(family)).expect("family selector succeeds"),
-                legacy,
-                "{family}"
-            );
+            });
+            let configured = configured(root, Some(family));
+            match (legacy, configured) {
+                (Ok(legacy), Ok(configured)) => assert_eq!(configured, legacy, "{family}"),
+                (Err(legacy), Err(configured)) => {
+                    assert_eq!(configured.to_string(), legacy.to_string(), "{family}");
+                }
+                (legacy, configured) => panic!(
+                    "{family}: configured and legacy results differ: {configured:?} versus {legacy:?}"
+                ),
+            }
         }
     }
+}
+
+fn multi_target_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+    fixture.write_source("example", "main.rs", "fn main() {}");
+    fixture
+}
+
+fn invalid_inventory_fixture() -> WorkspaceFixture {
+    let fixture = multi_target_fixture();
+    fixture.write("boundaries/planning.toml", "not_planning = true\n");
+    fixture
 }
 
 #[test]

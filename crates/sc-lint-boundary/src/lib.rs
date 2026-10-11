@@ -707,7 +707,7 @@ fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsRep
 }
 
 /// Reads `[tool.sc-lint.analyzers.boundary]` and `--rule-filter` (rule ids or
-/// family names), then runs the full analysis and keeps the selected rules.
+/// family names), preserving legacy fast paths for exact legacy families.
 pub fn analyze_workspace_configured(
     options: &AnalyzeOptions,
     config: Option<&Path>,
@@ -717,9 +717,9 @@ pub fn analyze_workspace_configured(
     if !settings.enabled {
         return Ok(disabled_report());
     }
-    // Selection has one mechanism: the full analysis runs, and `settings.apply`
-    // keeps the selected rule ids. `options.rule` stays for library callers.
-    let mut report = analyze_workspace(options)?;
+    let mut options = options.clone();
+    options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
+    let mut report = analyze_workspace(&options)?;
     let findings: Vec<Finding> = std::mem::take(&mut report.findings)
         .into_iter()
         .filter(|finding| {
@@ -738,6 +738,25 @@ pub fn analyze_workspace_configured(
     report.findings = findings;
     report.status = status;
     Ok(report)
+}
+
+fn legacy_family_rule_filter(selected: Option<&BTreeSet<CatalogRuleId>>) -> Option<RuleFilter> {
+    let selected = selected?;
+    [
+        (RuleFilter::Dependencies, "dependencies"),
+        (RuleFilter::Manifests, "manifests"),
+    ]
+    .into_iter()
+    .find_map(|(filter, family)| {
+        BOUNDARY_CATALOG
+            .families
+            .iter()
+            .find(|(name, _)| *name == family)
+            .filter(|(_, rules)| {
+                selected.len() == rules.len() && rules.iter().all(|rule| selected.contains(rule))
+            })
+            .map(|_| filter)
+    })
 }
 
 pub fn export_workspace_graph(
