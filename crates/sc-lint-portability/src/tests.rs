@@ -178,7 +178,7 @@ fn builtin_prefixes_still_apply_when_configured_list_is_set() {
     fixture.write_source(
         "example",
         "lib.rs",
-        "#[cfg(test)] mod tests { fn path() { let _ = \"/private/tmp/cache\"; } }",
+        "pub fn production_path() { let _ = \"/var/lib/cache\"; }\n#[cfg(test)] mod tests { fn path() { let _ = \"/private/tmp/cache\"; } }",
     );
 
     let report = analyze_workspace(&AnalyzeOptions {
@@ -192,6 +192,12 @@ fn builtin_prefixes_still_apply_when_configured_list_is_set() {
             .findings
             .iter()
             .any(|finding| finding.rule_id == RuleId::Port001)
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port006)
     );
 }
 
