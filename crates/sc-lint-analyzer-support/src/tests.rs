@@ -235,6 +235,18 @@ fn invalid_common_key_type_is_a_structured_error() {
 }
 
 #[test]
+fn reason_must_be_a_string() {
+    let directory = config_dir("[tool.sc-lint.analyzers.example]\nreason = 5\n");
+    let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    assert_eq!(
+        error.to_string(),
+        "example: `reason` in [tool.sc-lint.analyzers.example] must be a string"
+    );
+}
+
+#[test]
 fn families_and_rule_filters_resolve_to_catalog_rules() {
     let directory = TempDir::new().unwrap();
     let settings =

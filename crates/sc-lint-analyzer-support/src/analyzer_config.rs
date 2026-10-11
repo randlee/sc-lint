@@ -161,6 +161,7 @@ pub fn analyzer_settings_from(
     let table = analyzer_table(document, analyzer)?.unwrap_or(&empty);
     validate_keys(table, catalog)?;
     let enabled = read_enabled(table, analyzer)?;
+    let _reason = read_string(table, "reason", analyzer)?;
 
     let exclude_rules = resolve(
         catalog,
@@ -234,6 +235,22 @@ fn read_enabled(table: &toml::Table, analyzer: &'static str) -> Result<bool, Ana
             analyzer,
             key: "enabled".to_owned(),
             expected: "a boolean",
+        }),
+    }
+}
+
+fn read_string<'a>(
+    table: &'a toml::Table,
+    key: &str,
+    analyzer: &'static str,
+) -> Result<Option<&'a str>, AnalyzerConfigError> {
+    match table.get(key) {
+        None => Ok(None),
+        Some(toml::Value::String(value)) => Ok(Some(value.as_str())),
+        Some(_) => Err(AnalyzerConfigError::WrongType {
+            analyzer,
+            key: key.to_owned(),
+            expected: "a string",
         }),
     }
 }
