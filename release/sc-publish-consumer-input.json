@@ -105,9 +105,10 @@
       "bundled_paths": [
         {
           "source": "docs-bundle",
-          "destination": "share/doc/sc-lint",
+          "destination": "share/sc-lint/sc-lint-docs",
           "homebrew_destination_components": [
-            "pkgshare"
+            "pkgshare",
+            "sc-lint-docs"
           ]
         }
       ]

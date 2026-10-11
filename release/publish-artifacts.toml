@@ -88,7 +88,7 @@ wait_after_publish_seconds = 0
 
 [[release_binaries]]
 name = "sc-lint"
-bundled_paths = [{ source = "docs-bundle", destination = "share/doc/sc-lint", homebrew_destination_components = ["pkgshare"] }]
+bundled_paths = [{ source = "docs-bundle", destination = "share/sc-lint/sc-lint-docs", homebrew_destination_components = ["pkgshare", "sc-lint-docs"] }]
 [[release_binaries]]
 name = "sc-lint-boundary"
 [[release_binaries]]

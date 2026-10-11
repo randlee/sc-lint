@@ -283,16 +283,59 @@ mod tests {
 
     #[test]
     fn installed_layout_candidates_cover_archive_and_homebrew_pkgshare() {
-        let archive_binary = Path::new("/release/sc-lint");
+        let release: toml::Value =
+            toml::from_str(include_str!("../../../release/publish-artifacts.toml"))
+                .expect("valid release manifest");
+        let lint_binary = release["release_binaries"]
+            .as_array()
+            .expect("release binaries")
+            .iter()
+            .find(|binary| binary["name"].as_str() == Some("sc-lint"))
+            .expect("sc-lint release binary");
+        let bundled_path = lint_binary["bundled_paths"]
+            .as_array()
+            .expect("sc-lint bundled paths")
+            .first()
+            .expect("docs bundle path");
+        let archive_destination = Path::new(
+            bundled_path["destination"]
+                .as_str()
+                .expect("archive destination"),
+        );
+        let archive_root = Path::new("/release/sc-lint_0.7.0_x86_64-unknown-linux-gnu");
+        let archive_binary = archive_root.join("bin/sc-lint");
+        let expected_archive_docs = archive_root.join(archive_destination);
         assert!(
-            candidate_roots_for_executable(archive_binary)
-                .contains(&PathBuf::from("/release/sc-lint-docs"))
+            candidate_roots_for_executable(&archive_binary).contains(&expected_archive_docs),
+            "archive docs destination from the release manifest must be discoverable"
         );
 
+        let formula_path = release["channels"]["homebrew"]["formulas"]
+            .as_array()
+            .expect("Homebrew formulas")
+            .iter()
+            .find(|formula| formula["path"].as_str() == Some("Formula/sc-lint.rb"))
+            .and_then(|formula| formula["path"].as_str())
+            .expect("sc-lint Homebrew formula path");
+        let formula_name = Path::new(formula_path)
+            .file_stem()
+            .expect("Homebrew formula filename");
+        let homebrew_components = bundled_path["homebrew_destination_components"]
+            .as_array()
+            .expect("Homebrew destination components");
+        assert_eq!(
+            homebrew_components[0].as_str(),
+            Some("pkgshare"),
+            "Homebrew bundle must start at pkgshare"
+        );
+        let mut expected_homebrew_docs = PathBuf::from("/opt/homebrew/share").join(formula_name);
+        for component in homebrew_components.iter().skip(1) {
+            expected_homebrew_docs.push(component.as_str().expect("path component"));
+        }
         let homebrew_binary = Path::new("/opt/homebrew/bin/sc-lint");
         assert!(
-            candidate_roots_for_executable(homebrew_binary)
-                .contains(&PathBuf::from("/opt/homebrew/share/sc-lint/sc-lint-docs"))
+            candidate_roots_for_executable(homebrew_binary).contains(&expected_homebrew_docs),
+            "Homebrew docs destination from the release manifest must be discoverable"
         );
 
         let root = source_root();
