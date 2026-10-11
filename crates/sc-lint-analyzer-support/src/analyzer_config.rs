@@ -134,21 +134,21 @@ pub fn analyzer_settings_from(
     rule_filter: Option<&str>,
 ) -> Result<AnalyzerSettings, AnalyzerConfigError> {
     let analyzer = catalog.analyzer;
-    let mut table = analyzer_table(document, analyzer)?;
-    validate_keys(&table, catalog)?;
-    let enabled = take_enabled(&mut table, analyzer)?;
-    table.remove("reason");
+    let empty = toml::Table::new();
+    let table = analyzer_table(document, analyzer)?.unwrap_or(&empty);
+    validate_keys(table, catalog)?;
+    let enabled = read_enabled(table, analyzer)?;
 
     let exclude_rules = resolve(
         catalog,
-        &take_strings(&mut table, "exclude_rules", analyzer)?.unwrap_or_default(),
+        &read_strings(table, "exclude_rules", analyzer)?.unwrap_or_default(),
     )
     .map_err(|rule| AnalyzerConfigError::UnknownRule {
         analyzer,
         key: "exclude_rules",
         rule,
     })?;
-    let fail_rules = match take_strings(&mut table, "fail_rules", analyzer)? {
+    let fail_rules = match read_strings(table, "fail_rules", analyzer)? {
         Some(list) => resolve(catalog, &list).map_err(|rule| AnalyzerConfigError::UnknownRule {
             analyzer,
             key: "fail_rules",
@@ -156,7 +156,7 @@ pub fn analyzer_settings_from(
         })?,
         None => catalog.default_fail.iter().copied().collect(),
     };
-    let exclude_paths = take_strings(&mut table, "exclude_paths", analyzer)?.unwrap_or_default();
+    let exclude_paths = read_strings(table, "exclude_paths", analyzer)?.unwrap_or_default();
     let rule_filter = parse_rule_filter(catalog, rule_filter)?;
 
     Ok(AnalyzerSettings {
@@ -165,22 +165,26 @@ pub fn analyzer_settings_from(
         fail_rules,
         exclude_paths,
         rule_filter,
-        own: table,
+        own: table
+            .iter()
+            .filter(|(key, _)| !COMMON_KEYS.contains(&key.as_str()))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect(),
     })
 }
 
-fn analyzer_table(
-    document: &toml::Table,
+fn analyzer_table<'a>(
+    document: &'a toml::Table,
     analyzer: &'static str,
-) -> Result<toml::Table, AnalyzerConfigError> {
+) -> Result<Option<&'a toml::Table>, AnalyzerConfigError> {
     match document
         .get("tool")
         .and_then(|tool| tool.get("sc-lint"))
         .and_then(|sc_lint| sc_lint.get("analyzers"))
         .and_then(|analyzers| analyzers.get(analyzer))
     {
-        None => Ok(toml::Table::new()),
-        Some(toml::Value::Table(table)) => Ok(table.clone()),
+        None => Ok(None),
+        Some(toml::Value::Table(table)) => Ok(Some(table)),
         Some(_) => Err(AnalyzerConfigError::NotATable { analyzer }),
     }
 }
@@ -198,13 +202,10 @@ fn validate_keys(table: &toml::Table, catalog: &RuleCatalog) -> Result<(), Analy
     Ok(())
 }
 
-fn take_enabled(
-    table: &mut toml::Table,
-    analyzer: &'static str,
-) -> Result<bool, AnalyzerConfigError> {
-    match table.remove("enabled") {
+fn read_enabled(table: &toml::Table, analyzer: &'static str) -> Result<bool, AnalyzerConfigError> {
+    match table.get("enabled") {
         None => Ok(true),
-        Some(toml::Value::Boolean(enabled)) => Ok(enabled),
+        Some(toml::Value::Boolean(enabled)) => Ok(*enabled),
         Some(_) => Err(AnalyzerConfigError::WrongType {
             analyzer,
             key: "enabled".to_owned(),
@@ -235,12 +236,12 @@ fn parse_rule_filter(
         })
 }
 
-fn take_strings(
-    table: &mut toml::Table,
+fn read_strings(
+    table: &toml::Table,
     key: &str,
     analyzer: &'static str,
 ) -> Result<Option<Vec<String>>, AnalyzerConfigError> {
-    let Some(value) = table.remove(key) else {
+    let Some(value) = table.get(key) else {
         return Ok(None);
     };
     let invalid = || AnalyzerConfigError::WrongType {
@@ -252,9 +253,9 @@ fn take_strings(
         return Err(invalid());
     };
     items
-        .into_iter()
+        .iter()
         .map(|item| match item {
-            toml::Value::String(text) => Ok(text),
+            toml::Value::String(text) => Ok(text.clone()),
             _ => Err(invalid()),
         })
         .collect::<Result<Vec<_>, _>>()
