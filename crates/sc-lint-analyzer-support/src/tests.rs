@@ -64,7 +64,7 @@ const CATALOG: RuleCatalog = RuleCatalog {
         ],
     )],
     default_fail: &[CatalogRuleId::new("EXAMPLE-001")],
-    own_keys: &["extension"],
+    own_keys: &["extension", "labels"],
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -122,7 +122,7 @@ fn missing_config_yields_defaults() {
     assert!(settings.exclude_rules.is_empty());
     assert!(settings.exclude_paths.is_empty());
     assert_eq!(settings.rule_filter, None);
-    assert!(settings.own_value("extension").is_none());
+    assert_eq!(settings.own_string("extension").unwrap(), None);
 }
 
 #[test]
@@ -184,8 +184,44 @@ fn own_keys_are_preserved_and_common_keys_are_consumed() {
     assert!(!settings.enabled);
     assert_eq!(settings.exclude_paths, ["tests/**"]);
     assert_eq!(
-        settings.own_value("extension"),
-        Some(&toml::Value::Integer(1))
+        settings.own_string("extension").unwrap_err().code(),
+        "ANALYZER_CONFIG.WRONG_TYPE"
+    );
+}
+
+#[test]
+fn own_key_accessors_validate_strings_and_string_arrays() {
+    let directory = config_dir(
+        "[tool.sc-lint.analyzers.example]\nextension = \"enabled\"\nlabels = [\"alpha\", \"beta\"]\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert_eq!(
+        settings.own_string("extension").unwrap(),
+        Some("enabled".to_owned())
+    );
+    assert_eq!(settings.own_string("missing").unwrap(), None);
+    assert_eq!(
+        settings.own_strings("labels").unwrap(),
+        Some(vec!["alpha".to_owned(), "beta".to_owned()])
+    );
+    assert_eq!(settings.own_strings("missing").unwrap(), None);
+}
+
+#[test]
+fn own_key_accessors_report_structured_type_errors() {
+    let directory = config_dir(
+        "[tool.sc-lint.analyzers.example]\nextension = [\"enabled\"]\nlabels = \"alpha\"\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert_eq!(
+        settings.own_string("extension").unwrap_err().to_string(),
+        "example: `extension` in [tool.sc-lint.analyzers.example] must be a string"
+    );
+    assert_eq!(
+        settings.own_strings("labels").unwrap_err().to_string(),
+        "example: `labels` in [tool.sc-lint.analyzers.example] must be an array of strings"
     );
 }
 

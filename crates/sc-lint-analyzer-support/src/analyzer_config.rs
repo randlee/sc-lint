@@ -55,18 +55,13 @@ pub struct RuleCatalog {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnalyzerSettings {
+    analyzer: AnalyzerName,
     pub enabled: bool,
     pub exclude_rules: BTreeSet<CatalogRuleId>,
     pub fail_rules: BTreeSet<CatalogRuleId>,
     pub exclude_paths: Vec<String>,
     pub rule_filter: Option<BTreeSet<CatalogRuleId>>,
     own: toml::Table,
-}
-
-impl AnalyzerSettings {
-    pub fn own_value(&self, key: &str) -> Option<&toml::Value> {
-        self.own.get(key)
-    }
 }
 
 #[derive(Debug, Error)]
@@ -188,6 +183,7 @@ pub fn analyzer_settings_from(
     let rule_filter = parse_rule_filter(catalog, rule_filter)?;
 
     Ok(AnalyzerSettings {
+        analyzer: catalog.analyzer,
         enabled,
         exclude_rules,
         fail_rules,
@@ -269,7 +265,31 @@ fn read_strings(
     key: &str,
     analyzer: &'static str,
 ) -> Result<Option<Vec<String>>, AnalyzerConfigError> {
-    let Some(value) = table.get(key) else {
+    read_string_values(table.get(key), key, analyzer)
+}
+
+fn read_string_value(
+    value: Option<&toml::Value>,
+    key: &str,
+    analyzer: &'static str,
+) -> Result<Option<String>, AnalyzerConfigError> {
+    match value {
+        None => Ok(None),
+        Some(toml::Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(AnalyzerConfigError::WrongType {
+            analyzer,
+            key: key.to_owned(),
+            expected: "a string",
+        }),
+    }
+}
+
+fn read_string_values(
+    value: Option<&toml::Value>,
+    key: &str,
+    analyzer: &'static str,
+) -> Result<Option<Vec<String>>, AnalyzerConfigError> {
+    let Some(value) = value else {
         return Ok(None);
     };
     let invalid = || AnalyzerConfigError::WrongType {
@@ -314,6 +334,14 @@ fn resolve(catalog: &RuleCatalog, selectors: &[String]) -> Result<BTreeSet<Catal
 }
 
 impl AnalyzerSettings {
+    pub fn own_string(&self, key: &str) -> Result<Option<String>, AnalyzerConfigError> {
+        read_string_value(self.own.get(key), key, self.analyzer.as_str())
+    }
+
+    pub fn own_strings(&self, key: &str) -> Result<Option<Vec<String>>, AnalyzerConfigError> {
+        read_string_values(self.own.get(key), key, self.analyzer.as_str())
+    }
+
     pub fn path_excluded(&self, relative: &str) -> bool {
         self.exclude_paths
             .iter()
