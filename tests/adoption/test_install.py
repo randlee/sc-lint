@@ -49,7 +49,7 @@ def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> No
     assert os.access(consumer / ".sc-lint" / "bootstrap", os.X_OK)
     recipes = subprocess.run(["just", "--list"], cwd=consumer, text=True, capture_output=True, check=False)
     assert recipes.returncode == 0, recipes.stderr
-    for recipe in ("setup", "lint", "test", "upgrade"):
+    for recipe in ("default", "setup", "lint", "test", "upgrade"):
         assert f"    {recipe}" in recipes.stdout
 
 
