@@ -36,7 +36,9 @@ def run_subprocess(
     **options: Any,
 ) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(arguments, timeout=timeout, **options)
+        return subprocess.run(
+            arguments, stdin=subprocess.DEVNULL, timeout=timeout, **options
+        )
     except subprocess.TimeoutExpired as error:
         raise AssertionError(
             f"subprocess timed out after {timeout}s: {arguments!r}\n"
@@ -57,6 +59,23 @@ def run(
         capture_output=True,
         check=False,
     )
+
+
+def test_run_subprocess_stdin_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    command = ["python3", "-c", "import sys; print(repr(sys.stdin.read()))"]
+    actual_run = subprocess.run
+    observed_options: dict[str, Any] = {}
+
+    def record_options(*arguments: Any, **options: Any) -> subprocess.CompletedProcess[str]:
+        observed_options.update(options)
+        return actual_run(*arguments, **options)
+
+    monkeypatch.setattr(subprocess, "run", record_options)
+    result = run_subprocess(command, text=True, capture_output=True, check=False)
+
+    assert result.returncode == 0
+    assert result.stdout == "''\n"
+    assert observed_options["stdin"] is subprocess.DEVNULL
 
 
 def test_run_subprocess_timeout_reports_command_and_output() -> None:
