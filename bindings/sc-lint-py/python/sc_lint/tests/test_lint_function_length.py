@@ -12,6 +12,7 @@ from sc_lint.lint_function_length import evaluate
 from sc_lint.lint_function_length import find_functions
 from sc_lint.lint_function_length import load_baseline
 from sc_lint.lint_function_length import mask_rust_source
+from sc_lint.lint_function_length import remediation_hint
 from sc_lint.lint_function_length import scan_repo
 from sc_lint.lint_function_length import write_baseline
 from sc_lint.python_adapter import AdapterError
@@ -273,6 +274,28 @@ class BaselineTests(unittest.TestCase):
                 self.write_text(text)
                 with self.assertRaisesRegex(AdapterError, "path<TAB>name<TAB>code_lines"):
                     load_baseline(self.root)
+
+
+class RemediationHintTests(unittest.TestCase):
+    def test_stale_only_failures_recommend_ratcheting(self) -> None:
+        evaluation = evaluate([sized("example", FAIL_THRESHOLD)], {DEMO_KEY: [FAIL_THRESHOLD + 1]})
+        self.assertEqual(remediation_hint(evaluation), "run --write-baseline to ratchet stale allowances")
+
+    def test_new_or_grown_failures_do_not_recommend_ratcheting(self) -> None:
+        evaluation = evaluate([sized("example", FAIL_THRESHOLD)], {})
+        self.assertEqual(
+            remediation_hint(evaluation),
+            "new or grown functions are not eligible for baseline ratcheting; improve the design first",
+        )
+
+    def test_mixed_failures_require_design_work_before_ratcheting(self) -> None:
+        functions = [sized("new", FAIL_THRESHOLD), sized("stale", FAIL_THRESHOLD)]
+        baseline = {(DEMO_KEY[0], "stale"): [FAIL_THRESHOLD + 1]}
+        evaluation = evaluate(functions, baseline)
+        self.assertEqual(
+            remediation_hint(evaluation),
+            "improve new or grown functions before running --write-baseline to ratchet stale allowances",
+        )
 
 
 class RepositoryTests(unittest.TestCase):
