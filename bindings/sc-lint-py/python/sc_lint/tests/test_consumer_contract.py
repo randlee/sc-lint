@@ -117,6 +117,10 @@ class ConsumerContractTests(unittest.TestCase):
         contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
         self.assertIn('launcher="$staging/extract/sc-lint"', contents)
         self.assertIn('launcher="$staging/extract/sc-lint_${version}_${target}/bin/sc-lint"', contents)
+        self.assertLess(
+            contents.index('launcher="$staging/extract/sc-lint"'),
+            contents.index('launcher="$staging/extract/sc-lint_${version}_${target}/bin/sc-lint"'),
+        )
         self.assertIn('"$launcher" --config "$config" "$command" "$@"', contents)
         self.assertNotIn('mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new"', contents)
 

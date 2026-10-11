@@ -964,6 +964,33 @@ mod tests {
     }
 
     #[test]
+    fn release_binary_candidate_accepts_nested_and_prefers_legacy_flat_layouts() {
+        let fixture = TempDir::new().expect("fixture");
+        let minimum = MinimumVersion::from_str("0.7.0").expect("minimum");
+        let release_version = ResolvedReleaseVersion::for_minimum(&minimum);
+        let target = ReleaseTarget::detect().expect("current test host is supported");
+        let nested = fixture
+            .path()
+            .join(format!("sc-lint_{release_version}_{}", target.triple))
+            .join("bin")
+            .join(ReleaseTarget::binary_name());
+        fs::create_dir_all(nested.parent().expect("nested parent")).expect("nested directory");
+        fs::write(&nested, "nested release launcher").expect("nested launcher");
+
+        assert_eq!(
+            release_binary_candidate(fixture.path(), &release_version, target),
+            nested
+        );
+
+        let flat = fixture.path().join(ReleaseTarget::binary_name());
+        fs::write(&flat, "legacy flat release launcher").expect("flat launcher");
+        assert_eq!(
+            release_binary_candidate(fixture.path(), &release_version, target),
+            flat
+        );
+    }
+
+    #[test]
     fn consumer_bootstrap_exposes_only_product_owned_operations() {
         for operation in ["setup", "lint", "test", "upgrade"] {
             assert!(

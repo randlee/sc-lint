@@ -155,19 +155,23 @@ class ConsumerLifecycleTests(unittest.TestCase):
             triple, extension = "x86_64-unknown-linux-gnu", "tar.gz"
         archive = release_dir / f"sc-lint_{VERSION}_{triple}.{extension}"
         archive_root = f"sc-lint_{VERSION}_{triple}"
-        archive_entry = (
-            binary_name if layout == "flat" else f"{archive_root}/bin/{binary_name}"
-        )
+        archive_entries = []
+        if layout in ("nested", "both"):
+            archive_entries.append(f"{archive_root}/bin/{binary_name}")
+        if layout in ("flat", "both"):
+            archive_entries.append(binary_name)
         if extension == "zip":
             with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
                 if include_binary:
-                    package.write(binary, arcname=archive_entry)
+                    for archive_entry in archive_entries:
+                        package.write(binary, arcname=archive_entry)
                 else:
                     package.writestr(f"{archive_root}/missing-binary", "fixture")
         else:
             with tarfile.open(archive, "w:gz") as package:
                 if include_binary:
-                    package.add(binary, arcname=archive_entry)
+                    for archive_entry in archive_entries:
+                        package.add(binary, arcname=archive_entry)
                 else:
                     package.addfile(tarfile.TarInfo(f"{archive_root}/missing-binary"))
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -314,8 +318,9 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
 
-    @unittest.skipIf(os.name == "nt", "POSIX managed-binary replacement contract")
-    def test_posix_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
+    def assert_posix_managed_old_binary_self_upgrades_through_just_setup(
+        self, *, layout: str = "nested"
+    ) -> None:
         temporary, release, consumer = self.make_release_fixture()
         with temporary:
             self.initialize_rust_consumer(release, consumer)
@@ -323,7 +328,9 @@ class ConsumerLifecycleTests(unittest.TestCase):
             managed.mkdir()
             managed_binary = managed / self.product_binary.name
             self.write_old_probe(managed_binary)
-            self.write_release_archive(Path(temporary.name), release / self.product_binary.name)
+            self.write_release_archive(
+                Path(temporary.name), release / self.product_binary.name, layout=layout
+            )
             just = shutil.which("just")
             self.assertIsNotNone(just, "just is required for this fixture")
 
@@ -348,6 +355,18 @@ class ConsumerLifecycleTests(unittest.TestCase):
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+
+    @unittest.skipIf(os.name == "nt", "POSIX managed-binary replacement contract")
+    def test_posix_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
+        self.assert_posix_managed_old_binary_self_upgrades_through_just_setup()
+
+    @unittest.skipIf(os.name == "nt", "POSIX legacy flat archive compatibility")
+    def test_posix_managed_old_binary_accepts_legacy_flat_archive(self) -> None:
+        self.assert_posix_managed_old_binary_self_upgrades_through_just_setup(layout="flat")
+
+    @unittest.skipIf(os.name == "nt", "POSIX flat archive selection")
+    def test_posix_managed_old_binary_prefers_flat_when_both_layouts_exist(self) -> None:
+        self.assert_posix_managed_old_binary_self_upgrades_through_just_setup(layout="both")
 
     @unittest.skipUnless(os.name == "nt", "Windows managed-binary replacement contract")
     def test_windows_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
