@@ -347,47 +347,51 @@ impl AnalyzerSettings {
 }
 
 fn glob_match(pattern: &str, path: &str) -> bool {
-    fn matches_segments(pattern: &[&str], path: &[&str]) -> bool {
-        match pattern.split_first() {
-            None => path.is_empty(),
-            Some((&"**", rest)) => {
-                (0..=path.len()).any(|skip| matches_segments(rest, &path[skip..]))
-            }
-            Some((head, rest)) => path.split_first().is_some_and(|(first, tail)| {
-                matches_segment(head.as_bytes(), first.as_bytes()) && matches_segments(rest, tail)
-            }),
-        }
-    }
-    fn matches_segment(pattern: &[u8], text: &[u8]) -> bool {
-        let mut previous = vec![false; text.len() + 1];
-        previous[0] = true;
-
-        for &token in pattern {
-            let mut current = vec![false; text.len() + 1];
-            match token {
-                b'*' => {
-                    current[0] = previous[0];
-                    for index in 1..=text.len() {
-                        current[index] = previous[index] || current[index - 1];
-                    }
-                }
-                b'?' => {
-                    current[1..].copy_from_slice(&previous[..text.len()]);
-                }
-                expected => {
-                    for index in 1..=text.len() {
-                        current[index] = previous[index - 1] && expected == text[index - 1];
-                    }
-                }
-            }
-            previous = current;
-        }
-
-        previous[text.len()]
-    }
-
-    matches_segments(
-        &pattern.split('/').collect::<Vec<_>>(),
-        &path.split('/').collect::<Vec<_>>(),
+    let pattern: Vec<&str> = pattern.split('/').collect();
+    let path: Vec<&str> = path.split('/').collect();
+    // `**` matches any run of path segments; inside a segment `*` matches any
+    // run of bytes and `?` matches one byte.
+    wildcard_match(
+        &pattern,
+        &path,
+        |token| *token == "**",
+        |token, segment| {
+            wildcard_match(
+                token.as_bytes(),
+                segment.as_bytes(),
+                |byte| *byte == b'*',
+                |byte, actual| *byte == b'?' || byte == actual,
+            )
+        },
     )
+}
+
+/// Wildcard matching by dynamic programming over `text` positions, so the cost
+/// is `O(pattern.len() * text.len())` steps with no backtracking. `is_star`
+/// tokens match any run of `text` items, including none; every other token
+/// consumes one item that `matches_one` accepts.
+fn wildcard_match<P, T>(
+    pattern: &[P],
+    text: &[T],
+    is_star: impl Fn(&P) -> bool,
+    matches_one: impl Fn(&P, &T) -> bool,
+) -> bool {
+    // previous[index] is true when the tokens seen so far match text[..index].
+    let mut previous = vec![false; text.len() + 1];
+    previous[0] = true;
+    for token in pattern {
+        let mut current = vec![false; text.len() + 1];
+        if is_star(token) {
+            current[0] = previous[0];
+            for index in 1..=text.len() {
+                current[index] = previous[index] || current[index - 1];
+            }
+        } else {
+            for index in 1..=text.len() {
+                current[index] = previous[index - 1] && matches_one(token, &text[index - 1]);
+            }
+        }
+        previous = current;
+    }
+    previous[text.len()]
 }

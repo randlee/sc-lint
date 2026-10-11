@@ -291,6 +291,34 @@ fn exclude_paths_handle_dense_segment_wildcards_without_backtracking() {
 }
 
 #[test]
+fn exclude_paths_handle_dense_double_star_segments_without_backtracking() {
+    let pattern = format!("{}x", "**/".repeat(32));
+    let directory = config_dir(&format!(
+        "[tool.sc-lint.analyzers.example]\nexclude_paths = [\"{pattern}\"]\n"
+    ));
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert!(!settings.path_excluded(&format!("{}y", "a/".repeat(64))));
+    assert!(settings.path_excluded(&format!("{}x", "a/".repeat(64))));
+}
+
+#[test]
+fn exclude_paths_keep_glob_semantics() {
+    let directory = config_dir(
+        "[tool.sc-lint.analyzers.example]\nexclude_paths = [\"crates/*/src/**/*.rs\", \"docs/?.md\"]\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert!(settings.path_excluded("crates/app/src/lib.rs"));
+    assert!(settings.path_excluded("crates/app/src/a/b/mod.rs"));
+    assert!(settings.path_excluded("docs/a.md"));
+    assert!(!settings.path_excluded("crates/app/tests/lib.rs"));
+    assert!(!settings.path_excluded("crates/app/src/lib.txt"));
+    assert!(!settings.path_excluded("docs/ab.md"));
+    assert!(!settings.path_excluded("crates/a/b/src/lib.rs"));
+}
+
+#[test]
 fn settings_from_document_matches_file_loading() {
     let text = "[tool.sc-lint.analyzers.example]\nexclude_paths = [\"tests/**\"]\n";
     let directory = config_dir(text);
