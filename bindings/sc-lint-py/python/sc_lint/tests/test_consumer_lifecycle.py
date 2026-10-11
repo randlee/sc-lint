@@ -142,6 +142,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
         *,
         layout: str = "nested",
         include_binary: bool = True,
+        flat_marker: bytes = b"",
+        nested_failure: bool = False,
     ) -> Path:
         binary_name = self.product_binary.name
         release_dir = root / "published" / f"v{VERSION}"
@@ -155,23 +157,39 @@ class ConsumerLifecycleTests(unittest.TestCase):
             triple, extension = "x86_64-unknown-linux-gnu", "tar.gz"
         archive = release_dir / f"sc-lint_{VERSION}_{triple}.{extension}"
         archive_root = f"sc-lint_{VERSION}_{triple}"
+        flat_binary = binary
+        if flat_marker:
+            flat_binary = root / f"{binary_name}.flat"
+            shutil.copy2(binary, flat_binary)
+            with flat_binary.open("ab") as fixture_binary:
+                fixture_binary.write(flat_marker)
+        nested_binary = binary
+        if nested_failure:
+            nested_binary = root / f"{binary_name}.nested"
+            if os.name == "nt":
+                nested_binary.write_bytes(b"nested bootstrap launcher selected")
+            else:
+                nested_binary.write_bytes(
+                    b"#!/bin/sh\nprintf '%s\\n' nested-bootstrap-launcher-selected >&2\nexit 1\n"
+                )
+                nested_binary.chmod(0o755)
         archive_entries = []
         if layout in ("nested", "both"):
-            archive_entries.append(f"{archive_root}/bin/{binary_name}")
+            archive_entries.append((nested_binary, f"{archive_root}/bin/{binary_name}"))
         if layout in ("flat", "both"):
-            archive_entries.append(binary_name)
+            archive_entries.append((flat_binary, binary_name))
         if extension == "zip":
             with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
                 if include_binary:
-                    for archive_entry in archive_entries:
-                        package.write(binary, arcname=archive_entry)
+                    for archive_binary, archive_entry in archive_entries:
+                        package.write(archive_binary, arcname=archive_entry)
                 else:
                     package.writestr(f"{archive_root}/missing-binary", "fixture")
         else:
             with tarfile.open(archive, "w:gz") as package:
                 if include_binary:
-                    for archive_entry in archive_entries:
-                        package.add(binary, arcname=archive_entry)
+                    for archive_binary, archive_entry in archive_entries:
+                        package.add(archive_binary, arcname=archive_entry)
                 else:
                     package.addfile(tarfile.TarInfo(f"{archive_root}/missing-binary"))
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -319,7 +337,11 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
 
     def assert_posix_managed_old_binary_self_upgrades_through_just_setup(
-        self, *, layout: str = "nested"
+        self,
+        *,
+        layout: str = "nested",
+        flat_marker: bytes = b"",
+        nested_failure: bool = False,
     ) -> None:
         temporary, release, consumer = self.make_release_fixture()
         with temporary:
@@ -329,7 +351,11 @@ class ConsumerLifecycleTests(unittest.TestCase):
             managed_binary = managed / self.product_binary.name
             self.write_old_probe(managed_binary)
             self.write_release_archive(
-                Path(temporary.name), release / self.product_binary.name, layout=layout
+                Path(temporary.name),
+                release / self.product_binary.name,
+                layout=layout,
+                flat_marker=flat_marker,
+                nested_failure=nested_failure,
             )
             just = shutil.which("just")
             self.assertIsNotNone(just, "just is required for this fixture")
@@ -355,6 +381,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+            if flat_marker:
+                self.assertTrue(managed_binary.read_bytes().endswith(flat_marker))
 
     @unittest.skipIf(os.name == "nt", "POSIX managed-binary replacement contract")
     def test_posix_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
@@ -366,10 +394,19 @@ class ConsumerLifecycleTests(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "POSIX flat archive selection")
     def test_posix_managed_old_binary_prefers_flat_when_both_layouts_exist(self) -> None:
-        self.assert_posix_managed_old_binary_self_upgrades_through_just_setup(layout="both")
+        self.assert_posix_managed_old_binary_self_upgrades_through_just_setup(
+            layout="both",
+            flat_marker=b"sc-lint-flat-layout-precedence",
+            nested_failure=True,
+        )
 
-    @unittest.skipUnless(os.name == "nt", "Windows managed-binary replacement contract")
-    def test_windows_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
+    def assert_windows_managed_old_binary_self_upgrades_through_just_setup(
+        self,
+        *,
+        layout: str = "nested",
+        flat_marker: bytes = b"",
+        nested_failure: bool = False,
+    ) -> None:
         temporary, release, consumer = self.make_release_fixture()
         with temporary:
             self.initialize_rust_consumer(release, consumer)
@@ -377,8 +414,12 @@ class ConsumerLifecycleTests(unittest.TestCase):
             managed.mkdir()
             managed_binary = managed / self.product_binary.name
             self.write_old_probe(managed_binary)
-            published = self.write_release_archive(
-                Path(temporary.name), release / self.product_binary.name
+            self.write_release_archive(
+                Path(temporary.name),
+                release / self.product_binary.name,
+                layout=layout,
+                flat_marker=flat_marker,
+                nested_failure=nested_failure,
             )
 
             environment = os.environ.copy()
@@ -406,37 +447,24 @@ class ConsumerLifecycleTests(unittest.TestCase):
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+            if flat_marker:
+                self.assertTrue(managed_binary.read_bytes().endswith(flat_marker))
+
+    @unittest.skipUnless(os.name == "nt", "Windows managed-binary replacement contract")
+    def test_windows_managed_old_binary_self_upgrades_through_just_setup(self) -> None:
+        self.assert_windows_managed_old_binary_self_upgrades_through_just_setup()
 
     @unittest.skipUnless(os.name == "nt", "Windows legacy archive compatibility")
     def test_windows_managed_old_binary_accepts_legacy_flat_archive(self) -> None:
-        temporary, release, consumer = self.make_release_fixture()
-        with temporary:
-            self.initialize_rust_consumer(release, consumer)
-            managed = Path(temporary.name) / "managed"
-            managed.mkdir()
-            managed_binary = managed / self.product_binary.name
-            self.write_old_probe(managed_binary)
-            self.write_release_archive(
-                Path(temporary.name), release / self.product_binary.name, layout="flat"
-            )
+        self.assert_windows_managed_old_binary_self_upgrades_through_just_setup(layout="flat")
 
-            environment = os.environ.copy()
-            environment.pop("SC_LINT_BIN", None)
-            environment["SC_LINT_INSTALL_DIR"] = str(managed)
-            command_dirs = []
-            for command in ("just", "pwsh", "curl"):
-                resolved = shutil.which(command)
-                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
-                command_dirs.append(str(Path(resolved).parent))
-            command_dirs.append(str(Path(sys.executable).parent))
-            environment["PATH"] = os.pathsep.join(command_dirs)
-
-            with self.release_server(Path(temporary.name)) as release_base:
-                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
-                result = self.run_command(["just", "setup"], cwd=consumer, environment=environment)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("verified sc-lint", result.stdout)
+    @unittest.skipUnless(os.name == "nt", "Windows flat archive selection")
+    def test_windows_managed_old_binary_prefers_flat_when_both_layouts_exist(self) -> None:
+        self.assert_windows_managed_old_binary_self_upgrades_through_just_setup(
+            layout="both",
+            flat_marker=b"sc-lint-flat-layout-precedence",
+            nested_failure=True,
+        )
 
     @unittest.skipUnless(os.name == "nt", "Windows malformed archive rejection")
     def test_windows_bootstrap_rejects_archive_without_executable(self) -> None:

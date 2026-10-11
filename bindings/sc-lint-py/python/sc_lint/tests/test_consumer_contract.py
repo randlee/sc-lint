@@ -112,6 +112,12 @@ class ConsumerContractTests(unittest.TestCase):
             'Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"',
             contents,
         )
+        self.assertLess(
+            contents.index('$candidate = Join-Path $extract "sc-lint.exe"'),
+            contents.index(
+                'Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"'
+            ),
+        )
 
     def test_posix_bootstrap_leaves_managed_activation_to_the_rust_installer(self) -> None:
         contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
