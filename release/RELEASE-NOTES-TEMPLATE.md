@@ -13,12 +13,13 @@ Briefly describe what changed in this release.
 
 ## Included Crates
 
-Do not hand-maintain this list. `release/publish-artifacts.toml` is the source of
-truth for the publish set; generate the list from it so it cannot drift:
+Do not hand-maintain this list. `release/sc-lint-release-checks.toml` is the
+product source of truth for the release package set; generate the list from it
+so it cannot drift:
 
 ```bash
 python3 scripts/release_artifacts.py list-artifacts \
-  --manifest release/publish-artifacts.toml \
+  --manifest release/sc-lint-release-checks.toml \
   --publishable-only | sed 's/^/- `/;s/$/`/'
 ```
 
