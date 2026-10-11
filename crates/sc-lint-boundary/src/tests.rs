@@ -3414,3 +3414,226 @@ fn non_reference_generic_trait_impl_remains_an_unqualified_method_candidate() {
         edge.kind == "references_expr" && edge.from == resolved.id && edge.to == method.id
     }));
 }
+
+fn configured(
+    root: &Path,
+    rule_filter: Option<&str>,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: root.to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        rule_filter,
+    )
+}
+
+/// `app` depends on `api`; neither record allows the edge, so the
+/// dependencies pass reports SCB-DEPENDENCY-001 and SCB-DEPENDENCY-002.
+fn undeclared_dependency_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "api", "../api", "0.1.0"),
+    );
+    fixture.write("crates/api/Cargo.toml", &good_member_manifest("api", ""));
+    fixture.write_member_boundary_record("app", &[], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &[], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+    fixture
+}
+
+fn cycle_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "pub struct Alpha { pub beta: Beta }\npub struct Beta { pub alpha: Alpha }\n",
+    );
+    fixture
+}
+
+#[test]
+fn disabled_table_reports_pass_without_findings() {
+    let fixture = undeclared_dependency_fixture();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            enabled = false
+            reason = "boundary policy adopted later"
+        "#,
+    );
+
+    let report = configured(fixture.root(), None).expect("disabled analyzer succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert_eq!(report.scanned_crates, 0);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn unknown_table_key_is_config_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            targets = ["linux"]
+        "#,
+    );
+
+    match configured(fixture.root(), None) {
+        Err(BoundaryError::AnalyzerConfig(error)) => {
+            assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_KEY");
+            assert_eq!(
+                error.to_string(),
+                "boundary: unknown key `targets` in [tool.sc-lint.analyzers.boundary]"
+            );
+        }
+        other => panic!("expected AnalyzerConfig, got {other:?}"),
+    }
+}
+
+#[test]
+fn unknown_rule_filter_is_selector_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+
+    match configured(fixture.root(), Some("SCB-NOPE-001")) {
+        Err(BoundaryError::AnalyzerConfig(error)) => {
+            assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
+            assert_eq!(
+                error.to_string(),
+                "boundary: unknown rule selector `SCB-NOPE-001`"
+            );
+        }
+        other => panic!("expected AnalyzerConfig, got {other:?}"),
+    }
+}
+
+#[test]
+fn rule_filter_selects_exactly_the_rule() {
+    let fixture = undeclared_dependency_fixture();
+
+    let all =
+        configured(fixture.root(), Some("dependencies")).expect("dependency analysis succeeds");
+    let mut all_ids: Vec<RuleId> = all.findings.iter().map(|finding| finding.rule_id).collect();
+    all_ids.sort();
+    assert_eq!(
+        all_ids,
+        vec![RuleId::ScbDependency001, RuleId::ScbDependency002]
+    );
+
+    let report = configured(fixture.root(), Some("SCB-DEPENDENCY-001"))
+        .expect("dependency analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+}
+
+#[test]
+fn rule_filter_family_keeps_existing_cycles_behaviour() {
+    let fixture = cycle_fixture();
+
+    let legacy = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .expect("legacy cycles analysis succeeds");
+    let report = configured(fixture.root(), Some("cycles")).expect("cycles family succeeds");
+
+    assert_eq!(report, legacy);
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbCycle001);
+}
+
+#[test]
+fn every_family_matches_its_legacy_rule_filter() {
+    let cycle = cycle_fixture();
+    let dependency = undeclared_dependency_fixture();
+    let pairs = [
+        (RuleFilter::Cycles, "cycles"),
+        (RuleFilter::Boundaries, "boundaries"),
+        (RuleFilter::InternalOnly, "internal-only"),
+        (RuleFilter::ForbidExternalImpls, "forbid-external-impls"),
+        (RuleFilter::Dependencies, "dependencies"),
+        (RuleFilter::Manifests, "manifests"),
+    ];
+    assert_eq!(pairs.len(), BOUNDARY_CATALOG.families.len());
+    for root in [cycle.root(), dependency.root()] {
+        for (filter, family) in pairs {
+            let legacy = analyze_workspace(&AnalyzeOptions {
+                root: root.to_path_buf(),
+                format: OutputFormat::Json,
+                rule: Some(filter),
+            })
+            .expect("legacy analysis succeeds");
+            assert_eq!(
+                configured(root, Some(family)).expect("family selector succeeds"),
+                legacy,
+                "{family}"
+            );
+        }
+    }
+}
+
+#[test]
+fn kebab_case_family_is_accepted() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+
+    let report = configured(fixture.root(), Some("forbid-external-impls"))
+        .expect("kebab-case family is a valid selector");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn exclude_paths_drops_manifest_findings() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+
+    let before = configured(fixture.root(), Some("manifests")).expect("manifest analysis succeeds");
+    assert_eq!(
+        finding_messages(&before),
+        vec!["crates/example/Cargo.toml: set [package].homepage.workspace = true".to_string()]
+    );
+    assert_eq!(
+        before.findings[0].owner_ids[0].as_str(),
+        "crates/example/Cargo.toml"
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            exclude_paths = ["crates/example/**"]
+        "#,
+    );
+    let report = configured(fixture.root(), Some("manifests")).expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}

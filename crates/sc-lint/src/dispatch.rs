@@ -54,6 +54,24 @@ impl BoundaryDispatchError {
                             "Check the boundary inventory and workspace sources, then rerun `sc-lint lint sc-boundary` for a focused failure report.",
                         )
                 }
+                BoundaryBackendError::AnalyzerConfig(ref config_error) => {
+                    let code = config_error.code();
+                    // A bad selector is a usage error (exit 2); every other
+                    // config error is a configuration error (exit 3).
+                    let err = if code == "ANALYZER_CONFIG.SELECTOR" {
+                        CliError::usage(format!("{tool} rejected --rule-filter"))
+                    } else {
+                        CliError::config(format!(
+                            "{tool} rejected [tool.sc-lint.analyzers.boundary]"
+                        ))
+                    };
+                    err.with_source(error)
+                        .with_detail(consts::FIELD_TOOL, json!(tool))
+                        .with_detail("analyzer_config_code", json!(code))
+                        .with_suggested_action(
+                            "Fix the [tool.sc-lint.analyzers.boundary] table or the rule selector named in the error, then rerun `sc-lint lint sc-boundary`.",
+                        )
+                }
             },
             Self::Serialize(error) => CliError::backend_protocol(format!(
                 "{tool} produced a report that could not be encoded as machine JSON"

@@ -1,13 +1,15 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
+use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_boundary::AnalyzeOptions;
+use sc_lint_boundary::BoundaryError;
 use sc_lint_boundary::ExportGraphOptions;
 use sc_lint_boundary::GraphOutputFormat;
-use sc_lint_boundary::RuleFilter;
-use sc_lint_boundary::analyze_workspace;
+use sc_lint_boundary::analyze_workspace_configured;
 use sc_lint_boundary::export_workspace_graph;
 use sc_lint_boundary::render_findings_report;
 use sc_lint_boundary::render_graph_export_json;
@@ -30,7 +32,9 @@ enum Command {
         #[arg(long, default_value = "text")]
         format: FormatArg,
         #[arg(long = "rule-filter", alias = "rule")]
-        rule_filter: Option<RuleFilterArg>,
+        rule_filter: Option<String>,
+        #[arg(long)]
+        config: Option<PathBuf>,
     },
     ExportGraph {
         #[arg(long, default_value = ".")]
@@ -52,16 +56,6 @@ enum GraphFormatArg {
     Turtle,
 }
 
-#[derive(Debug, Clone, clap::ValueEnum)]
-enum RuleFilterArg {
-    Cycles,
-    Boundaries,
-    InternalOnly,
-    ForbidExternalImpls,
-    Dependencies,
-    Manifests,
-}
-
 impl From<FormatArg> for OutputFormat {
     fn from(value: FormatArg) -> Self {
         match value {
@@ -80,20 +74,23 @@ impl From<GraphFormatArg> for GraphOutputFormat {
     }
 }
 
-impl From<RuleFilterArg> for RuleFilter {
-    fn from(value: RuleFilterArg) -> Self {
-        match value {
-            RuleFilterArg::Cycles => RuleFilter::Cycles,
-            RuleFilterArg::Boundaries => RuleFilter::Boundaries,
-            RuleFilterArg::InternalOnly => RuleFilter::InternalOnly,
-            RuleFilterArg::ForbidExternalImpls => RuleFilter::ForbidExternalImpls,
-            RuleFilterArg::Dependencies => RuleFilter::Dependencies,
-            RuleFilterArg::Manifests => RuleFilter::Manifests,
-        }
+fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> u8 {
+    match error {
+        AnalyzerConfigError::Selector { .. } => 2,
+        _ => 3,
     }
 }
 
-fn main() -> Result<()> {
+fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
+    match error {
+        AnalyzerConfigError::Selector { analyzer, selector } => {
+            format!("{analyzer}: unknown --rule-filter selector `{selector}`")
+        }
+        _ => error.to_string(),
+    }
+}
+
+fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -101,13 +98,25 @@ fn main() -> Result<()> {
             root,
             format,
             rule_filter,
+            config,
         } => {
             let options = AnalyzeOptions {
                 root,
                 format: format.clone().into(),
-                rule: rule_filter.map(Into::into),
+                rule: None,
             };
-            let report = analyze_workspace(&options)?;
+            let report = match analyze_workspace_configured(
+                &options,
+                config.as_deref(),
+                rule_filter.as_deref(),
+            ) {
+                Ok(report) => report,
+                Err(BoundaryError::AnalyzerConfig(error)) => {
+                    eprintln!("error: {}", analyzer_config_message(&error));
+                    return Ok(ExitCode::from(analyzer_config_exit_code(&error)));
+                }
+                Err(error) => return Err(error.into()),
+            };
             match OutputFormat::from(format) {
                 OutputFormat::Text => {
                     println!("{}", render_findings_report(&report));
@@ -130,5 +139,35 @@ fn main() -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analyzer_config_exit_codes_are_cli_owned() {
+        assert_eq!(
+            analyzer_config_exit_code(&AnalyzerConfigError::Selector {
+                analyzer: "boundary",
+                selector: "SCB-NOPE-001".to_owned(),
+            }),
+            2
+        );
+        assert_eq!(
+            analyzer_config_exit_code(&AnalyzerConfigError::UnknownKey {
+                analyzer: "boundary",
+                key: "targets".to_owned(),
+            }),
+            3
+        );
+        assert_eq!(
+            analyzer_config_message(&AnalyzerConfigError::Selector {
+                analyzer: "boundary",
+                selector: "SCB-NOPE-001".to_owned(),
+            }),
+            "boundary: unknown --rule-filter selector `SCB-NOPE-001`"
+        );
+    }
 }

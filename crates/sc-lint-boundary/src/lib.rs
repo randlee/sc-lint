@@ -10,6 +10,10 @@ use anyhow as anyhow_crate;
 use anyhow::Context;
 use anyhow::Result;
 use quote::ToTokens;
+use sc_lint_analyzer_support::AnalyzerName;
+use sc_lint_analyzer_support::CatalogRuleId;
+use sc_lint_analyzer_support::RuleCatalog;
+use sc_lint_analyzer_support::load_analyzer_settings;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
 pub use sc_lint_schema::CrateId;
@@ -80,6 +84,8 @@ pub enum BoundaryError {
         #[source]
         source: BoundaryErrorSource,
     },
+    #[error(transparent)]
+    AnalyzerConfig(#[from] sc_lint_analyzer_support::AnalyzerConfigError),
 }
 
 impl BoundaryError {
@@ -259,6 +265,95 @@ impl TryFrom<&str> for RuleFilter {
             "manifests" => Ok(Self::Manifests),
             other => Err(RuleFilterParseError::new(other)),
         }
+    }
+}
+
+const fn rule(id: RuleId) -> CatalogRuleId {
+    CatalogRuleId::new(id.as_str())
+}
+
+pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
+    rule(RuleId::ScbCycle001),
+    rule(RuleId::ScbCycle002),
+    rule(RuleId::ScbCycle003),
+    rule(RuleId::ScbBoundary001),
+    rule(RuleId::ScbBoundary002),
+    rule(RuleId::ScbBoundary003),
+    rule(RuleId::ScbCaller001),
+    rule(RuleId::ScbDependency001),
+    rule(RuleId::ScbDependency002),
+    rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbManifest001),
+    rule(RuleId::ScbManifest002),
+];
+
+/// Every id except SCB-CYCLE-002/003: the set `analysis::finding_is_failure` fails on.
+pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
+    rule(RuleId::ScbCycle001),
+    rule(RuleId::ScbBoundary001),
+    rule(RuleId::ScbBoundary002),
+    rule(RuleId::ScbBoundary003),
+    rule(RuleId::ScbCaller001),
+    rule(RuleId::ScbDependency001),
+    rule(RuleId::ScbDependency002),
+    rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbManifest001),
+    rule(RuleId::ScbManifest002),
+];
+
+/// Families keep today's CLI spellings (kebab-case, as clap rendered the old
+/// `RuleFilterArg`); members are what each `RuleFilter` arm runs.
+pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
+    analyzer: AnalyzerName::new("boundary"),
+    rules: ALL_BOUNDARY_IDS,
+    families: &[
+        (
+            "cycles",
+            &[
+                rule(RuleId::ScbCycle001),
+                rule(RuleId::ScbCycle002),
+                rule(RuleId::ScbCycle003),
+            ],
+        ),
+        (
+            "boundaries",
+            &[
+                rule(RuleId::ScbBoundary001),
+                rule(RuleId::ScbBoundary002),
+                rule(RuleId::ScbBoundary003),
+                rule(RuleId::ScbCaller001),
+            ],
+        ),
+        (
+            "internal-only",
+            &[rule(RuleId::ScbBoundary001), rule(RuleId::ScbBoundary002)],
+        ),
+        ("forbid-external-impls", &[rule(RuleId::ScbBoundary003)]),
+        (
+            "dependencies",
+            &[
+                rule(RuleId::ScbDependency001),
+                rule(RuleId::ScbDependency002),
+                rule(RuleId::ScbDependency003),
+            ],
+        ),
+        (
+            "manifests",
+            &[rule(RuleId::ScbManifest001), rule(RuleId::ScbManifest002)],
+        ),
+    ],
+    default_fail: DEFAULT_FAIL_IDS,
+    own_keys: &[],
+};
+
+fn disabled_report() -> FindingsReport {
+    FindingsReport {
+        tool: SC_LINT_BOUNDARY_TOOL,
+        version: SC_LINT_BOUNDARY_VERSION,
+        schema_version: SC_LINT_SCHEMA_VERSION,
+        status: ReportStatus::Pass,
+        scanned_crates: 0,
+        findings: Vec::new(),
     }
 }
 
@@ -609,6 +704,40 @@ fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsRep
         scanned_crates,
         findings,
     }
+}
+
+/// Reads `[tool.sc-lint.analyzers.boundary]` and `--rule-filter` (rule ids or
+/// family names), then runs the full analysis and keeps the selected rules.
+pub fn analyze_workspace_configured(
+    options: &AnalyzeOptions,
+    config: Option<&Path>,
+    rule_filter: Option<&str>,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    let settings = load_analyzer_settings(&BOUNDARY_CATALOG, &options.root, config, rule_filter)?;
+    if !settings.enabled {
+        return Ok(disabled_report());
+    }
+    // Selection has one mechanism: the full analysis runs, and `settings.apply`
+    // keeps the selected rule ids. `options.rule` stays for library callers.
+    let mut report = analyze_workspace(options)?;
+    let findings: Vec<Finding> = std::mem::take(&mut report.findings)
+        .into_iter()
+        .filter(|finding| {
+            // Only manifest findings carry a path: their first owner id is the
+            // repo-relative manifest path.
+            !(matches!(
+                finding.rule_id,
+                RuleId::ScbManifest001 | RuleId::ScbManifest002
+            ) && finding
+                .owner_ids
+                .first()
+                .is_some_and(|owner| settings.path_excluded(owner.as_str())))
+        })
+        .collect();
+    let (findings, status) = settings.apply(findings, |rule| rule.as_str());
+    report.findings = findings;
+    report.status = status;
+    Ok(report)
 }
 
 pub fn export_workspace_graph(
