@@ -1455,7 +1455,7 @@ fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
     fixture.write_source("example", "lib.rs", "pub fn example() {}\n");
-    let mock_backend = MockBackend::install(
+    let mock_backend = MockBackend::install_native(
         tool,
         &json!({
             "tool": tool,
@@ -2315,6 +2315,40 @@ impl MockBackend {
         std::fs::write(&script_path, script).expect("mock backend script");
         set_mock_backend_permissions(&script_path);
 
+        Self::with_path(tempdir, script_path)
+    }
+
+    fn install_native(tool: &str, payload: &Value) -> Self {
+        let tempdir = TempDir::new().expect("temp dir");
+        let source_path = tempdir.path().join("mock_backend.rs");
+        let executable_name = if cfg!(windows) {
+            format!("{tool}.exe")
+        } else {
+            tool.to_string()
+        };
+        let executable_path = tempdir.path().join(executable_name);
+        let source = format!(
+            "fn main() {{ use std::io::Write; std::io::stdout().write_all(&{:?}).unwrap(); }}\n",
+            payload.to_string().as_bytes()
+        );
+        fs::write(&source_path, source).expect("mock backend Rust source");
+        let compilation = ProcessCommand::new("rustc")
+            .args(["--edition=2024"])
+            .arg(&source_path)
+            .arg("-o")
+            .arg(&executable_path)
+            .output()
+            .expect("compile native mock backend");
+        assert!(
+            compilation.status.success(),
+            "native mock backend compilation failed: {}",
+            String::from_utf8_lossy(&compilation.stderr)
+        );
+
+        Self::with_path(tempdir, executable_path)
+    }
+
+    fn with_path(tempdir: TempDir, executable: PathBuf) -> Self {
         let original_path = std::env::var_os("PATH");
         let updated_path = std::env::join_paths(
             std::iter::once(tempdir.path().to_path_buf()).chain(
@@ -2332,7 +2366,7 @@ impl MockBackend {
 
         Self {
             _tempdir: tempdir,
-            executable: script_path,
+            executable,
             original_path,
         }
     }
