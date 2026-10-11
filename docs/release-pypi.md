@@ -11,15 +11,15 @@ repository; the maintainer provisions them in GitHub.
 
 | Stage | Where | Notes |
 |---|---|---|
-| Rehearsal | `release-preflight.yml` job `testpypi-rehearsal` | Builds the Linux wheel and sdist, uploads to TestPyPI with `--skip-existing`. Environment `testpypi`, secret `TEST_PYPI_TOKEN`. |
-| Build | `release.yml` job `build-python-wheels` | Wheels for linux x86_64, macOS x86_64 and arm64, Windows x86_64 (sdist from linux). Each job installs the built wheel and checks `sc_lint.__version__` equals the release version. |
-| Upload | `release.yml` job `publish-pypi` | Needs `release`, which needs `publish-crates`, so PyPI follows crates.io and the GitHub Release. Environment `pypi`, secret `PYPI_TOKEN`; `maturin upload --skip-existing`. |
-| Recovery | `pypi-publish.yml` (`workflow_dispatch`) | Downloads the wheels and sdist attached to an already published GitHub Release and uploads them. Never rebuilds or re-tags. |
+| Rehearsal | `release.yml` job `publish-testpypi` when dispatch input `target` is `testpypi` | Uploads the configured Python distributions to TestPyPI with `--skip-existing`. Environment `testpypi`; the channel contract names the credential `TEST_PYPI_API_TOKEN`. |
+| Build | `release.yml` jobs `build-python-wheels` and `build-python-sdists` | Builds the manifest-declared wheels and sdist; wheel jobs verify `sc_lint.__version__` against the release version. |
+| Upload | `pypi-publish.yml` workflow (`workflow_dispatch`), job `publish`, with target `production` | Uploads verified wheels and sdist from an already published GitHub Release. Environment `pypi`; the channel contract names the credential `PYPI_API_TOKEN`. The workflow selects maturin or twine from the manifest. |
+| Recovery | Re-run `pypi-publish.yml` with the same tag and target | Reuses the immutable GitHub Release assets. It never rebuilds or re-tags. |
 
 ## Linux compatibility floor
 
 The Linux wheel is built with `maturin --compatibility manylinux2014 --zig`
-in both `release.yml` and `release-preflight.yml`, so it is tagged
+in `release.yml`, so it is tagged
 `manylinux_2_17_x86_64.manylinux2014_x86_64` and needs glibc 2.17 or newer
 (Ubuntu 20.04+, Debian 11+, RHEL/Rocky 8+). Building on the bare
 `ubuntu-latest` image would tag the wheel with that image's glibc
@@ -27,15 +27,16 @@ in both `release.yml` and `release-preflight.yml`, so it is tagged
 macOS and Windows wheels use maturin's defaults.
 
 The distribution list comes from `[[python_distributions]]` in
-`release/publish-artifacts.toml`.
+`release/publish-artifacts.toml`. The standard PyPI environments and secret
+names come from `release/publish-channel-contracts.toml`.
 
 ## Required GitHub configuration
 
 Create two environments (Settings > Environments):
 
-- `testpypi` with secret `TEST_PYPI_TOKEN` (a TestPyPI API token).
-- `pypi` with secret `PYPI_TOKEN` (a PyPI API token). Add required reviewers
-  to this environment so a production upload needs approval.
+- `testpypi` with secret `TEST_PYPI_API_TOKEN` (a TestPyPI API token).
+- `pypi` with secret `PYPI_API_TOKEN` (a PyPI API token). Add required
+  reviewers to this environment so a production upload needs approval.
 
 Do not store tokens in repository secrets or files.
 
@@ -59,15 +60,20 @@ the uploading account.
    account-scoped. After the first upload, replace each with a token scoped to
    the `sc-lint` project and revoke the account-scoped one.
 2. Add the environments and secrets above.
-3. Run `Release Preflight` via `workflow_dispatch`; confirm
-   `testpypi-rehearsal` uploads and `pip install --index-url
+3. Run the `Release Preflight` workflow via `workflow_dispatch` for `0.7.0`
+   and confirm its preflight checks pass.
+4. Run the `Release` workflow via `workflow_dispatch` with `target=testpypi`;
+   confirm `publish-testpypi` uploads and
+   `pip install --index-url
    https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/
    sc-lint==0.7.0` works in a clean venv (the extra index supplies
    `codespell`).
-4. Run the production `Release` workflow for `0.7.0`. After `publish-pypi`
-   succeeds, verify `pip install sc-lint==0.7.0` in a clean venv and that
+5. Run the `Release` workflow for `0.7.0` with `target=production`.
+   After the GitHub Release is published, run `Publish PyPI` via
+   `workflow_dispatch` with tag `v0.7.0` and target `production`. Verify
+   `pip install sc-lint==0.7.0` in a clean venv and that
    `python -c "import sc_lint; print(sc_lint.__version__)"` prints `0.7.0`.
-5. PyPI files are immutable: a bad upload needs a new version, not a re-upload.
+6. PyPI files are immutable: a bad upload needs a new version, not a re-upload.
 
 ## Re-running a failed upload
 

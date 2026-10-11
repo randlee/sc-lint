@@ -588,8 +588,8 @@ parallel release inventory. The intended supported install surface is:
 
 Architecture consequences:
 
-- the `update-homebrew` workflow may use a secondary `homebrew-tap/` checkout
-  to rewrite tap-local formula files
+- the `homebrew-publish.yml` workflow's `update-tap` job uses a secondary
+  `homebrew-tap/` checkout to rewrite tap-local formula files
 - the top-level `sc-lint` formula is the primary supported Homebrew surface
   for normal users
 - backend binaries included in the release manifest should be installed from
