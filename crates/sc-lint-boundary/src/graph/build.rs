@@ -928,12 +928,11 @@ fn workspace_dependency_roots(
         else {
             continue;
         };
-        let Some(library_target) = workspace_package.targets.iter().find(|target| {
-            target
-                .kind
-                .iter()
-                .any(|kind| matches!(kind, cargo_metadata::TargetKind::Lib))
-        }) else {
+        let Some(library_target) = workspace_package
+            .targets
+            .iter()
+            .find(|target| crate::is_library_target(target))
+        else {
             continue;
         };
         let dependency_root = dependency

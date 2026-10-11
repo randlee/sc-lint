@@ -153,7 +153,7 @@ pub(crate) fn validate_owner_crate_paths(
     inventory: &BoundaryInventory,
     metadata: &cargo_metadata::Metadata,
 ) -> Result<()> {
-    let workspace_packages = metadata.workspace_packages();
+    let workspace_packages = crate::workspace_packages(metadata);
     for record in &inventory.records {
         let Some(package) = workspace_packages
             .iter()
