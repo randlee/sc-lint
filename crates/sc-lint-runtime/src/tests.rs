@@ -292,7 +292,7 @@ fn unknown_table_key_is_config_error() {
         panic!("expected an analyzer config error");
     };
 
-    assert_eq!(error.exit_code(), 3);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_KEY");
     assert_eq!(
         error.to_string(),
         "runtime: unknown key `targets` in [tool.sc-lint.analyzers.runtime]"
@@ -312,7 +312,7 @@ fn rule_filter_selects_exactly_the_rule() {
 }
 
 #[test]
-fn unknown_rule_filter_is_exit_2() {
+fn unknown_rule_filter_is_a_selector_error() {
     let fixture = runtime_fixture(None);
 
     let Err(RuntimeError::AnalyzerConfig(error)) =
@@ -321,7 +321,7 @@ fn unknown_rule_filter_is_exit_2() {
         panic!("expected an analyzer config error");
     };
 
-    assert_eq!(error.exit_code(), 2);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
 }
 
 #[test]

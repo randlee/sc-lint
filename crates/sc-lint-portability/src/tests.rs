@@ -209,7 +209,7 @@ fn unknown_table_key_is_config_error() {
         panic!("expected analyzer config error");
     };
 
-    assert_eq!(error.exit_code(), 3);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_KEY");
     assert!(error.to_string().contains("unknown"));
 }
 
@@ -229,12 +229,12 @@ fn wrong_prefix_type_is_config_error() {
         panic!("expected analyzer config error");
     };
 
-    assert_eq!(error.exit_code(), 3);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
     assert!(error.to_string().contains("unix_path_prefixes"));
 }
 
 #[test]
-fn unknown_rule_filter_is_exit_2() {
+fn unknown_rule_filter_is_a_selector_error() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -250,7 +250,7 @@ fn unknown_rule_filter_is_exit_2() {
         panic!("expected analyzer config error");
     };
 
-    assert_eq!(error.exit_code(), 2);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn empty_unix_path_prefix_is_config_error() {
         panic!("expected an analyzer config error");
     };
 
-    assert_eq!(error.exit_code(), 3);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
     assert_eq!(
         error.to_string(),
         "portability: `unix_path_prefixes` in [tool.sc-lint.analyzers.portability] must be an array of non-empty strings starting with `/`"
@@ -342,7 +342,7 @@ fn relative_unix_path_prefix_is_config_error() {
         panic!("expected an analyzer config error");
     };
 
-    assert_eq!(error.exit_code(), 3);
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
     assert_eq!(
         error.to_string(),
         "portability: `unix_path_prefixes` in [tool.sc-lint.analyzers.portability] must be an array of non-empty strings starting with `/`"

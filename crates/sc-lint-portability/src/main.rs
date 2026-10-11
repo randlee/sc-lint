@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
+use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_portability::AnalyzeOptions;
 use sc_lint_portability::analyze_workspace_configured;
 use sc_lint_portability::render_findings_report;
@@ -47,6 +47,13 @@ impl From<FormatArg> for OutputFormat {
     }
 }
 
+fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> u8 {
+    match error {
+        AnalyzerConfigError::Selector { .. } => 2,
+        _ => 3,
+    }
+}
+
 fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
@@ -69,9 +76,7 @@ fn main() -> Result<ExitCode> {
                 Ok(report) => report,
                 Err(sc_lint_portability::PortabilityError::AnalyzerConfig(error)) => {
                     eprintln!("error: {error}");
-                    let exit_code = u8::try_from(error.exit_code())
-                        .context("analyzer config exit code does not fit in u8")?;
-                    return Ok(ExitCode::from(exit_code));
+                    return Ok(ExitCode::from(analyzer_config_exit_code(&error)));
                 }
                 Err(error) => return Err(error.into()),
             };
@@ -83,4 +88,27 @@ fn main() -> Result<ExitCode> {
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analyzer_config_exit_codes_are_cli_owned() {
+        assert_eq!(
+            analyzer_config_exit_code(&AnalyzerConfigError::Selector {
+                analyzer: "portability",
+                selector: "PORT-999".to_owned(),
+            }),
+            2
+        );
+        assert_eq!(
+            analyzer_config_exit_code(&AnalyzerConfigError::UnknownKey {
+                analyzer: "portability",
+                key: "unknown".to_owned(),
+            }),
+            3
+        );
+    }
 }

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
+use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_runtime::AnalyzeOptions;
 use sc_lint_runtime::RuntimeError;
 use sc_lint_runtime::analyze_workspace_configured;
@@ -46,6 +47,13 @@ impl From<FormatArg> for OutputFormat {
     }
 }
 
+fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> i32 {
+    match error {
+        AnalyzerConfigError::Selector { .. } => 2,
+        _ => 3,
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -68,7 +76,7 @@ fn main() -> Result<()> {
                 Ok(report) => report,
                 Err(RuntimeError::AnalyzerConfig(error)) => {
                     eprintln!("error: {error}");
-                    std::process::exit(error.exit_code());
+                    std::process::exit(analyzer_config_exit_code(&error));
                 }
                 Err(error) => return Err(error.into()),
             };
@@ -80,4 +88,27 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analyzer_config_exit_codes_are_cli_owned() {
+        assert_eq!(
+            analyzer_config_exit_code(&AnalyzerConfigError::Selector {
+                analyzer: "runtime",
+                selector: "SCB-RUNTIME-999".to_owned(),
+            }),
+            2
+        );
+        assert_eq!(
+            analyzer_config_exit_code(&AnalyzerConfigError::UnknownKey {
+                analyzer: "runtime",
+                key: "unknown".to_owned(),
+            }),
+            3
+        );
+    }
 }
