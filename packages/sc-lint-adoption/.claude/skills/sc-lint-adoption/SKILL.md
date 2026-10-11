@@ -134,8 +134,9 @@ drift remains, include the new dry-run output instead of claiming convergence.
 
 ## How to extend
 
-- **Analyzers:** add `[tool.sc-lint.analyzers.<name>]` entries with `enabled`,
-  `reason`, target facts, and analyzer-specific settings.
+- **Analyzers:** set `analyzers.<name>` in `install.json`; the kit renders it as
+  `[tool.sc-lint.analyzers.<name>]`. The keys are listed in `configuration.md`,
+  "Analyzer tables"; any other key fails the install.
 - **Test layers:** declare ordered `[tool.sc-lint.test.<layer>]` lists. `unit`
   is the default; `just test <layer> *args` passes through and `just test all`
   follows declared order.

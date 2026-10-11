@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -272,7 +273,42 @@ def test_analyzer_worked_example_is_declarative() -> None:
     config = (consumer / "sc-lint.toml").read_text()
     assert 'reason = "no async runtime"' in config
     assert '"linux"' in config
+    assert "[tool.sc-lint.analyzers.runtime]\nenabled = false" in config
     assert 'name = "unit"' in config and 'name = "integrate"' in config
+
+
+def test_unknown_analyzer_key_is_rejected(tmp_path: Path) -> None:
+    data = json.loads((FIXTURES / "install.json").read_text())
+    data["analyzers"]["portability"]["severity"] = "warn"
+    (tmp_path / "in.json").write_text(json.dumps(data))
+    result = run("--input", str(tmp_path / "in.json"), str(copy_fixture("empty-workspace")))
+    assert result.returncode == 2
+    assert result.stderr == "conflict: analyzers.portability has unknown fields: ['severity']\n"
+
+
+def test_portability_keys_render_into_own_table(tmp_path: Path) -> None:
+    data = json.loads((FIXTURES / "install.json").read_text())
+    data["analyzers"]["portability"] = {"unix_path_prefixes": ["/opt/"], "fail_rules": ["PORT-001"]}
+    (tmp_path / "in.json").write_text(json.dumps(data))
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(tmp_path / "in.json"), str(consumer)).returncode == 0
+    assert '[tool.sc-lint.analyzers.portability]\nunix_path_prefixes = ["/opt/"]\nfail_rules = ["PORT-001"]' in (
+        consumer / "sc-lint.toml"
+    ).read_text()
+
+
+def test_schema_analyzer_keys_match_rust_catalogs() -> None:
+    schema = json.loads((KIT / "install.schema.json").read_text())
+    tables = schema["properties"]["analyzers"]["properties"]
+    common = {"enabled", "reason", "exclude_rules", "fail_rules", "exclude_paths"}
+    for name, crate in [
+        ("boundary", "sc-lint-boundary"),
+        ("portability", "sc-lint-portability"),
+        ("runtime", "sc-lint-runtime"),
+    ]:
+        source = (ROOT / "crates" / crate / "src" / "lib.rs").read_text()
+        own = set(re.findall(r'"([a-z_]+)"', re.search(r"own_keys: &\[([^\]]*)\]", source).group(1)))
+        assert set(tables[name]["properties"]) == common | own, name
 
 
 def test_analyzer_worked_example_runs_all_declared_just_layers() -> None:

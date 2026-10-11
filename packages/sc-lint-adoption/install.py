@@ -76,7 +76,10 @@ def toml_value(value: object) -> str:
 
 
 def render(template: Path, data: dict) -> str:
-    analyzers = "\n".join(f"{name} = {toml_value(value)}" for name, value in data["analyzers"].items())
+    analyzers = "\n\n".join(
+        f"[tool.sc-lint.analyzers.{name}]\n" + "\n".join(f"{key} = {toml_value(item)}" for key, item in value.items())
+        for name, value in data["analyzers"].items()
+    )
     profiles = "\n\n".join(f'[[tool.sc-lint.lint]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data["profiles"].items())
     layers = "\n\n".join(f'[[tool.sc-lint.test]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data.get("test", {}).items())
     runners = [ {"linux":"ubuntu-latest", "macos":"macos-latest", "windows":"windows-latest"}.get(item, item) for item in data["ci"]["os"] ]
