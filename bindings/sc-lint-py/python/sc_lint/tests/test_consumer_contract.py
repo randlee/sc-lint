@@ -72,6 +72,11 @@ class ConsumerContractTests(unittest.TestCase):
         self.assertIn("run: just setup", workflow)
         self.assertIn("run: just test", workflow)
         self.assertNotIn("run: cargo test --verbose", workflow)
+        self.assertIn("wheel-runtime:", workflow)
+        self.assertIn('python: ["3.11", "3.14"]', workflow)
+        self.assertIn("github.base_ref == 'develop'", workflow)
+        self.assertIn("github.base_ref == 'main'", workflow)
+        self.assertIn("sc_lint.run", workflow)
 
     def test_windows_companion_is_a_managed_part_of_the_model_contract(self) -> None:
         # This is a content guard; the PowerShell integration path is not run here.

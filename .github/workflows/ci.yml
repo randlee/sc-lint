@@ -129,6 +129,53 @@ jobs:
       - name: Run adoption kit integration tests
         run: just test-adoption-integration
 
+  wheel-runtime:
+    if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
+    name: Wheel runtime (Python ${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Build the sc_lint wheel and its dependencies for offline install
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet maturin==1.9.4
+          python -m pip wheel --wheel-dir "${RUNNER_TEMP}/wheels" bindings/sc-lint-py
+
+      - name: Install and exercise the built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="${RUNNER_TEMP}/wheel-runtime"
+          python -m venv "${runtime}"
+          py="${runtime}/bin/python"
+          "${py}" -m pip install --quiet --disable-pip-version-check --no-index --find-links "${RUNNER_TEMP}/wheels" sc-lint
+          "${py}" -m pip check
+          cd "${RUNNER_TEMP}"
+          "${py}" - <<'PY'
+          import json
+          import sc_lint
+
+          assert sc_lint.__version__ != "0.0.0+source"
+          assert json.loads(sc_lint.version_json())["version"] == sc_lint.__version__
+          assert sc_lint.run(["sc-lint", "version", "--json"]) == 0
+          PY
+
   release-smoke:
     # Exercise the pinned publish-kit archive layout from publish-artifacts.toml:
     # a version/target root with binaries in bin/ and bundled_paths at their
