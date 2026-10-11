@@ -322,17 +322,20 @@ class SprintReportTests(unittest.TestCase):
             {'id': 'minor', 'priority': 4, 'metadata': {'layer': 3, 'difficulty': 'fast'}},
             {'id': 'blocking', 'priority': 1, 'metadata': {'layer': 2, 'severity': 'blocking', 'difficulty': 'hard'}},
             {'id': 'unknown', 'priority': 2, 'metadata': {'layer': 1}},
-        ], [{'identity': 'luna', 'model': 'gpt-6-luna'}, {'identity': 'astra', 'model': 'gpt-6-astra'}], set())
+        ], [{'identity': 'luna', 'model': 'gpt-6-luna', 'agent_type': 'dev'},
+            {'identity': 'astra', 'model': 'gpt-6-astra', 'agent_type': 'dev'}], set())
         self.assertEqual([row['id'] for row in rows], ['blocking', 'unknown', 'minor'])
         self.assertEqual(rows[0]['agents'], 'astra')
         self.assertEqual(rows[1]['agents'], 'UNCLASSIFIED')
         self.assertIn('UNCLASSIFIED', report.render_dispatch(rows))
 
-    def test_dispatch_fixture_matches_three_model_classes_and_waits(self):
+    def test_dispatch_recommends_dev_members_at_the_tier_then_one_up(self):
         members = [
-            {'identity': 'luna', 'model': 'gpt-6-luna'},
-            {'identity': 'terra', 'model': 'gpt-6-terra'},
-            {'identity': 'astra', 'model': 'gpt-6-astra'},
+            {'identity': 'luna', 'model': 'gpt-6-luna', 'agent_type': 'dev'},
+            {'identity': 'terra', 'model': 'gpt-6-terra', 'agent_type': 'dev'},
+            {'identity': 'astra', 'model': 'gpt-6-astra', 'agent_type': 'dev'},
+            {'identity': 'publisher', 'model': 'claude-opus-5-5', 'agent_type': 'publisher'},
+            {'identity': 'sanity', 'model': 'luna', 'agent_type': 'worker'},
         ]
         ready = [
             {'id': 'normal', 'priority': 2, 'metadata': {'layer': 2, 'difficulty': 'normal'}},
@@ -341,9 +344,12 @@ class SprintReportTests(unittest.TestCase):
         ]
         rows = report.dispatch_rows(ready, members, set())
         self.assertEqual([row['id'] for row in rows], ['hard', 'normal', 'fast'])
-        self.assertEqual([row['agents'] for row in rows], ['astra', 'terra', 'luna'])
-        hard_wait = report.dispatch_rows([ready[2]], members[:1], set())
-        self.assertEqual(hard_wait[0]['agents'], 'WAIT')
+        self.assertEqual([row['agents'] for row in rows], ['astra', 'terra', 'luna'])   # non-dev types never listed
+        busy_fast = report.dispatch_rows([ready[1]], members, {'luna'})
+        self.assertEqual(busy_fast[0]['agents'], 'terra')                             # one tier up when none is idle
+        self.assertEqual(report.dispatch_rows([ready[1]], members, {'luna', 'terra'})[0]['agents'], 'WAIT')  # never two up
+        self.assertEqual(report.dispatch_rows([ready[2]], members[:1], set())[0]['agents'], 'WAIT')
+        self.assertIn('no roster member has type dev', report.render_dispatch(rows, members[3:]))
 
 
 if __name__ == '__main__':

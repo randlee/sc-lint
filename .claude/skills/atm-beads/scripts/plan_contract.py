@@ -49,6 +49,12 @@ POLICY_KEYS: tuple[str, ...] = ("human_gates", "waivers")
 WAIVABLE_CHECKS: tuple[str, ...] = ("reopened_after_pass", "started_before_blocker", "pass_without_qa")
 
 
+def difficulty_tiers(difficulty: str) -> tuple[str, ...]:
+    """The difficulty, then the one tier above it: difficulty is a minimum, never far out of line."""
+    order = ("fast", "normal", "hard")
+    return order[order.index(difficulty):order.index(difficulty) + 2] if difficulty in order else ()
+
+
 def model_matches(model: str | None, difficulty: str) -> bool:
     """True when a roster model string may take work of the given difficulty."""
     if not model or difficulty not in DIFFICULTY_MODELS:
