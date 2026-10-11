@@ -105,6 +105,7 @@ struct BuiltInDefaults {
 struct PortabilityConfig {
     config_home_env: Option<String>,
     unix_path_prefixes: Vec<String>,
+    configured_unix_path_prefixes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -122,7 +123,7 @@ impl AnalyzerPortabilityKeys {
             key: key.to_string(),
             expected,
         };
-        let strings = |key: &str| match settings.own.get(key) {
+        let strings = |key: &str| match settings.own_value(key) {
             None => Ok(Vec::new()),
             Some(toml::Value::Array(items)) => items
                 .iter()
@@ -131,15 +132,25 @@ impl AnalyzerPortabilityKeys {
                 .ok_or_else(|| wrong_type(key, "an array of strings")),
             Some(_) => Err(wrong_type(key, "an array of strings")),
         };
-        let config_home_env = match settings.own.get("config_home_env") {
+        let config_home_env = match settings.own_value("config_home_env") {
             None => None,
             Some(toml::Value::String(value)) => Some(value.clone()),
             Some(_) => return Err(wrong_type("config_home_env", "a string")),
         };
         strings("targets")?;
+        let unix_path_prefixes = strings("unix_path_prefixes")?;
+        if unix_path_prefixes
+            .iter()
+            .any(|prefix| prefix.is_empty() || !prefix.starts_with('/'))
+        {
+            return Err(wrong_type(
+                "unix_path_prefixes",
+                "an array of non-empty strings starting with `/`",
+            ));
+        }
         Ok(Self {
             config_home_env,
-            unix_path_prefixes: strings("unix_path_prefixes")?,
+            unix_path_prefixes,
         })
     }
 }
@@ -962,7 +973,7 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
                 self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
             } else if self
                 .config
-                .unix_path_prefixes
+                .configured_unix_path_prefixes
                 .iter()
                 .any(|prefix| lit.value().starts_with(prefix))
             {
@@ -1019,5 +1030,6 @@ fn load_portability_config(
             .into_iter()
             .chain(analyzer_keys.unix_path_prefixes.iter().cloned())
             .collect(),
+        configured_unix_path_prefixes: analyzer_keys.unix_path_prefixes.clone(),
     })
 }
