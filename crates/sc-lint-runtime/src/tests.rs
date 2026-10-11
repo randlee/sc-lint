@@ -358,7 +358,14 @@ fn catalog_lists_every_rule_id() {
             ScbRuntime001 | ScbRuntime002 => {}
         }
     }
-    assert_eq!(RUNTIME_CATALOG.rules, every.map(RuleId::as_str));
+    assert_eq!(
+        RUNTIME_CATALOG
+            .rules
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>(),
+        every.map(RuleId::as_str).to_vec()
+    );
 }
 
 #[test]

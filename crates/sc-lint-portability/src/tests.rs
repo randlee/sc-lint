@@ -1583,7 +1583,13 @@ fn catalog_lists_every_rule_id() {
             | Port009 | Port010 => {}
         }
     }
-    assert_eq!(ALL_PORT_IDS, every.map(RuleId::as_str));
+    assert_eq!(
+        ALL_PORT_IDS
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>(),
+        every.map(RuleId::as_str).to_vec()
+    );
 }
 
 struct WorkspaceFixture {

@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
 use sc_lint_analyzer_support::AnalyzerConfigError;
+use sc_lint_analyzer_support::AnalyzerName;
+use sc_lint_analyzer_support::CatalogRuleId;
 use sc_lint_analyzer_support::RuleCatalog;
 use sc_lint_analyzer_support::load_analyzer_settings;
 use sc_lint_schema::CrateId;
@@ -24,10 +26,16 @@ const SC_LINT_RUNTIME_TOOL: &str = "sc-lint-runtime";
 const SC_LINT_RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
-    analyzer: "runtime",
-    rules: &["SCB-RUNTIME-001", "SCB-RUNTIME-002"],
+    analyzer: AnalyzerName::new("runtime"),
+    rules: &[
+        CatalogRuleId::new("SCB-RUNTIME-001"),
+        CatalogRuleId::new("SCB-RUNTIME-002"),
+    ],
     families: &[],
-    default_fail: &["SCB-RUNTIME-001", "SCB-RUNTIME-002"],
+    default_fail: &[
+        CatalogRuleId::new("SCB-RUNTIME-001"),
+        CatalogRuleId::new("SCB-RUNTIME-002"),
+    ],
     own_keys: &[],
 };
 

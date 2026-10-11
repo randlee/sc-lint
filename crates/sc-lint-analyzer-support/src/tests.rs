@@ -14,6 +14,8 @@ use sc_lint_schema::OwnerId;
 use sc_lint_schema::ReportStatus;
 
 use super::AnalyzerConfigError;
+use super::AnalyzerName;
+use super::CatalogRuleId;
 use super::RuleCatalog;
 use super::analyzer_settings_from;
 use super::load_analyzer_settings;
@@ -49,10 +51,19 @@ fn text_report_rendering_is_shared_and_stable() {
 }
 
 const CATALOG: RuleCatalog = RuleCatalog {
-    analyzer: "example",
-    rules: &["EXAMPLE-001", "EXAMPLE-002"],
-    families: &[("example", &["EXAMPLE-001", "EXAMPLE-002"])],
-    default_fail: &["EXAMPLE-001"],
+    analyzer: AnalyzerName::new("example"),
+    rules: &[
+        CatalogRuleId::new("EXAMPLE-001"),
+        CatalogRuleId::new("EXAMPLE-002"),
+    ],
+    families: &[(
+        "example",
+        &[
+            CatalogRuleId::new("EXAMPLE-001"),
+            CatalogRuleId::new("EXAMPLE-002"),
+        ],
+    )],
+    default_fail: &[CatalogRuleId::new("EXAMPLE-001")],
     own_keys: &["extension"],
 };
 
@@ -85,8 +96,20 @@ fn config_dir(contents: &str) -> TempDir {
     directory
 }
 
-fn rule_set(rules: &[&'static str]) -> BTreeSet<&'static str> {
-    rules.iter().copied().collect()
+fn rule_set(rules: &[&'static str]) -> BTreeSet<CatalogRuleId> {
+    rules.iter().map(|rule| CatalogRuleId::new(rule)).collect()
+}
+
+#[test]
+#[should_panic(expected = "analyzer name must not be empty")]
+fn empty_analyzer_name_is_rejected() {
+    let _ = AnalyzerName::new("");
+}
+
+#[test]
+#[should_panic(expected = "rule id must not be empty")]
+fn empty_catalog_rule_id_is_rejected() {
+    let _ = CatalogRuleId::new("");
 }
 
 #[test]

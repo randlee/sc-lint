@@ -15,23 +15,51 @@ const COMMON_KEYS: &[&str] = &[
     "exclude_paths",
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AnalyzerName(&'static str);
+
+impl AnalyzerName {
+    pub const fn new(value: &'static str) -> Self {
+        assert!(!value.is_empty(), "analyzer name must not be empty");
+        Self(value)
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CatalogRuleId(&'static str);
+
+impl CatalogRuleId {
+    pub const fn new(value: &'static str) -> Self {
+        assert!(!value.is_empty(), "rule id must not be empty");
+        Self(value)
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
 /// Rule ids, rule families, and analyzer-specific keys published by an analyzer.
 #[derive(Debug, Clone, Copy)]
 pub struct RuleCatalog {
-    pub analyzer: &'static str,
-    pub rules: &'static [&'static str],
-    pub families: &'static [(&'static str, &'static [&'static str])],
-    pub default_fail: &'static [&'static str],
+    pub analyzer: AnalyzerName,
+    pub rules: &'static [CatalogRuleId],
+    pub families: &'static [(&'static str, &'static [CatalogRuleId])],
+    pub default_fail: &'static [CatalogRuleId],
     pub own_keys: &'static [&'static str],
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnalyzerSettings {
     pub enabled: bool,
-    pub exclude_rules: BTreeSet<&'static str>,
-    pub fail_rules: BTreeSet<&'static str>,
+    pub exclude_rules: BTreeSet<CatalogRuleId>,
+    pub fail_rules: BTreeSet<CatalogRuleId>,
     pub exclude_paths: Vec<String>,
-    pub rule_filter: Option<BTreeSet<&'static str>>,
+    pub rule_filter: Option<BTreeSet<CatalogRuleId>>,
     own: toml::Table,
 }
 
@@ -124,7 +152,7 @@ pub fn load_analyzer_settings(
     config: Option<&Path>,
     rule_filter: Option<&str>,
 ) -> Result<AnalyzerSettings, AnalyzerConfigError> {
-    let document = read_config_document(catalog.analyzer, root, config)?;
+    let document = read_config_document(catalog.analyzer.as_str(), root, config)?;
     analyzer_settings_from(catalog, &document, rule_filter)
 }
 
@@ -133,7 +161,7 @@ pub fn analyzer_settings_from(
     document: &toml::Table,
     rule_filter: Option<&str>,
 ) -> Result<AnalyzerSettings, AnalyzerConfigError> {
-    let analyzer = catalog.analyzer;
+    let analyzer = catalog.analyzer.as_str();
     let empty = toml::Table::new();
     let table = analyzer_table(document, analyzer)?.unwrap_or(&empty);
     validate_keys(table, catalog)?;
@@ -190,7 +218,7 @@ fn analyzer_table<'a>(
 }
 
 fn validate_keys(table: &toml::Table, catalog: &RuleCatalog) -> Result<(), AnalyzerConfigError> {
-    let analyzer = catalog.analyzer;
+    let analyzer = catalog.analyzer.as_str();
     if let Some(key) = table.keys().find(|key| {
         !COMMON_KEYS.contains(&key.as_str()) && !catalog.own_keys.contains(&key.as_str())
     }) {
@@ -217,21 +245,21 @@ fn read_enabled(table: &toml::Table, analyzer: &'static str) -> Result<bool, Ana
 fn parse_rule_filter(
     catalog: &RuleCatalog,
     rule_filter: Option<&str>,
-) -> Result<Option<BTreeSet<&'static str>>, AnalyzerConfigError> {
+) -> Result<Option<BTreeSet<CatalogRuleId>>, AnalyzerConfigError> {
     let Some(raw) = rule_filter else {
         return Ok(None);
     };
     let selectors: Vec<String> = raw.split(',').map(|item| item.trim().to_owned()).collect();
     if selectors.iter().any(String::is_empty) {
         return Err(AnalyzerConfigError::Selector {
-            analyzer: catalog.analyzer,
+            analyzer: catalog.analyzer.as_str(),
             selector: raw.to_owned(),
         });
     }
     resolve(catalog, &selectors)
         .map(Some)
         .map_err(|selector| AnalyzerConfigError::Selector {
-            analyzer: catalog.analyzer,
+            analyzer: catalog.analyzer.as_str(),
             selector,
         })
 }
@@ -262,14 +290,14 @@ fn read_strings(
         .map(Some)
 }
 
-fn resolve(catalog: &RuleCatalog, selectors: &[String]) -> Result<BTreeSet<&'static str>, String> {
+fn resolve(catalog: &RuleCatalog, selectors: &[String]) -> Result<BTreeSet<CatalogRuleId>, String> {
     let mut rules = BTreeSet::new();
     for selector in selectors {
         if let Some(rule) = catalog
             .rules
             .iter()
             .copied()
-            .find(|rule| *rule == selector.as_str())
+            .find(|rule| rule.as_str() == selector.as_str())
         {
             rules.insert(rule);
         } else if let Some((_, members)) = catalog
@@ -300,14 +328,16 @@ impl AnalyzerSettings {
         let kept: Vec<Finding<R>> = findings
             .into_iter()
             .filter(|finding| match &self.rule_filter {
-                Some(selected) => selected.contains(id(&finding.rule_id)),
-                None => !self.exclude_rules.contains(id(&finding.rule_id)),
+                Some(selected) => selected.contains(&CatalogRuleId::new(id(&finding.rule_id))),
+                None => !self
+                    .exclude_rules
+                    .contains(&CatalogRuleId::new(id(&finding.rule_id))),
             })
             .collect();
-        let status = if kept
-            .iter()
-            .any(|finding| self.fail_rules.contains(id(&finding.rule_id)))
-        {
+        let status = if kept.iter().any(|finding| {
+            self.fail_rules
+                .contains(&CatalogRuleId::new(id(&finding.rule_id)))
+        }) {
             ReportStatus::Fail
         } else {
             ReportStatus::Pass

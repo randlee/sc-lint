@@ -5,7 +5,9 @@ mod render;
 mod source_scan;
 
 pub use analyzer_config::AnalyzerConfigError;
+pub use analyzer_config::AnalyzerName;
 pub use analyzer_config::AnalyzerSettings;
+pub use analyzer_config::CatalogRuleId;
 pub use analyzer_config::RuleCatalog;
 pub use analyzer_config::analyzer_settings_from;
 pub use analyzer_config::load_analyzer_settings;

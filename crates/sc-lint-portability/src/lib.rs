@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use anyhow as anyhow_crate;
 use sc_lint_analyzer_support::AnalyzerConfigError;
+use sc_lint_analyzer_support::AnalyzerName;
+use sc_lint_analyzer_support::CatalogRuleId;
 use sc_lint_analyzer_support::RuleCatalog;
 use sc_lint_analyzer_support::analyzer_settings_from;
 use sc_lint_analyzer_support::read_config_document;
@@ -21,13 +23,21 @@ mod tests;
 
 const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
-const ALL_PORT_IDS: &[&str] = &[
-    "PORT-001", "PORT-002", "PORT-003", "PORT-004", "PORT-005", "PORT-006", "PORT-007", "PORT-008",
-    "PORT-009", "PORT-010",
+const ALL_PORT_IDS: &[CatalogRuleId] = &[
+    CatalogRuleId::new("PORT-001"),
+    CatalogRuleId::new("PORT-002"),
+    CatalogRuleId::new("PORT-003"),
+    CatalogRuleId::new("PORT-004"),
+    CatalogRuleId::new("PORT-005"),
+    CatalogRuleId::new("PORT-006"),
+    CatalogRuleId::new("PORT-007"),
+    CatalogRuleId::new("PORT-008"),
+    CatalogRuleId::new("PORT-009"),
+    CatalogRuleId::new("PORT-010"),
 ];
 
 pub const PORTABILITY_CATALOG: RuleCatalog = RuleCatalog {
-    analyzer: "portability",
+    analyzer: AnalyzerName::new("portability"),
     rules: ALL_PORT_IDS,
     families: &[],
     default_fail: ALL_PORT_IDS,
@@ -123,7 +133,8 @@ pub fn analyze_workspace_configured(
     config: Option<&Path>,
     rule_filter: Option<&str>,
 ) -> std::result::Result<FindingsReport, PortabilityError> {
-    let document = read_config_document(PORTABILITY_CATALOG.analyzer, &options.root, config)?;
+    let document =
+        read_config_document(PORTABILITY_CATALOG.analyzer.as_str(), &options.root, config)?;
     let settings = analyzer_settings_from(&PORTABILITY_CATALOG, &document, rule_filter)?;
     let analyzer_keys = portability::AnalyzerPortabilityKeys::from_settings(&settings)?;
     let (findings, scanned_crates) = if settings.enabled {
