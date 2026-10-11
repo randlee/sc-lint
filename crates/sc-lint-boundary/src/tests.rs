@@ -3593,6 +3593,13 @@ fn every_family_matches_its_legacy_rule_filter() {
     let dependency = undeclared_dependency_fixture();
     let multi_target = multi_target_fixture();
     let invalid_inventory = invalid_inventory_fixture();
+    let manifest_policy_error = manifest_policy_error_fixture();
+    analyze_workspace(&AnalyzeOptions {
+        root: manifest_policy_error.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .expect("legacy cycles analysis skips manifest policy");
     let pairs = [
         (RuleFilter::Cycles, "cycles"),
         (RuleFilter::Boundaries, "boundaries"),
@@ -3607,6 +3614,7 @@ fn every_family_matches_its_legacy_rule_filter() {
         dependency.root(),
         multi_target.root(),
         invalid_inventory.root(),
+        manifest_policy_error.root(),
     ] {
         for (filter, family) in pairs {
             let legacy = analyze_workspace(&AnalyzeOptions {
@@ -3634,12 +3642,44 @@ fn multi_target_fixture() -> WorkspaceFixture {
     fixture.write_package_manifest("example");
     fixture.write_source("example", "lib.rs", "pub struct Example;");
     fixture.write_source("example", "main.rs", "fn main() {}");
+    fixture.write_source("example", "bin/extra.rs", "fn main() {}");
     fixture
 }
 
 fn invalid_inventory_fixture() -> WorkspaceFixture {
     let fixture = multi_target_fixture();
     fixture.write("boundaries/planning.toml", "not_planning = true\n");
+    fixture
+}
+
+fn manifest_policy_error_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write(
+        "Cargo.toml",
+        r#"
+            [workspace]
+            members = ["crates/example"]
+            resolver = "2"
+
+            [workspace.package]
+            edition = "2024"
+            rust-version = "1.94.1"
+            authors = ["sc-lint contributors"]
+            license = "MIT OR Apache-2.0"
+            repository = "https://example.invalid/sc-lint"
+            homepage = "https://example.invalid/sc-lint"
+        "#,
+    );
+    fixture.write(
+        "crates/example/Cargo.toml",
+        &good_member_manifest("example", "").replacen(
+            "version.workspace = true\n",
+            "version = \"0.1.0\"\n",
+            1,
+        ),
+    );
+    fixture.write_member_boundary_record("example", &[], &[], &[]);
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
     fixture
 }
 

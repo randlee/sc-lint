@@ -707,7 +707,8 @@ fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsRep
 }
 
 /// Reads `[tool.sc-lint.analyzers.boundary]` and `--rule-filter` (rule ids or
-/// family names), preserving legacy fast paths for exact legacy families.
+/// family names). Exact full-family selections preserve legacy fast paths;
+/// mixed and subset selections use full analysis before findings are filtered.
 pub fn analyze_workspace_configured(
     options: &AnalyzeOptions,
     config: Option<&Path>,
@@ -743,6 +744,10 @@ pub fn analyze_workspace_configured(
 fn legacy_family_rule_filter(selected: Option<&BTreeSet<CatalogRuleId>>) -> Option<RuleFilter> {
     let selected = selected?;
     [
+        (RuleFilter::Cycles, "cycles"),
+        (RuleFilter::Boundaries, "boundaries"),
+        (RuleFilter::InternalOnly, "internal-only"),
+        (RuleFilter::ForbidExternalImpls, "forbid-external-impls"),
         (RuleFilter::Dependencies, "dependencies"),
         (RuleFilter::Manifests, "manifests"),
     ]
