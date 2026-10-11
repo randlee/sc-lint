@@ -84,7 +84,6 @@ impl AnalyzerConfigError {
             Self::UnknownRule { .. } => "ANALYZER_CONFIG.UNKNOWN_RULE",
         }
     }
-
 }
 
 pub fn read_config_document(
