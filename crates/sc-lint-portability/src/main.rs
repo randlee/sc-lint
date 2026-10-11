@@ -54,6 +54,15 @@ fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> u8 {
     }
 }
 
+fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
+    match error {
+        AnalyzerConfigError::Selector { analyzer, selector } => {
+            format!("{analyzer}: unknown --rule-filter selector `{selector}`")
+        }
+        _ => error.to_string(),
+    }
+}
+
 fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
@@ -75,7 +84,7 @@ fn main() -> Result<ExitCode> {
             ) {
                 Ok(report) => report,
                 Err(sc_lint_portability::PortabilityError::AnalyzerConfig(error)) => {
-                    eprintln!("error: {error}");
+                    eprintln!("error: {}", analyzer_config_message(&error));
                     return Ok(ExitCode::from(analyzer_config_exit_code(&error)));
                 }
                 Err(error) => return Err(error.into()),
@@ -109,6 +118,13 @@ mod tests {
                 key: "unknown".to_owned(),
             }),
             3
+        );
+        assert_eq!(
+            analyzer_config_message(&AnalyzerConfigError::Selector {
+                analyzer: "portability",
+                selector: "PORT-999".to_owned(),
+            }),
+            "portability: unknown --rule-filter selector `PORT-999`"
         );
     }
 }

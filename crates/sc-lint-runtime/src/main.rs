@@ -54,6 +54,15 @@ fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> i32 {
     }
 }
 
+fn analyzer_config_message(error: &AnalyzerConfigError) -> String {
+    match error {
+        AnalyzerConfigError::Selector { analyzer, selector } => {
+            format!("{analyzer}: unknown --rule-filter selector `{selector}`")
+        }
+        _ => error.to_string(),
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -75,7 +84,7 @@ fn main() -> Result<()> {
             ) {
                 Ok(report) => report,
                 Err(RuntimeError::AnalyzerConfig(error)) => {
-                    eprintln!("error: {error}");
+                    eprintln!("error: {}", analyzer_config_message(&error));
                     std::process::exit(analyzer_config_exit_code(&error));
                 }
                 Err(error) => return Err(error.into()),
@@ -109,6 +118,13 @@ mod tests {
                 key: "unknown".to_owned(),
             }),
             3
+        );
+        assert_eq!(
+            analyzer_config_message(&AnalyzerConfigError::Selector {
+                analyzer: "runtime",
+                selector: "SCB-RUNTIME-999".to_owned(),
+            }),
+            "runtime: unknown --rule-filter selector `SCB-RUNTIME-999`"
         );
     }
 }
