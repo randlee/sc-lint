@@ -334,10 +334,6 @@ pub(crate) fn is_unix_path_literal(value: &str) -> bool {
         .any(|prefix| value.starts_with(prefix))
 }
 
-pub(crate) fn path_prefix_match(value: &str, prefixes: &[String]) -> bool {
-    prefixes.iter().any(|prefix| value.starts_with(prefix))
-}
-
 pub(crate) fn is_windows_path_literal(value: &str) -> bool {
     let bytes = value.as_bytes();
     let drive_absolute = bytes.len() >= 3
