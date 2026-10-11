@@ -5,6 +5,7 @@ host_python := if os_family() == "windows" { "python" } else { "python3" }
 python_cmd := if os_family() == "windows" { ".\\.sc-lint\\venv\\Scripts\\python.exe" } else { ".sc-lint/venv/bin/python3" }
 sc_lint_binary := if os_family() == "windows" { ".\\target\\debug\\sc-lint.exe" } else { "./target/debug/sc-lint" }
 export SC_LINT_BIN := sc_lint_binary
+adoption_binary := if os_family() == "windows" { "target/adoption-product/debug/sc-lint.exe" } else { "target/adoption-product/debug/sc-lint" }
 
 # Show the curated repo task help.
 default: help
@@ -120,6 +121,14 @@ test: _source-build _source-venv
 # `python -m pip install 'pytest>=8,<9'` (Windows).
 test-adoption:
     {{host_python}} -m pytest tests/adoption -q
+
+# Run the adoption tests that execute the kit's just layers against a product
+# built into target/adoption-product, never the shared target/debug or
+# .sc-lint/wheels. Missing artifacts fail the run.
+test-adoption-integration:
+    cargo build --workspace --target-dir target/adoption-product
+    {{host_python}} -m pip wheel --quiet --disable-pip-version-check -w target/adoption-product/wheels bindings/sc-lint-py
+    {{host_python}} -m pytest tests/adoption -q -m integration --integration --sc-lint-bin {{adoption_binary}} --sc-lint-wheel-dir target/adoption-product/wheels
 
 # Inspect the managed upgrade path without changing the source checkout.
 upgrade: _source-build _source-venv

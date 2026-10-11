@@ -10,6 +10,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import pytest
+from conftest import ProductArtifacts
+
 ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "packages" / "sc-lint-adoption"
 INSTALL = KIT / "install.py"
@@ -311,26 +314,41 @@ def test_schema_analyzer_keys_match_rust_catalogs() -> None:
         assert set(tables[name]["properties"]) == common | own, name
 
 
-def test_analyzer_worked_example_runs_all_declared_just_layers() -> None:
-    binary = ROOT / "target" / "debug" / "sc-lint"
-    wheels = ROOT / ".sc-lint" / "wheels"
-    workspace_version = next(
-        line.split('"')[1] for line in (ROOT / "Cargo.toml").read_text().splitlines() if line.startswith("version =")
-    )
-    expected_wheel = f"sc_lint-{workspace_version}"
-    if not binary.exists() or not any(wheels.glob(f"{expected_wheel}-*.whl")):
-        import pytest
+LAYER_INVOCATIONS = (("test",), ("test", "all"), ("test", "integrate"), ("lint",))
 
-        pytest.skip("requires the source product binary and matching offline wheel set")
+
+def install_worked_example(version: str | None = None) -> Path:
     consumer = copy_fixture("analyzer-worked-example")
     input_data = json.loads((FIXTURES / "analyzer-worked-example" / "install.json").read_text())
-    input_data["minimum_version"] = workspace_version
+    if version is not None:
+        input_data["minimum_version"] = version
     input_path = consumer.parent / "install.json"
     input_path.write_text(json.dumps(input_data))
     result = run("--input", str(input_path), str(consumer))
     assert result.returncode == 0, result.stderr
-    environment = {**os.environ, "SC_LINT_BIN": str(binary), "SC_LINT_WHEEL_DIR": str(wheels)}
-    for arguments in (("test",), ("test", "all"), ("test", "integrate"), ("lint",)):
+    return consumer
+
+
+def test_analyzer_worked_example_declares_all_just_layers() -> None:
+    consumer = install_worked_example()
+    for arguments in LAYER_INVOCATIONS:
+        command = subprocess.run(
+            ["just", "--dry-run", *arguments], cwd=consumer, text=True, capture_output=True, check=False
+        )
+        assert command.returncode == 0, command.stderr
+        forwarded = " ".join([arguments[0], "--config", "sc-lint.toml", *arguments[1:]])
+        assert command.stderr.rstrip().endswith(forwarded), command.stderr
+
+
+@pytest.mark.integration
+def test_analyzer_worked_example_runs_all_declared_just_layers(product_artifacts: ProductArtifacts) -> None:
+    consumer = install_worked_example(product_artifacts.version)
+    environment = {
+        **os.environ,
+        "SC_LINT_BIN": str(product_artifacts.binary),
+        "SC_LINT_WHEEL_DIR": str(product_artifacts.wheel_dir),
+    }
+    for arguments in LAYER_INVOCATIONS:
         command = subprocess.run(["just", *arguments], cwd=consumer, env=environment, text=True, capture_output=True, check=False)
         assert command.returncode == 0, command.stderr
 
