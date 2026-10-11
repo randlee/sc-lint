@@ -168,6 +168,7 @@ fn unknown_key_names_analyzer_and_key() {
     let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
 
     assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_KEY");
+    assert!(!error.is_selector());
     assert_eq!(
         error.to_string(),
         "example: unknown key `unknown` in [tool.sc-lint.analyzers.example]"
@@ -299,6 +300,7 @@ fn bad_rule_filter_is_a_selector_error() {
         load_analyzer_settings(&CATALOG, directory.path(), None, Some("unknown")).unwrap_err();
 
     assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
+    assert!(error.is_selector());
     let AnalyzerConfigError::Selector { analyzer, selector } = error else {
         panic!("expected a selector error");
     };
@@ -313,6 +315,7 @@ fn empty_rule_filter_entry_is_a_selector_error() {
         load_analyzer_settings(&CATALOG, directory.path(), None, Some("EXAMPLE-001,")).unwrap_err();
 
     assert_eq!(error.code(), "ANALYZER_CONFIG.SELECTOR");
+    assert!(error.is_selector());
 }
 
 #[test]

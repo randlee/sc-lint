@@ -107,6 +107,11 @@ pub enum AnalyzerConfigError {
 }
 
 impl AnalyzerConfigError {
+    /// Whether this error came from an invalid rule selector supplied by the caller.
+    pub const fn is_selector(&self) -> bool {
+        matches!(self, Self::Selector { .. })
+    }
+
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Selector { .. } => "ANALYZER_CONFIG.SELECTOR",

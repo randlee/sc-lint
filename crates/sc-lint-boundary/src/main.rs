@@ -75,10 +75,7 @@ impl From<GraphFormatArg> for GraphOutputFormat {
 }
 
 fn analyzer_config_exit_code(error: &AnalyzerConfigError) -> u8 {
-    match error {
-        AnalyzerConfigError::Selector { .. } => 2,
-        _ => 3,
-    }
+    if error.is_selector() { 2 } else { 3 }
 }
 
 fn analyzer_config_message(error: &AnalyzerConfigError) -> String {

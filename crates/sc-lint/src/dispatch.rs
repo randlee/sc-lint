@@ -59,7 +59,7 @@ impl BoundaryDispatchError {
                     let code = config_error.code();
                     // A bad selector is a usage error (exit 2); every other
                     // config error is a configuration error (exit 3).
-                    let err = if code == "ANALYZER_CONFIG.SELECTOR" {
+                    let err = if config_error.is_selector() {
                         CliError::usage(format!("{tool} rejected --rule-filter"))
                     } else {
                         CliError::config(format!(
