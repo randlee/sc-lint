@@ -54,6 +54,57 @@ class ReleaseArtifactsTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
+    def test_python_package_version_works_with_release_build_composite(self) -> None:
+        workspace_toml = REPO_ROOT / "Cargo.toml"
+        pyproject = REPO_ROOT / "bindings" / "sc-lint-py" / "pyproject.toml"
+        version = tomllib.loads(workspace_toml.read_text(encoding="utf-8"))["workspace"]["package"]["version"]
+        metadata = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]
+
+        self.assertEqual(metadata["version"], version)
+        self.assertNotIn("version", metadata.get("dynamic", []))
+
+        synced_pyproject = self.root / "pyproject.toml"
+        synced_pyproject.write_text(pyproject.read_text(encoding="utf-8"), encoding="utf-8")
+        sync = subprocess.run(
+            [
+                sys.executable,
+                str(PUBLISH_KIT_SCRIPT),
+                "sync-python-version",
+                "--workspace-toml",
+                "Cargo.toml",
+                "--pyproject",
+                str(synced_pyproject),
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+        self.assertEqual(sync.returncode, 0, sync.stderr)
+        self.assertIn(f"synced python package version to {version}", sync.stdout)
+
+        verify = subprocess.run(
+            [
+                sys.executable,
+                str(PUBLISH_KIT_SCRIPT),
+                "verify-python-version",
+                "--workspace-toml",
+                "Cargo.toml",
+                "--pyproject",
+                str(synced_pyproject),
+                "--version",
+                version,
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+        self.assertEqual(verify.returncode, 0, verify.stderr)
+        self.assertIn("python version verification passed", verify.stdout)
+
     def stage_archive(self, name: str = "archive") -> Path:
         staging = self.root / name
         release_artifacts.stage_release_archive(

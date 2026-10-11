@@ -3534,60 +3534,6 @@ def test_python_version_steps_use_the_manifest_declared_workspace_toml() -> None
     ) == 2
 
 
-def test_sc_lint_python_version_works_with_release_build_composite(tmp_path: Path) -> None:
-    root = repo_root()
-    workspace_toml = root / "Cargo.toml"
-    pyproject = root / "bindings" / "sc-lint-py" / "pyproject.toml"
-    version = tomllib.loads(workspace_toml.read_text(encoding="utf-8"))["workspace"]["package"]["version"]
-    metadata = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]
-
-    assert metadata["version"] == version
-    assert "version" not in metadata.get("dynamic", [])
-
-    synced_pyproject = tmp_path / "pyproject.toml"
-    synced_pyproject.write_text(pyproject.read_text(encoding="utf-8"), encoding="utf-8")
-    script = root / ".github" / "scripts" / "release_artifacts.py"
-    sync = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            "sync-python-version",
-            "--workspace-toml",
-            "Cargo.toml",
-            "--pyproject",
-            str(synced_pyproject),
-        ],
-        cwd=root,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=TEST_COMMAND_TIMEOUT_SECONDS,
-    )
-    assert sync.returncode == 0, sync.stderr
-    assert f"synced python package version to {version}" in sync.stdout
-
-    verify = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            "verify-python-version",
-            "--workspace-toml",
-            "Cargo.toml",
-            "--pyproject",
-            str(synced_pyproject),
-            "--version",
-            version,
-        ],
-        cwd=root,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=TEST_COMMAND_TIMEOUT_SECONDS,
-    )
-    assert verify.returncode == 0, verify.stderr
-    assert "python version verification passed" in verify.stdout
-
-
 def test_version_resolution_honors_a_pyproject_workspace_toml(tmp_path: Path) -> None:
     """A pure-Python consumer resolves its version without any Cargo.toml."""
     _, manifest = write_repo_fixture(
