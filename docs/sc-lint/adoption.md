@@ -52,16 +52,26 @@ README.sc-lint.md
 and updates.
 
 The root `Justfile` is merged through this block and keeps all text outside it
-unchanged:
+unchanged. When `justfile.windows_shell` is enabled and the consumer has no
+`windows-shell` setting, the installer includes that setting in the managed
+block:
 
-```text
+```just
 # >>> sc-lint managed integration >>>
+set windows-shell := ["pwsh", "-NoLogo", "-Command"]
 import '.sc-lint/justfile'
 # <<< sc-lint managed integration <<<
 ```
 
+The setting is omitted when the consumer already defines `windows-shell` or
+`justfile.windows_shell` is false.
+
 Do not edit text inside that block. Keep repository-specific recipes before or
 after it; that is the supported extension point.
+
+If an existing `Justfile` has no `test` recipe, the installer adds sc-lint's
+recommended recipe outside the managed block. A repository with no `Justfile`
+starts from `plugins/sc-lint/templates/Justfile.default`.
 
 The pre-existing-file clash check applies on every install to kit targets
 absent from the prior installed manifest. It skips the merged `Justfile` and
