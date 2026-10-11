@@ -931,6 +931,61 @@ fn manifest_policy_matches_python_oracle_on_representative_fixtures() {
     }
 }
 
+fn cycle_rule_ids(source: &str) -> Vec<RuleId> {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", source);
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap()
+    .findings
+    .iter()
+    .map(|finding| finding.rule_id)
+    .collect()
+}
+
+#[test]
+fn private_helper_delegation_is_not_a_type_method_self_loop() {
+    assert!(
+        cycle_rule_ids("pub struct T; impl T { pub fn a(&self) { self.b() } fn b(&self) {} }")
+            .is_empty()
+    );
+    assert!(
+        cycle_rule_ids("pub struct T; impl T { pub fn a(&self) { Self::b(self) } fn b(&self) {} }")
+            .is_empty()
+    );
+}
+
+#[test]
+fn mutual_method_recursion_is_a_type_method_self_loop() {
+    assert_eq!(
+        cycle_rule_ids(
+            "pub struct T; impl T { pub fn a(&self) { Self::b(self) } fn b(&self) { Self::a(self) } }"
+        ),
+        vec![RuleId::ScbCycle002]
+    );
+}
+
+#[test]
+fn trait_impl_receiver_call_is_not_a_trait_self_loop() {
+    assert!(cycle_rule_ids(
+        "pub struct T; pub trait Run { fn run(&self); } impl Run for T { fn run(&self) { Self::step(self) } } impl T { pub fn step(&self) {} }"
+    )
+    .is_empty());
+}
+
+#[test]
+fn enum_variant_expressions_do_not_resolve_to_methods() {
+    assert!(cycle_rule_ids(
+        "pub enum E { A } impl E { pub fn get(&self) { let _ = Self::A; } #[allow(non_snake_case)] pub fn A() {} }"
+    )
+    .is_empty());
+}
+
 #[test]
 fn reports_type_method_self_loop_as_non_fatal_signal() {
     let fixture = WorkspaceFixture::new();

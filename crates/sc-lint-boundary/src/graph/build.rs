@@ -130,12 +130,20 @@ fn resolve_trait_method_edges(builder: &mut GraphBuilder) {
     let known: BTreeSet<_> = builder.nodes.iter().map(|node| node.id.clone()).collect();
     let reference_impl_ids = &builder.reference_impl_ids;
     for edge in &mut builder.edges {
-        if !matches!(edge.kind, "references" | "references_expr") || known.contains(&edge.to) {
+        if !matches!(edge.kind, "references" | "references_expr") {
             continue;
         }
         let Some((owner, method)) = edge.to.rsplit_once("::") else {
             continue;
         };
+        let variant = NodeId::new(format!("{owner}::variant::{method}"));
+        if known.contains(&variant) {
+            edge.to = variant;
+            continue;
+        }
+        if known.contains(&edge.to) {
+            continue;
+        }
         // Self::method inside a trait impl resolves to that impl when no
         // inherent method exists. Otherwise accept only an unambiguous impl.
         if let Some((source_owner, _)) = edge.from.split_once("::impl::")

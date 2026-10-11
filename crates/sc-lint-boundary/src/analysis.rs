@@ -39,9 +39,13 @@ pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
         }
 
         let owner_id = &component[0];
-        let Some(self_refs) = owner_graph.self_refs.get(owner_id) else {
+        let Some(owner_edges) = owner_graph.self_refs.get(owner_id) else {
             continue;
         };
+        let self_refs: Vec<&OwnerRefEdge> = owner_edges
+            .iter()
+            .filter(|edge| !is_delegation_edge(edge, owner_edges, &node_map))
+            .collect();
         if self_refs.is_empty() {
             continue;
         }
@@ -415,6 +419,7 @@ struct OwnerRefEdge {
     owner_kind: &'static str,
     source_kind: &'static str,
     source_node_id: NodeId,
+    target_node_id: NodeId,
     source_impl_kind: Option<ImplKind>,
     reference_kind: ReferenceKind,
     node_ids: Vec<NodeId>,
@@ -444,6 +449,9 @@ fn build_owner_graph<'a>(
         let Some(target_node) = node_map.get(&edge.to) else {
             continue;
         };
+        if target_node.kind == "variant" {
+            continue;
+        }
 
         let Some(source_owner_id) = owner_id_for_node_id(&source_node.id, source_node.kind) else {
             continue;
@@ -458,6 +466,7 @@ fn build_owner_graph<'a>(
             owner_kind: owner_kind_for_node_id(&source_owner_id, node_map).unwrap_or("module"),
             source_kind: source_node.kind,
             source_node_id: source_node.id.clone(),
+            target_node_id: target_node.id.clone(),
             source_impl_kind: source_node.impl_kind,
             reference_kind: match edge.kind {
                 "references_type" => ReferenceKind::Type,
@@ -489,6 +498,51 @@ fn build_owner_graph<'a>(
     }
 
     owner_graph
+}
+
+fn is_delegation_edge(
+    edge: &OwnerRefEdge,
+    owner_edges: &[OwnerRefEdge],
+    node_map: &BTreeMap<NodeId, &GraphNode>,
+) -> bool {
+    if edge.reference_kind != ReferenceKind::Expr || edge.source_node_id == edge.target_node_id {
+        return false;
+    }
+    let (Some(source), Some(callee)) = (
+        node_map.get(&edge.source_node_id),
+        node_map.get(&edge.target_node_id),
+    ) else {
+        return false;
+    };
+    if source.kind != "method" || callee.kind != "method" || callee.label == source.label {
+        return false;
+    }
+    let private_helper = callee.visibility != Some("public");
+    let receiver_call = source.impl_kind == Some(ImplKind::Trait);
+    (private_helper || receiver_call)
+        && !reaches(owner_edges, &edge.target_node_id, &edge.source_node_id)
+}
+
+fn reaches(owner_edges: &[OwnerRefEdge], from: &NodeId, to: &NodeId) -> bool {
+    let mut seen = BTreeSet::new();
+    let mut stack = vec![from.clone()];
+    while let Some(node) = stack.pop() {
+        if node == *to {
+            return true;
+        }
+        if !seen.insert(node.clone()) {
+            continue;
+        }
+        stack.extend(
+            owner_edges
+                .iter()
+                .filter(|edge| {
+                    edge.reference_kind == ReferenceKind::Expr && edge.source_node_id == node
+                })
+                .map(|edge| edge.target_node_id.clone()),
+        );
+    }
+    false
 }
 
 fn owner_contributors(owners: &[OwnerId], owner_graph: &OwnerGraph) -> Vec<NodeId> {
