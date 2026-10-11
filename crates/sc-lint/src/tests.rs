@@ -314,6 +314,7 @@ fn consumer_commands_require_an_explicit_consumer_mode() {
             target: LintTarget::Ci,
             consumer: true,
             profile: None,
+            rule_filter: None,
         })
     ));
     let test = Cli::parse_from(["sc-lint", "test"]);
@@ -1380,6 +1381,85 @@ fn lint_sc_boundary_reports_dependency_policy_failures_through_dispatch() {
             "missing {rule_id} in top-level dispatch payload"
         );
     }
+}
+
+#[test]
+fn lint_rule_filter_parses_for_analyzer_targets() {
+    for target in ["sc-boundary", "sc-portability", "sc-runtime"] {
+        let cli = Cli::parse_from([
+            "sc-lint",
+            "lint",
+            target,
+            "--rule-filter",
+            "PORT-001,PORT-006",
+        ]);
+        let context = CommandContext::from_cli(&cli).expect("analyzer context");
+        assert_eq!(context.rule_filter(), Some("PORT-001,PORT-006"), "{target}");
+    }
+    let cli = Cli::parse_from(["sc-lint", "lint", "sc-portability"]);
+    let context = CommandContext::from_cli(&cli).expect("analyzer context");
+    assert_eq!(context.rule_filter(), None);
+}
+
+#[test]
+fn lint_rule_filter_rejected_for_non_analyzer_target() {
+    let cli = Cli::parse_from(["sc-lint", "lint", "fast", "--rule-filter", "PORT-001"]);
+    let error = CommandContext::from_cli(&cli).expect_err("rule filter on fast");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert_eq!(error.exit_code(), 2);
+    assert!(error.message.contains("--rule-filter"));
+
+    assert!(
+        Cli::try_parse_from(["sc-lint", "lint", "ci", "--consumer", "--rule-filter", "X"]).is_err()
+    );
+}
+
+#[test]
+fn lint_sc_boundary_rule_filter_selects_the_rule() {
+    let fixture = AnalysisFixture::new();
+    fixture.configure_disallowed_dependency();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        fixture.root().to_str().expect("root"),
+        "lint",
+        "sc-boundary",
+        "--rule-filter",
+        "SCB-DEPENDENCY-001",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let success = crate::command::execute(&context, &loaded).expect("dispatch succeeds");
+    let findings = success.data["findings"].as_array().expect("findings array");
+    assert!(!findings.is_empty());
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding["rule_id"] == "SCB-DEPENDENCY-001")
+    );
+}
+
+#[test]
+fn lint_sc_boundary_unknown_rule_filter_is_usage_error() {
+    let fixture = AnalysisFixture::new();
+    fixture.configure_disallowed_dependency();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--json",
+        "--root",
+        fixture.root().to_str().expect("root"),
+        "lint",
+        "sc-boundary",
+        "--rule-filter",
+        "NOPE",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("boundary context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    let error = crate::command::execute(&context, &loaded).expect_err("unknown selector");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert_eq!(error.exit_code(), 2);
+    assert!(error.message.contains("rejected --rule-filter"));
 }
 
 fn lint_boundary_outcome(root: &Path, json_mode: bool) -> crate::entry::ExecutionOutcome {

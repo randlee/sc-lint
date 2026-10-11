@@ -460,6 +460,9 @@ If the delegated binary:
   - emit `CLI.BACKEND_EXEC_FAILURE`
 - exits zero with malformed machine-readable output
   - emit `CLI.BACKEND_PROTOCOL_ERROR`
+- `sc-lint lint sc-boundary|sc-portability|sc-runtime` forwards `--config` and
+  `--rule-filter` unchanged; a backend exit 2 becomes a usage error and exit 3
+  a config error.
 
 ### Python adapter backend
 
