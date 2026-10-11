@@ -663,13 +663,13 @@ impl<'a> PortabilityCollector<'a> {
             Expr::Lit(ExprLit {
                 lit: Lit::Str(lit), ..
             }) => {
-                if self.path_prefix_match(&lit.value()) {
+                let value = lit.value();
+                if self.path_prefix_match(&value) {
                     self.findings.push(PortabilityFinding {
                         rule_id: RuleId::Port001,
                         kind: "hardcoded_unix_path_literal",
                         message: format!(
-                            "PORT-001 hardcoded Unix-only absolute path literal `{}` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source",
-                            lit.value()
+                            "PORT-001 hardcoded Unix-only absolute path literal `{value}` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source"
                         ),
                         source_path: self.file_context.source_path.clone(),
                         line: span_start_line(lit.span()),
@@ -945,12 +945,13 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
         if self.platform_gated_depth == 0
             && let Lit::Str(lit) = &node.lit
         {
-            if is_unix_shell_path_literal(&lit.value()) {
-                self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
-            } else if path_prefix_match(&lit.value(), &self.config.configured_unix_path_prefixes) {
-                self.push_path_finding(RuleId::Port006, &lit.value(), span_start_line(lit.span()));
-            } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
-                self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            let value = lit.value();
+            if is_unix_shell_path_literal(&value) {
+                self.push_shell_finding(&value, span_start_line(lit.span()));
+            } else if path_prefix_match(&value, &self.config.configured_unix_path_prefixes) {
+                self.push_path_finding(RuleId::Port006, &value, span_start_line(lit.span()));
+            } else if let Some(rule_id) = production_path_rule_id(&value) {
+                self.push_path_finding(rule_id, &value, span_start_line(lit.span()));
             }
         }
         syn::visit::visit_expr_lit(self, node);
