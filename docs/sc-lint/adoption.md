@@ -83,6 +83,7 @@ The installer input describes consumer facts, not imperative setup code:
     "runtime": {"enabled": false, "reason": "no async runtime"},
     "portability": {"enabled": true, "targets": ["linux", "macos", "windows"]}
   },
+  "justfile": {"windows_shell": true},
   "test": {"unit": ["cargo", "test"]}
 }
 ```
@@ -92,7 +93,10 @@ profiles. `ci` records the intended platform matrix. `analyzers` records each
 choice with an explicit enablement reason; derive it from observed async-runtime
 and target-platform facts. Analyzers are the sole repository-specific *policy*
 input. `profiles`, `ci`, and `test` are consumer-owned recipe declarations,
-not policy. `test` optionally declares ordered test layers.
+not policy. `test` optionally declares ordered test layers. The optional
+`justfile` object accepts `windows_shell`, a boolean that defaults to `true`;
+set it to `false` to omit the kit's `set windows-shell` line. A consumer-owned
+`set windows-shell` is never duplicated.
 
 ## Migrate existing named test recipes
 

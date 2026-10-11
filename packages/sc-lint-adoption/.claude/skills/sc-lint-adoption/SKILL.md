@@ -61,8 +61,10 @@ set `"justfile": {"windows_shell": false}` to omit it entirely. Never duplicate 
 ## 2. Write and validate `install.json`
 
 Create `install.json` at the consumer root. It has `minimum_version`,
-`profiles`, `ci`, `analyzers`, and optional `test` fields. The dry-run in step
-3 validates this input against the packaged `install.schema.json` before it
+`profiles`, `ci`, `analyzers`, and optional `test` and `justfile` fields.
+`justfile.windows_shell` is a boolean that defaults to `true`; set it to
+`false` to omit the kit's `set windows-shell` line. The dry-run in step 3
+validates this input against the packaged `install.schema.json` before it
 renders any file.
 
 ```bash
