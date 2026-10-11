@@ -138,7 +138,7 @@ jobs:
         python: ["3.11", "3.14"]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -146,7 +146,7 @@ jobs:
           toolchain: "1.94.1"
 
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
 
@@ -154,7 +154,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --quiet maturin==1.9.4
+          python -m pip install --quiet maturin==1.15.0
           python -m pip wheel --wheel-dir "${RUNNER_TEMP}/wheels" bindings/sc-lint-py
 
       - name: Install and exercise the built wheel
@@ -223,7 +223,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --quiet maturin==1.9.4
+          python -m pip install --quiet maturin==1.15.0
           python -m pip wheel --wheel-dir "${RUNNER_TEMP}/wheels" bindings/sc-lint-py
 
       - name: Package the manifest-declared publish-kit archive
