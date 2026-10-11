@@ -297,3 +297,101 @@ def test_analyzer_worked_example_runs_all_declared_just_layers() -> None:
     for arguments in (("test",), ("test", "all"), ("test", "integrate"), ("lint",)):
         command = subprocess.run(["just", *arguments], cwd=consumer, env=environment, text=True, capture_output=True, check=False)
         assert command.returncode == 0, command.stderr
+
+
+def test_kit_justfile_declares_no_set_default_or_test() -> None:
+    text = (KIT / ".sc-lint" / "justfile").read_text()
+    assert not any(line.startswith(("set ", "default", "test")) for line in text.splitlines())
+
+
+def test_new_repository_gets_the_default_justfile() -> None:
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    text = (consumer / "Justfile").read_text()
+    assert text.startswith((KIT / "templates" / "Justfile.default").read_text().rstrip())
+    assert (KIT / "templates" / "test.just").read_text() in text
+    assert text.count("set windows-shell") == 1
+
+
+def test_existing_justfile_without_test_gets_the_recommended_recipe() -> None:
+    consumer = copy_fixture("empty-workspace")
+    (consumer / "Justfile").write_text("hello:\n    @echo hi\n")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    assert run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    assert (consumer / "Justfile").read_text().count("test *layer:") == 1
+
+
+def test_consumer_test_recipe_is_kept() -> None:
+    consumer = copy_fixture("empty-workspace")
+    (consumer / "Justfile").write_text("test:\n    cargo nextest run\n")
+    assert run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 1
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    assert (consumer / "Justfile").read_text().startswith("test:\n    cargo nextest run\n")
+
+
+def test_windows_shell_rendered_in_managed_block_when_consumer_has_none() -> None:
+    consumer = copy_fixture("empty-workspace")
+    (consumer / "Justfile").write_text("hello:\n    @echo hi\n")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    assert "managed integration >>>\nset windows-shell := " in (consumer / "Justfile").read_text()
+
+
+def test_consumer_windows_shell_is_not_duplicated() -> None:
+    consumer = copy_fixture("empty-workspace")
+    (consumer / "Justfile").write_text('set windows-shell := ["cmd", "/c"]\n\nhello:\n    @echo hi\n')
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    assert (consumer / "Justfile").read_text().count("set windows-shell") == 1
+    assert subprocess.run(["just", "--list"], cwd=consumer, capture_output=True, check=False).returncode == 0
+
+
+def test_windows_shell_false_omits_setting() -> None:
+    consumer = copy_fixture("empty-workspace")
+    (consumer / "Justfile").write_text("hello:\n    @echo hi\n")
+    input_path = write_input(consumer, justfile={"windows_shell": False})
+    assert run("--input", str(input_path), str(consumer)).returncode == 0
+    assert "windows-shell" not in (consumer / "Justfile").read_text()
+
+
+def test_unknown_justfile_key_is_rejected() -> None:
+    consumer = copy_fixture("empty-workspace")
+    result = run("--input", str(write_input(consumer, justfile={"shell": True})), str(consumer))
+    assert result.returncode == 2
+    assert result.stderr == "conflict: justfile has unknown fields: ['shell']\n"
+
+
+def test_non_boolean_windows_shell_is_rejected() -> None:
+    consumer = copy_fixture("empty-workspace")
+    result = run("--input", str(write_input(consumer, justfile={"windows_shell": "yes"})), str(consumer))
+    assert result.returncode == 2
+    assert result.stderr == "conflict: justfile.windows_shell must be a boolean\n"
+
+
+def test_dry_run_names_colliding_recipes_without_writing() -> None:
+    consumer = copy_fixture("empty-workspace")
+    original = "lint:\n    echo mine\n\nupgrade:\n    echo mine\n"
+    (consumer / "Justfile").write_text(original)
+    result = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 2
+    assert result.stderr == "conflict: Justfile collisions: lint, upgrade\n"
+    assert (consumer / "Justfile").read_text() == original
+    assert not (consumer / ".sc-lint").exists()
+
+
+def test_dry_run_without_just_on_path_exits_2_and_says_so() -> None:
+    consumer = copy_fixture("empty-workspace")
+    environment = {**os.environ, "PATH": str(consumer / "src")}
+    result = subprocess.run(
+        [shutil.which("python3"), str(INSTALL), "--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer)],
+        env=environment, text=True, capture_output=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "--dry-run needs `just` on PATH" in result.stderr
+
+
+def test_hyphenated_test_recipe_still_gets_the_recommended_recipe() -> None:
+    consumer = copy_fixture("empty-workspace")
+    (consumer / "Justfile").write_text("test-unit:\n    echo unit\n")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    text = (consumer / "Justfile").read_text()
+    assert "test-unit:" in text
+    assert text.count("\ntest *layer:") == 1

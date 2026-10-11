@@ -7,7 +7,9 @@ import difflib
 import hashlib
 import json
 import re
+import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +19,9 @@ MARKER_END = "# <<< sc-lint managed integration <<<"
 MANIFEST = Path(".sc-lint/installed.json")
 INSTALL_INPUT = Path(".sc-lint/install.json")
 RENAMED = {Path("README.md"): Path("README.sc-lint.md")}
+WINDOWS_SHELL = 'set windows-shell := ["pwsh", "-NoLogo", "-Command"]\n'
+RECIPE = r"^([A-Za-z_][\w-]*)[^:\n]*:(?!=)"
+JUST_COLLISION = re.compile(r"(?:recipe|setting) `([^`]+)`", re.I)
 TEMPLATES = {
     Path("templates/sc-lint.toml.j2"): Path("sc-lint.toml"),
     Path("templates/Justfile.import.j2"): Path("Justfile"),
@@ -40,13 +45,21 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
     if kind == "object" and not isinstance(value, dict): raise ValueError(f"{label} must be an object")
     if kind == "string" and not isinstance(value, str): raise ValueError(f"{label} must be a string")
     if kind == "boolean" and type(value) is not bool: raise ValueError(f"{label} must be a boolean")
+    if kind == "array" and not isinstance(value, list): raise ValueError(f"{label} must be an array")
     if "pattern" in schema and isinstance(value, str) and not re.fullmatch(schema["pattern"], value): raise ValueError(f"{label} does not match {schema['pattern']}")
+    if isinstance(value, dict) and "properties" in schema:
+        extra = set(value) - set(schema["properties"])
+        if schema.get("additionalProperties") is False and extra: raise ValueError(f"{label} has unknown fields: {sorted(extra)}")
+        for key, item in value.items():
+            if key in schema["properties"]: _schema_value(item, schema["properties"][key], f"{label}.{key}")
+    if isinstance(value, list) and "items" in schema:
+        for index, item in enumerate(value): _schema_value(item, schema["items"], f"{label}[{index}]")
 
 
 def values(path: Path) -> dict:
     data = json.loads(path.read_text())
     schema = json.loads((ROOT / "install.schema.json").read_text())
-    _schema_value(data, schema, "install input")
+    if not isinstance(data, dict): raise ValueError("install input must be an object")
     properties = schema["properties"]
     unknown = set(data) - set(properties)
     missing = set(schema["required"]) - set(data)
@@ -71,6 +84,23 @@ def render(template: Path, data: dict) -> str:
             .replace("{{ profiles }}", profiles).replace("{{ test_layers }}", layers).replace("{{ ci_os }}", json.dumps(runners)))
 
 
+def unmanaged(text: str) -> str:
+    return re.sub(re.escape(MARKER_START) + r".*?" + re.escape(MARKER_END), "", text, flags=re.S)
+
+
+def justfile_collisions(targets: dict[Path, bytes]) -> list[str]:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        for relative in (Path("Justfile"), Path(".sc-lint/justfile")):
+            (root / relative).parent.mkdir(parents=True, exist_ok=True); (root / relative).write_bytes(targets[relative])
+        result = subprocess.run(["just", "--justfile", str(root / "Justfile"), "--working-directory", str(root), "--list"], text=True, capture_output=True, check=False)
+    if result.returncode == 0: return []
+    kit = set(re.findall(RECIPE, targets[Path(".sc-lint/justfile")].decode(), re.M))
+    consumer = set(re.findall(RECIPE, unmanaged(targets[Path("Justfile")].decode()), re.M))
+    named = set(JUST_COLLISION.findall(result.stderr))
+    return sorted(named | (kit & consumer))
+
+
 def package_files() -> dict[Path, bytes]:
     return {Path("plugins/sc-lint") / source.relative_to(ROOT): source.read_bytes() for source in ROOT.rglob("*") if source.is_file()}
 
@@ -86,9 +116,11 @@ def desired(data: dict, repo: Path, input_path: Path) -> Desired:
         if source.name == "sc-lint-workflow.yml.j2" and not data["ci"]["enabled"]: continue
         result[target] = render(ROOT / source, data).encode()
     result[INSTALL_INPUT] = json.dumps(data, indent=2, sort_keys=True).encode() + b"\n"
-    justfile = repo / "Justfile"; original = justfile.read_text() if justfile.exists() else ""
+    justfile = repo / "Justfile"; original = justfile.read_text() if justfile.exists() else (ROOT / "templates/Justfile.default").read_text()
+    if not re.search(r"^test(?![\w-])[^:\n]*:(?!=)", unmanaged(original), re.M): original = (original.rstrip() + "\n\n" + (ROOT / "templates/test.just").read_text()).lstrip("\n")
     if original.count(MARKER_START) != original.count(MARKER_END) or original.count(MARKER_START) > 1: raise RuntimeError(f"{justfile}: marker conflict")
-    block = render(ROOT / Path("templates/Justfile.import.j2"), data).strip()
+    shell = data.get("justfile", {}).get("windows_shell", True) and not re.search(r"^set\s+windows-shell\b", unmanaged(original), re.M)
+    block = render(ROOT / Path("templates/Justfile.import.j2"), data).replace("{{ windows_shell }}", WINDOWS_SHELL if shell else "").strip()
     result[Path("Justfile")] = (re.sub(re.escape(MARKER_START) + r".*?" + re.escape(MARKER_END), block, original, flags=re.S) if MARKER_START in original else (original.rstrip() + "\n\n" + block).lstrip("\n")).encode()
     persisted = frozenset({INSTALL_INPUT}) if input_path.resolve() == (repo / INSTALL_INPUT).resolve() else frozenset()
     return Desired(result, frozenset({Path("Justfile")}), persisted)
@@ -136,6 +168,9 @@ def main() -> int:
             if not args.dry_run and prior and relative not in targets.special_targets and relative.as_posix() in prior and digest(current) != prior[relative.as_posix()]: print(f"conflict: {path} was modified outside sc-lint", file=sys.stderr); return 2
             changes.append((path, current, expected))
     if args.dry_run:
+        try: collisions = justfile_collisions(targets.files)
+        except OSError as error: print(f"conflict: --dry-run needs `just` on PATH to check Justfile collisions: {error}", file=sys.stderr); return 2
+        if collisions: print(f"conflict: Justfile collisions: {', '.join(collisions)}", file=sys.stderr); return 2
         for path, old, new in changes: print("".join(difflib.unified_diff(old.decode(errors="replace").splitlines(True), new.decode(errors="replace").splitlines(True), fromfile=str(path), tofile=str(path))))
         return 1 if changes else 0
     manifest = {relative.as_posix(): digest(content) for relative, content in targets.files.items()}

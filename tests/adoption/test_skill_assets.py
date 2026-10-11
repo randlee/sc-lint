@@ -25,6 +25,8 @@ def test_skill_has_the_seven_agent_run_steps() -> None:
     assert "sc-lint adoption dry-run exit" in text
     assert "command arrays must name a shipped binary or `sc_lint` module only" in text
     assert "test-<name>" in text
+    for collision in ("`lint`", "`default`", "`set`", "windows_shell", "templates/test.just"):
+        assert collision in text
     assert "sc-lint docs --path" in text
     assert "adopt.xml.j2" in text
 

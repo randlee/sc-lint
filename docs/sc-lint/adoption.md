@@ -10,9 +10,12 @@ just test
 ```
 
 `just setup` checks or provisions the minimum compatible `sc-lint` release.
-`just lint` runs the selected required lint profile. `just test` runs the
-declared test contract. Consumer-specific recipes remain ordinary recipes
-outside the managed `Justfile` import block.
+`just lint` runs the selected required lint profile. `just test` is the
+repository's own recipe. When the `Justfile` has none, the installer adds
+sc-lint's recommended `test` recipe, which runs the declared test layers; an
+existing `test` recipe is kept. A repository with no `Justfile` starts from
+`plugins/sc-lint/templates/Justfile.default`. Consumer-specific recipes remain
+ordinary recipes outside the managed `Justfile` import block.
 
 ## Install the package and start the skill
 
@@ -125,8 +128,9 @@ for every drifted managed file and returns:
   untracked kit path whose content differs from the desired output. The
   installer lists each such path and writes nothing. The clash check runs on
   every install; the merged `Justfile` and selected `.sc-lint/install.json`
-  input are exempt. Stop and repair the conflict without overwriting
-  consumer-owned content.
+  input are exempt. `--dry-run` also exits 2 when the consumer Justfile and
+  the kit justfile define the same recipe or setting, and names each one.
+  Stop and repair the conflict without overwriting consumer-owned content.
 
 After applying, rerun `--dry-run`. The consumer PR must include the literal
 `sc-lint adoption dry-run exit 0` line only when the final recheck converges.
