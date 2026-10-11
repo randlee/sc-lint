@@ -121,6 +121,14 @@ jobs:
       - name: Run adoption kit tests
         run: just test-adoption
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.1"
+
+      - name: Run adoption kit integration tests
+        run: just test-adoption-integration
+
   release-smoke:
     # G.3b: the released archive must run every kit recipe with no source-tree
     # helper. Stages the archive exactly like release.yml, then drives

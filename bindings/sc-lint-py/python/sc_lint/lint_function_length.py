@@ -344,12 +344,20 @@ def render_stale(stale: StaleAllowance) -> str:
     return f"{stale.path} {stale.name}: allowance {stale.recorded_lines} is above current {stale.current_lines}"
 
 
+def remediation_hint(evaluation: Evaluation) -> str:
+    if not evaluation.violations:
+        return "run --write-baseline to ratchet stale allowances"
+    if not evaluation.stale:
+        return "new or grown functions are not eligible for baseline ratcheting; improve the design first"
+    return "improve new or grown functions before running --write-baseline to ratchet stale allowances"
+
+
 def build_data(repo_root: Path, evaluation: Evaluation, elapsed_ms: int) -> dict:
     output_dir = reset_findings_dir(repo_root, TOOL_NAME)
     failed = evaluation.failed
     summary = (
         f"function-length gate failed: {len(evaluation.violations)} new or grown function(s), "
-        f"{len(evaluation.stale)} stale allowance(s); run --write-baseline to ratchet"
+        f"{len(evaluation.stale)} stale allowance(s); {remediation_hint(evaluation)}"
         if failed
         else "function-length gate passed"
     )

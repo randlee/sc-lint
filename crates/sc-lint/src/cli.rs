@@ -40,6 +40,9 @@ pub enum Command {
         /// Run only the named consumer lint profile step (`all` runs every step in declaration order).
         #[arg(long, requires = "consumer")]
         profile: Option<String>,
+        /// Run only these rules (`<RULE-ID|family>[,...]`); forwarded unchanged to sc-boundary, sc-portability or sc-runtime.
+        #[arg(long = "rule-filter", conflicts_with = "consumer")]
+        rule_filter: Option<String>,
     },
     View {
         #[arg(value_enum)]

@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - uses: ./.github/actions/setup-sc-lint
+      - uses: ./plugins/sc-lint/.github/actions/setup-sc-lint
         with:
           config: sc-lint.toml
       - run: just setup

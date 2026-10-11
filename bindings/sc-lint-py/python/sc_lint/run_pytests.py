@@ -75,6 +75,7 @@ def main(argv: list[str]) -> int:
         repo_root / ".claude/skills/triaging-findings/tests/test_triage_record_template.py",
         repo_root / ".claude/skills/triaging-findings/tests/test_qa_triage_prompt.py",
         repo_root / ".just/tests/test_team_lead_roster_check.py",
+        repo_root / "tests/adr",
     ]
     pytest = subprocess.run([sys.executable, "-m", "pytest", "-q", *map(str, orchestration_tests)], check=False)
     return 0 if result.wasSuccessful() and pytest.returncode == 0 else 1

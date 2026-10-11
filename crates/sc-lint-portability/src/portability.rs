@@ -44,6 +44,8 @@ use crate::predicates::is_unix_shell_path_literal;
 use crate::predicates::production_env_portability_variable;
 use crate::predicates::production_path_rule_id;
 use crate::predicates::use_tree_contains_std_os_unix;
+use sc_lint_analyzer_support::AnalyzerConfigError;
+use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageName;
 use sc_lint_analyzer_support::ScopeKind;
@@ -57,13 +59,36 @@ use sc_lint_analyzer_support::item_name_hint_is_tests;
 use sc_lint_analyzer_support::span_start_line;
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
-struct RepoLintConfig {
-    portability: Option<RepoPortabilityConfig>,
-}
-
-#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 struct RepoPortabilityConfig {
     config_home_env: Option<String>,
+}
+
+fn legacy_portability_config(
+    document: &toml::Table,
+) -> std::result::Result<RepoPortabilityConfig, AnalyzerConfigError> {
+    let wrong_type = |key: &str, expected: &'static str| AnalyzerConfigError::WrongType {
+        analyzer: "portability",
+        key: key.to_string(),
+        expected,
+    };
+    let Some(value) = document.get("portability") else {
+        return Ok(RepoPortabilityConfig::default());
+    };
+    let table = value
+        .as_table()
+        .ok_or_else(|| wrong_type("portability", "a table"))?;
+    let config_home_env = match table.get("config_home_env") {
+        None => None,
+        Some(toml::Value::String(value)) => Some(value.clone()),
+        Some(_) => return Err(wrong_type("config_home_env", "a string")),
+    };
+    Ok(RepoPortabilityConfig { config_home_env })
+}
+
+pub(crate) fn validate_legacy_portability_config(
+    document: &toml::Table,
+) -> std::result::Result<(), AnalyzerConfigError> {
+    legacy_portability_config(document).map(|_| ())
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -79,7 +104,53 @@ struct BuiltInDefaults {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PortabilityConfig {
     config_home_env: Option<String>,
+    /// The Unix path prefixes PORT-001 and PORT-006 share (ADR-010): the
+    /// built-in list, extended by any configured `unix_path_prefixes`.
     unix_path_prefixes: Vec<String>,
+}
+
+impl PortabilityConfig {
+    fn unix_path_prefix_match(&self, value: &str) -> bool {
+        self.unix_path_prefixes
+            .iter()
+            .any(|prefix| value.starts_with(prefix))
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct AnalyzerPortabilityKeys {
+    config_home_env: Option<String>,
+    unix_path_prefixes: Vec<String>,
+}
+
+impl AnalyzerPortabilityKeys {
+    pub(crate) fn from_settings(
+        settings: &AnalyzerSettings,
+    ) -> std::result::Result<Self, AnalyzerConfigError> {
+        let wrong_type = |key: &str, expected: &'static str| AnalyzerConfigError::WrongType {
+            analyzer: "portability",
+            key: key.to_string(),
+            expected,
+        };
+        let config_home_env = settings.own_string("config_home_env")?;
+        settings.own_strings("targets")?;
+        let unix_path_prefixes = settings
+            .own_strings("unix_path_prefixes")?
+            .unwrap_or_default();
+        if unix_path_prefixes
+            .iter()
+            .any(|prefix| prefix.is_empty() || !prefix.starts_with('/'))
+        {
+            return Err(wrong_type(
+                "unix_path_prefixes",
+                "an array of non-empty strings starting with `/`",
+            ));
+        }
+        Ok(Self {
+            config_home_env,
+            unix_path_prefixes,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -94,12 +165,22 @@ struct PortabilityFinding {
     node_label: String,
 }
 
-pub(crate) fn analyze_portability(root: &Path) -> Result<Vec<Finding>> {
-    let config = load_portability_config(root)?;
+pub(crate) fn analyze_portability(
+    root: &Path,
+    document: &toml::Table,
+    settings: &AnalyzerSettings,
+    analyzer_keys: &AnalyzerPortabilityKeys,
+) -> Result<Vec<Finding>> {
+    let config = load_portability_config(document, analyzer_keys)?;
     let source_files = discover_source_files(root)?;
     let mut findings = Vec::new();
 
-    for file_context in source_files {
+    for file_context in source_files.into_iter().filter(|file| {
+        !settings.path_excluded(&sc_lint_analyzer_support::relative_slash_path(
+            root,
+            &file.source_path,
+        ))
+    }) {
         let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
             || {
                 format!(
@@ -118,7 +199,11 @@ pub(crate) fn analyze_portability(root: &Path) -> Result<Vec<Finding>> {
         let mut collector = PortabilityCollector::new(&file_context, &config);
         collector.visit_file_items(&parsed);
         findings.extend(collector.findings);
-        findings.extend(collect_unix_portability_findings(&parsed, &file_context));
+        findings.extend(collect_unix_portability_findings(
+            &parsed,
+            &file_context,
+            &config,
+        ));
     }
 
     findings.sort_by(|left, right| {
@@ -163,6 +248,7 @@ struct PortabilityCollector<'a> {
 fn collect_unix_portability_findings(
     file: &File,
     file_context: &FileContext,
+    config: &PortabilityConfig,
 ) -> Vec<PortabilityFinding> {
     let mut findings = Vec::new();
     let initial_scope = if file_context.is_test_file {
@@ -177,6 +263,7 @@ fn collect_unix_portability_findings(
         false,
         file_context,
         &mut findings,
+        config,
     );
     findings
 }
@@ -188,6 +275,7 @@ fn visit_items_for_unix_portability(
     inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
+    config: &PortabilityConfig,
 ) {
     collect_parity_findings(
         items,
@@ -204,6 +292,7 @@ fn visit_items_for_unix_portability(
             inherited_platform_gated,
             file_context,
             findings,
+            config,
         );
     }
 }
@@ -215,6 +304,7 @@ fn visit_item_for_unix_portability(
     inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
+    config: &PortabilityConfig,
 ) {
     let attrs = item_attrs(item);
     let scope = classify_scope(attrs, inherited_scope, item_name_hint_is_tests(item));
@@ -222,7 +312,7 @@ fn visit_item_for_unix_portability(
     let platform_gated = inherited_platform_gated || attrs.iter().any(attr_is_platform_cfg);
 
     if scope == ScopeKind::NonTest && !platform_gated {
-        collect_production_path_literal_findings(item, file_context, findings);
+        collect_production_path_literal_findings(item, file_context, findings, config);
     }
 
     if scope == ScopeKind::NonTest {
@@ -274,6 +364,7 @@ fn visit_item_for_unix_portability(
             platform_gated,
             file_context,
             findings,
+            config,
         );
     }
 }
@@ -282,6 +373,7 @@ fn collect_production_path_literal_findings(
     item: &Item,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
+    config: &PortabilityConfig,
 ) {
     match item {
         Item::Fn(item_fn) => visit_block_for_unix_portability(
@@ -291,6 +383,7 @@ fn collect_production_path_literal_findings(
             false,
             file_context,
             findings,
+            config,
         ),
         Item::Const(item_const) => visit_expr_for_unix_portability(
             &item_const.expr,
@@ -299,6 +392,7 @@ fn collect_production_path_literal_findings(
             false,
             file_context,
             findings,
+            config,
         ),
         Item::Static(item_static) => visit_expr_for_unix_portability(
             &item_static.expr,
@@ -307,6 +401,7 @@ fn collect_production_path_literal_findings(
             false,
             file_context,
             findings,
+            config,
         ),
         Item::Impl(item_impl) => {
             collect_impl_method_parity_findings(
@@ -327,6 +422,7 @@ fn collect_production_path_literal_findings(
                             false,
                             file_context,
                             findings,
+                            config,
                         );
                     }
                 }
@@ -343,6 +439,7 @@ fn visit_block_for_unix_portability(
     inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
+    config: &PortabilityConfig,
 ) {
     for stmt in &block.stmts {
         match stmt {
@@ -353,6 +450,7 @@ fn visit_block_for_unix_portability(
                 inherited_platform_gated,
                 file_context,
                 findings,
+                config,
             ),
             Stmt::Local(local) => {
                 if let Some(init) = &local.init {
@@ -363,6 +461,7 @@ fn visit_block_for_unix_portability(
                         inherited_platform_gated,
                         file_context,
                         findings,
+                        config,
                     );
                 }
             }
@@ -373,6 +472,7 @@ fn visit_block_for_unix_portability(
                 inherited_platform_gated,
                 file_context,
                 findings,
+                config,
             ),
             Stmt::Macro(_) => {}
         }
@@ -386,11 +486,12 @@ fn visit_expr_for_unix_portability(
     inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
+    config: &PortabilityConfig,
 ) {
     if inherited_scope != ScopeKind::NonTest || inherited_unix_gated || inherited_platform_gated {
         return;
     }
-    let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings);
+    let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings, config);
     visitor.visit_expr(expr);
 }
 
@@ -582,13 +683,14 @@ impl<'a> PortabilityCollector<'a> {
             Expr::Lit(ExprLit {
                 lit: Lit::Str(lit), ..
             }) => {
-                if self.path_prefix_match(&lit.value()) {
+                let value = lit.value();
+                if self.config.unix_path_prefix_match(&value) {
                     self.findings.push(PortabilityFinding {
                         rule_id: RuleId::Port001,
                         kind: "hardcoded_unix_path_literal",
                         message: format!(
                             "PORT-001 hardcoded Unix-only absolute path literal `{}` in test code; prefer std::env::temp_dir(), dirs::home_dir(), or another platform-aware path source",
-                            lit.value()
+                            value
                         ),
                         source_path: self.file_context.source_path.clone(),
                         line: span_start_line(lit.span()),
@@ -619,7 +721,7 @@ impl<'a> PortabilityCollector<'a> {
             return false;
         };
         let value = lit.value();
-        if !self.path_prefix_match(&value) {
+        if !self.config.unix_path_prefix_match(&value) {
             return false;
         }
         self.findings.push(PortabilityFinding {
@@ -658,13 +760,6 @@ impl<'a> PortabilityCollector<'a> {
             ),
         });
     }
-
-    fn path_prefix_match(&self, value: &str) -> bool {
-        self.config
-            .unix_path_prefixes
-            .iter()
-            .any(|prefix| value.starts_with(prefix))
-    }
 }
 
 #[derive(Default)]
@@ -676,14 +771,20 @@ struct ProductionPathLiteralVisitor<'a, 'b> {
     file_context: &'a FileContext,
     findings: &'b mut Vec<PortabilityFinding>,
     platform_gated_depth: usize,
+    config: &'a PortabilityConfig,
 }
 
 impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
-    fn new(file_context: &'a FileContext, findings: &'b mut Vec<PortabilityFinding>) -> Self {
+    fn new(
+        file_context: &'a FileContext,
+        findings: &'b mut Vec<PortabilityFinding>,
+        config: &'a PortabilityConfig,
+    ) -> Self {
         Self {
             file_context,
             findings,
             platform_gated_depth: 0,
+            config,
         }
     }
 
@@ -860,10 +961,13 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
         if self.platform_gated_depth == 0
             && let Lit::Str(lit) = &node.lit
         {
-            if is_unix_shell_path_literal(&lit.value()) {
-                self.push_shell_finding(&lit.value(), span_start_line(lit.span()));
-            } else if let Some(rule_id) = production_path_rule_id(&lit.value()) {
-                self.push_path_finding(rule_id, &lit.value(), span_start_line(lit.span()));
+            let value = lit.value();
+            if is_unix_shell_path_literal(&value) {
+                self.push_shell_finding(&value, span_start_line(lit.span()));
+            } else if self.config.unix_path_prefix_match(&value) {
+                self.push_path_finding(RuleId::Port006, &value, span_start_line(lit.span()));
+            } else if let Some(rule_id) = production_path_rule_id(&value) {
+                self.push_path_finding(rule_id, &value, span_start_line(lit.span()));
             }
         }
         syn::visit::visit_expr_lit(self, node);
@@ -893,29 +997,26 @@ impl<'ast> Visit<'ast> for FunctionBodyVisitor {
     }
 }
 
-fn load_portability_config(root: &Path) -> Result<PortabilityConfig> {
+fn load_portability_config(
+    document: &toml::Table,
+    analyzer_keys: &AnalyzerPortabilityKeys,
+) -> Result<PortabilityConfig> {
     let defaults = toml::from_str::<BuiltInDefaults>(crate::DEFAULT_RULES_TOML)
         .context("failed to parse built-in portability defaults")?;
-    let repo_config_path = Some(root.join("sc-lint.toml")).filter(|path| path.exists());
-    let repo_config = if let Some(repo_config_path) = repo_config_path {
-        let text = fs::read_to_string(&repo_config_path).with_context(|| {
-            format!(
-                "failed to read repo portability config: {}",
-                repo_config_path.display()
-            )
-        })?;
-        toml::from_str::<RepoLintConfig>(&text).with_context(|| {
-            format!(
-                "failed to parse repo portability config: {}",
-                repo_config_path.display()
-            )
-        })?
-    } else {
-        RepoLintConfig::default()
-    };
+    let repo_config = legacy_portability_config(document)
+        .map_err(anyhow::Error::from)
+        .context("failed to parse repo portability config")?;
 
     Ok(PortabilityConfig {
-        config_home_env: repo_config.portability.and_then(|cfg| cfg.config_home_env),
-        unix_path_prefixes: defaults.portability.unix_path_prefixes,
+        config_home_env: analyzer_keys
+            .config_home_env
+            .clone()
+            .or(repo_config.config_home_env),
+        unix_path_prefixes: defaults
+            .portability
+            .unix_path_prefixes
+            .into_iter()
+            .chain(analyzer_keys.unix_path_prefixes.iter().cloned())
+            .collect(),
     })
 }

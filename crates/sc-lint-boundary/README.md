@@ -13,7 +13,7 @@ Use `sc-boundary` to check:
 - direct workspace package dependency policy from boundary inventory
 - Rust-native manifest-policy checks added in A.7
 
-Current rule families include:
+Rule IDs include:
 
 - `SCB-CYCLE-001`
 - `SCB-CYCLE-002`
@@ -27,6 +27,15 @@ Current rule families include:
 - `SCB-DEPENDENCY-003`
 - `SCB-MANIFEST-001`
 - `SCB-MANIFEST-002`
+
+Rule filters accept individual rule IDs and these kebab-case family names:
+
+- `cycles`
+- `boundaries`
+- `internal-only`
+- `forbid-external-impls`
+- `dependencies`
+- `manifests`
 
 ## Invocation
 
@@ -54,9 +63,34 @@ Backend-local filtered analysis:
 
 ```bash
 cargo run -p sc-lint-boundary -- analyze --root . --rule-filter cycles --format text
-cargo run -p sc-lint-boundary -- analyze --root . --rule-filter boundaries --format text
-cargo run -p sc-lint-boundary -- analyze --root . --rule-filter dependencies --format text
+cargo run -p sc-lint-boundary -- analyze --root . --rule-filter SCB-DEPENDENCY-001 --format text
+cargo run -p sc-lint-boundary -- analyze --root . --config sc-lint.toml --rule-filter manifests --format text
 ```
+
+## Analyzer Configuration
+
+`--config <path>` selects the TOML file used for analyzer settings. When it is
+omitted, `sc-boundary` reads `sc-lint.toml` from the workspace root. Boundary
+settings live under `[tool.sc-lint.analyzers.boundary]`:
+
+```toml
+[tool.sc-lint.analyzers.boundary]
+enabled = true
+reason = "boundary checks apply to this workspace"
+exclude_rules = ["SCB-MANIFEST-001"]
+fail_rules = ["cycles", "SCB-DEPENDENCY-001"]
+exclude_paths = ["crates/generated/**"]
+```
+
+The table supports the common keys `enabled`, `reason`, `exclude_rules`,
+`fail_rules`, and `exclude_paths`; boundary has no analyzer-specific keys.
+Rule IDs and family names can be used in `--rule-filter`, `exclude_rules`,
+and `fail_rules`.
+
+An unknown `--rule-filter` selector is a usage error and exits with code `2`.
+Invalid configuration, including an unknown table key or an invalid key
+value, exits with code `3`. These match the top-level CLI's normalized usage
+and configuration exit codes.
 
 Graph export stays backend-local and is adjacent to, but not part of, the
 top-level `lint sc-boundary` contract:
@@ -155,6 +189,7 @@ annotations:
 [dependencies]
 allowed_dependents = ["sc-lint"]
 allowed_dependencies = ["sc-lint-directives", "sc-lint-schema"]
+allowed_dev_dependencies = ["sc-lint-test-support"]
 forbidden_edges = [
   { from = "sc-lint-boundary", to = "sc-lint-attributes" },
   { from = "sc-lint-boundary", to = "sc-observability" },
@@ -168,6 +203,12 @@ SCB-DEPENDENCY-001 package dependency not allowed:
 workspace package `sc-lint-boundary` directly depends on `sc-lint-attributes` but `sc-lint-attributes` is not listed in `BOUNDARY-ScLintBoundaryAnalyzer` allowed_dependencies
 ```
 
+`allowed_dependencies` permits direct workspace-package dependencies of any
+kind. A dev-dependency is also permitted when its target appears in
+`allowed_dev_dependencies`; normal and build dependencies still require
+`allowed_dependencies`. If an edge is both a normal dependency and a
+dev-dependency, it is checked as a normal dependency.
+
 Boundary inventory records may use either structured or arrow-delimited
 forbidden edges:
 
@@ -179,9 +220,22 @@ forbidden_edges = [
 ```
 
 Boundary records define exactly one non-empty `[public].facade` or
-`[public].trait`; `owner_crate_path` equals `owner_package` with hyphens
-replaced by underscores. For example, `sc-lint-boundary` maps to
-`sc_lint_boundary`.
+`[public].trait`. `owner_crate_path` must equal the library target name for
+`owner_package` reported by `cargo metadata`, including an explicitly named
+`[lib]` target. Do not derive it by replacing hyphens in the package name. For
+example, `sc-lint-boundary` has the default library target name
+`sc_lint_boundary`, but a package with `[lib] name = "boundary_api"` must use
+`boundary_api`.
+
+A boundary record may also carry one opaque `extensions` table, whose
+namespaced entries are parsed as TOML and ignored by `sc-lint`:
+
+```toml
+[extensions.example]
+consumer_metadata = "consumer-defined metadata"
+```
+
+Other unknown fields in a boundary record remain errors.
 
 Operator guidance:
 

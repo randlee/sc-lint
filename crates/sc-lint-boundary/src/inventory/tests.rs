@@ -1032,6 +1032,39 @@ state = "concrete_landed"
 }
 
 #[test]
+fn loads_allowed_dev_dependencies() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "allowed_dev_dependencies = [\"sc-lint-directives\"]\nforbidden_edges = []",
+        )
+    });
+
+    load_boundary_inventory(fixture.root()).expect("allowed dev dependencies load");
+}
+
+#[test]
+fn rejects_duplicate_allowed_dev_dependency_names() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "allowed_dev_dependencies = [\"sc-lint-directives\", \"sc-lint-directives\"]\nforbidden_edges = []",
+        )
+    });
+
+    let error =
+        load_boundary_inventory(fixture.root()).expect_err("duplicate dev dependencies fail");
+    assert!(
+        format!("{error:#}")
+            .contains("duplicate package `sc-lint-directives` in `allowed_dev_dependencies`")
+    );
+}
+
+#[test]
 fn rejects_duplicate_forbidden_edges() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
@@ -1600,22 +1633,15 @@ state = "concrete_landed"
 }
 
 #[test]
-fn rejects_owner_crate_path_mismatch() {
+fn ignores_opaque_extensions_table() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
     fixture.rewrite_valid_boundary(|contents| {
-        contents.replace(
-            "owner_crate_path = \"sc_lint_boundary\"",
-            "owner_crate_path = \"wrong_crate_path\"",
-        )
+        contents + "\n[extensions.atm]\nteam = \"core\"\nlimits = { max = 3 }\n"
     });
 
-    let error = load_boundary_inventory(fixture.root())
-        .expect_err("owner crate path mismatch fails")
-        .to_string();
-    assert!(error.contains(
-        "boundary `BOUNDARY-ScLintBoundaryAnalyzer` declares owner_crate_path `wrong_crate_path` but expected `sc_lint_boundary` from owner_package `sc-lint-boundary`"
-    ));
+    let inventory = load_boundary_inventory(fixture.root()).expect("extensions are ignored");
+    assert_eq!(inventory.records.len(), 1);
 }
 
 #[test]

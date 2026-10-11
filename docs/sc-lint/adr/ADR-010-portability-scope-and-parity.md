@@ -74,4 +74,8 @@ consumer-local.
    prefix adds detection and never suppresses a finding.
 2. Extends Decision 5: `PORT-002` reads `config_home_env` from the same
    `[tool.sc-lint.analyzers.portability]` table.
-3. The rest of Decision 5 stands.
+3. The legacy top-level `[portability]` table remains a compatibility fallback
+   only for `config_home_env`; a value in the analyzer table takes precedence.
+   Both tables require `config_home_env` to be a string and reject a wrong type
+   through the analyzer configuration error path.
+4. The rest of Decision 5 stands.

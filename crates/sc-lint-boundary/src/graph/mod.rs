@@ -6,6 +6,7 @@ mod build;
 mod reference_collector;
 
 pub(crate) use build::build_workspace_graph;
+pub(crate) use build::build_workspace_graph_from;
 
 pub(crate) fn node_has_allow_rule(node: &GraphNode, rule_id: &str) -> bool {
     node.attributes.iter().any(|attr| {
@@ -244,6 +245,14 @@ pub(crate) fn crate_id(package_name: &str, target_name: &str) -> CrateId {
 pub(crate) fn load_metadata(root: &Path) -> Result<cargo_metadata::Metadata> {
     MetadataCommand::new()
         .current_dir(root)
+        .exec()
+        .with_context(|| format!("failed to load cargo metadata for {}", root.display()))
+}
+
+pub(crate) fn load_metadata_without_deps(root: &Path) -> Result<cargo_metadata::Metadata> {
+    MetadataCommand::new()
+        .current_dir(root)
+        .no_deps()
         .exec()
         .with_context(|| format!("failed to load cargo metadata for {}", root.display()))
 }
