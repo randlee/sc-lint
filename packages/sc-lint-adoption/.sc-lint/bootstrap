@@ -159,13 +159,17 @@ bootstrap_install() {
         printf '%s\n' "setup: could not extract $archive (CLI.SC_LINT_RELEASE_UNAVAILABLE)" >&2
         exit 4
     fi
-    [ -f "$staging/extract/sc-lint" ] || {
+    launcher="$staging/extract/sc-lint"
+    if [ ! -f "$launcher" ]; then
+        launcher="$staging/extract/sc-lint_${version}_${target}/bin/sc-lint"
+    fi
+    [ -f "$launcher" ] || {
         printf '%s\n' "setup: release archive did not contain sc-lint (CLI.SC_LINT_RELEASE_UNAVAILABLE)" >&2
         exit 4
     }
     # The extracted release is only a launcher. Its Rust installer owns the
     # managed-target backup, activation, rollback, and version verification.
-    "$staging/extract/sc-lint" --config "$config" "$command" "$@"
+    "$launcher" --config "$config" "$command" "$@"
 }
 
 ensure_product() {

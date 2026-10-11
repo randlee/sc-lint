@@ -147,12 +147,13 @@ class ConsumerLifecycleTests(unittest.TestCase):
         else:
             triple, extension = "x86_64-unknown-linux-gnu", "tar.gz"
         archive = release_dir / f"sc-lint_{VERSION}_{triple}.{extension}"
+        archive_root = f"sc-lint_{VERSION}_{triple}"
         if extension == "zip":
             with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
-                package.write(binary, arcname=binary_name)
+                package.write(binary, arcname=f"{archive_root}/bin/{binary_name}")
         else:
             with tarfile.open(archive, "w:gz") as package:
-                package.add(binary, arcname=binary_name)
+                package.add(binary, arcname=f"{archive_root}/bin/{binary_name}")
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         (release_dir / "checksums.txt").write_text(
             f"{digest} {archive.name}\n", encoding="utf-8"

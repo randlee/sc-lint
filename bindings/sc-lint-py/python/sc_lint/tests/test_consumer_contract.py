@@ -110,7 +110,9 @@ class ConsumerContractTests(unittest.TestCase):
 
     def test_posix_bootstrap_leaves_managed_activation_to_the_rust_installer(self) -> None:
         contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
-        self.assertIn('"$staging/extract/sc-lint" --config "$config" "$command" "$@"', contents)
+        self.assertIn('launcher="$staging/extract/sc-lint"', contents)
+        self.assertIn('launcher="$staging/extract/sc-lint_${version}_${target}/bin/sc-lint"', contents)
+        self.assertIn('"$launcher" --config "$config" "$command" "$@"', contents)
         self.assertNotIn('mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new"', contents)
 
     def test_root_helpers_match_the_generated_product_assets(self) -> None:
