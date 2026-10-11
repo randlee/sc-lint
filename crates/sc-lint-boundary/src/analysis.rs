@@ -16,131 +16,152 @@ pub(crate) fn analyze_cycles(graph: &GraphExport) -> Vec<Finding> {
     let mut findings = Vec::new();
     for component in sccs {
         if component.len() > 1 {
-            if component_allows_recursive_value_container(&component, &node_map) {
-                continue;
+            if !component_allows_recursive_value_container(&component, &node_map) {
+                findings.push(multi_owner_cycle_finding(&component, &owner_graph));
             }
-            let mut owners = component.clone();
-            owners.sort();
-            findings.push(Finding {
-                rule_id: RuleId::ScbCycle001,
-                kind: "multi_owner_architectural_cycle".into(),
-                message: format!(
-                    "architectural cycle across owners: {}",
-                    owners
-                        .iter()
-                        .map(OwnerId::as_str)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
-                owner_ids: owners.clone(),
-                node_ids: owner_contributors(&owners, &owner_graph),
-            });
             continue;
         }
 
         let owner_id = &component[0];
-        let Some(owner_edges) = owner_graph.self_refs.get(owner_id) else {
-            continue;
-        };
-        let self_refs: Vec<&OwnerRefEdge> = owner_edges
-            .iter()
-            .filter(|edge| !is_delegation_edge(edge, owner_edges, &node_map))
-            .collect();
-        if self_refs.is_empty() {
-            continue;
-        }
-        let mut per_source: BTreeMap<NodeId, Vec<&OwnerRefEdge>> = BTreeMap::new();
-        for edge in self_refs {
-            per_source
-                .entry(edge.source_node_id.clone())
-                .or_default()
-                .push(edge);
-        }
-        let mut inherent_nodes = BTreeSet::new();
-        let mut trait_nodes: BTreeMap<String, BTreeSet<NodeId>> = BTreeMap::new();
-
-        for (source_node_id, source_edges) in per_source {
-            let allow_rule = source_edges.iter().any(|edge| {
-                edge.node_ids.iter().any(|node_id| {
-                    node_map
-                        .get(node_id)
-                        .map(|node| graph::node_has_allow_rule(node, "cycle.type_method_self_loop"))
-                        .unwrap_or(false)
-                })
-            });
-            if allow_rule {
-                continue;
-            }
-
-            let is_type_method_self_loop = source_edges.iter().all(|edge| {
-                edge.source_kind == "method"
-                    && edge.owner_kind == "type"
-                    && edge.target_owner_id == edge.source_owner_id
-                    && edge.source_impl_kind != Some(ImplKind::Trait)
-            });
-            if is_type_method_self_loop {
-                let has_expr_ref = source_edges
-                    .iter()
-                    .any(|edge| edge.reference_kind == ReferenceKind::Expr);
-                let has_type_ref = source_edges
-                    .iter()
-                    .any(|edge| edge.reference_kind == ReferenceKind::Type);
-                if !has_expr_ref || has_type_ref {
-                    continue;
-                }
-                for edge in source_edges {
-                    for node_id in &edge.node_ids {
-                        inherent_nodes.insert(node_id.clone());
-                    }
-                }
-                continue;
-            }
-
-            let is_trait_impl_self_loop = source_edges.iter().all(|edge| {
-                edge.source_kind == "method"
-                    && edge.owner_kind == "type"
-                    && edge.target_owner_id == edge.source_owner_id
-                    && edge.source_impl_kind == Some(ImplKind::Trait)
-            });
-            if is_trait_impl_self_loop {
-                let trait_name = node_map
-                    .get(&source_node_id)
-                    .and_then(|node| node.impl_trait.as_deref())
-                    .unwrap_or("unknown_trait");
-                if is_non_architectural_trait_impl_self_loop(trait_name) {
-                    continue;
-                }
-                let entry = trait_nodes.entry(trait_name.to_string()).or_default();
-                for edge in source_edges {
-                    for node_id in &edge.node_ids {
-                        entry.insert(node_id.clone());
-                    }
-                }
-            }
-        }
-
-        if !inherent_nodes.is_empty() {
-            findings.push(Finding {
-                rule_id: RuleId::ScbCycle002,
-                kind: "type_method_self_loop".into(),
-                message: format!("type/method self-loop on owner {owner_id}"),
-                owner_ids: vec![owner_id.clone()],
-                node_ids: inherent_nodes.into_iter().collect(),
-            });
-        }
-
-        for (trait_name, node_ids) in trait_nodes {
-            findings.push(Finding {
-                rule_id: RuleId::ScbCycle003,
-                kind: "trait_impl_self_loop".into(),
-                message: format!("trait-impl self-loop on owner {owner_id} via {trait_name}"),
-                owner_ids: vec![owner_id.clone()],
-                node_ids: node_ids.into_iter().collect(),
-            });
+        if let Some(owner_edges) = owner_graph.self_refs.get(owner_id) {
+            findings.extend(self_loop_findings(owner_id, owner_edges, &node_map));
         }
     }
 
     findings
+}
+
+fn multi_owner_cycle_finding(component: &[OwnerId], owner_graph: &OwnerGraph) -> Finding {
+    let mut owners = component.to_vec();
+    owners.sort();
+    Finding {
+        rule_id: RuleId::ScbCycle001,
+        kind: "multi_owner_architectural_cycle".into(),
+        message: format!(
+            "architectural cycle across owners: {}",
+            owners
+                .iter()
+                .map(OwnerId::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        owner_ids: owners.clone(),
+        node_ids: owner_contributors(&owners, owner_graph),
+    }
+}
+
+/// Node ids a single owner's self-referencing sources contribute, split into
+/// inherent type/method self-loops and trait-impl self-loops keyed by trait.
+#[derive(Default)]
+struct SelfLoopNodes {
+    inherent: BTreeSet<NodeId>,
+    by_trait: BTreeMap<String, BTreeSet<NodeId>>,
+}
+
+fn self_loop_findings(
+    owner_id: &OwnerId,
+    owner_edges: &[OwnerRefEdge],
+    node_map: &BTreeMap<NodeId, &GraphNode>,
+) -> Vec<Finding> {
+    let mut per_source: BTreeMap<NodeId, Vec<&OwnerRefEdge>> = BTreeMap::new();
+    for edge in owner_edges
+        .iter()
+        .filter(|edge| !is_delegation_edge(edge, owner_edges, node_map))
+    {
+        per_source
+            .entry(edge.source_node_id.clone())
+            .or_default()
+            .push(edge);
+    }
+
+    let mut nodes = SelfLoopNodes::default();
+    for (source_node_id, source_edges) in per_source {
+        record_self_loop_source(&source_node_id, &source_edges, node_map, &mut nodes);
+    }
+
+    let mut findings = Vec::new();
+    if !nodes.inherent.is_empty() {
+        findings.push(Finding {
+            rule_id: RuleId::ScbCycle002,
+            kind: "type_method_self_loop".into(),
+            message: format!("type/method self-loop on owner {owner_id}"),
+            owner_ids: vec![owner_id.clone()],
+            node_ids: nodes.inherent.into_iter().collect(),
+        });
+    }
+    for (trait_name, node_ids) in nodes.by_trait {
+        findings.push(Finding {
+            rule_id: RuleId::ScbCycle003,
+            kind: "trait_impl_self_loop".into(),
+            message: format!("trait-impl self-loop on owner {owner_id} via {trait_name}"),
+            owner_ids: vec![owner_id.clone()],
+            node_ids: node_ids.into_iter().collect(),
+        });
+    }
+    findings
+}
+
+fn record_self_loop_source(
+    source_node_id: &NodeId,
+    source_edges: &[&OwnerRefEdge],
+    node_map: &BTreeMap<NodeId, &GraphNode>,
+    nodes: &mut SelfLoopNodes,
+) {
+    let allow_rule = source_edges.iter().any(|edge| {
+        edge.node_ids.iter().any(|node_id| {
+            node_map
+                .get(node_id)
+                .map(|node| graph::node_has_allow_rule(node, "cycle.type_method_self_loop"))
+                .unwrap_or(false)
+        })
+    });
+    if allow_rule {
+        return;
+    }
+    let edge_node_ids = || {
+        source_edges
+            .iter()
+            .flat_map(|edge| edge.node_ids.iter().cloned())
+    };
+
+    let is_type_method_self_loop = source_edges.iter().all(|edge| {
+        edge.source_kind == "method"
+            && edge.owner_kind == "type"
+            && edge.target_owner_id == edge.source_owner_id
+            && edge.source_impl_kind != Some(ImplKind::Trait)
+    });
+    if is_type_method_self_loop {
+        let has_expr_ref = source_edges
+            .iter()
+            .any(|edge| edge.reference_kind == ReferenceKind::Expr);
+        let has_type_ref = source_edges
+            .iter()
+            .any(|edge| edge.reference_kind == ReferenceKind::Type);
+        if has_expr_ref && !has_type_ref {
+            nodes.inherent.extend(edge_node_ids());
+        }
+        return;
+    }
+
+    let is_trait_impl_self_loop = source_edges.iter().all(|edge| {
+        edge.source_kind == "method"
+            && edge.owner_kind == "type"
+            && edge.target_owner_id == edge.source_owner_id
+            && edge.source_impl_kind == Some(ImplKind::Trait)
+    });
+    if is_trait_impl_self_loop {
+        let trait_name = node_map
+            .get(source_node_id)
+            .and_then(|node| node.impl_trait.as_deref())
+            .unwrap_or("unknown_trait");
+        if !is_non_architectural_trait_impl_self_loop(trait_name) {
+            nodes
+                .by_trait
+                .entry(trait_name.to_string())
+                .or_default()
+                .extend(edge_node_ids());
+        }
+    }
 }
 
 fn component_allows_recursive_value_container(

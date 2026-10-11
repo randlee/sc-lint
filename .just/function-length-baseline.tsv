@@ -1,7 +1,6 @@
 # function-length baseline: functions at or over 80 code lines.
 # columns: path, name, code_lines. A name may repeat; each row is one allowance.
 # regenerate: python -m sc_lint.lint_function_length --write-baseline
-crates/sc-lint-boundary/src/analysis.rs	analyze_cycles	126
 crates/sc-lint-boundary/src/analysis.rs	analyze_named_callers	86
 crates/sc-lint-boundary/src/graph/build.rs	ingest_module_items	484
 crates/sc-lint-boundary/src/inventory/mod.rs	validate_boundary_schema	120
