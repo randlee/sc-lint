@@ -129,7 +129,7 @@ skills:
 # atm-bd-orchestration configuration (read by its install.py; no defaults)
 roles:
   lead: team-lead
-  dev-sanity: dev-sanity
+  dev-sanity: lint-sanity
   quality-mgr: quality-mgr
 bead_prefix: lint
 worktree_base: ../sc-lint-worktrees
