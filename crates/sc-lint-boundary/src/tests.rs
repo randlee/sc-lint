@@ -471,6 +471,203 @@ fn dependency_policy_allows_direct_workspace_dependency() {
 }
 
 #[test]
+fn dependency_policy_resolves_owner_and_policy_aliases_to_canonical_packages() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app-dir", "crates/api-dir"]);
+    fixture.write(
+        "crates/app-dir/Cargo.toml",
+        &identity_member_manifest(
+            "app-pkg",
+            "app_lib",
+            "[dependencies]\napi_alias = { package = \"api-pkg\", path = \"../api-dir\", version = \"0.1.0\" }",
+        ),
+    );
+    fixture.write(
+        "crates/api-dir/Cargo.toml",
+        &identity_member_manifest("api-pkg", "api_lib", ""),
+    );
+    fixture.write_boundary_record("app-dir", "app-dir", "app_lib", &["api_lib"], &[], &[]);
+    fixture.write_boundary_record("api-dir", "api-dir", "api_lib", &[], &["app-dir"], &[]);
+    fixture.write_source("app-dir", "lib.rs", "pub struct App;");
+    fixture.write_source("api-dir", "lib.rs", "pub struct Api;");
+
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    assert_eq!(
+        analyze_workspace(&options).unwrap().status,
+        ReportStatus::Pass
+    );
+
+    fixture.write_boundary_record(
+        "app-dir",
+        "app-dir",
+        "app_lib",
+        &["api_lib"],
+        &[],
+        &[("app-dir", "api_lib")],
+    );
+    let report = analyze_workspace(&options).unwrap();
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency003);
+    assert_eq!(
+        report.findings[0].message,
+        "forbidden workspace dependency edge `app-pkg -> api-pkg` is present"
+    );
+}
+
+#[test]
+fn dependency_reference_exact_name_takes_precedence_over_directory_alias() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/exact-dir", "crates/other/shared"]);
+    fixture.write(
+        "crates/exact-dir/Cargo.toml",
+        &identity_member_manifest(
+            "exact-dir",
+            "exact_lib",
+            "[dependencies]\nshared = { path = \"../other/shared\", version = \"0.1.0\" }",
+        ),
+    );
+    fixture.write(
+        "crates/other/shared/Cargo.toml",
+        &identity_member_manifest("shared", "other_lib", ""),
+    );
+    fixture.write_boundary_record("exact-dir", "exact-dir", "exact_lib", &["shared"], &[], &[]);
+    fixture.write_source("exact-dir", "lib.rs", "pub struct Exact;");
+    fixture.write("crates/other/shared/src/lib.rs", "pub struct Other;");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+}
+
+#[test]
+fn dependency_policy_rejects_unknown_owner_and_edge_references() {
+    let unknown_owner = WorkspaceFixture::new();
+    unknown_owner.write_workspace_root_with_members(&["crates/app"]);
+    unknown_owner.write(
+        "crates/app/Cargo.toml",
+        &identity_member_manifest("app", "app", ""),
+    );
+    unknown_owner.write_boundary_record("missing", "missing", "missing", &[], &[], &[]);
+    unknown_owner.write_source("app", "lib.rs", "pub struct App;");
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: unknown_owner.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("unknown owner must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("unknown workspace package reference `missing`")
+    );
+    assert!(error.to_string().contains("owner_package"));
+
+    let unknown_edge = WorkspaceFixture::new();
+    unknown_edge.write_workspace_root_with_members(&["crates/app"]);
+    unknown_edge.write(
+        "crates/app/Cargo.toml",
+        &identity_member_manifest("app", "app", ""),
+    );
+    unknown_edge.write_boundary_record("app", "app", "app", &[], &[], &[("app", "missing")]);
+    unknown_edge.write_source("app", "lib.rs", "pub struct App;");
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: unknown_edge.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("unknown forbidden-edge endpoint must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("unknown workspace package reference `missing`")
+    );
+    assert!(
+        error
+            .to_string()
+            .contains("dependencies.forbidden_edges[].to")
+    );
+}
+
+#[test]
+fn dependency_policy_rejects_ambiguous_directory_and_library_aliases() {
+    for (alias, members, manifests) in [
+        (
+            "shared",
+            vec!["crates/owner", "crates/one/shared", "crates/two/shared"],
+            vec![
+                (
+                    "crates/owner/Cargo.toml",
+                    identity_member_manifest("owner", "owner", ""),
+                ),
+                (
+                    "crates/one/shared/Cargo.toml",
+                    identity_member_manifest("one-pkg", "one", ""),
+                ),
+                (
+                    "crates/two/shared/Cargo.toml",
+                    identity_member_manifest("two-pkg", "two", ""),
+                ),
+            ],
+        ),
+        (
+            "shared_lib",
+            vec!["crates/owner", "crates/one", "crates/two"],
+            vec![
+                (
+                    "crates/owner/Cargo.toml",
+                    identity_member_manifest("owner", "owner", ""),
+                ),
+                (
+                    "crates/one/Cargo.toml",
+                    identity_member_manifest("one-pkg", "shared_lib", ""),
+                ),
+                (
+                    "crates/two/Cargo.toml",
+                    identity_member_manifest("two-pkg", "shared_lib", ""),
+                ),
+            ],
+        ),
+    ] {
+        let fixture = WorkspaceFixture::new();
+        fixture.write_workspace_root_with_members(&members);
+        for (path, manifest) in manifests {
+            fixture.write(path, &manifest);
+            fixture.write(
+                &path.replace("Cargo.toml", "src/lib.rs"),
+                "pub struct Fixture;",
+            );
+        }
+        fixture.write_boundary_record("owner", "owner", "owner", &[alias], &[], &[]);
+
+        let error = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Dependencies),
+        })
+        .expect_err("ambiguous alias must fail");
+        assert!(
+            error
+                .to_string()
+                .contains("ambiguous workspace package reference"),
+            "{error:#}"
+        );
+        assert!(
+            error.to_string().contains("`one-pkg`, `two-pkg`"),
+            "{error:#}"
+        );
+    }
+}
+
+#[test]
 fn dependency_policy_flags_disallowed_direct_dependency() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
@@ -2583,6 +2780,98 @@ impl WorkspaceFixture {
         );
     }
 
+    fn write_boundary_record(
+        &self,
+        boundary_directory: &str,
+        owner_package: &str,
+        owner_crate_path: &str,
+        allowed_dependencies: &[&str],
+        allowed_dependents: &[&str],
+        forbidden_edges: &[(&str, &str)],
+    ) {
+        let boundary_id = boundary_directory
+            .split('-')
+            .map(|segment| {
+                let mut chars = segment.chars();
+                match chars.next() {
+                    Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
+                    None => String::new(),
+                }
+            })
+            .collect::<String>();
+        let allowed_dependencies = allowed_dependencies
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let allowed_dependents = allowed_dependents
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges = forbidden_edges
+            .iter()
+            .map(|(from, to)| format!("{{ from = \"{from}\", to = \"{to}\" }}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let forbidden_edges = if forbidden_edges.is_empty() {
+            "[]".to_string()
+        } else {
+            format!("[{forbidden_edges}]")
+        };
+
+        self.write(
+            "boundaries/planning.toml",
+            r#"
+                [planning]
+                current_sprint = "D.1"
+            "#,
+        );
+        self.write(
+            &format!("boundaries/{boundary_directory}/boundary.toml"),
+            &format!(
+                r#"
+                    boundary_id = "BOUNDARY-{boundary_id}"
+                    owner_package = "{owner_package}"
+                    owner_crate_path = "{owner_crate_path}"
+                    name = "{boundary_directory}"
+
+                    [public]
+                    facade = "run"
+
+                    [implementation]
+                    type = "run"
+                    module = "{owner_crate_path}"
+                    visibility = "public"
+                    constructor = "none"
+
+                    [composition]
+                    roots = ["run"]
+
+                    [dependencies]
+                    allowed_dependents = [{allowed_dependents}]
+                    allowed_dependencies = [{allowed_dependencies}]
+                    forbidden_edges = {forbidden_edges}
+
+                    [references]
+                    scope = "outside_owner_crate"
+                    forbidden = []
+
+                    [testing]
+                    allowed_test_double_paths = []
+                    forbidden_test_bypasses = []
+
+                    [enforcement]
+                    lint_rules = []
+                    review_gates = []
+
+                    [status]
+                    state = "concrete_landed"
+                "#,
+            ),
+        );
+    }
+
     fn write(&self, relative_path: &str, contents: &str) {
         let path = self.root().join(relative_path);
         if let Some(parent) = path.parent() {
@@ -2788,6 +3077,12 @@ fn good_member_manifest(package_name: &str, extra: &str) -> String {
             {extra}
         "#
     ))
+}
+
+fn identity_member_manifest(package_name: &str, library_name: &str, extra: &str) -> String {
+    format!(
+        "[package]\nname = \"{package_name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[lib]\nname = \"{library_name}\"\n\n{extra}\n"
+    )
 }
 
 fn path_dependency_manifest(

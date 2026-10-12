@@ -1506,6 +1506,34 @@ fn lint_analyzer_pass_verdict_exits_zero() {
 }
 
 #[test]
+fn lint_sc_boundary_wrapper_resolves_workspace_identity_aliases() {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app-dir", "crates/api-dir"]);
+    fixture.write(
+        "crates/app-dir/Cargo.toml",
+        "[package]\nname = \"app-pkg\"\nversion.workspace = true\nedition.workspace = true\nrust-version.workspace = true\nauthors.workspace = true\nlicense.workspace = true\nrepository.workspace = true\nhomepage.workspace = true\n\n[lib]\nname = \"app_lib\"\n\n[dependencies]\napi_alias = { package = \"api-pkg\", path = \"../api-dir\", version = \"0.1.0\" }\n",
+    );
+    fixture.write(
+        "crates/api-dir/Cargo.toml",
+        "[package]\nname = \"api-pkg\"\nversion.workspace = true\nedition.workspace = true\nrust-version.workspace = true\nauthors.workspace = true\nlicense.workspace = true\nrepository.workspace = true\nhomepage.workspace = true\n\n[lib]\nname = \"api_lib\"\n",
+    );
+    fixture.write_source("app-dir", "lib.rs", "pub struct App;\n");
+    fixture.write_source("api-dir", "lib.rs", "pub struct Api;\n");
+    fixture.write_custom_boundary_record("app-dir", "app-dir", "app_lib", &["api_lib"]);
+
+    for json_mode in [true, false] {
+        let outcome = lint_boundary_outcome(fixture.root(), json_mode);
+        assert_eq!(
+            outcome.exit_code, 0,
+            "json_mode = {json_mode}, data = {:?}",
+            outcome.rendered
+        );
+        assert!(outcome.ok, "json_mode = {json_mode}");
+        assert!(outcome.error.is_none(), "json_mode = {json_mode}");
+    }
+}
+
+#[test]
 fn verdict_exit_code_covers_every_analyzer_target() {
     use crate::entry::verdict_exit_code;
 
@@ -2351,6 +2379,26 @@ homepage = "https://example.invalid/sc-lint"
                 "boundary_id = \"BOUNDARY-{boundary_id}\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{}\"\nname = \"{owner_package}\"\n\n[public]\nfacade = \"run\"\n\n[implementation]\ntype = \"run\"\nmodule = \"{}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"run\"]\n\n[dependencies]\nallowed_dependents = [{allowed_dependents}]\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = {forbidden_edges_block}\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
                 owner_crate_path,
                 owner_package,
+            ),
+        );
+    }
+
+    fn write_custom_boundary_record(
+        &self,
+        boundary_directory: &str,
+        owner_package: &str,
+        owner_crate_path: &str,
+        allowed_dependencies: &[&str],
+    ) {
+        let allowed_dependencies = allowed_dependencies
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.write(
+            &format!("boundaries/{boundary_directory}/boundary.toml"),
+            &format!(
+                "boundary_id = \"BOUNDARY-App\"\nowner_package = \"{owner_package}\"\nowner_crate_path = \"{owner_crate_path}\"\nname = \"App\"\n\n[public]\nfacade = \"App\"\n\n[implementation]\ntype = \"App\"\nmodule = \"{owner_crate_path}\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"App\"]\n\n[dependencies]\nallowed_dependents = []\nallowed_dependencies = [{allowed_dependencies}]\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n"
             ),
         );
     }
