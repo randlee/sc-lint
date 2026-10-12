@@ -1598,6 +1598,89 @@ fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
     (exit_code, envelope)
 }
 
+fn run_lint_with_path_backend(version: &str) -> (std::process::Output, MockBackend, TempDir) {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub fn example() {}\n");
+
+    let backend =
+        MockBackend::install_native_version_probe(crate::consts::TOOL_PORTABILITY, version);
+    let launcher_dir = TempDir::new().expect("isolated launcher directory");
+    let test_executable = std::env::current_exe().expect("test executable path");
+    let cli_name = if cfg!(windows) {
+        "sc-lint.exe"
+    } else {
+        "sc-lint"
+    };
+    let cli_source = test_executable
+        .parent()
+        .and_then(Path::parent)
+        .map(|target_dir| target_dir.join(cli_name))
+        .expect("sc-lint executable path");
+    let cli_copy = launcher_dir.path().join(cli_name);
+    fs::copy(cli_source, &cli_copy).expect("copy isolated sc-lint launcher");
+
+    let output = ProcessCommand::new(cli_copy)
+        .args(["--json", "--root"])
+        .arg(fixture.root())
+        .args(["lint", "sc-portability"])
+        .output()
+        .expect("run isolated sc-lint launcher");
+    (output, backend, launcher_dir)
+}
+
+#[test]
+#[serial]
+fn stale_path_backend_fails_before_running_analysis() {
+    let (output, backend, _launcher_dir) = run_lint_with_path_backend("0.4.0");
+    let analysis_marker = backend._tempdir.path().join("analysis-invoked");
+    let envelope: Value = serde_json::from_slice(&output.stderr).expect("error envelope JSON");
+    let error = &envelope["error"];
+
+    assert_eq!(
+        output.status.code(),
+        Some(i32::from(crate::consts::EXIT_BACKEND_FAILURE))
+    );
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(error["code"], "CLI.BACKEND_EXEC_FAILURE");
+    assert_eq!(error["details"]["reported_version"], "0.4.0");
+    assert_eq!(
+        error["details"]["backend_path"],
+        backend.path().display().to_string()
+    );
+    assert!(
+        error["suggested_action"]
+            .as_str()
+            .unwrap()
+            .contains("sc-lint setup")
+    );
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap()
+            .contains(&backend.path().display().to_string())
+    );
+    assert!(!analysis_marker.exists(), "stale backend must not analyze");
+}
+
+#[test]
+#[serial]
+fn matching_version_path_backend_runs_analysis() {
+    let (output, backend, _launcher_dir) = run_lint_with_path_backend(env!("CARGO_PKG_VERSION"));
+    let analysis_marker = backend._tempdir.path().join("analysis-invoked");
+    let envelope: Value = serde_json::from_slice(&output.stdout).expect("success envelope JSON");
+
+    assert!(
+        output.status.success(),
+        "launcher stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(envelope["ok"], true);
+    assert_eq!(envelope["data"]["tool"], crate::consts::TOOL_PORTABILITY);
+    assert!(analysis_marker.exists(), "matching backend should analyze");
+}
+
 #[test]
 #[serial]
 fn lint_sc_portability_fail_verdict_exits_ten_with_success_envelope() {
@@ -2481,6 +2564,60 @@ impl MockBackend {
             .arg(&executable_path)
             .output()
             .expect("compile native mock backend");
+        assert!(
+            compilation.status.success(),
+            "native mock backend compilation failed: {}",
+            String::from_utf8_lossy(&compilation.stderr)
+        );
+
+        Self::with_path(tempdir, executable_path)
+    }
+
+    fn install_native_version_probe(tool: &str, version: &str) -> Self {
+        let tempdir = TempDir::new().expect("temp dir");
+        let source_path = tempdir.path().join("mock_backend.rs");
+        let executable_name = if cfg!(windows) {
+            format!("{tool}.exe")
+        } else {
+            tool.to_string()
+        };
+        let executable_path = tempdir.path().join(executable_name);
+        let analysis_marker = tempdir.path().join("analysis-invoked");
+        let version_payload = serde_json::json!({
+            "ok": true,
+            "command": "version",
+            "data": {
+                "tool": crate::consts::SERVICE_NAME,
+                "version": version,
+                "contract_schema": crate::config::VERSION_PROBE_SCHEMA,
+            },
+        })
+        .to_string();
+        let backend_payload = serde_json::json!({
+            "tool": tool,
+            "findings": [],
+            "status": "pass",
+        })
+        .to_string();
+        let source = format!(
+            "fn main() {{\n\
+                let args: Vec<String> = std::env::args().skip(1).collect();\n\
+                if args.len() == 2 && args[0] == \"--json\" && args[1] == \"version\" {{\n\
+                    print!(\"{{}}\", {version_payload:?});\n\
+                }} else {{\n\
+                    std::fs::write({analysis_marker:?}, b\"analysis\").expect(\"write analysis marker\");\n\
+                    print!(\"{{}}\", {backend_payload:?});\n\
+                }}\n\
+            }}\n"
+        );
+        fs::write(&source_path, source).expect("mock backend Rust source");
+        let compilation = ProcessCommand::new("rustc")
+            .args(["--edition=2024"])
+            .arg(&source_path)
+            .arg("-o")
+            .arg(&executable_path)
+            .output()
+            .expect("compile native version-probe mock backend");
         assert!(
             compilation.status.success(),
             "native mock backend compilation failed: {}",

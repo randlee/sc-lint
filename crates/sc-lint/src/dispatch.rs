@@ -177,7 +177,17 @@ fn run_delegated_backend(
     rule_filter: Option<&str>,
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
-    let backend_binary = find_backend_binary(tool);
+    let sibling_backend = find_sibling_backend_binary(tool);
+    let backend_binary = match sibling_backend {
+        Some(binary) => binary,
+        None => match find_backend_on_path(tool) {
+            Some(binary) => {
+                validate_path_backend(tool, &binary)?;
+                binary
+            }
+            None => PathBuf::from(tool),
+        },
+    };
     let output = ProcessCommand::new(&backend_binary)
         .args(backend_args(
             repo_root,
@@ -314,13 +324,77 @@ fn self_contained_layout_for_executable(executable: &Path) -> bool {
         && crate::docs::installed_bundle_root_for_executable(executable).is_some()
 }
 
-fn find_backend_binary(tool: &str) -> PathBuf {
+fn find_sibling_backend_binary(tool: &str) -> Option<PathBuf> {
     std::env::current_exe()
         .ok()
         .and_then(|current_exe| find_backend_binary_from_exe(&current_exe, tool))
-        // Falling back to PATH keeps local development, CI, and non-sibling
-        // binary layouts working when the installed sibling lookup does not.
-        .unwrap_or_else(|| PathBuf::from(tool))
+}
+
+fn find_backend_on_path(tool: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path).find_map(|directory| {
+        let candidate = if cfg!(windows) {
+            let executable = directory.join(format!("{tool}.exe"));
+            if executable.is_file() {
+                executable
+            } else {
+                directory.join(tool)
+            }
+        } else {
+            directory.join(tool)
+        };
+        candidate.is_file().then_some(candidate)
+    })
+}
+
+fn validate_path_backend(tool: &str, binary: &Path) -> Result<(), CliError> {
+    let expected = semver::Version::parse(env!("CARGO_PKG_VERSION"))
+        .expect("package version is valid semantic version");
+    match crate::installer::probe_version(binary) {
+        Ok(reported) if reported == expected => Ok(()),
+        Ok(reported) => Err(path_backend_version_error(
+            tool,
+            binary,
+            &expected,
+            Some(&reported),
+            format!("reported version `{reported}` does not match launcher version `{expected}`"),
+        )),
+        Err(reason) => Err(path_backend_version_error(
+            tool,
+            binary,
+            &expected,
+            None,
+            format!("version and identity probe failed: {reason}"),
+        )),
+    }
+}
+
+fn path_backend_version_error(
+    tool: &str,
+    binary: &Path,
+    expected: &semver::Version,
+    reported: Option<&semver::Version>,
+    cause: String,
+) -> CliError {
+    let mut error = CliError::backend_failure(format!(
+        "PATH backend `{}` for {tool} is incompatible with launcher version `{expected}`",
+        binary.display()
+    ))
+    .with_cause(cause)
+    .with_detail(consts::FIELD_TOOL, json!(tool))
+    .with_detail(
+        consts::FIELD_BACKEND_PATH,
+        json!(binary.display().to_string()),
+    )
+    .with_detail("expected_version", json!(expected.to_string()))
+    .with_suggested_action(
+        "Install the release archive with its matching backend binaries, or run `sc-lint setup`, then rerun the profile.",
+    )
+    .with_documentation("sc-lint docs setup");
+    if let Some(reported) = reported {
+        error = error.with_detail("reported_version", json!(reported.to_string()));
+    }
+    error
 }
 
 fn find_backend_binary_from_exe(current_exe: &Path, tool: &str) -> Option<PathBuf> {

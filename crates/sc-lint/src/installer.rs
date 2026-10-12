@@ -1250,7 +1250,7 @@ fn reject_running_managed_binary(target: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn probe_version(binary: &Path) -> Result<Version, String> {
+pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
     if !binary.is_file() {
         return Err("binary was not found".to_string());
     }
