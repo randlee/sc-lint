@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
+import os
 import sys
 import tempfile
 import textwrap
@@ -9,6 +10,7 @@ import unittest
 from unittest import mock
 
 
+from sc_lint import run_pytests
 from sc_lint.run_pytests import build_suite
 from sc_lint.run_pytests import count_fixtures
 from sc_lint.run_pytests import print_fixture_summary
@@ -65,6 +67,36 @@ class RunPytestsTests(unittest.TestCase):
             "  test_beta.BetaTests: 1\n"
             "pytests fixtures total: 2\n",
         )
+
+    def test_main_runs_bundled_tests_from_a_foreign_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            previous_directory = Path.cwd()
+            try:
+                os.chdir(tempdir)
+                with (
+                    mock.patch.object(run_pytests, "build_suite", return_value=unittest.TestSuite()),
+                    mock.patch("sys.stdout", StringIO()),
+                ):
+                    self.assertEqual(run_pytests.main(["run_pytests"]), 0)
+            finally:
+                os.chdir(previous_directory)
+
+    def test_main_preserves_a_failing_bundled_test_exit_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            previous_directory = Path.cwd()
+            failing_test = unittest.FunctionTestCase(
+                lambda: self.fail("bundled test failure should make the runner fail")
+            )
+            try:
+                os.chdir(tempdir)
+                with mock.patch.object(
+                    run_pytests,
+                    "build_suite",
+                    return_value=unittest.TestSuite([failing_test]),
+                ), mock.patch("sys.stdout", StringIO()):
+                    self.assertEqual(run_pytests.main(["run_pytests"]), 1)
+            finally:
+                os.chdir(previous_directory)
 
 
 if __name__ == "__main__":

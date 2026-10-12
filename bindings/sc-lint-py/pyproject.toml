@@ -31,3 +31,9 @@ python-source = "python"
 module-name = "sc_lint._native"
 features = ["python-extension"]
 manifest-path = "Cargo.toml"
+exclude = [
+  "python/sc_lint/tests/test_consumer_contract.py",
+  "python/sc_lint/tests/test_consumer_lifecycle.py",
+  "python/sc_lint/tests/test_orchestration_contracts.py",
+  "python/sc_lint/tests/test_release_artifacts.py",
+]

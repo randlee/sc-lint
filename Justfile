@@ -71,6 +71,10 @@ _lint-spell:
 _lint-pytests:
     {{python_cmd}} -m sc_lint.run_pytests
 
+[private]
+_source-repo-pytests:
+    {{python_cmd}} -m pytest -q bindings/sc-lint-py/python/sc_lint/tests/test_consumer_contract.py bindings/sc-lint-py/python/sc_lint/tests/test_consumer_lifecycle.py bindings/sc-lint-py/python/sc_lint/tests/test_orchestration_contracts.py bindings/sc-lint-py/python/sc_lint/tests/test_release_artifacts.py .claude/skills/closing-triage/scripts/test_query_open_findings.py .claude/skills/graph-orchestration/scripts/test_validate_findings.py .claude/skills/triaging-findings/tests/test_check_dependencies.py .claude/skills/triaging-findings/tests/test_triage_record_template.py .claude/skills/triaging-findings/tests/test_qa_triage_prompt.py .just/tests/test_team_lead_roster_check.py tests/adr
+
 # Build the full workspace.
 build:
     cargo build --workspace
@@ -93,6 +97,7 @@ _source-test:
     cargo build --workspace
     cargo test --workspace
     {{python_cmd}} -m sc_lint.run_pytests
+    just _source-repo-pytests
     node --test action/test/action.test.cjs
 
 # Remove workspace build artifacts.
