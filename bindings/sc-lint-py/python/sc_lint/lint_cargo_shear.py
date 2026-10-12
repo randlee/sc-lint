@@ -269,7 +269,7 @@ def main(argv: list[str]) -> int:
         return 2
 
     for line in workspace_crate_section_lines(repo_root):
-        print(line)
+        write_console_output(sys.stdout, f"{line}\n")
 
     completed = subprocess.run(
         build_command(repo_root),
@@ -312,20 +312,20 @@ def main(argv: list[str]) -> int:
 
     if policy_findings:
         for line in render_policy_findings(policy_findings):
-            print(line)
+            write_console_output(sys.stdout, f"{line}\n")
         for line in annotate_sections(sections, repo_root):
             if any(f.file_path in line for f in policy_findings):
-                print(line)
+                write_console_output(sys.stdout, f"{line}\n")
         if downgraded:
             for line in downgraded:
-                print(line)
+                write_console_output(sys.stdout, f"{line}\n")
         if stdout:
             write_console_output(sys.stdout, stdout)
         return 1
 
     if downgraded:
         for line in downgraded:
-            print(line)
+            write_console_output(sys.stdout, f"{line}\n")
     if stdout:
         write_console_output(sys.stdout, stdout)
     if completed.stderr:

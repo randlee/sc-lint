@@ -10,6 +10,8 @@ from unittest import mock
 from unittest.mock import patch
 
 
+from sc_lint import lint_cargo_deny
+from sc_lint import lint_cargo_shear
 from sc_lint import lint_codespell
 from sc_lint.lint_common import WorkspaceCrate
 from sc_lint.lint_cargo_deny import build_command as build_cargo_deny_command
@@ -22,6 +24,7 @@ from sc_lint.lint_cargo_shear import load_policy_config
 from sc_lint.lint_cargo_shear import main as cargo_shear_main
 from sc_lint.lint_cargo_shear import parse_sections
 from sc_lint.lint_codespell import build_command as build_codespell_command
+from sc_lint.lint_common import WorkspaceCrate
 from sc_lint.lint_common import write_console_output
 
 APP_CRATE = "fixture-app"
@@ -33,6 +36,14 @@ CORE_PACKAGE = "synthetic-lib"
 class RestrictiveEncodingStream(io.StringIO):
     encoding = "ascii"
     errors = "strict"
+
+    def write(self, text: str) -> int:
+        text.encode(self.encoding, errors=self.errors)
+        return super().write(text)
+
+
+class Cp1252RestrictiveEncodingStream(RestrictiveEncodingStream):
+    encoding = "cp1252"
 
 
 class ExternalLintToolTests(unittest.TestCase):
@@ -426,6 +437,138 @@ shear/unlinked_files
         self.assertEqual(result, 7)
         self.assertEqual(stdout.getvalue(), "output: ?\n")
         self.assertEqual(stderr.getvalue(), "failure: ?\n")
+
+    def test_cargo_deny_main_forwards_restrictive_console_output_and_exit_code(self) -> None:
+        stdout = RestrictiveEncodingStream()
+        stderr = RestrictiveEncodingStream()
+        completed = subprocess.CompletedProcess(
+            args=["cargo-deny"],
+            returncode=5,
+            stdout="deny output: \u03bb\n",
+            stderr="deny failure: \u03bb\n",
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "deny.toml").write_text("[advisories]\n", encoding="utf-8")
+            with (
+                patch("sc_lint.lint_cargo_deny.discover_repo_root", return_value=repo_root),
+                patch("sc_lint.lint_cargo_deny.shutil.which", return_value="cargo-deny"),
+                patch("sc_lint.lint_cargo_deny.workspace_crate_section_lines", return_value=["workspace crates:"]),
+                patch("sc_lint.lint_cargo_deny.detect_version", return_value=(0, 20)),
+                patch("sc_lint.lint_cargo_deny.subprocess.run", return_value=completed),
+                patch("sc_lint.lint_cargo_deny.sys.stdout", stdout),
+                patch("sc_lint.lint_cargo_deny.sys.stderr", stderr),
+            ):
+                result = lint_cargo_deny.main(["lint-cargo-deny", "--root", str(repo_root)])
+
+        self.assertEqual(result, 5)
+        self.assertEqual(stdout.getvalue(), "workspace crates:\ndeny output: ?\n")
+        self.assertEqual(stderr.getvalue(), "deny failure: ?\n")
+
+    def test_cargo_shear_main_safely_writes_policy_and_downgraded_lines(self) -> None:
+        stdout = Cp1252RestrictiveEncodingStream()
+        stderr = Cp1252RestrictiveEncodingStream()
+        child_output = """\
+shear/unlinked_files
+
+  ⚠ 1 unlinked file in `synthetic-app`
+  │ src/λambda.rs
+  help: delete this file
+
+shear/empty_files
+
+  ⚠ 1 empty file in `synthetic-app`
+  │ src/βeta.rs
+"""
+        completed = subprocess.CompletedProcess(
+            args=["cargo-shear"], returncode=0, stdout=child_output, stderr=""
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            crate = WorkspaceCrate(
+                crate_dir="app",
+                package_name=APP_PACKAGE,
+                crate_path_name="app",
+                manifest_path="crates/app/Cargo.toml",
+            )
+            policy = {
+                "allowed_empty_files": {"src/βeta.rs": "reviewed λ"},
+                "allowed_unlinked_files": {},
+            }
+            with (
+                patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
+                patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
+                patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=["workspace crates:"]),
+                patch("sc_lint.lint_cargo_shear.workspace_crates", return_value=[crate]),
+                patch("sc_lint.lint_cargo_shear.load_policy_config", return_value=policy),
+                patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=completed),
+                patch("sc_lint.lint_cargo_shear.sys.stdout", stdout),
+                patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
+            ):
+                result = lint_cargo_shear.main(["lint-cargo-shear", "--root", str(repo_root)])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            stdout.getvalue(),
+            "workspace crates:\n"
+            "shear policy error: src/?ambda.rs [unlinked_files] "
+            "unlinked_files must be fixed or explicitly downgraded in .just/lint-config.toml\n"
+            "shear note: crates/app/src/?ambda.rs [unlinked_files]\n"
+            "empty_files: downgraded src/?eta.rs (reviewed ?)\n"
+            + child_output.encode("cp1252", errors="replace").decode("cp1252"),
+        )
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_cargo_shear_main_safely_writes_downgraded_only_lines(self) -> None:
+        stdout = Cp1252RestrictiveEncodingStream()
+        stderr = Cp1252RestrictiveEncodingStream()
+        child_output = """\
+shear/empty_files
+
+  ⚠ 1 empty file in `synthetic-app`
+  │ src/βeta.rs
+"""
+        completed = subprocess.CompletedProcess(
+            args=["cargo-shear"], returncode=0, stdout=child_output, stderr=""
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            policy = {
+                "allowed_empty_files": {"src/βeta.rs": "reviewed λ"},
+                "allowed_unlinked_files": {},
+            }
+            with (
+                patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
+                patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
+                patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=["workspace crates:"]),
+                patch("sc_lint.lint_cargo_shear.load_policy_config", return_value=policy),
+                patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=completed),
+                patch("sc_lint.lint_cargo_shear.sys.stdout", stdout),
+                patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
+            ):
+                result = lint_cargo_shear.main(["lint-cargo-shear", "--root", str(repo_root)])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            stdout.getvalue(),
+            "workspace crates:\nempty_files: downgraded src/?eta.rs (reviewed ?)\n"
+            + child_output.encode("cp1252", errors="replace").decode("cp1252"),
+        )
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_write_console_output_preserves_unrelated_io_errors(self) -> None:
+        class BrokenStream:
+            encoding = "ascii"
+            errors = "strict"
+
+            def write(self, text: str) -> None:
+                raise OSError("console disconnected")
+
+        with self.assertRaisesRegex(OSError, "console disconnected"):
+            write_console_output(BrokenStream(), "symbol \u03bb\n")
 
 
 if __name__ == "__main__":
