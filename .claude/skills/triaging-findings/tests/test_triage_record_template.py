@@ -13,7 +13,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO_ROOT / ".claude"))
 from lib.orchestration_test_cli import require_dev_cli
-from lib.sc_compose_dependency import MIN_SC_COMPOSE_TEXT, SC_COMPOSE_INSTALL
+from lib.sc_compose_dependency import (
+    MIN_SC_COMPOSE_TEXT,
+    SC_COMPOSE_INSTALL,
+    SC_COMPOSE_WHEEL_PIN,
+)
 
 TEMPLATE = ".claude/skills/triaging-findings/triage-record.ttl.j2"
 
@@ -117,19 +121,21 @@ def test_render_includes_found_provenance_and_parses_as_turtle(tmp_path: Path) -
     assert parsed.returncode == 0, parsed.stderr or parsed.stdout
 
 
-def test_python_binding_renders_canonical_template() -> None:
-    """The pip/maturin binding must render the same template tokens as the CLI."""
+def test_pinned_python_binding_renders_canonical_template() -> None:
+    """The pinned renderer wheel must produce the canonical triage output."""
     try:
         import importlib.metadata
         import sc_compose
     except (ImportError, importlib.metadata.PackageNotFoundError) as exc:  # pragma: no cover - dependency preflight owns setup
         pytest.skip(f"sc-compose Python binding unavailable: {exc}")
-    assert tuple(int(part) for part in importlib.metadata.version("sc-compose").split(".")[:3]) >= (1, 6, 1)
+    assert importlib.metadata.version("sc-compose") == SC_COMPOSE_WHEEL_PIN
     rendered = sc_compose.render_template(
         (REPO_ROOT / TEMPLATE).read_text(encoding="utf-8"), _vars()
     )
     assert "triage:foundIn triage:AICH-S7" in rendered
     assert 'triage:foundAt "2026-07-25T16:26:33Z"^^xsd:dateTime' in rendered
+    with pytest.raises(sc_compose.ScRenderError):
+        sc_compose.render_template("{% if %}", {})
 
 
 @pytest.mark.parametrize("missing", ["found_in", "found_at", "worktree_paths"])

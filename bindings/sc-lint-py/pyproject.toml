@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "sc-lint"
-version = "0.7.1"
+version = "0.7.2"
 description = "sc-lint Python bindings and repository helper package."
 readme = "README.md"
 dependencies = ["codespell>=2.2"]
