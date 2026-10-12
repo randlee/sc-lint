@@ -33,7 +33,7 @@ type = "workflow"
 [[steps]]
 id = "sprint"
 title = "phase-{{{ phase }}}: sprint {{{ phase }}}-1 sc-compose {{{ to_version }}}"
-description = "Sprint container for the sc-compose {{{ to_version }}} upgrade. Its deliverables are on {{{ parent }}}.{{{ ref }}}-upgrade; QA fix groups attach under this bead. It closes when the qa step closes."
+description = "Sprint container for the sc-compose {{{ to_version }}} upgrade. Its deliverables are on {{{ parent }}}.{{{ ref }}}-upgrade; QA fix groups attach under this bead. Container only: do not dispatch it. The lead closes it when {{{ parent }}}.{{{ ref }}}-qa closes."
 type = "task"
 priority = {{{ priority }}}
 labels = ["phase-{{{ phase }}}", "stack:phase-{{{ phase }}}", "stage:sprint"]
