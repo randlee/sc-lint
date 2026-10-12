@@ -64,7 +64,7 @@ pub(crate) fn render_success_human(
                 .unwrap_or("unknown");
             format!("sc-lint {version}")
         }
-        CommandId::LintScBoundary => {
+        CommandId::LintScBoundary | CommandId::LintScPortability | CommandId::LintScRuntime => {
             let status = envelope
                 .data
                 .as_ref()
@@ -79,7 +79,7 @@ pub(crate) fn render_success_human(
                 .map_or(0, std::vec::Vec::len);
             format!(
                 "{}: {status} ({finding_count} findings)",
-                consts::TOOL_BOUNDARY
+                context.id().dispatch_tool().unwrap_or(context.command_id())
             )
         }
         CommandId::LintFast
