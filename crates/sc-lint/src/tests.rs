@@ -1598,6 +1598,158 @@ fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
     (exit_code, envelope)
 }
 
+fn run_lint_with_path_backend_without_version() -> (std::process::Output, MockBackend, TempDir) {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub fn example() {}\n");
+
+    let backend = MockBackend::install_native_without_version(crate::consts::TOOL_PORTABILITY);
+    let launcher_dir = TempDir::new().expect("isolated launcher directory");
+    let test_executable = std::env::current_exe().expect("test executable path");
+    let cli_name = if cfg!(windows) {
+        "sc-lint.exe"
+    } else {
+        "sc-lint"
+    };
+    let cli_source = test_executable
+        .parent()
+        .and_then(Path::parent)
+        .map(|target_dir| target_dir.join(cli_name))
+        .expect("sc-lint executable path");
+    let cli_copy = launcher_dir.path().join(cli_name);
+    fs::copy(cli_source, &cli_copy).expect("copy isolated sc-lint launcher");
+
+    let output = ProcessCommand::new(cli_copy)
+        .args(["--json", "--root"])
+        .arg(fixture.root())
+        .args(["lint", "sc-portability"])
+        .output()
+        .expect("run isolated sc-lint launcher");
+    (output, backend, launcher_dir)
+}
+
+#[test]
+#[serial]
+fn stale_path_backend_without_version_fails_before_running_analysis() {
+    let (output, backend, _launcher_dir) = run_lint_with_path_backend_without_version();
+    let analysis_marker = backend._tempdir.path().join("analysis-invoked");
+    let envelope: Value = serde_json::from_slice(&output.stderr).expect("error envelope JSON");
+    let error = &envelope["error"];
+
+    assert_eq!(
+        output.status.code(),
+        Some(i32::from(crate::consts::EXIT_BACKEND_FAILURE))
+    );
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(error["code"], "CLI.BACKEND_EXEC_FAILURE");
+    assert_eq!(
+        error["details"]["expected_version"],
+        env!("CARGO_PKG_VERSION")
+    );
+    assert!(
+        error["details"]["version_probe_failure"]
+            .as_str()
+            .unwrap()
+            .contains("--version` probe exited")
+    );
+    assert_eq!(
+        error["details"]["backend_path"],
+        backend.path().display().to_string()
+    );
+    assert!(
+        error["suggested_action"]
+            .as_str()
+            .unwrap()
+            .contains("sc-lint setup")
+    );
+    assert!(
+        error["message"]
+            .as_str()
+            .unwrap()
+            .contains(&backend.path().display().to_string())
+    );
+    assert!(!analysis_marker.exists(), "stale backend must not analyze");
+}
+
+#[test]
+fn matching_real_path_backends_run_analysis() {
+    for (tool, target) in [
+        (crate::consts::TOOL_BOUNDARY, "sc-boundary"),
+        (crate::consts::TOOL_PORTABILITY, "sc-portability"),
+        (crate::consts::TOOL_RUNTIME, "sc-runtime"),
+    ] {
+        let (output, _launcher_dir, _backend_dir) = run_lint_with_real_path_backend(tool, target);
+        let envelope: Value =
+            serde_json::from_slice(&output.stdout).expect("success envelope JSON");
+
+        assert!(
+            output.status.success()
+                || output.status.code() == Some(i32::from(crate::consts::EXIT_VERDICT_FAIL)),
+            "{tool} exit {:?}, stdout: {}, stderr: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(envelope["ok"], true, "{tool} envelope: {envelope}");
+        assert_eq!(envelope["data"]["tool"], tool);
+    }
+}
+
+fn run_lint_with_real_path_backend(
+    tool: &str,
+    target: &str,
+) -> (std::process::Output, TempDir, TempDir) {
+    let fixture = AnalysisFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub fn example() {}\n");
+
+    let launcher_dir = TempDir::new().expect("isolated launcher directory");
+    let backend_dir = TempDir::new().expect("isolated backend directory");
+    let test_executable = std::env::current_exe().expect("test executable path");
+    let target_dir = test_executable
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .expect("target debug directory");
+    let binary_name = |name: &str| {
+        if cfg!(windows) {
+            format!("{name}.exe")
+        } else {
+            name.to_string()
+        }
+    };
+    let launcher_name = binary_name(crate::consts::SERVICE_NAME);
+    fs::copy(
+        target_dir.join(&launcher_name),
+        launcher_dir.path().join(&launcher_name),
+    )
+    .expect("copy isolated sc-lint launcher");
+    for backend in [
+        crate::consts::TOOL_BOUNDARY,
+        crate::consts::TOOL_PORTABILITY,
+        crate::consts::TOOL_RUNTIME,
+    ] {
+        let name = binary_name(backend);
+        fs::copy(target_dir.join(&name), backend_dir.path().join(&name))
+            .unwrap_or_else(|error| panic!("copy built real backend {backend}: {error}"));
+    }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let path = std::env::join_paths(
+        std::iter::once(backend_dir.path().to_path_buf()).chain(std::env::split_paths(&path)),
+    )
+    .expect("join isolated backend PATH");
+    let output = ProcessCommand::new(launcher_dir.path().join(launcher_name))
+        .env("PATH", path)
+        .args(["--json", "--root"])
+        .arg(fixture.root())
+        .args(["lint", target])
+        .output()
+        .unwrap_or_else(|error| panic!("run real {tool} PATH backend: {error}"));
+    (output, launcher_dir, backend_dir)
+}
+
 #[test]
 #[serial]
 fn lint_sc_portability_fail_verdict_exits_ten_with_success_envelope() {
@@ -2507,6 +2659,51 @@ impl MockBackend {
         assert!(
             compilation.status.success(),
             "native mock backend compilation failed: {}",
+            String::from_utf8_lossy(&compilation.stderr)
+        );
+
+        Self::with_path(tempdir, executable_path)
+    }
+
+    fn install_native_without_version(tool: &str) -> Self {
+        let tempdir = TempDir::new().expect("temp dir");
+        let source_path = tempdir.path().join("mock_backend.rs");
+        let executable_name = if cfg!(windows) {
+            format!("{tool}.exe")
+        } else {
+            tool.to_string()
+        };
+        let executable_path = tempdir.path().join(executable_name);
+        let analysis_marker = tempdir.path().join("analysis-invoked");
+        let backend_payload = serde_json::json!({
+            "tool": tool,
+            "findings": [],
+            "status": "pass",
+        })
+        .to_string();
+        let source = format!(
+            "fn main() {{\n\
+                let args: Vec<String> = std::env::args().skip(1).collect();\n\
+                if args.iter().any(|arg| arg == \"--version\") {{\n\
+                    eprintln!(\"error: unexpected argument '--version' found\");\n\
+                    std::process::exit(2);\n\
+                }} else {{\n\
+                    std::fs::write({analysis_marker:?}, b\"analysis\").expect(\"write analysis marker\");\n\
+                    print!(\"{{}}\", {backend_payload:?});\n\
+                }}\n\
+            }}\n"
+        );
+        fs::write(&source_path, source).expect("stale backend source");
+        let compilation = ProcessCommand::new("rustc")
+            .args(["--edition=2024"])
+            .arg(&source_path)
+            .arg("-o")
+            .arg(&executable_path)
+            .output()
+            .expect("compile native stale backend stub");
+        assert!(
+            compilation.status.success(),
+            "native stale backend compilation failed: {}",
             String::from_utf8_lossy(&compilation.stderr)
         );
 

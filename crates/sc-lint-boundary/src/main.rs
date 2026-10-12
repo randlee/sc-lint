@@ -18,6 +18,7 @@ use sc_lint_schema::OutputFormat;
 
 #[derive(Debug, Parser)]
 #[command(name = "sc-lint-boundary")]
+#[command(version)]
 #[command(about = "AST-sensitive Rust boundary analyzer")]
 struct Cli {
     #[command(subcommand)]
