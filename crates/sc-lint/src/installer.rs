@@ -12,10 +12,14 @@
 
 use std::env;
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::process::{Child, Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use etcetera::{BaseStrategy, choose_base_strategy};
 use semver::Version;
@@ -29,6 +33,16 @@ use crate::error::ErrorCode;
 const DEFAULT_RELEASE_BASE_URL: &str = "https://github.com/randlee/sc-lint/releases/download";
 const RELEASE_BASE_URL_ENV: &str = "SC_LINT_RELEASE_BASE_URL";
 const INSTALL_DIR_ENV: &str = "SC_LINT_INSTALL_DIR";
+const BACKEND_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
+const BACKEND_PROBE_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const BACKEND_PROBE_OUTPUT_LIMIT: usize = 64 * 1024;
+#[cfg(test)]
+const PUBLISH_ARTIFACTS: &str = include_str!("../../../release/publish-artifacts.toml");
+const MANAGED_BACKENDS: &[&str] = &[
+    crate::consts::TOOL_BOUNDARY,
+    crate::consts::TOOL_PORTABILITY,
+    crate::consts::TOOL_RUNTIME,
+];
 
 /// The only executable helper E.3 may place in a consumer repository.
 ///
@@ -166,7 +180,23 @@ fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, 
     let had_previous_installation = std::iter::once(managed_binary.clone())
         .chain(path_binary_candidates_if(use_path_candidates))
         .any(|binary| binary.is_file());
-    let existing = find_compatible_binary(&managed_binary, minimum_version, use_path_candidates);
+    let managed_existing =
+        find_compatible_binary_with(&managed_binary, minimum_version, false, |binary| {
+            let version = probe_version(binary)?;
+            managed_payload_complete(binary)
+                .then_some(version)
+                .ok_or_else(|| "managed release bundle is incomplete".to_string())
+        });
+    let existing = managed_existing.or_else(|| {
+        // PATH is a supported development fallback when no managed launcher
+        // exists. A partial managed install must be repaired from the release,
+        // even if an unrelated PATH executable happens to be compatible.
+        (!managed_binary.exists() && use_path_candidates)
+            .then(|| {
+                find_compatible_binary_with(&managed_binary, minimum_version, true, probe_version)
+            })
+            .flatten()
+    });
 
     if let Some((binary, version)) = existing {
         return Ok(json!({
@@ -265,14 +295,6 @@ fn release_url(version: &ResolvedReleaseVersion, filename: &str) -> String {
     )
 }
 
-fn find_compatible_binary(
-    managed_binary: &Path,
-    minimum: &MinimumVersion,
-    use_path_candidates: bool,
-) -> Option<(PathBuf, Version)> {
-    find_compatible_binary_with(managed_binary, minimum, use_path_candidates, probe_version)
-}
-
 fn find_compatible_binary_with<F>(
     managed_binary: &Path,
     minimum: &MinimumVersion,
@@ -360,24 +382,402 @@ fn install_into_staging(
     fs::create_dir(&extract_dir).map_err(|error| permission_error(&extract_dir, error))?;
     extract_archive(&archive, &extract_dir)?;
     let candidate = release_binary_candidate(&extract_dir, release_version, target);
-    if !candidate.is_file() {
+    let payload = release_payload_candidates(&candidate, managed_binary);
+    if let Some(problem) = payload_validation_issue(&payload) {
         return Err(install_error(
             InstallerErrorCode::ReleaseUnavailable,
-            format!(
-                "release archive `{archive_name}` did not contain `{}`",
-                ReleaseTarget::binary_name()
-            ),
-            "The release artifact did not match the published sc-lint archive layout.",
-            "Download a supported release again or report the malformed release artifact.",
+            format!("release archive `{archive_name}` failed payload validation: {problem}"),
+            "The release artifact must contain the launcher, healthy manifest-declared backend binaries, and the documentation bundle.",
+            "Download a complete supported release again or report the malformed release artifact.",
         )
         .with_detail("archive_name", json!(archive_name))
-        .with_detail("expected_binary", json!(ReleaseTarget::binary_name()))
+        .with_detail("payload_validation_problem", json!(problem))
+        .with_detail("expected_binaries", json!([ReleaseTarget::binary_name(), MANAGED_BACKENDS[0], MANAGED_BACKENDS[1], MANAGED_BACKENDS[2]]))
         .with_detail(
             "extract_directory",
             json!(extract_dir.display().to_string()),
         ));
     }
-    activate_candidate(&candidate, managed_binary, minimum_version)
+    activate_payload(&payload, managed_binary, minimum_version)
+}
+
+#[derive(Debug, Clone)]
+struct PayloadEntry {
+    source: PathBuf,
+    target: PathBuf,
+}
+
+type PayloadChange = (PathBuf, PathBuf, bool, bool);
+type ProbeOutputReader = thread::JoinHandle<io::Result<Vec<u8>>>;
+
+fn release_payload_candidates(binary: &Path, managed_binary: &Path) -> Vec<PayloadEntry> {
+    let bin_dir = binary.parent().unwrap_or_else(|| Path::new("."));
+    let managed_bin_dir = managed_binary.parent().unwrap_or_else(|| Path::new("."));
+    let mut entries = vec![PayloadEntry {
+        source: binary.to_path_buf(),
+        target: managed_binary.to_path_buf(),
+    }];
+    for backend in MANAGED_BACKENDS {
+        let name = if cfg!(windows) {
+            format!("{backend}.exe")
+        } else {
+            (*backend).to_string()
+        };
+        entries.push(PayloadEntry {
+            source: bin_dir.join(&name),
+            target: managed_bin_dir.join(name),
+        });
+    }
+    let prefix = if bin_dir.file_name().is_some_and(|name| name == "bin") {
+        bin_dir.parent().unwrap_or(bin_dir)
+    } else {
+        bin_dir
+    };
+    let docs_candidates = [
+        bin_dir.join("docs-bundle"),
+        bin_dir.join(crate::consts::DOCS_BUNDLE_DIR),
+        prefix.join("share/sc-lint/sc-lint-docs"),
+        prefix.join("share/sc-lint/docs-bundle"),
+    ];
+    let docs_source = docs_candidates
+        .iter()
+        .find(|path| docs_bundle_complete(path))
+        .cloned()
+        .unwrap_or_else(|| docs_candidates[0].clone());
+    let managed_prefix = managed_bin_dir.parent().unwrap_or(managed_bin_dir);
+    entries.push(PayloadEntry {
+        source: docs_source,
+        target: managed_prefix.join("share/sc-lint/sc-lint-docs"),
+    });
+    entries
+}
+
+fn docs_bundle_complete(path: &Path) -> bool {
+    let Ok(manifest) = fs::read_to_string(path.join("manifest.toml")) else {
+        return false;
+    };
+    let Ok(manifest) = toml::from_str::<toml::Value>(&manifest) else {
+        return false;
+    };
+    if manifest
+        .get("schema_version")
+        .and_then(toml::Value::as_integer)
+        != Some(1)
+    {
+        return false;
+    }
+    let Some(guides) = manifest.get("guides").and_then(toml::Value::as_array) else {
+        return false;
+    };
+    let mut has_overview = false;
+    for guide in guides {
+        let Some(relative) = guide.get("path").and_then(toml::Value::as_str) else {
+            return false;
+        };
+        let relative = Path::new(relative);
+        if relative.is_absolute()
+            || relative
+                .components()
+                .any(|component| !matches!(component, std::path::Component::Normal(_)))
+            || !path.join(relative).is_file()
+        {
+            return false;
+        }
+        has_overview |= relative == Path::new("README.md");
+    }
+    has_overview
+}
+
+fn payload_validation_issue(entries: &[PayloadEntry]) -> Option<String> {
+    payload_validation_issue_with_timeout(entries, BACKEND_PROBE_TIMEOUT)
+}
+
+fn payload_validation_issue_with_timeout(
+    entries: &[PayloadEntry],
+    probe_timeout: Duration,
+) -> Option<String> {
+    for entry in entries {
+        if entry.source.is_dir() {
+            if !docs_bundle_complete(&entry.source) {
+                return Some(format!(
+                    "documentation bundle at `{}` is incomplete",
+                    entry.source.display()
+                ));
+            }
+        } else if let Some(backend) = entry
+            .source
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| {
+                MANAGED_BACKENDS.iter().find(|backend| {
+                    name == if cfg!(windows) {
+                        format!("{backend}.exe")
+                    } else {
+                        (*backend).to_string()
+                    }
+                })
+            })
+        {
+            if let Some(problem) = backend_cli_failure(&entry.source, backend, probe_timeout) {
+                return Some(problem);
+            }
+        } else if !entry.source.is_file() {
+            return Some(format!(
+                "required release file `{}` is missing",
+                entry.source.display()
+            ));
+        }
+    }
+    None
+}
+
+fn managed_payload_complete(binary: &Path) -> bool {
+    managed_payload_validation_issue(binary).is_none()
+}
+
+fn managed_payload_validation_issue(binary: &Path) -> Option<String> {
+    managed_payload_validation_issue_with_timeout(binary, BACKEND_PROBE_TIMEOUT)
+}
+
+fn managed_payload_validation_issue_with_timeout(
+    binary: &Path,
+    probe_timeout: Duration,
+) -> Option<String> {
+    let parent = binary.parent().unwrap_or_else(|| Path::new("."));
+    for backend in MANAGED_BACKENDS {
+        let name = if cfg!(windows) {
+            format!("{backend}.exe")
+        } else {
+            (*backend).to_string()
+        };
+        let path = parent.join(name);
+        if let Some(problem) = backend_cli_failure(&path, backend, probe_timeout) {
+            return Some(problem);
+        }
+    }
+    let prefix = parent.parent().unwrap_or(parent);
+    if docs_bundle_complete(&parent.join("docs-bundle"))
+        || docs_bundle_complete(&parent.join(crate::consts::DOCS_BUNDLE_DIR))
+        || docs_bundle_complete(&prefix.join("share/sc-lint/sc-lint-docs"))
+        || docs_bundle_complete(&prefix.join("share/sc-lint/docs-bundle"))
+    {
+        None
+    } else {
+        Some(format!(
+            "documentation bundle is missing or incomplete beside `{}`",
+            binary.display()
+        ))
+    }
+}
+
+/// Probe the supported CLI help contract rather than assuming backend binaries
+/// expose a version flag. This checks that the companion can execute and that
+/// it is the expected analyzer CLI with its documented `analyze` command.
+fn backend_cli_failure(binary: &Path, expected_name: &str, timeout: Duration) -> Option<String> {
+    let Some(expected_about) = backend_about(expected_name) else {
+        return Some(format!("unknown backend companion `{expected_name}`"));
+    };
+    let (mut child, reader) = match spawn_backend_help(binary, expected_name) {
+        Ok(probe) => probe,
+        Err(problem) => return Some(problem),
+    };
+    let process_id = child.id();
+    let status = match wait_for_backend_help(&mut child, binary, expected_name, timeout) {
+        Ok(status) => status,
+        Err(problem) => return Some(problem),
+    };
+    let output = match finish_backend_output(reader, process_id, binary, expected_name) {
+        Ok(output) => output,
+        Err(problem) => return Some(problem),
+    };
+    backend_help_contract_failure(
+        &output,
+        status.success(),
+        binary,
+        expected_name,
+        expected_about,
+    )
+}
+
+fn spawn_backend_help(
+    binary: &Path,
+    expected_name: &str,
+) -> Result<(Child, ProbeOutputReader), String> {
+    let mut command = Command::new(binary);
+    command
+        .arg("--help")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(unix)]
+    command.process_group(0);
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return Err(format!(
+                "could not start backend companion `{expected_name}` at `{}`: {error}",
+                binary.display()
+            ));
+        }
+    };
+    let Some(stdout) = child.stdout.take() else {
+        terminate_probe_processes(&mut child);
+        return Err(format!(
+            "backend companion `{expected_name}` at `{}` did not provide a readable help stream",
+            binary.display()
+        ));
+    };
+    let reader = thread::spawn(move || read_probe_output(stdout));
+    Ok((child, reader))
+}
+
+fn wait_for_backend_help(
+    child: &mut Child,
+    binary: &Path,
+    expected_name: &str,
+    timeout: Duration,
+) -> Result<std::process::ExitStatus, String> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if Instant::now() < deadline => {
+                thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
+            }
+            Ok(None) => {
+                terminate_probe_processes(child);
+                return Err(format!(
+                    "backend companion `{expected_name}` at `{}` timed out after {} ms during its `--help` probe; process-tree cleanup was attempted",
+                    binary.display(),
+                    timeout.as_millis()
+                ));
+            }
+            Err(error) => {
+                terminate_probe_processes(child);
+                return Err(format!(
+                    "could not wait for backend companion `{expected_name}` at `{}`: {error}",
+                    binary.display()
+                ));
+            }
+        }
+    }
+}
+
+fn finish_backend_output(
+    reader: ProbeOutputReader,
+    process_id: u32,
+    binary: &Path,
+    expected_name: &str,
+) -> Result<Vec<u8>, String> {
+    // A descendant can outlive the direct child while holding stdout open.
+    // Give the reader a short chance to drain normal output, then stop the
+    // process group instead of waiting indefinitely for EOF.
+    let drain_deadline = Instant::now() + Duration::from_millis(50);
+    while !reader.is_finished() && Instant::now() < drain_deadline {
+        thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
+    }
+    if !reader.is_finished() && !terminate_probe_process_tree(process_id) {
+        return Err(format!(
+            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its help process exited",
+            binary.display()
+        ));
+    }
+    match reader.join() {
+        Ok(Ok(output)) => Ok(output),
+        Ok(Err(error)) => Err(format!(
+            "could not read help output from backend companion `{expected_name}` at `{}`: {error}",
+            binary.display()
+        )),
+        Err(_) => Err(format!(
+            "help output reader panicked for backend companion `{expected_name}` at `{}`",
+            binary.display()
+        )),
+    }
+}
+
+fn backend_help_contract_failure(
+    output: &[u8],
+    successful_exit: bool,
+    binary: &Path,
+    expected_name: &str,
+    expected_about: &str,
+) -> Option<String> {
+    if !successful_exit {
+        return Some(format!(
+            "backend companion `{expected_name}` at `{}` exited unsuccessfully",
+            binary.display()
+        ));
+    }
+    let help = String::from_utf8_lossy(output);
+    let healthy = help.contains(expected_about)
+        && help
+            .lines()
+            .any(|line| line.trim_start().starts_with("Usage:") && line.contains("<COMMAND>"))
+        && help
+            .lines()
+            .any(|line| line.trim_start().starts_with("analyze "));
+    if healthy {
+        None
+    } else {
+        Some(format!(
+            "backend companion `{expected_name}` at `{}` did not satisfy the documented `--help` contract",
+            binary.display()
+        ))
+    }
+}
+
+fn backend_about(name: &str) -> Option<&'static str> {
+    match name {
+        crate::consts::TOOL_BOUNDARY => Some("AST-sensitive Rust boundary analyzer"),
+        crate::consts::TOOL_PORTABILITY => Some("AST-sensitive Rust portability analyzer"),
+        crate::consts::TOOL_RUNTIME => Some("AST-sensitive Rust runtime analyzer"),
+        _ => None,
+    }
+}
+
+fn read_probe_output(mut stdout: impl Read) -> io::Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(BACKEND_PROBE_OUTPUT_LIMIT.min(4096));
+    let mut buffer = [0u8; 4096];
+    loop {
+        let count = stdout.read(&mut buffer)?;
+        if count == 0 {
+            return Ok(output);
+        }
+        let remaining = BACKEND_PROBE_OUTPUT_LIMIT.saturating_sub(output.len());
+        output.extend_from_slice(&buffer[..count.min(remaining)]);
+    }
+}
+
+fn terminate_probe_processes(child: &mut Child) {
+    let process_id = child.id();
+    let _ = terminate_probe_process_tree(process_id);
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[cfg(unix)]
+fn terminate_probe_process_tree(process_id: u32) -> bool {
+    let process_group = format!("-{process_id}");
+    Command::new("/bin/kill")
+        .args(["-KILL", "--", &process_group])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+#[cfg(windows)]
+fn terminate_probe_process_tree(process_id: u32) -> bool {
+    Command::new("taskkill")
+        .args(["/PID", &process_id.to_string(), "/T", "/F"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn terminate_probe_process_tree(_process_id: u32) -> bool {
+    false
 }
 
 fn release_binary_candidate(
@@ -603,6 +1003,14 @@ fn extract_archive(archive: &Path, destination: &Path) -> Result<(), CliError> {
 trait InstallerFileOps {
     fn remove_file(&self, path: &Path) -> io::Result<()>;
     fn rename(&self, source: &Path, destination: &Path) -> io::Result<()>;
+
+    fn remove_path(&self, path: &Path) -> io::Result<()> {
+        if path.is_dir() {
+            fs::remove_dir_all(path)
+        } else {
+            self.remove_file(path)
+        }
+    }
 }
 
 struct SystemFileOps;
@@ -615,145 +1023,177 @@ impl InstallerFileOps for SystemFileOps {
     fn rename(&self, source: &Path, destination: &Path) -> io::Result<()> {
         fs::rename(source, destination)
     }
+
+    fn remove_path(&self, path: &Path) -> io::Result<()> {
+        if path.is_dir() {
+            fs::remove_dir_all(path)
+        } else {
+            fs::remove_file(path)
+        }
+    }
 }
 
-#[derive(Debug)]
-struct PostInstallVerificationFailure {
-    cause: String,
-    observed_version: Option<Version>,
-}
-
-fn activate_candidate(
-    candidate: &Path,
-    target: &Path,
+fn activate_payload(
+    entries: &[PayloadEntry],
+    managed_binary: &Path,
     minimum: &MinimumVersion,
 ) -> Result<Version, CliError> {
-    activate_candidate_with(candidate, target, minimum, &SystemFileOps, probe_version)
+    activate_payload_with(entries, managed_binary, minimum, &SystemFileOps)
 }
 
-fn activate_candidate_with<F, P>(
-    candidate: &Path,
-    target: &Path,
+fn activate_payload_with<F: InstallerFileOps>(
+    entries: &[PayloadEntry],
+    managed_binary: &Path,
     minimum: &MinimumVersion,
     file_ops: &F,
-    probe: P,
-) -> Result<Version, CliError>
-where
-    F: InstallerFileOps,
-    P: FnOnce(&Path) -> Result<Version, String>,
-{
-    reject_running_managed_binary(target)?;
-    let parent = target.parent().ok_or_else(|| {
-        install_error(
-            InstallerErrorCode::ActivationFailed,
-            format!(
-                "managed binary path `{}` has no parent directory",
-                target.display()
-            ),
-            "The managed installation path is invalid.",
-            "Set SC_LINT_INSTALL_DIR to a writable directory and rerun `sc-lint setup`.",
-        )
-    })?;
-    let backup = parent.join(format!(".{}-backup", ReleaseTarget::binary_name()));
-    if backup.exists() {
-        file_ops
-            .remove_file(&backup)
-            .map_err(|error| permission_error(&backup, error))?;
-    }
-    let had_previous = target.exists();
-    if had_previous {
-        file_ops
-            .rename(target, &backup)
-            .map_err(|error| activation_error(target, error))?;
-    }
-    if let Err(error) = file_ops.rename(candidate, target) {
-        if had_previous && let Err(rollback_error) = file_ops.rename(&backup, target) {
-            return Err(rollback_failure_error(
-                target,
-                &backup,
-                rollback_error,
-                Some(error),
-            ));
+) -> Result<Version, CliError> {
+    reject_running_managed_binary(managed_binary)?;
+    let backups = prepare_payload_activation(entries, managed_binary)?;
+    let changes = activate_payload_entries(entries, &backups, managed_binary, file_ops)?;
+    match verify_activated_payload(managed_binary, minimum) {
+        Ok(version) => {
+            remove_payload_backups(&changes, file_ops);
+            Ok(version)
         }
-        return Err(activation_error(target, error));
-    }
-    let verification = probe(target)
-        .map_err(|cause| PostInstallVerificationFailure {
-            cause,
-            observed_version: None,
-        })
-        .and_then(|version| {
-            (version >= *minimum.as_semver())
-                .then_some(version.clone())
-                .ok_or_else(|| PostInstallVerificationFailure {
-                    cause: format!("activated version `{version}` is below required `{minimum}`"),
-                    observed_version: Some(version),
-                })
-        });
-    let version = match verification {
-        Ok(version) => version,
-        Err(failure) => {
-            if let Err(rollback_error) = rollback_candidate(target, &backup, had_previous, file_ops)
-            {
+        Err(cause) => {
+            if let Err(rollback_error) = rollback_payload(&changes, file_ops) {
+                let backup = changes
+                    .first()
+                    .map(|(_, backup, _, _)| backup.as_path())
+                    .unwrap_or(managed_binary);
                 return Err(
-                    rollback_failure_error(target, &backup, rollback_error, None)
-                        .with_detail("post_install_verification_cause", json!(failure.cause)),
+                    rollback_failure_error(managed_binary, backup, rollback_error, None)
+                        .with_detail("post_install_verification_cause", json!(cause)),
                 );
             }
-            return Err(post_install_verification_error(
-                target,
-                minimum,
-                had_previous,
-                failure,
+            Err(install_error(
+                InstallerErrorCode::PostInstallVersionFailed,
+                format!("activated sc-lint bundle `{}` failed post-install verification", managed_binary.display()),
+                cause,
+                "The previous managed bundle was restored. Repair the release source and rerun `sc-lint setup`.",
+            )
+            .with_detail("managed_binary", json!(managed_binary.display().to_string()))
+            .with_detail("minimum_version", json!(minimum.to_string())))
+        }
+    }
+}
+
+fn prepare_payload_activation(
+    entries: &[PayloadEntry],
+    managed_binary: &Path,
+) -> Result<Vec<PathBuf>, CliError> {
+    let mut backups = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let parent = entry.target.parent().ok_or_else(|| {
+            activation_error(
+                &entry.target,
+                io::Error::other("target has no parent directory"),
+            )
+        })?;
+        fs::create_dir_all(parent).map_err(|error| permission_error(parent, error))?;
+        let file_name = entry
+            .target
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy();
+        let backup = parent.join(format!(".{file_name}-sc-lint-backup"));
+        if backup.exists() {
+            return Err(install_error(
+                InstallerErrorCode::RollbackFailed,
+                format!("managed payload backup `{}` already exists", backup.display()),
+                "A prior activation left a backup that may contain the previous managed payload.",
+                "Inspect the backup and managed installation, restore the known-good payload if needed, then rerun `sc-lint setup`.",
+            )
+            .with_detail("managed_binary", json!(managed_binary.display().to_string()))
+            .with_detail("backup_path", json!(backup.display().to_string())));
+        }
+        backups.push(backup);
+    }
+    Ok(backups)
+}
+
+fn activate_payload_entries<F: InstallerFileOps>(
+    entries: &[PayloadEntry],
+    backups: &[PathBuf],
+    managed_binary: &Path,
+    file_ops: &F,
+) -> Result<Vec<PayloadChange>, CliError> {
+    let mut changes = Vec::with_capacity(entries.len());
+    for (entry, backup) in entries.iter().zip(backups) {
+        let had_previous = entry.target.exists();
+        if had_previous && let Err(error) = file_ops.rename(&entry.target, backup) {
+            let error_message = error.to_string();
+            rollback_payload(&changes, file_ops).map_err(|rollback_error| {
+                rollback_failure_error(
+                    managed_binary,
+                    backup,
+                    rollback_error,
+                    Some(io::Error::other(error_message.clone())),
+                )
+            })?;
+            return Err(activation_error(
+                &entry.target,
+                io::Error::other(error_message),
             ));
         }
-    };
-    if had_previous {
-        let _ = file_ops.remove_file(&backup);
+        changes.push((entry.target.clone(), backup.clone(), had_previous, false));
+        if let Err(error) = file_ops.rename(&entry.source, &entry.target) {
+            if let Err(rollback_error) = rollback_payload(&changes, file_ops) {
+                return Err(rollback_failure_error(
+                    managed_binary,
+                    backup,
+                    rollback_error,
+                    Some(error),
+                ));
+            }
+            return Err(activation_error(&entry.target, error));
+        }
+        if let Some(last) = changes.last_mut() {
+            last.3 = true;
+        }
+    }
+    Ok(changes)
+}
+
+fn verify_activated_payload(
+    managed_binary: &Path,
+    minimum: &MinimumVersion,
+) -> Result<Version, String> {
+    let version = probe_version(managed_binary)?;
+    if version < *minimum.as_semver() {
+        return Err(format!(
+            "activated version `{version}` is below required `{minimum}`"
+        ));
+    }
+    if let Some(problem) = managed_payload_validation_issue(managed_binary) {
+        return Err(format!(
+            "activated release payload failed validation: {problem}"
+        ));
     }
     Ok(version)
 }
 
-fn rollback_candidate<F: InstallerFileOps>(
-    target: &Path,
-    backup: &Path,
-    had_previous: bool,
-    file_ops: &F,
-) -> io::Result<()> {
-    file_ops.remove_file(target)?;
-    if had_previous {
-        file_ops.rename(backup, target)?;
+fn remove_payload_backups<F: InstallerFileOps>(changes: &[PayloadChange], file_ops: &F) {
+    for (_, backup, had_previous, _) in changes {
+        if *had_previous {
+            let _ = file_ops.remove_path(backup);
+        }
     }
-    Ok(())
 }
 
-fn post_install_verification_error(
-    target: &Path,
-    minimum: &MinimumVersion,
-    had_previous: bool,
-    failure: PostInstallVerificationFailure,
-) -> CliError {
-    let recovery = if had_previous {
-        "The previous managed installation was restored. Repair the release source and rerun `sc-lint setup`."
-    } else {
-        "The failed candidate was removed. Repair the release source and rerun `sc-lint setup`."
-    };
-    let mut error = install_error(
-        InstallerErrorCode::PostInstallVersionFailed,
-        format!(
-            "activated sc-lint binary `{}` failed post-install verification",
-            target.display()
-        ),
-        failure.cause,
-        recovery,
-    )
-    .with_detail("managed_binary", json!(target.display().to_string()))
-    .with_detail("minimum_version", json!(minimum.to_string()))
-    .with_detail("had_previous_installation", json!(had_previous));
-    if let Some(observed_version) = failure.observed_version {
-        error = error.with_detail("observed_version", json!(observed_version.to_string()));
+fn rollback_payload<F: InstallerFileOps>(
+    changes: &[PayloadChange],
+    file_ops: &F,
+) -> io::Result<()> {
+    for (target, backup, had_previous, activated) in changes.iter().rev() {
+        if *activated && target.exists() {
+            file_ops.remove_path(target)?;
+        }
+        if *had_previous && backup.exists() {
+            file_ops.rename(backup, target)?;
+        }
     }
-    error
+    Ok(())
 }
 
 fn rollback_failure_error(
@@ -900,6 +1340,10 @@ mod tests {
 
     use tempfile::TempDir;
 
+    const MINIMAL_DOCS_MANIFEST: &str = "schema_version = 1\n\n[[guides]]\npath = \"README.md\"\n";
+    #[cfg(unix)]
+    const BACKEND_PROBE_TEST_WATCHDOG: Duration = Duration::from_secs(30);
+
     #[test]
     fn release_target_matches_the_published_release_matrix() {
         let target = ReleaseTarget::detect().expect("current test host is supported");
@@ -912,6 +1356,39 @@ mod tests {
             ]
             .contains(&target.triple)
         );
+    }
+
+    #[test]
+    fn managed_payload_contract_matches_the_publish_artifact_manifest() {
+        let manifest: toml::Value = toml::from_str(PUBLISH_ARTIFACTS).expect("publish manifest");
+        let binaries = manifest
+            .get("release_binaries")
+            .and_then(toml::Value::as_array)
+            .expect("release binaries");
+        let names = binaries
+            .iter()
+            .filter_map(|binary| binary.get("name").and_then(toml::Value::as_str))
+            .collect::<Vec<_>>();
+        assert!(names.contains(&"sc-lint"));
+        for backend in MANAGED_BACKENDS {
+            assert!(
+                names.contains(backend),
+                "missing {backend} in publish manifest"
+            );
+        }
+        let launcher = binaries
+            .iter()
+            .find(|binary| binary.get("name").and_then(toml::Value::as_str) == Some("sc-lint"))
+            .expect("launcher manifest entry");
+        let bundled_paths = launcher
+            .get("bundled_paths")
+            .and_then(toml::Value::as_array)
+            .expect("launcher bundled paths");
+        assert!(bundled_paths.iter().any(|bundle| {
+            bundle.get("source").and_then(toml::Value::as_str) == Some("docs-bundle")
+                && bundle.get("destination").and_then(toml::Value::as_str)
+                    == Some("share/sc-lint/sc-lint-docs")
+        }));
     }
 
     #[test]
@@ -963,6 +1440,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn release_binary_candidate_accepts_nested_and_prefers_legacy_flat_layouts() {
         let fixture = TempDir::new().expect("fixture");
@@ -987,6 +1465,20 @@ mod tests {
         assert_eq!(
             release_binary_candidate(fixture.path(), &release_version, target),
             flat
+        );
+        for backend in MANAGED_BACKENDS {
+            write_backend_probe(&fixture.path().join(backend), backend);
+        }
+        let legacy_docs = fixture.path().join("docs-bundle");
+        fs::create_dir_all(&legacy_docs).expect("legacy docs");
+        fs::write(legacy_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
+            .expect("legacy docs manifest");
+        fs::write(legacy_docs.join("README.md"), "# legacy docs\n").expect("legacy README");
+        let flat_payload =
+            release_payload_candidates(&flat, &fixture.path().join("managed/bin/sc-lint"));
+        assert!(
+            payload_validation_issue(&flat_payload).is_none(),
+            "legacy flat layout is accepted"
         );
     }
 
@@ -1023,16 +1515,24 @@ mod tests {
         let payload_dir = fixture.path().join("payload");
         let install_dir = fixture.path().join("managed");
         fs::create_dir_all(&release_dir).expect("release directory");
-        fs::create_dir(&payload_dir).expect("payload directory");
+        let archive_root = payload_dir.join(format!(
+            "sc-lint_{release_version}_{}",
+            release_target.triple
+        ));
+        fs::create_dir_all(archive_root.join("bin")).expect("payload directory");
         fs::create_dir(&install_dir).expect("managed directory");
-        write_probe(&payload_dir.join(ReleaseTarget::binary_name()), "0.4.1");
+        write_probe(
+            &archive_root.join("bin").join(ReleaseTarget::binary_name()),
+            "0.4.1",
+        );
+        add_fake_release_companions(&archive_root);
         let archive = release_dir.join(&archive_name);
         let tar_status = Command::new("tar")
             .args(["-czf"])
             .arg(&archive)
             .args(["-C"])
             .arg(&payload_dir)
-            .arg(ReleaseTarget::binary_name())
+            .arg(".")
             .status()
             .expect("tar starts");
         assert!(tar_status.success(), "tar produced fixture archive");
@@ -1062,6 +1562,93 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn checksum_valid_release_with_nonfunctional_backend_preserves_previous_bundle() {
+        let fixture = TempDir::new().expect("fixture");
+        let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
+        let release_version = ResolvedReleaseVersion::for_minimum(&minimum);
+        let target = ReleaseTarget::detect().expect("supported fixture host");
+        let archive_name = target.archive_name(&release_version);
+        let release_dir = fixture.path().join("release").join("v0.4.1");
+        let payload_dir = fixture.path().join("payload");
+        let prefix = format!("sc-lint_{release_version}_{}", target.triple);
+        let archive_root = payload_dir.join(&prefix);
+        let bin_dir = archive_root.join("bin");
+        fs::create_dir_all(&bin_dir).expect("payload bin");
+        fs::create_dir_all(&release_dir).expect("release directory");
+        write_probe(&bin_dir.join(ReleaseTarget::binary_name()), "0.4.1");
+        add_fake_release_companions(&archive_root);
+        write_failing_stub(&bin_dir.join(crate::consts::TOOL_RUNTIME));
+        let archive = release_dir.join(&archive_name);
+        let tar_status = Command::new("tar")
+            .args(["-czf"])
+            .arg(&archive)
+            .args(["-C"])
+            .arg(&payload_dir)
+            .arg(".")
+            .status()
+            .expect("tar starts");
+        assert!(
+            tar_status.success(),
+            "tar produced malformed fixture archive"
+        );
+        let digest = sha256(&archive).expect("archive checksum");
+        fs::write(
+            release_dir.join("checksums.txt"),
+            format!("{digest} {archive_name}\n"),
+        )
+        .expect("checksum manifest");
+
+        let install_dir = fixture.path().join("managed/bin");
+        let managed_binary = install_dir.join(ReleaseTarget::binary_name());
+        let managed_docs = fixture.path().join("managed/share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&install_dir).expect("managed bin");
+        fs::create_dir_all(&managed_docs).expect("managed docs");
+        write_probe(&managed_binary, "0.4.1");
+        let previous_launcher = fs::read(&managed_binary).expect("previous launcher");
+        for backend in MANAGED_BACKENDS {
+            write_backend_probe(&install_dir.join(backend), backend);
+        }
+        fs::write(managed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
+            .expect("managed docs manifest");
+        fs::write(managed_docs.join("README.md"), "previous complete bundle\n")
+            .expect("managed docs README");
+        let previous_backends = MANAGED_BACKENDS
+            .iter()
+            .map(|backend| fs::read(install_dir.join(backend)).expect("previous backend"))
+            .collect::<Vec<_>>();
+
+        let error = install_verified_release(
+            &release_version,
+            &minimum,
+            target,
+            &install_dir,
+            &managed_binary,
+            &format!("file://{}", archive.display()),
+            &format!("file://{}", release_dir.join("checksums.txt").display()),
+        )
+        .expect_err("nonfunctional backend is rejected");
+        assert_eq!(error.code(), "CLI.SC_LINT_RELEASE_UNAVAILABLE");
+        assert_eq!(
+            fs::read(&managed_binary).expect("previous launcher remains"),
+            previous_launcher
+        );
+        assert_eq!(
+            probe_version(&managed_binary).expect("previous launcher remains"),
+            Version::parse("0.4.1").expect("version")
+        );
+        for (backend, previous) in MANAGED_BACKENDS.iter().zip(previous_backends) {
+            let path = install_dir.join(backend);
+            assert_eq!(fs::read(&path).expect("previous backend remains"), previous);
+            assert!(backend_cli_failure(&path, backend, BACKEND_PROBE_TIMEOUT).is_none());
+        }
+        assert_eq!(
+            fs::read_to_string(managed_docs.join("README.md")).expect("previous docs remain"),
+            "previous complete bundle\n"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn failed_post_install_probe_restores_the_previous_binary() {
         let fixture = TempDir::new().expect("fixture");
         let target = fixture.path().join("sc-lint");
@@ -1070,8 +1657,15 @@ mod tests {
         write_probe(&candidate, "0.3.0");
         let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
 
-        let error = activate_candidate(&candidate, &target, &minimum)
-            .expect_err("old candidate rolls back");
+        let error = activate_payload(
+            &[PayloadEntry {
+                source: candidate,
+                target: target.clone(),
+            }],
+            &target,
+            &minimum,
+        )
+        .expect_err("old candidate rolls back");
         assert_eq!(error.code(), "CLI.SC_LINT_POST_INSTALL_VERSION_FAILED");
         assert_eq!(
             probe_version(&target).expect("old binary restored"),
@@ -1079,10 +1673,266 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn failed_bundle_activation_restores_every_previous_managed_payload() {
+        let fixture = TempDir::new().expect("fixture");
+        let install = fixture.path().join("managed/bin");
+        let old_docs = fixture.path().join("managed/share/sc-lint/sc-lint-docs");
+        let staged = fixture.path().join("candidate");
+        let staged_bin = staged.join("bin");
+        let staged_docs = staged.join("share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&install).expect("install directory");
+        fs::create_dir_all(&old_docs).expect("old docs directory");
+        fs::create_dir_all(&staged_bin).expect("candidate bin directory");
+        fs::create_dir_all(&staged_docs).expect("candidate docs directory");
+        write_probe(&install.join(ReleaseTarget::binary_name()), "0.4.1");
+        write_probe(&staged_bin.join(ReleaseTarget::binary_name()), "0.3.0");
+        for backend in MANAGED_BACKENDS {
+            write_backend_probe(&install.join(backend), backend);
+            write_backend_probe(&staged_bin.join(backend), backend);
+        }
+        let previous_backends = MANAGED_BACKENDS
+            .iter()
+            .map(|backend| fs::read(install.join(backend)).expect("old backend"))
+            .collect::<Vec<_>>();
+        fs::write(old_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("old manifest");
+        fs::write(old_docs.join("README.md"), "old docs\n").expect("old README");
+        fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("new manifest");
+        fs::write(staged_docs.join("README.md"), "new docs\n").expect("new README");
+
+        let managed_binary = install.join(ReleaseTarget::binary_name());
+        let mut entries = vec![PayloadEntry {
+            source: staged_bin.join(ReleaseTarget::binary_name()),
+            target: managed_binary.clone(),
+        }];
+        entries.extend(MANAGED_BACKENDS.iter().map(|backend| PayloadEntry {
+            source: staged_bin.join(backend),
+            target: install.join(backend),
+        }));
+        entries.push(PayloadEntry {
+            source: staged_docs,
+            target: old_docs.clone(),
+        });
+
+        let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
+        let error = activate_payload(&entries, &managed_binary, &minimum)
+            .expect_err("candidate below floor must roll back entire bundle");
+        assert_eq!(error.code(), "CLI.SC_LINT_POST_INSTALL_VERSION_FAILED");
+        assert_eq!(
+            probe_version(&managed_binary).expect("restored launcher"),
+            Version::parse("0.4.1").unwrap()
+        );
+        for (backend, previous) in MANAGED_BACKENDS.iter().zip(previous_backends) {
+            assert_eq!(
+                fs::read(install.join(backend)).expect("old backend restored"),
+                previous
+            );
+            assert!(
+                backend_cli_failure(&install.join(backend), backend, BACKEND_PROBE_TIMEOUT)
+                    .is_none()
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(old_docs.join("README.md")).expect("old docs"),
+            "old docs\n"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn release_payload_validation_rejects_missing_backend_and_corrupt_docs() {
+        let fixture = TempDir::new().expect("fixture");
+        let version = ResolvedReleaseVersion(Version::new(0, 7, 1));
+        let target = ReleaseTarget::detect().expect("supported target");
+        let archive_root = fixture
+            .path()
+            .join(format!("sc-lint_{version}_{}", target.triple));
+        let bin = archive_root.join("bin");
+        let managed = fixture.path().join("managed/bin/sc-lint");
+        fs::create_dir_all(&bin).expect("archive bin");
+        fs::write(bin.join(ReleaseTarget::binary_name()), "launcher").expect("launcher");
+        for backend in MANAGED_BACKENDS {
+            write_backend_probe(&bin.join(backend), backend);
+        }
+        fs::remove_file(bin.join(crate::consts::TOOL_RUNTIME)).expect("omit runtime");
+        let docs = archive_root.join("share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&docs).expect("docs directory");
+        fs::write(docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("manifest");
+        let mut entries =
+            release_payload_candidates(&bin.join(ReleaseTarget::binary_name()), &managed);
+        assert!(
+            payload_validation_issue(&entries).is_some(),
+            "missing backend is rejected"
+        );
+        write_backend_probe(
+            &bin.join(crate::consts::TOOL_RUNTIME),
+            crate::consts::TOOL_RUNTIME,
+        );
+        assert!(
+            payload_validation_issue(&entries).is_some(),
+            "docs without overview are rejected"
+        );
+        fs::write(docs.join("README.md"), "# docs\n").expect("overview");
+        entries = release_payload_candidates(&bin.join(ReleaseTarget::binary_name()), &managed);
+        assert!(
+            payload_validation_issue(&entries).is_none(),
+            "complete release payload is accepted"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn swapped_real_backend_is_rejected_from_staged_and_installed_bundles() {
+        let fixture = TempDir::new().expect("fixture");
+        let staged_root = fixture.path().join("staged");
+        let staged_bin = staged_root.join("bin");
+        let staged_docs = staged_root.join("share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&staged_bin).expect("staged bin");
+        fs::create_dir_all(&staged_docs).expect("staged docs");
+        fs::write(staged_bin.join(ReleaseTarget::binary_name()), "launcher")
+            .expect("staged launcher");
+        for backend in MANAGED_BACKENDS {
+            fs::copy(built_backend_binary(backend), staged_bin.join(backend))
+                .expect("copy staged real backend");
+        }
+        fs::copy(
+            built_backend_binary(crate::consts::TOOL_RUNTIME),
+            staged_bin.join(crate::consts::TOOL_PORTABILITY),
+        )
+        .expect("swap staged portability backend");
+        fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
+            .expect("staged docs manifest");
+        fs::write(staged_docs.join("README.md"), "# docs\n").expect("staged docs README");
+        let staged_entries = release_payload_candidates(
+            &staged_bin.join(ReleaseTarget::binary_name()),
+            &fixture.path().join("managed/bin/sc-lint"),
+        );
+        assert!(
+            payload_validation_issue(&staged_entries).is_some(),
+            "runtime binary renamed as portability is rejected in staging"
+        );
+
+        let installed_root = fixture.path().join("installed");
+        let installed_bin = installed_root.join("bin");
+        let installed_docs = installed_root.join("share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&installed_bin).expect("installed bin");
+        fs::create_dir_all(&installed_docs).expect("installed docs");
+        fs::write(installed_bin.join(ReleaseTarget::binary_name()), "launcher")
+            .expect("installed launcher");
+        for backend in MANAGED_BACKENDS {
+            fs::copy(built_backend_binary(backend), installed_bin.join(backend))
+                .expect("copy installed real backend");
+        }
+        fs::copy(
+            built_backend_binary(crate::consts::TOOL_RUNTIME),
+            installed_bin.join(crate::consts::TOOL_PORTABILITY),
+        )
+        .expect("swap installed portability backend");
+        fs::write(installed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
+            .expect("installed docs manifest");
+        fs::write(installed_docs.join("README.md"), "# docs\n").expect("installed docs README");
+        assert!(
+            !managed_payload_complete(&installed_bin.join(ReleaseTarget::binary_name())),
+            "runtime binary renamed as portability is rejected in an installed bundle"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn backend_probe_accepts_a_healthy_companion_after_the_old_two_second_limit() {
+        let fixture = TempDir::new().expect("fixture");
+        let backend = crate::consts::TOOL_RUNTIME;
+        let path = fixture.path().join(backend);
+        write_slow_backend_probe(&path, backend, "2.25");
+
+        assert_eq!(
+            backend_cli_failure(&path, backend, BACKEND_PROBE_TIMEOUT),
+            None,
+            "healthy companion should pass when its first help response exceeds the old deadline"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hanging_noisy_backend_is_bounded_and_cleaned_up_in_staged_and_installed_bundles() {
+        let fixture = TempDir::new().expect("fixture");
+
+        let staged_root = fixture.path().join("staged");
+        let staged_bin = staged_root.join("bin");
+        let staged_docs = staged_root.join("share/sc-lint/sc-lint-docs");
+        let staged_pid_file = fixture.path().join("staged-child-pids");
+        fs::create_dir_all(&staged_bin).expect("staged bin");
+        fs::create_dir_all(&staged_docs).expect("staged docs");
+        fs::write(staged_bin.join(ReleaseTarget::binary_name()), "launcher")
+            .expect("staged launcher");
+        for backend in [
+            crate::consts::TOOL_BOUNDARY,
+            crate::consts::TOOL_PORTABILITY,
+        ] {
+            write_backend_probe(&staged_bin.join(backend), backend);
+        }
+        write_hanging_noisy_stub(
+            &staged_bin.join(crate::consts::TOOL_RUNTIME),
+            &staged_pid_file,
+        );
+        fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
+            .expect("staged docs manifest");
+        fs::write(staged_docs.join("README.md"), "# docs\n").expect("staged docs README");
+        let staged_launcher = staged_bin.join(ReleaseTarget::binary_name());
+        let staged_managed = fixture.path().join("managed/bin/sc-lint");
+        let probe_timeout = Duration::from_secs(5);
+        let staged_is_complete = run_probe_with_watchdog(&staged_pid_file, move || {
+            let entries = release_payload_candidates(&staged_launcher, &staged_managed);
+            payload_validation_issue_with_timeout(&entries, probe_timeout)
+        });
+        let staged_problem = staged_is_complete.expect("hanging staged companion is rejected");
+        assert!(
+            staged_problem.contains(crate::consts::TOOL_RUNTIME),
+            "unexpected staged probe failure: {staged_problem}"
+        );
+        assert!(
+            staged_problem.contains("timed out after 5000 ms"),
+            "unexpected staged probe failure: {staged_problem}"
+        );
+        assert_probe_children_stopped(&staged_pid_file);
+
+        let installed_root = fixture.path().join("installed");
+        let installed_bin = installed_root.join("bin");
+        let installed_docs = installed_root.join("share/sc-lint/sc-lint-docs");
+        let installed_pid_file = fixture.path().join("installed-child-pids");
+        fs::create_dir_all(&installed_bin).expect("installed bin");
+        fs::create_dir_all(&installed_docs).expect("installed docs");
+        fs::write(installed_bin.join(ReleaseTarget::binary_name()), "launcher")
+            .expect("installed launcher");
+        for backend in [
+            crate::consts::TOOL_BOUNDARY,
+            crate::consts::TOOL_PORTABILITY,
+        ] {
+            write_backend_probe(&installed_bin.join(backend), backend);
+        }
+        write_hanging_noisy_stub(
+            &installed_bin.join(crate::consts::TOOL_RUNTIME),
+            &installed_pid_file,
+        );
+        fs::write(installed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
+            .expect("installed docs manifest");
+        fs::write(installed_docs.join("README.md"), "# docs\n").expect("installed docs README");
+        let installed_launcher = installed_bin.join(ReleaseTarget::binary_name());
+        let installed_is_complete = run_probe_with_watchdog(&installed_pid_file, move || {
+            managed_payload_validation_issue_with_timeout(&installed_launcher, probe_timeout)
+        });
+        let installed_problem =
+            installed_is_complete.expect("hanging installed companion is rejected");
+        assert!(installed_problem.contains(crate::consts::TOOL_RUNTIME));
+        assert!(installed_problem.contains("timed out after 5000 ms"));
+        assert_probe_children_stopped(&installed_pid_file);
+    }
+
     #[test]
     fn rollback_failure_never_claims_the_previous_binary_was_restored() {
         let fixture = TempDir::new().expect("fixture");
-        let target = fixture.path().join("sc-lint");
+        let target = fixture.path().join(ReleaseTarget::binary_name());
         let candidate = fixture.path().join("candidate");
         fs::write(&target, "known-good").expect("target");
         fs::write(&candidate, "candidate").expect("candidate");
@@ -1091,9 +1941,15 @@ mod tests {
             target: target.clone(),
         };
 
-        let error = activate_candidate_with(&candidate, &target, &minimum, &file_ops, |_| {
-            Err("post-install version probe rejected candidate".to_string())
-        })
+        let error = activate_payload_with(
+            &[PayloadEntry {
+                source: candidate,
+                target: target.clone(),
+            }],
+            &target,
+            &minimum,
+            &file_ops,
+        )
         .expect_err("a failed rollback must surface separately");
 
         assert_eq!(error.code(), "CLI.SC_LINT_INSTALL_ROLLBACK_FAILED");
@@ -1108,7 +1964,7 @@ mod tests {
             Some(&json!(
                 fixture
                     .path()
-                    .join(format!(".{}-backup", ReleaseTarget::binary_name()))
+                    .join(format!(".{}-sc-lint-backup", ReleaseTarget::binary_name()))
                     .display()
                     .to_string()
             ))
@@ -1116,7 +1972,7 @@ mod tests {
         assert!(
             fixture
                 .path()
-                .join(format!(".{}-backup", ReleaseTarget::binary_name()))
+                .join(format!(".{}-sc-lint-backup", ReleaseTarget::binary_name()))
                 .is_file()
         );
     }
@@ -1160,6 +2016,13 @@ mod tests {
         let managed_binary = install_dir.join(ReleaseTarget::binary_name());
         // Keep the test process from holding a write fd for the executable it probes.
         fs::hard_link(&built_binary, &managed_binary).expect("hard link native CLI probe");
+        for backend in MANAGED_BACKENDS {
+            write_backend_probe(&install_dir.join(backend), backend);
+        }
+        let docs = install_fixture.path().join("share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&docs).expect("managed docs");
+        fs::write(docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("manifest");
+        fs::write(docs.join("README.md"), "# docs\n").expect("docs overview");
         let current = probe_version(&managed_binary).expect("probe linked native CLI");
 
         let mut old_floor = current.clone();
@@ -1218,6 +2081,29 @@ mod tests {
         assert_eq!(current["status"], "current");
         assert_eq!(current["installed_version"], "0.4.1");
 
+        // A matching launcher version does not make an incomplete managed
+        // bundle current. setup repairs missing required release payloads.
+        fs::write(install_dir.join(crate::consts::TOOL_RUNTIME), "")
+            .expect("truncate runtime companion");
+        fs::remove_file(install_dir.join("../share/sc-lint/sc-lint-docs/README.md"))
+            .expect("remove docs overview");
+        let repaired = execute_install_command(&config_path, &["setup"]);
+        assert_eq!(repaired["status"], "upgraded");
+        assert!(install_dir.join(crate::consts::TOOL_RUNTIME).is_file());
+        assert!(
+            backend_cli_failure(
+                &install_dir.join(crate::consts::TOOL_RUNTIME),
+                crate::consts::TOOL_RUNTIME,
+                BACKEND_PROBE_TIMEOUT,
+            )
+            .is_none()
+        );
+        assert!(
+            install_dir
+                .join("../share/sc-lint/sc-lint-docs/README.md")
+                .is_file()
+        );
+
         write_probe(&install_dir.join(ReleaseTarget::binary_name()), "0.5.0");
         let newer = execute_install_command(&config_path, &["upgrade"]);
         assert_eq!(newer["status"], "current");
@@ -1226,6 +2112,154 @@ mod tests {
             fs::read_to_string(&consumer_readme).expect("readme"),
             "consumer-owned README\n"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[serial]
+    fn real_release_archive_installs_self_contained_bundle_ahead_of_stale_path_helpers() {
+        let fixture = TempDir::new().expect("fixture");
+        let version = env!("CARGO_PKG_VERSION");
+        let minimum = MinimumVersion::from_str(version).expect("package version");
+        let release_version = ResolvedReleaseVersion::for_minimum(&minimum);
+        let target = ReleaseTarget::detect().expect("supported target");
+        let archive_name = target.archive_name(&release_version);
+        let release_dir = fixture.path().join("release").join(format!("v{version}"));
+        let payload_dir = fixture.path().join("payload");
+        let archive_root = payload_dir.join(format!("sc-lint_{version}_{}", target.triple));
+        let bin_dir = archive_root.join("bin");
+        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let build_status = Command::new("cargo")
+            .args([
+                "build",
+                "--quiet",
+                "-p",
+                "sc-lint",
+                "-p",
+                "sc-lint-boundary",
+                "-p",
+                "sc-lint-portability",
+                "-p",
+                "sc-lint-runtime",
+            ])
+            .current_dir(&workspace_root)
+            .status()
+            .expect("build release backend binaries");
+        assert!(build_status.success(), "backend binaries build");
+        fs::create_dir_all(&release_dir).expect("release directory");
+        fs::create_dir_all(&bin_dir).expect("archive bin directory");
+        let debug_dir = built_cli_binary()
+            .parent()
+            .expect("debug directory")
+            .to_path_buf();
+        for name in
+            std::iter::once(ReleaseTarget::binary_name()).chain(MANAGED_BACKENDS.iter().copied())
+        {
+            fs::copy(debug_dir.join(name), bin_dir.join(name)).expect("copy release binary");
+        }
+        copy_directory(
+            &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs-bundle"),
+            &archive_root.join("share/sc-lint/sc-lint-docs"),
+        );
+        let archive = release_dir.join(&archive_name);
+        let tar_status = Command::new("tar")
+            .args(["-czf"])
+            .arg(&archive)
+            .args(["-C"])
+            .arg(&payload_dir)
+            .arg(".")
+            .status()
+            .expect("tar starts");
+        assert!(tar_status.success(), "tar produced release-shaped archive");
+        let digest = sha256(&archive).expect("archive checksum");
+        fs::write(
+            release_dir.join("checksums.txt"),
+            format!("{digest} {archive_name}\n"),
+        )
+        .expect("checksum manifest");
+
+        let install_dir = fixture.path().join("managed/bin");
+        let config_path = fixture.path().join("consumer/sc-lint.toml");
+        let consumer = config_path.parent().expect("consumer dir");
+        fs::create_dir_all(consumer).expect("consumer directory");
+        fs::write(
+            &config_path,
+            format!("[tool.sc-lint]\nminimum_version = \"{version}\"\n"),
+        )
+        .expect("consumer config");
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+        let stale_path = fixture.path().join("stale-path");
+        fs::create_dir_all(&stale_path).expect("stale PATH directory");
+        for backend in [crate::consts::TOOL_PORTABILITY, crate::consts::TOOL_RUNTIME] {
+            write_failing_stub(&stale_path.join(backend));
+        }
+        let stale_and_original_path = env::join_paths(
+            std::iter::once(stale_path.as_path().as_os_str().to_os_string()).chain(
+                env::split_paths(&env::var_os("PATH").expect("PATH"))
+                    .map(|path| path.into_os_string()),
+            ),
+        )
+        .expect("joined PATH");
+        let release_base: OsString =
+            format!("file://{}", fixture.path().join("release").display()).into();
+        let _environment = InstallerEnvironment::set(&[
+            (INSTALL_DIR_ENV, install_dir.as_os_str()),
+            (RELEASE_BASE_URL_ENV, release_base.as_os_str()),
+            ("PATH", stale_and_original_path.as_os_str()),
+        ]);
+
+        let installed = execute_install_command(&config_path, &["setup"]);
+        assert_eq!(installed["status"], "installed");
+        let managed_binary = install_dir.join(ReleaseTarget::binary_name());
+        for args in [
+            vec![
+                "--json",
+                "--config",
+                config_path.to_str().unwrap(),
+                "--root",
+                workspace.to_str().unwrap(),
+                "lint",
+                "sc-boundary",
+            ],
+            vec![
+                "--json",
+                "--config",
+                config_path.to_str().unwrap(),
+                "--root",
+                workspace.to_str().unwrap(),
+                "lint",
+                "sc-runtime",
+            ],
+            vec![
+                "--json",
+                "--config",
+                config_path.to_str().unwrap(),
+                "--root",
+                workspace.to_str().unwrap(),
+                "lint",
+                "sc-portability",
+            ],
+            vec!["--json", "docs"],
+            vec!["--json", "version"],
+        ] {
+            let output = Command::new(&managed_binary)
+                .args(&args)
+                .current_dir(&workspace)
+                .output()
+                .expect("managed command starts");
+            assert!(
+                output.status.success(),
+                "managed command {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let envelope: Value = serde_json::from_slice(&output.stdout).expect("JSON output");
+            assert_eq!(envelope["ok"], true, "command {:?}", args);
+            if args.last() == Some(&"version") {
+                assert_eq!(envelope["data"]["self_contained"], true);
+            }
+        }
     }
 
     #[test]
@@ -1336,6 +2370,21 @@ mod tests {
     }
 
     #[cfg(unix)]
+    fn built_backend_binary(name: &str) -> PathBuf {
+        let test_binary = env::current_exe().expect("test executable");
+        let debug_dir = test_binary
+            .parent()
+            .and_then(Path::parent)
+            .expect("target debug directory");
+        let name = if cfg!(windows) {
+            format!("{name}.exe")
+        } else {
+            name.to_string()
+        };
+        debug_dir.join(name)
+    }
+
+    #[cfg(unix)]
     fn write_local_release_fixture(root: &Path, version: &str) -> OsString {
         let minimum = MinimumVersion::from_str(version).expect("fixture version");
         let release_version = ResolvedReleaseVersion::for_minimum(&minimum);
@@ -1350,6 +2399,7 @@ mod tests {
             &archive_root.join("bin").join(ReleaseTarget::binary_name()),
             version,
         );
+        add_fake_release_companions(&archive_root);
         let archive = release_dir.join(&archive_name);
         let tar_status = Command::new("tar")
             .args(["-czf"])
@@ -1367,6 +2417,43 @@ mod tests {
         )
         .expect("checksums");
         format!("file://{}", root.join("release").display()).into()
+    }
+
+    #[cfg(unix)]
+    fn add_fake_release_companions(root: &Path) {
+        let bin_dir = root.join("bin");
+        let docs = root.join("share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&bin_dir).expect("release bin");
+        for backend in MANAGED_BACKENDS {
+            write_backend_probe(&bin_dir.join(backend), backend);
+        }
+        fs::create_dir_all(&docs).expect("release docs");
+        fs::write(docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("docs manifest");
+        fs::write(docs.join("README.md"), "# sc-lint\n").expect("docs README");
+    }
+
+    #[cfg(unix)]
+    fn copy_directory(source: &Path, destination: &Path) {
+        fs::create_dir_all(destination).expect("destination directory");
+        for entry in fs::read_dir(source).expect("source directory") {
+            let entry = entry.expect("directory entry");
+            let target = destination.join(entry.file_name());
+            if entry.file_type().expect("entry type").is_dir() {
+                copy_directory(&entry.path(), &target);
+            } else {
+                fs::copy(entry.path(), target).expect("copy docs file");
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn write_failing_stub(path: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::write(path, "#!/bin/sh\nexit 97\n").expect("stale helper");
+        let mut permissions = fs::metadata(path).expect("stub metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("make stub executable");
     }
 
     #[cfg(unix)]
@@ -1388,5 +2475,177 @@ mod tests {
             .write_all(script.as_bytes())
             .expect("script text");
         assert!(child.wait().expect("probe writer waits").success());
+    }
+
+    fn write_backend_probe(path: &Path, name: &str) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let about = backend_about(name).expect("known backend identity");
+            fs::write(
+            path,
+            format!(
+                    "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  printf '%s\\n' 'Usage: {name} <COMMAND>' '{about}' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
+            ),
+        )
+        .expect("backend probe");
+            let mut permissions = fs::metadata(path).expect("probe metadata").permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(path, permissions).expect("make backend probe executable");
+        }
+        #[cfg(not(unix))]
+        {
+            let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+            let executable = format!("{name}.exe");
+            let destination = path.with_file_name(format!("{name}.exe"));
+            fs::copy(
+                workspace_root.join("target/debug").join(executable),
+                destination,
+            )
+            .expect("copy built backend executable");
+        }
+    }
+
+    #[cfg(unix)]
+    fn write_slow_backend_probe(path: &Path, name: &str, delay_seconds: &str) {
+        use std::os::unix::fs::PermissionsExt;
+
+        let about = backend_about(name).expect("known backend identity");
+        fs::write(
+            path,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  sleep {delay_seconds}\n  printf '%s\\n' 'Usage: {name} <COMMAND>' '{about}' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
+            ),
+        )
+        .expect("slow backend probe");
+        let mut permissions = fs::metadata(path).expect("probe metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("make slow backend probe executable");
+    }
+
+    #[cfg(unix)]
+    fn write_hanging_noisy_stub(path: &Path, child_pid_file: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+
+        let child_pid_file = child_pid_file.to_string_lossy().replace('\'', "'\\''");
+        fs::write(
+            path,
+            format!(
+                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{child_pid_file}'\nwait\n"
+            ),
+        )
+        .expect("write hanging noisy backend");
+        let mut permissions = fs::metadata(path)
+            .expect("hanging backend metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("make hanging backend executable");
+    }
+
+    #[cfg(unix)]
+    fn run_probe_with_watchdog<T: Send + 'static>(
+        child_pid_file: &Path,
+        probe: impl FnOnce() -> T + Send + 'static,
+    ) -> T {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let worker = thread::spawn(move || {
+            let _ = sender.send(probe());
+        });
+        match receiver.recv_timeout(BACKEND_PROBE_TEST_WATCHDOG) {
+            Ok(result) => {
+                worker.join().expect("probe worker");
+                result
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                terminate_test_probe_processes(child_pid_file);
+                panic!(
+                    "backend probe exceeded the {}-second test deadlock watchdog",
+                    BACKEND_PROBE_TEST_WATCHDOG.as_secs()
+                );
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                let _ = worker.join();
+                panic!("probe worker exited without returning a result");
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn terminate_test_probe_processes(child_pid_file: &Path) {
+        let Ok(pids) = fs::read_to_string(child_pid_file) else {
+            return;
+        };
+        let pids = pids
+            .split_whitespace()
+            .filter_map(|pid| pid.parse::<u32>().ok())
+            .collect::<Vec<_>>();
+        if let Some(group_id) = pids.first() {
+            let process_group = format!("-{group_id}");
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", "--", &process_group])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+        for pid in pids {
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", &pid.to_string()])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+    }
+
+    #[cfg(unix)]
+    fn assert_probe_children_stopped(child_pid_file: &Path) {
+        let child_pids = fs::read_to_string(child_pid_file)
+            .expect("probe recorded child pids")
+            .split_whitespace()
+            .map(|pid| pid.parse::<u32>().expect("child pid"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            child_pids.len(),
+            3,
+            "probe recorded parent and both child pids"
+        );
+        for pid in child_pids {
+            let mut details = probe_process_details(pid);
+            for _ in 0..100 {
+                if details
+                    .as_deref()
+                    .is_none_or(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X')))
+                {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(10));
+                details = probe_process_details(pid);
+            }
+            if details
+                .as_deref()
+                .is_some_and(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X')))
+            {
+                eprintln!("backend probe child {pid} terminated; process details {details:?}");
+            }
+            assert!(
+                details
+                    .as_deref()
+                    .is_none_or(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X'))),
+                "backend probe child {pid} remained live with process details {details:?}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    fn probe_process_details(pid: u32) -> Option<String> {
+        let output = Command::new("ps")
+            .args(["-o", "stat=,ppid=,pgid=,command=", "-p", &pid.to_string()])
+            .output()
+            .ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+            .filter(|state| !state.is_empty())
     }
 }

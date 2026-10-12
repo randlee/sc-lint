@@ -8,23 +8,14 @@ use crate::OwnerId;
 use crate::RuleId;
 use crate::inventory::BoundaryInventory;
 use crate::inventory::BoundaryRecord;
-use crate::inventory::ForbiddenPackageEdge;
 use crate::inventory::WorkspacePackageName;
+use crate::inventory::WorkspacePackageResolver;
 
 /// A direct workspace-member dependency edge observed in Cargo metadata.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct PackageEdge {
     from: WorkspacePackageName,
     to: WorkspacePackageName,
-}
-
-impl From<&ForbiddenPackageEdge> for PackageEdge {
-    fn from(edge: &ForbiddenPackageEdge) -> Self {
-        Self {
-            from: edge.from.clone(),
-            to: edge.to.clone(),
-        }
-    }
 }
 
 /// How an observed edge is declared, which decides the allowlists it is
@@ -56,6 +47,14 @@ pub(crate) struct PackagePolicyReport {
     pub(crate) scanned_crates: usize,
 }
 
+struct ResolvedDependencyPolicy {
+    owner: WorkspacePackageName,
+    allowed_dependencies: BTreeSet<WorkspacePackageName>,
+    allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
+    allowed_dependents: BTreeSet<WorkspacePackageName>,
+    forbidden_edges: BTreeSet<PackageEdge>,
+}
+
 pub(crate) fn analyze_package_policy(
     metadata: &cargo_metadata::Metadata,
     inventory: &BoundaryInventory,
@@ -65,15 +64,30 @@ pub(crate) fn analyze_package_policy(
         .iter()
         .map(|package| package.name.to_string())
         .collect::<BTreeSet<_>>();
+    let known_non_workspace_packages = metadata
+        .packages
+        .iter()
+        .map(|package| package.name.to_string())
+        .filter(|package| !workspace_package_names.contains(package))
+        .chain(
+            inventory
+                .records
+                .iter()
+                .filter(|record| !record.status.state.requires_workspace_package())
+                .map(|record| record.owner_package.to_string()),
+        )
+        .collect::<BTreeSet<_>>();
+    let resolver = WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
     let (runtime_edges, dev_edges) =
         collect_direct_workspace_edges(&workspace_packages, &workspace_package_names);
 
     let findings = collect_policy_findings(
         inventory,
-        &workspace_package_names,
+        &resolver,
+        &known_non_workspace_packages,
         &runtime_edges,
         &dev_edges,
-    );
+    )?;
 
     Ok(PackagePolicyReport {
         findings,
@@ -111,10 +125,11 @@ fn collect_direct_workspace_edges(
 
 fn collect_policy_findings(
     inventory: &BoundaryInventory,
-    workspace_package_names: &BTreeSet<String>,
+    resolver: &WorkspacePackageResolver,
+    known_non_workspace_packages: &BTreeSet<String>,
     runtime_edges: &BTreeSet<PackageEdge>,
     dev_edges: &BTreeSet<PackageEdge>,
-) -> Vec<Finding> {
+) -> Result<Vec<Finding>> {
     let direct_edges = runtime_edges
         .union(dev_edges)
         .cloned()
@@ -124,14 +139,16 @@ fn collect_policy_findings(
     let incoming_edges = index_incoming_edges(&direct_edges);
 
     for record in &inventory.records {
-        if !workspace_package_names.contains(record.owner_package.as_ref()) {
+        if !record.status.state.requires_workspace_package() {
             continue;
         }
+        let policy = resolve_dependency_policy(resolver, known_non_workspace_packages, record)?;
 
-        let owner = WorkspacePackageName::from_package_name(record.owner_package.as_ref());
-
-        for edge in runtime_edges.iter().filter(|edge| edge.from == owner) {
-            if !record.dependencies.allowed_dependencies.contains(&edge.to) {
+        for edge in runtime_edges
+            .iter()
+            .filter(|edge| edge.from == policy.owner)
+        {
+            if !policy.allowed_dependencies.contains(&edge.to) {
                 findings.push(disallowed_dependency_finding(
                     record,
                     edge,
@@ -139,12 +156,9 @@ fn collect_policy_findings(
                 ));
             }
         }
-        for edge in dev_edges.iter().filter(|edge| edge.from == owner) {
-            if !record.dependencies.allowed_dependencies.contains(&edge.to)
-                && !record
-                    .dependencies
-                    .allowed_dev_dependencies
-                    .contains(&edge.to)
+        for edge in dev_edges.iter().filter(|edge| edge.from == policy.owner) {
+            if !policy.allowed_dependencies.contains(&edge.to)
+                && !policy.allowed_dev_dependencies.contains(&edge.to)
             {
                 findings.push(disallowed_dependency_finding(
                     record,
@@ -154,14 +168,17 @@ fn collect_policy_findings(
             }
         }
 
-        for dependent in incoming_edges.get(&owner).into_iter().flatten() {
-            if !record.dependencies.allowed_dependents.contains(dependent) {
-                findings.push(disallowed_dependent_finding(record, dependent, &owner));
+        for dependent in incoming_edges.get(&policy.owner).into_iter().flatten() {
+            if !policy.allowed_dependents.contains(dependent) {
+                findings.push(disallowed_dependent_finding(
+                    record,
+                    dependent,
+                    &policy.owner,
+                ));
             }
         }
 
-        for edge in &record.dependencies.forbidden_edges {
-            let edge = PackageEdge::from(edge);
+        for edge in policy.forbidden_edges {
             if direct_edges.contains(&edge) && forbidden_findings.insert(edge.clone()) {
                 findings.push(forbidden_edge_finding(&edge));
             }
@@ -173,7 +190,108 @@ fn collect_policy_findings(
             .cmp(&right.rule_id)
             .then_with(|| left.message.cmp(&right.message))
     });
-    findings
+    Ok(findings)
+}
+
+fn resolve_dependency_policy(
+    resolver: &WorkspacePackageResolver,
+    known_non_workspace_packages: &BTreeSet<String>,
+    record: &BoundaryRecord,
+) -> Result<ResolvedDependencyPolicy> {
+    Ok(ResolvedDependencyPolicy {
+        owner: resolve_policy_reference(
+            resolver,
+            known_non_workspace_packages,
+            record,
+            "owner_package",
+            record.owner_package.as_ref(),
+        )?
+        .expect("enforceable boundary owners must resolve to workspace packages"),
+        allowed_dependencies: resolve_policy_references(
+            resolver,
+            known_non_workspace_packages,
+            record,
+            "dependencies.allowed_dependencies",
+            &record.dependencies.allowed_dependencies,
+        )?,
+        allowed_dev_dependencies: resolve_policy_references(
+            resolver,
+            known_non_workspace_packages,
+            record,
+            "dependencies.allowed_dev_dependencies",
+            &record.dependencies.allowed_dev_dependencies,
+        )?,
+        allowed_dependents: resolve_policy_references(
+            resolver,
+            known_non_workspace_packages,
+            record,
+            "dependencies.allowed_dependents",
+            &record.dependencies.allowed_dependents,
+        )?,
+        forbidden_edges: record
+            .dependencies
+            .forbidden_edges
+            .iter()
+            .filter_map(|edge| {
+                let from = resolve_policy_reference(
+                    resolver,
+                    known_non_workspace_packages,
+                    record,
+                    "dependencies.forbidden_edges[].from",
+                    edge.from.as_ref(),
+                );
+                let to = resolve_policy_reference(
+                    resolver,
+                    known_non_workspace_packages,
+                    record,
+                    "dependencies.forbidden_edges[].to",
+                    edge.to.as_ref(),
+                );
+                match (from, to) {
+                    (Ok(Some(from)), Ok(Some(to))) => Some(Ok(PackageEdge { from, to })),
+                    (Ok(_), Ok(_)) => None,
+                    (Err(error), _) | (_, Err(error)) => Some(Err(error)),
+                }
+            })
+            .collect::<Result<BTreeSet<_>>>()?,
+    })
+}
+
+fn resolve_policy_references(
+    resolver: &WorkspacePackageResolver,
+    known_non_workspace_packages: &BTreeSet<String>,
+    record: &BoundaryRecord,
+    field: &str,
+    references: &BTreeSet<WorkspacePackageName>,
+) -> Result<BTreeSet<WorkspacePackageName>> {
+    let mut resolved = BTreeSet::new();
+    for reference in references {
+        if let Some(package) = resolve_policy_reference(
+            resolver,
+            known_non_workspace_packages,
+            record,
+            field,
+            reference.as_ref(),
+        )? {
+            resolved.insert(package);
+        }
+    }
+    Ok(resolved)
+}
+
+fn resolve_policy_reference(
+    resolver: &WorkspacePackageResolver,
+    known_non_workspace_packages: &BTreeSet<String>,
+    record: &BoundaryRecord,
+    field: &str,
+    reference: &str,
+) -> Result<Option<WorkspacePackageName>> {
+    let context = format!("`{field}` for boundary `{}`", record.boundary_id);
+    match resolver.resolve_if_known(reference, &context)? {
+        Some(package) => Ok(Some(package)),
+        None if known_non_workspace_packages.contains(reference) => Ok(None),
+        None => resolver.resolve(reference, context).map(Some),
+    }
 }
 
 fn index_incoming_edges(
