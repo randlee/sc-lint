@@ -10,6 +10,7 @@ import sys
 import tempfile
 
 from sc_lint.lint_common import discover_repo_root
+from sc_lint.lint_common import write_console_output
 from sc_lint.lint_common import workspace_crate_section_lines
 
 
@@ -65,17 +66,19 @@ def main(argv: list[str]) -> int:
     repo_root = discover_repo_root(args.root)
 
     if shutil.which("cargo-deny") is None:
-        print("cargo-deny is not installed; install it to run this lint", file=sys.stderr)
+        write_console_output(
+            sys.stderr, "cargo-deny is not installed; install it to run this lint\n"
+        )
         return 2
 
     for line in workspace_crate_section_lines(repo_root):
-        print(line)
+        write_console_output(sys.stdout, f"{line}\n")
 
     runtime_config = build_runtime_config(repo_root)
     try:
         version = detect_version()
     except RuntimeError as error:
-        print(str(error), file=sys.stderr)
+        write_console_output(sys.stderr, f"{error}\n")
         return 2
     completed = subprocess.run(
         build_command(runtime_config, version),
@@ -85,9 +88,9 @@ def main(argv: list[str]) -> int:
         encoding="utf-8",
     )
     if completed.stdout:
-        print(completed.stdout, end="")
+        write_console_output(sys.stdout, completed.stdout)
     if completed.stderr:
-        print(completed.stderr, end="", file=sys.stderr)
+        write_console_output(sys.stderr, completed.stderr)
     return completed.returncode
 
 

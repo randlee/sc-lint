@@ -474,6 +474,7 @@ fn lint_profile_plan(
             python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
             product_step("sc-boundary", "lint", ["lint", "sc-boundary"]),
             product_step("sc-portability", "lint", ["lint", "sc-portability"]),
+            product_step("sc-runtime", "lint", ["lint", "sc-runtime"]),
             python_step(
                 repo_root,
                 "function-length",
@@ -510,40 +511,48 @@ fn lint_profile_plan(
             python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
             product_step("sc-boundary", "lint", ["lint", "sc-boundary"]),
             product_step("sc-portability", "lint", ["lint", "sc-portability"]),
+            product_step("sc-runtime", "lint", ["lint", "sc-runtime"]),
             // REQ-CLI-015: the CI profile never includes xwin-only steps.
         ],
     };
 
-    if matches!(profile, LintProfile::Full) && xwin_available {
-        plan.push(cargo_step(
-            "check.xwin",
-            "check",
-            [
-                "xwin",
-                "check",
-                "--workspace",
-                "--target",
-                WINDOWS_XWIN_TARGET,
-            ],
-        ));
-        plan.push(cargo_step(
-            "clippy.xwin",
-            "clippy",
-            [
-                "xwin",
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--target",
-                WINDOWS_XWIN_TARGET,
-                "--",
-                "-D",
-                "warnings",
-            ],
-        ));
-    }
-
+    plan.extend(xwin_lint_steps(profile, xwin_available));
     plan
+}
+
+fn xwin_lint_steps(profile: LintProfile, xwin_available: bool) -> Vec<StepPlan> {
+    if matches!(profile, LintProfile::Full) && xwin_available {
+        vec![
+            cargo_step(
+                "check.xwin",
+                "check",
+                [
+                    "xwin",
+                    "check",
+                    "--workspace",
+                    "--target",
+                    WINDOWS_XWIN_TARGET,
+                ],
+            ),
+            cargo_step(
+                "clippy.xwin",
+                "clippy",
+                [
+                    "xwin",
+                    "clippy",
+                    "--workspace",
+                    "--all-targets",
+                    "--target",
+                    WINDOWS_XWIN_TARGET,
+                    "--",
+                    "-D",
+                    "warnings",
+                ],
+            ),
+        ]
+    } else {
+        Vec::new()
+    }
 }
 
 #[expect(

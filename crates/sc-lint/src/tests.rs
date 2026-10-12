@@ -1933,6 +1933,8 @@ fn full_profile_adds_xwin_only_when_available() {
         .get("steps")
         .and_then(Value::as_array)
         .expect("steps array");
+    let unavailable_step_names = step_names(unavailable_steps);
+    assert!(unavailable_step_names.contains(&"sc-runtime".to_string()));
     assert!(!step_names(unavailable_steps).contains(&"check.xwin".to_string()));
     assert_eq!(unavailable.data["xwin"]["included"], false);
 
@@ -1949,6 +1951,7 @@ fn full_profile_adds_xwin_only_when_available() {
         .expect("steps array");
     assert!(step_names(available_steps).contains(&"check.xwin".to_string()));
     assert!(step_names(available_steps).contains(&"clippy.xwin".to_string()));
+    assert!(step_names(available_steps).contains(&"sc-runtime".to_string()));
     assert_eq!(available.data["xwin"]["included"], true);
 }
 
@@ -1984,6 +1987,17 @@ fn ci_and_lint_ci_differ_only_by_test_execution() {
     assert_eq!(
         step_names(lint_steps),
         step_names(&ci_steps[..lint_steps.len()])
+    );
+    assert!(step_names(lint_steps).contains(&"sc-runtime".to_string()));
+    assert_eq!(
+        adapter
+            .invocations
+            .borrow()
+            .iter()
+            .filter(|step| step.as_str() == "sc-runtime")
+            .count(),
+        2,
+        "lint ci and the top-level ci profile each dispatch sc-runtime"
     );
     assert_eq!(ci_steps.last().expect("test step")["name"], "test");
     assert_eq!(top_level_ci.data["tests_included"], true);

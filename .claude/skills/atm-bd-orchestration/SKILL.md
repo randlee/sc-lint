@@ -1,6 +1,6 @@
 ---
 name: atm-bd-orchestration
-version: 0.7.3
+version: 0.14.0
 description: Bead-driven phase orchestration for the lead. Use when running a phase whose plan is in beads, dispatching from `bd ready` with ATM tasks, and landing it as one gh stack.
 requires:
   cli:
@@ -104,7 +104,7 @@ one fails the render.
 | `qa_member` | `qa-bead.json.j2` (`qa_member`), a parallel quick fix's QA bead |
 | `worktree_base` | sprint bead `worktree` = `<worktree_base>/<branch>` |
 | `test_command` | `dev-template`, `fix-assignment`, `dev-fix` |
-| `lint_command` | `dev-sanity-template` |
+| `lint_command` | `dev-template`, `fix-assignment`, `dev-fix`, `dev-sanity-template` |
 | `integration_branch_pattern` | the root's `integration_branch` (`plan-root.json.j2`), then `review-template` and `plan-review-template` (`integration_branch`) |
 | `plans_dir` | `sprint_index_common.py` (`phase_path`), `sprint-report`, `sprint-review`, `plan-review-template` |
 | `requirements_globs`, `adr_globs` | `plan-review-template`, `fix-assignment` |
@@ -343,7 +343,7 @@ Then, on each task close:
 
 Re-run `bd ready` after every close. Never cache the ready list. The open
 phase root also appears in it; it is never dispatched.
-On each Loop pass also run `.claude/skills/atm-bd-orchestration/scripts/bead-queues --phase <x>` and act on every row it reports.
+While phase work is under way, a cron must run `.claude/skills/atm-bd-orchestration/scripts/bead-queues --phase <x>` every 15 minutes, the only report of what the loop missed; the lead acts on every row it reports. Disable it when phase work is paused or the phase is complete.
 
 Close a sprint container when every child is closed (`bd children <sprint>
 --json | jq -e 'all(.[]; .status == "closed")'`): `bd close <sprint> --reason
@@ -529,7 +529,7 @@ written to beads with the `atm-beads` templates.
 | `finding-bead.json.j2` | bead | quality-mgr (QA, important and minor) and lead (review), one per finding |
 | `workflow-issue-bead.json.j2` | bead | anyone, a workflow class bead for a recurring failure signature |
 
-Bead templates render with `sc-compose render --file <t> --var-file <v>
+Bead templates render with `sc-compose render --strict --file <t> --var-file <v>
 --strict`, then `jq -c .` into a JSONL file for `bd import`. Examples of every
 template's vars are in [`examples/`](examples/).
 
