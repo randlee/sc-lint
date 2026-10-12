@@ -2,6 +2,37 @@
 
 All notable changes to sc-lint are documented here.
 
+## [0.7.1] — 2026-10-12
+
+Consumer-adoption fixes found while adopting 0.7.0.
+
+### Added
+
+- cargo-shear: `[cargo_shear.allowed_unused_dependencies]` in
+  `.just/lint-config.toml` downgrades reviewed unused dependencies, keyed
+  `<package>.<dependency>` with a required reason. These compose with the
+  existing unlinked/empty-file allowlists, also when `--root` is run from
+  another directory (#346).
+
+### Fixed
+
+- The built-in `ci` and `full` lint profiles now run the runtime analyzer
+  (#344).
+- The packaged pytest runner runs only its bundled tests and no longer
+  hard-codes the sc-lint repository's own test paths (#345).
+- cargo-shear: crate-root file paths are evaluated, and output sections the
+  wrapper cannot parse fail rather than pass (#346).
+- identity-literals detects literals split across `concat!`, including
+  distinct repeated occurrences and trailing comments (#347).
+- The adoption installer rejects unresolved template variables and
+  substitutes placeholders written without spaces (#348).
+- Python tool runners no longer crash writing captured output to a console
+  with a restrictive encoding, such as Windows; only characters the console
+  cannot encode are replaced (#349).
+- The adoption bootstrap treats an incompatible sc-lint on `PATH` that it did
+  not install as unavailable and installs the pinned release; a missing
+  managed path no longer breaks the probe (#367).
+
 ## [0.7.0] — 2026-10-11
 
 ### Added
