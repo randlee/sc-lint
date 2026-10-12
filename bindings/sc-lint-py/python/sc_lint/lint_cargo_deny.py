@@ -10,6 +10,7 @@ import sys
 import tempfile
 
 from sc_lint.lint_common import discover_repo_root
+from sc_lint.lint_common import write_console_output
 from sc_lint.lint_common import workspace_crate_section_lines
 
 
@@ -85,9 +86,9 @@ def main(argv: list[str]) -> int:
         encoding="utf-8",
     )
     if completed.stdout:
-        print(completed.stdout, end="")
+        write_console_output(sys.stdout, completed.stdout)
     if completed.stderr:
-        print(completed.stderr, end="", file=sys.stderr)
+        write_console_output(sys.stderr, completed.stderr)
     return completed.returncode
 
 

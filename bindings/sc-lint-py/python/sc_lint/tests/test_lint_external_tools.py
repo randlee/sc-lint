@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
+from sc_lint import lint_codespell
 from sc_lint.lint_cargo_deny import build_command as build_cargo_deny_command
 from sc_lint.lint_cargo_deny import build_runtime_config
 from sc_lint.lint_cargo_shear import annotate_sections
@@ -14,11 +18,17 @@ from sc_lint.lint_cargo_shear import evaluate_policy
 from sc_lint.lint_cargo_shear import load_policy_config
 from sc_lint.lint_cargo_shear import parse_sections
 from sc_lint.lint_codespell import build_command as build_codespell_command
+from sc_lint.lint_common import write_console_output
 
 APP_CRATE = "fixture-app"
 CORE_CRATE = "fixture-lib"
 APP_PACKAGE = "synthetic-app"
 CORE_PACKAGE = "synthetic-lib"
+
+
+class RestrictiveEncodingStream(io.StringIO):
+    encoding = "ascii"
+    errors = "strict"
 
 
 class ExternalLintToolTests(unittest.TestCase):
@@ -220,6 +230,36 @@ shear/unlinked_files
             self.assertEqual(command[:2], [sys.executable, "-c"])
             self.assertIn("codespell_lib", command[2])
             self.assertEqual(len(command), 3)
+
+    def test_write_console_output_preserves_representable_unicode(self) -> None:
+        stream = io.StringIO()
+
+        write_console_output(stream, "symbol \u03bb\n")
+
+        self.assertEqual(stream.getvalue(), "symbol \u03bb\n")
+
+    def test_codespell_forwards_restrictive_console_output_and_exit_code(self) -> None:
+        stdout = RestrictiveEncodingStream()
+        stderr = RestrictiveEncodingStream()
+        completed = subprocess.CompletedProcess(
+            args=["codespell"],
+            returncode=7,
+            stdout="output: \u03bb\n",
+            stderr="failure: \u03bb\n",
+        )
+
+        with (
+            patch("sc_lint.lint_codespell.discover_repo_root", return_value=Path(".")),
+            patch("sc_lint.lint_codespell.workspace_crate_section_lines", return_value=[]),
+            patch("sc_lint.lint_codespell.subprocess.run", return_value=completed),
+            patch("sc_lint.lint_codespell.sys.stdout", stdout),
+            patch("sc_lint.lint_codespell.sys.stderr", stderr),
+        ):
+            result = lint_codespell.main(["lint-codespell"])
+
+        self.assertEqual(result, 7)
+        self.assertEqual(stdout.getvalue(), "output: ?\n")
+        self.assertEqual(stderr.getvalue(), "failure: ?\n")
 
 
 if __name__ == "__main__":

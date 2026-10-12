@@ -12,6 +12,7 @@ from sc_lint.lint_common import discover_repo_root
 from sc_lint.lint_common import load_lint_config
 from sc_lint.lint_common import workspace_crate_section_lines
 from sc_lint.lint_common import workspace_crates
+from sc_lint.lint_common import write_console_output
 
 
 ERROR_SECTIONS = {"unlinked_files", "empty_files"}
@@ -203,9 +204,9 @@ def main(argv: list[str]) -> int:
 
     if completed.returncode != 0:
         if stdout:
-            print(stdout, end="")
+            write_console_output(sys.stdout, stdout)
         if completed.stderr:
-            print(completed.stderr, end="", file=sys.stderr)
+            write_console_output(sys.stderr, completed.stderr)
         return completed.returncode
 
     if policy_findings:
@@ -218,16 +219,16 @@ def main(argv: list[str]) -> int:
             for line in downgraded:
                 print(line)
         if stdout:
-            print(stdout, end="")
+            write_console_output(sys.stdout, stdout)
         return 1
 
     if downgraded:
         for line in downgraded:
             print(line)
     if stdout:
-        print(stdout, end="")
+        write_console_output(sys.stdout, stdout)
     if completed.stderr:
-        print(completed.stderr, end="", file=sys.stderr)
+        write_console_output(sys.stderr, completed.stderr)
     return 0
 
 
