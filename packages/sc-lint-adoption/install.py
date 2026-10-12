@@ -27,6 +27,12 @@ TEMPLATES = {
     Path("templates/Justfile.import.j2"): Path("Justfile"),
     Path("templates/sc-lint-workflow.yml.j2"): Path(".github/workflows/sc-lint.yml"),
 }
+TEMPLATE_PLACEHOLDERS = {
+    "sc-lint.toml.j2": {"minimum_version", "analyzers", "profiles", "test_layers"},
+    "Justfile.import.j2": {"windows_shell"},
+    "sc-lint-workflow.yml.j2": {"ci_os"},
+}
+TEMPLATE_VARIABLE = re.compile(r"{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}")
 
 
 @dataclass(frozen=True)
@@ -76,6 +82,18 @@ def toml_value(value: object) -> str:
 
 
 def render(template: Path, data: dict) -> str:
+    source = template.read_text()
+    expected = TEMPLATE_PLACEHOLDERS.get(template.name)
+    if expected is None:
+        raise ValueError(f"{template.name}: no declared template variables")
+    observed = set(TEMPLATE_VARIABLE.findall(source))
+    missing = expected - observed
+    unknown = observed - expected
+    if missing or unknown:
+        problems = []
+        if missing: problems.append(f"missing template variables: {sorted(missing)}")
+        if unknown: problems.append(f"unknown template variables: {sorted(unknown)}")
+        raise ValueError(f"{template.name}: {'; '.join(problems)}")
     analyzers = "\n\n".join(
         f"[tool.sc-lint.analyzers.{name}]\n" + "\n".join(f"{key} = {toml_value(item)}" for key, item in value.items())
         for name, value in data["analyzers"].items()
@@ -83,7 +101,7 @@ def render(template: Path, data: dict) -> str:
     profiles = "\n\n".join(f'[[tool.sc-lint.lint]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data["profiles"].items())
     layers = "\n\n".join(f'[[tool.sc-lint.test]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data.get("test", {}).items())
     runners = [ {"linux":"ubuntu-latest", "macos":"macos-latest", "windows":"windows-latest"}.get(item, item) for item in data["ci"]["os"] ]
-    return (template.read_text().replace("{{ minimum_version }}", data["minimum_version"]).replace("{{ analyzers }}", analyzers)
+    return (source.replace("{{ minimum_version }}", data["minimum_version"]).replace("{{ analyzers }}", analyzers)
             .replace("{{ profiles }}", profiles).replace("{{ test_layers }}", layers).replace("{{ ci_os }}", json.dumps(runners)))
 
 

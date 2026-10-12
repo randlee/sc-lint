@@ -211,9 +211,39 @@ def test_workflow_uses_vendored_action_and_root_has_no_action() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     workflow = (consumer / ".github" / "workflows" / "sc-lint.yml").read_text()
+    assert "runs-on: ${{ matrix.os }}" in workflow
     assert "uses: ./plugins/sc-lint/.github/actions/setup-sc-lint\n" in workflow
     assert (consumer / "plugins/sc-lint/.github/actions/setup-sc-lint/action.yml").is_file()
     assert not (consumer / ".github" / "actions").exists()
+
+
+@pytest.mark.parametrize(
+    ("replacement", "error_fragment"),
+    [
+        ("{{ unknown_setting }}", "unknown template variables: ['unknown_setting']"),
+        ("", "missing template variables: ['analyzers']"),
+    ],
+)
+def test_unresolved_template_variables_fail_before_writing(
+    tmp_path: Path, replacement: str, error_fragment: str
+) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    template = kit / "templates" / "sc-lint.toml.j2"
+    template.write_text(template.read_text().replace("{{ analyzers }}", replacement))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert error_fragment in result.stderr
+    assert list(consumer.iterdir()) == []
 
 
 def test_ci_disabled_writes_no_workflow_or_action_files() -> None:
