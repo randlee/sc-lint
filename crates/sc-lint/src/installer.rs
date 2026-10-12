@@ -628,7 +628,7 @@ fn terminate_probe_processes(child: &mut Child) {
 fn terminate_probe_process_tree(process_id: u32) -> bool {
     let process_group = format!("-{process_id}");
     Command::new("/bin/kill")
-        .args(["-KILL", &process_group])
+        .args(["-KILL", "--", &process_group])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -1772,7 +1772,7 @@ mod tests {
     #[test]
     fn rollback_failure_never_claims_the_previous_binary_was_restored() {
         let fixture = TempDir::new().expect("fixture");
-        let target = fixture.path().join("sc-lint");
+        let target = fixture.path().join(ReleaseTarget::binary_name());
         let candidate = fixture.path().join("candidate");
         fs::write(&target, "known-good").expect("target");
         fs::write(&candidate, "candidate").expect("candidate");
@@ -2333,13 +2333,13 @@ mod tests {
         #[cfg(not(unix))]
         {
             let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-            let executable = if cfg!(windows) {
-                format!("{name}.exe")
-            } else {
-                name.to_string()
-            };
-            fs::copy(workspace_root.join("target/debug").join(executable), path)
-                .expect("copy built backend executable");
+            let executable = format!("{name}.exe");
+            let destination = path.with_file_name(format!("{name}.exe"));
+            fs::copy(
+                workspace_root.join("target/debug").join(executable),
+                destination,
+            )
+            .expect("copy built backend executable");
         }
     }
 
@@ -2402,7 +2402,7 @@ mod tests {
         if let Some(group_id) = pids.first() {
             let process_group = format!("-{group_id}");
             let _ = Command::new("/bin/kill")
-                .args(["-KILL", &process_group])
+                .args(["-KILL", "--", &process_group])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status();
@@ -2429,20 +2429,42 @@ mod tests {
             "probe recorded parent and both child pids"
         );
         for pid in child_pids {
-            let mut running = false;
+            let mut details = probe_process_details(pid);
             for _ in 0..100 {
-                running = Command::new("/bin/kill")
-                    .args(["-0", &pid.to_string()])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .is_ok_and(|status| status.success());
-                if !running {
+                if details
+                    .as_deref()
+                    .is_none_or(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X')))
+                {
                     break;
                 }
                 thread::sleep(Duration::from_millis(10));
+                details = probe_process_details(pid);
             }
-            assert!(!running, "backend probe child {pid} was left running");
+            if details
+                .as_deref()
+                .is_some_and(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X')))
+            {
+                eprintln!("backend probe child {pid} terminated; process details {details:?}");
+            }
+            assert!(
+                details
+                    .as_deref()
+                    .is_none_or(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X'))),
+                "backend probe child {pid} remained live with process details {details:?}"
+            );
         }
+    }
+
+    #[cfg(unix)]
+    fn probe_process_details(pid: u32) -> Option<String> {
+        let output = Command::new("ps")
+            .args(["-o", "stat=,ppid=,pgid=,command=", "-p", &pid.to_string()])
+            .output()
+            .ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+            .filter(|state| !state.is_empty())
     }
 }
