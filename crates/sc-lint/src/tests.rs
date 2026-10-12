@@ -2078,7 +2078,7 @@ fn native_and_xwin_preflight_commands_use_success_envelopes() {
 }
 
 #[test]
-fn render_success_human_covers_version_boundary_and_summary_paths() {
+fn render_success_human_covers_version_analyzer_and_summary_paths() {
     let version_cli = Cli::parse_from(["sc-lint", "version"]);
     let version_context = CommandContext::from_cli(&version_cli).expect("version context");
     let version_output = crate::render::render_success_human(
@@ -2100,6 +2100,29 @@ fn render_success_human_covers_version_boundary_and_summary_paths() {
         ),
     );
     assert_eq!(boundary_output, "sc-lint-boundary: fail (1 findings)");
+
+    let portability_cli = Cli::parse_from(["sc-lint", "lint", "sc-portability"]);
+    let portability_context =
+        CommandContext::from_cli(&portability_cli).expect("portability context");
+    let portability_output = crate::render::render_success_human(
+        &portability_context,
+        &CommandEnvelope::success(
+            portability_context.command_id(),
+            json!({ "status": "pass", "findings": [] }),
+        ),
+    );
+    assert_eq!(portability_output, "sc-lint-portability: pass (0 findings)");
+
+    let runtime_cli = Cli::parse_from(["sc-lint", "lint", "sc-runtime"]);
+    let runtime_context = CommandContext::from_cli(&runtime_cli).expect("runtime context");
+    let runtime_output = crate::render::render_success_human(
+        &runtime_context,
+        &CommandEnvelope::success(
+            runtime_context.command_id(),
+            json!({ "status": "fail", "findings": [{ "rule_id": "RUN-001" }] }),
+        ),
+    );
+    assert_eq!(runtime_output, "sc-lint-runtime: fail (1 findings)");
 
     let view_cli = Cli::parse_from(["sc-lint", "view", "findings"]);
     let view_context = CommandContext::from_cli(&view_cli).expect("view findings context");
