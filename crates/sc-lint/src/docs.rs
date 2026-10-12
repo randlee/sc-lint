@@ -13,11 +13,13 @@ fn candidate_roots_for_executable(executable: &Path) -> Vec<PathBuf> {
     let Some(bin_dir) = executable.parent() else {
         return Vec::new();
     };
-    let mut candidates = vec![bin_dir.join("docs-bundle"), bin_dir.join("sc-lint-docs")];
+    let mut candidates = Vec::new();
     if let Some(prefix) = bin_dir.parent() {
         candidates.push(prefix.join("share/sc-lint/sc-lint-docs"));
         candidates.push(prefix.join("share/sc-lint/docs-bundle"));
     }
+    candidates.push(bin_dir.join("docs-bundle"));
+    candidates.push(bin_dir.join("sc-lint-docs"));
     candidates
 }
 
@@ -348,6 +350,28 @@ mod tests {
         assert_eq!(
             discovered,
             dunce::canonicalize(root).expect("canonical source bundle")
+        );
+    }
+
+    #[test]
+    fn published_docs_win_over_legacy_bundle_when_both_are_installed() {
+        let temporary = tempfile::TempDir::new().expect("temporary installation");
+        let prefix = temporary.path();
+        let bin = prefix.join("bin");
+        let executable = bin.join("sc-lint");
+        let published_docs = prefix.join("share/sc-lint/sc-lint-docs");
+        let legacy_docs = bin.join("sc-lint-docs");
+        fs::create_dir_all(&bin).expect("bin directory");
+        fs::write(&executable, "launcher").expect("launcher");
+        for docs in [&published_docs, &legacy_docs] {
+            fs::create_dir_all(docs).expect("docs directory");
+            fs::write(docs.join("manifest.toml"), "schema_version = 1\n").expect("manifest");
+            fs::write(docs.join("README.md"), "# docs\n").expect("overview");
+        }
+
+        assert_eq!(
+            installed_bundle_root_for_executable(&executable),
+            Some(dunce::canonicalize(published_docs).expect("published docs path"))
         );
     }
 

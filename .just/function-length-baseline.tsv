@@ -7,6 +7,5 @@ crates/sc-lint-boundary/src/inventory/mod.rs	validate_boundary_schema	120
 crates/sc-lint-boundary/src/render.rs	render_graph_export_turtle	88
 crates/sc-lint/src/config.rs	evaluate_compatibility	97
 crates/sc-lint/src/consumer_integration.rs	run_consumer_init_at	99
-crates/sc-lint/src/installer.rs	activate_candidate_with	82
 crates/sc-lint/src/python_adapter.rs	parse_adapter_output	87
 crates/sc-lint/src/render.rs	render_success_human	93

@@ -57,9 +57,33 @@ class ConsumerLifecycleTests(unittest.TestCase):
         cls._wheel_environment.start()
         binary_name = "sc-lint.exe" if os.name == "nt" else "sc-lint"
         cls.product_binary = ROOT / "target" / "debug" / binary_name
-        if not cls.product_binary.is_file():
+        cls.release_binaries = [
+            cls.product_binary,
+            *(
+                ROOT / "target" / "debug" / f"{name}{'.exe' if os.name == 'nt' else ''}"
+                for name in (
+                    "sc-lint-boundary",
+                    "sc-lint-portability",
+                    "sc-lint-runtime",
+                )
+            ),
+        ]
+        if any(not binary.is_file() for binary in cls.release_binaries):
             subprocess.run(
-                ["cargo", "build", "--bin", "sc-lint"], cwd=ROOT, check=True
+                [
+                    "cargo",
+                    "build",
+                    "-p",
+                    "sc-lint",
+                    "-p",
+                    "sc-lint-boundary",
+                    "-p",
+                    "sc-lint-portability",
+                    "-p",
+                    "sc-lint-runtime",
+                ],
+                cwd=ROOT,
+                check=True,
             )
 
     @classmethod
@@ -74,6 +98,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
         release.mkdir()
         consumer.mkdir()
         shutil.copy2(self.product_binary, release / self.product_binary.name)
+        for binary in self.release_binaries[1:]:
+            shutil.copy2(binary, release / binary.name)
         shutil.copytree(ROOT / "docs-bundle", release / "sc-lint-docs")
         return temporary, release, consumer
 
@@ -173,16 +199,33 @@ class ConsumerLifecycleTests(unittest.TestCase):
                     b"#!/bin/sh\nprintf '%s\\n' nested-bootstrap-launcher-selected >&2\nexit 1\n"
                 )
                 nested_binary.chmod(0o755)
+        backend_binaries = self.release_binaries[1:]
         archive_entries = []
         if layout in ("nested", "both"):
             archive_entries.append((nested_binary, f"{archive_root}/bin/{binary_name}"))
+            archive_entries.extend(
+                (backend, f"{archive_root}/bin/{backend.name}")
+                for backend in backend_binaries
+            )
         if layout in ("flat", "both"):
             archive_entries.append((flat_binary, binary_name))
+            archive_entries.extend((backend, backend.name) for backend in backend_binaries)
         if extension == "zip":
             with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
                 if include_binary:
                     for archive_binary, archive_entry in archive_entries:
                         package.write(archive_binary, arcname=archive_entry)
+                    docs_prefix = (
+                        f"{archive_root}/share/sc-lint/sc-lint-docs"
+                        if layout == "nested"
+                        else "docs-bundle"
+                    )
+                    for guide in (ROOT / "docs-bundle").rglob("*"):
+                        if guide.is_file():
+                            package.write(
+                                guide,
+                                arcname=f"{docs_prefix}/{guide.relative_to(ROOT / 'docs-bundle')}",
+                            )
                 else:
                     package.writestr(f"{archive_root}/missing-binary", "fixture")
         else:
@@ -190,6 +233,12 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 if include_binary:
                     for archive_binary, archive_entry in archive_entries:
                         package.add(archive_binary, arcname=archive_entry)
+                    docs_prefix = (
+                        f"{archive_root}/share/sc-lint/sc-lint-docs"
+                        if layout == "nested"
+                        else "docs-bundle"
+                    )
+                    package.add(ROOT / "docs-bundle", arcname=docs_prefix)
                 else:
                     package.addfile(tarfile.TarInfo(f"{archive_root}/missing-binary"))
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
