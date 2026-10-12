@@ -6,16 +6,20 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from unittest.mock import patch
 
 
 from sc_lint import lint_codespell
+from sc_lint.lint_common import WorkspaceCrate
 from sc_lint.lint_cargo_deny import build_command as build_cargo_deny_command
 from sc_lint.lint_cargo_deny import build_runtime_config
 from sc_lint.lint_cargo_shear import annotate_sections
 from sc_lint.lint_cargo_shear import build_command as build_cargo_shear_command
 from sc_lint.lint_cargo_shear import evaluate_policy
+from sc_lint.lint_cargo_shear import evaluate_unused_dependency_policy
 from sc_lint.lint_cargo_shear import load_policy_config
+from sc_lint.lint_cargo_shear import main as cargo_shear_main
 from sc_lint.lint_cargo_shear import parse_sections
 from sc_lint.lint_codespell import build_command as build_codespell_command
 from sc_lint.lint_common import write_console_output
@@ -158,6 +162,152 @@ shear/empty_files
             ["empty_files: downgraded src/model_registry.rs (planned stub)"],
         )
 
+    def test_evaluate_unused_dependency_policy_downgrades_exact_crate_dependency(self) -> None:
+        stdout = """\
+shear/unused_dependency
+
+  × unused dependency `serde`
+    ╭─[crates/fixture-app/Cargo.toml:9:1]
+  help: remove this dependency
+
+shear/summary
+
+  × 1 error
+"""
+        findings, downgraded, only_unused_dependencies = evaluate_unused_dependency_policy(
+            parse_sections(stdout),
+            {
+                "allowed_empty_files": {},
+                "allowed_unlinked_files": {},
+                "allowed_unused_dependencies": {
+                    f"{APP_PACKAGE}.serde": "used by generated code",
+                },
+            },
+            {f"crates/{APP_CRATE}/Cargo.toml": APP_PACKAGE},
+        )
+        self.assertEqual(findings, [])
+        self.assertTrue(only_unused_dependencies)
+        self.assertEqual(
+            downgraded,
+            [
+                "unused_dependency: downgraded "
+                f"{APP_PACKAGE}.serde (used by generated code)"
+            ],
+        )
+
+    def test_evaluate_unused_dependency_policy_rejects_other_findings(self) -> None:
+        stdout = """\
+shear/misplaced_dependency
+
+  × dependency `serde` is misplaced
+"""
+        findings, downgraded, only_unused_dependencies = evaluate_unused_dependency_policy(
+            parse_sections(stdout),
+            {
+                "allowed_empty_files": {},
+                "allowed_unlinked_files": {},
+                "allowed_unused_dependencies": {
+                    f"{APP_PACKAGE}.serde": "used by generated code",
+                },
+            },
+            {f"crates/{APP_CRATE}/Cargo.toml": APP_PACKAGE},
+        )
+        self.assertEqual(findings, [])
+        self.assertEqual(downgraded, [])
+        self.assertFalse(only_unused_dependencies)
+
+    def test_evaluate_unused_dependency_policy_rejects_unapproved_dependency(self) -> None:
+        stdout = """\
+shear/unused_dependency
+
+  × unused dependency `serde`
+    ╭─[crates/fixture-app/Cargo.toml:9:1]
+  help: remove this dependency
+"""
+        findings, downgraded, only_unused_dependencies = evaluate_unused_dependency_policy(
+            parse_sections(stdout),
+            {
+                "allowed_empty_files": {},
+                "allowed_unlinked_files": {},
+                "allowed_unused_dependencies": {},
+            },
+            {f"crates/{APP_CRATE}/Cargo.toml": APP_PACKAGE},
+        )
+        self.assertEqual(downgraded, [])
+        self.assertTrue(only_unused_dependencies)
+        self.assertEqual(findings[0].file_path, f"{APP_PACKAGE}.serde")
+
+    @mock.patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[])
+    @mock.patch("sc_lint.lint_cargo_shear.workspace_crates")
+    @mock.patch("sc_lint.lint_cargo_shear.subprocess.run")
+    @mock.patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear")
+    def test_main_downgrades_only_allowlisted_unused_dependency_exit(
+        self,
+        _which_mock: mock.Mock,
+        subprocess_run_mock: mock.Mock,
+        workspace_crates_mock: mock.Mock,
+        _section_lines_mock: mock.Mock,
+    ) -> None:
+        stdout = """\
+shear/unused_dependency
+
+  × unused dependency `serde`
+    ╭─[crates/fixture-app/Cargo.toml:9:1]
+  help: remove this dependency
+
+shear/summary
+
+  × 1 error
+"""
+        subprocess_run_mock.return_value = mock.Mock(returncode=1, stdout=stdout, stderr="")
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            just_dir = repo_root / ".just"
+            just_dir.mkdir()
+            (just_dir / "lint-config.toml").write_text(
+                f"""\
+[cargo_shear.allowed_unused_dependencies]
+"{APP_PACKAGE}.serde" = "used by generated code"
+""",
+                encoding="utf-8",
+            )
+            workspace_crates_mock.return_value = [
+                WorkspaceCrate(
+                    crate_dir=f"crates/{APP_CRATE}",
+                    package_name=APP_PACKAGE,
+                    crate_path_name=APP_CRATE.replace("-", "_"),
+                    manifest_path=str(repo_root / "crates" / APP_CRATE / "Cargo.toml"),
+                )
+            ]
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as stdout_mock:
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
+
+        self.assertEqual(result, 0)
+        self.assertIn(
+            f"unused_dependency: downgraded {APP_PACKAGE}.serde (used by generated code)",
+            stdout_mock.getvalue(),
+        )
+
+    @mock.patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[])
+    @mock.patch("sc_lint.lint_cargo_shear.subprocess.run")
+    @mock.patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear")
+    def test_main_preserves_fatal_cargo_shear_exit(
+        self,
+        _which_mock: mock.Mock,
+        subprocess_run_mock: mock.Mock,
+        _section_lines_mock: mock.Mock,
+    ) -> None:
+        subprocess_run_mock.return_value = mock.Mock(
+            returncode=2,
+            stdout="error: cargo metadata failed\n",
+            stderr="",
+        )
+        with tempfile.TemporaryDirectory() as tempdir:
+            with mock.patch("sys.stdout", new_callable=io.StringIO):
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", tempdir])
+
+        self.assertEqual(result, 2)
+
     def test_load_policy_config_normalizes_windows_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
@@ -170,6 +320,10 @@ shear/empty_files
 
 [cargo_shear.allowed_unlinked_files]
 "tests\\\\support\\\\mod.rs" = "legacy pending"
+
+[cargo_shear.allowed_unused_dependencies]
+"synthetic-app.serde" = "used by generated code"
+"synthetic-lib.empty" = "   "
 """,
                 encoding="utf-8",
             )
@@ -182,6 +336,18 @@ shear/empty_files
             self.assertEqual(
                 policy["allowed_unlinked_files"]["tests/support/mod.rs"],
                 "legacy pending",
+            )
+            self.assertEqual(
+                policy["allowed_unused_dependencies"]["synthetic-app.serde"],
+                "used by generated code",
+            )
+            self.assertNotIn("synthetic-lib.empty", policy["allowed_unused_dependencies"])
+
+    def test_load_policy_config_defaults_unused_dependency_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            self.assertEqual(
+                load_policy_config(Path(tempdir))["allowed_unused_dependencies"],
+                {},
             )
 
     def test_annotate_sections_uses_crate_paths(self) -> None:

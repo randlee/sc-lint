@@ -16,6 +16,8 @@ from sc_lint.lint_common import write_console_output
 
 
 ERROR_SECTIONS = {"unlinked_files", "empty_files"}
+UNUSED_DEPENDENCY_SECTION = "unused_dependency"
+SUMMARY_SECTION = "summary"
 
 
 @dataclass(frozen=True)
@@ -95,25 +97,43 @@ def package_to_crate_dir(repo_root: Path) -> dict[str, str]:
     }
 
 
+def manifest_to_package_name(repo_root: Path) -> dict[str, str]:
+    resolved_root = repo_root.resolve()
+    return {
+        Path(crate.manifest_path).resolve().relative_to(resolved_root).as_posix(): crate.package_name
+        for crate in workspace_crates(repo_root)
+    }
+
+
 def load_policy_config(repo_root: Path) -> dict[str, dict[str, str]]:
     config = load_lint_config(repo_root)
     cargo_shear = config.get("cargo_shear", {})
     if not isinstance(cargo_shear, dict):
-        return {"allowed_empty_files": {}, "allowed_unlinked_files": {}}
+        return {
+            "allowed_empty_files": {},
+            "allowed_unlinked_files": {},
+            "allowed_unused_dependencies": {},
+        }
 
-    def table(name: str) -> dict[str, str]:
+    def table(name: str, *, require_reason: bool = False) -> dict[str, str]:
         value = cargo_shear.get(name, {})
         if not isinstance(value, dict):
             return {}
         normalized: dict[str, str] = {}
         for key, reason in value.items():
-            if isinstance(key, str) and isinstance(reason, str):
-                normalized[key.replace("\\", "/")] = reason
+            if not isinstance(key, str) or not isinstance(reason, str):
+                continue
+            if require_reason and not reason.strip():
+                continue
+            normalized[key.replace("\\", "/")] = reason.strip() if require_reason else reason
         return normalized
 
     return {
         "allowed_empty_files": table("allowed_empty_files"),
         "allowed_unlinked_files": table("allowed_unlinked_files"),
+        "allowed_unused_dependencies": table(
+            "allowed_unused_dependencies", require_reason=True
+        ),
     }
 
 
@@ -153,6 +173,68 @@ def render_policy_findings(findings: list[ShearPolicyFinding]) -> list[str]:
             f"shear policy error: {finding.file_path} [{finding.section_name}] {finding.reason}"
         )
     return rendered
+
+
+def extract_unused_dependency(
+    section: ShearSection, manifest_packages: dict[str, str]
+) -> str | None:
+    dependency_name: str | None = None
+    manifest_path: str | None = None
+
+    for line in section.body_lines:
+        stripped = line.strip()
+        prefix = "× unused dependency `"
+        if stripped.startswith(prefix) and stripped.endswith("`"):
+            dependency_name = stripped[len(prefix) : -1]
+        if stripped.startswith("╭─[") and stripped.endswith("]"):
+            location = stripped[3:-1]
+            location_parts = location.rsplit(":", 2)
+            if len(location_parts) == 3 and all(part.isdigit() for part in location_parts[1:]):
+                manifest_path = location_parts[0].replace("\\", "/")
+
+    if dependency_name is None or manifest_path is None:
+        return None
+    package_name = manifest_packages.get(manifest_path)
+    if package_name is None:
+        return None
+    return f"{package_name}.{dependency_name}"
+
+
+def evaluate_unused_dependency_policy(
+    sections: list[ShearSection],
+    policy: dict[str, dict[str, str]],
+    manifest_packages: dict[str, str],
+) -> tuple[list[ShearPolicyFinding], list[str], bool]:
+    findings: list[ShearPolicyFinding] = []
+    downgraded: list[str] = []
+    saw_unused_dependency = False
+
+    for section in sections:
+        if section.name == SUMMARY_SECTION:
+            continue
+        if section.name != UNUSED_DEPENDENCY_SECTION:
+            return findings, downgraded, False
+        dependency_key = extract_unused_dependency(section, manifest_packages)
+        if dependency_key is None:
+            return findings, downgraded, False
+        saw_unused_dependency = True
+        reason = policy["allowed_unused_dependencies"].get(dependency_key)
+        if reason is None:
+            findings.append(
+                ShearPolicyFinding(
+                    section_name=section.name,
+                    file_path=dependency_key,
+                    reason=(
+                        "unused dependency must be fixed or explicitly downgraded "
+                        "in .just/lint-config.toml"
+                    ),
+                )
+            )
+            continue
+        downgraded.append(
+            f"{section.name}: downgraded {dependency_key} ({reason})"
+        )
+    return findings, downgraded, saw_unused_dependency
 
 
 def annotate_sections(sections: list[ShearSection], repo_root: Path) -> list[str]:
@@ -201,6 +283,25 @@ def main(argv: list[str]) -> int:
     sections = parse_sections(stdout)
     policy = load_policy_config(repo_root)
     policy_findings, downgraded = evaluate_policy(sections, policy)
+
+    if completed.returncode == 1:
+        unused_findings, unused_downgraded, only_unused_dependencies = (
+            evaluate_unused_dependency_policy(
+                sections,
+                policy,
+                manifest_to_package_name(repo_root),
+            )
+        )
+        if only_unused_dependencies:
+            for line in render_policy_findings(unused_findings):
+                print(line)
+            for line in unused_downgraded:
+                print(line)
+            if stdout:
+                print(stdout, end="")
+            if completed.stderr:
+                print(completed.stderr, end="", file=sys.stderr)
+            return 1 if unused_findings else 0
 
     if completed.returncode != 0:
         if stdout:
