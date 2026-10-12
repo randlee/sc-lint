@@ -1,0 +1,31 @@
+{
+  "schema": "sc-compose/beads/v1",
+  "operation": "validate",
+  "working_directory": ".",
+  "bead_variables": {},
+  "template": ".claude/skills/atm-bd-orchestration/formulas/finding-group.formula.toml.j2",
+  "rendered_formula": "target/upgrade-samples/finding-group.formula.toml",
+  "formula_name": "finding-group",
+  "compose_variables": {
+    "parent": "lint-sample",
+    "ref": "f1",
+    "finding_ref": "F-1",
+    "round": 1,
+    "severity": "medium",
+    "reviewer": "quality-mgr",
+    "finding_title": "Sample finding",
+    "remedy": "Fix the sample.",
+    "filed_by": "quality-mgr",
+    "found_at_commit": "0000000000000000000000000000000000000000",
+    "requirements": [
+      "REQ-PRODUCT-001"
+    ],
+    "adrs": [],
+    "phase": "x",
+    "sprint": "x-1",
+    "stack": "phase-x",
+    "difficulty": "fast",
+    "priority": 2,
+    "edge_option": "C"
+  }
+}

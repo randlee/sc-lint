@@ -588,9 +588,9 @@ The product should support both:
   input from Rand. The formula's steps are the plan; a run adds no other work.
 
 - `REQ-PRODUCT-026`
-  The upgrade edits only the repo's own pin
-  (`.claude/lib/sc_compose_dependency.py` for sc-compose). Other skills and
-  kits keep their own minimum versions and are not edited.
+  The upgrade changes only the repo's own version pin
+  (`.claude/lib/sc_compose_dependency.py` for sc-compose) and edits no other
+  skill's or kit's pin or files; those keep their own minimum versions.
 
 - `REQ-PRODUCT-027`
   Before testing, the run reads the dependency's CHANGELOG and migration docs
@@ -600,10 +600,11 @@ The product should support both:
 
 - `REQ-PRODUCT-028`
   The run tests the old and new versions side by side, with recorded installed
-  versions: the rendering tests and a validate/preview of every formula the
-  team pours. The upgrade is breaking when a test passing on the old version
-  fails on the new one or a formula's output differs. quality-mgr re-runs the
-  comparison independently.
+  versions: the old version on the base commit, the new on the upgrade head.
+  It compares the rendering tests and the rendered output of every formula the
+  team pours, from committed sample requests. The upgrade is breaking when a
+  test passing on the old version fails on the new one or a rendered formula
+  differs. quality-mgr re-runs the comparison independently.
 
 - `REQ-PRODUCT-029`
   When breaking, the run stops with a ready PR to `develop` whose description
@@ -616,9 +617,10 @@ The product should support both:
   from GitHub user `rand-lee`.
 
 - `REQ-PRODUCT-031`
-  Every decision point and escalation sends an explicit
-  `atm send omega-prime@hermes` message with the PR link, including when a PR
-  to `develop` or `main` has green CI.
+  Every decision point, stop and escalation (QA or sanity failure, a refused
+  run, an issue filed on another repository, a blocked release) sends an
+  explicit `atm send omega-prime@hermes` message with the link, including when
+  a PR to `develop` or `main` has green CI.
 
 ## Current Detailed Requirement Areas
 
