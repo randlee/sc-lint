@@ -147,6 +147,9 @@ function Invoke-VerifiedReleaseLauncher {
         $extract = Join-Path $staging "extract"
         Expand-Archive -Path $archivePath -DestinationPath $extract -Force
         $candidate = Join-Path $extract "sc-lint.exe"
+        if (-not (Test-Path -Path $candidate -PathType Leaf)) {
+            $candidate = Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"
+        }
         if (-not (Test-Path -Path $candidate -PathType Leaf)) { throw "release archive did not contain sc-lint.exe" }
         New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
         # The extracted release is only a launcher. It delegates managed-target

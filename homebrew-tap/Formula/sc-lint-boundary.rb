@@ -1,8 +1,8 @@
 # typed: false
 # frozen_string_literal: true
 
-# Legacy compatibility template for the release workflow.
-# Normal users should install `randlee/tap/sc-lint`; the update-homebrew job
+# Legacy compatibility template for the Homebrew publish workflow.
+# Normal users should install `randlee/tap/sc-lint`; its update-tap job
 # rewrites the tap checkout with release-pinned URLs and SHA256 values.
 class ScLintBoundary < Formula
   desc "Legacy compatibility formula for the sc-lint boundary analyzer"

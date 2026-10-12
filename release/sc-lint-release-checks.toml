@@ -1,0 +1,29 @@
+# Product-owned docs-integrity policy only. Publication inventory and archive
+# layout come from the kit-rendered release/publish-artifacts.toml.
+schema_version = 1
+
+[documentation_bundle]
+# The rendered publish manifest supplies the bundle source and archive path.
+# These lists define the product-specific documentation content contract.
+required_files = [
+  "manifest.toml",
+  "README.md",
+  "installation.md",
+  "using-sc-lint.md",
+  "configuration.md",
+  "just-setup.md",
+  "ci.md",
+  "upgrade.md",
+  "troubleshooting.md",
+  "best-practices.md",
+]
+package_guides = [
+  "sc-lint.md",
+  "sc-lint-attributes.md",
+  "sc-lint-analyzer-support.md",
+  "sc-lint-boundary.md",
+  "sc-lint-directives.md",
+  "sc-lint-portability.md",
+  "sc-lint-runtime.md",
+  "sc-lint-schema.md",
+]

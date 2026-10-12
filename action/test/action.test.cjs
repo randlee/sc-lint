@@ -48,7 +48,7 @@ function zip(entries) {
   return Buffer.concat(blocks);
 }
 
-function fixture(platform, architecture, operation) {
+function fixture(platform, architecture, operation, layout = "nested") {
   const target = {
     "linux/x64": ["x86_64-unknown-linux-gnu", "tar.gz"],
     "darwin/x64": ["x86_64-apple-darwin", "tar.gz"],
@@ -56,7 +56,13 @@ function fixture(platform, architecture, operation) {
     "win32/x64": ["x86_64-pc-windows-msvc", "zip"],
   }[`${platform}/${architecture}`];
   const binary = platform === "win32" ? "sc-lint.exe" : "sc-lint";
-  const entries = [[binary, "fixture binary"], ["sc-lint-docs/README.md", "offline guide"]];
+  const archiveRoot = `sc-lint_0.4.0_${target[0]}`;
+  const entry = (name) => layout === "nested" ? `${archiveRoot}/${name}` : name;
+  const binaryPath = layout === "nested" ? entry(`bin/${binary}`) : binary;
+  const docsPath = layout === "nested"
+    ? entry("share/sc-lint/sc-lint-docs/README.md")
+    : "sc-lint-docs/README.md";
+  const entries = [[binaryPath, "fixture binary"], [docsPath, "offline guide"]];
   const archive = target[1] === "zip" ? zip(entries) : tarGz(entries);
   const archiveName = `sc-lint_0.4.0_${target[0]}.${target[1]}`;
   const checksums = Buffer.from(`${crypto.createHash("sha256").update(archive).digest("hex")}  ${archiveName}\n`);
@@ -86,6 +92,13 @@ function fixture(platform, architecture, operation) {
     runnerPath,
   };
 }
+
+test("legacy flat archive remains accepted", async () => {
+  const local = fixture("linux", "x64", "setup", "flat");
+  const result = await runAction(local.options);
+  assert.equal(result.binaryPath, path.join(local.options.installRoot, "sc-lint"));
+  assert.equal(result.docsPath, path.join(local.options.installRoot, "sc-lint-docs"));
+});
 
 for (const [platform, architecture] of [["linux", "x64"], ["darwin", "x64"], ["win32", "x64"]]) {
   for (const operation of ["setup", "lint", "test"]) {
