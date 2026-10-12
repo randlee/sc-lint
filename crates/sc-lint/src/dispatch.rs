@@ -361,7 +361,7 @@ fn find_backend_on_path(tool: &str) -> Option<PathBuf> {
 fn validate_path_backend(tool: &str, binary: &Path) -> Result<(), CliError> {
     let expected = semver::Version::parse(env!("CARGO_PKG_VERSION"))
         .expect("package version is valid semantic version");
-    match crate::installer::probe_version(binary) {
+    match crate::installer::probe_backend_version(binary, tool) {
         Ok(reported) if reported == expected => Ok(()),
         Ok(reported) => Err(path_backend_version_error(
             tool,
@@ -375,7 +375,7 @@ fn validate_path_backend(tool: &str, binary: &Path) -> Result<(), CliError> {
             binary,
             &expected,
             None,
-            format!("version and identity probe failed: {reason}"),
+            format!("`--version` identity/version probe failed: {reason}"),
         )),
     }
 }
@@ -391,7 +391,7 @@ fn path_backend_version_error(
         "PATH backend `{}` for {tool} is incompatible with launcher version `{expected}`",
         binary.display()
     ))
-    .with_cause(cause)
+    .with_cause(cause.clone())
     .with_detail(consts::FIELD_TOOL, json!(tool))
     .with_detail(
         consts::FIELD_BACKEND_PATH,
@@ -402,8 +402,13 @@ fn path_backend_version_error(
         "Install the release archive with its matching backend binaries, or run `sc-lint setup`, then rerun the profile.",
     )
     .with_documentation("sc-lint docs setup");
-    if let Some(reported) = reported {
-        error = error.with_detail("reported_version", json!(reported.to_string()));
+    match reported {
+        Some(reported) => {
+            error = error.with_detail("reported_version", json!(reported.to_string()));
+        }
+        None => {
+            error = error.with_detail("version_probe_failure", json!(cause));
+        }
     }
     error
 }
