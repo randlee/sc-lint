@@ -6,17 +6,17 @@ import subprocess
 import tempfile
 import unittest
 
-from sc_lint.tests.test_lint_boundaries import LintBoundariesTests
+from sc_lint.lint_boundaries import validate_inventory
 from sc_lint.tests.test_lint_boundaries import VALID_BOUNDARY
+from sc_lint.tests.test_lint_boundaries import write_fixture
 
 
 class LintBoundariesRustParityTests(unittest.TestCase):
     def test_validate_inventory_matches_rust_for_widened_schema_and_lib_target(self) -> None:
         source_root = Path.cwd()
-        fixture = LintBoundariesTests()
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
-            fixture.write_fixture(repo_root)
+            write_fixture(repo_root)
             crate_manifest = repo_root / "crates" / "example" / "Cargo.toml"
             crate_manifest.write_text(
                 crate_manifest.read_text(encoding="utf-8") + '\n[lib]\nname = "cli_core"\n',
@@ -30,7 +30,7 @@ class LintBoundariesRustParityTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assertEqual(fixture.validate_inventory(repo_root), [])
+            self.assertEqual(validate_inventory(repo_root), [])
             result = subprocess.run(
                 [
                     "cargo",
@@ -63,7 +63,7 @@ class LintBoundariesRustParityTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            self.assertTrue(fixture.validate_inventory(repo_root))
+            self.assertTrue(validate_inventory(repo_root))
             result = subprocess.run(
                 [
                     "cargo", "run", "--quiet", "--manifest-path", str(source_root / "Cargo.toml"),
@@ -75,4 +75,10 @@ class LintBoundariesRustParityTests(unittest.TestCase):
                 text=True,
                 check=False,
             )
-            self.assertNotEqual(result.returncode, 0)
+            self.assertNotEqual(
+                result.returncode,
+                0,
+                "Rust analyzer accepted a boundary with the wrong owner crate path",
+            )
+            self.assertIn("declares owner_crate_path `wrong_name`", result.stderr)
+            self.assertIn("expected `cli_core`", result.stderr)

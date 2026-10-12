@@ -60,27 +60,31 @@ expires_when = "sprint_before_current"
 """
 
 
+def write_fixture(repo_root: Path) -> None:
+    (repo_root / "Cargo.toml").write_text(
+        '[workspace]\nmembers=["crates/example"]\nresolver="2"\n\n[workspace.package]\nversion="0.1.0"\n',
+        encoding="utf-8",
+    )
+    crate_dir = repo_root / "crates" / "example"
+    crate_dir.mkdir(parents=True)
+    (crate_dir / "Cargo.toml").write_text(
+        '[package]\nname="sc-lint"\nversion="0.1.0"\nedition="2024"\n',
+        encoding="utf-8",
+    )
+    (crate_dir / "src").mkdir()
+    (crate_dir / "src" / "lib.rs").write_text("pub struct Cli;\n", encoding="utf-8")
+    boundaries_dir = repo_root / "boundaries" / "sc-lint"
+    boundaries_dir.mkdir(parents=True)
+    (boundaries_dir / "top-level-cli.toml").write_text(VALID_BOUNDARY, encoding="utf-8")
+    (repo_root / "boundaries" / "planning.toml").write_text(
+        VALID_PLANNING,
+        encoding="utf-8",
+    )
+
+
 class LintBoundariesTests(unittest.TestCase):
     def write_fixture(self, repo_root: Path) -> None:
-        (repo_root / "Cargo.toml").write_text(
-            '[workspace]\nmembers=["crates/example"]\nresolver="2"\n\n[workspace.package]\nversion="0.1.0"\n',
-            encoding="utf-8",
-        )
-        crate_dir = repo_root / "crates" / "example"
-        crate_dir.mkdir(parents=True)
-        (crate_dir / "Cargo.toml").write_text(
-            '[package]\nname="sc-lint"\nversion="0.1.0"\nedition="2024"\n',
-            encoding="utf-8",
-        )
-        (crate_dir / "src").mkdir()
-        (crate_dir / "src" / "lib.rs").write_text("pub struct Cli;\n", encoding="utf-8")
-        boundaries_dir = repo_root / "boundaries" / "sc-lint"
-        boundaries_dir.mkdir(parents=True)
-        (boundaries_dir / "top-level-cli.toml").write_text(VALID_BOUNDARY, encoding="utf-8")
-        (repo_root / "boundaries" / "planning.toml").write_text(
-            VALID_PLANNING,
-            encoding="utf-8",
-        )
+        write_fixture(repo_root)
 
     def test_validate_inventory_accepts_valid_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
