@@ -28,6 +28,7 @@ Subcommands
   set-beads       record the anchor / plan-questions / dev-questions bead IDs
   promote         mark an anchor as promoted to an ADR (keeps its ID)
   compose-item    build the labelled item text from `bd show --json` (and `bd children --json`)
+  agent-preflight validate and canonicalise agent paths and identifiers before any read or upload
   shape           size and shape metrics of plan beads (sections, code vs prose, references, repeated paragraphs); never gates
   judge           ask Jev about one item against one or more anchors, write a run
   check-fixtures  judge each anchor's fixtures.pass / fixtures.fail sentences as items
@@ -58,7 +59,6 @@ Plan-gate size handling
   sent (PLAN.TOO_LARGE), and
   a context overflow from Jev is recorded per anchor as PLAN.TOO_LARGE. The
   development gate keeps the truncate-and-halve behaviour.
-  130 interrupted by the user
 """
 from __future__ import annotations
 
@@ -141,7 +141,6 @@ DEDUPE_DEFAULT_THRESHOLD = 0.5     # `dedupe` reports pairs at or above this tok
 LIKELY_DUPLICATE_JACCARD = 0.8     # without Jev, `dedupe` calls a pair a likely duplicate at or above this
 SIMILAR_REPORT_FLOOR = DUPLICATE_JACCARD / 2  # `add` lists candidates at or above this in data.similar
 DEDUPE_QUESTION = "same_constraint"
-REQUIREMENT_MODALS = ("must", "never", "always", "only", "shall")
 REQUIREMENT_VERBS = ("must", "never", "always", "only", "shall", "is", "are", "requires", "uses", "does not")
 HEDGES = ("should", "could", "maybe", "probably", "might", "perhaps", "ideally", "try to", "as needed", "if possible",
           "where possible", "when possible", "where appropriate", "as appropriate", "etc", "and so on")
@@ -151,8 +150,16 @@ STOPWORDS = frozenset("the a an and or of to in on for by from with as at be is 
 LINT_VERBATIM = "statement is the verbatim quote"
 LINT_VERBATIM_PROBLEM = LINT_VERBATIM + "; write a testable anchor (see references/anchor-capture.md)"
 QUOTE_MISSING_PROBLEM = "quote missing; record the user's verbatim words"
+REQUIREMENT_FORM_WARNINGS = (
+    "hedged wording; state the requirement",
+    "written as speech, not as a requirement",
+    "not phrased as a testable requirement",
+)
 
 _sleep = time.sleep  # replaced in tests
+
+SAFE_AGENT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+BEARER_RE = re.compile(r"(?i)(bearer\s+)[^\s\"']+")
 
 
 # --------------------------------------------------------------------------- #
@@ -171,7 +178,7 @@ class JudgeError(Exception):
         self.data = None                # optional facts that explain the error (PLAN.TOO_LARGE carries the bead's shape)
 
     def to_json(self) -> dict:
-        return {
+        return redact_sensitive({
             "success": False,
             "data": self.data,
             "error": {
@@ -180,10 +187,28 @@ class JudgeError(Exception):
                 "recoverable": self.recoverable,
                 "suggested_action": self.action,
             },
-        }
+        })
+
+
+def redact_sensitive(value):
+    """Remove the live TypeSafe credential and bearer tokens from every emitted value."""
+    if isinstance(value, dict):
+        return {key: redact_sensitive(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [redact_sensitive(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_sensitive(item) for item in value)
+    if not isinstance(value, str):
+        return value
+    text = value
+    api_key = os.environ.get("TYPESAFE_API_KEY", "")
+    if api_key:
+        text = text.replace(api_key, "<redacted>")
+    return BEARER_RE.sub(r"\1<redacted>", text)
 
 
 def emit(obj, fmt: str = "json") -> None:
+    obj = redact_sensitive(obj)
     if fmt == "json":
         print(json.dumps(obj, indent=2, ensure_ascii=False))
     else:
@@ -260,6 +285,81 @@ def short_date(iso: str) -> str:
 
 def sanitize_id(text: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]", "_", text)
+
+
+def _inside(path: pathlib.Path, root: pathlib.Path) -> bool:
+    return path == root or root in path.parents
+
+
+def canonical_workspace_path(raw: str, root: pathlib.Path, what: str, *, must_exist: bool,
+                             regular_file: bool = False) -> pathlib.Path:
+    if not raw or not raw.strip():
+        raise JudgeError("VALIDATION.PATH", f"{what} is empty", action=f"Pass a {what} inside the repository.")
+    candidate = pathlib.Path(raw).expanduser()
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        resolved = candidate.resolve(strict=must_exist)
+    except (OSError, RuntimeError) as exc:
+        raise JudgeError("VALIDATION.PATH", f"{what} could not be resolved: {exc}",
+                         action=f"Pass a readable {what} inside {root}.")
+    if not _inside(resolved, root):
+        raise JudgeError("VALIDATION.PATH", f"{what} is outside the repository: {resolved}",
+                         action=f"Use a path under {root}; external files are never read or sent to Jev.")
+    if regular_file and not resolved.is_file():
+        raise JudgeError("VALIDATION.PATH", f"{what} is not a regular file: {resolved}",
+                         action=f"Pass an existing regular file for {what}.")
+    return resolved
+
+
+def cmd_agent_preflight(args) -> dict:
+    """Fail closed before an agent reads local evidence or sends it to Jev."""
+    try:
+        root = pathlib.Path(args.workspace_root).expanduser().resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise JudgeError("VALIDATION.PATH", f"workspace root could not be resolved: {exc}",
+                         action="Run from a Git worktree and pass `git rev-parse --show-toplevel`.")
+    if not root.is_dir():
+        raise JudgeError("VALIDATION.PATH", f"workspace root is not a directory: {root}")
+
+    try:
+        script = pathlib.Path(args.script).expanduser().resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise JudgeError("VALIDATION.PATH", f"script could not be resolved: {exc}",
+                         action="Use the installed plan-anchoring script selected from the harness skill directory.")
+    running_script = pathlib.Path(__file__).resolve()
+    if script != running_script:
+        raise JudgeError("VALIDATION.PATH", f"script does not match the running plan-anchoring script: {script}",
+                         action="Use the installed plan-anchoring script selected from the harness skill directory.")
+
+    anchors = canonical_workspace_path(args.anchors, root, "anchors file", must_exist=True, regular_file=True)
+    raw_run_dir = args.run_dir or str(anchors.parent / "anchor-runs")
+    run_dir = canonical_workspace_path(raw_run_dir, root, "run directory", must_exist=False)
+    if run_dir.exists() and not run_dir.is_dir():
+        raise JudgeError("VALIDATION.PATH", f"run directory is not a directory: {run_dir}",
+                         action="Pass a directory inside the repository for run output.")
+    evidence = [str(canonical_workspace_path(path, root, "evidence file", must_exist=True, regular_file=True))
+                for path in args.evidence]
+
+    for identifier in args.identifier:
+        if not SAFE_AGENT_ID_RE.fullmatch(identifier):
+            raise JudgeError("VALIDATION.ID", f"unsafe agent identifier: {identifier!r}",
+                             action="Use 1-128 letters, digits, dots, underscores, colons or hyphens; do not use paths or whitespace.")
+    if args.pr_number and (not args.pr_number.isascii() or not args.pr_number.isdigit() or int(args.pr_number) < 1):
+        raise JudgeError("VALIDATION.ID", f"invalid PR number: {args.pr_number!r}",
+                         action="Pass a positive decimal pull-request number.")
+
+    work_source = args.correlation_id or (args.identifier[0] if args.identifier else "run")
+    return {"success": True, "data": {
+        "workspace_root": str(root),
+        "script": str(script),
+        "anchors_path": str(anchors),
+        "run_dir": str(run_dir),
+        "evidence": evidence,
+        "identifiers": list(args.identifier),
+        "pr_number": args.pr_number or None,
+        "work_key": sanitize_id(work_source)[:128],
+    }, "error": None}
 
 
 # --------------------------------------------------------------------------- #
@@ -349,9 +449,6 @@ def lint_statement(statement: str, quote: str, source_type: str = "ANC") -> list
         warnings.append(LINT_VERBATIM)
     if len(text) > MAX_STATEMENT_CHARS:
         warnings.append("too long; split into one constraint per anchor")
-    modal_count = len(re.findall(r"(?<![A-Za-z0-9])(?:" + "|".join(REQUIREMENT_MODALS) + r")(?![A-Za-z0-9])", text, re.IGNORECASE))
-    if modal_count >= 2:
-        warnings.append("may bundle two constraints")
     if any(_has_word(text, h) for h in HEDGES):
         warnings.append("hedged wording; state the requirement")
     if any(_has_word(text, p) for p in SPEECH_PRONOUNS):
@@ -380,16 +477,14 @@ def jaccard(a: set, b: set) -> float:
 
 
 def best_similarity(statement_a: str, quote_a: str, statement_b: str, quote_b: str) -> tuple:
-    """Best token Jaccard over statement/quote of A against statement/quote of B: (score, field_a, field_b)."""
-    best = (0.0, "statement", "statement")
-    sides_a = (("statement", tokens(statement_a)), ("quote", tokens(quote_a)))
-    sides_b = (("statement", tokens(statement_b)), ("quote", tokens(quote_b)))
-    for fa, ta in sides_a:
-        for fb, tb in sides_b:
-            score = jaccard(ta, tb)
-            if score > best[0]:
-                best = (score, fa, fb)
-    return best
+    """Token Jaccard over testable statements only.
+
+    Quotes are immutable provenance, not constraints. One multi-directive quote
+    may legitimately produce several distinct atomic anchors, so quote overlap
+    must never make those anchors duplicates.
+    """
+    del quote_a, quote_b
+    return (jaccard(tokens(statement_a), tokens(statement_b)), "statement", "statement")
 
 
 def similar_anchors(anchors: list, statement: str, quote: str, floor: float = SIMILAR_REPORT_FLOOR) -> list:
@@ -1935,14 +2030,14 @@ def cmd_dedupe(args) -> dict:
             "anchors": len(anchors), "pairs": pairs, "likely_duplicates": []}
     if jev_mode:
         qs = load_simple_question_set("dedupe", (DEDUPE_QUESTION,))
-        api_key = remote_preflight(args, "The anchor statements and quotes") if (pairs and not dry_run and fixture is None) else ""
+        api_key = remote_preflight(args, "The anchor statements") if (pairs and not dry_run and fixture is None) else ""
         by_id = {a.get("id"): a for a in anchors}
         requests_out = []
         for pair in pairs:
             a, b = by_id[pair["a"]], by_id[pair["b"]]
             body = {"model": args.model, "questions": qs["questions"], "state": {
-                "a": {"id": a.get("id"), "statement": a.get("statement") or "", "quote": anchor_quote(a)},
-                "b": {"id": b.get("id"), "statement": b.get("statement") or "", "quote": anchor_quote(b)}}}
+                "a": {"id": a.get("id"), "statement": a.get("statement") or ""},
+                "b": {"id": b.get("id"), "statement": b.get("statement") or ""}}}
             if dry_run:
                 try:
                     fit_request(body, DEFAULT_MAX_REQUEST_BYTES, DEFAULT_MIN_ITEM_CHARS, {})
@@ -1970,22 +2065,113 @@ def cmd_dedupe(args) -> dict:
     return {"success": True, "data": data, "error": None}
 
 
-RUBRIC_QUESTIONS = ("single_constraint", "observable", "requirement_form", "faithful", "scoped", "positive_form")
+RUBRIC_QUESTIONS = ("single_constraint", "observable", "faithful", "scoped", "self_contained")
+
+
+def rubric_confirmation_outcome(responses: list, questions: tuple, threshold: float, lint_errors: list) -> dict:
+    """Classify two rubric confirmations and an optional tie-breaker.
+
+    A third response is meaningful only when the first two choices disagree.
+    Choice disagreement that a third answer cannot resolve is unstable. A
+    resolved choice supported by fewer than two confident matching answers is
+    inconclusive. Confident no/unclear is needs_work; only all-confident yes
+    with no deterministic lint errors is testable.
+    """
+    if len(responses) not in (2, 3):
+        raise JudgeError("RUBRIC.CONFIRMATION", "rubric confirmation needs two responses and an optional third")
+    disagreements = []
+    unstable = []
+    low = []
+    failing = []
+    resolved = {}
+    for qid in questions:
+        cells = [answer_choice(response["answers"][qid]) for response in responses]
+        first_disagrees = cells[0][0] != cells[1][0]
+        if first_disagrees:
+            disagreements.append(qid)
+            if len(cells) != 3:
+                raise JudgeError("RUBRIC.CONFIRMATION", f"third response missing for disagreement on {qid}")
+            confident = {
+                choice: [index + 1 for index, (got, confidence) in enumerate(cells)
+                         if got == choice and confidence >= threshold]
+                for choice in ("yes", "no", "unclear")
+            }
+            supported = [choice for choice, calls in confident.items() if len(calls) >= 2]
+            competing = [choice for choice, calls in confident.items() if calls]
+            if len(supported) == 1 and len(competing) == 1:
+                choice = supported[0]
+                matching = confident[choice]
+                confidences = [cells[index - 1][1] for index in matching]
+            elif len(competing) > 1:
+                unstable.append(qid)
+                resolved[qid] = {"choice": None, "confidence": None, "matching_calls": []}
+                continue
+            else:
+                low.append(qid)
+                resolved[qid] = {"choice": None, "confidence": None, "matching_calls": []}
+                continue
+        else:
+            choice = cells[0][0]
+            matching = [1, 2]
+            confidences = [cells[0][1], cells[1][1]]
+        min_confidence = min(confidences)
+        resolved[qid] = {
+            "choice": choice,
+            "confidence": round(min_confidence, 3),
+            "matching_calls": matching,
+        }
+        if min_confidence < threshold:
+            low.append(qid)
+        elif choice != "yes":
+            failing.append(qid)
+
+    if unstable:
+        verdict = "unstable"
+    elif low:
+        verdict = "inconclusive"
+    elif failing or lint_errors:
+        verdict = "needs_work"
+    else:
+        verdict = "testable"
+    return {
+        "verdict": verdict,
+        "failing": list(dict.fromkeys(failing + low + unstable + list(lint_errors))),
+        "low_confidence": low,
+        "unstable": unstable,
+        "initial_disagreements": disagreements,
+        "resolved": resolved,
+    }
+
+
+def rubric_fixture_response(fixture: dict, keys: tuple, index: int, questions: dict) -> dict:
+    value = None
+    for key in keys:
+        value = fixture.get(key)
+        if value is not None:
+            break
+    if value is None:
+        raise JudgeError("FIXTURE.MISSING", f"answers fixture has no entry for {keys[0]} (or '*')")
+    if isinstance(value, list):
+        if index >= len(value):
+            raise JudgeError("FIXTURE.MISSING", f"answers fixture has no confirmation {index + 1} for {keys[0]}")
+        value = value[index]
+    return validate_response({"model": "fixture", "answers": value}, questions)
 
 
 def rubric_entries(args, candidates: list, threshold: float, dry_run: bool, fixture, what: str) -> tuple:
     """Lint, then one Jev request per candidate {id, statement, quote, scope, source_type}. Returns (entries, requests_out).
 
-    An entry is testable when every rubric question is yes at or above the threshold and the lint has no error
-    (the verbatim rule); `failing` lists the failed question ids and the lint errors. Lint warnings that are not
-    errors ride along in `lint` without changing the verdict. Nothing is written to disk.
+    An entry is testable when every rubric question has two confident yes
+    confirmations and deterministic requirement-form lint has no error. A
+    third call is made only when the first two choices disagree. Nothing is
+    written to disk.
     """
     qs = load_simple_question_set("testability", RUBRIC_QUESTIONS)
     api_key = remote_preflight(args, what) if (candidates and not dry_run and fixture is None) else ""
     entries, requests_out = [], []
     for c in candidates:
         warnings = lint_statement(c["statement"], c["quote"], c.get("source_type") or "ANC")
-        lint_errors = [w for w in warnings if w == LINT_VERBATIM]
+        lint_errors = [w for w in warnings if w == LINT_VERBATIM or w in REQUIREMENT_FORM_WARNINGS]
         entry = {"id": c["id"], "statement": c["statement"], "quote": c["quote"], "scope": c.get("scope") or "",
                  "verdict": None, "failing": list(lint_errors), "answers": None, "lint": {"warnings": warnings, "errors": lint_errors}}
         body = {"model": args.model, "questions": qs["questions"],
@@ -1995,20 +2181,39 @@ def rubric_entries(args, candidates: list, threshold: float, dry_run: bool, fixt
                 fit_request(body, DEFAULT_MAX_REQUEST_BYTES, DEFAULT_MIN_ITEM_CHARS, {})
             except JudgeError as exc:
                 entry["error"] = exc.to_json()["error"]
-            requests_out.append(body)
+            requests_out.extend((body, json.loads(json.dumps(body))))
             entries.append(entry)
             continue
         try:
-            resp, meta = ask_jev_once(args, api_key, body, qs["questions"], fixture, (c["id"], "*"))
-            failed = []
-            for qid in qs["questions"]:
-                choice, conf = answer_choice(resp["answers"][qid])
-                if choice != "yes" or conf < threshold:
-                    failed.append(qid)
-            entry["answers"] = resp["answers"]
-            entry["attempts"] = meta.get("attempts")
-            entry["failing"] = failed + lint_errors
-            entry["verdict"] = "testable" if not entry["failing"] else "needs_work"
+            responses = []
+            attempts = 0
+            for index in range(2):
+                if fixture is not None:
+                    response = rubric_fixture_response(fixture, (c["id"], "*"), index, qs["questions"])
+                    meta = {"attempts": 1}
+                else:
+                    response, meta = ask_jev_once(args, api_key, body, qs["questions"], None, (c["id"], "*"))
+                responses.append(response)
+                attempts += meta.get("attempts", 1)
+            first_choices = [answer_choice(responses[0]["answers"][qid])[0] for qid in qs["questions"]]
+            second_choices = [answer_choice(responses[1]["answers"][qid])[0] for qid in qs["questions"]]
+            if first_choices != second_choices:
+                if fixture is not None:
+                    response = rubric_fixture_response(fixture, (c["id"], "*"), 2, qs["questions"])
+                    meta = {"attempts": 1}
+                else:
+                    response, meta = ask_jev_once(args, api_key, body, qs["questions"], None, (c["id"], "*"))
+                responses.append(response)
+                attempts += meta.get("attempts", 1)
+            outcome = rubric_confirmation_outcome(responses, tuple(qs["questions"]), threshold, lint_errors)
+            entry["answers"] = responses[0]["answers"]
+            entry["answers_second"] = responses[1]["answers"]
+            if len(responses) == 3:
+                entry["answers_third"] = responses[2]["answers"]
+            entry["attempts"] = attempts
+            entry["confirmations"] = outcome
+            entry["failing"] = outcome["failing"]
+            entry["verdict"] = outcome["verdict"]
         except JudgeError as exc:
             if exc.code in ABORT_CODES:
                 raise
@@ -2045,7 +2250,7 @@ def cmd_rubric(args) -> dict:
     dry_run = bool(args.dry_run)
     entries, requests_out = rubric_entries(args, candidates, threshold, dry_run, fixture, "The anchor statements, quotes and scopes")
     data = {"threshold": threshold, "dry_run": dry_run, "fixture": fixture is not None, "path": path, "anchors": entries,
-            "needs_work": [e["id"] for e in entries if e["verdict"] in ("needs_work", "error")],
+            "needs_work": [e["id"] for e in entries if e["verdict"] != "testable"],
             "pass": bool(entries) and all(e["verdict"] == "testable" for e in entries) and not dry_run}
     if dry_run:
         data["requests"] = requests_out
@@ -2218,6 +2423,13 @@ def cmd_diff(args) -> dict:
     def passing(v):
         return v is not None and v != "error" and v not in FAILING
 
+    def item_chars(run):
+        item = run.get("item") or {}
+        value = item.get("chars_before_reduction", item.get("chars", 0))
+        return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+    before_chars, after_chars = item_chars(prev), item_chars(nxt)
+
     data = {"gate": nxt["gate"], "item": nxt["item"]["id"], "prev": prev["run_id"], "next": nxt["run_id"],
             "changed": changed, "added": added, "removed": removed,
             # regressions: the verdict got more severe (kept as before). pass_to_fail / fail_to_pass: which side of the gate moved.
@@ -2225,6 +2437,8 @@ def cmd_diff(args) -> dict:
             "regressions": [c["anchor_id"] for c in changed if not c["improved"]],
             "pass_to_fail": [c["anchor_id"] for c in changed if passing(c["from"]) and not passing(c["to"])],
             "fail_to_pass": [c["anchor_id"] for c in changed if not passing(c["from"]) and passing(c["to"])],
+            "item_size": {"before_chars": before_chars, "after_chars": after_chars,
+                          "delta_chars": after_chars - before_chars, "grew": after_chars > before_chars},
             "pass_before": prev["summary"].get("pass"), "pass_after": nxt["summary"].get("pass")}
     if getattr(args, "expected", ""):
         expected = load_json(args.expected, "expected verdicts")
@@ -2408,6 +2622,17 @@ def build_parser() -> argparse.ArgumentParser:
                          "dev: every section plus closed children")
     ci.add_argument("--out", default="", help="write the text here; without it the text is returned in data.text")
     ci.set_defaults(func=cmd_compose_item)
+
+    ap = sub.add_parser("agent-preflight", help="validate agent paths and identifiers before reading or sending data")
+    ap.add_argument("--workspace-root", required=True, help="absolute root from `git rev-parse --show-toplevel`")
+    ap.add_argument("--script", required=True, help="selected installed jev_judge.py; must equal this running script")
+    ap.add_argument("--anchors", required=True, help="anchors.json inside the workspace")
+    ap.add_argument("--run-dir", default="", help="output directory inside the workspace; default beside anchors.json")
+    ap.add_argument("--evidence", action="append", default=[], help="existing evidence file inside the workspace; repeatable")
+    ap.add_argument("--identifier", action="append", default=[], help="bead, sprint or anchor id; repeatable")
+    ap.add_argument("--pr-number", default="", help="positive decimal GitHub pull-request number")
+    ap.add_argument("--correlation-id", default="", help="safe correlation id used to derive a temporary work key")
+    ap.set_defaults(func=cmd_agent_preflight)
 
     sh = sub.add_parser("shape", help="size and shape metrics of plan beads; informs, never gates (exit 0)")
     sh.add_argument("--beads", default="", help="directory of `bd show --json` files")
