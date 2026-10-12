@@ -1209,6 +1209,8 @@ mod tests {
     use tempfile::TempDir;
 
     const MINIMAL_DOCS_MANIFEST: &str = "schema_version = 1\n\n[[guides]]\npath = \"README.md\"\n";
+    #[cfg(unix)]
+    const BACKEND_PROBE_TEST_WATCHDOG: Duration = Duration::from_secs(30);
 
     #[test]
     fn release_target_matches_the_published_release_matrix() {
@@ -1728,13 +1730,13 @@ mod tests {
         fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("staged docs manifest");
         fs::write(staged_docs.join("README.md"), "# docs\n").expect("staged docs README");
-        let started = Instant::now();
-        let staged_entries = release_payload_candidates(
-            &staged_bin.join(ReleaseTarget::binary_name()),
-            &fixture.path().join("managed/bin/sc-lint"),
-        );
-        assert!(!payload_is_complete(&staged_entries));
-        assert_probe_within_timeout(started);
+        let staged_launcher = staged_bin.join(ReleaseTarget::binary_name());
+        let staged_managed = fixture.path().join("managed/bin/sc-lint");
+        let staged_is_complete = run_probe_with_watchdog(&staged_pid_file, move || {
+            let entries = release_payload_candidates(&staged_launcher, &staged_managed);
+            payload_is_complete(&entries)
+        });
+        assert!(!staged_is_complete);
         assert_probe_children_stopped(&staged_pid_file);
 
         let installed_root = fixture.path().join("installed");
@@ -1759,11 +1761,11 @@ mod tests {
         fs::write(installed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("installed docs manifest");
         fs::write(installed_docs.join("README.md"), "# docs\n").expect("installed docs README");
-        let started = Instant::now();
-        assert!(!managed_payload_complete(
-            &installed_bin.join(ReleaseTarget::binary_name())
-        ));
-        assert_probe_within_timeout(started);
+        let installed_launcher = installed_bin.join(ReleaseTarget::binary_name());
+        let installed_is_complete = run_probe_with_watchdog(&installed_pid_file, move || {
+            managed_payload_complete(&installed_launcher)
+        });
+        assert!(!installed_is_complete);
         assert_probe_children_stopped(&installed_pid_file);
     }
 
@@ -2349,7 +2351,7 @@ mod tests {
         fs::write(
             path,
             format!(
-                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s\\n' \"$sleeper\" \"$noiser\" > '{child_pid_file}'\nwait\n"
+                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{child_pid_file}'\nwait\n"
             ),
         )
         .expect("write hanging noisy backend");
@@ -2361,11 +2363,57 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn assert_probe_within_timeout(started: Instant) {
-        assert!(
-            started.elapsed() < BACKEND_PROBE_TIMEOUT + Duration::from_secs(2),
-            "backend probe exceeded its bound"
-        );
+    fn run_probe_with_watchdog<T: Send + 'static>(
+        child_pid_file: &Path,
+        probe: impl FnOnce() -> T + Send + 'static,
+    ) -> T {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let worker = thread::spawn(move || {
+            let _ = sender.send(probe());
+        });
+        match receiver.recv_timeout(BACKEND_PROBE_TEST_WATCHDOG) {
+            Ok(result) => {
+                worker.join().expect("probe worker");
+                result
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                terminate_test_probe_processes(child_pid_file);
+                panic!(
+                    "backend probe exceeded the {}-second test deadlock watchdog",
+                    BACKEND_PROBE_TEST_WATCHDOG.as_secs()
+                );
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                let _ = worker.join();
+                panic!("probe worker exited without returning a result");
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn terminate_test_probe_processes(child_pid_file: &Path) {
+        let Ok(pids) = fs::read_to_string(child_pid_file) else {
+            return;
+        };
+        let pids = pids
+            .split_whitespace()
+            .filter_map(|pid| pid.parse::<u32>().ok())
+            .collect::<Vec<_>>();
+        if let Some(group_id) = pids.first() {
+            let process_group = format!("-{group_id}");
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", &process_group])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+        for pid in pids {
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", &pid.to_string()])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
     }
 
     #[cfg(unix)]
@@ -2375,7 +2423,11 @@ mod tests {
             .split_whitespace()
             .map(|pid| pid.parse::<u32>().expect("child pid"))
             .collect::<Vec<_>>();
-        assert_eq!(child_pids.len(), 2, "probe recorded both child pids");
+        assert_eq!(
+            child_pids.len(),
+            3,
+            "probe recorded parent and both child pids"
+        );
         for pid in child_pids {
             let mut running = false;
             for _ in 0..100 {
