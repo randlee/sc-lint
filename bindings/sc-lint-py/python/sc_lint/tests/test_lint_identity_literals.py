@@ -102,6 +102,37 @@ fn uses_split_identity() {{
                 ],
             )
 
+    def test_identity_literal_lint_handles_trailing_concat_comments_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = seed_workspace(Path(tempdir))
+            split_at = len(TEAM_LEAD_IDENTITY) // 2
+            prefix, suffix = TEAM_LEAD_IDENTITY[:split_at], TEAM_LEAD_IDENTITY[split_at:]
+            (repo_root / "crates/demo/src/lib.rs").write_text(
+                f'''pub const SINGLE: &str = concat!("{TEAM_LEAD_IDENTITY}");
+pub const LINE_COMMENT: &str = concat!("{prefix}", "{suffix}", // keep
+);
+pub const BLOCK_COMMENT: &str = concat!("{prefix}", "{suffix}", /* keep */);
+''',
+                encoding="utf-8",
+            )
+
+            violations = collect_identity_violations(
+                repo_root,
+                forbidden_literals=(),
+                production_canonical_literals={
+                    TEAM_LEAD_IDENTITY: ("crates/demo/src/constants.rs",),
+                },
+            )
+
+            self.assertEqual(
+                [(item.path, item.line_number, item.kind) for item in violations],
+                [
+                    ("crates/demo/src/lib.rs", 1, "production_scope_canonical_literal"),
+                    ("crates/demo/src/lib.rs", 2, "production_scope_canonical_literal"),
+                    ("crates/demo/src/lib.rs", 4, "production_scope_canonical_literal"),
+                ],
+            )
+
     def test_identity_literal_defaults_do_not_leak_consumer_policy(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = seed_workspace(Path(tempdir))
