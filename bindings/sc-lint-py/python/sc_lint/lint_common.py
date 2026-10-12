@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import time
 import tomllib
-from typing import Callable
+from typing import Callable, TextIO
 
 
 LOG_DIR = Path(".just/logs")
@@ -129,6 +129,23 @@ def discover_repo_root(explicit_root: str | None = None) -> Path:
         if (candidate / "sc-lint.toml").is_file() or (candidate / ".git").exists():
             return candidate
     return current
+
+
+def write_console_output(stream: TextIO, text: str) -> None:
+    """Write captured UTF-8 child output using the destination stream's encoding.
+
+    Preserve output unchanged when the stream can represent it. For restrictive
+    console encodings, replace only characters the stream cannot encode.
+    """
+
+    encoding = getattr(stream, "encoding", None)
+    if encoding:
+        errors = getattr(stream, "errors", None) or "strict"
+        try:
+            text.encode(encoding, errors=errors)
+        except UnicodeEncodeError:
+            text = text.encode(encoding, errors="replace").decode(encoding)
+    stream.write(text)
 
 
 def load_lint_config(repo_root: Path, config_path: str | None = None) -> dict:

@@ -249,6 +249,152 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 (Path(environment["SC_LINT_INSTALL_DIR"]) / self.product_binary.name).is_file()
             )
 
+    @unittest.skipIf(os.name == "nt", "POSIX PATH bootstrap")
+    def test_incompatible_path_binary_is_replaced_by_a_verified_managed_release(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            old_bin = Path(temporary.name) / "old-bin"
+            old_bin.mkdir()
+            old_binary = old_bin / "sc-lint"
+            calls = Path(temporary.name) / "old-binary-calls.log"
+            old_binary.write_text(
+                "#!/bin/sh\n"
+                f"printf '%s\\n' \"$*\" >> '{calls}'\n"
+                'for argument in "$@"; do [ "$argument" = compatibility ] && exit 1; done\n'
+                "exit 64\n",
+                encoding="utf-8",
+            )
+            old_binary.chmod(0o755)
+            self.write_release_archive(Path(temporary.name), release / self.product_binary.name)
+            just = shutil.which("just")
+            self.assertIsNotNone(just, "just is required for the consumer fixture")
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            command_dirs = [old_bin, Path(just).parent, Path("/usr/bin"), Path("/bin")]
+            environment["PATH"] = os.pathsep.join(
+                str(path) for path in command_dirs if path.is_dir()
+            )
+
+            with self.release_server(Path(temporary.name)) as release_base:
+                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
+                result = self.run_command([just, "setup"], cwd=consumer, environment=environment)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((managed / self.product_binary.name).is_file())
+            self.assertEqual(
+                calls.read_text(encoding="utf-8").splitlines(),
+                [f"--config sc-lint.toml compatibility check --binary {old_binary}"],
+            )
+            installed = self.run_command(
+                [str(managed / self.product_binary.name), "--json", "version"],
+                cwd=consumer,
+                environment=environment,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+
+    @unittest.skipIf(os.name == "nt", "POSIX PATH bootstrap")
+    def test_compatible_path_binary_is_reused_without_managed_install(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            path_bin = Path(temporary.name) / "path-bin"
+            path_bin.mkdir()
+            shutil.copy2(self.product_binary, path_bin / "sc-lint")
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            environment["SC_LINT_RELEASE_BASE_URL"] = "http://127.0.0.1:9/unreachable"
+            environment["PATH"] = os.pathsep.join(
+                str(path)
+                for path in (path_bin, Path("/usr/bin"), Path("/bin"))
+                if path.is_dir()
+            )
+
+            result = self.run_command(
+                ["sh", str(consumer / ".sc-lint/bootstrap"), "setup", "--config", "sc-lint.toml", "--dry-run"],
+                cwd=consumer,
+                environment=environment,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", result.stdout + result.stderr)
+            self.assertFalse((managed / self.product_binary.name).exists())
+
+    @unittest.skipIf(os.name == "nt", "POSIX PATH bootstrap")
+    def test_incompatible_path_binary_dry_run_does_not_fetch_or_override_explicit_bin(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            old_bin = Path(temporary.name) / "old-bin"
+            old_bin.mkdir()
+            old_binary = old_bin / "sc-lint"
+            calls = Path(temporary.name) / "old-binary-calls.log"
+            old_binary.write_text(
+                "#!/bin/sh\n"
+                f"printf '%s\\n' \"$*\" >> '{calls}'\n"
+                'for argument in "$@"; do [ "$argument" = compatibility ] && exit 1; done\n'
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            old_binary.chmod(0o755)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            environment = os.environ.copy()
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            environment["SC_LINT_RELEASE_BASE_URL"] = "http://127.0.0.1:9/unreachable"
+            environment.pop("SC_LINT_BIN", None)
+            environment["PATH"] = os.pathsep.join(
+                str(path)
+                for path in (old_bin, Path("/usr/bin"), Path("/bin"))
+                if path.is_dir()
+            )
+            bootstrap = str(consumer / ".sc-lint/bootstrap")
+            config = str(consumer / "sc-lint.toml")
+            path_result = self.run_command(
+                ["sh", bootstrap, "setup", "--config", config, "--dry-run"],
+                cwd=consumer,
+                environment=environment,
+            )
+
+            self.assertEqual(path_result.returncode, 0, path_result.stdout + path_result.stderr)
+            self.assertNotIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", path_result.stdout + path_result.stderr)
+            self.assertFalse((managed / self.product_binary.name).exists())
+            self.assertEqual(
+                calls.read_text(encoding="utf-8").splitlines(),
+                [
+                    f"--config {config} compatibility check --binary {old_binary}",
+                    f"--config {config} setup --dry-run",
+                    f"--config {config} setup --dry-run",
+                ],
+            )
+
+            calls.unlink()
+            environment["SC_LINT_BIN"] = str(old_binary)
+            override_result = self.run_command(
+                ["sh", str(consumer / ".sc-lint/bootstrap"), "setup", "--config", str(consumer / "sc-lint.toml"), "--dry-run"],
+                cwd=consumer,
+                environment=environment,
+            )
+
+            self.assertEqual(override_result.returncode, 0, override_result.stdout + override_result.stderr)
+            self.assertNotIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", override_result.stdout + override_result.stderr)
+            self.assertFalse((managed / self.product_binary.name).exists())
+            self.assertEqual(
+                calls.read_text(encoding="utf-8").splitlines(),
+                [
+                    f"--config {config} compatibility check --binary {old_binary}",
+                    f"--config {config} setup --dry-run",
+                    f"--config {config} setup --dry-run",
+                ],
+            )
+
     def test_too_old_binary_produces_structured_release_recovery(self) -> None:
         temporary, release, consumer = self.make_release_fixture()
         with temporary:
@@ -364,6 +510,47 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertIn("verified sc-lint", result.stdout)
             installed = self.run_command(
                 [str(managed_binary), "--json", "version"],
+                cwd=consumer,
+                environment=environment,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            self.assertIn(f'"version": "{VERSION}"', installed.stdout)
+
+    @unittest.skipUnless(os.name == "nt", "Windows PATH bootstrap")
+    def test_windows_incompatible_path_binary_is_replaced_by_a_verified_managed_release(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            managed = Path(temporary.name) / "managed"
+            managed.mkdir()
+            old_bin = Path(temporary.name) / "old-bin"
+            old_bin.mkdir()
+            old_binary = old_bin / "sc-lint.exe"
+            self.write_old_probe(old_binary)
+            self.write_release_archive(Path(temporary.name), release / self.product_binary.name)
+            just = shutil.which("just")
+            self.assertIsNotNone(just, "just is required for the consumer fixture")
+            command_dirs = []
+            for command in ("pwsh", "curl"):
+                resolved = shutil.which(command)
+                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
+                command_dirs.append(str(Path(resolved).parent))
+            command_dirs.append(str(Path(sys.executable).parent))
+            environment = os.environ.copy()
+            environment.pop("SC_LINT_BIN", None)
+            environment["SC_LINT_INSTALL_DIR"] = str(managed)
+            environment["PATH"] = os.pathsep.join(
+                [str(old_bin), str(Path(just).parent), *command_dirs]
+            )
+
+            with self.release_server(Path(temporary.name)) as release_base:
+                environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
+                result = self.run_command([just, "setup"], cwd=consumer, environment=environment)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((managed / self.product_binary.name).is_file())
+            installed = self.run_command(
+                [str(managed / self.product_binary.name), "--json", "version"],
                 cwd=consumer,
                 environment=environment,
             )

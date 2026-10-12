@@ -4,3 +4,6 @@ config_home_env = "SC_LINT_CONFIG_HOME"
 [cargo_shear.allowed_empty_files]
 
 [cargo_shear.allowed_unlinked_files]
+
+# Reviewed entries use "<crate>.<dependency>" = "reason"; reasons must be nonblank.
+[cargo_shear.allowed_unused_dependencies]

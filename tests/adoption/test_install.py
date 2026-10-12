@@ -211,9 +211,81 @@ def test_workflow_uses_vendored_action_and_root_has_no_action() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     workflow = (consumer / ".github" / "workflows" / "sc-lint.yml").read_text()
+    assert "runs-on: ${{ matrix.os }}" in workflow
     assert "uses: ./plugins/sc-lint/.github/actions/setup-sc-lint\n" in workflow
     assert (consumer / "plugins/sc-lint/.github/actions/setup-sc-lint/action.yml").is_file()
     assert not (consumer / ".github" / "actions").exists()
+
+
+@pytest.mark.parametrize(
+    ("replacement", "error_fragment"),
+    [
+        ("{{ unknown_setting }}", "unknown template variables: ['unknown_setting']"),
+        ("", "missing template variables: ['analyzers']"),
+    ],
+)
+def test_unresolved_template_variables_fail_before_writing(
+    tmp_path: Path, replacement: str, error_fragment: str
+) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    template = kit / "templates" / "sc-lint.toml.j2"
+    template.write_text(template.read_text().replace("{{ analyzers }}", replacement))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert error_fragment in result.stderr
+    assert list(consumer.iterdir()) == []
+
+
+def test_unspaced_template_variable_is_substituted_by_installer(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    template = kit / "templates" / "sc-lint.toml.j2"
+    template.write_text(template.read_text().replace("{{ minimum_version }}", "{{minimum_version}}"))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    rendered = (consumer / "sc-lint.toml").read_text()
+    assert 'minimum_version = "0.5.0"' in rendered
+    assert "{{minimum_version}}" not in rendered
+
+
+def test_unspaced_windows_shell_variable_is_substituted_in_second_pass(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    template = kit / "templates" / "Justfile.import.j2"
+    template.write_text(template.read_text().replace("{{ windows_shell }}", "{{windows_shell}}"))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    rendered = (consumer / "Justfile").read_text()
+    assert "set windows-shell :=" in rendered
+    assert "{{windows_shell}}" not in rendered
 
 
 def test_ci_disabled_writes_no_workflow_or_action_files() -> None:
