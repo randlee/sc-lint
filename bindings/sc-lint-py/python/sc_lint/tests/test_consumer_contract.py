@@ -4,8 +4,10 @@ from sc_lint.lint_common import discover_repo_root
 
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 
 
@@ -92,6 +94,49 @@ class ConsumerContractTests(unittest.TestCase):
                 "$env:PATH = (Split-Path -Parent $productBinary) + [IO.Path]::PathSeparator + $env:PATH",
                 contents,
             )
+
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell Core is required")
+    def test_windows_managed_binary_probe_is_quiet_when_managed_path_is_missing(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(
+            encoding="utf-8"
+        )
+        match = re.search(r"(?ms)^function Test-ManagedBinary \{\n.*?^\}", contents)
+        self.assertIsNotNone(match, "Test-ManagedBinary function must remain available")
+
+        script = f'''$ErrorActionPreference = "Continue"
+$root = Join-Path ([IO.Path]::GetTempPath()) ("sc-lint-managed-guard-" + [guid]::NewGuid().ToString("N"))
+$managedDirectory = Join-Path $root "managed"
+$externalDirectory = Join-Path $root "external"
+New-Item -ItemType Directory -Path $managedDirectory, $externalDirectory -Force | Out-Null
+$managedBinary = Join-Path $managedDirectory "sc-lint.exe"
+$externalBinary = Join-Path $externalDirectory "sc-lint.exe"
+Set-Content -LiteralPath $externalBinary -Value "external"
+{match.group(0)}
+$Error.Clear()
+$missingResult = Test-ManagedBinary $externalBinary
+$missingErrors = @($Error)
+Set-Content -LiteralPath $managedBinary -Value "managed"
+$Error.Clear()
+$existingResult = Test-ManagedBinary $managedBinary
+$existingErrors = @($Error)
+Write-Output "$missingResult|$existingResult|$($missingErrors.Count)|$($existingErrors.Count)"
+Remove-Item -LiteralPath $root -Recurse -Force
+if ($missingResult -ne $false -or $existingResult -ne $true -or $missingErrors.Count -gt 0 -or $existingErrors.Count -gt 0) {{ exit 1 }}
+'''
+        with tempfile.TemporaryDirectory(prefix="sc-lint-pwsh-probe-") as temporary:
+            script_path = Path(temporary) / "managed_binary_probe.ps1"
+            script_path.write_text(script, encoding="utf-8")
+            result = subprocess.run(
+                ["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script_path)],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.strip(), "False|True|0|0")
+        self.assertEqual(result.stderr, "")
 
     def test_posix_lint_and_test_share_one_product_environment_helper(self) -> None:
         contents = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")

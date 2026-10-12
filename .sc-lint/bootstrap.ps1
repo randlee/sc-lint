@@ -112,6 +112,7 @@ function Resolve-ProductBinary {
 function Test-ManagedBinary {
     param([string]$Binary)
     if (-not $Binary -or -not (Test-Path -LiteralPath $Binary -PathType Leaf)) { return $false }
+    if (-not (Test-Path -LiteralPath $managedBinary -PathType Leaf)) { return $false }
     $resolvedBinary = (Resolve-Path -LiteralPath $Binary).Path
     $resolvedManaged = (Resolve-Path -LiteralPath $managedBinary).Path
     return [string]::Equals($resolvedBinary, $resolvedManaged, [System.StringComparison]::OrdinalIgnoreCase)
