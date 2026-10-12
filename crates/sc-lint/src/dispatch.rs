@@ -177,17 +177,7 @@ fn run_delegated_backend(
     rule_filter: Option<&str>,
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
-    let sibling_backend = find_sibling_backend_binary(tool);
-    let backend_binary = match sibling_backend {
-        Some(binary) => binary,
-        None => match find_backend_on_path(tool) {
-            Some(binary) => {
-                validate_path_backend(tool, &binary)?;
-                binary
-            }
-            None => PathBuf::from(tool),
-        },
-    };
+    let backend_binary = backend_binary_for_dispatch(tool)?;
     let output = ProcessCommand::new(&backend_binary)
         .args(backend_args(
             repo_root,
@@ -261,6 +251,23 @@ fn run_delegated_backend(
         normalized,
         DispatchTelemetry::new(tool, finding_count),
     ))
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Backend resolution failures remain in the shared top-level CliError contract."
+)]
+fn backend_binary_for_dispatch(tool: &str) -> Result<PathBuf, CliError> {
+    if let Some(binary) = find_sibling_backend_binary(tool) {
+        return Ok(binary);
+    }
+    match find_backend_on_path(tool) {
+        Some(binary) => {
+            validate_path_backend(tool, &binary)?;
+            Ok(binary)
+        }
+        None => Ok(PathBuf::from(tool)),
+    }
 }
 
 fn backend_args(root: &Path, config: Option<&Path>, rule_filter: Option<&str>) -> Vec<OsString> {
@@ -347,6 +354,10 @@ fn find_backend_on_path(tool: &str) -> Option<PathBuf> {
     })
 }
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Backend compatibility failures remain in the shared top-level CliError contract."
+)]
 fn validate_path_backend(tool: &str, binary: &Path) -> Result<(), CliError> {
     let expected = semver::Version::parse(env!("CARGO_PKG_VERSION"))
         .expect("package version is valid semantic version");
