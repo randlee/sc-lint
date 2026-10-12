@@ -294,26 +294,24 @@ pub(crate) fn product_binary() -> PathBuf {
     std::env::current_exe().unwrap_or_else(|_| PathBuf::from(consts::SERVICE_NAME))
 }
 
-/// True when the running executable sits in the released archive layout:
-/// every declared backend binary and the documentation bundle are beside it,
-/// so no step depends on a source checkout.
+/// True when the running executable can resolve every backend and the installed
+/// documentation bundle without falling back to the source checkout.
 pub(crate) fn self_contained_layout() -> bool {
     std::env::current_exe()
         .ok()
         .as_deref()
-        .and_then(Path::parent)
-        .is_some_and(self_contained_layout_in_dir)
+        .is_some_and(self_contained_layout_for_executable)
 }
 
-fn self_contained_layout_in_dir(dir: &Path) -> bool {
+fn self_contained_layout_for_executable(executable: &Path) -> bool {
     [
         consts::TOOL_BOUNDARY,
         consts::TOOL_PORTABILITY,
         consts::TOOL_RUNTIME,
     ]
     .into_iter()
-    .all(|tool| find_backend_binary_in_dir(dir, tool).is_some())
-        && dir.join(consts::DOCS_BUNDLE_DIR).is_dir()
+    .all(|tool| find_backend_binary_from_exe(executable, tool).is_some())
+        && crate::docs::installed_bundle_root_for_executable(executable).is_some()
 }
 
 fn find_backend_binary(tool: &str) -> PathBuf {
@@ -354,7 +352,7 @@ mod tests {
     use super::backend_args;
     use super::backend_rejection;
     use super::find_backend_binary_from_exe;
-    use super::self_contained_layout_in_dir;
+    use super::self_contained_layout_for_executable;
     use crate::consts;
     use crate::error::CliErrorKind;
     use sc_lint_boundary::AnalyzeOptions;
@@ -464,16 +462,46 @@ mod tests {
     }
 
     #[test]
-    fn self_contained_layout_requires_every_backend_and_the_docs_bundle() {
+    fn self_contained_layout_recognizes_published_and_legacy_archives() {
         let temp_dir = TempDir::new().expect("temp dir");
-        let dir = temp_dir.path();
-        assert!(!self_contained_layout_in_dir(dir));
+        let prefix = temp_dir.path();
+        let bin = prefix.join("bin");
+        fs::create_dir_all(&bin).expect("bin directory");
+        let executable = bin.join("sc-lint");
+        fs::write(&executable, "").expect("primary binary");
         for tool in ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"] {
-            fs::write(dir.join(tool), "").expect("backend");
+            fs::write(bin.join(tool), "").expect("backend");
         }
-        assert!(!self_contained_layout_in_dir(dir));
-        fs::create_dir_all(dir.join(crate::consts::DOCS_BUNDLE_DIR)).expect("docs");
-        assert!(self_contained_layout_in_dir(dir));
+        let published_docs = prefix.join("share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&published_docs).expect("published docs");
+        fs::write(published_docs.join("manifest.toml"), "schema_version = 1\n")
+            .expect("docs manifest");
+        fs::write(published_docs.join("README.md"), "# sc-lint\n").expect("docs overview");
+        assert!(self_contained_layout_for_executable(&executable));
+
+        let legacy = prefix.join("legacy");
+        fs::create_dir_all(&legacy).expect("legacy directory");
+        let legacy_executable = legacy.join("sc-lint");
+        fs::write(&legacy_executable, "").expect("legacy primary binary");
+        for tool in ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"] {
+            fs::write(legacy.join(tool), "").expect("legacy backend");
+        }
+        let legacy_docs = legacy.join(crate::consts::DOCS_BUNDLE_DIR);
+        fs::create_dir_all(&legacy_docs).expect("legacy docs");
+        fs::write(legacy_docs.join("manifest.toml"), "schema_version = 1\n")
+            .expect("legacy docs manifest");
+        fs::write(legacy_docs.join("README.md"), "# sc-lint\n").expect("legacy docs overview");
+        assert!(self_contained_layout_for_executable(&legacy_executable));
+
+        let missing_docs = prefix.join("missing-docs");
+        let missing_bin = missing_docs.join("bin");
+        fs::create_dir_all(&missing_bin).expect("missing-docs bin directory");
+        let missing_executable = missing_bin.join("sc-lint");
+        fs::write(&missing_executable, "").expect("missing-docs primary binary");
+        for tool in ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"] {
+            fs::write(missing_bin.join(tool), "").expect("missing-docs backend");
+        }
+        assert!(!self_contained_layout_for_executable(&missing_executable));
     }
 
     #[test]

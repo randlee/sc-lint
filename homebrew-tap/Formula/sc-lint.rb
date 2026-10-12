@@ -1,9 +1,9 @@
 # typed: false
 # frozen_string_literal: true
 
-# Bootstrap template for the release workflow.
-# The update-homebrew job rewrites the tap checkout with release-pinned URLs
-# and SHA256 values after each published sc-lint release.
+# Bootstrap template for the Homebrew publish workflow.
+# Its update-tap job rewrites the tap checkout with release-pinned URLs and
+# SHA256 values after each published sc-lint release.
 class ScLint < Formula
   desc "Top-level sc-lint CLI and analyzer toolset for Rust workspaces"
   homepage "https://github.com/randlee/sc-lint"

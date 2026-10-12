@@ -353,8 +353,9 @@ emits this payload under the standard success envelope's `data` field:
 
 `self_contained` reports the archive layout: `true` when every declared
 backend binary (`sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`)
-and the `sc-lint-docs` bundle sit beside the running executable, as they do in
-a released archive; `false` for source builds under `target/`. The `full` and
+and the `sc-lint-docs` bundle resolve from a supported installed layout,
+including the published archive's `bin/` and manifest-declared bundle paths;
+`false` for source builds under `target/`. The `full` and
 `ci` lint profiles re-enter the running executable for their `sc-boundary` and
 `sc-portability` steps, so a released archive runs every kit recipe with no
 source-tree helper (issue #84).

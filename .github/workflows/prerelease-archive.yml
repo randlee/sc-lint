@@ -1,0 +1,195 @@
+name: Prerelease Archive
+
+on:
+  push:
+    tags: ["prerelease/v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prerelease-archive-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
+      rust_toolchain: ${{ steps.version.outputs.rust_toolchain }}
+      matrix: ${{ steps.matrix.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.x" }
+      - id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          prefix="$(python3 - <<'PY'
+          import tomllib
+          print(tomllib.load(open('release/publish-artifacts.toml','rb'))['prerelease']['tag_prefix'])
+          PY
+          )"
+          [[ "$tag" == "$prefix"* ]] || { echo "unexpected prerelease tag: $tag" >&2; exit 1; }
+          version="${tag#"$prefix"}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid prerelease version" >&2; exit 1; }
+          plan="$(python3 .github/scripts/release_artifacts.py build-plan --manifest "$RELEASE_ARTIFACT_MANIFEST")"
+          workspace="$(jq -r .workspace_toml <<<"$plan")"
+          rust_toolchain="$(jq -r .rust_toolchain <<<"$plan")"
+          python3 .github/scripts/release_artifacts.py validate-manifest --manifest "$RELEASE_ARTIFACT_MANIFEST" --workspace-toml "$workspace"
+          python3 .github/scripts/release_artifacts.py verify-version --manifest "$RELEASE_ARTIFACT_MANIFEST" --workspace-toml "$workspace" --version "$version"
+          python3 .github/scripts/release_artifacts.py verify-version-lockstep --manifest "$RELEASE_ARTIFACT_MANIFEST" --workspace-toml "$workspace"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "rust_toolchain=$rust_toolchain" >> "$GITHUB_OUTPUT"
+      - id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          matrix="$(python3 .github/scripts/release_artifacts.py release-target-matrix --manifest "$RELEASE_ARTIFACT_MANIFEST")"
+          echo "value=$matrix" >> "$GITHUB_OUTPUT"
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.source_sha }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ needs.plan.outputs.rust_toolchain }}
+          targets: ${{ matrix.target }}
+      - run: rustup target add ${{ matrix.target }}
+
+      - name: Install Linux native build deps
+        uses: ./.github/actions/install-linux-native-deps
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.target }}-cargo-prerelease-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          bins="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "$RELEASE_ARTIFACT_MANIFEST")"
+          cargo build --release --target "${{ matrix.target }}" $bins
+
+      - name: Package manifest-declared prerelease archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import sys
+          import subprocess
+          import tarfile
+          import zipfile
+
+          target_name = "${{ matrix.target }}"
+          version = "${{ needs.plan.outputs.version }}"
+          config = json.loads(
+              subprocess.check_output(
+                  [
+                      sys.executable,
+                      ".github/scripts/release_artifacts.py",
+                      "release-package-config",
+                      "--manifest",
+                      os.environ["RELEASE_ARTIFACT_MANIFEST"],
+                      "--target",
+                      target_name,
+                  ],
+                  text=True,
+              )
+          )
+          project = config["project"]
+          target = config["target"]
+          stage = Path(f"{project['archive_prefix']}_{version}_{target_name}")
+          if stage.exists():
+              shutil.rmtree(stage)
+          (stage / "bin").mkdir(parents=True)
+          for binary in config["binaries"]:
+              filename = binary["name"] + (".exe" if "windows" in target_name else "")
+              shutil.copy2(Path("target") / target_name / "release" / filename, stage / "bin" / filename)
+              for bundled_path in binary.get("bundled_paths", []):
+                  source = Path(bundled_path["source"])
+                  destination = stage / bundled_path["destination"]
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copytree(source, destination, dirs_exist_ok=True)
+          archive = Path(f"{stage}.{target['archive']}")
+          if target["archive"] == "tar.gz":
+              with tarfile.open(archive, "w:gz") as output:
+                  output.add(stage, arcname=stage.name)
+          elif target["archive"] == "zip":
+              with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as output:
+                  for item in stage.rglob("*"):
+                      if item.is_file():
+                          output.write(item, item.relative_to(stage.parent))
+          else:
+              raise SystemExit(f"unsupported archive type: {target['archive']}")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as env:
+              env.write(f"ARCHIVE={archive}\n")
+          PY
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ env.ARCHIVE }}
+  release:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: assets }
+      - name: Generate checksums and publish GitHub prerelease assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          find assets -type f -exec cp {} . \;
+          mapfile -t archives < <(find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) -print | sed 's#^./##' | sort)
+          ((${#archives[@]} > 0)) || { echo "no prerelease archives were downloaded" >&2; exit 1; }
+          shasum -a 256 "${archives[@]}" > checksums.txt
+          tag="${GITHUB_REF_NAME}"
+          if gh release create "$tag" --prerelease --title "$tag" --generate-notes "${archives[@]}" checksums.txt; then
+            exit 0
+          fi
+
+          echo "release creation did not win; verifying an identical existing prerelease"
+          metadata="$(gh release view "$tag" --json isDraft,isPrerelease,assets)"
+          [[ "$(jq -r .isPrerelease <<<"$metadata")" == "true" ]] || { echo "$tag is not a prerelease" >&2; exit 1; }
+          [[ "$(jq -r .isDraft <<<"$metadata")" == "false" ]] || { echo "$tag is still a draft" >&2; exit 1; }
+          expected_assets="$(printf '%s\n' "${archives[@]}" checksums.txt | sort)"
+          actual_assets="$(jq -r '.assets[].name' <<<"$metadata" | sort)"
+          [[ "$actual_assets" == "$expected_assets" ]] || { echo "$tag has a different asset set" >&2; exit 1; }
+          mkdir existing-release
+          gh release download "$tag" --pattern checksums.txt --dir existing-release
+          cmp checksums.txt existing-release/checksums.txt || { echo "$tag has different archive checksums" >&2; exit 1; }
+          echo "existing prerelease $tag is identical; concurrent run converged"
