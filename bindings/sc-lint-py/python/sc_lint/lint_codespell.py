@@ -26,7 +26,7 @@ def main(argv: list[str]) -> int:
     repo_root = discover_repo_root(args.root)
 
     for line in workspace_crate_section_lines(repo_root):
-        print(line)
+        write_console_output(sys.stdout, f"{line}\n")
 
     completed = subprocess.run(
         build_command(repo_root),

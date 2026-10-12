@@ -27,11 +27,25 @@ from sc_lint.lint_cargo_shear import parse_sections
 from sc_lint.lint_codespell import build_command as build_codespell_command
 from sc_lint.lint_common import WorkspaceCrate
 from sc_lint.lint_common import write_console_output
+from sc_lint.lint_common import workspace_crate_section_lines
 
 APP_CRATE = "fixture-app"
 CORE_CRATE = "fixture-lib"
 APP_PACKAGE = "synthetic-app"
 CORE_PACKAGE = "synthetic-lib"
+
+
+def create_non_ascii_workspace(repo_root: Path) -> None:
+    crate_dir = repo_root / "crates" / "λapp"
+    crate_dir.mkdir(parents=True)
+    (repo_root / "Cargo.toml").write_text(
+        '[workspace]\nmembers = ["crates/λapp"]\nresolver = "2"\n',
+        encoding="utf-8",
+    )
+    (crate_dir / "Cargo.toml").write_text(
+        '[package]\nname = "synthetic-app"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
 
 
 class RestrictiveEncodingStream(io.StringIO):
@@ -614,18 +628,49 @@ shear/unlinked_files
             stderr="failure: \u03bb\n",
         )
 
-        with (
-            patch("sc_lint.lint_codespell.discover_repo_root", return_value=Path(".")),
-            patch("sc_lint.lint_codespell.workspace_crate_section_lines", return_value=[]),
-            patch("sc_lint.lint_codespell.subprocess.run", return_value=completed),
-            patch("sc_lint.lint_codespell.sys.stdout", stdout),
-            patch("sc_lint.lint_codespell.sys.stderr", stderr),
-        ):
-            result = lint_codespell.main(["lint-codespell"])
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            create_non_ascii_workspace(repo_root)
+            section = "".join(
+                f"{line}\n" for line in workspace_crate_section_lines(repo_root)
+            )
+            with (
+                patch("sc_lint.lint_codespell.subprocess.run", return_value=completed),
+                patch("sc_lint.lint_codespell.sys.stdout", stdout),
+                patch("sc_lint.lint_codespell.sys.stderr", stderr),
+            ):
+                result = lint_codespell.main(
+                    ["lint-codespell", "--root", str(repo_root)]
+                )
 
         self.assertEqual(result, 7)
-        self.assertEqual(stdout.getvalue(), "output: ?\n")
+        self.assertEqual(
+            stdout.getvalue(),
+            section.encode("ascii", errors="replace").decode("ascii")
+            + "output: ?\n",
+        )
         self.assertEqual(stderr.getvalue(), "failure: ?\n")
+
+    def test_codespell_main_preserves_non_ascii_workspace_on_utf8_console(self) -> None:
+        stdout = io.StringIO()
+        completed = subprocess.CompletedProcess(
+            args=["codespell"], returncode=0, stdout="", stderr=""
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            create_non_ascii_workspace(repo_root)
+            with (
+                patch("sc_lint.lint_codespell.subprocess.run", return_value=completed),
+                patch("sc_lint.lint_codespell.sys.stdout", stdout),
+            ):
+                result = lint_codespell.main(
+                    ["lint-codespell", "--root", str(repo_root)]
+                )
+
+        self.assertEqual(result, 0)
+        self.assertIn("λapp", stdout.getvalue())
+        self.assertNotIn("?app", stdout.getvalue())
 
     def test_cargo_deny_main_forwards_restrictive_console_output_and_exit_code(self) -> None:
         stdout = RestrictiveEncodingStream()
@@ -639,11 +684,14 @@ shear/unlinked_files
 
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
+            create_non_ascii_workspace(repo_root)
             (repo_root / "deny.toml").write_text("[advisories]\n", encoding="utf-8")
+            section = "".join(
+                f"{line}\n" for line in workspace_crate_section_lines(repo_root)
+            )
             with (
                 patch("sc_lint.lint_cargo_deny.discover_repo_root", return_value=repo_root),
                 patch("sc_lint.lint_cargo_deny.shutil.which", return_value="cargo-deny"),
-                patch("sc_lint.lint_cargo_deny.workspace_crate_section_lines", return_value=["workspace crates:"]),
                 patch("sc_lint.lint_cargo_deny.detect_version", return_value=(0, 20)),
                 patch("sc_lint.lint_cargo_deny.subprocess.run", return_value=completed),
                 patch("sc_lint.lint_cargo_deny.sys.stdout", stdout),
@@ -652,7 +700,11 @@ shear/unlinked_files
                 result = lint_cargo_deny.main(["lint-cargo-deny", "--root", str(repo_root)])
 
         self.assertEqual(result, 5)
-        self.assertEqual(stdout.getvalue(), "workspace crates:\ndeny output: ?\n")
+        self.assertEqual(
+            stdout.getvalue(),
+            section.encode("ascii", errors="replace").decode("ascii")
+            + "deny output: ?\n",
+        )
         self.assertEqual(stderr.getvalue(), "deny failure: ?\n")
 
     def test_cargo_shear_main_safely_writes_policy_and_downgraded_lines(self) -> None:
