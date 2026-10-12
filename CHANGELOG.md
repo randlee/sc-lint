@@ -2,6 +2,19 @@
 
 All notable changes to sc-lint are documented here.
 
+## [0.7.3] — 2026-10-12
+
+Fixes found after publishing 0.7.2.
+
+### Fixed
+
+- A lone `sc-lint` now rejects a stale or foreign `sc-lint-*` backend found on
+  `PATH` with `BACKEND_EXEC_FAILURE` and the `sc-lint setup` remedy instead of
+  running it. The backends gain `--version` so the launcher can check them
+  (#407).
+- Text output reports `fail` when the verdict is failing, so the rendered
+  result matches the exit status and JSON output (#405).
+
 ## [0.7.2] — 2026-10-12
 
 Consumer installation and boundary fixes found while adopting 0.7.1.
@@ -20,6 +33,14 @@ Consumer installation and boundary fixes found while adopting 0.7.1.
   by Cargo package name, then by a unique workspace member directory, then by
   a unique library target name, so records and `forbidden_edges` that use the
   directory name are no longer silently skipped (#375).
+
+### Changed
+
+- An unresolved boundary package reference (an `owner_package`, dependent or
+  edge name that matches no Cargo workspace package, member directory or
+  library target) now fails with `CLI.CONFIG_ERROR` ("unknown workspace
+  package reference ..."). 0.7.1 skipped such entries silently. Consumers must
+  name a Cargo workspace package, member directory or library target (#375).
 
 ## [0.7.1] — 2026-10-12
 
