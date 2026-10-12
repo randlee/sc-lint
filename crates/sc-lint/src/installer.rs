@@ -483,6 +483,21 @@ fn payload_is_complete(entries: &[PayloadEntry]) -> bool {
     entries.iter().all(|entry| {
         if entry.source.is_dir() {
             docs_bundle_complete(&entry.source)
+        } else if let Some(backend) = entry
+            .source
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| {
+                MANAGED_BACKENDS.iter().find(|backend| {
+                    name == if cfg!(windows) {
+                        format!("{backend}.exe")
+                    } else {
+                        (*backend).to_string()
+                    }
+                })
+            })
+        {
+            backend_cli_healthy(&entry.source, backend)
         } else {
             entry.source.is_file()
         }
@@ -491,20 +506,38 @@ fn payload_is_complete(entries: &[PayloadEntry]) -> bool {
 
 fn managed_payload_complete(binary: &Path) -> bool {
     let parent = binary.parent().unwrap_or_else(|| Path::new("."));
-    let backends_present = MANAGED_BACKENDS.iter().all(|backend| {
+    let backends_healthy = MANAGED_BACKENDS.iter().all(|backend| {
         let name = if cfg!(windows) {
             format!("{backend}.exe")
         } else {
             (*backend).to_string()
         };
-        parent.join(name).is_file()
+        backend_cli_healthy(&parent.join(name), backend)
     });
     let prefix = parent.parent().unwrap_or(parent);
-    backends_present
+    backends_healthy
         && (docs_bundle_complete(&parent.join("docs-bundle"))
             || docs_bundle_complete(&parent.join(crate::consts::DOCS_BUNDLE_DIR))
             || docs_bundle_complete(&prefix.join("share/sc-lint/sc-lint-docs"))
             || docs_bundle_complete(&prefix.join("share/sc-lint/docs-bundle")))
+}
+
+/// Probe the supported CLI help contract rather than assuming backend binaries
+/// expose a version flag. This checks that the companion can execute and that
+/// it is the expected analyzer CLI with its documented `analyze` command.
+fn backend_cli_healthy(binary: &Path, expected_name: &str) -> bool {
+    let Ok(output) = Command::new(binary).arg("--help").output() else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+    let help = String::from_utf8_lossy(&output.stdout);
+    help.lines()
+        .any(|line| line.trim() == format!("Usage: {expected_name} <COMMAND>"))
+        && help
+            .lines()
+            .any(|line| line.trim_start().starts_with("analyze "))
 }
 
 fn release_binary_candidate(
@@ -1163,6 +1196,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn release_binary_candidate_accepts_nested_and_prefers_legacy_flat_layouts() {
         let fixture = TempDir::new().expect("fixture");
@@ -1189,7 +1223,7 @@ mod tests {
             flat
         );
         for backend in MANAGED_BACKENDS {
-            fs::write(fixture.path().join(backend), "legacy backend").expect("legacy backend");
+            write_backend_probe(&fixture.path().join(backend), backend);
         }
         let legacy_docs = fixture.path().join("docs-bundle");
         fs::create_dir_all(&legacy_docs).expect("legacy docs");
@@ -1247,7 +1281,7 @@ mod tests {
             &archive_root.join("bin").join(ReleaseTarget::binary_name()),
             "0.4.1",
         );
-        add_fake_release_companions(&archive_root, "0.4.1");
+        add_fake_release_companions(&archive_root);
         let archive = release_dir.join(&archive_name);
         let tar_status = Command::new("tar")
             .args(["-czf"])
@@ -1279,6 +1313,93 @@ mod tests {
         assert_eq!(
             probe_version(&target).expect("installed probe"),
             Version::parse("0.4.1").expect("version")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn checksum_valid_release_with_nonfunctional_backend_preserves_previous_bundle() {
+        let fixture = TempDir::new().expect("fixture");
+        let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
+        let release_version = ResolvedReleaseVersion::for_minimum(&minimum);
+        let target = ReleaseTarget::detect().expect("supported fixture host");
+        let archive_name = target.archive_name(&release_version);
+        let release_dir = fixture.path().join("release").join("v0.4.1");
+        let payload_dir = fixture.path().join("payload");
+        let prefix = format!("sc-lint_{release_version}_{}", target.triple);
+        let archive_root = payload_dir.join(&prefix);
+        let bin_dir = archive_root.join("bin");
+        fs::create_dir_all(&bin_dir).expect("payload bin");
+        fs::create_dir_all(&release_dir).expect("release directory");
+        write_probe(&bin_dir.join(ReleaseTarget::binary_name()), "0.4.1");
+        add_fake_release_companions(&archive_root);
+        write_failing_stub(&bin_dir.join(crate::consts::TOOL_RUNTIME));
+        let archive = release_dir.join(&archive_name);
+        let tar_status = Command::new("tar")
+            .args(["-czf"])
+            .arg(&archive)
+            .args(["-C"])
+            .arg(&payload_dir)
+            .arg(".")
+            .status()
+            .expect("tar starts");
+        assert!(
+            tar_status.success(),
+            "tar produced malformed fixture archive"
+        );
+        let digest = sha256(&archive).expect("archive checksum");
+        fs::write(
+            release_dir.join("checksums.txt"),
+            format!("{digest} {archive_name}\n"),
+        )
+        .expect("checksum manifest");
+
+        let install_dir = fixture.path().join("managed/bin");
+        let managed_binary = install_dir.join(ReleaseTarget::binary_name());
+        let managed_docs = fixture.path().join("managed/share/sc-lint/sc-lint-docs");
+        fs::create_dir_all(&install_dir).expect("managed bin");
+        fs::create_dir_all(&managed_docs).expect("managed docs");
+        write_probe(&managed_binary, "0.4.1");
+        let previous_launcher = fs::read(&managed_binary).expect("previous launcher");
+        for backend in MANAGED_BACKENDS {
+            write_backend_probe(&install_dir.join(backend), backend);
+        }
+        fs::write(managed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
+            .expect("managed docs manifest");
+        fs::write(managed_docs.join("README.md"), "previous complete bundle\n")
+            .expect("managed docs README");
+        let previous_backends = MANAGED_BACKENDS
+            .iter()
+            .map(|backend| fs::read(install_dir.join(backend)).expect("previous backend"))
+            .collect::<Vec<_>>();
+
+        let error = install_verified_release(
+            &release_version,
+            &minimum,
+            target,
+            &install_dir,
+            &managed_binary,
+            &format!("file://{}", archive.display()),
+            &format!("file://{}", release_dir.join("checksums.txt").display()),
+        )
+        .expect_err("nonfunctional backend is rejected");
+        assert_eq!(error.code(), "CLI.SC_LINT_RELEASE_UNAVAILABLE");
+        assert_eq!(
+            fs::read(&managed_binary).expect("previous launcher remains"),
+            previous_launcher
+        );
+        assert_eq!(
+            probe_version(&managed_binary).expect("previous launcher remains"),
+            Version::parse("0.4.1").expect("version")
+        );
+        for (backend, previous) in MANAGED_BACKENDS.iter().zip(previous_backends) {
+            let path = install_dir.join(backend);
+            assert_eq!(fs::read(&path).expect("previous backend remains"), previous);
+            assert!(backend_cli_healthy(&path, backend));
+        }
+        assert_eq!(
+            fs::read_to_string(managed_docs.join("README.md")).expect("previous docs remain"),
+            "previous complete bundle\n"
         );
     }
 
@@ -1324,9 +1445,13 @@ mod tests {
         write_probe(&install.join(ReleaseTarget::binary_name()), "0.4.1");
         write_probe(&staged_bin.join(ReleaseTarget::binary_name()), "0.3.0");
         for backend in MANAGED_BACKENDS {
-            fs::write(install.join(backend), format!("previous {backend}")).expect("old backend");
-            fs::write(staged_bin.join(backend), format!("candidate {backend}")).expect("backend");
+            write_backend_probe(&install.join(backend), backend);
+            write_backend_probe(&staged_bin.join(backend), backend);
         }
+        let previous_backends = MANAGED_BACKENDS
+            .iter()
+            .map(|backend| fs::read(install.join(backend)).expect("old backend"))
+            .collect::<Vec<_>>();
         fs::write(old_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("old manifest");
         fs::write(old_docs.join("README.md"), "old docs\n").expect("old README");
         fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("new manifest");
@@ -1354,11 +1479,12 @@ mod tests {
             probe_version(&managed_binary).expect("restored launcher"),
             Version::parse("0.4.1").unwrap()
         );
-        for backend in MANAGED_BACKENDS {
+        for (backend, previous) in MANAGED_BACKENDS.iter().zip(previous_backends) {
             assert_eq!(
-                fs::read_to_string(install.join(backend)).expect("old backend"),
-                format!("previous {backend}")
+                fs::read(install.join(backend)).expect("old backend restored"),
+                previous
             );
+            assert!(backend_cli_healthy(&install.join(backend), backend));
         }
         assert_eq!(
             fs::read_to_string(old_docs.join("README.md")).expect("old docs"),
@@ -1366,6 +1492,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn release_payload_validation_rejects_missing_backend_and_corrupt_docs() {
         let fixture = TempDir::new().expect("fixture");
@@ -1379,7 +1506,7 @@ mod tests {
         fs::create_dir_all(&bin).expect("archive bin");
         fs::write(bin.join(ReleaseTarget::binary_name()), "launcher").expect("launcher");
         for backend in MANAGED_BACKENDS {
-            fs::write(bin.join(backend), "backend").expect("backend");
+            write_backend_probe(&bin.join(backend), backend);
         }
         fs::remove_file(bin.join(crate::consts::TOOL_RUNTIME)).expect("omit runtime");
         let docs = archive_root.join("share/sc-lint/sc-lint-docs");
@@ -1391,7 +1518,10 @@ mod tests {
             !payload_is_complete(&entries),
             "missing backend is rejected"
         );
-        fs::write(bin.join(crate::consts::TOOL_RUNTIME), "backend").expect("restore runtime");
+        write_backend_probe(
+            &bin.join(crate::consts::TOOL_RUNTIME),
+            crate::consts::TOOL_RUNTIME,
+        );
         assert!(
             !payload_is_complete(&entries),
             "docs without overview are rejected"
@@ -1492,7 +1622,7 @@ mod tests {
         // Keep the test process from holding a write fd for the executable it probes.
         fs::hard_link(&built_binary, &managed_binary).expect("hard link native CLI probe");
         for backend in MANAGED_BACKENDS {
-            fs::write(install_dir.join(backend), "managed backend fixture").expect("backend");
+            write_backend_probe(&install_dir.join(backend), backend);
         }
         let docs = install_fixture.path().join("share/sc-lint/sc-lint-docs");
         fs::create_dir_all(&docs).expect("managed docs");
@@ -1558,12 +1688,17 @@ mod tests {
 
         // A matching launcher version does not make an incomplete managed
         // bundle current. setup repairs missing required release payloads.
-        fs::remove_file(install_dir.join(crate::consts::TOOL_RUNTIME)).expect("remove runtime");
+        fs::write(install_dir.join(crate::consts::TOOL_RUNTIME), "")
+            .expect("truncate runtime companion");
         fs::remove_file(install_dir.join("../share/sc-lint/sc-lint-docs/README.md"))
             .expect("remove docs overview");
         let repaired = execute_install_command(&config_path, &["setup"]);
         assert_eq!(repaired["status"], "upgraded");
         assert!(install_dir.join(crate::consts::TOOL_RUNTIME).is_file());
+        assert!(backend_cli_healthy(
+            &install_dir.join(crate::consts::TOOL_RUNTIME),
+            crate::consts::TOOL_RUNTIME,
+        ));
         assert!(
             install_dir
                 .join("../share/sc-lint/sc-lint-docs/README.md")
@@ -1850,7 +1985,7 @@ mod tests {
             &archive_root.join("bin").join(ReleaseTarget::binary_name()),
             version,
         );
-        add_fake_release_companions(&archive_root, version);
+        add_fake_release_companions(&archive_root);
         let archive = release_dir.join(&archive_name);
         let tar_status = Command::new("tar")
             .args(["-czf"])
@@ -1871,12 +2006,12 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn add_fake_release_companions(root: &Path, version: &str) {
+    fn add_fake_release_companions(root: &Path) {
         let bin_dir = root.join("bin");
         let docs = root.join("share/sc-lint/sc-lint-docs");
         fs::create_dir_all(&bin_dir).expect("release bin");
         for backend in MANAGED_BACKENDS {
-            write_probe(&bin_dir.join(backend), version);
+            write_backend_probe(&bin_dir.join(backend), backend);
         }
         fs::create_dir_all(&docs).expect("release docs");
         fs::write(docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("docs manifest");
@@ -1926,5 +2061,34 @@ mod tests {
             .write_all(script.as_bytes())
             .expect("script text");
         assert!(child.wait().expect("probe writer waits").success());
+    }
+
+    fn write_backend_probe(path: &Path, name: &str) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            fs::write(
+            path,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  printf '%s\\n' 'Usage: {name} <COMMAND>' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
+            ),
+        )
+        .expect("backend probe");
+            let mut permissions = fs::metadata(path).expect("probe metadata").permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(path, permissions).expect("make backend probe executable");
+        }
+        #[cfg(not(unix))]
+        {
+            let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+            let executable = if cfg!(windows) {
+                format!("{name}.exe")
+            } else {
+                name.to_string()
+            };
+            fs::copy(workspace_root.join("target/debug").join(executable), path)
+                .expect("copy built backend executable");
+        }
     }
 }
