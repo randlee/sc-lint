@@ -21,7 +21,7 @@ from lib.sc_compose_dependency import (  # noqa: E402
     MIN_SC_COMPOSE_BINDING_TEXT,
     MIN_SC_COMPOSE_TEXT,
     SC_COMPOSE_BINDING_INSTALL,
-    is_supported_version,
+    SC_COMPOSE_WHEEL_PIN,
     parse_version as _version,
 )
 
@@ -74,15 +74,14 @@ def _entry(name: str, required: str, *, minimum: tuple[int, int, int] | None = N
     parsed = _version(version_text)
     if version_text is None:
         return {"name": name, "required": required, "path": str(path), "ok": False, "error": detail or "--version failed"}
-    if minimum is not None and not is_supported_version(parsed):
-        return {"name": name, "required": required, "path": str(path), "version": version_text, "ok": False, "error": f"requires {required}"}
+    if minimum is not None and (parsed is None or parsed < minimum):
+        return {"name": name, "required": required, "path": str(path), "version": version_text, "ok": False, "error": f"requires >= {'.'.join(map(str, minimum))}"}
     return {"name": name, "required": required, "path": str(path), "version": version_text, "ok": True}
 
 
 def _python_binding_entry() -> dict[str, Any]:
     try:
         import sc_compose  # noqa: F401
-        installed = _version(importlib.metadata.version("sc-compose"))
         version_text = importlib.metadata.version("sc-compose")
     except (ImportError, importlib.metadata.PackageNotFoundError):
         return {
@@ -95,7 +94,7 @@ def _python_binding_entry() -> dict[str, Any]:
                 + SC_COMPOSE_BINDING_INSTALL
             ),
         }
-    if not is_supported_version(installed):
+    if version_text != SC_COMPOSE_WHEEL_PIN:
         return {
             "name": "sc_compose",
             "required": f"Python binding {MIN_SC_COMPOSE_BINDING_TEXT}",
@@ -118,23 +117,7 @@ def run() -> dict[str, Any]:
         checks.append({"name": "rdflib", "required": "importable by this Python", "path": sys.executable, "version": getattr(rdflib, "__version__", "unknown"), "ok": True})
     except ImportError as exc:
         checks.append({"name": "rdflib", "required": "importable by this Python", "path": sys.executable, "ok": False, "error": str(exc)})
-    binding = _python_binding_entry()
-    checks.append(binding)
-    cli = checks[0]
-    cli_version = _version(cli.get("version") if cli["ok"] else None)
-    binding_version = _version(binding.get("version") if binding["ok"] else None)
-    if cli_version is not None and binding_version is not None and cli_version != binding_version:
-        checks.append(
-            {
-                "name": "sc-compose version alignment",
-                "required": "matching CLI and Python binding versions",
-                "ok": False,
-                "error": (
-                    "sc-compose CLI and Python binding versions must match; "
-                    f"found CLI {'.'.join(map(str, cli_version))} and binding {'.'.join(map(str, binding_version))}"
-                ),
-            }
-        )
+    checks.append(_python_binding_entry())
     failures = [item for item in checks if not item["ok"]]
     return {
         "success": not failures,
