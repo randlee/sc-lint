@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -365,6 +366,71 @@ shear/summary
             + stdout.encode("ascii", errors="replace").decode("ascii"),
         )
         self.assertEqual(restrictive_stderr.getvalue(), "cargo-shear warning: ?\n")
+
+    def run_unused_dependency_main_from_foreign_cwd(self, allowlist: str) -> tuple[int, str]:
+        """Run main() with --root from another cwd against a real workspace.
+
+        workspace_crates returns repo-relative manifest paths, so this covers
+        the path the mocked-absolute tests above do not.
+        """
+        stdout = f"""\
+shear/unused_dependency
+
+  × unused dependency `serde`
+    ╭─[crates/{APP_CRATE}/Cargo.toml:9:1]
+  help: remove this dependency
+
+shear/summary
+
+  × 1 error
+"""
+        completed = mock.Mock(returncode=1, stdout=stdout, stderr="")
+        with tempfile.TemporaryDirectory() as repo_dir, tempfile.TemporaryDirectory() as foreign_cwd:
+            repo_root = Path(repo_dir)
+            (repo_root / "Cargo.toml").write_text(
+                '[workspace]\nmembers = ["crates/*"]\n', encoding="utf-8"
+            )
+            crate_dir = repo_root / "crates" / APP_CRATE
+            crate_dir.mkdir(parents=True)
+            (crate_dir / "Cargo.toml").write_text(
+                f'[package]\nname = "{APP_PACKAGE}"\nversion = "0.1.0"\n\n[dependencies]\nserde = "1"\n',
+                encoding="utf-8",
+            )
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text(allowlist, encoding="utf-8")
+            with (
+                patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
+                patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=completed),
+                patch("sys.stdout", new_callable=io.StringIO) as stdout_mock,
+                patch("sys.stderr", new_callable=io.StringIO),
+            ):
+                previous_cwd = os.getcwd()
+                os.chdir(foreign_cwd)
+                try:
+                    result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
+                finally:
+                    os.chdir(previous_cwd)
+        return result, stdout_mock.getvalue()
+
+    def test_main_from_foreign_cwd_downgrades_allowlisted_unused_dependency(self) -> None:
+        result, output = self.run_unused_dependency_main_from_foreign_cwd(
+            f'[cargo_shear.allowed_unused_dependencies]\n"{APP_PACKAGE}.serde" = "used by generated code"\n'
+        )
+
+        self.assertEqual(result, 0)
+        self.assertIn(
+            f"unused_dependency: downgraded {APP_PACKAGE}.serde (used by generated code)",
+            output,
+        )
+
+    def test_main_from_foreign_cwd_rejects_unlisted_unused_dependency(self) -> None:
+        result, output = self.run_unused_dependency_main_from_foreign_cwd("")
+
+        self.assertEqual(result, 1)
+        self.assertIn(
+            f"shear policy error: {APP_PACKAGE}.serde [unused_dependency] unused dependency must be fixed",
+            output,
+        )
 
     @mock.patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[])
     @mock.patch("sc_lint.lint_cargo_shear.subprocess.run")

@@ -98,9 +98,11 @@ def package_to_crate_dir(repo_root: Path) -> dict[str, str]:
 
 
 def manifest_to_package_name(repo_root: Path) -> dict[str, str]:
+    # workspace_crates returns repo-relative manifest paths; resolve them
+    # against repo_root, not the process cwd, so --root works from anywhere.
     resolved_root = repo_root.resolve()
     return {
-        Path(crate.manifest_path).resolve().relative_to(resolved_root).as_posix(): crate.package_name
+        (repo_root / crate.manifest_path).resolve().relative_to(resolved_root).as_posix(): crate.package_name
         for crate in workspace_crates(repo_root)
     }
 
