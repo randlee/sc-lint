@@ -1,6 +1,6 @@
 ---
 name: code-review-questions
-version: 0.3.0
+version: 0.4.0
 description: The development-gate (sprint review) Jev question set, the evidence question, what delivered-work text to feed it, and pairing with deterministic checks.
 ---
 
@@ -10,7 +10,7 @@ The wording of record is `assets/questions/dev.json`. The quality manager runs t
 
 ## What is being judged
 
-Jev judges an account of what was built, assembled by the agent in this priority order and truncated at 24,000 characters from the bottom:
+Jev judges an account of what was built, assembled by the agent in this priority order. The complete serialized development request is capped at 64,000 bytes; when necessary the script truncates the account from the bottom:
 
 1. The sprint report or completion summary, if one exists.
 2. The PR description (title and body).
