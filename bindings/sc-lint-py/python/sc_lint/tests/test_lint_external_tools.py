@@ -150,6 +150,34 @@ shear/empty_files
             ("src/model_registry.rs", "src/schema/settings.rs"),
         )
 
+    def test_parse_sections_extracts_crate_root_files_and_flags_unrecognized_lines(self) -> None:
+        stdout = """\
+shear/unlinked_files
+
+  ⚠ 2 unlinked files in `synthetic-app`
+  │ src/orphan.rs
+  │ stray.rs
+
+shear/empty_files
+
+  ⚠ 2 empty files in `synthetic-app`
+  │ empty.rs
+  │ src/extra.rs
+"""
+        sections = parse_sections(stdout)
+
+        self.assertEqual(
+            [section.file_paths for section in sections],
+            [("src/orphan.rs", "stray.rs"), ("empty.rs", "src/extra.rs")],
+        )
+        self.assertFalse(any(section.has_unrecognized_file_lines for section in sections))
+
+        section_with_description = parse_sections(
+            "shear/unlinked_files\n│ src/orphan.rs\n│ review this output manually\n"
+        )[0]
+        self.assertEqual(section_with_description.file_paths, ("src/orphan.rs",))
+        self.assertTrue(section_with_description.has_unrecognized_file_lines)
+
     def test_evaluate_policy_promotes_unapproved_warning_files_to_errors(self) -> None:
         stdout = f"""\
 shear/unlinked_files
@@ -501,6 +529,90 @@ shear/summary
         self.assertEqual(result, 1)
         self.assertIn("shear policy error: src/orphan.rs [unlinked_files]", output)
         self.assertIn(f"unused_dependency: downgraded {APP_PACKAGE}.serde (used by generated code)", output)
+
+    def test_main_evaluates_root_and_nested_files_in_both_error_sections(self) -> None:
+        for section_name in ("unlinked_files", "empty_files"):
+            with self.subTest(section_name=section_name):
+                stdout = f"""\
+shear/unused_dependency
+
+  × unused dependency `serde`
+    ╭─[crates/{APP_CRATE}/Cargo.toml:9:1]
+
+shear/{section_name}
+
+  ⚠ 2 files in `{APP_PACKAGE}`
+  │ src/orphan.rs
+  │ stray.rs
+
+shear/summary
+
+  × 1 error
+"""
+                allowlisted_nested_only = (
+                    self.MIXED_DEPENDENCY_ALLOWLIST
+                    + f'\n[cargo_shear.allowed_{section_name}]\n'
+                    + '"src/orphan.rs" = "reviewed nested file"\n'
+                )
+                result, output = self.run_unused_dependency_main_from_foreign_cwd(
+                    allowlisted_nested_only, stdout
+                )
+
+                self.assertEqual(result, 1)
+                self.assertIn(f"shear policy error: stray.rs [{section_name}]", output)
+                self.assertNotIn(f"{section_name}: downgraded stray.rs", output)
+
+                fully_allowlisted = (
+                    allowlisted_nested_only
+                    + '"stray.rs" = "reviewed root file"\n'
+                )
+                result, output = self.run_unused_dependency_main_from_foreign_cwd(
+                    fully_allowlisted, stdout
+                )
+
+                self.assertEqual(result, 0)
+                self.assertIn(
+                    f"{section_name}: downgraded src/orphan.rs (reviewed nested file)",
+                    output,
+                )
+                self.assertIn(
+                    f"{section_name}: downgraded stray.rs (reviewed root file)",
+                    output,
+                )
+
+    def test_main_does_not_treat_descriptive_file_lines_as_reviewed(self) -> None:
+        for section_name in ("unlinked_files", "empty_files"):
+            with self.subTest(section_name=section_name):
+                stdout = f"""\
+shear/unused_dependency
+
+  × unused dependency `serde`
+    ╭─[crates/{APP_CRATE}/Cargo.toml:9:1]
+
+shear/{section_name}
+
+  ⚠ file report for `{APP_PACKAGE}`
+  │ src/orphan.rs
+  │ review this output manually
+
+shear/summary
+
+  × 1 error
+"""
+                allowlisted_file = (
+                    self.MIXED_DEPENDENCY_ALLOWLIST
+                    + f'\n[cargo_shear.allowed_{section_name}]\n'
+                    + '"src/orphan.rs" = "reviewed nested file"\n'
+                )
+                result, output = self.run_unused_dependency_main_from_foreign_cwd(
+                    allowlisted_file, stdout
+                )
+
+                self.assertEqual(result, 1)
+                self.assertNotIn(
+                    f"{section_name}: downgraded src/orphan.rs", output
+                )
+                self.assertIn(f"shear/{section_name}", output)
 
     def test_main_rejects_unparsed_error_sections_beside_allowlisted_dependencies(self) -> None:
         for section_name in ("unlinked_files", "empty_files"):

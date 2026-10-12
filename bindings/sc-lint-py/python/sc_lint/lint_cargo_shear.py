@@ -26,6 +26,7 @@ class ShearSection:
     header: str
     body_lines: tuple[str, ...]
     file_paths: tuple[str, ...]
+    has_unrecognized_file_lines: bool = False
 
 
 @dataclass(frozen=True)
@@ -48,12 +49,14 @@ def parse_sections(stdout: str) -> list[ShearSection]:
     for line in stdout.splitlines():
         if line.startswith("shear/"):
             if current_name is not None:
+                file_paths, has_unrecognized_file_lines = parse_file_paths(current_body)
                 sections.append(
                     ShearSection(
                         name=current_name,
                         header=current_header,
                         body_lines=tuple(current_body),
-                        file_paths=tuple(extract_file_paths(current_body)),
+                        file_paths=tuple(file_paths),
+                        has_unrecognized_file_lines=has_unrecognized_file_lines,
                     )
                 )
             current_name = line.split("/", 1)[1].strip()
@@ -64,19 +67,24 @@ def parse_sections(stdout: str) -> list[ShearSection]:
             current_body.append(line)
 
     if current_name is not None:
+        file_paths, has_unrecognized_file_lines = parse_file_paths(current_body)
         sections.append(
             ShearSection(
                 name=current_name,
                 header=current_header,
                 body_lines=tuple(current_body),
-                file_paths=tuple(extract_file_paths(current_body)),
+                file_paths=tuple(file_paths),
+                has_unrecognized_file_lines=has_unrecognized_file_lines,
             )
         )
     return sections
 
 
-def extract_file_paths(body_lines: list[str] | tuple[str, ...]) -> list[str]:
+def parse_file_paths(
+    body_lines: list[str] | tuple[str, ...],
+) -> tuple[list[str], bool]:
     paths: list[str] = []
+    has_unrecognized_file_lines = False
     for line in body_lines:
         stripped = line.strip()
         if not stripped.startswith("│ "):
@@ -84,9 +92,17 @@ def extract_file_paths(body_lines: list[str] | tuple[str, ...]) -> list[str]:
         candidate = stripped[2:].strip()
         if not candidate:
             continue
-        if "/" not in candidate and "\\" not in candidate:
+        is_path = "/" in candidate or "\\" in candidate
+        is_crate_root_rust_file = Path(candidate).name == candidate and candidate.endswith(".rs")
+        if not is_path and not is_crate_root_rust_file:
+            has_unrecognized_file_lines = True
             continue
         paths.append(candidate.replace("\\", "/"))
+    return paths, has_unrecognized_file_lines
+
+
+def extract_file_paths(body_lines: list[str] | tuple[str, ...]) -> list[str]:
+    paths, _ = parse_file_paths(body_lines)
     return paths
 
 
@@ -216,7 +232,7 @@ def evaluate_unused_dependency_policy(
         if section.name == SUMMARY_SECTION:
             continue
         if section.name in ERROR_SECTIONS:
-            if not section.file_paths:
+            if not section.file_paths or section.has_unrecognized_file_lines:
                 return findings, downgraded, False
             continue
         if section.name != UNUSED_DEPENDENCY_SECTION:
