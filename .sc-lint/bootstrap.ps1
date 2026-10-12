@@ -27,6 +27,7 @@ if ($selector.Count -gt 1 -or ($Operation -notin @("lint", "test") -and $selecto
 $installDirectory = if ($env:SC_LINT_INSTALL_DIR) { $env:SC_LINT_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "sc-lint\\bin" }
 $managedBinary = Join-Path $installDirectory "sc-lint.exe"
 $productBinary = $null
+$productBinaryOverride = $false
 
 # Python helper package (sc_lint wheel) provisioned next to the config file.
 $venvDirectory = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $Config).Path) ".sc-lint\venv"
@@ -94,9 +95,13 @@ function Install-Venv {
 }
 
 function Resolve-ProductBinary {
+    $script:productBinaryOverride = $false
     if ($env:SC_LINT_BIN) {
         $resolved = Get-Command $env:SC_LINT_BIN -ErrorAction SilentlyContinue
-        if ($resolved) { return $resolved.Source }
+        if ($resolved) {
+            $script:productBinaryOverride = $true
+            return $resolved.Source
+        }
     }
     if (Test-Path -Path $managedBinary -PathType Leaf) { return $managedBinary }
     $resolved = Get-Command "sc-lint" -ErrorAction SilentlyContinue
@@ -173,9 +178,11 @@ function Ensure-Product {
                 Invoke-VerifiedReleaseLauncher "setup" $remaining
             }
             $script:productBinary = $managedBinary
-        } else {
-            & $script:productBinary --config $Config setup
+        } elseif ($script:productBinaryOverride -or $remaining -contains "--check" -or $remaining -contains "--dry-run") {
+            & $script:productBinary --config $Config setup @remaining
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        } else {
+            Invoke-VerifiedReleaseLauncher "setup" $remaining
             $script:productBinary = $managedBinary
         }
     }
@@ -214,6 +221,9 @@ switch ($Operation) {
         & $productBinary --config $Config compatibility check --binary $productBinary
         if ($LASTEXITCODE -ne 0 -and (Test-ManagedBinary $productBinary) -and $remaining -notcontains "--check" -and $remaining -notcontains "--dry-run") {
             Invoke-VerifiedReleaseLauncher "upgrade" $remaining
+        } elseif ($LASTEXITCODE -ne 0 -and -not $productBinaryOverride -and $remaining -notcontains "--check" -and $remaining -notcontains "--dry-run") {
+            Invoke-VerifiedReleaseLauncher "upgrade" $remaining
+            exit $LASTEXITCODE
         } else {
             & $productBinary --config $Config upgrade @remaining
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
