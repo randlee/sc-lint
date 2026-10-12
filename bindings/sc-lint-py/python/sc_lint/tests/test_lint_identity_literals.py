@@ -42,6 +42,66 @@ forbidden_literals = ["{TEAM_LEAD_IDENTITY}"]
             self.assertTrue(any("tests.rs" in item for item in rendered))
             self.assertTrue(any("lib.rs" in item for item in rendered))
 
+    def test_identity_literal_lint_detects_literal_concat_without_false_positives(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = seed_workspace(Path(tempdir))
+            split_at = len(TEAM_LEAD_IDENTITY) // 2
+            prefix, suffix = TEAM_LEAD_IDENTITY[:split_at], TEAM_LEAD_IDENTITY[split_at:]
+            (repo_root / ".just/lint-config.toml").write_text(
+                f'''[identities]
+forbidden_literals = ["{TEAM_LEAD_IDENTITY}"]
+
+[identities.production_canonical_literals]
+"{TEAM_LEAD_IDENTITY}" = ["crates/demo/src/constants.rs"]
+''',
+                encoding="utf-8",
+            )
+            (repo_root / "crates/demo/src/lib.rs").write_text(
+                f'''pub const SINGLE: &str = concat!("{prefix}", "{suffix}");
+pub const MULTI: &str = concat!(
+    "{prefix}",
+    /* comments between literal arguments are allowed */ "{suffix}",
+);
+pub const NONLITERAL: &str = concat!("{prefix}", IDENTITY_SUFFIX, "{suffix}");
+pub const ORDINARY: &str = "concat!(\\"{prefix}\\", \\"{suffix}\\")";
+// concat!("{prefix}", "{suffix}")
+/* concat!("{prefix}", "{suffix}") */
+''',
+                encoding="utf-8",
+            )
+            (repo_root / "crates/demo/src/constants.rs").write_text(
+                f'pub const OWNER: &str = concat!("{prefix}", "{suffix}");\n',
+                encoding="utf-8",
+            )
+            (repo_root / "crates/demo/tests/tests.rs").write_text(
+                f'''#[test]
+fn uses_split_identity() {{
+    let owner = concat!("{prefix}", "{suffix}");
+    // lint-identity-literals: allow-next-line
+    let allowed = concat!("{prefix}", "{suffix}");
+    let dynamic = concat!("{prefix}", IDENTITY_SUFFIX, "{suffix}");
+    let ordinary = "concat!(\\"{prefix}\\", \\"{suffix}\\")";
+    // concat!("{prefix}", "{suffix}")
+}}
+''',
+                encoding="utf-8",
+            )
+
+            violations = collect_identity_violations(
+                repo_root,
+                forbidden_literals=(TEAM_LEAD_IDENTITY,),
+                production_canonical_literals={TEAM_LEAD_IDENTITY: ("crates/demo/src/constants.rs",)},
+            )
+
+            self.assertEqual(
+                [(item.path, item.line_number, item.kind) for item in violations],
+                [
+                    ("crates/demo/src/lib.rs", 1, "production_scope_canonical_literal"),
+                    ("crates/demo/src/lib.rs", 2, "production_scope_canonical_literal"),
+                    ("crates/demo/tests/tests.rs", 3, "test_scope_forbidden_literal"),
+                ],
+            )
+
     def test_identity_literal_defaults_do_not_leak_consumer_policy(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = seed_workspace(Path(tempdir))
