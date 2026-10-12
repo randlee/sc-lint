@@ -294,13 +294,13 @@ def main(argv: list[str]) -> int:
         )
         if only_unused_dependencies:
             for line in render_policy_findings(unused_findings):
-                print(line)
+                write_console_output(sys.stdout, f"{line}\n")
             for line in unused_downgraded:
-                print(line)
+                write_console_output(sys.stdout, f"{line}\n")
             if stdout:
-                print(stdout, end="")
+                write_console_output(sys.stdout, stdout)
             if completed.stderr:
-                print(completed.stderr, end="", file=sys.stderr)
+                write_console_output(sys.stderr, completed.stderr)
             return 1 if unused_findings else 0
 
     if completed.returncode != 0:
