@@ -1,6 +1,6 @@
 ---
 name: installation-and-troubleshooting
-version: 0.4.1
+version: 0.4.2
 description: Installing and locating the CLIs and credentials plan-anchoring depends on (python3, beads, sc-compose, TypeSafe API key), minimum versions, PATH issues in Claude Code, Codex environment policy, validation, and known issues.
 ---
 
@@ -92,10 +92,11 @@ python3 "$S" validate --anchors "$X/anchors.example.json"
 python3 "$S" judge --anchors "$X/anchors.example.json" --gate plan --all --item-id smoke --item-file "<skill dir>/SKILL.md" \
   --answers-file "$X/answers.fixture.json" --out /tmp/anchor-smoke.json; echo "exit $?"
 python3 "$S" report --run /tmp/anchor-smoke.json --format md
-python3 -m unittest discover -s "<skill dir>/tests"
+# Maintainer source checkout only; the marketplace plugin excludes this suite.
+python3 -m unittest discover -s "<repository root>/tests/sc-plan-anchor"
 ```
 
-The smoke `judge` runs the full gating path offline: expect `not_addressed` for ANC-012, `not_applicable` for REQ-014, and **exit 1**, because the gate fails by design. The test suite reports `OK`.
+The smoke `judge` runs the full gating path offline: expect `not_addressed` for ANC-012, `not_applicable` for REQ-014, and **exit 1**, because the gate fails by design. In a maintainer source checkout, the repository-level test suite reports `OK`; it is not included in marketplace installations.
 
 ## Known issues
 

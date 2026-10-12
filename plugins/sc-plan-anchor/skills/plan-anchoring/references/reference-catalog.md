@@ -1,5 +1,5 @@
 ---
-version: 0.4.4
+version: 0.4.5
 ---
 
 # Reference catalog
@@ -33,4 +33,4 @@ version: 0.4.4
 - `references/agent-runner-contract.md` - one trusted agent resolution, strict fenced envelopes, and redacted attestation
 - `assets/questions/plan.json`, `assets/questions/dev.json`, `assets/questions/testability.json`, `assets/questions/dedupe.json` - the question wording of record
 - `assets/templates/intent.md`, `assets/templates/anchor-questions-bead.md`, `assets/examples/` - starting points and a worked example
-- `tests/test_jev_judge.py` - offline test suite; `python3 -m unittest discover -s <skill dir>/tests`
+- `<repository root>/tests/sc-plan-anchor/` - maintainer-only offline test suite; intentionally excluded from the redistributed plugin

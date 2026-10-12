@@ -1,0 +1,20 @@
+{
+  "name": "sc-lint-marketplace",
+  "interface": {
+    "displayName": "sc-lint"
+  },
+  "plugins": [
+    {
+      "name": "sc-plan-anchor",
+      "source": {
+        "source": "local",
+        "path": "./plugins/sc-plan-anchor"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

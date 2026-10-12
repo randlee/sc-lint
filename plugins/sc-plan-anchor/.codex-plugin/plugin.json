@@ -1,0 +1,37 @@
+{
+  "name": "sc-plan-anchor",
+  "version": "0.4.0",
+  "description": "Keep plans and delivered work aligned with user-approved anchors using Jev-backed gates.",
+  "author": {
+    "name": "randlee",
+    "url": "https://github.com/randlee"
+  },
+  "homepage": "https://github.com/randlee/plan-anchor",
+  "repository": "https://github.com/randlee/plan-anchor",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "requirements",
+    "jev",
+    "beads",
+    "code-review"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Plan Anchor",
+    "shortDescription": "Keep plans tied to approved intent.",
+    "longDescription": "Capture user-approved planning anchors, independently tune Jev questions, and enforce the anchors at planning and delivery gates.",
+    "developerName": "randlee",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "websiteURL": "https://github.com/randlee/plan-anchor",
+    "defaultPrompt": [
+      "Anchor this planning constraint.",
+      "Run the planning gate on these beads.",
+      "Review this sprint against its anchors."
+    ],
+    "brandColor": "#4F7CAC"
+  }
+}

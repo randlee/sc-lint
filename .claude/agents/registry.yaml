@@ -53,15 +53,6 @@ agents:
   parallax:
     version: 0.11.9  # atm-bd-orchestration package
     path: .claude/agents/parallax.md
-  anchor-plan-review:
-    version: 0.4.0
-    path: .claude/agents/anchor-plan-review.md
-  anchor-sprint-review:
-    version: 0.4.0
-    path: .claude/agents/anchor-sprint-review.md
-  anchor-tuning:
-    version: 0.4.2
-    path: .claude/agents/anchor-tuning.md
 
 skills:
   codex-orchestration:
@@ -119,13 +110,6 @@ skills:
       rust-code-reviewer: 0.x
       rust-code-explorer: 0.x
       rust-qa-agent: 0.x
-  plan-anchoring:
-    version: 0.4.4
-    path: .claude/skills/plan-anchoring/SKILL.md
-    depends_on:
-      anchor-plan-review: "0.x"
-      anchor-sprint-review: "0.x"
-      anchor-tuning: "0.x"
 # atm-bd-orchestration configuration (read by its install.py; no defaults)
 roles:
   lead: team-lead

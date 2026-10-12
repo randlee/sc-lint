@@ -1,0 +1,27 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "sc-plan-anchor",
+  "displayName": "Plan Anchor",
+  "version": "0.4.0",
+  "description": "Keep plans and delivered work aligned with user-approved anchors using Jev-backed gates.",
+  "author": {
+    "name": "randlee",
+    "url": "https://github.com/randlee"
+  },
+  "homepage": "https://github.com/randlee/plan-anchor",
+  "repository": "https://github.com/randlee/plan-anchor",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "requirements",
+    "jev",
+    "beads",
+    "code-review"
+  ],
+  "skills": "./skills/",
+  "agents": [
+    "./.claude/agents/anchor-plan-review.md",
+    "./.claude/agents/anchor-sprint-review.md",
+    "./.claude/agents/anchor-tuning.md"
+  ]
+}
