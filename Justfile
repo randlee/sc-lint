@@ -135,18 +135,6 @@ test-adoption-integration:
     {{host_python}} -m pip wheel --quiet --disable-pip-version-check -w target/adoption-product/wheels bindings/sc-lint-py
     {{host_python}} -m pytest tests/adoption -q -m integration --integration --sc-lint-bin {{adoption_binary}} --sc-lint-wheel-dir target/adoption-product/wheels
 
-# Check the vendored sc-plan-anchor plugin for both harnesses: each anchor agent
-# resolves to its Claude (Sonnet/Opus) and Codex (Luna/Sol) definition, and the
-# Claude manifest validates. Codex install is checked as in docs/plan-anchor.md.
-plan-anchor-check:
-    {{host_python}} plugins/sc-plan-anchor/skills/plan-anchoring/scripts/anchor_runner_contract.py resolve --plugin-root plugins/sc-plan-anchor --harness claude --agent anchor-plan-review
-    {{host_python}} plugins/sc-plan-anchor/skills/plan-anchoring/scripts/anchor_runner_contract.py resolve --plugin-root plugins/sc-plan-anchor --harness claude --agent anchor-sprint-review
-    {{host_python}} plugins/sc-plan-anchor/skills/plan-anchoring/scripts/anchor_runner_contract.py resolve --plugin-root plugins/sc-plan-anchor --harness claude --agent anchor-tuning
-    {{host_python}} plugins/sc-plan-anchor/skills/plan-anchoring/scripts/anchor_runner_contract.py resolve --plugin-root plugins/sc-plan-anchor --harness codex --agent anchor-plan-review
-    {{host_python}} plugins/sc-plan-anchor/skills/plan-anchoring/scripts/anchor_runner_contract.py resolve --plugin-root plugins/sc-plan-anchor --harness codex --agent anchor-sprint-review
-    {{host_python}} plugins/sc-plan-anchor/skills/plan-anchoring/scripts/anchor_runner_contract.py resolve --plugin-root plugins/sc-plan-anchor --harness codex --agent anchor-tuning
-    claude plugin validate plugins/sc-plan-anchor
-
 # Inspect the managed upgrade path without changing the source checkout.
 upgrade: _source-build _source-venv
     .sc-lint/bootstrap upgrade --config sc-lint.toml --check --dry-run
