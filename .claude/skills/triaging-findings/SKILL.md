@@ -34,8 +34,8 @@ record:
 python3 .claude/skills/triaging-findings/scripts/check_dependencies.py
 ```
 
-The preflight requires the released v1.6.1 `sc-compose` CLI prebuilt release binary and
-the Python `sc_compose` binding at `>= 1.6.1`, plus `oxigraph`, `rg`, and Python `rdflib`. It checks PATH plus
+The preflight requires a released `sc-compose` CLI and Python `sc_compose`
+renderer wheel at `>= 1.6.1`, plus `oxigraph`, `rg`, and Python `rdflib`. It checks PATH plus
 common Homebrew/Cargo/user-install locations and returns a structured result.
 A non-zero result is a hard stop; read
 `references/installation-and-troubleshooting.md`, fix the environment, and
@@ -54,7 +54,7 @@ Before using this workflow:
 2. The target phase has an explicit `phase_id` such as `phase-R`.
 3. The ordered worktree list is known in promotion order.
 4. QA findings exist in a structured form with stable finding ids.
-5. The Step 1 preflight passes: the pinned `sc-compose` CLI and `sc_compose >= 1.6.1` Python binding,
+5. The Step 1 preflight passes: `sc-compose` and the `sc_compose` renderer wheel are `>= 1.6.1`,
    `oxigraph`, `rg`, and Python `rdflib` are available.
 
 ## Ownership Model
