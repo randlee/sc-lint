@@ -18,10 +18,10 @@ if str(_CLAUDE_DIR) not in sys.path:
 
 from lib.sc_compose_dependency import (  # noqa: E402
     MIN_SC_COMPOSE,
+    MIN_SC_COMPOSE_BINDING,
     MIN_SC_COMPOSE_BINDING_TEXT,
     MIN_SC_COMPOSE_TEXT,
     SC_COMPOSE_BINDING_INSTALL,
-    SC_COMPOSE_WHEEL_PIN,
     parse_version as _version,
 )
 
@@ -82,6 +82,7 @@ def _entry(name: str, required: str, *, minimum: tuple[int, int, int] | None = N
 def _python_binding_entry() -> dict[str, Any]:
     try:
         import sc_compose  # noqa: F401
+        installed = _version(importlib.metadata.version("sc-compose"))
         version_text = importlib.metadata.version("sc-compose")
     except (ImportError, importlib.metadata.PackageNotFoundError):
         return {
@@ -94,7 +95,7 @@ def _python_binding_entry() -> dict[str, Any]:
                 + SC_COMPOSE_BINDING_INSTALL
             ),
         }
-    if version_text != SC_COMPOSE_WHEEL_PIN:
+    if installed is None or installed < MIN_SC_COMPOSE_BINDING:
         return {
             "name": "sc_compose",
             "required": f"Python binding {MIN_SC_COMPOSE_BINDING_TEXT}",
