@@ -11,12 +11,129 @@ use serde::Deserialize;
 mod dependency_policy;
 mod types;
 
-pub(crate) use dependency_policy::ForbiddenPackageEdge;
 pub(crate) use dependency_policy::WorkspacePackageName;
 pub(crate) use types::BoundaryInventory;
 pub(crate) use types::BoundaryRecord;
 pub(crate) use types::CallersSection;
 pub(crate) use types::ReferenceScope;
+
+/// Resolves boundary inventory package references to canonical Cargo package names.
+///
+/// Boundary files keep their owner directory layout, but policy evaluation accepts
+/// a workspace member directory basename or a library target name when each maps
+/// to exactly one package.
+pub(crate) struct WorkspacePackageResolver {
+    packages: BTreeMap<String, WorkspacePackageName>,
+    member_directories: BTreeMap<String, BTreeSet<WorkspacePackageName>>,
+    library_targets: BTreeMap<String, BTreeSet<WorkspacePackageName>>,
+}
+
+impl WorkspacePackageResolver {
+    pub(crate) fn from_workspace_packages(packages: &[&cargo_metadata::Package]) -> Self {
+        let mut resolver = Self {
+            packages: BTreeMap::new(),
+            member_directories: BTreeMap::new(),
+            library_targets: BTreeMap::new(),
+        };
+
+        for package in packages {
+            let package_name = WorkspacePackageName::from_package_name(package.name.to_string());
+            resolver
+                .packages
+                .insert(package.name.to_string(), package_name.clone());
+
+            if let Some(member_directory) = package
+                .manifest_path
+                .parent()
+                .and_then(|parent| parent.file_name())
+            {
+                resolver
+                    .member_directories
+                    .entry(member_directory.to_owned())
+                    .or_default()
+                    .insert(package_name.clone());
+            }
+
+            for target in package
+                .targets
+                .iter()
+                .filter(|target| crate::is_library_target(target))
+            {
+                resolver
+                    .library_targets
+                    .entry(target.name.clone())
+                    .or_default()
+                    .insert(package_name.clone());
+            }
+        }
+
+        resolver
+    }
+
+    pub(crate) fn resolve(
+        &self,
+        reference: &str,
+        context: impl AsRef<str>,
+    ) -> Result<WorkspacePackageName> {
+        if let Some(package) = self.resolve_if_known(reference, context.as_ref())? {
+            return Ok(package);
+        }
+
+        let known_packages = self
+            .packages
+            .keys()
+            .map(|package| format!("`{package}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        anyhow::bail!(
+            "unknown workspace package reference `{reference}` in {}; use an exact package name, a workspace member directory, or a library target name; known package names: {known_packages}",
+            context.as_ref(),
+        );
+    }
+
+    pub(crate) fn resolve_if_known(
+        &self,
+        reference: &str,
+        context: &str,
+    ) -> Result<Option<WorkspacePackageName>> {
+        if let Some(package) = self.packages.get(reference) {
+            return Ok(Some(package.clone()));
+        }
+        if let Some(package) = self.resolve_alias(
+            reference,
+            context,
+            &self.member_directories,
+            "workspace member directory",
+        )? {
+            return Ok(Some(package));
+        }
+        self.resolve_alias(reference, context, &self.library_targets, "library target")
+    }
+
+    fn resolve_alias(
+        &self,
+        reference: &str,
+        context: &str,
+        aliases: &BTreeMap<String, BTreeSet<WorkspacePackageName>>,
+        alias_kind: &str,
+    ) -> Result<Option<WorkspacePackageName>> {
+        let Some(packages) = aliases.get(reference) else {
+            return Ok(None);
+        };
+        if packages.len() == 1 {
+            return Ok(packages.iter().next().cloned());
+        }
+
+        let candidates = packages
+            .iter()
+            .map(|package| format!("`{package}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        anyhow::bail!(
+            "ambiguous workspace package reference `{reference}` in {context}: {alias_kind} matches {candidates}; use an exact package name",
+        );
+    }
+}
 
 pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> {
     let boundaries_root = root.join("boundaries");
@@ -154,13 +271,19 @@ pub(crate) fn validate_owner_crate_paths(
     metadata: &cargo_metadata::Metadata,
 ) -> Result<()> {
     let workspace_packages = crate::workspace_packages(metadata);
+    let resolver = WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
     for record in &inventory.records {
-        let Some(package) = workspace_packages
-            .iter()
-            .find(|package| package.name.as_str() == record.owner_package.as_str())
-        else {
+        if !record.status.state.requires_workspace_package() {
             continue;
-        };
+        }
+        let owner_package = resolver.resolve(
+            record.owner_package.as_ref(),
+            format!("owner_package for boundary `{}`", record.boundary_id),
+        )?;
+        let package = workspace_packages
+            .iter()
+            .find(|package| package.name.as_str() == owner_package.as_ref())
+            .expect("resolved workspace package must exist");
         let Some(library) = package
             .targets
             .iter()

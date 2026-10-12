@@ -2,6 +2,25 @@
 
 All notable changes to sc-lint are documented here.
 
+## [0.7.2] — 2026-10-12
+
+Consumer installation and boundary fixes found while adopting 0.7.1.
+
+### Fixed
+
+- Managed setup installs and repairs the complete release bundle (the
+  `sc-lint` launcher, its analyzer companions and the documentation bundle)
+  instead of the launcher alone, so an older companion on `PATH` is no longer
+  selected. This fixes `sc-lint lint sc-runtime` rejecting `--config` (#373).
+- Setup checks each managed companion's identity and health with bounded
+  startup probes; a missing, corrupt, renamed or hanging companion is repaired
+  or rejected, and a failed upgrade keeps the previous complete install
+  (#373).
+- The boundary analyzer resolves a crate named in a record or dependency edge
+  by Cargo package name, then by a unique workspace member directory, then by
+  a unique library target name, so records and `forbidden_edges` that use the
+  directory name are no longer silently skipped (#375).
+
 ## [0.7.1] — 2026-10-12
 
 Consumer-adoption fixes found while adopting 0.7.0.
