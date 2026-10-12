@@ -172,7 +172,11 @@ def _iter_literal_concat_values(source: str):
                                 arguments.pop()
                             values = [_single_string_argument(argument) for argument in arguments]
                             if values and all(value is not None for value in values):
-                                yield cursor, "".join(value for value in values if value is not None)
+                                yield (
+                                    cursor,
+                                    "".join(value for value in values if value is not None),
+                                    len(arguments) == 1,
+                                )
             cursor = end
             continue
         cursor += 1
@@ -270,11 +274,9 @@ def collect_identity_violations(
                 )
                 break
 
-        literal_violation_keys = {
-            (violation.path, violation.line_number, violation.kind)
-            for violation in violations
-        }
-        for offset, concatenated in _iter_literal_concat_values(source):
+        for offset, concatenated, is_single_literal in _iter_literal_concat_values(source):
+            if is_single_literal:
+                continue
             line_number = source.count("\n", 0, offset) + 1
             line = lines[line_number - 1]
             if not is_code_line(line) or line_is_suppressed(line_number, lines, DIRECTIVE_POLICY):
@@ -282,9 +284,6 @@ def collect_identity_violations(
             in_test_scope = scope[line_number - 1]
             if in_test_scope:
                 if concatenated in forbidden_literals:
-                    key = (rel_path.as_posix(), line_number, "test_scope_forbidden_literal")
-                    if key in literal_violation_keys:
-                        continue
                     violations.append(
                         IdentityViolation(
                             path=rel_path.as_posix(),
@@ -299,9 +298,6 @@ def collect_identity_violations(
                 concatenated in production_canonical_literals
                 and rel_path.as_posix() not in production_canonical_literals[concatenated]
             ):
-                key = (rel_path.as_posix(), line_number, "production_scope_canonical_literal")
-                if key in literal_violation_keys:
-                    continue
                 violations.append(
                     IdentityViolation(
                         path=rel_path.as_posix(),

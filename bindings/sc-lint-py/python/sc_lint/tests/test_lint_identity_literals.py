@@ -133,6 +133,41 @@ pub const BLOCK_COMMENT: &str = concat!("{prefix}", "{suffix}", /* keep */);
                 ],
             )
 
+    def test_identity_literal_lint_keeps_distinct_same_line_concat_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = seed_workspace(Path(tempdir))
+            split_at = len(TEAM_LEAD_IDENTITY) // 2
+            prefix, suffix = TEAM_LEAD_IDENTITY[:split_at], TEAM_LEAD_IDENTITY[split_at:]
+            (repo_root / "crates/demo/src/lib.rs").write_text(
+                f'''pub const DIRECT: &str = "{TEAM_LEAD_IDENTITY}"; pub const ASSEMBLED: &str = concat!("{prefix}", "{suffix}");
+''',
+                encoding="utf-8",
+            )
+            (repo_root / "crates/demo/tests/tests.rs").write_text(
+                f'''#[test]
+fn detects_both() {{ let direct = "{TEAM_LEAD_IDENTITY}"; let assembled = concat!("{prefix}", "{suffix}"); }}
+''',
+                encoding="utf-8",
+            )
+
+            violations = collect_identity_violations(
+                repo_root,
+                forbidden_literals=(TEAM_LEAD_IDENTITY,),
+                production_canonical_literals={
+                    TEAM_LEAD_IDENTITY: ("crates/demo/src/constants.rs",),
+                },
+            )
+
+            self.assertEqual(
+                [(item.path, item.line_number, item.kind) for item in violations],
+                [
+                    ("crates/demo/src/lib.rs", 1, "production_scope_canonical_literal"),
+                    ("crates/demo/src/lib.rs", 1, "production_scope_canonical_literal"),
+                    ("crates/demo/tests/tests.rs", 2, "test_scope_forbidden_literal"),
+                    ("crates/demo/tests/tests.rs", 2, "test_scope_forbidden_literal"),
+                ],
+            )
+
     def test_identity_literal_defaults_do_not_leak_consumer_policy(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = seed_workspace(Path(tempdir))
