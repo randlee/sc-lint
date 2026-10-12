@@ -609,6 +609,12 @@ pub(crate) enum BoundaryState {
     ReservedFuture,
 }
 
+impl BoundaryState {
+    pub(crate) fn requires_workspace_package(&self) -> bool {
+        !matches!(self, Self::Planned | Self::Retired | Self::ReservedFuture)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(try_from = "String")]
 pub(crate) struct ApprovedSymbol(String);
