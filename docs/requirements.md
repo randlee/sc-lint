@@ -579,6 +579,47 @@ The product should support both:
   consumer once installed.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
 
+### Dependency upgrades (Rand 2026-10-12)
+
+- `REQ-PRODUCT-025`
+  A dependency upgrade runs from a repo formula
+  (`.atm-bd/formula/upgrade-<dependency>.formula.toml.j2`) attached with
+  sc-compose `bead attach` under a new phase root, and runs to its end with no
+  input from Rand. The formula's steps are the plan; a run adds no other work.
+
+- `REQ-PRODUCT-026`
+  The upgrade edits only the repo's own pin
+  (`.claude/lib/sc_compose_dependency.py` for sc-compose). Other skills and
+  kits keep their own minimum versions and are not edited.
+
+- `REQ-PRODUCT-027`
+  Before testing, the run reads the dependency's CHANGELOG and migration docs
+  between the two versions. Each breaking change, deprecation or recommended
+  change is applied to repo-owned uses, recorded as not used, or filed as an
+  issue against the owning repository.
+
+- `REQ-PRODUCT-028`
+  The run tests the old and new versions side by side, with recorded installed
+  versions: the rendering tests and a validate/preview of every formula the
+  team pours. The upgrade is breaking when a test passing on the old version
+  fails on the new one or a formula's output differs. quality-mgr re-runs the
+  comparison independently.
+
+- `REQ-PRODUCT-029`
+  When breaking, the run stops with a ready PR to `develop` whose description
+  carries the failing tests and diffs. When not breaking and no other work is
+  in progress, it continues to a patch bump, publish-preflight GO and a PR to
+  `main`; with other work in progress it stops after `develop`.
+
+- `REQ-PRODUCT-030`
+  No agent merges to `develop` or `main`. Every PR to either requests review
+  from GitHub user `rand-lee`.
+
+- `REQ-PRODUCT-031`
+  Every decision point and escalation sends an explicit
+  `atm send omega-prime@hermes` message with the PR link, including when a PR
+  to `develop` or `main` has green CI.
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements

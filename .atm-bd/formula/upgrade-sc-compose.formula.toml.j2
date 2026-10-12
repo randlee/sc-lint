@@ -1,0 +1,104 @@
+---
+name: upgrade-sc-compose
+version: 2.0.0
+description: Unattended sc-compose upgrade - edit the repo pin, test it, PR, and release when nothing else is in flight.
+format: toml
+required_variables:
+  - parent
+  - ref
+  - phase
+  - from_version
+  - to_version
+  - priority
+---
+{#
+sc-compose beads formula (sc-compose/beads/v1), attached with
+`sc-compose bead attach` under the phase root of one upgrade run. Poured ids
+are <parent>.<ref>-<step>.
+
+The repo pin is the only thing this formula changes. Other skills and kits
+declare their own minimum versions and are not edited here. The run needs no
+input from Rand; every decision and escalation goes to omega-prime@hermes.
+#}
+formula = "upgrade-sc-compose"
+description = "Upgrade sc-compose {{{ from_version }}} -> {{{ to_version }}} (phase-{{{ phase }}})."
+version = 1
+type = "workflow"
+
+[[steps]]
+id = "upgrade"
+title = "phase-{{{ phase }}}: pin sc-compose {{{ to_version }}}"
+description = """
+## Deliverables
+1. `.claude/lib/sc_compose_dependency.py`: `SC_COMPOSE_PIN` and the `sc-compose==` install pin read {{{ to_version }}}. Minimum-version constants are not changed.
+2. Read randlee/sc-compose at tag v{{{ to_version }}}: every `CHANGELOG.md` section after {{{ from_version }}} up to {{{ to_version }}}, `docs/migration-notes.md` and `docs/migration/`. List each breaking change, deprecation and recommended change in this bead's notes. For each one, `git grep` the repo for the affected command, flag, API or template syntax and either (a) apply the change to the repo-owned use in this layer, covered by deliverable 4 or 5, or (b) record "not used" with the grep. A use in a kit- or other-skill-owned file is not edited: file a GitHub issue against the owning repo and link it in the notes.
+3. Two scratch environments, A = sc-compose {{{ from_version }}} and B = sc-compose {{{ to_version }}} (release CLI binary on PATH plus `pip install sc-compose==<v>` in a venv). In each, record `sc-compose --version` and the wheel's version; a run whose recorded versions do not match is void.
+4. In A and in B, run the rendering suite and record pass/fail per test: `python3 -m pytest -q .claude/skills/atm-bd-orchestration/scripts/tests .claude/skills/atm-beads/tests .claude/skills/triaging-findings/tests bindings/sc-lint-py/python/sc_lint/tests/test_orchestration_contracts.py`.
+5. In A and in B, run `sc-compose bead validate` and `sc-compose bead preview-pour` (preview-attach for attach formulas) on every formula the team pours: `.claude/skills/atm-bd-orchestration/formulas/sprint-group.formula.toml.j2`, `finding-group.formula.toml.j2`, and this formula, with fixed sample variables. Diff B's JSON output against A's.
+6. Verdict in this bead's notes: BREAKING when a test passing in A fails in B, or a formula's validate/preview output differs between A and B; the notes list each such test or formula with its output or diff. A test failing in both is pre-existing and reported, not breaking. NOT BREAKING otherwise.
+7. With B installed, `just lint` and `just test` pass.
+8. `git grep -n "sc-compose==\\|SC_COMPOSE_PIN"` finds no repo-owned pin other than deliverable 1; any new one is listed in the notes and added to this formula's deliverable 1.
+"""
+type = "task"
+priority = {{{ priority }}}
+labels = ["phase-{{{ phase }}}", "stage:dev"]
+
+[steps.metadata]
+role = "dev"
+phase = "{{{ phase }}}"
+difficulty = "fast"
+branch = "sprint/{{{ phase }}}-1-sc-compose-{{{ to_version }}}"
+pr_target = "integrate/phase-{{{ phase }}}"
+owned_paths = [".claude/lib/sc_compose_dependency.py", "repo-owned files changed by deliverable 2"]
+
+[[steps]]
+id = "qa"
+title = "phase-{{{ phase }}}: QA sc-compose {{{ to_version }}} pin"
+description = """
+## Deliverables
+1. quality-mgr checks the upgrade bead's changelog list against the sc-compose CHANGELOG and migration docs (each item applied, not used, or issued), re-runs deliverables 3-6 independently at the layer's pushed head and confirms the recorded versions, per-test results, formula diffs and BREAKING verdict match; only the pin and the deliverable 2 changes are in the diff; CI on the layer is green or its failure is a recorded breaking change.
+"""
+type = "task"
+priority = {{{ priority }}}
+labels = ["phase-{{{ phase }}}", "stage:qa"]
+needs = ["upgrade"]
+
+[steps.metadata]
+role = "qa"
+phase = "{{{ phase }}}"
+difficulty = "normal"
+checked_bead = "{{{ parent }}}.{{{ ref }}}-upgrade"
+
+[[steps]]
+id = "pr_develop"
+title = "phase-{{{ phase }}}: PR to develop"
+description = """
+Decision point 1 (breaking or not). Land the layer on integrate/phase-{{{ phase }}} (`gh stack merge <stack> --yes --merge`), open the ready integrate/phase-{{{ phase }}} -> develop PR, and request review from `rand-lee` (`gh api -X POST repos/randlee/sc-lint/pulls/<n>/requested_reviewers -f 'reviewers[]=rand-lee'`). Never merge it; only Rand merges to develop.
+- Breaking (upgrade notes record a failure): put the failing tests and output in the PR description, run `atm send omega-prime@hermes "sc-lint: sc-compose {{{ to_version }}} upgrade is BREAKING. Rand, please review <PR link>. <failing tests>"`, close release as not planned, and close this bead.
+- Not breaking, CI green: run `atm send omega-prime@hermes "sc-lint: sc-compose {{{ to_version }}} upgrade, CI green. Rand, please complete <PR link>."` and close this bead.
+"""
+type = "task"
+priority = {{{ priority }}}
+labels = ["phase-{{{ phase }}}", "stage:land"]
+needs = ["qa"]
+
+[steps.metadata]
+role = "lead"
+phase = "{{{ phase }}}"
+
+[[steps]]
+id = "release"
+title = "phase-{{{ phase }}}: patch release PR to main"
+description = """
+Decision point 2, after Rand merges the PR to develop. Other work in progress = an open phase or release bead, or another open PR to develop.
+- Other work in progress: run `atm send omega-prime@hermes "sc-lint: sc-compose {{{ to_version }}} on develop; release deferred because <work>."` and close this bead.
+- Otherwise: the publisher bumps the patch version on release/<next-patch>-prep (PR to develop, `rand-lee` reviewer, omega-prime notified when green), then after Rand merges it runs publish-preflight to GO, tags the release candidate, and opens the develop -> main PR with `rand-lee` as reviewer. When CI is green run `atm send omega-prime@hermes "sc-lint: <version> release PR to main, preflight GO, CI green. Rand, please complete <PR link>."`. If preflight or CI cannot go green, run `atm send omega-prime@hermes "sc-lint: <version> release blocked: <cause>. <link>"` and leave this bead open. No agent merges to develop or main.
+"""
+type = "task"
+priority = {{{ priority }}}
+labels = ["phase-{{{ phase }}}", "stage:release"]
+needs = ["pr_develop"]
+
+[steps.metadata]
+role = "publisher"
+phase = "{{{ phase }}}"
