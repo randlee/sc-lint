@@ -81,6 +81,12 @@ def toml_value(value: object) -> str:
     return json.dumps(value)
 
 
+def substitute_template_variables(source: str, replacements: dict[str, str]) -> str:
+    return TEMPLATE_VARIABLE.sub(
+        lambda match: replacements.get(match.group(1), match.group(0)), source
+    )
+
+
 def render(template: Path, data: dict) -> str:
     source = template.read_text()
     expected = TEMPLATE_PLACEHOLDERS.get(template.name)
@@ -101,8 +107,17 @@ def render(template: Path, data: dict) -> str:
     profiles = "\n\n".join(f'[[tool.sc-lint.lint]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data["profiles"].items())
     layers = "\n\n".join(f'[[tool.sc-lint.test]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data.get("test", {}).items())
     runners = [ {"linux":"ubuntu-latest", "macos":"macos-latest", "windows":"windows-latest"}.get(item, item) for item in data["ci"]["os"] ]
-    return (source.replace("{{ minimum_version }}", data["minimum_version"]).replace("{{ analyzers }}", analyzers)
-            .replace("{{ profiles }}", profiles).replace("{{ test_layers }}", layers).replace("{{ ci_os }}", json.dumps(runners)))
+    replacements = {
+        "minimum_version": data["minimum_version"],
+        "analyzers": analyzers,
+        "profiles": profiles,
+        "test_layers": layers,
+        "ci_os": json.dumps(runners),
+    }
+    deferred = {"windows_shell"} if template.name == "Justfile.import.j2" else set()
+    if observed - replacements.keys() != deferred:
+        raise ValueError(f"{template.name}: unresolved template variables after rendering")
+    return substitute_template_variables(source, replacements)
 
 
 def unmanaged(text: str) -> str:
@@ -141,7 +156,10 @@ def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     if not re.search(r"^test(?![\w-])[^:\n]*:(?!=)", unmanaged(original), re.M): original = (original.rstrip() + "\n\n" + (ROOT / "templates/test.just").read_text()).lstrip("\n")
     if original.count(MARKER_START) != original.count(MARKER_END) or original.count(MARKER_START) > 1: raise RuntimeError(f"{justfile}: marker conflict")
     shell = data.get("justfile", {}).get("windows_shell", True) and not re.search(r"^set\s+windows-shell\b", unmanaged(original), re.M)
-    block = render(ROOT / Path("templates/Justfile.import.j2"), data).replace("{{ windows_shell }}", WINDOWS_SHELL if shell else "").strip()
+    block = substitute_template_variables(
+        render(ROOT / Path("templates/Justfile.import.j2"), data),
+        {"windows_shell": WINDOWS_SHELL if shell else ""},
+    ).strip()
     result[Path("Justfile")] = (re.sub(re.escape(MARKER_START) + r".*?" + re.escape(MARKER_END), block, original, flags=re.S) if MARKER_START in original else (original.rstrip() + "\n\n" + block).lstrip("\n")).encode()
     persisted = frozenset({INSTALL_INPUT}) if input_path.resolve() == (repo / INSTALL_INPUT).resolve() else frozenset()
     return Desired(result, frozenset({Path("Justfile")}), persisted)

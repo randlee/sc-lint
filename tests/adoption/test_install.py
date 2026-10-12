@@ -246,6 +246,48 @@ def test_unresolved_template_variables_fail_before_writing(
     assert list(consumer.iterdir()) == []
 
 
+def test_unspaced_template_variable_is_substituted_by_installer(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    template = kit / "templates" / "sc-lint.toml.j2"
+    template.write_text(template.read_text().replace("{{ minimum_version }}", "{{minimum_version}}"))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    rendered = (consumer / "sc-lint.toml").read_text()
+    assert 'minimum_version = "0.5.0"' in rendered
+    assert "{{minimum_version}}" not in rendered
+
+
+def test_unspaced_windows_shell_variable_is_substituted_in_second_pass(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    template = kit / "templates" / "Justfile.import.j2"
+    template.write_text(template.read_text().replace("{{ windows_shell }}", "{{windows_shell}}"))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    rendered = (consumer / "Justfile").read_text()
+    assert "set windows-shell :=" in rendered
+    assert "{{windows_shell}}" not in rendered
+
+
 def test_ci_disabled_writes_no_workflow_or_action_files() -> None:
     consumer = copy_fixture("empty-workspace")
     input_path = write_input(consumer, ci={"os": ["linux"], "enabled": False})
