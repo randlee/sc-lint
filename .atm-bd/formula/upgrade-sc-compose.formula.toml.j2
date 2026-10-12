@@ -31,6 +31,21 @@ version = 2
 type = "workflow"
 
 [[steps]]
+id = "sprint"
+title = "phase-{{{ phase }}}: sprint {{{ phase }}}-1 sc-compose {{{ to_version }}}"
+description = "Sprint container for the sc-compose {{{ to_version }}} upgrade. Its deliverables are on {{{ parent }}}.{{{ ref }}}-upgrade; QA fix groups attach under this bead. It closes when the qa step closes."
+type = "task"
+priority = {{{ priority }}}
+labels = ["phase-{{{ phase }}}", "stack:phase-{{{ phase }}}", "stage:sprint"]
+
+[steps.metadata]
+phase = "{{{ phase }}}"
+sprint = "{{{ phase }}}-1"
+stack = "phase-{{{ phase }}}"
+layer = 1
+difficulty = "fast"
+
+[[steps]]
 id = "upgrade"
 title = "phase-{{{ phase }}}: pin sc-compose {{{ to_version }}}"
 description = """
@@ -39,7 +54,7 @@ description = """
 2. Read randlee/sc-compose at tag v{{{ to_version }}}: every `CHANGELOG.md` section after {{{ from_version }}} up to {{{ to_version }}}, `docs/migration-notes.md` and `docs/migration/`. List each breaking change, deprecation and recommended change in this bead's notes. For each one, `git grep` the repo for the affected command, flag, API or template syntax and either (a) apply the change to the repo-owned use in this layer, covered by deliverable 4 or 5, and list the changed path in the notes, or (b) record "not used" with the grep. A use in a kit- or other-skill-owned file is not edited: file a GitHub issue against the owning repo, link it in the notes, and send omega-prime@hermes the issue link.
 3. Two scratch environments: A = a worktree at this layer's base commit (before deliverables 1-2) with sc-compose {{{ from_version }}}; B = this layer's head with sc-compose {{{ to_version }}}. Each has the release CLI binary first on PATH and `pip install sc-compose==<v>` in its own venv. Record `sc-compose --version` and the wheel version in each; a mismatch voids the run.
 4. In A and in B, run `python3 -m pytest -q .claude/skills/atm-bd-orchestration/scripts/tests .claude/skills/atm-beads/tests .claude/skills/triaging-findings/tests bindings/sc-lint-py/python/sc_lint/tests/test_orchestration_contracts.py` and record pass/fail per test id.
-5. In A and in B, run `sc-compose bead validate --request <f> --json` for each file in `.atm-bd/formula/upgrade-sc-compose.samples/`. Record each payload.outcome, then diff each rendered formula under `target/upgrade-samples/` byte for byte between A and B.
+5. In A and in B, run `sc-compose bead validate --request <f> --json` for each file in `.atm-bd/formula/upgrade-sc-compose.samples/`. For the upgrade-sc-compose sample, B renders A's copy of this formula (the base commit's), so an edit made under deliverable 8 is not a difference. Record each payload.outcome, then diff each rendered formula under `target/upgrade-samples/` byte for byte between A and B.
 6. Verdict in this bead's notes: BREAKING when a test passing in A fails in B, a sample's outcome differs, or a rendered formula differs between A and B; list each with its output or diff. A test failing in both is pre-existing and reported, not breaking. NOT BREAKING otherwise.
 7. With B installed, `just lint` and `just test` pass.
 8. `git grep -n "sc-compose==\\|SC_COMPOSE_PIN"` finds no repo-owned pin other than deliverable 1; any new one is listed in the notes and added to this formula's deliverable 1.
@@ -56,6 +71,8 @@ phase = "{{{ phase }}}"
 stack = "phase-{{{ phase }}}"
 layer = 1
 difficulty = "fast"
+sprint = "{{{ phase }}}-1"
+sprint_bead = "{{{ parent }}}.{{{ ref }}}-sprint"
 branch = "sprint/{{{ phase }}}-1-sc-compose-{{{ to_version }}}"
 pr_target = "integrate/phase-{{{ phase }}}"
 owned_paths = [".claude/lib/sc_compose_dependency.py"]
@@ -63,13 +80,23 @@ owned_paths = [".claude/lib/sc_compose_dependency.py"]
 [[steps]]
 id = "sanity"
 title = "phase-{{{ phase }}}: sanity check"
-description = "Sanity check of {{{ parent }}}.{{{ ref }}}-upgrade: each numbered deliverable is written and lint passes. This is not QA. Close on PASS only; on FAIL reopen the upgrade bead, leave this bead open, and send omega-prime@hermes the failing deliverables."
+description = """
+## Deliverables
+1. Sanity check of {{{ parent }}}.{{{ ref }}}-upgrade: each numbered deliverable is written and lint passes. This is not QA.
+
+Close on PASS only; on FAIL reopen the upgrade bead, leave this bead open, and send omega-prime@hermes the failing deliverables.
+"""
 type = "task"
 priority = {{{ priority }}}
 labels = ["phase-{{{ phase }}}", "stack:phase-{{{ phase }}}", "stage:dev-sanity"]
 needs = ["upgrade"]
 
 [steps.metadata]
+role = "dev-sanity"
+phase = "{{{ phase }}}"
+stack = "phase-{{{ phase }}}"
+sprint = "{{{ phase }}}-1"
+sprint_bead = "{{{ parent }}}.{{{ ref }}}-sprint"
 dev_bead = "{{{ parent }}}.{{{ ref }}}-upgrade"
 difficulty = "fast"
 
@@ -93,6 +120,8 @@ phase = "{{{ phase }}}"
 stack = "phase-{{{ phase }}}"
 round = 1
 difficulty = "normal"
+sprint = "{{{ phase }}}-1"
+sprint_bead = "{{{ parent }}}.{{{ ref }}}-sprint"
 checked_bead = "{{{ parent }}}.{{{ ref }}}-upgrade"
 
 [[steps]]
@@ -102,7 +131,7 @@ description = """
 ## Deliverables
 1. Land the layer on integrate/phase-{{{ phase }}} (`gh stack merge <stack> --yes --merge`), open the ready integrate/phase-{{{ phase }}} -> develop PR, and request review from `rand-lee` (`gh api -X POST repos/randlee/sc-lint/pulls/<n>/requested_reviewers -f 'reviewers[]=rand-lee'`). Never merge it; only Rand merges to develop.
 2. Decision point 1. BREAKING (upgrade verdict): put the verdict, failing tests and diffs in the PR description; close `{{{ parent }}}.{{{ ref }}}-release` as not planned; send omega-prime@hermes "sc-lint: sc-compose {{{ to_version }}} upgrade is BREAKING. Rand, please review <PR link>." with the failing tests. NOT BREAKING: when CI is green, send omega-prime@hermes "sc-lint: sc-compose {{{ to_version }}} upgrade, CI green. Rand, please complete <PR link>.". If CI cannot go green, send omega-prime@hermes the failing check and leave this bead open.
-3. Keep this bead open until Rand merges the PR. When omega-prime or Rand reports the merge, confirm it with one REST read (`gh api repos/randlee/sc-lint/pulls/<n> --jq .merged`), then close this bead. No polling.
+3. Keep this bead open until Rand merges the PR. When omega-prime or Rand reports the merge, confirm it with one REST read (`gh api repos/randlee/sc-lint/pulls/<n> --jq .merged`), then close this bead. No polling. This bead is open by design while it waits for the merge; do not re-dispatch it.
 """
 type = "task"
 priority = {{{ priority }}}
