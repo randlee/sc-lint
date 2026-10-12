@@ -1840,16 +1840,16 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn backend_probe_accepts_a_slow_healthy_companion_within_its_deadline() {
+    fn backend_probe_accepts_a_healthy_companion_after_the_old_two_second_limit() {
         let fixture = TempDir::new().expect("fixture");
         let backend = crate::consts::TOOL_RUNTIME;
         let path = fixture.path().join(backend);
-        write_slow_backend_probe(&path, backend, "0.25");
+        write_slow_backend_probe(&path, backend, "2.25");
 
         assert_eq!(
-            backend_cli_failure(&path, backend, Duration::from_secs(10)),
+            backend_cli_failure(&path, backend, BACKEND_PROBE_TIMEOUT),
             None,
-            "healthy companion should pass even when its first help response is delayed"
+            "healthy companion should pass when its first help response exceeds the old deadline"
         );
     }
 
