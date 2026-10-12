@@ -29,8 +29,9 @@ def _binding(version: str) -> dict[str, object]:
 
 def test_preflight_accepts_newer_compatible_cli_and_binding(monkeypatch):
     monkeypatch.setattr(check_dependencies, "_find", lambda name: Path("/bin/true"))
-    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("tool 1.8.2", "tool 1.8.2"))
-    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: _binding("1.8.2"))
+    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("sc-compose 2.0.0", "sc-compose 2.0.0"))
+    monkeypatch.setitem(sys.modules, "sc_compose", object())
+    monkeypatch.setattr(check_dependencies.importlib.metadata, "version", lambda _name: "2.0.0")
     result = check_dependencies.run()
     assert result["success"] is True
     assert result["error"] is None
@@ -57,14 +58,37 @@ def test_missing_python_binding_has_actionable_install_hint(monkeypatch):
     assert ">=1.6.1" in SC_COMPOSE_BINDING_INSTALL
 
 
-def test_python_binding_accepts_newer_compatible_version(monkeypatch):
+def test_python_binding_accepts_minimum_version(monkeypatch):
     monkeypatch.setitem(sys.modules, "sc_compose", object())
-    monkeypatch.setattr(check_dependencies.importlib.metadata, "version", lambda _name: "1.7.1")
+    monkeypatch.setattr(check_dependencies.importlib.metadata, "version", lambda _name: "1.6.1")
 
     result = check_dependencies._python_binding_entry()
 
     assert result["ok"] is True
-    assert result["version"] == "1.7.1"
+    assert result["version"] == "1.6.1"
+    assert result["required"] == "Python binding >= 1.6.1"
+
+
+def test_python_binding_rejects_version_below_minimum(monkeypatch):
+    monkeypatch.setitem(sys.modules, "sc_compose", object())
+    monkeypatch.setattr(check_dependencies.importlib.metadata, "version", lambda _name: "1.6.0")
+
+    result = check_dependencies._python_binding_entry()
+
+    assert result["ok"] is False
+    assert result["version"] == "1.6.0"
+    assert result["required"] == "Python binding >= 1.6.1"
+    assert "requires >= 1.6.1" in result["error"]
+
+
+def test_python_binding_accepts_major_version_2(monkeypatch):
+    monkeypatch.setitem(sys.modules, "sc_compose", object())
+    monkeypatch.setattr(check_dependencies.importlib.metadata, "version", lambda _name: "2.0.0")
+
+    result = check_dependencies._python_binding_entry()
+
+    assert result["ok"] is True
+    assert result["version"] == "2.0.0"
     assert result["required"] == "Python binding >= 1.6.1"
 
 
