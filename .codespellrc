@@ -1,4 +1,4 @@
 [codespell]
-skip = ./.git,./target,./.just/logs,./Cargo.lock,./artifacts,./plugins/sc-plan-anchor
+skip = ./.git,./target,./.just/logs,./Cargo.lock,./artifacts
 ignore-words = .codespellignore
 quiet-level = 2

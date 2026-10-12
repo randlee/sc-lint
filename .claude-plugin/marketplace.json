@@ -23,15 +23,6 @@
       },
       "category": "tools",
       "source": "./packages/sc-lint-adoption"
-    },
-    {
-      "name": "sc-plan-anchor",
-      "description": "Keep plans and delivered work aligned with user-approved anchors using Jev-backed gates.",
-      "author": {
-        "name": "randlee"
-      },
-      "category": "tools",
-      "source": "./plugins/sc-plan-anchor"
     }
   ]
 }
