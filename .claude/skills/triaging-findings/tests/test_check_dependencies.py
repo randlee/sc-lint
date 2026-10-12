@@ -1,9 +1,16 @@
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).parents[1] / "scripts" / "check_dependencies.py"
+CLAUDE_DIR = SCRIPT.parents[3]
+if str(CLAUDE_DIR) not in sys.path:
+    sys.path.insert(0, str(CLAUDE_DIR))
+
+from lib.sc_compose_dependency import SC_COMPOSE_BINDING_INSTALL, is_supported_version
+
+
 spec = importlib.util.spec_from_file_location("check_dependencies", SCRIPT)
 check_dependencies = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
@@ -16,10 +23,14 @@ def test_version_parser():
     assert check_dependencies._version("missing") is None
 
 
-def test_preflight_passes_in_current_environment(monkeypatch):
+def _binding(version: str) -> dict[str, object]:
+    return {"name": "sc_compose", "version": version, "ok": True}
+
+
+def test_preflight_accepts_matching_newer_compatible_versions(monkeypatch):
     monkeypatch.setattr(check_dependencies, "_find", lambda name: Path("/bin/true"))
-    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("tool 1.6.1", "tool 1.6.1"))
-    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: {"name": "sc_compose", "ok": True})
+    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("tool 1.8.2", "tool 1.8.2"))
+    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: _binding("1.8.2"))
     result = check_dependencies.run()
     assert result["success"] is True
     assert result["error"] is None
@@ -28,7 +39,7 @@ def test_preflight_passes_in_current_environment(monkeypatch):
 def test_old_sc_compose_is_a_structured_failure(monkeypatch):
     monkeypatch.setattr(check_dependencies, "_find", lambda name: Path("/bin/true"))
     monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("sc-compose 1.0.1", "sc-compose 1.0.1"))
-    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: {"name": "sc_compose", "ok": True})
+    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: _binding("1.7.0"))
     result = check_dependencies.run()
     assert result["success"] is False
     assert result["error"]["code"] == "EXECUTION.DEPENDENCY"
@@ -42,13 +53,37 @@ def test_missing_python_binding_has_actionable_install_hint(monkeypatch):
     monkeypatch.setattr(check_dependencies.importlib.metadata, "version", missing)
     result = check_dependencies._python_binding_entry()
     assert result["ok"] is False
-    assert "python3 -m pip install --user --break-system-packages" in result["error"]
+    assert SC_COMPOSE_BINDING_INSTALL in result["error"]
+    assert "==" not in SC_COMPOSE_BINDING_INSTALL
+
+
+def test_preflight_rejects_mismatched_cli_and_binding_versions(monkeypatch):
+    monkeypatch.setattr(check_dependencies, "_find", lambda name: Path("/bin/true"))
+    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("sc-compose 1.8.2", "sc-compose 1.8.2"))
+    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: _binding("1.7.0"))
+
+    result = check_dependencies.run()
+
+    assert result["success"] is False
+    assert any(item["name"] == "sc-compose version alignment" for item in result["error"]["failures"])
+
+
+def test_preflight_rejects_versions_outside_the_supported_range(monkeypatch):
+    monkeypatch.setattr(check_dependencies, "_find", lambda name: Path("/bin/true"))
+    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("sc-compose 2.0.0", "sc-compose 2.0.0"))
+    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: _binding("2.0.0"))
+
+    result = check_dependencies.run()
+
+    assert result["success"] is False
+    assert not is_supported_version((2, 0, 0))
+    assert any(item["name"] == "sc-compose" for item in result["error"]["failures"])
 
 
 def test_cli_emits_json_success_contract(monkeypatch, capsys):
     monkeypatch.setattr(check_dependencies, "_find", lambda name: Path("/bin/true"))
-    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("tool 1.6.1", "tool 1.6.1"))
-    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: {"name": "sc_compose", "ok": True})
+    monkeypatch.setattr(check_dependencies, "_run_version", lambda path: ("tool 1.7.0", "tool 1.7.0"))
+    monkeypatch.setattr(check_dependencies, "_python_binding_entry", lambda: _binding("1.7.0"))
     assert check_dependencies.main() == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["success"] is True

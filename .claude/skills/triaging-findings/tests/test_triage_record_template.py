@@ -13,7 +13,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO_ROOT / ".claude"))
 from lib.orchestration_test_cli import require_dev_cli
-from lib.sc_compose_dependency import MIN_SC_COMPOSE_TEXT, SC_COMPOSE_INSTALL
+from lib.sc_compose_dependency import (
+    MIN_SC_COMPOSE_TEXT,
+    SC_COMPOSE_INSTALL,
+    is_supported_version,
+    parse_version,
+)
 
 TEMPLATE = ".claude/skills/triaging-findings/triage-record.ttl.j2"
 
@@ -124,7 +129,7 @@ def test_python_binding_renders_canonical_template() -> None:
         import sc_compose
     except (ImportError, importlib.metadata.PackageNotFoundError) as exc:  # pragma: no cover - dependency preflight owns setup
         pytest.skip(f"sc-compose Python binding unavailable: {exc}")
-    assert tuple(int(part) for part in importlib.metadata.version("sc-compose").split(".")[:3]) >= (1, 6, 1)
+    assert is_supported_version(parse_version(importlib.metadata.version("sc-compose")))
     rendered = sc_compose.render_template(
         (REPO_ROOT / TEMPLATE).read_text(encoding="utf-8"), _vars()
     )
