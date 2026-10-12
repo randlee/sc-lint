@@ -212,7 +212,8 @@ def evaluate_unused_dependency_policy(
     saw_unused_dependency = False
 
     for section in sections:
-        if section.name == SUMMARY_SECTION:
+        # evaluate_policy owns unlinked/empty files, so they compose here.
+        if section.name == SUMMARY_SECTION or section.name in ERROR_SECTIONS:
             continue
         if section.name != UNUSED_DEPENDENCY_SECTION:
             return findings, downgraded, False
@@ -295,15 +296,16 @@ def main(argv: list[str]) -> int:
             )
         )
         if only_unused_dependencies:
-            for line in render_policy_findings(unused_findings):
+            all_findings = unused_findings + policy_findings
+            for line in render_policy_findings(all_findings):
                 write_console_output(sys.stdout, f"{line}\n")
-            for line in unused_downgraded:
+            for line in unused_downgraded + downgraded:
                 write_console_output(sys.stdout, f"{line}\n")
             if stdout:
                 write_console_output(sys.stdout, stdout)
             if completed.stderr:
                 write_console_output(sys.stderr, completed.stderr)
-            return 1 if unused_findings else 0
+            return 1 if all_findings else 0
 
     if completed.returncode != 0:
         if stdout:

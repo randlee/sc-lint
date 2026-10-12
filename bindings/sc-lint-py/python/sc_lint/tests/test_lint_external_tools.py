@@ -367,13 +367,15 @@ shear/summary
         )
         self.assertEqual(restrictive_stderr.getvalue(), "cargo-shear warning: ?\n")
 
-    def run_unused_dependency_main_from_foreign_cwd(self, allowlist: str) -> tuple[int, str]:
+    def run_unused_dependency_main_from_foreign_cwd(
+        self, allowlist: str, shear_stdout: str | None = None
+    ) -> tuple[int, str]:
         """Run main() with --root from another cwd against a real workspace.
 
         workspace_crates returns repo-relative manifest paths, so this covers
         the path the mocked-absolute tests above do not.
         """
-        stdout = f"""\
+        stdout = shear_stdout or f"""\
 shear/unused_dependency
 
   × unused dependency `serde`
@@ -431,6 +433,60 @@ shear/summary
             f"shear policy error: {APP_PACKAGE}.serde [unused_dependency] unused dependency must be fixed",
             output,
         )
+
+    # Section layout of a real cargo-shear run: exit 1 with two unused
+    # dependencies (errors) and one unlinked file (warning).
+    MIXED_SHEAR_STDOUT = f"""\
+shear/unused_dependency
+
+  × unused dependency `serde`
+   ╭─[crates/{APP_CRATE}/Cargo.toml:6:1]
+  help: remove this dependency
+
+shear/unused_dependency
+
+  × unused dependency `regex`
+   ╭─[crates/{APP_CRATE}/Cargo.toml:7:1]
+  help: remove this dependency
+
+shear/unlinked_files
+
+  ⚠ 1 unlinked file in `{APP_PACKAGE}`
+  │ src/orphan.rs
+  help: delete this file
+
+shear/summary
+
+  ✗ 2 errors
+  ⚠ 1 warning
+"""
+    MIXED_DEPENDENCY_ALLOWLIST = f"""\
+[cargo_shear.allowed_unused_dependencies]
+"{APP_PACKAGE}.serde" = "used by generated code"
+"{APP_PACKAGE}.regex" = "used by generated code"
+"""
+
+    def test_main_composes_allowlisted_unused_dependencies_and_unlinked_files(self) -> None:
+        result, output = self.run_unused_dependency_main_from_foreign_cwd(
+            self.MIXED_DEPENDENCY_ALLOWLIST
+            + '\n[cargo_shear.allowed_unlinked_files]\n"src/orphan.rs" = "planned module"\n',
+            self.MIXED_SHEAR_STDOUT,
+        )
+
+        self.assertEqual(result, 0)
+        self.assertIn(f"unused_dependency: downgraded {APP_PACKAGE}.serde (used by generated code)", output)
+        self.assertIn(f"unused_dependency: downgraded {APP_PACKAGE}.regex (used by generated code)", output)
+        self.assertIn("unlinked_files: downgraded src/orphan.rs (planned module)", output)
+        self.assertNotIn("shear policy error", output)
+
+    def test_main_rejects_unlisted_unlinked_file_beside_allowlisted_dependencies(self) -> None:
+        result, output = self.run_unused_dependency_main_from_foreign_cwd(
+            self.MIXED_DEPENDENCY_ALLOWLIST, self.MIXED_SHEAR_STDOUT
+        )
+
+        self.assertEqual(result, 1)
+        self.assertIn("shear policy error: src/orphan.rs [unlinked_files]", output)
+        self.assertIn(f"unused_dependency: downgraded {APP_PACKAGE}.serde (used by generated code)", output)
 
     @mock.patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[])
     @mock.patch("sc_lint.lint_cargo_shear.subprocess.run")
