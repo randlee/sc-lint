@@ -213,7 +213,11 @@ def evaluate_unused_dependency_policy(
 
     for section in sections:
         # evaluate_policy owns unlinked/empty files, so they compose here.
-        if section.name == SUMMARY_SECTION or section.name in ERROR_SECTIONS:
+        if section.name == SUMMARY_SECTION:
+            continue
+        if section.name in ERROR_SECTIONS:
+            if not section.file_paths:
+                return findings, downgraded, False
             continue
         if section.name != UNUSED_DEPENDENCY_SECTION:
             return findings, downgraded, False

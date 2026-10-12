@@ -502,6 +502,32 @@ shear/summary
         self.assertIn("shear policy error: src/orphan.rs [unlinked_files]", output)
         self.assertIn(f"unused_dependency: downgraded {APP_PACKAGE}.serde (used by generated code)", output)
 
+    def test_main_rejects_unparsed_error_sections_beside_allowlisted_dependencies(self) -> None:
+        for section_name in ("unlinked_files", "empty_files"):
+            with self.subTest(section_name=section_name):
+                stdout = f"""\\
+shear/unused_dependency
+
+  × unused dependency `serde`
+    ╭─[crates/{APP_CRATE}/Cargo.toml:9:1]
+
+shear/{section_name}
+
+  help: cargo-shear output did not include a file path
+
+shear/summary
+
+  × 1 error
+"""
+                result, output = self.run_unused_dependency_main_from_foreign_cwd(
+                    self.MIXED_DEPENDENCY_ALLOWLIST,
+                    stdout,
+                )
+
+                self.assertEqual(result, 1)
+                self.assertNotIn("unused_dependency: downgraded", output)
+                self.assertIn(f"shear/{section_name}", output)
+
     @mock.patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[])
     @mock.patch("sc_lint.lint_cargo_shear.subprocess.run")
     @mock.patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear")
