@@ -33,7 +33,7 @@ use crate::error::ErrorCode;
 const DEFAULT_RELEASE_BASE_URL: &str = "https://github.com/randlee/sc-lint/releases/download";
 const RELEASE_BASE_URL_ENV: &str = "SC_LINT_RELEASE_BASE_URL";
 const INSTALL_DIR_ENV: &str = "SC_LINT_INSTALL_DIR";
-const BACKEND_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+const BACKEND_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const BACKEND_PROBE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const BACKEND_PROBE_OUTPUT_LIMIT: usize = 64 * 1024;
 #[cfg(test)]
@@ -383,14 +383,15 @@ fn install_into_staging(
     extract_archive(&archive, &extract_dir)?;
     let candidate = release_binary_candidate(&extract_dir, release_version, target);
     let payload = release_payload_candidates(&candidate, managed_binary);
-    if !payload_is_complete(&payload) {
+    if let Some(problem) = payload_validation_issue(&payload) {
         return Err(install_error(
             InstallerErrorCode::ReleaseUnavailable,
-            format!("release archive `{archive_name}` did not contain the complete sc-lint bundle"),
-            "The release artifact must contain the launcher, all manifest-declared backend binaries, and the documentation bundle.",
+            format!("release archive `{archive_name}` failed payload validation: {problem}"),
+            "The release artifact must contain the launcher, healthy manifest-declared backend binaries, and the documentation bundle.",
             "Download a complete supported release again or report the malformed release artifact.",
         )
         .with_detail("archive_name", json!(archive_name))
+        .with_detail("payload_validation_problem", json!(problem))
         .with_detail("expected_binaries", json!([ReleaseTarget::binary_name(), MANAGED_BACKENDS[0], MANAGED_BACKENDS[1], MANAGED_BACKENDS[2]]))
         .with_detail(
             "extract_directory",
@@ -407,6 +408,7 @@ struct PayloadEntry {
 }
 
 type PayloadChange = (PathBuf, PathBuf, bool, bool);
+type ProbeOutputReader = thread::JoinHandle<io::Result<Vec<u8>>>;
 
 fn release_payload_candidates(binary: &Path, managed_binary: &Path) -> Vec<PayloadEntry> {
     let bin_dir = binary.parent().unwrap_or_else(|| Path::new("."));
@@ -486,10 +488,22 @@ fn docs_bundle_complete(path: &Path) -> bool {
     has_overview
 }
 
-fn payload_is_complete(entries: &[PayloadEntry]) -> bool {
-    entries.iter().all(|entry| {
+fn payload_validation_issue(entries: &[PayloadEntry]) -> Option<String> {
+    payload_validation_issue_with_timeout(entries, BACKEND_PROBE_TIMEOUT)
+}
+
+fn payload_validation_issue_with_timeout(
+    entries: &[PayloadEntry],
+    probe_timeout: Duration,
+) -> Option<String> {
+    for entry in entries {
         if entry.source.is_dir() {
-            docs_bundle_complete(&entry.source)
+            if !docs_bundle_complete(&entry.source) {
+                return Some(format!(
+                    "documentation bundle at `{}` is incomplete",
+                    entry.source.display()
+                ));
+            }
         } else if let Some(backend) = entry
             .source
             .file_name()
@@ -504,38 +518,91 @@ fn payload_is_complete(entries: &[PayloadEntry]) -> bool {
                 })
             })
         {
-            backend_cli_healthy(&entry.source, backend)
-        } else {
-            entry.source.is_file()
+            if let Some(problem) = backend_cli_failure(&entry.source, backend, probe_timeout) {
+                return Some(problem);
+            }
+        } else if !entry.source.is_file() {
+            return Some(format!(
+                "required release file `{}` is missing",
+                entry.source.display()
+            ));
         }
-    })
+    }
+    None
 }
 
 fn managed_payload_complete(binary: &Path) -> bool {
+    managed_payload_validation_issue(binary).is_none()
+}
+
+fn managed_payload_validation_issue(binary: &Path) -> Option<String> {
+    managed_payload_validation_issue_with_timeout(binary, BACKEND_PROBE_TIMEOUT)
+}
+
+fn managed_payload_validation_issue_with_timeout(
+    binary: &Path,
+    probe_timeout: Duration,
+) -> Option<String> {
     let parent = binary.parent().unwrap_or_else(|| Path::new("."));
-    let backends_healthy = MANAGED_BACKENDS.iter().all(|backend| {
+    for backend in MANAGED_BACKENDS {
         let name = if cfg!(windows) {
             format!("{backend}.exe")
         } else {
             (*backend).to_string()
         };
-        backend_cli_healthy(&parent.join(name), backend)
-    });
+        let path = parent.join(name);
+        if let Some(problem) = backend_cli_failure(&path, backend, probe_timeout) {
+            return Some(problem);
+        }
+    }
     let prefix = parent.parent().unwrap_or(parent);
-    backends_healthy
-        && (docs_bundle_complete(&parent.join("docs-bundle"))
-            || docs_bundle_complete(&parent.join(crate::consts::DOCS_BUNDLE_DIR))
-            || docs_bundle_complete(&prefix.join("share/sc-lint/sc-lint-docs"))
-            || docs_bundle_complete(&prefix.join("share/sc-lint/docs-bundle")))
+    if docs_bundle_complete(&parent.join("docs-bundle"))
+        || docs_bundle_complete(&parent.join(crate::consts::DOCS_BUNDLE_DIR))
+        || docs_bundle_complete(&prefix.join("share/sc-lint/sc-lint-docs"))
+        || docs_bundle_complete(&prefix.join("share/sc-lint/docs-bundle"))
+    {
+        None
+    } else {
+        Some(format!(
+            "documentation bundle is missing or incomplete beside `{}`",
+            binary.display()
+        ))
+    }
 }
 
 /// Probe the supported CLI help contract rather than assuming backend binaries
 /// expose a version flag. This checks that the companion can execute and that
 /// it is the expected analyzer CLI with its documented `analyze` command.
-fn backend_cli_healthy(binary: &Path, expected_name: &str) -> bool {
+fn backend_cli_failure(binary: &Path, expected_name: &str, timeout: Duration) -> Option<String> {
     let Some(expected_about) = backend_about(expected_name) else {
-        return false;
+        return Some(format!("unknown backend companion `{expected_name}`"));
     };
+    let (mut child, reader) = match spawn_backend_help(binary, expected_name) {
+        Ok(probe) => probe,
+        Err(problem) => return Some(problem),
+    };
+    let process_id = child.id();
+    let status = match wait_for_backend_help(&mut child, binary, expected_name, timeout) {
+        Ok(status) => status,
+        Err(problem) => return Some(problem),
+    };
+    let output = match finish_backend_output(reader, process_id, binary, expected_name) {
+        Ok(output) => output,
+        Err(problem) => return Some(problem),
+    };
+    backend_help_contract_failure(
+        &output,
+        status.success(),
+        binary,
+        expected_name,
+        expected_about,
+    )
+}
+
+fn spawn_backend_help(
+    binary: &Path,
+    expected_name: &str,
+) -> Result<(Child, ProbeOutputReader), String> {
     let mut command = Command::new(binary);
     command
         .arg("--help")
@@ -543,56 +610,119 @@ fn backend_cli_healthy(binary: &Path, expected_name: &str) -> bool {
         .stderr(Stdio::null());
     #[cfg(unix)]
     command.process_group(0);
-    let Ok(mut child) = command.spawn() else {
-        return false;
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return Err(format!(
+                "could not start backend companion `{expected_name}` at `{}`: {error}",
+                binary.display()
+            ));
+        }
     };
-    let process_id = child.id();
     let Some(stdout) = child.stdout.take() else {
         terminate_probe_processes(&mut child);
-        return false;
+        return Err(format!(
+            "backend companion `{expected_name}` at `{}` did not provide a readable help stream",
+            binary.display()
+        ));
     };
     let reader = thread::spawn(move || read_probe_output(stdout));
-    let deadline = Instant::now() + BACKEND_PROBE_TIMEOUT;
-    let status = loop {
+    Ok((child, reader))
+}
+
+fn wait_for_backend_help(
+    child: &mut Child,
+    binary: &Path,
+    expected_name: &str,
+    timeout: Duration,
+) -> Result<std::process::ExitStatus, String> {
+    let deadline = Instant::now() + timeout;
+    loop {
         match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
+            Ok(Some(status)) => return Ok(status),
             Ok(None) if Instant::now() < deadline => {
                 thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
             }
-            _ => {
-                terminate_probe_processes(&mut child);
-                break None;
+            Ok(None) => {
+                terminate_probe_processes(child);
+                return Err(format!(
+                    "backend companion `{expected_name}` at `{}` timed out after {} ms during its `--help` probe; process-tree cleanup was attempted",
+                    binary.display(),
+                    timeout.as_millis()
+                ));
+            }
+            Err(error) => {
+                terminate_probe_processes(child);
+                return Err(format!(
+                    "could not wait for backend companion `{expected_name}` at `{}`: {error}",
+                    binary.display()
+                ));
             }
         }
-    };
-
-    if let Some(status) = status {
-        // A descendant can outlive the direct child while holding stdout open.
-        // Give the reader a short chance to drain normal output, then stop the
-        // process group instead of waiting indefinitely for EOF.
-        let drain_deadline = Instant::now() + Duration::from_millis(50);
-        while !reader.is_finished() && Instant::now() < drain_deadline {
-            thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
-        }
-        if !reader.is_finished() && !terminate_probe_process_tree(process_id) {
-            return false;
-        }
-        let Ok(Ok(output)) = reader.join() else {
-            return false;
-        };
-        if !status.success() {
-            return false;
-        }
-        let help = String::from_utf8_lossy(&output);
-        return help.contains(expected_about)
-            && help
-                .lines()
-                .any(|line| line.trim_start().starts_with("Usage:") && line.contains("<COMMAND>"))
-            && help
-                .lines()
-                .any(|line| line.trim_start().starts_with("analyze "));
     }
-    false
+}
+
+fn finish_backend_output(
+    reader: ProbeOutputReader,
+    process_id: u32,
+    binary: &Path,
+    expected_name: &str,
+) -> Result<Vec<u8>, String> {
+    // A descendant can outlive the direct child while holding stdout open.
+    // Give the reader a short chance to drain normal output, then stop the
+    // process group instead of waiting indefinitely for EOF.
+    let drain_deadline = Instant::now() + Duration::from_millis(50);
+    while !reader.is_finished() && Instant::now() < drain_deadline {
+        thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
+    }
+    if !reader.is_finished() && !terminate_probe_process_tree(process_id) {
+        return Err(format!(
+            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its help process exited",
+            binary.display()
+        ));
+    }
+    match reader.join() {
+        Ok(Ok(output)) => Ok(output),
+        Ok(Err(error)) => Err(format!(
+            "could not read help output from backend companion `{expected_name}` at `{}`: {error}",
+            binary.display()
+        )),
+        Err(_) => Err(format!(
+            "help output reader panicked for backend companion `{expected_name}` at `{}`",
+            binary.display()
+        )),
+    }
+}
+
+fn backend_help_contract_failure(
+    output: &[u8],
+    successful_exit: bool,
+    binary: &Path,
+    expected_name: &str,
+    expected_about: &str,
+) -> Option<String> {
+    if !successful_exit {
+        return Some(format!(
+            "backend companion `{expected_name}` at `{}` exited unsuccessfully",
+            binary.display()
+        ));
+    }
+    let help = String::from_utf8_lossy(output);
+    let healthy = help.contains(expected_about)
+        && help
+            .lines()
+            .any(|line| line.trim_start().starts_with("Usage:") && line.contains("<COMMAND>"))
+        && help
+            .lines()
+            .any(|line| line.trim_start().starts_with("analyze "));
+    if healthy {
+        None
+    } else {
+        Some(format!(
+            "backend companion `{expected_name}` at `{}` did not satisfy the documented `--help` contract",
+            binary.display()
+        ))
+    }
 }
 
 fn backend_about(name: &str) -> Option<&'static str> {
@@ -1035,8 +1165,10 @@ fn verify_activated_payload(
             "activated version `{version}` is below required `{minimum}`"
         ));
     }
-    if !managed_payload_complete(managed_binary) {
-        return Err("activated release bundle is not self-contained".to_string());
+    if let Some(problem) = managed_payload_validation_issue(managed_binary) {
+        return Err(format!(
+            "activated release payload failed validation: {problem}"
+        ));
     }
     Ok(version)
 }
@@ -1345,7 +1477,7 @@ mod tests {
         let flat_payload =
             release_payload_candidates(&flat, &fixture.path().join("managed/bin/sc-lint"));
         assert!(
-            payload_is_complete(&flat_payload),
+            payload_validation_issue(&flat_payload).is_none(),
             "legacy flat layout is accepted"
         );
     }
@@ -1507,7 +1639,7 @@ mod tests {
         for (backend, previous) in MANAGED_BACKENDS.iter().zip(previous_backends) {
             let path = install_dir.join(backend);
             assert_eq!(fs::read(&path).expect("previous backend remains"), previous);
-            assert!(backend_cli_healthy(&path, backend));
+            assert!(backend_cli_failure(&path, backend, BACKEND_PROBE_TIMEOUT).is_none());
         }
         assert_eq!(
             fs::read_to_string(managed_docs.join("README.md")).expect("previous docs remain"),
@@ -1596,7 +1728,10 @@ mod tests {
                 fs::read(install.join(backend)).expect("old backend restored"),
                 previous
             );
-            assert!(backend_cli_healthy(&install.join(backend), backend));
+            assert!(
+                backend_cli_failure(&install.join(backend), backend, BACKEND_PROBE_TIMEOUT)
+                    .is_none()
+            );
         }
         assert_eq!(
             fs::read_to_string(old_docs.join("README.md")).expect("old docs"),
@@ -1627,7 +1762,7 @@ mod tests {
         let mut entries =
             release_payload_candidates(&bin.join(ReleaseTarget::binary_name()), &managed);
         assert!(
-            !payload_is_complete(&entries),
+            payload_validation_issue(&entries).is_some(),
             "missing backend is rejected"
         );
         write_backend_probe(
@@ -1635,13 +1770,13 @@ mod tests {
             crate::consts::TOOL_RUNTIME,
         );
         assert!(
-            !payload_is_complete(&entries),
+            payload_validation_issue(&entries).is_some(),
             "docs without overview are rejected"
         );
         fs::write(docs.join("README.md"), "# docs\n").expect("overview");
         entries = release_payload_candidates(&bin.join(ReleaseTarget::binary_name()), &managed);
         assert!(
-            payload_is_complete(&entries),
+            payload_validation_issue(&entries).is_none(),
             "complete release payload is accepted"
         );
     }
@@ -1674,7 +1809,7 @@ mod tests {
             &fixture.path().join("managed/bin/sc-lint"),
         );
         assert!(
-            !payload_is_complete(&staged_entries),
+            payload_validation_issue(&staged_entries).is_some(),
             "runtime binary renamed as portability is rejected in staging"
         );
 
@@ -1705,6 +1840,21 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn backend_probe_accepts_a_slow_healthy_companion_within_its_deadline() {
+        let fixture = TempDir::new().expect("fixture");
+        let backend = crate::consts::TOOL_RUNTIME;
+        let path = fixture.path().join(backend);
+        write_slow_backend_probe(&path, backend, "0.25");
+
+        assert_eq!(
+            backend_cli_failure(&path, backend, Duration::from_secs(10)),
+            None,
+            "healthy companion should pass even when its first help response is delayed"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn hanging_noisy_backend_is_bounded_and_cleaned_up_in_staged_and_installed_bundles() {
         let fixture = TempDir::new().expect("fixture");
 
@@ -1720,8 +1870,7 @@ mod tests {
             crate::consts::TOOL_BOUNDARY,
             crate::consts::TOOL_PORTABILITY,
         ] {
-            fs::copy(built_backend_binary(backend), staged_bin.join(backend))
-                .expect("copy staged backend");
+            write_backend_probe(&staged_bin.join(backend), backend);
         }
         write_hanging_noisy_stub(
             &staged_bin.join(crate::consts::TOOL_RUNTIME),
@@ -1732,11 +1881,20 @@ mod tests {
         fs::write(staged_docs.join("README.md"), "# docs\n").expect("staged docs README");
         let staged_launcher = staged_bin.join(ReleaseTarget::binary_name());
         let staged_managed = fixture.path().join("managed/bin/sc-lint");
+        let probe_timeout = Duration::from_secs(5);
         let staged_is_complete = run_probe_with_watchdog(&staged_pid_file, move || {
             let entries = release_payload_candidates(&staged_launcher, &staged_managed);
-            payload_is_complete(&entries)
+            payload_validation_issue_with_timeout(&entries, probe_timeout)
         });
-        assert!(!staged_is_complete);
+        let staged_problem = staged_is_complete.expect("hanging staged companion is rejected");
+        assert!(
+            staged_problem.contains(crate::consts::TOOL_RUNTIME),
+            "unexpected staged probe failure: {staged_problem}"
+        );
+        assert!(
+            staged_problem.contains("timed out after 5000 ms"),
+            "unexpected staged probe failure: {staged_problem}"
+        );
         assert_probe_children_stopped(&staged_pid_file);
 
         let installed_root = fixture.path().join("installed");
@@ -1751,8 +1909,7 @@ mod tests {
             crate::consts::TOOL_BOUNDARY,
             crate::consts::TOOL_PORTABILITY,
         ] {
-            fs::copy(built_backend_binary(backend), installed_bin.join(backend))
-                .expect("copy installed backend");
+            write_backend_probe(&installed_bin.join(backend), backend);
         }
         write_hanging_noisy_stub(
             &installed_bin.join(crate::consts::TOOL_RUNTIME),
@@ -1763,9 +1920,12 @@ mod tests {
         fs::write(installed_docs.join("README.md"), "# docs\n").expect("installed docs README");
         let installed_launcher = installed_bin.join(ReleaseTarget::binary_name());
         let installed_is_complete = run_probe_with_watchdog(&installed_pid_file, move || {
-            managed_payload_complete(&installed_launcher)
+            managed_payload_validation_issue_with_timeout(&installed_launcher, probe_timeout)
         });
-        assert!(!installed_is_complete);
+        let installed_problem =
+            installed_is_complete.expect("hanging installed companion is rejected");
+        assert!(installed_problem.contains(crate::consts::TOOL_RUNTIME));
+        assert!(installed_problem.contains("timed out after 5000 ms"));
         assert_probe_children_stopped(&installed_pid_file);
     }
 
@@ -1930,10 +2090,14 @@ mod tests {
         let repaired = execute_install_command(&config_path, &["setup"]);
         assert_eq!(repaired["status"], "upgraded");
         assert!(install_dir.join(crate::consts::TOOL_RUNTIME).is_file());
-        assert!(backend_cli_healthy(
-            &install_dir.join(crate::consts::TOOL_RUNTIME),
-            crate::consts::TOOL_RUNTIME,
-        ));
+        assert!(
+            backend_cli_failure(
+                &install_dir.join(crate::consts::TOOL_RUNTIME),
+                crate::consts::TOOL_RUNTIME,
+                BACKEND_PROBE_TIMEOUT,
+            )
+            .is_none()
+        );
         assert!(
             install_dir
                 .join("../share/sc-lint/sc-lint-docs/README.md")
@@ -2341,6 +2505,23 @@ mod tests {
             )
             .expect("copy built backend executable");
         }
+    }
+
+    #[cfg(unix)]
+    fn write_slow_backend_probe(path: &Path, name: &str, delay_seconds: &str) {
+        use std::os::unix::fs::PermissionsExt;
+
+        let about = backend_about(name).expect("known backend identity");
+        fs::write(
+            path,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  sleep {delay_seconds}\n  printf '%s\\n' 'Usage: {name} <COMMAND>' '{about}' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
+            ),
+        )
+        .expect("slow backend probe");
+        let mut permissions = fs::metadata(path).expect("probe metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).expect("make slow backend probe executable");
     }
 
     #[cfg(unix)]
