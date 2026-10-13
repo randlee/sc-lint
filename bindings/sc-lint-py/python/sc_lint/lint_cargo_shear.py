@@ -28,7 +28,8 @@ PATH_KEY_MIGRATION_DIAGNOSTIC = (
     'longer supported; use <package>.<dependency-key> (the dependency rename '
     'alias when present, otherwise its package name), or workspace.<dependency-key> '
     'only for a virtual-root workspace dependency. Package roots use their '
-    'package name, including a package named workspace.'
+    'package name, including a package named workspace; if both resolve to the '
+    'same key, rename the package or dependency alias to disambiguate it.'
 )
 
 
@@ -36,6 +37,7 @@ PATH_KEY_MIGRATION_DIAGNOSTIC = (
 class CargoShearWorkspaceMetadata:
     manifest_packages: dict[str, str]
     allowed_unused_dependency_keys: frozenset[str]
+    ambiguous_unused_dependency_keys: frozenset[str] = frozenset()
 
 
 class CargoShearMetadataError(RuntimeError):
@@ -213,6 +215,7 @@ def load_cargo_shear_workspace_metadata(
     resolved_root = repo_root.resolve()
     manifest_packages: dict[str, str] = {}
     allowed_keys: set[str] = set()
+    key_origins: dict[str, set[str]] = {}
     for package in packages:
         if not isinstance(package, dict):
             continue
@@ -220,6 +223,12 @@ def load_cargo_shear_workspace_metadata(
         if not isinstance(package_name, str):
             continue
 
+        manifest_path = package.get("manifest_path")
+        package_origin = (
+            Path(manifest_path).resolve().as_posix()
+            if isinstance(manifest_path, str)
+            else f"<package:{package.get('id', package_name)}>"
+        )
         dependencies = package.get("dependencies", [])
         if isinstance(dependencies, list):
             for dependency in dependencies:
@@ -227,9 +236,10 @@ def load_cargo_shear_workspace_metadata(
                     continue
                 dependency_name = dependency.get("rename") or dependency.get("name")
                 if isinstance(dependency_name, str):
-                    allowed_keys.add(f"{package_name}.{dependency_name}")
+                    key = f"{package_name}.{dependency_name}"
+                    allowed_keys.add(key)
+                    key_origins.setdefault(key, set()).add(package_origin)
 
-        manifest_path = package.get("manifest_path")
         if not isinstance(manifest_path, str):
             continue
         try:
@@ -253,13 +263,18 @@ def load_cargo_shear_workspace_metadata(
         if isinstance(workspace_dependencies, dict):
             for dependency_name in workspace_dependencies:
                 if isinstance(dependency_name, str):
-                    allowed_keys.add(f"workspace.{dependency_name}")
+                    key = f"workspace.{dependency_name}"
+                    allowed_keys.add(key)
+                    key_origins.setdefault(key, set()).add("<virtual-workspace-root>")
         manifest_packages["Cargo.toml"] = "workspace"
         manifest_packages[root_manifest_path.as_posix()] = "workspace"
 
     return CargoShearWorkspaceMetadata(
         manifest_packages=manifest_packages,
         allowed_unused_dependency_keys=frozenset(allowed_keys),
+        ambiguous_unused_dependency_keys=frozenset(
+            key for key, origins in key_origins.items() if len(origins) > 1
+        ),
     )
 
 
@@ -305,6 +320,12 @@ def validate_unused_dependency_allowlist(
                     f'key={key!r} cause=path-like-key action="replace with a canonical dependency key"',
                     PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key),
                 )
+            )
+        elif key in metadata.ambiguous_unused_dependency_keys:
+            diagnostics.append(
+                f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
+                f'key={key!r} cause=ambiguous-dependency-key '
+                'action="disambiguate the virtual workspace root from a package named workspace by renaming the package or dependency alias"'
             )
         elif key not in metadata.allowed_unused_dependency_keys:
             diagnostics.append(

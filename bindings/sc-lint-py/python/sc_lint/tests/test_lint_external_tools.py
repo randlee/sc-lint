@@ -377,6 +377,54 @@ allow = ["MIT"]
         self.assertIn("external-member.serde", metadata.allowed_unused_dependency_keys)
         self.assertNotIn(member_manifest.as_posix(), metadata.manifest_packages)
 
+    def test_cargo_shear_virtual_root_workspace_member_collision_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                '[workspace]\nmembers = ["crates/workspace"]\n'
+                '[workspace.dependencies]\nshared = "1"\nroot_only = "1"\n',
+                encoding="utf-8",
+            )
+            member_manifest = repo_root / "crates" / "workspace" / "Cargo.toml"
+            member_manifest.parent.mkdir(parents=True)
+            member_manifest.write_text(
+                '[package]\nname = "workspace"\nversion = "0.1.0"\n',
+                encoding="utf-8",
+            )
+            metadata_json = {
+                "packages": [
+                    {
+                        "name": "workspace",
+                        "manifest_path": str(member_manifest),
+                        "dependencies": [
+                            {"name": "shared", "rename": None},
+                            {"name": "member_only", "rename": None},
+                        ],
+                    }
+                ]
+            }
+            completed = subprocess.CompletedProcess(
+                ["cargo", "metadata"], 0, json.dumps(metadata_json), ""
+            )
+            with patch(
+                "sc_lint.lint_cargo_shear.subprocess.run", return_value=completed
+            ):
+                metadata = load_cargo_shear_workspace_metadata(repo_root)
+
+        self.assertEqual(
+            metadata.ambiguous_unused_dependency_keys,
+            frozenset({"workspace.shared"}),
+        )
+        self.assertIn("workspace.root_only", metadata.allowed_unused_dependency_keys)
+        self.assertIn("workspace.member_only", metadata.allowed_unused_dependency_keys)
+        diagnostics = validate_unused_dependency_allowlist(
+            {"workspace.shared": "either package or virtual-root dependency"}, metadata
+        )
+        self.assertEqual(len(diagnostics), 1)
+        self.assertIn("cause=ambiguous-dependency-key", diagnostics[0])
+        self.assertIn("virtual workspace root", diagnostics[0])
+        self.assertIn("package named workspace", diagnostics[0])
+
     def test_cargo_shear_validation_reports_exact_path_key_migration(self) -> None:
         metadata = CargoShearWorkspaceMetadata(
             {"crates/app/Cargo.toml": APP_PACKAGE},
