@@ -24,11 +24,11 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fmt;
+use std::path::Path;
 
 use serde_json::json;
 
 use crate::CliError;
-use crate::config::ConsumerProfileStep;
 
 /// Stable top-level code for every invalid consumer profile declaration.
 pub const PROFILE_PLAN_ERROR_CODE: &str = "CLI.SC_LINT_PROFILE_CONFIG_INVALID";
@@ -846,4 +846,62 @@ fn targeted_argv(
     args.push(target.as_str().into());
     args.extend(tail[separator..].iter().map(OsString::from));
     Ok(("cargo".into(), args))
+}
+
+/// A command is decoded and validated at the TOML boundary, so profile
+/// orchestration never needs to split shell strings or infer consumer policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ConsumerProfileStep {
+    name: String,
+    command: Vec<String>,
+    platform: Option<Platform>,
+    target: Option<Target>,
+}
+
+impl ConsumerProfileStep {
+    /// Builds a step from already-decoded fields; semantic checks live in
+    /// [`validate_lint_step`].
+    pub(crate) fn new(
+        name: impl Into<String>,
+        command: Vec<String>,
+        platform: Option<Platform>,
+        target: Option<Target>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            command,
+            platform,
+            target,
+        }
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn command(&self) -> &[String] {
+        &self.command
+    }
+
+    pub(crate) const fn platform(&self) -> Option<Platform> {
+        self.platform
+    }
+
+    pub(crate) const fn target(&self) -> Option<&Target> {
+        self.target.as_ref()
+    }
+}
+
+/// Everything the planner needs for one consumer lint selection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LintPlanInput<'a> {
+    pub(crate) root: &'a Path,
+    /// Declared steps, or the ordered members of a selected named profile.
+    pub(crate) steps: Vec<ConsumerProfileStep>,
+    /// A single-step selector for the planner; `None` selects every `steps` entry.
+    pub(crate) selector: Option<ProfileName>,
+}
+
+pub(crate) fn profile_plan_config_error(error: ProfilePlanError, path: &Path) -> CliError {
+    CliError::from(error).with_detail("config_path", json!(path.display().to_string()))
 }

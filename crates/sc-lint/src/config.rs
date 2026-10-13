@@ -18,11 +18,12 @@ pub(crate) use crate::consumer_integration::run_consumer_init;
 #[cfg(test)]
 pub(crate) use crate::consumer_integration::run_consumer_init_at;
 use crate::error::ErrorCode;
+pub(crate) use crate::profile_plan::ConsumerProfileStep;
+use crate::profile_plan::LintPlanInput;
 use crate::profile_plan::LintProfiles;
-use crate::profile_plan::Platform;
 use crate::profile_plan::ProfileName;
-use crate::profile_plan::Target;
 use crate::profile_plan::decode_lint_step_fields;
+use crate::profile_plan::profile_plan_config_error;
 use crate::profile_plan::validate_lint_step;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
@@ -62,60 +63,6 @@ enum LoadedConfigMode {
     Standard,
     Compatibility(CompatibilityRequirement),
     Consumer(ConsumerRequirement),
-}
-
-/// A command is decoded and validated at the TOML boundary, so profile
-/// orchestration never needs to split shell strings or infer consumer policy.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ConsumerProfileStep {
-    name: String,
-    command: Vec<String>,
-    platform: Option<Platform>,
-    target: Option<Target>,
-}
-
-impl ConsumerProfileStep {
-    /// Builds a step from already-decoded fields; semantic checks live in
-    /// [`crate::profile_plan::validate_lint_step`].
-    pub(crate) fn new(
-        name: impl Into<String>,
-        command: Vec<String>,
-        platform: Option<Platform>,
-        target: Option<Target>,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            command,
-            platform,
-            target,
-        }
-    }
-
-    pub(crate) fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub(crate) fn command(&self) -> &[String] {
-        &self.command
-    }
-
-    pub(crate) const fn platform(&self) -> Option<Platform> {
-        self.platform
-    }
-
-    pub(crate) const fn target(&self) -> Option<&Target> {
-        self.target.as_ref()
-    }
-}
-
-/// Everything the planner needs for one consumer lint selection.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct LintPlanInput<'a> {
-    pub(crate) root: &'a Path,
-    /// Declared steps, or the ordered members of a selected named profile.
-    pub(crate) steps: Vec<ConsumerProfileStep>,
-    /// A single-step selector for the planner; `None` selects every `steps` entry.
-    pub(crate) selector: Option<ProfileName>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -908,13 +855,6 @@ fn validate_consumer_profile(
         steps.push(declared);
     }
     Ok(steps)
-}
-
-fn profile_plan_config_error(
-    error: crate::profile_plan::ProfilePlanError,
-    path: &Path,
-) -> CliError {
-    CliError::from(error).with_detail("config_path", json!(path.display().to_string()))
 }
 
 fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {
