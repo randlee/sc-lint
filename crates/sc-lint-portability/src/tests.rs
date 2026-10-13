@@ -2003,6 +2003,113 @@ fn issue372_adapter_scan_failure_keeps_its_cause() {
 }
 
 #[test]
+fn issue372_invalid_adapter_matrix_covers_every_row_and_stable_code() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        #[cfg(unix)] mod unix_socket;
+        #[cfg(windows)] mod named_pipe;
+        #[cfg(windows)] mod windows_only;
+        #[cfg(test)] mod test_only;
+        "#,
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+    fixture.write_source("example", "windows_only.rs", "fn connect() {}");
+    fixture.write_source("example", "test_only.rs", "fn connect() {}");
+
+    let valid_pair = |unix_module: &str, windows_module: &str| {
+        format!(
+            "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"{unix_module}\"\nwindows_module = \"{windows_module}\"\nreason = \"Private transport adapters\"\n"
+        )
+    };
+    let repeated_pair = format!(
+        "{}[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"crates/example/src/unix_socket.rs\"\nwindows_module = \"crates/example/src/named_pipe.rs\"\nreason = \"Repeated pair\"\n",
+        valid_pair(
+            "crates/example/src/unix_socket.rs",
+            "crates/example/src/named_pipe.rs"
+        )
+    );
+    let cases = [
+        (
+            "wrong type",
+            "ANALYZER_CONFIG.WRONG_TYPE",
+            "[tool.sc-lint.analyzers.portability]\nplatform_adapters = \"invalid\"\n".to_owned(),
+        ),
+        (
+            "unknown key",
+            "ANALYZER_CONFIG.UNKNOWN_KEY",
+            "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"crates/example/src/unix_socket.rs\"\nwindows_module = \"crates/example/src/named_pipe.rs\"\nreason = \"Private transport adapters\"\nextra = true\n".to_owned(),
+        ),
+        (
+            "non-rs path",
+            "ANALYZER_CONFIG.ADAPTER_PATH",
+            valid_pair(
+                "crates/example/src/socket.txt",
+                "crates/example/src/named_pipe.rs",
+            ),
+        ),
+        (
+            "missing adapter",
+            "ANALYZER_CONFIG.ADAPTER_MISSING",
+            valid_pair(
+                "crates/example/src/missing.rs",
+                "crates/example/src/named_pipe.rs",
+            ),
+        ),
+        (
+            "repeated pair",
+            "ANALYZER_CONFIG.ADAPTER_DUPLICATE",
+            repeated_pair,
+        ),
+        (
+            "wrong cfg",
+            "ANALYZER_CONFIG.ADAPTER_CFG",
+            valid_pair(
+                "crates/example/src/windows_only.rs",
+                "crates/example/src/named_pipe.rs",
+            ),
+        ),
+        (
+            "test-only adapter",
+            "ANALYZER_CONFIG.ADAPTER_TEST_ONLY",
+            valid_pair(
+                "crates/example/src/test_only.rs",
+                "crates/example/src/named_pipe.rs",
+            ),
+        ),
+    ];
+
+    let mut mismatches = Vec::new();
+    for (label, expected_code, config) in cases {
+        fixture.write_lint_config(&config);
+        let error = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        })
+        .unwrap_err();
+        let actual_code = match error {
+            PortabilityError::AnalyzerConfig(error) => error.code().to_owned(),
+            PortabilityError::AdapterConfig(error) => error.code().to_owned(),
+            other => panic!("{label} returned the wrong error family: {other}"),
+        };
+        if actual_code != expected_code {
+            mismatches.push(format!(
+                "{label}: expected {expected_code}, got {actual_code}"
+            ));
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "stable-code mismatches: {mismatches:#?}"
+    );
+}
+
+#[test]
 fn issue372_empty_adapter_list_preserves_prior_findings() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
