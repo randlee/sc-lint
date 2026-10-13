@@ -421,6 +421,28 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .output()
             .expect("run inherited-environment PowerShell consumer bootstrap");
 
+        eprintln!(
+            "Windows native execution controls for {name}: direct cmd status={:?}, stdout={:?}, stderr={:?}; cleared direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared bootstrap status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}",
+            direct.status.code(),
+            String::from_utf8_lossy(&direct.stdout),
+            String::from_utf8_lossy(&direct.stderr),
+            direct_powershell.status.code(),
+            String::from_utf8_lossy(&direct_powershell.stdout),
+            String::from_utf8_lossy(&direct_powershell.stderr),
+            powershell_builtin.status.code(),
+            String::from_utf8_lossy(&powershell_builtin.stdout),
+            String::from_utf8_lossy(&powershell_builtin.stderr),
+            inherited_direct_powershell.status.code(),
+            String::from_utf8_lossy(&inherited_direct_powershell.stdout),
+            String::from_utf8_lossy(&inherited_direct_powershell.stderr),
+            output.status.code(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+            inherited_output.status.code(),
+            String::from_utf8_lossy(&inherited_output.stdout),
+            String::from_utf8_lossy(&inherited_output.stderr)
+        );
+
         assert!(
             output.status.success(),
             "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}; direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}",
@@ -445,14 +467,25 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
         );
         assert!(
             String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
-            "bootstrap stdout={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}; direct PowerShell status={:?}, stdout={:?}, stderr={:?}",
+            "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}; direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}",
+            output.status.code(),
             String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
             direct.status.code(),
             String::from_utf8_lossy(&direct.stdout),
             String::from_utf8_lossy(&direct.stderr),
             direct_powershell.status.code(),
             String::from_utf8_lossy(&direct_powershell.stdout),
-            String::from_utf8_lossy(&direct_powershell.stderr)
+            String::from_utf8_lossy(&direct_powershell.stderr),
+            powershell_builtin.status.code(),
+            String::from_utf8_lossy(&powershell_builtin.stdout),
+            String::from_utf8_lossy(&powershell_builtin.stderr),
+            inherited_direct_powershell.status.code(),
+            String::from_utf8_lossy(&inherited_direct_powershell.stdout),
+            String::from_utf8_lossy(&inherited_direct_powershell.stderr),
+            inherited_output.status.code(),
+            String::from_utf8_lossy(&inherited_output.stdout),
+            String::from_utf8_lossy(&inherited_output.stderr)
         );
         assert!(
             direct.status.success() && String::from_utf8_lossy(&direct.stdout).contains("sc-lint"),
