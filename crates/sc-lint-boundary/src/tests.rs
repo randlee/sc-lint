@@ -525,6 +525,177 @@ fn dependency_policy_allows_direct_workspace_dependency() {
 }
 
 #[test]
+fn issue376_union_matrix() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &path_dependency_manifest("q", "p", "../p", "0.1.0"),
+    );
+    fixture.write(
+        "crates/r/Cargo.toml",
+        &(good_member_manifest("r", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    for package in ["p", "q", "r"] {
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], Some(&["r"]), "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &["q"], Some(&[]), "active");
+
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    let report = analyze_workspace(&options).expect("union policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], Some(&[]), "active");
+    let report = analyze_workspace(&options).expect("missing dev edge analyzes");
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::ScbDependency002)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn issue376_stale_active_gate() {
+    for (state, expects_stale) in [
+        ("active", true),
+        ("stub_landed", true),
+        ("concrete_landed", true),
+        ("unix_implemented_windows_pending", true),
+        ("planned", false),
+        ("retired", false),
+        ("reserved_future", false),
+    ] {
+        let fixture = WorkspaceFixture::new();
+        fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+        fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+        fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+        fixture.write_source("p", "lib.rs", "pub struct P;");
+        fixture.write_source("q", "lib.rs", "pub struct Q;");
+        write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, state);
+        write_policy_record(&fixture, "p/b.toml", "B", &["q"], None, state);
+
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Dependencies),
+        })
+        .expect("stale policy analyzes");
+        assert_eq!(
+            report
+                .findings
+                .iter()
+                .filter(|finding| finding.rule_id == RuleId::ScbDependency004)
+                .count(),
+            usize::from(expects_stale),
+            "state={state}: {:#?}",
+            report.findings
+        );
+    }
+}
+
+#[test]
+fn issue377_semantic_mutations() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&fixture, "p/a.toml", "A", &[], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], None, "active");
+    let first = fixture.root().join("boundaries/p/a.toml");
+    let first_contents = fs::read_to_string(&first).expect("read first record");
+    fs::write(
+        &first,
+        first_contents
+            .replace("facade = \"run\"", "facade = \"not-valid\"")
+            .replace(
+                "type = \"Runner\"\nmodule = \"p\"\nvisibility = \"public\"\nconstructor = \"none\"",
+                "visibility = \"trait_only\"\nconstructor = \"public\"",
+            )
+            .replace("roots = [\"run\"]", "roots = [\"api::\", \"q::Root\"]")
+            .replace("forbidden_edges = []", "forbidden_edges = [\"p -> p\"]"),
+    )
+    .expect("write first record");
+    let second = fixture.root().join("boundaries/p/b.toml");
+    let second_contents = fs::read_to_string(&second).expect("read second record");
+    fs::write(
+        &second,
+        second_contents.replace("name = \"B\"", "name = \"A\""),
+    )
+    .expect("write second record");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("semantic defects are findings");
+    let kinds = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbBoundary004)
+        .map(|finding| finding.kind.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        kinds,
+        BTreeSet::from([
+            "duplicate_owner_name",
+            "invalid_identifier",
+            "invalid_public_path",
+            "self_forbidden_edge",
+            "trait_only_constructor",
+            "unapproved_composition_root",
+        ])
+    );
+    assert_eq!(report.status, ReportStatus::Fail);
+}
+
+#[test]
+fn issue377_aggregates_and_keeps_fatal_errors() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&fixture, "p/a.toml", "A", &[], None, "active");
+    let record = fixture.root().join("boundaries/p/a.toml");
+    let contents = fs::read_to_string(&record).expect("read record");
+    fs::write(
+        &record,
+        contents.replace("facade = \"run\"", "facade = \"bad name\""),
+    )
+    .expect("write semantic record");
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("semantic defect is not fatal");
+    assert_eq!(report.findings[0].kind, "invalid_identifier");
+
+    fs::write(&record, "not valid = [toml").expect("write malformed record");
+    assert!(
+        analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Dependencies),
+        })
+        .is_err()
+    );
+}
+
+#[test]
 fn dependency_policy_resolves_owner_and_policy_aliases_to_canonical_packages() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/app-dir", "crates/api-dir"]);
@@ -2994,6 +3165,77 @@ fn write_named_caller_boundary_record(fixture: &WorkspaceFixture, approved_entri
                 [status]
                 state = "concrete_landed"
             "#
+        ),
+    );
+}
+
+fn write_policy_record(
+    fixture: &WorkspaceFixture,
+    path: &str,
+    name: &str,
+    allowed_dependents: &[&str],
+    allowed_dev_dependents: Option<&[&str]>,
+    state: &str,
+) {
+    let allowed_dependents = allowed_dependents
+        .iter()
+        .map(|package| format!("\"{package}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let allowed_dev_dependents = allowed_dev_dependents.map(|packages| {
+        let packages = packages
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("                allowed_dev_dependents = [{packages}]\n                ")
+    });
+    fixture.write(
+        "boundaries/planning.toml",
+        "[planning]\ncurrent_sprint = \"K.3\"\n",
+    );
+    fixture.write(
+        &format!("boundaries/{path}"),
+        &format!(
+            r#"
+                boundary_id = "BOUNDARY-P{name}"
+                owner_package = "p"
+                owner_crate_path = "p"
+                name = "{name}"
+
+                [public]
+                facade = "run"
+
+                [implementation]
+                type = "Runner"
+                module = "p"
+                visibility = "public"
+                constructor = "none"
+
+                [composition]
+                roots = ["run"]
+
+                [dependencies]
+                allowed_dependents = [{allowed_dependents}]
+                {allowed_dev_dependents}allowed_dependencies = []
+                forbidden_edges = []
+
+                [references]
+                scope = "outside_owner_crate"
+                forbidden = []
+
+                [testing]
+                allowed_test_double_paths = []
+                forbidden_test_bypasses = []
+
+                [enforcement]
+                lint_rules = []
+                review_gates = []
+
+                [status]
+                state = "{state}"
+            "#,
+            allowed_dev_dependents = allowed_dev_dependents.unwrap_or_default(),
         ),
     );
 }

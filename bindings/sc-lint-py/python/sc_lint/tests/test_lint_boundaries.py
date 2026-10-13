@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
 
-
+from sc_lint.lint_boundaries import RULE_ID
+from sc_lint.lint_boundaries import delegation_argv
 from sc_lint.lint_boundaries import run
 from sc_lint.lint_boundaries import validate_inventory
 
@@ -52,18 +54,12 @@ state = "concrete_landed"
 VALID_PLANNING = """
 [planning]
 current_sprint = "A.6"
-
-[planned_items."BOUNDARY-ScLintCli.public.facade"]
-scheduled_sprint = "A.1a"
-tracking_id = "SC-LINT-CLI-003"
-expires_when = "sprint_before_current"
 """
 
 
 def write_fixture(repo_root: Path) -> None:
     (repo_root / "Cargo.toml").write_text(
-        '[workspace]\nmembers=["crates/example"]\nresolver="2"\n\n[workspace.package]\nversion="0.1.0"\n',
-        encoding="utf-8",
+        '[workspace]\nmembers=["crates/example"]\nresolver="2"\n', encoding="utf-8"
     )
     crate_dir = repo_root / "crates" / "example"
     crate_dir.mkdir(parents=True)
@@ -76,214 +72,53 @@ def write_fixture(repo_root: Path) -> None:
     boundaries_dir = repo_root / "boundaries" / "sc-lint"
     boundaries_dir.mkdir(parents=True)
     (boundaries_dir / "top-level-cli.toml").write_text(VALID_BOUNDARY, encoding="utf-8")
-    (repo_root / "boundaries" / "planning.toml").write_text(
-        VALID_PLANNING,
-        encoding="utf-8",
-    )
+    (repo_root / "boundaries" / "planning.toml").write_text(VALID_PLANNING, encoding="utf-8")
 
 
 class LintBoundariesTests(unittest.TestCase):
-    def write_fixture(self, repo_root: Path) -> None:
-        write_fixture(repo_root)
-
-    def test_validate_inventory_accepts_valid_fixture(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            self.assertEqual(validate_inventory(repo_root), [])
-
-    def test_validate_inventory_rejects_invalid_schema(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            (repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml").write_text(
-                VALID_BOUNDARY + '\nunexpected = "nope"\n',
-                encoding="utf-8",
-            )
-            errors = validate_inventory(repo_root)
-            self.assertIn(
-                f"{repo_root / 'boundaries' / 'sc-lint' / 'top-level-cli.toml'}: unexpected status keys: unexpected",
-                errors,
+    def test_delegation_argv_uses_only_the_rust_rule(self) -> None:
+        root = Path("/tmp/example")
+        with mock.patch("sc_lint.lint_boundaries.binary_path", return_value="/bin/sc-lint"):
+            self.assertEqual(
+                delegation_argv(root),
+                [
+                    "/bin/sc-lint",
+                    "--json",
+                    "--root",
+                    "/tmp/example",
+                    "lint",
+                    "sc-boundary",
+                    "--rule-filter",
+                    RULE_ID,
+                ],
             )
 
-    def test_validate_inventory_accepts_pr115_schema_additions(self) -> None:
+    def test_run_projects_rust_status(self) -> None:
+        payload = json.dumps({"data": {"status": "fail", "findings": []}})
+        completed = mock.Mock(returncode=0, stdout=payload, stderr="")
+        with mock.patch("sc_lint.lint_boundaries.subprocess.run", return_value=completed):
+            self.assertEqual(run(Path("/tmp/example")), 1)
+
+    def test_validate_inventory_projects_rust_messages(self) -> None:
+        payload = json.dumps(
+            {"data": {"status": "fail", "findings": [{"message": "Rust owns this"}]}}
+        )
+        completed = mock.Mock(returncode=0, stdout=payload, stderr="")
+        with mock.patch("sc_lint.lint_boundaries.subprocess.run", return_value=completed):
+            self.assertEqual(validate_inventory(Path("/tmp/example")), ["Rust owns this"])
+
+    def test_issue377_delegate_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
+            write_fixture(repo_root)
             boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
             boundary.write_text(
-                VALID_BOUNDARY.replace('facade = "Cli"', 'trait = "CliPort"\nnotes = "public contract"')
-                .replace("[dependencies]", "[ownership]\nio_owns = []\nio_forbidden = []\n\n[callers]\napproved = []\n\n[dependencies]")
-                .replace("[testing]", "[contracts]\nrequest_types = []\nresponse_types = []\nerror_types = []\nnotes = []\n\n[testing]")
-                .replace("forbidden_edges = []", 'forbidden_edges = ["sc-lint -> sc-lint-schema"]')
-                .replace('state = "concrete_landed"', 'state = "concrete_landed"\nnotes = []'),
+                VALID_BOUNDARY.replace('facade = "Cli"', 'facade = "not-valid"'),
                 encoding="utf-8",
             )
-            self.assertEqual(validate_inventory(repo_root), [])
-
-    def test_validate_inventory_rejects_both_public_surface(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-            boundary.write_text(
-                VALID_BOUNDARY.replace('facade = "Cli"', 'facade = "Cli"\ntrait = "CliPort"'),
-                encoding="utf-8",
-            )
-            self.assertIn(
-                f"{boundary}: must define exactly one of public.facade or public.trait",
-                validate_inventory(repo_root),
-            )
-
-    def test_validate_inventory_rejects_empty_public_trait(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-            boundary.write_text(
-                VALID_BOUNDARY.replace('facade = "Cli"', 'facade = "Cli"\ntrait = ""'),
-                encoding="utf-8",
-            )
-            self.assertIn(
-                f"{boundary}: defines an empty public.trait",
-                validate_inventory(repo_root),
-            )
-
-    def test_validate_inventory_rejects_neither_public_surface(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-            boundary.write_text(
-                VALID_BOUNDARY.replace('facade = "Cli"', 'notes = "context"'),
-                encoding="utf-8",
-            )
-            self.assertIn(
-                f"{boundary}: must define a non-empty public.facade or public.trait",
-                validate_inventory(repo_root),
-            )
-
-    def test_validate_inventory_rejects_empty_public_facade(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-            boundary.write_text(
-                VALID_BOUNDARY.replace('facade = "Cli"', 'facade = "   "'),
-                encoding="utf-8",
-            )
-            self.assertIn(
-                f"{boundary}: defines an empty public.facade",
-                validate_inventory(repo_root),
-            )
-
-    def test_validate_inventory_accepts_new_visibility_and_constructor_values(self) -> None:
-        for visibility, constructor in (
-            ("private", "public"),
-            ("pub(crate)", "private"),
-            ("public", "pub(crate)"),
-        ):
-            with self.subTest(visibility=visibility), tempfile.TemporaryDirectory() as tempdir:
-                repo_root = Path(tempdir)
-                self.write_fixture(repo_root)
-                boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-                boundary.write_text(
-                    VALID_BOUNDARY.replace('visibility = "public"', f'visibility = "{visibility}"')
-                    .replace('constructor = "none"', f'constructor = "{constructor}"'),
-                    encoding="utf-8",
-                )
-                self.assertEqual(validate_inventory(repo_root), [])
-
-    def test_validate_inventory_accepts_trait_only_without_implementation_shape(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-            boundary.write_text(
-                VALID_BOUNDARY.replace('facade = "Cli"', 'trait = "CliPort"')
-                .replace('visibility = "public"', 'visibility = "trait_only"')
-                .replace('type = "Cli"\nmodule = "sc_lint"\n', ''),
-                encoding="utf-8",
-            )
-            self.assertEqual(validate_inventory(repo_root), [])
-
-    def test_validate_inventory_rejects_unknown_visibility_and_constructor(self) -> None:
-        for field, original, value in (
-            ("visibility", 'visibility = "public"', "internal"),
-            ("constructor", 'constructor = "none"', "factory"),
-        ):
-            with self.subTest(field=field), tempfile.TemporaryDirectory() as tempdir:
-                repo_root = Path(tempdir)
-                self.write_fixture(repo_root)
-                boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-                boundary.write_text(
-                    VALID_BOUNDARY.replace(original, f'{field} = "{value}"'),
-                    encoding="utf-8",
-                )
-                self.assertIn(
-                    f"{boundary}: unsupported implementation.{field} `{value}`",
-                    validate_inventory(repo_root),
-                )
-
-    def test_validate_inventory_rejects_missing_private_and_pub_crate_fields(self) -> None:
-        for visibility, constructor in (("private", "private"), ("pub(crate)", "pub(crate)")):
-            for field, line in (
-                ("type", 'type = "Cli"\n'),
-                ("module", 'module = "sc_lint"\n'),
-                ("constructor", f'constructor = "{constructor}"\n'),
-            ):
-                with self.subTest(visibility=visibility, field=field), tempfile.TemporaryDirectory() as tempdir:
-                    repo_root = Path(tempdir)
-                    self.write_fixture(repo_root)
-                    boundary = repo_root / "boundaries" / "sc-lint" / "top-level-cli.toml"
-                    contents = VALID_BOUNDARY.replace('visibility = "public"', f'visibility = "{visibility}"')
-                    contents = contents.replace('constructor = "none"', f'constructor = "{constructor}"')
-                    boundary.write_text(contents.replace(line, ""), encoding="utf-8")
-                    self.assertTrue(
-                        any(
-                            f"implementation.{field} must be present for {visibility} visibility" in error
-                            for error in validate_inventory(repo_root)
-                        )
-                    )
-
-    def test_validate_inventory_rejects_duplicate_boundary_ids(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            duplicate_dir = repo_root / "boundaries" / "other-owner"
-            duplicate_dir.mkdir(parents=True)
-            duplicate = VALID_BOUNDARY.replace(
-                'owner_package = "sc-lint"',
-                'owner_package = "other-owner"',
-            ).replace(
-                'owner_crate_path = "sc_lint"',
-                'owner_crate_path = "other_owner"',
-            )
-            (duplicate_dir / "duplicate.toml").write_text(duplicate, encoding="utf-8")
-            errors = validate_inventory(repo_root)
-            self.assertTrue(any("duplicate boundary_id" in error for error in errors))
-
-    @mock.patch("sc_lint.lint_boundaries.print_report")
-    @mock.patch("sc_lint.lint_boundaries.build_report")
-    def test_run_reports_failure_from_validation_errors(
-        self,
-        build_report_mock: mock.Mock,
-        print_report_mock: mock.Mock,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            self.write_fixture(repo_root)
-            (repo_root / "boundaries" / "planning.toml").write_text(
-                "[planning]\ncurrent_sprint = \"\"\n",
-                encoding="utf-8",
-            )
-            build_report_mock.return_value = mock.Mock(
-                log_path=repo_root / ".just/logs/example.log"
-            )
-
-            self.assertEqual(run(repo_root), 1)
-            self.assertTrue(build_report_mock.called)
-            print_report_mock.assert_called_once()
+            messages = validate_inventory(repo_root)
+            self.assertEqual(len(messages), 1)
+            self.assertIn("invalid Rust identifier `not-valid`", messages[0])
 
 
 if __name__ == "__main__":

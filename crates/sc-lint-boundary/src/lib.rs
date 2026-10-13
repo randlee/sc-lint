@@ -342,6 +342,7 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
         (
             "dependencies",
             &[
+                rule(RuleId::ScbBoundary004),
                 rule(RuleId::ScbDependency001),
                 rule(RuleId::ScbDependency002),
                 rule(RuleId::ScbDependency003),
@@ -635,17 +636,26 @@ pub fn analyze_workspace(
         graph::load_metadata(root).map_err(|e| BoundaryError::inventory_load(root, e))?;
     inventory::validate_owner_crate_paths(&inventory, &metadata)
         .map_err(|e| BoundaryError::inventory_load(root, e))?;
+    let workspace_packages = workspace_packages(&metadata);
+    let resolver =
+        inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
+    let (inventory, semantic_diagnostics) = inventory::validate_inventory(inventory, &resolver);
+    let semantic_findings = semantic_diagnostics
+        .iter()
+        .map(inventory::InventoryDiagnostic::finding)
+        .collect::<Vec<_>>();
     if options.rule == Some(RuleFilter::Dependencies) {
         let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
             .map_err(|e| BoundaryError::package_policy(root, e))?;
-        return Ok(findings_report(
-            dependency_report.scanned_crates,
-            dependency_report.findings,
-        ));
+        let mut findings = semantic_findings;
+        findings.extend(dependency_report.findings);
+        return Ok(findings_report(dependency_report.scanned_crates, findings));
     }
     let graph = graph::build_workspace_graph_from(&metadata)
         .map_err(|e| BoundaryError::graph_build(root, e))?;
-    let mut findings = Vec::with_capacity(inventory.summary().recommended_finding_capacity());
+    let raw_inventory = inventory.as_raw_inventory();
+    let mut findings = semantic_findings;
+    findings.reserve(inventory.summary().recommended_finding_capacity());
     let filter = options.rule;
     use RuleFilter::{Boundaries, Cycles, ForbidExternalImpls, InternalOnly};
     if rule_selected(filter, &[Cycles]) {
@@ -658,7 +668,7 @@ pub fn analyze_workspace(
         findings.extend(analysis::analyze_forbid_external_impls(&graph));
     }
     if rule_selected(filter, &[Boundaries]) {
-        findings.extend(analysis::analyze_named_callers(&graph, &inventory));
+        findings.extend(analysis::analyze_named_callers(&graph, &raw_inventory));
     }
     if filter.is_none() {
         let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
@@ -729,6 +739,11 @@ pub fn analyze_workspace_configured(
     if !settings.enabled {
         return Ok(disabled_report());
     }
+    if settings.rule_filter.as_ref().is_some_and(|selected| {
+        selected.len() == 1 && selected.contains(&rule(RuleId::ScbBoundary004))
+    }) {
+        return analyze_inventory_semantics(&options.root);
+    }
     let mut options = options.clone();
     options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
     let mut report = analyze_workspace(&options)?;
@@ -754,6 +769,26 @@ fn manifest_finding_path(finding: &Finding) -> Option<RepoRelativePath> {
     .then(|| finding.owner_ids.first())
     .flatten()
     .and_then(|owner| RepoRelativePath::parse(owner.as_str()).ok())
+}
+
+fn analyze_inventory_semantics(root: &Path) -> std::result::Result<FindingsReport, BoundaryError> {
+    let inventory = inventory::load_boundary_inventory(root)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    let metadata =
+        graph::load_metadata(root).map_err(|error| BoundaryError::inventory_load(root, error))?;
+    inventory::validate_owner_crate_paths(&inventory, &metadata)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    let workspace_packages = workspace_packages(&metadata);
+    let resolver =
+        inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
+    let (_, diagnostics) = inventory::validate_inventory(inventory, &resolver);
+    Ok(findings_report(
+        workspace_packages.len(),
+        diagnostics
+            .iter()
+            .map(inventory::InventoryDiagnostic::finding)
+            .collect(),
+    ))
 }
 
 fn legacy_family_rule_filter(selected: Option<&BTreeSet<CatalogRuleId>>) -> Option<RuleFilter> {

@@ -14,6 +14,7 @@
       "SCB-CYCLE-003"
     ],
     "dependencies": [
+      "SCB-BOUNDARY-004",
       "SCB-DEPENDENCY-001",
       "SCB-DEPENDENCY-002",
       "SCB-DEPENDENCY-003",

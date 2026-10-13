@@ -294,6 +294,7 @@ impl TryFrom<RawBoundaryRecord> for BoundaryRecord {
     fn try_from(value: RawBoundaryRecord) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             dependencies: value.dependencies.validate(&value.boundary_id)?,
+            record_path: std::path::PathBuf::new(),
             boundary_id: value.boundary_id,
             owner_package: value.owner_package,
             owner_crate_path: value.owner_crate_path,

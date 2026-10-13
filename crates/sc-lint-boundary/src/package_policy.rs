@@ -6,8 +6,8 @@ use anyhow::Result;
 use crate::Finding;
 use crate::OwnerId;
 use crate::RuleId;
-use crate::inventory::BoundaryInventory;
 use crate::inventory::BoundaryRecord;
+use crate::inventory::ValidatedInventory;
 use crate::inventory::WorkspacePackageName;
 use crate::inventory::WorkspacePackageResolver;
 
@@ -58,7 +58,7 @@ struct ResolvedDependencyPolicy {
 
 pub(crate) fn analyze_package_policy(
     metadata: &cargo_metadata::Metadata,
-    inventory: &BoundaryInventory,
+    inventory: &ValidatedInventory,
 ) -> Result<PackagePolicyReport> {
     let workspace_packages = crate::workspace_packages(metadata);
     let workspace_package_names = workspace_packages
@@ -72,8 +72,7 @@ pub(crate) fn analyze_package_policy(
         .filter(|package| !workspace_package_names.contains(package))
         .chain(
             inventory
-                .records
-                .iter()
+                .records()
                 .filter(|record| !record.status.state.requires_workspace_package())
                 .map(|record| record.owner_package.to_string()),
         )
@@ -125,7 +124,7 @@ fn collect_direct_workspace_edges(
 }
 
 fn collect_policy_findings(
-    inventory: &BoundaryInventory,
+    inventory: &ValidatedInventory,
     resolver: &WorkspacePackageResolver,
     known_non_workspace_packages: &BTreeSet<String>,
     runtime_edges: &BTreeSet<PackageEdge>,
@@ -138,8 +137,7 @@ fn collect_policy_findings(
     let mut findings = Vec::new();
     let mut forbidden_findings = BTreeSet::new();
     let policies = inventory
-        .records
-        .iter()
+        .records()
         .filter(|record| record.status.state.requires_workspace_package())
         .map(|record| {
             resolve_dependency_policy(resolver, known_non_workspace_packages, record)
