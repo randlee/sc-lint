@@ -33,6 +33,43 @@ TEMPLATE_PLACEHOLDERS = {
     "sc-lint-workflow.yml.j2": {"ci_os"},
 }
 TEMPLATE_VARIABLE = re.compile(r"{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}")
+CATALOG_DIRECTORY = ROOT / "analyzer-catalog"
+SCHEMA_DIRECTORY = ROOT / "schema.d"
+
+
+def merge_schema(base: dict, overlay: dict, label: str = "") -> dict:
+    result = dict(base)
+    for key, value in overlay.items():
+        path = f"{label}.{key}" if label else key
+        if key not in result:
+            result[key] = value
+        elif isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = merge_schema(result[key], value, path)
+        elif result[key] != value:
+            raise ValueError(f"schema conflict at {path}")
+    return result
+
+
+def load_schema() -> dict:
+    schema = json.loads((ROOT / "install.schema.json").read_text())
+    if not SCHEMA_DIRECTORY.exists():
+        return schema
+    for overlay_path in sorted(SCHEMA_DIRECTORY.glob("*.json")):
+        schema = merge_schema(schema, json.loads(overlay_path.read_text()))
+    return schema
+
+
+def load_catalogs() -> dict[str, dict]:
+    catalogs = {}
+    for path in sorted(CATALOG_DIRECTORY.glob("*.json")):
+        catalog = json.loads(path.read_text())
+        name = catalog.get("analyzer")
+        if not isinstance(name, str) or name in catalogs:
+            raise ValueError(f"invalid analyzer catalog: {path}")
+        if not isinstance(catalog.get("rules"), list) or not isinstance(catalog.get("families"), dict):
+            raise ValueError(f"invalid analyzer catalog: {path}")
+        catalogs[name] = catalog
+    return catalogs
 
 
 @dataclass(frozen=True)
@@ -57,25 +94,37 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
         extra = set(value) - set(schema["properties"])
         if schema.get("additionalProperties") is False and extra: raise ValueError(f"{label} has unknown fields: {sorted(extra)}")
         for key, item in value.items():
-            if key in schema["properties"]: _schema_value(item, schema["properties"][key], f"{label}.{key}")
+            if key in schema["properties"]:
+                _schema_value(item, schema["properties"][key], f"{label}.{key}")
+            elif isinstance(schema.get("additionalProperties"), dict):
+                _schema_value(item, schema["additionalProperties"], f"{label}.{key}")
     if isinstance(value, list) and "items" in schema:
         for index, item in enumerate(value): _schema_value(item, schema["items"], f"{label}[{index}]")
 
 
 def values(path: Path) -> dict:
     data = json.loads(path.read_text())
-    schema = json.loads((ROOT / "install.schema.json").read_text())
+    schema = load_schema()
     if not isinstance(data, dict): raise ValueError("install input must be an object")
     properties = schema["properties"]
     unknown = set(data) - set(properties)
     missing = set(schema["required"]) - set(data)
     if unknown or missing: raise ValueError(f"install input has missing or unknown fields: {sorted(missing | unknown)}")
     for key, value in data.items(): _schema_value(value, properties[key], key)
+    for analyzer, settings in data["analyzers"].items():
+        catalog = load_catalogs()[analyzer]
+        rules = set(catalog["rules"])
+        selectors = rules | set(catalog["families"])
+        for key in ("exclude_rules", "fail_rules"):
+            invalid = set(settings.get(key, [])) - selectors
+            if invalid: raise ValueError(f"analyzers.{analyzer}.{key} has unknown rules: {sorted(invalid)}")
+        invalid = set(settings.get("exclude_paths_by_rule", {})) - rules
+        if invalid: raise ValueError(f"analyzers.{analyzer}.exclude_paths_by_rule has unknown exact rules: {sorted(invalid)}")
     return data
 
 
 def toml_value(value: object) -> str:
-    if isinstance(value, dict): return "{ " + ", ".join(f"{key} = {toml_value(item)}" for key, item in value.items()) + " }"
+    if isinstance(value, dict): return "{ " + ", ".join(f"{json.dumps(key)} = {toml_value(item)}" for key, item in value.items()) + " }"
     if isinstance(value, list): return "[" + ", ".join(toml_value(item) for item in value) + "]"
     if isinstance(value, bool): return str(value).lower()
     return json.dumps(value)
@@ -146,7 +195,7 @@ def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     if not data["ci"]["enabled"]:
         result = {path: content for path, content in result.items() if path.parts[2] != ".github"}
     for source in ROOT.rglob("*"):
-        if not source.is_file() or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"templates", ".claude-plugin", ".github"}: continue
+        if not source.is_file() or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"templates", ".claude-plugin", ".github", "schema.d", "analyzer-catalog"}: continue
         result[RENAMED.get(source.relative_to(ROOT), source.relative_to(ROOT))] = source.read_bytes()
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.j2" and not data["ci"]["enabled"]: continue

@@ -1,5 +1,6 @@
 #![cfg(test)]
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -10,6 +11,34 @@ use tempfile::TempDir;
 use super::*;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OwnerId;
+
+#[test]
+#[ignore]
+fn emit_installer_catalog() {
+    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
+        .expect("catalog output path must be provided");
+    let families = PORTABILITY_CATALOG
+        .families
+        .iter()
+        .map(|(name, rules)| {
+            (
+                *name,
+                rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    fs::write(
+        output,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "analyzer": PORTABILITY_CATALOG.analyzer.as_str(),
+            "rules": PORTABILITY_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+            "families": families,
+            "own_keys": PORTABILITY_CATALOG.own_keys,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+}
 
 #[test]
 fn portability_string_literal_visitor_arms_decode_once() {
@@ -334,6 +363,61 @@ fn exclude_paths_drops_findings_from_matching_files() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn issue385_rule_path_exclusion_retains_other_rule() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        include_str!("../tests/fixtures/issue385.rs"),
+    );
+
+    let baseline = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+    assert!(
+        baseline
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port006)
+    );
+    assert!(
+        baseline
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port007)
+    );
+
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
+        "PORT-007" = ["crates/example/src/lib.rs"]
+        "#,
+    );
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port006)
+    );
+    assert!(
+        !report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port007)
+    );
 }
 
 #[test]

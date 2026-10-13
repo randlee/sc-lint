@@ -455,10 +455,51 @@ def test_portability_keys_render_into_own_table(tmp_path: Path) -> None:
     ).read_text()
 
 
+def test_rule_path_exclusions_render_quoted_toml_keys_and_require_exact_ids(tmp_path: Path) -> None:
+    data = json.loads((FIXTURES / "install.json").read_text())
+    data["analyzers"]["portability"] = {
+        "exclude_paths_by_rule": {"PORT-007": ["crates/example/src/lib.rs"]}
+    }
+    input_path = tmp_path / "in.json"
+    input_path.write_text(json.dumps(data))
+    consumer = copy_fixture("empty-workspace")
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 0, result.stderr
+    assert 'exclude_paths_by_rule = { "PORT-007" = ["crates/example/src/lib.rs"] }' in (
+        consumer / "sc-lint.toml"
+    ).read_text()
+
+    data["analyzers"]["portability"] = {
+        "exclude_paths_by_rule": {"portability": ["crates/example/src/lib.rs"]}
+    }
+    input_path.write_text(json.dumps(data))
+    result = run("--input", str(input_path), str(copy_fixture("empty-workspace")))
+    assert result.returncode == 2
+    assert "unknown exact rules" in result.stderr
+
+
+def test_generated_catalogs_are_current_and_vendored_only() -> None:
+    result = run_subprocess(
+        ["python3", str(ROOT / "tools" / "generate_installer_catalog.py"), "--check"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    assert not (consumer / "analyzer-catalog").exists()
+    assert (consumer / "plugins" / "sc-lint" / "analyzer-catalog" / "portability.json").is_file()
+
+
 def test_schema_analyzer_keys_match_rust_catalogs() -> None:
     schema = json.loads((KIT / "install.schema.json").read_text())
     tables = schema["properties"]["analyzers"]["properties"]
-    common = {"enabled", "reason", "exclude_rules", "fail_rules", "exclude_paths"}
+    common = {"enabled", "reason", "exclude_rules", "fail_rules", "exclude_paths", "exclude_paths_by_rule"}
     for name, crate in [
         ("boundary", "sc-lint-boundary"),
         ("portability", "sc-lint-portability"),

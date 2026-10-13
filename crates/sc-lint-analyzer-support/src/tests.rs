@@ -16,6 +16,7 @@ use sc_lint_schema::ReportStatus;
 use super::AnalyzerConfigError;
 use super::AnalyzerName;
 use super::CatalogRuleId;
+use super::RepoRelativePath;
 use super::RuleCatalog;
 use super::analyzer_settings_from;
 use super::load_analyzer_settings;
@@ -73,10 +74,10 @@ enum ConfigRule {
     Two,
 }
 
-fn config_rule_id(rule: &ConfigRule) -> &'static str {
+fn config_rule_id(rule: &ConfigRule) -> CatalogRuleId {
     match rule {
-        ConfigRule::One => "EXAMPLE-001",
-        ConfigRule::Two => "EXAMPLE-002",
+        ConfigRule::One => CatalogRuleId::new("EXAMPLE-001"),
+        ConfigRule::Two => CatalogRuleId::new("EXAMPLE-002"),
     }
 }
 
@@ -121,6 +122,7 @@ fn missing_config_yields_defaults() {
     assert_eq!(settings.fail_rules, rule_set(&["EXAMPLE-001"]));
     assert!(settings.exclude_rules.is_empty());
     assert!(settings.exclude_paths.is_empty());
+    assert!(settings.exclude_paths_by_rule.is_empty());
     assert_eq!(settings.rule_filter, None);
     assert_eq!(settings.own_string("extension").unwrap(), None);
 }
@@ -350,6 +352,104 @@ fn settings_apply_filtering_and_failure_policy() {
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].rule_id, ConfigRule::One);
     assert_eq!(status, ReportStatus::Pass);
+}
+
+#[test]
+fn per_rule_path_exclusions_require_exact_catalog_rule_ids() {
+    let directory = config_dir(
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\n\"EXAMPLE-002\" = [\"fixtures/**\"]\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                config_finding(ConfigRule::One),
+                Some(RepoRelativePath::parse("fixtures/input.rs").unwrap()),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::parse("fixtures/input.rs").unwrap()),
+            ),
+        ],
+        config_rule_id,
+    );
+
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule_id, ConfigRule::One);
+    assert_eq!(status, ReportStatus::Fail);
+
+    let family = config_dir(
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\nexample = [\"fixtures/**\"]\n",
+    );
+    let error = load_analyzer_settings(&CATALOG, family.path(), None, None).unwrap_err();
+    assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_RULE");
+}
+
+#[test]
+fn per_rule_path_exclusions_validate_table_and_values() {
+    for contents in [
+        "[tool.sc-lint.analyzers.example]\nexclude_paths_by_rule = [\"EXAMPLE-001\"]\n",
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\n\"EXAMPLE-001\" = \"fixtures/**\"\n",
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\n\"EXAMPLE-001\" = [1]\n",
+    ] {
+        let directory = config_dir(contents);
+        let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+        assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    }
+}
+
+#[test]
+fn own_tables_require_nested_tables_with_indexed_errors() {
+    let directory = config_dir(
+        "[tool.sc-lint.analyzers.example]\n[tool.sc-lint.analyzers.example.extension]\n[tool.sc-lint.analyzers.example.extension.alpha]\nenabled = true\n",
+    );
+    let settings = load_analyzer_settings(
+        &RuleCatalog {
+            own_keys: &["extension"],
+            ..CATALOG
+        },
+        directory.path(),
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(
+        settings
+            .own_tables("extension")
+            .unwrap()
+            .unwrap()
+            .contains_key("alpha")
+    );
+
+    let invalid = config_dir(
+        "[tool.sc-lint.analyzers.example]\n[tool.sc-lint.analyzers.example.extension]\nalpha = true\n",
+    );
+    let settings = load_analyzer_settings(
+        &RuleCatalog {
+            own_keys: &["extension"],
+            ..CATALOG
+        },
+        invalid.path(),
+        None,
+        None,
+    )
+    .unwrap();
+    let error = settings.own_tables("extension").unwrap_err();
+    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    assert!(error.to_string().contains("`extension.alpha`"));
+}
+
+#[test]
+fn repo_relative_paths_normalize_separators_and_reject_escape_or_absolute_paths() {
+    assert_eq!(
+        RepoRelativePath::parse("crates\\example/./src/lib.rs")
+            .unwrap()
+            .as_str(),
+        "crates/example/src/lib.rs"
+    );
+    assert!(RepoRelativePath::parse("../outside.rs").is_err());
+    assert!(RepoRelativePath::parse("/outside.rs").is_err());
+    assert!(RepoRelativePath::parse("C:\\outside.rs").is_err());
 }
 
 #[test]

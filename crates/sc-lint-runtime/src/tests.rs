@@ -5,9 +5,38 @@ use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::OwnerId;
 use sc_lint_schema::ReportStatus;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use tempfile::TempDir;
+
+#[test]
+#[ignore]
+fn emit_installer_catalog() {
+    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
+        .expect("catalog output path must be provided");
+    let families = RUNTIME_CATALOG
+        .families
+        .iter()
+        .map(|(name, rules)| {
+            (
+                *name,
+                rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    std::fs::write(
+        output,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "analyzer": RUNTIME_CATALOG.analyzer.as_str(),
+            "rules": RUNTIME_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+            "families": families,
+            "own_keys": RUNTIME_CATALOG.own_keys,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+}
 
 #[test]
 fn findings_report_text_is_stable() {
@@ -334,6 +363,20 @@ fn exclude_paths_drops_findings_from_matching_files() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn per_rule_path_exclusion_keeps_other_runtime_findings() {
+    let fixture = runtime_fixture(Some(
+        r#"
+        [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+        "SCB-RUNTIME-001" = ["crates/example/src/lib.rs"]
+        "#,
+    ));
+
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+
+    assert_eq!(rule_ids(&report), vec![RuleId::ScbRuntime002]);
 }
 
 #[test]

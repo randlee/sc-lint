@@ -48,6 +48,7 @@ use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageName;
+use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::classify_scope;
@@ -168,19 +169,14 @@ struct PortabilityFinding {
 pub(crate) fn analyze_portability(
     root: &Path,
     document: &toml::Table,
-    settings: &AnalyzerSettings,
+    _settings: &AnalyzerSettings,
     analyzer_keys: &AnalyzerPortabilityKeys,
-) -> Result<Vec<Finding>> {
+) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let config = load_portability_config(document, analyzer_keys)?;
     let source_files = discover_source_files(root)?;
     let mut findings = Vec::new();
 
-    for file_context in source_files.into_iter().filter(|file| {
-        !settings.path_excluded(&sc_lint_analyzer_support::relative_slash_path(
-            root,
-            &file.source_path,
-        ))
-    }) {
+    for file_context in source_files {
         let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
             || {
                 format!(
@@ -217,20 +213,29 @@ pub(crate) fn analyze_portability(
 
     Ok(findings
         .into_iter()
-        .map(|finding| Finding {
-            rule_id: finding.rule_id,
-            kind: finding.kind.into(),
-            message: format!(
-                "{}:{}: {}",
-                finding.source_path.display(),
-                finding.line,
-                finding.message
-            ),
-            owner_ids: vec![OwnerId::new(CrateId::from_parts(
-                finding.package.as_str(),
-                finding.target.as_str(),
-            ))],
-            node_ids: vec![NodeId::new(finding.node_label)],
+        .map(|finding| {
+            let source_path = RepoRelativePath::parse(
+                &sc_lint_analyzer_support::relative_slash_path(root, &finding.source_path),
+            )
+            .expect("discovered source files must be repository-relative");
+            (
+                Finding {
+                    rule_id: finding.rule_id,
+                    kind: finding.kind.into(),
+                    message: format!(
+                        "{}:{}: {}",
+                        finding.source_path.display(),
+                        finding.line,
+                        finding.message
+                    ),
+                    owner_ids: vec![OwnerId::new(CrateId::from_parts(
+                        finding.package.as_str(),
+                        finding.target.as_str(),
+                    ))],
+                    node_ids: vec![NodeId::new(finding.node_label)],
+                },
+                Some(source_path),
+            )
         })
         .collect())
 }

@@ -12,6 +12,7 @@ use anyhow::Result;
 use quote::ToTokens;
 use sc_lint_analyzer_support::AnalyzerName;
 use sc_lint_analyzer_support::CatalogRuleId;
+use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::RuleCatalog;
 use sc_lint_analyzer_support::load_analyzer_settings;
 use sc_lint_directives::AttributeInput;
@@ -721,21 +722,25 @@ pub fn analyze_workspace_configured(
     let mut options = options.clone();
     options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
     let mut report = analyze_workspace(&options)?;
-    let findings: Vec<Finding> = std::mem::take(&mut report.findings)
+    let findings: Vec<_> = std::mem::take(&mut report.findings)
         .into_iter()
-        .filter(|finding| {
-            // Only manifest findings carry a path: their first owner id is the
-            // repo-relative manifest path.
-            !(matches!(
+        .map(|finding| {
+            let path = matches!(
                 finding.rule_id,
                 RuleId::ScbManifest001 | RuleId::ScbManifest002
-            ) && finding
-                .owner_ids
-                .first()
-                .is_some_and(|owner| settings.path_excluded(owner.as_str())))
+            )
+            .then(|| {
+                finding.owner_ids.first().map(|owner| {
+                    RepoRelativePath::parse(owner.as_str())
+                        .expect("manifest finding paths must be repository-relative")
+                })
+            })
+            .flatten();
+            (finding, path)
         })
         .collect();
-    let (findings, status) = settings.apply(findings, |rule| rule.as_str());
+    let (findings, status) =
+        settings.apply_with_paths(findings, |rule: &RuleId| CatalogRuleId::new(rule.as_str()));
     report.findings = findings;
     report.status = status;
     Ok(report)

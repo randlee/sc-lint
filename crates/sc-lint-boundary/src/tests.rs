@@ -4,12 +4,41 @@ use super::*;
 use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
 use tempfile::TempDir;
+
+#[test]
+#[ignore]
+fn emit_installer_catalog() {
+    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
+        .expect("catalog output path must be provided");
+    let families = BOUNDARY_CATALOG
+        .families
+        .iter()
+        .map(|(name, rules)| {
+            (
+                *name,
+                rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    fs::write(
+        output,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "analyzer": BOUNDARY_CATALOG.analyzer.as_str(),
+            "rules": BOUNDARY_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+            "families": families,
+            "own_keys": BOUNDARY_CATALOG.own_keys,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+}
 
 fn fixture_display_path(relative_path: &str) -> String {
     std::env::temp_dir()
@@ -4019,6 +4048,29 @@ fn exclude_paths_drops_manifest_findings() {
             exclude_paths = ["crates/example/**"]
         "#,
     );
+    let report = configured(fixture.root(), Some("manifests")).expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn per_rule_path_exclusion_drops_only_matching_manifest_rule() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+            "SCB-MANIFEST-001" = ["crates/example/Cargo.toml"]
+        "#,
+    );
+
     let report = configured(fixture.root(), Some("manifests")).expect("manifest analysis succeeds");
 
     assert_eq!(report.status, ReportStatus::Pass);
