@@ -769,3 +769,121 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     assert_eq!(windows_log_value(&captured, "arg1"), "two words");
     assert_eq!(windows_log_value(&captured, "arg2"), "tail");
 }
+
+#[cfg(unix)]
+struct OverrideFixture {
+    _fixture: TempDir,
+    root: PathBuf,
+    on_path: PathBuf,
+    log: PathBuf,
+}
+
+#[cfg(unix)]
+fn override_fixture(cwd_stub: bool, path_stub: bool) -> OverrideFixture {
+    let fixture = TempDir::new().expect("fixture root");
+    let root = consumer_fixture(fixture.path(), "override-consumer", false);
+    let on_path = fixture.path().join("on-path");
+    fs::create_dir_all(&on_path).expect("PATH directory");
+    let log = fixture.path().join("override.log");
+    let stub =
+        |marker: &str| format!("#!/bin/sh\nprintf '{marker}\\n' > \"$SC_LINT_EXEC_LOG\"\nexit 0\n");
+    if cwd_stub {
+        write_executable(&root.join("sc-lint"), &stub("cwd"));
+    }
+    if path_stub {
+        write_executable(&on_path.join("sc-lint"), &stub("path"));
+    }
+    fs::create_dir_all(root.join("bin")).expect("relative override directory");
+    write_executable(&root.join("bin/sc-lint"), &stub("relative"));
+    OverrideFixture {
+        _fixture: fixture,
+        root,
+        on_path,
+        log,
+    }
+}
+
+#[cfg(unix)]
+fn run_with_override(fixture: &OverrideFixture, sc_lint_bin: &str) -> Output {
+    run_bootstrap(
+        &fixture.root,
+        &["exec", "--", "sc-lint", "version"],
+        &[
+            ("SC_LINT_BIN", sc_lint_bin),
+            ("SC_LINT_EXEC_LOG", fixture.log.to_str().expect("log path")),
+            (
+                "PATH",
+                &format!("{}:/usr/bin:/bin", fixture.on_path.display()),
+            ),
+        ],
+    )
+}
+
+#[cfg(unix)]
+fn assert_override_ran(fixture: &OverrideFixture, output: &Output, marker: &str) {
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(&fixture.log).expect("override log"),
+        format!("{marker}\n")
+    );
+}
+
+#[cfg(unix)]
+fn assert_override_unavailable(fixture: &OverrideFixture, output: &Output, sc_lint_bin: &str) {
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        format!("sc-lint binary is unavailable at {sc_lint_bin}; run just setup\n")
+    );
+    assert!(
+        !fixture.log.exists(),
+        "an unresolved override must not fall back"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn bootstrap_exec_resolves_bare_sc_lint_bin_override_on_path() {
+    let fixture = override_fixture(false, true);
+    let output = run_with_override(&fixture, "sc-lint");
+    assert_override_ran(&fixture, &output, "path");
+}
+
+#[cfg(unix)]
+#[test]
+fn bootstrap_exec_does_not_resolve_bare_sc_lint_bin_override_from_cwd() {
+    let fixture = override_fixture(true, false);
+    let output = run_with_override(&fixture, "sc-lint");
+    assert_override_unavailable(&fixture, &output, "sc-lint");
+}
+
+#[cfg(unix)]
+#[test]
+fn bootstrap_exec_prefers_path_over_cwd_for_bare_sc_lint_bin_override() {
+    let fixture = override_fixture(true, true);
+    let output = run_with_override(&fixture, "sc-lint");
+    assert_override_ran(&fixture, &output, "path");
+}
+
+#[cfg(unix)]
+#[test]
+fn bootstrap_exec_uses_explicit_relative_sc_lint_bin_override() {
+    let fixture = override_fixture(false, true);
+    let output = run_with_override(&fixture, "bin/sc-lint");
+    assert_override_ran(&fixture, &output, "relative");
+}
+
+#[cfg(unix)]
+#[test]
+fn bootstrap_exec_does_not_fall_back_when_sc_lint_bin_override_is_missing() {
+    let fixture = override_fixture(true, true);
+    for missing in ["missing-sc-lint", "bin/missing-sc-lint"] {
+        let output = run_with_override(&fixture, missing);
+        assert_override_unavailable(&fixture, &output, missing);
+    }
+}

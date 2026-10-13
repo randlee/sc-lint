@@ -33,7 +33,17 @@ if [ "$operation" = exec ]; then
     [ "$#" -gt 0 ] || usage
 
     if [ -n "${SC_LINT_BIN:-}" ]; then
-        exec_binary="$SC_LINT_BIN"
+        # Resolve the override as a command, like resolve_product_binary and
+        # bootstrap.ps1: a bare name is a PATH lookup, a path is used as given.
+        # An unresolved override fails here; it never falls back.
+        exec_binary="$(command -v "$SC_LINT_BIN" 2>/dev/null || :)"
+        case "$exec_binary" in
+            */*) ;;
+            *)
+                printf '%s\n' "sc-lint binary is unavailable at $SC_LINT_BIN; run just setup" >&2
+                exit 1
+                ;;
+        esac
     else
         exec_install_dir="${SC_LINT_INSTALL_DIR:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/sc-lint/bin}"
         exec_binary="$exec_install_dir/sc-lint"
