@@ -1,5 +1,11 @@
-pub fn issue385_paths() {
-    let unix_cache = "/home/example/.cache/sc-lint";
-    let windows_cache = r"C:\\ProgramData\\sc-lint\\cache";
-    let _ = (unix_cache, windows_cache);
+pub fn named_pipe_name(name: &str) -> String {
+    if name.starts_with(r"\\.\pipe\") {
+        name.to_owned()
+    } else {
+        format!(r"\\.\pipe\{name}")
+    }
+}
+
+pub fn unix_socket_path() -> &'static str {
+    "/var/run/sc-lint.sock"
 }

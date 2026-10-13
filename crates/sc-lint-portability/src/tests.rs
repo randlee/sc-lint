@@ -393,17 +393,21 @@ fn issue385_rule_path_exclusion_retains_other_rule() {
         format: OutputFormat::Json,
     })
     .unwrap();
-    assert!(
+    assert_eq!(
         baseline
             .findings
             .iter()
-            .any(|finding| finding.rule_id == RuleId::Port006)
+            .filter(|finding| finding.rule_id == RuleId::Port006)
+            .count(),
+        1
     );
-    assert!(
+    assert_eq!(
         baseline
             .findings
             .iter()
-            .any(|finding| finding.rule_id == RuleId::Port007)
+            .filter(|finding| finding.rule_id == RuleId::Port007)
+            .count(),
+        1
     );
 
     fixture.write_lint_config(
@@ -418,18 +422,8 @@ fn issue385_rule_path_exclusion_retains_other_rule() {
     })
     .unwrap();
 
-    assert!(
-        report
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == RuleId::Port006)
-    );
-    assert!(
-        !report
-            .findings
-            .iter()
-            .any(|finding| finding.rule_id == RuleId::Port007)
-    );
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port006);
 }
 
 #[test]

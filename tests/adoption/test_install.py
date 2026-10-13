@@ -410,10 +410,10 @@ def test_portability_keys_render_into_own_table(tmp_path: Path) -> None:
     ).read_text()
 
 
-def test_rule_path_exclusions_render_quoted_toml_keys_and_require_exact_ids(tmp_path: Path) -> None:
+def test_issue385_installer_roundtrip(tmp_path: Path) -> None:
     data = json.loads((FIXTURES / "install.json").read_text())
     data["analyzers"]["portability"] = {
-        "exclude_paths_by_rule": {"PORT-007": ["crates/example/src/lib.rs"]}
+        "exclude_paths_by_rule": {"PORT-007": ["src/lib.rs"]}
     }
     input_path = tmp_path / "in.json"
     input_path.write_text(json.dumps(data))
@@ -422,12 +422,48 @@ def test_rule_path_exclusions_render_quoted_toml_keys_and_require_exact_ids(tmp_
     result = run("--input", str(input_path), str(consumer))
 
     assert result.returncode == 0, result.stderr
-    assert 'exclude_paths_by_rule = { "PORT-007" = ["crates/example/src/lib.rs"] }' in (
+    assert 'exclude_paths_by_rule = { "PORT-007" = ["src/lib.rs"] }' in (
         consumer / "sc-lint.toml"
     ).read_text()
+    (consumer / "src" / "lib.rs").write_text(
+        (ROOT / "crates" / "sc-lint-portability" / "tests" / "fixtures" / "issue385.rs").read_text()
+    )
+
+    analyzer = run_subprocess(
+        [
+            "cargo",
+            "run",
+            "--quiet",
+            "-p",
+            "sc-lint-portability",
+            "--",
+            "analyze",
+            "--root",
+            str(consumer),
+            "--config",
+            str(consumer / "sc-lint.toml"),
+            "--format",
+            "json",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert analyzer.returncode == 0, analyzer.stderr
+    report = json.loads(analyzer.stdout)
+    assert [finding["rule_id"] for finding in report["findings"]] == ["PORT-006"]
 
     data["analyzers"]["portability"] = {
-        "exclude_paths_by_rule": {"portability": ["crates/example/src/lib.rs"]}
+        "exclude_paths_by_rule": {"PORT-007": "src/lib.rs"}
+    }
+    input_path.write_text(json.dumps(data))
+    result = run("--input", str(input_path), str(copy_fixture("empty-workspace")))
+    assert result.returncode == 2
+    assert "exclude_paths_by_rule" in result.stderr
+
+    data["analyzers"]["portability"] = {
+        "exclude_paths_by_rule": {"portability": ["src/lib.rs"]}
     }
     input_path.write_text(json.dumps(data))
     result = run("--input", str(input_path), str(copy_fixture("empty-workspace")))

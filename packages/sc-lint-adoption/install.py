@@ -90,12 +90,13 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
     if kind == "boolean" and type(value) is not bool: raise ValueError(f"{label} must be a boolean")
     if kind == "array" and not isinstance(value, list): raise ValueError(f"{label} must be an array")
     if "pattern" in schema and isinstance(value, str) and not re.fullmatch(schema["pattern"], value): raise ValueError(f"{label} does not match {schema['pattern']}")
-    if isinstance(value, dict) and "properties" in schema:
-        extra = set(value) - set(schema["properties"])
+    if isinstance(value, dict):
+        properties = schema.get("properties", {})
+        extra = set(value) - set(properties)
         if schema.get("additionalProperties") is False and extra: raise ValueError(f"{label} has unknown fields: {sorted(extra)}")
         for key, item in value.items():
-            if key in schema["properties"]:
-                _schema_value(item, schema["properties"][key], f"{label}.{key}")
+            if key in properties:
+                _schema_value(item, properties[key], f"{label}.{key}")
             elif isinstance(schema.get("additionalProperties"), dict):
                 _schema_value(item, schema["additionalProperties"], f"{label}.{key}")
     if isinstance(value, list) and "items" in schema:
