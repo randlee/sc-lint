@@ -20,6 +20,7 @@ from install_helpers import FIXTURES
 from install_helpers import INSTALL
 from install_helpers import KIT
 from install_helpers import ROOT
+from install_helpers import SUBPROCESS_TIMEOUT_SECONDS
 from install_helpers import WORKED_EXAMPLE_TIMEOUT_SECONDS
 from install_helpers import copy_fixture
 from install_helpers import run
@@ -432,14 +433,40 @@ def test_issue385_installer_roundtrip(tmp_path: Path) -> None:
         (ROOT / "crates" / "sc-lint-portability" / "tests" / "fixtures" / "issue385.rs").read_text()
     )
 
-    analyzer = run_subprocess(
+    build = run_subprocess(
         [
             "cargo",
-            "run",
+            "build",
             "--quiet",
+            "--message-format=json-render-diagnostics",
             "-p",
             "sc-lint-portability",
-            "--",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
+    )
+    assert build.returncode == 0, build.stderr
+
+    artifacts = []
+    for line in build.stdout.splitlines():
+        message = json.loads(line)
+        target = message.get("target", {})
+        if (
+            message.get("reason") == "compiler-artifact"
+            and target.get("name") == "sc-lint-portability"
+            and "bin" in target.get("kind", [])
+            and message.get("executable")
+        ):
+            artifacts.append(message)
+    assert len(artifacts) == 1, build.stdout
+    analyzer_path = artifacts[0]["executable"]
+
+    analyzer = run_subprocess(
+        [
+            analyzer_path,
             "analyze",
             "--root",
             str(consumer),
@@ -452,6 +479,7 @@ def test_issue385_installer_roundtrip(tmp_path: Path) -> None:
         text=True,
         capture_output=True,
         check=False,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
     )
     assert analyzer.returncode == 0, analyzer.stderr
     report = json.loads(analyzer.stdout)
