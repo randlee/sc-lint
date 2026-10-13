@@ -491,7 +491,7 @@ def test_generated_catalogs_are_current_and_vendored_only() -> None:
     assert not (consumer / "schema.d").exists()
     plugin = consumer / "plugins" / "sc-lint"
     assert (plugin / "analyzer-catalog" / "portability.json").is_file()
-    assert not (plugin / "schema.d").exists()
+    assert (plugin / "schema.d" / "tools.json").is_file()
     assert (plugin / "install.schema.json").is_file()
 
 
@@ -499,7 +499,7 @@ def test_install_omits_internal_schema_and_catalog(tmp_path: Path) -> None:
     kit = tmp_path / "kit"
     shutil.copytree(KIT, kit)
     fragment = kit / "schema.d" / "phase-k.json"
-    fragment.parent.mkdir()
+    fragment.parent.mkdir(exist_ok=True)
     fragment.write_text(json.dumps({"properties": {"phase_k_fixture": {"type": "string"}}}))
     consumer = tmp_path / "consumer"
     consumer.mkdir()
@@ -523,7 +523,7 @@ def test_schema_merge_conflict_names_fragment_and_property(tmp_path: Path) -> No
     kit = tmp_path / "kit"
     shutil.copytree(KIT, kit)
     overlay = kit / "schema.d" / "zzz-conflict.json"
-    overlay.parent.mkdir()
+    overlay.parent.mkdir(exist_ok=True)
     overlay.write_text(json.dumps({"properties": {"minimum_version": {"type": "integer"}}}))
     consumer = tmp_path / "consumer"
     consumer.mkdir()
