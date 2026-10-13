@@ -5,6 +5,7 @@
       "SCB-BOUNDARY-001",
       "SCB-BOUNDARY-002",
       "SCB-BOUNDARY-003",
+      "SCB-BOUNDARY-004",
       "SCB-CALLER-001"
     ],
     "cycles": [
@@ -15,7 +16,8 @@
     "dependencies": [
       "SCB-DEPENDENCY-001",
       "SCB-DEPENDENCY-002",
-      "SCB-DEPENDENCY-003"
+      "SCB-DEPENDENCY-003",
+      "SCB-DEPENDENCY-004"
     ],
     "forbid-external-impls": [
       "SCB-BOUNDARY-003"
@@ -37,10 +39,12 @@
     "SCB-BOUNDARY-001",
     "SCB-BOUNDARY-002",
     "SCB-BOUNDARY-003",
+    "SCB-BOUNDARY-004",
     "SCB-CALLER-001",
     "SCB-DEPENDENCY-001",
     "SCB-DEPENDENCY-002",
     "SCB-DEPENDENCY-003",
+    "SCB-DEPENDENCY-004",
     "SCB-MANIFEST-001",
     "SCB-MANIFEST-002"
   ]
