@@ -85,7 +85,7 @@ class LintBoundariesTests(unittest.TestCase):
                     "/bin/sc-lint",
                     "--json",
                     "--root",
-                    "/tmp/example",
+                    str(root),
                     "lint",
                     "sc-boundary",
                     "--rule-filter",
