@@ -513,35 +513,55 @@ allow = ["MIT"]
         self.assertEqual(stderr.getvalue(), "tool failure\n")
 
     def test_cargo_shear_path_key_is_rejected_before_successful_tool_run(self) -> None:
-        key = "crates/old/Cargo.toml.serde"
-        metadata = CargoShearWorkspaceMetadata({}, frozenset({f"{APP_PACKAGE}.serde"}))
-        stderr = io.StringIO()
-        with tempfile.TemporaryDirectory() as tempdir:
-            repo_root = Path(tempdir)
-            (repo_root / ".just").mkdir()
-            (repo_root / ".just" / "lint-config.toml").write_text(
-                f'[cargo_shear.allowed_unused_dependencies]\n"{key}" = "old path"\n',
-                encoding="utf-8",
-            )
-            with (
-                patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
-                patch(
-                    "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
-                    return_value=metadata,
-                ),
-                patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[]),
-                patch("sc_lint.lint_cargo_shear.shutil.which") as which_mock,
-                patch("sc_lint.lint_cargo_shear.subprocess.run") as child_mock,
-                patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
-            ):
-                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
+        keys = (
+            "crates/old/Cargo.toml.serde",
+            r"crates\old\Cargo.toml.serde",
+            "./crates/old/Cargo.toml.serde",
+            "~/.cache/Cargo.toml.serde",
+            r"C:\crates\old\Cargo.toml.serde",
+        )
+        for key in keys:
+            with self.subTest(key=key):
+                metadata = CargoShearWorkspaceMetadata(
+                    {}, frozenset({f"{APP_PACKAGE}.serde"})
+                )
+                stderr = io.StringIO()
+                with tempfile.TemporaryDirectory() as tempdir:
+                    repo_root = Path(tempdir)
+                    (repo_root / ".just").mkdir()
+                    (repo_root / ".just" / "lint-config.toml").write_text(
+                        f"[cargo_shear.allowed_unused_dependencies]\n'{key}' = \"old path\"\n",
+                        encoding="utf-8",
+                    )
+                    with (
+                        patch(
+                            "sc_lint.lint_cargo_shear.discover_repo_root",
+                            return_value=repo_root,
+                        ),
+                        patch(
+                            "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
+                            return_value=metadata,
+                        ),
+                        patch(
+                            "sc_lint.lint_cargo_shear.workspace_crate_section_lines",
+                            return_value=[],
+                        ),
+                        patch("sc_lint.lint_cargo_shear.shutil.which") as which_mock,
+                        patch("sc_lint.lint_cargo_shear.subprocess.run") as child_mock,
+                        patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
+                    ):
+                        result = cargo_shear_main(
+                            ["lint_cargo_shear.py", "--root", str(repo_root)]
+                        )
 
-        diagnostics = stderr.getvalue().splitlines()
-        self.assertEqual(result, 2)
-        self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", diagnostics[0])
-        self.assertEqual(diagnostics[1], PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key))
-        which_mock.assert_not_called()
-        child_mock.assert_not_called()
+                diagnostics = stderr.getvalue().splitlines()
+                self.assertEqual(result, 2)
+                self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", diagnostics[0])
+                self.assertEqual(
+                    diagnostics[1], PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key)
+                )
+                which_mock.assert_not_called()
+                child_mock.assert_not_called()
 
     def test_cargo_shear_stale_key_is_rejected_before_successful_tool_run(self) -> None:
         stale_key = f"{APP_PACKAGE}.not_declared"
