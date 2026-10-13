@@ -49,6 +49,8 @@ SECTIONS = (
             ("lint version", "Run only the version alignment checks."),
             ("lint spell", "Run the spelling/content check."),
             ("lint pytests", "Run the Python lint-tool unit tests."),
+            ("lint <selector>", "Consumer repositories: run one named lint step or lint profile."),
+            ("lint <selector> <scope>", "Consumer repositories: also select platform scope host, all, linux, macos, or windows."),
         ),
     ),
 )

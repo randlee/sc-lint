@@ -30,7 +30,7 @@ TEMPLATES = {
 TEMPLATE_PLACEHOLDERS = {
     "sc-lint.toml.j2": {"minimum_version", "analyzers", "profiles", "test_layers"},
     "Justfile.import.j2": {"windows_shell"},
-    "sc-lint-workflow.yml.j2": {"ci_os"},
+    "sc-lint-workflow.yml.j2": {"ci_os", "lint_steps"},
 }
 TEMPLATE_VARIABLE = re.compile(r"{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}")
 CATALOG_DIRECTORY = ROOT / "analyzer-catalog"
@@ -90,7 +90,15 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
     if kind == "boolean" and type(value) is not bool: raise ValueError(f"{label} must be a boolean")
     if kind == "array" and not isinstance(value, list): raise ValueError(f"{label} must be an array")
     if "pattern" in schema and isinstance(value, str) and not re.fullmatch(schema["pattern"], value): raise ValueError(f"{label} does not match {schema['pattern']}")
+    if "oneOf" in schema:
+        errors = []
+        for option in schema["oneOf"]:
+            try: _schema_value(value, option, label)
+            except ValueError as error: errors.append(str(error))
+        if len(errors) != len(schema["oneOf"]) - 1: raise ValueError(f"{label} must match exactly one accepted shape: {'; '.join(errors)}")
     if isinstance(value, dict):
+        missing = [key for key in schema.get("required", []) if key not in value]
+        if missing: raise ValueError(f"{label} is missing required fields: {missing}")
         properties = schema.get("properties", {})
         extra = set(value) - set(properties)
         if schema.get("additionalProperties") is False and extra: raise ValueError(f"{label} has unknown fields: {sorted(extra)}")
@@ -139,6 +147,33 @@ def substitute_template_variables(source: str, replacements: dict[str, str]) -> 
     )
 
 
+def toml_key(name: str) -> str:
+    return name if re.fullmatch(r"[A-Za-z0-9_-]+", name) else json.dumps(name)
+
+
+def lint_profiles_table(lint_profiles: dict) -> str:
+    if not lint_profiles: return ""
+    rows = "\n".join(f"{toml_key(name)} = {json.dumps(members)}" for name, members in lint_profiles.items())
+    return f"[tool.sc-lint.lint_profiles]\n{rows}"
+
+
+def lint_step(name: str, step: object) -> str:
+    """Renders one lint row; semantics (platform, target, shape) belong to the sc-lint binary."""
+    command, tags = (step, {}) if isinstance(step, list) else (step["command"], step)
+    lines = [f"name = {json.dumps(name)}", f"command = {json.dumps(command)}"]
+    lines += [f"{key} = {json.dumps(tags[key])}" for key in ("platform", "target") if key in tags]
+    return "[[tool.sc-lint.lint]]\n" + "\n".join(lines)
+
+
+def lint_workflow_steps(data: dict) -> str:
+    """Resolves the CI lint invocation: a declared `ci` profile runs every platform on Linux, host-only elsewhere."""
+    indent = "      "
+    if "ci" in data.get("lint_profiles", {}):
+        return (f"- run: just lint ci all\n{indent}  if: runner.os == 'Linux'\n"
+                f"{indent}- run: just lint ci\n{indent}  if: runner.os != 'Linux'")
+    return "- run: just lint ci" if "ci" in data["profiles"] else "- run: just lint"
+
+
 def render(template: Path, data: dict) -> str:
     source = template.read_text()
     expected = TEMPLATE_PLACEHOLDERS.get(template.name)
@@ -156,7 +191,7 @@ def render(template: Path, data: dict) -> str:
         f"[tool.sc-lint.analyzers.{name}]\n" + "\n".join(f"{key} = {toml_value(item)}" for key, item in value.items())
         for name, value in data["analyzers"].items()
     )
-    profiles = "\n\n".join(f'[[tool.sc-lint.lint]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data["profiles"].items())
+    profiles = "\n\n".join(filter(None, [lint_profiles_table(data.get("lint_profiles", {})), *(lint_step(name, step) for name, step in data["profiles"].items())]))
     layers = "\n\n".join(f'[[tool.sc-lint.test]]\nname = {json.dumps(name)}\ncommand = {json.dumps(command)}' for name, command in data.get("test", {}).items())
     runners = [ {"linux":"ubuntu-latest", "macos":"macos-latest", "windows":"windows-latest"}.get(item, item) for item in data["ci"]["os"] ]
     replacements = {
@@ -165,6 +200,7 @@ def render(template: Path, data: dict) -> str:
         "profiles": profiles,
         "test_layers": layers,
         "ci_os": json.dumps(runners),
+        "lint_steps": lint_workflow_steps(data),
     }
     deferred = {"windows_shell"} if template.name == "Justfile.import.j2" else set()
     if observed - replacements.keys() != deferred:
