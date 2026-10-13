@@ -7,8 +7,11 @@
 
 use serde_json::{Value, json};
 use std::fs;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
 #[cfg(unix)]
@@ -24,7 +27,114 @@ const EMPTY_COLLECTIONS: &str = r#"{"minimum_version":"0.7.0","profiles":{},"ci"
 const MALFORMED_TOOLS: &str =
     r#"{"minimum_version":"0.7.0","profiles":{},"ci":{"enabled":false},"analyzers":{},"tools":[]}"#;
 
+const SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
+
 const STUB_HELPER: &str = "import json, os, sys\n\nif __name__ == '__main__':\n    with open(os.environ['SC_LINT_HELPER_LOG'], 'a', encoding='utf-8') as handle:\n        handle.write(json.dumps({'argv': sys.argv[1:], 'cwd': os.getcwd(), 'cargo_home': os.environ.get('CARGO_HOME')}) + '\\n')\n    sys.exit(int(os.environ.get('SC_LINT_HELPER_STATUS', '0')))\n";
+
+/// Run a fixture subprocess with captured output and a hard deadline.
+fn run_bounded(command: &mut Command, stdin: Option<&[u8]>) -> Output {
+    run_bounded_for(command, stdin, SUBPROCESS_TIMEOUT)
+}
+
+fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duration) -> Output {
+    let label = format!(
+        "{:?} {:?}",
+        command.get_program(),
+        command.get_args().collect::<Vec<_>>()
+    );
+    let stdout = tempfile::tempfile().expect("create subprocess stdout capture");
+    let stderr = tempfile::tempfile().expect("create subprocess stderr capture");
+    let input = stdin.map(|contents| {
+        let mut file = tempfile::tempfile().expect("create subprocess stdin");
+        file.write_all(contents).expect("write subprocess stdin");
+        file.seek(SeekFrom::Start(0))
+            .expect("rewind subprocess stdin");
+        file
+    });
+    command
+        .stdin(input.map_or(Stdio::null(), Stdio::from))
+        .stdout(Stdio::from(
+            stdout.try_clone().expect("clone stdout capture"),
+        ))
+        .stderr(Stdio::from(
+            stderr.try_clone().expect("clone stderr capture"),
+        ));
+
+    let started = Instant::now();
+    let mut child = command
+        .spawn()
+        .unwrap_or_else(|error| panic!("failed to start {label}: {error}"));
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < timeout => {
+                thread::sleep(Duration::from_millis(20));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let status = child.wait().expect("reap timed out subprocess");
+                let stderr = captured(stderr, "timed out subprocess stderr");
+                panic!(
+                    "subprocess exceeded {timeout:?}: {label}; status after kill: {status}; stderr: {}",
+                    String::from_utf8_lossy(&stderr)
+                );
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let stderr = captured(stderr, "failed subprocess stderr");
+                panic!(
+                    "failed waiting for subprocess {label}: {error}; stderr: {}",
+                    String::from_utf8_lossy(&stderr)
+                );
+            }
+        }
+    };
+
+    Output {
+        status,
+        stdout: captured(stdout, "subprocess stdout"),
+        stderr: captured(stderr, "subprocess stderr"),
+    }
+}
+
+#[test]
+fn bounded_runner_timeout_child() {
+    if std::env::var_os("SC_LINT_TIMEOUT_TEST_CHILD").is_some() {
+        eprintln!("intentional timeout probe");
+        thread::sleep(Duration::from_secs(30));
+    }
+}
+
+#[test]
+fn bounded_runner_kills_and_reports_a_hung_child() {
+    let mut command = Command::new(std::env::current_exe().expect("test executable"));
+    command
+        .args(["--exact", "bounded_runner_timeout_child", "--nocapture"])
+        .env("SC_LINT_TIMEOUT_TEST_CHILD", "1");
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        run_bounded_for(&mut command, None, Duration::from_secs(2));
+    }))
+    .expect_err("hung subprocess should hit its deadline");
+    let panic = match panic.downcast::<String>() {
+        Ok(message) => *message,
+        Err(payload) => payload
+            .downcast::<&str>()
+            .map(|message| (*message).to_owned())
+            .expect("timeout panic has a string payload"),
+    };
+    assert!(panic.contains("bounded_runner_timeout_child"), "{panic}");
+    assert!(panic.contains("intentional timeout probe"), "{panic}");
+}
+
+fn captured(mut file: std::fs::File, description: &str) -> Vec<u8> {
+    let mut contents = Vec::new();
+    file.seek(SeekFrom::Start(0))
+        .unwrap_or_else(|error| panic!("rewind {description}: {error}"));
+    file.read_to_end(&mut contents)
+        .unwrap_or_else(|error| panic!("read {description}: {error}"));
+    contents
+}
 
 fn host_python() -> PathBuf {
     let names: &[&str] = if cfg!(windows) {
@@ -49,25 +159,34 @@ fn host_python_directory() -> PathBuf {
 /// Create a real `.sc-lint/venv` whose `sc_lint` package is a recording stub.
 fn stub_venv(root: &Path, with_helper: bool) {
     let venv = root.join(".sc-lint").join("venv");
-    let created = Command::new(host_python())
-        .args(["-m", "venv", "--without-pip"])
-        .arg(&venv)
-        .status()
-        .expect("create stub venv");
-    assert!(created.success(), "stub venv creation failed");
+    let created = run_bounded(
+        Command::new(host_python())
+            .args(["-m", "venv", "--without-pip"])
+            .arg(&venv),
+        None,
+    );
+    assert!(
+        created.status.success(),
+        "stub venv creation failed: {}",
+        stderr(&created)
+    );
     let python = if cfg!(windows) {
         venv.join("Scripts").join("python.exe")
     } else {
         venv.join("bin").join("python3")
     };
-    let purelib = Command::new(&python)
-        .args([
+    let purelib = run_bounded(
+        Command::new(&python).args([
             "-c",
             "import sysconfig; print(sysconfig.get_paths()['purelib'])",
-        ])
-        .output()
-        .expect("read stub venv purelib");
-    assert!(purelib.status.success(), "stub venv purelib probe failed");
+        ]),
+        None,
+    );
+    assert!(
+        purelib.status.success(),
+        "stub venv purelib probe failed: {}",
+        stderr(&purelib)
+    );
     let package = PathBuf::from(String::from_utf8_lossy(&purelib.stdout).trim()).join("sc_lint");
     fs::create_dir_all(&package).expect("stub sc_lint package");
     fs::write(package.join("__init__.py"), "__version__ = '0.7.0'\n").expect("stub sc_lint");
@@ -121,28 +240,18 @@ fn same_path(actual: &Value, expected: &Path) -> bool {
 
 #[cfg(unix)]
 fn write_executable(path: &Path, contents: &str) {
-    use std::io::Write;
-    use std::process::Stdio;
-
     // Write in a child so the test process never holds a writable descriptor
     // for a file the bootstrap is about to execute.
-    let mut child = Command::new("sh")
-        .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "write-executable"])
-        .arg(path)
-        .stdin(Stdio::piped())
-        .spawn()
-        .expect("executable fixture writer starts");
-    let mut stdin = child.stdin.take().expect("executable fixture writer stdin");
-    stdin
-        .write_all(contents.as_bytes())
-        .expect("write executable fixture contents");
-    drop(stdin);
+    let output = run_bounded(
+        Command::new("sh")
+            .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "write-executable"])
+            .arg(path),
+        Some(contents.as_bytes()),
+    );
     assert!(
-        child
-            .wait()
-            .expect("executable fixture writer waits")
-            .success(),
-        "executable fixture writer succeeds"
+        output.status.success(),
+        "executable fixture writer failed: {}",
+        stderr(&output)
     );
 }
 
@@ -167,7 +276,7 @@ fn bootstrap(fixture: &Path, root: &Path, arguments: &[&str], extra: &[(&str, &s
     for (name, value) in extra {
         command.env(name, value);
     }
-    command.output().expect("run consumer bootstrap")
+    run_bounded(&mut command, None)
 }
 
 /// Run consumer bootstrap `setup|lint` with a stub product that always passes.
@@ -213,7 +322,7 @@ fn bootstrap(fixture: &Path, root: &Path, arguments: &[&str], extra: &[(&str, &s
     for (name, value) in extra {
         command.env(name, value);
     }
-    command.output().expect("run PowerShell consumer bootstrap")
+    run_bounded(&mut command, None)
 }
 
 #[test]
@@ -403,14 +512,15 @@ fn direct_binary_setup_keeps_its_meaning_with_declared_tools() {
     path.extend(std::env::split_paths(
         &std::env::var_os("PATH").expect("host PATH"),
     ));
-    let output = Command::new(env!("CARGO_BIN_EXE_sc-lint"))
-        .args(["--config", "sc-lint.toml", "setup", "--dry-run"])
-        .current_dir(&root)
-        .env("PATH", std::env::join_paths(path).expect("PATH"))
-        .env("SC_LINT_INSTALL_DIR", fixture.path().join("empty-install"))
-        .env("CARGO_HOME", fixture.path().join("cargo-home"))
-        .output()
-        .expect("run product setup");
+    let output = run_bounded(
+        Command::new(env!("CARGO_BIN_EXE_sc-lint"))
+            .args(["--config", "sc-lint.toml", "setup", "--dry-run"])
+            .current_dir(&root)
+            .env("PATH", std::env::join_paths(path).expect("PATH"))
+            .env("SC_LINT_INSTALL_DIR", fixture.path().join("empty-install"))
+            .env("CARGO_HOME", fixture.path().join("cargo-home")),
+        None,
+    );
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(
         !log.exists(),
