@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -26,6 +25,7 @@ from sc_lint.lint_cargo_shear import evaluate_policy
 from sc_lint.lint_cargo_shear import evaluate_unused_dependency_policy
 from sc_lint.lint_cargo_shear import load_cargo_shear_workspace_metadata
 from sc_lint.lint_cargo_shear import load_policy_config
+from sc_lint.lint_cargo_shear import manifest_to_package_name
 from sc_lint.lint_cargo_shear import main as cargo_shear_main
 from sc_lint.lint_cargo_shear import parse_sections
 from sc_lint.lint_cargo_shear import PATH_KEY_MIGRATION_DIAGNOSTIC
@@ -1016,7 +1016,7 @@ shear/summary
   × 1 error
 """
         completed = mock.Mock(returncode=1, stdout=stdout, stderr="")
-        with tempfile.TemporaryDirectory() as repo_dir, tempfile.TemporaryDirectory() as foreign_cwd:
+        with tempfile.TemporaryDirectory() as repo_dir:
             repo_root = Path(repo_dir)
             (repo_root / "Cargo.toml").write_text(
                 '[workspace]\nmembers = ["crates/*"]\n', encoding="utf-8"
@@ -1029,6 +1029,11 @@ shear/summary
             )
             (repo_root / ".just").mkdir()
             (repo_root / ".just" / "lint-config.toml").write_text(allowlist, encoding="utf-8")
+            self.assertNotEqual(repo_root.resolve(), Path.cwd().resolve())
+            self.assertEqual(
+                manifest_to_package_name(repo_root),
+                {f"crates/{APP_CRATE}/Cargo.toml": APP_PACKAGE},
+            )
             with (
                 patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
                 patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=completed),
@@ -1044,12 +1049,7 @@ shear/summary
                 patch("sys.stdout", new_callable=io.StringIO) as stdout_mock,
                 patch("sys.stderr", new_callable=io.StringIO),
             ):
-                previous_cwd = os.getcwd()
-                os.chdir(foreign_cwd)
-                try:
-                    result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
-                finally:
-                    os.chdir(previous_cwd)
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
         return result, stdout_mock.getvalue()
 
     def test_main_from_foreign_cwd_downgrades_allowlisted_unused_dependency(self) -> None:
