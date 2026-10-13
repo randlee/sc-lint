@@ -17,6 +17,7 @@ use syn::ItemMod;
 use syn::spanned::Spanned;
 use thiserror::Error;
 
+use crate::PortabilityError;
 use crate::predicates::attr_is_cfg_unix;
 use crate::predicates::attr_is_cfg_windows;
 
@@ -66,16 +67,16 @@ pub(super) fn parse_records(
 #[derive(Debug, Error)]
 pub enum AdapterConfigError {
     #[error(
-        "ADAPTER_PATH index {index} field `{field}` value `{value}` is invalid ({cause}); use a confined repository-relative .rs file"
+        "ANALYZER_CONFIG.ADAPTER_PATH index {index} field `{field}` value `{value}` is invalid ({cause}); use a confined repository-relative .rs file"
     )]
     Path {
         index: usize,
         field: &'static str,
         value: String,
-        cause: RelativePathError,
+        cause: AdapterPathCause,
     },
     #[error(
-        "ADAPTER_MISSING index {index} field `{field}` value `{value}` must name an existing confined .rs file; use a repository-relative implementation file"
+        "ANALYZER_CONFIG.ADAPTER_MISSING index {index} field `{field}` value `{value}` must name an existing confined .rs file; use a repository-relative implementation file"
     )]
     Missing {
         index: usize,
@@ -83,7 +84,7 @@ pub enum AdapterConfigError {
         value: String,
     },
     #[error(
-        "ADAPTER_DUPLICATE index {index} field `{field}` value `{value}` resolves to an adapter module already used by this configuration; use distinct files"
+        "ANALYZER_CONFIG.ADAPTER_DUPLICATE index {index} field `{field}` value `{value}` resolves to an adapter module already used by this configuration; use distinct files"
     )]
     Duplicate {
         index: usize,
@@ -91,7 +92,7 @@ pub enum AdapterConfigError {
         value: String,
     },
     #[error(
-        "ADAPTER_CFG index {index} field `{field}` value `{value}` must be declared by an out-of-line module with #[cfg({platform})]; declare the production platform module"
+        "ANALYZER_CONFIG.ADAPTER_CFG index {index} field `{field}` value `{value}` must be declared by an out-of-line module with #[cfg({platform})]; declare the production platform module"
     )]
     Cfg {
         index: usize,
@@ -100,13 +101,34 @@ pub enum AdapterConfigError {
         platform: &'static str,
     },
     #[error(
-        "ADAPTER_TEST index {index} field `{field}` value `{value}` resolves to a test-only module; supply a production counterpart"
+        "ANALYZER_CONFIG.ADAPTER_TEST_ONLY index {index} field `{field}` value `{value}` resolves to a test-only module; supply a production counterpart"
     )]
-    Test {
+    TestOnly {
         index: usize,
         field: &'static str,
         value: String,
     },
+}
+
+impl AdapterConfigError {
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Path { .. } => "ANALYZER_CONFIG.ADAPTER_PATH",
+            Self::Missing { .. } => "ANALYZER_CONFIG.ADAPTER_MISSING",
+            Self::Duplicate { .. } => "ANALYZER_CONFIG.ADAPTER_DUPLICATE",
+            Self::Cfg { .. } => "ANALYZER_CONFIG.ADAPTER_CFG",
+            Self::TestOnly { .. } => "ANALYZER_CONFIG.ADAPTER_TEST_ONLY",
+        }
+    }
+}
+
+/// Why an adapter path is not a confined repository-relative `.rs` file.
+#[derive(Debug, Error)]
+pub enum AdapterPathCause {
+    #[error(transparent)]
+    Relative(#[from] RelativePathError),
+    #[error("not a .rs file")]
+    NotRustSource,
 }
 
 #[derive(Debug, Clone)]
@@ -144,24 +166,20 @@ impl PlatformAdapters {
 pub(super) fn validate(
     root: &Path,
     records: &[PlatformAdapterRecord],
-) -> Result<PlatformAdapters, AdapterConfigError> {
+) -> Result<PlatformAdapters, PortabilityError> {
     if records.is_empty() {
         return Ok(PlatformAdapters::default());
     }
 
-    let root = root
+    let scan_error = |source: anyhow::Error| PortabilityError::AdapterScan {
+        root: root.to_path_buf(),
+        source: source.into(),
+    };
+    let canonical_root = root
         .canonicalize()
-        .map_err(|_| AdapterConfigError::Missing {
-            index: 0,
-            field: "unix_module",
-            value: root.display().to_string(),
-        })?;
-    let declarations =
-        collect_declarations(root.as_path()).map_err(|_| AdapterConfigError::Missing {
-            index: 0,
-            field: "unix_module",
-            value: root.display().to_string(),
-        })?;
+        .map_err(|source| scan_error(source.into()))?;
+    let declarations = collect_declarations(canonical_root.as_path()).map_err(scan_error)?;
+    let root = canonical_root;
     let mut used_files = BTreeSet::new();
     let mut validate_pair = |root: &Path,
                              record: &PlatformAdapterRecord,
@@ -249,7 +267,7 @@ fn validate_path(
         index,
         field,
         value: value.to_owned(),
-        cause,
+        cause: cause.into(),
     })?;
     if root
         .join(path.as_str())
@@ -257,10 +275,11 @@ fn validate_path(
         .and_then(|value| value.to_str())
         != Some("rs")
     {
-        return Err(AdapterConfigError::Missing {
+        return Err(AdapterConfigError::Path {
             index,
             field,
             value: value.to_owned(),
+            cause: AdapterPathCause::NotRustSource,
         });
     }
     Ok(path)
@@ -404,7 +423,7 @@ fn validate_declaration(
             platform,
         })?;
     if declaration.is_test_only {
-        return Err(AdapterConfigError::Test {
+        return Err(AdapterConfigError::TestOnly {
             index,
             field,
             value: value.to_owned(),

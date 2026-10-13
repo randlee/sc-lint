@@ -128,6 +128,12 @@ pub enum PortabilityError {
     AnalyzerConfig(#[from] AnalyzerConfigError),
     #[error(transparent)]
     AdapterConfig(#[from] platform_adapters::AdapterConfigError),
+    #[error("failed to scan platform adapter declarations under root `{}`: {source:#}", root.display())]
+    AdapterScan {
+        root: PathBuf,
+        #[source]
+        source: PortabilityErrorSource,
+    },
 }
 
 pub fn analyze_workspace(

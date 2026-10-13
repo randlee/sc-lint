@@ -1922,36 +1922,84 @@ fn issue372_invalid_adapter_matrix_covers_path_duplicate_cfg_and_test_cases() {
         fixture.write_lint_config(&format!(
             "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"{unix_module}\"\nwindows_module = \"{windows_module}\"\nreason = \"Private transport adapters\"\n"
         ));
-        analyze_workspace(&AnalyzeOptions {
+        let error = analyze_workspace(&AnalyzeOptions {
             root: fixture.root().to_path_buf(),
             format: OutputFormat::Json,
         })
-        .unwrap_err()
-        .to_string()
+        .unwrap_err();
+        let PortabilityError::AdapterConfig(adapter) = &error else {
+            panic!("expected an adapter configuration error, got {error}");
+        };
+        let message = error.to_string();
+        assert!(
+            message.starts_with(adapter.code()),
+            "display keeps the stable code: {message}"
+        );
+        adapter.code()
     };
 
-    assert!(analyze("/tmp/socket.rs", "crates/example/src/named_pipe.rs").contains("ADAPTER_PATH"));
-    assert!(
-        analyze(
+    let named_pipe = "crates/example/src/named_pipe.rs";
+    for (unix_module, windows_module, code) in [
+        ("/tmp/socket.rs", named_pipe, "ANALYZER_CONFIG.ADAPTER_PATH"),
+        ("../socket.rs", named_pipe, "ANALYZER_CONFIG.ADAPTER_PATH"),
+        (
+            "crates/example/src/unix_socket.txt",
+            named_pipe,
+            "ANALYZER_CONFIG.ADAPTER_PATH",
+        ),
+        (
+            "crates/example/src/missing.rs",
+            named_pipe,
+            "ANALYZER_CONFIG.ADAPTER_MISSING",
+        ),
+        (
             "crates/example/src/unix_socket.rs",
-            "crates/example/src/unix_socket.rs"
-        )
-        .contains("ADAPTER_DUPLICATE")
-    );
-    assert!(
-        analyze(
-            "crates/example/src/named_pipe.rs",
-            "crates/example/src/unix_socket.rs"
-        )
-        .contains("ADAPTER_CFG")
-    );
-    assert!(
-        analyze(
+            "crates/example/src/unix_socket.rs",
+            "ANALYZER_CONFIG.ADAPTER_DUPLICATE",
+        ),
+        (
+            named_pipe,
+            "crates/example/src/unix_socket.rs",
+            "ANALYZER_CONFIG.ADAPTER_CFG",
+        ),
+        (
             "crates/example/src/test_only.rs",
-            "crates/example/src/named_pipe.rs"
-        )
-        .contains("ADAPTER_TEST")
+            named_pipe,
+            "ANALYZER_CONFIG.ADAPTER_TEST_ONLY",
+        ),
+    ] {
+        assert_eq!(analyze(unix_module, windows_module), code, "{unix_module}");
+    }
+}
+
+#[test]
+fn issue372_adapter_scan_failure_keeps_its_cause() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(unix)] mod unix_socket;\nfn broken( {",
     );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"crates/example/src/unix_socket.rs\"\nwindows_module = \"crates/example/src/named_pipe.rs\"\nreason = \"Private transport adapters\"\n",
+    );
+
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap_err();
+
+    assert!(
+        matches!(error, PortabilityError::AdapterScan { .. }),
+        "scan failure is not a configuration error: {error}"
+    );
+    let message = error.to_string();
+    assert!(!message.contains("ADAPTER_MISSING"), "{message}");
+    assert!(std::error::Error::source(&error).is_some(), "{message}");
 }
 
 #[test]
