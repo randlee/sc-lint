@@ -1024,21 +1024,25 @@ mod tests {
 
     #[test]
     fn consumer_bootstrap_exposes_only_product_owned_operations() {
-        for operation in ["setup", "lint", "test", "upgrade", "exec"] {
+        for operation in ["setup", "lint", "test", "upgrade"] {
             assert!(
                 CONSUMER_BOOTSTRAP_ASSET.contains(operation),
                 "bootstrap does not expose {operation}"
             );
         }
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(r#"[ "$operation" = exec ]"#));
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(".sc-lint/bootstrap exec"));
         assert!(CONSUMER_BOOTSTRAP_ASSET.contains("compatibility check"));
         assert!(CONSUMER_BOOTSTRAP_ASSET.contains("--config"));
         assert!(!CONSUMER_BOOTSTRAP_ASSET.contains("cargo run"));
-        for operation in ["setup", "lint", "test", "upgrade", "exec"] {
+        for operation in ["setup", "lint", "test", "upgrade"] {
             assert!(
                 CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(operation),
                 "Windows bootstrap does not expose {operation}"
             );
         }
+        assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(r#"$Operation -eq "exec""#));
+        assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(".sc-lint/bootstrap.ps1 exec"));
         assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("CLI.SC_LINT_RELEASE_UNAVAILABLE"));
         assert!(!CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("cargo run"));
     }

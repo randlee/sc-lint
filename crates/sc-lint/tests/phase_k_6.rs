@@ -33,9 +33,20 @@ fn consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBu
     if atm_core_derived {
         fs::write(
             root.join("Cargo.toml"),
-            "[package]\nname = \"consumer-derived-from-atm-core\"\nversion = \"0.1.0\"\n",
+            "[package]\nname = \"consumer-derived-from-atm-core\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[workspace]\n",
         )
         .expect("derived consumer manifest");
+        fs::write(
+            root.join("sc-lint.toml"),
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\".sc-lint/bootstrap\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n",
+        )
+        .expect("derived consumer profile configuration");
+    } else {
+        fs::write(
+            root.join("sc-lint.toml"),
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n",
+        )
+        .expect("consumer config");
     }
     root
 }
@@ -114,8 +125,6 @@ fn bootstrap_exec_does_not_reenter_consumer_profile() {
     ] {
         let root = consumer_fixture(fixture.path(), name, derived);
         let config = root.join("sc-lint.toml");
-        fs::write(&config, "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n")
-            .expect("consumer config");
         let config = config.to_str().expect("config path");
         let managed_binary_path = managed_binary.to_str().expect("managed binary path");
         let search_path = format!("{}:/usr/bin:/bin", decoy.display());
@@ -170,10 +179,13 @@ fn bootstrap_exec_does_not_reenter_consumer_profile() {
             "the product must replace argv[0]: {captured}"
         );
         assert!(
-            !captured.contains("decoy\\n"),
+            !captured.contains("decoy\n"),
             "the PATH decoy must not run: {captured}"
         );
-        assert!(root.join("Cargo.toml").exists() == derived);
+        assert!(
+            !captured.contains("arg=profile-marker\n"),
+            "the consumer profile must not re-enter the bootstrap: {captured}"
+        );
         let _ = fs::remove_file(&log);
     }
 }
@@ -220,7 +232,6 @@ fn bootstrap_exec_uses_managed_product() {
             !captured.contains("arg=--config\n"),
             "omitted config must preserve discovery: {captured}"
         );
-        assert_eq!(root.join("Cargo.toml").exists(), derived);
         let _ = fs::remove_file(&log);
     }
 }
