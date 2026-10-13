@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 #[cfg(unix)]
 use std::process::Output;
-
 use tempfile::TempDir;
 
 #[cfg(unix)]
@@ -16,12 +15,30 @@ const BOOTSTRAP_POWERSHELL: &str = include_str!("../assets/bootstrap.ps1");
 
 #[cfg(unix)]
 fn write_executable(path: &Path, contents: &str) {
-    use std::os::unix::fs::PermissionsExt;
+    use std::io::Write;
+    use std::process::Stdio;
 
-    fs::write(path, contents).expect("write executable fixture");
-    let mut permissions = fs::metadata(path).expect("fixture metadata").permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions).expect("make fixture executable");
+    // The test process must not own a writable descriptor for a file that a
+    // bootstrap fixture will immediately execute. Write it in a child, close
+    // the pipe, and wait for that child before returning.
+    let mut child = Command::new("sh")
+        .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "write-executable"])
+        .arg(path)
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("executable fixture writer starts");
+    let mut stdin = child.stdin.take().expect("executable fixture writer stdin");
+    stdin
+        .write_all(contents.as_bytes())
+        .expect("write executable fixture contents");
+    drop(stdin);
+    assert!(
+        child
+            .wait()
+            .expect("executable fixture writer waits")
+            .success(),
+        "executable fixture writer succeeds"
+    );
 }
 
 #[cfg(unix)]
