@@ -5028,3 +5028,88 @@ fn per_rule_path_exclusion_drops_only_matching_manifest_rule() {
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
 }
+
+#[test]
+fn issue385_boundary_manifest_paths() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+    let baseline = configured(fixture.root(), Some("manifests")).unwrap();
+    let baseline_json = serde_json::to_vec(&baseline).unwrap();
+
+    fixture
+        .workspace
+        .write("sc-lint.toml", "[tool.sc-lint.analyzers.boundary]\n");
+    assert_eq!(
+        serde_json::to_vec(&configured(fixture.root(), Some("manifests")).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        "[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n",
+    );
+    assert_eq!(
+        serde_json::to_vec(&configured(fixture.root(), Some("manifests")).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+        [tool.sc-lint.analyzers.boundary]
+        exclude_paths = ["crates/example/Cargo.toml"]
+        [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+        "SCB-MANIFEST-001" = ["crates/other/Cargo.toml"]
+        "#,
+    );
+    assert!(
+        configured(fixture.root(), Some("manifests"))
+            .unwrap()
+            .findings
+            .is_empty()
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+        [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+        "SCB-MANIFEST-001" = ["crates/example/Cargo.toml"]
+        "#,
+    );
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.root(),
+        None,
+        Some("manifests"),
+    )
+    .unwrap();
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse(
+                        "crates\\example\\Cargo.toml",
+                    )
+                    .unwrap(),
+                ),
+            ),
+            (baseline.findings[0].clone(), None),
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse("crates/example/other.toml")
+                        .unwrap(),
+                ),
+            ),
+        ],
+        |rule| sc_lint_analyzer_support::CatalogRuleId::new(rule.as_str()),
+    );
+    assert_eq!(findings.len(), 2);
+    assert_eq!(status, ReportStatus::Fail);
+}
