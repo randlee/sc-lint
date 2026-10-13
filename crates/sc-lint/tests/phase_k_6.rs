@@ -1,7 +1,5 @@
 use std::fs;
-#[cfg(windows)]
-use std::path::PathBuf;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 use std::path::{Path, PathBuf};
 use std::process::Command;
 #[cfg(unix)]
@@ -66,6 +64,50 @@ fn consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBu
         .expect("consumer config");
     }
     root
+}
+
+#[cfg(windows)]
+fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBuf {
+    let root = parent.join(name);
+    fs::create_dir_all(root.join(".sc-lint")).expect("consumer bootstrap directory");
+    fs::write(root.join(".sc-lint/bootstrap.ps1"), BOOTSTRAP_POWERSHELL)
+        .expect("consumer PowerShell bootstrap");
+    if atm_core_derived {
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"consumer-derived-from-atm-core\"\nversion = \"0.1.0\"\n",
+        )
+        .expect("derived consumer manifest");
+    }
+    root
+}
+
+#[cfg(windows)]
+fn windows_log_value<'a>(captured: &'a str, name: &str) -> &'a str {
+    captured
+        .lines()
+        .find_map(|line| line.strip_prefix(&format!("{name}=")))
+        .unwrap_or_else(|| panic!("missing {name} in child log: {captured}"))
+}
+
+#[cfg(windows)]
+fn assert_windows_logged_path(captured: &str, name: &str, expected: &Path) {
+    let actual = Path::new(windows_log_value(captured, name))
+        .canonicalize()
+        .expect("canonical logged Windows path");
+    let expected = expected
+        .canonicalize()
+        .expect("canonical expected Windows path");
+    assert!(
+        actual
+            .as_os_str()
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&expected.as_os_str().to_string_lossy()),
+        "expected {}={}, got {}",
+        name,
+        expected.display(),
+        actual.display()
+    );
 }
 
 #[cfg(unix)]
@@ -255,24 +297,105 @@ fn bootstrap_exec_uses_managed_product() {
 
 #[cfg(windows)]
 #[test]
-fn bootstrap_exec_uses_managed_product() {
+fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
     let fixture = TempDir::new().expect("fixture root");
-    let root = fixture.path().join("simple-consumer");
-    fs::create_dir_all(root.join(".sc-lint")).expect("consumer bootstrap directory");
-    fs::write(root.join(".sc-lint/bootstrap.ps1"), BOOTSTRAP_POWERSHELL)
-        .expect("consumer PowerShell bootstrap");
     let local_app_data = fixture.path().join("AppData/Local");
     let managed = local_app_data.join("sc-lint/bin");
     fs::create_dir_all(&managed).expect("managed directory");
     let managed_binary = managed.join("sc-lint.exe");
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), &managed_binary).expect("managed product copy");
 
+    for (name, derived) in [
+        ("neutral-consumer", false),
+        ("atm-core-derived-consumer", true),
+    ] {
+        let root = windows_consumer_fixture(fixture.path(), name, derived);
+        let output = powershell_command()
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+            .arg(root.join(".sc-lint/bootstrap.ps1"))
+            .args(["exec", "--", "sc-lint", "version"])
+            .current_dir(&root)
+            .env_remove("SC_LINT_BIN")
+            .env_remove("SC_LINT_INSTALL_DIR")
+            .env("LOCALAPPDATA", &local_app_data)
+            .output()
+            .expect("run PowerShell consumer bootstrap");
+
+        assert!(
+            output.status.success(),
+            "stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
+            "stdout: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert_eq!(root.join("Cargo.toml").exists(), derived);
+    }
+    assert!(managed_binary.is_file());
+}
+
+#[cfg(windows)]
+#[test]
+fn bootstrap_exec_reports_missing_windows_managed_product_without_path_fallback() {
+    let fixture = TempDir::new().expect("fixture root");
+    let root = windows_consumer_fixture(fixture.path(), "simple-consumer", false);
+    let missing = fixture.path().join("missing");
+    let decoy = fixture.path().join("decoy");
+    fs::create_dir_all(&decoy).expect("decoy directory");
+    fs::copy(env!("CARGO_BIN_EXE_sc-lint"), decoy.join("sc-lint.exe"))
+        .expect("PATH decoy product copy");
+    let path = format!(
+        "{};{}",
+        decoy.display(),
+        std::env::var("PATH").expect("host PATH")
+    );
+
     let output = powershell_command()
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(root.join(".sc-lint/bootstrap.ps1"))
         .args(["exec", "--", "sc-lint", "version"])
         .current_dir(&root)
-        .env("LOCALAPPDATA", &local_app_data)
+        .env_remove("SC_LINT_BIN")
+        .env("SC_LINT_INSTALL_DIR", &missing)
+        .env("PATH", path)
+        .output()
+        .expect("run PowerShell consumer bootstrap");
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty(), "stdout: {:?}", output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!(
+            "sc-lint binary is unavailable at {}; run just setup",
+            missing.join("sc-lint.exe").display()
+        )),
+        "stderr: {stderr}"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn bootstrap_exec_forwards_windows_config() {
+    let fixture = TempDir::new().expect("fixture root");
+    let root = windows_consumer_fixture(fixture.path(), "simple-consumer", false);
+    let config = root.join("sc-lint.toml");
+    fs::write(&config, "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n").expect("consumer config");
+    let managed = fixture.path().join("managed");
+    fs::create_dir_all(&managed).expect("managed directory");
+    fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
+        .expect("managed product copy");
+
+    let output = powershell_command()
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+        .arg(root.join(".sc-lint/bootstrap.ps1"))
+        .args(["exec", "--config"])
+        .arg(&config)
+        .args(["--", "sc-lint", "version"])
+        .current_dir(&root)
+        .env_remove("SC_LINT_BIN")
+        .env("SC_LINT_INSTALL_DIR", &managed)
         .output()
         .expect("run PowerShell consumer bootstrap");
 
@@ -286,7 +409,45 @@ fn bootstrap_exec_uses_managed_product() {
         "stdout: {}",
         String::from_utf8_lossy(&output.stdout)
     );
-    assert!(managed_binary.is_file());
+}
+
+#[cfg(windows)]
+#[test]
+fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
+    let fixture = TempDir::new().expect("fixture root");
+    let root = windows_consumer_fixture(fixture.path(), "simple-consumer", false);
+    let override_directory = fixture.path().join("override");
+    fs::create_dir_all(&override_directory).expect("override directory");
+    let override_binary = override_directory.join("sc-lint.exe");
+    fs::copy(env!("CARGO_BIN_EXE_sc-lint"), &override_binary).expect("override product copy");
+
+    let output = powershell_command()
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+        .arg(root.join(".sc-lint/bootstrap.ps1"))
+        .args(["exec", "--", "sc-lint", "version"])
+        .current_dir(&root)
+        .env(
+            "LOCALAPPDATA",
+            fixture.path().join("missing-local-app-data"),
+        )
+        .env(
+            "SC_LINT_INSTALL_DIR",
+            fixture.path().join("missing-install-dir"),
+        )
+        .env("SC_LINT_BIN", &override_binary)
+        .output()
+        .expect("run PowerShell consumer bootstrap");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
+        "stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
 }
 
 #[cfg(unix)]
@@ -433,10 +594,7 @@ fn bootstrap_exec_reports_missing_managed_product() {
 #[test]
 fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     let fixture = TempDir::new().expect("fixture root");
-    let root = fixture.path().join("simple-consumer");
-    fs::create_dir_all(root.join(".sc-lint")).expect("consumer bootstrap directory");
-    fs::write(root.join(".sc-lint/bootstrap.ps1"), BOOTSTRAP_POWERSHELL)
-        .expect("consumer PowerShell bootstrap");
+    let root = windows_consumer_fixture(fixture.path(), "simple-consumer", false);
     let managed = fixture.path().join("managed");
     fs::create_dir_all(&managed).expect("managed directory");
     let managed_binary = managed.join("sc-lint.exe");
@@ -445,10 +603,9 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     let log = fixture.path().join("child.log");
     fs::write(
         &child,
-        "@echo off\r\n> \"%SC_LINT_EXEC_LOG%\" echo cwd=%CD%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo bin=%SC_LINT_BIN%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo custom=%SC_LINT_TEST_VALUE%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo path=%PATH%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo args=%*\r\nexit /b 23\r\n",
+        "@echo off\r\n> \"%SC_LINT_EXEC_LOG%\" echo cwd=%CD%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo bin=%SC_LINT_BIN%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo custom=%SC_LINT_TEST_VALUE%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo path=%PATH%\r\n>> \"%SC_LINT_EXEC_LOG%\" echo arg1=%~1\r\n>> \"%SC_LINT_EXEC_LOG%\" echo arg2=%~2\r\nexit /b 23\r\n",
     )
     .expect("consumer command fixture");
-    let root_path = root.to_str().expect("consumer path");
     let log_path = log.to_str().expect("log path");
     let managed_path = managed.to_str().expect("managed path");
     let child_path = child.to_str().expect("child path");
@@ -456,7 +613,8 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(root.join(".sc-lint/bootstrap.ps1"))
         .args(["exec", "--", child_path, "two words", "tail"])
-        .current_dir(root_path)
+        .current_dir(&root)
+        .env_remove("SC_LINT_BIN")
         .env("SC_LINT_INSTALL_DIR", managed_path)
         .env("SC_LINT_EXEC_LOG", log_path)
         .env("SC_LINT_TEST_VALUE", "preserved")
@@ -470,15 +628,24 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
         String::from_utf8_lossy(&output.stderr)
     );
     let captured = fs::read_to_string(log).expect("child process log");
-    assert!(captured.contains(&format!("cwd={root_path}")), "{captured}");
+    assert_windows_logged_path(&captured, "cwd", &root);
+    assert_windows_logged_path(&captured, "bin", &managed_binary);
+    assert_eq!(windows_log_value(&captured, "custom"), "preserved");
     assert!(
-        captured.contains(&format!("bin={}", managed_binary.display())),
+        windows_log_value(&captured, "path")
+            .to_ascii_lowercase()
+            .starts_with(
+                &format!(
+                    "{};",
+                    managed
+                        .canonicalize()
+                        .expect("canonical managed path")
+                        .display()
+                )
+                .to_ascii_lowercase()
+            ),
         "{captured}"
     );
-    assert!(captured.contains("custom=preserved"), "{captured}");
-    assert!(
-        captured.contains(&format!("path={};", managed.display())),
-        "{captured}"
-    );
-    assert!(captured.contains("args=two words tail"), "{captured}");
+    assert_eq!(windows_log_value(&captured, "arg1"), "two words");
+    assert_eq!(windows_log_value(&captured, "arg2"), "tail");
 }
