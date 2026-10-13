@@ -53,7 +53,7 @@ Summary: Only the needed file changes
 Scope: the upgrade-sc-compose formula (.atm-bd/formula/upgrade-sc-compose.formula.toml.j2) and every bead poured from it
 
 Fixtures:
-- pass: Deliverable 1 bumps SC_COMPOSE_PIN in .claude/lib/sc_compose_dependency.py; deliverable 2 edits only the repo-owned files the changelog requires; owned_paths lists only these.
+- pass: Deliverable 1 bumps SC_COMPOSE_WHEEL_PIN in .claude/lib/sc_compose_dependency.py; deliverable 2 edits only the repo-owned files the changelog requires; owned_paths lists only these.
 - fail: The upgrade step also refactors the bead templates, rewrites the README and reorganises .claude/lib while bumping the pin.
 
 ## ANC-003

@@ -24,7 +24,39 @@
           "The release step pauses and asks Rand to confirm whether to cut a patch release before it continues."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The concrete requirement is absent from `item.text`, including when the item only mentions the same topic.",
+                "unclear": "Part of `item.text` is garbled or missing, so presence cannot be judged.",
+                "yes": "The concrete requirement appears in `item.text`, verbatim or paraphrased."
+              },
+              "instructions": "List to yourself the concrete requirement in `anchor.statement` (for example a recipient such as `omega-prime@hermes`, a command such as `atm send`, a limit on which files change, or a required end state such as a PR left ready to merge). Is that concrete requirement present in `item.text`? A paraphrase counts; a topic mention does not. When `anchor.statement` applies under a condition (for example when there are breaking changes, or when CI is green), the requirement is present only if `item.text` states what happens under that condition; doing a related step without addressing the condition does not count. Judge presence only, not conflict.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+                "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+                "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+              },
+              "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only. Leaving a required step unmentioned, or marking a step done without saying what else happens, is silence, not contradiction. Anything `anchor.statement` itself names as allowed or as an exception is not a contradiction.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+                "unclear": "The item text is too vague to tell what part of the system it touches.",
+                "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+              },
+              "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 3,
       "status": "locked",
       "promoted_to": null,
@@ -59,6 +91,15 @@
           "at": "2026-10-13T17:53:08Z",
           "by": "Rand Lee",
           "note": "AskUserQuestion 2026-10-13: 'I am fine to lock. tuning requires slightly rewording/updating.'"
+        },
+        {
+          "event": "questions_tuned",
+          "gate": "plan",
+          "at": "2026-10-13",
+          "by": "anchor-tuning (lint-8fyq-tune-2)",
+          "question_set_digest": "86bc0e8bc63923adbbbe5bbbf68b0c559359c0a1b706c60d23d07655f0ac929b",
+          "result_sha256": "9ca6531ae5589f240341a9aee70e5c079bde2b47d12e6653589a1cb5bd49a65e",
+          "oracle_sha256": "f3b4bd117203fa882c7fdfd8affc71bb408f2bdda064ec4fe6d002c9d6f58749"
         }
       ]
     },
@@ -77,13 +118,45 @@
       "deterministic_check": "",
       "fixtures": {
         "pass": [
-          "Deliverable 1 bumps SC_COMPOSE_PIN in .claude/lib/sc_compose_dependency.py; deliverable 2 edits only the repo-owned files the changelog requires; owned_paths lists only these."
+          "Deliverable 1 bumps SC_COMPOSE_WHEEL_PIN in .claude/lib/sc_compose_dependency.py; deliverable 2 edits only the repo-owned files the changelog requires; owned_paths lists only these."
         ],
         "fail": [
           "The upgrade step also refactors the bead templates, rewrites the README and reorganises .claude/lib while bumping the pin."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The concrete requirement is absent from `item.text`, including when the item only mentions the same topic.",
+                "unclear": "Part of `item.text` is garbled or missing, so presence cannot be judged.",
+                "yes": "The concrete requirement appears in `item.text`, verbatim or paraphrased."
+              },
+              "instructions": "List to yourself the concrete requirement in `anchor.statement` (for example a recipient such as `omega-prime@hermes`, a command such as `atm send`, a limit on which files change, or a required end state such as a PR left ready to merge). Is that concrete requirement present in `item.text`? A paraphrase counts; a topic mention does not. When `anchor.statement` applies under a condition (for example when there are breaking changes, or when CI is green), the requirement is present only if `item.text` states what happens under that condition; doing a related step without addressing the condition does not count. Judge presence only, not conflict.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+                "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+                "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+              },
+              "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only. Leaving a required step unmentioned, or marking a step done without saying what else happens, is silence, not contradiction. Anything `anchor.statement` itself names as allowed or as an exception is not a contradiction.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+                "unclear": "The item text is too vague to tell what part of the system it touches.",
+                "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+              },
+              "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -110,6 +183,15 @@
           "at": "2026-10-13T17:53:08Z",
           "by": "Rand Lee",
           "note": "AskUserQuestion 2026-10-13: 'I am fine to lock. tuning requires slightly rewording/updating.'"
+        },
+        {
+          "event": "questions_tuned",
+          "gate": "plan",
+          "at": "2026-10-13",
+          "by": "anchor-tuning (lint-8fyq-tune-2)",
+          "question_set_digest": "86bc0e8bc63923adbbbe5bbbf68b0c559359c0a1b706c60d23d07655f0ac929b",
+          "result_sha256": "9ca6531ae5589f240341a9aee70e5c079bde2b47d12e6653589a1cb5bd49a65e",
+          "oracle_sha256": "f3b4bd117203fa882c7fdfd8affc71bb408f2bdda064ec4fe6d002c9d6f58749"
         }
       ]
     },
@@ -396,7 +478,39 @@
           "On a BREAKING verdict the run abandons the branch without opening a PR to develop."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The concrete requirement is absent from `item.text`, including when the item only mentions the same topic.",
+                "unclear": "Part of `item.text` is garbled or missing, so presence cannot be judged.",
+                "yes": "The concrete requirement appears in `item.text`, verbatim or paraphrased."
+              },
+              "instructions": "List to yourself the concrete requirement in `anchor.statement` (for example a recipient such as `omega-prime@hermes`, a command such as `atm send`, a limit on which files change, or a required end state such as a PR left ready to merge). Is that concrete requirement present in `item.text`? A paraphrase counts; a topic mention does not. When `anchor.statement` applies under a condition (for example when there are breaking changes, or when CI is green), the requirement is present only if `item.text` states what happens under that condition; doing a related step without addressing the condition does not count. Judge presence only, not conflict.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+                "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+                "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+              },
+              "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only. Leaving a required step unmentioned, or marking a step done without saying what else happens, is silence, not contradiction. Anything `anchor.statement` itself names as allowed or as an exception is not a contradiction.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+                "unclear": "The item text is too vague to tell what part of the system it touches.",
+                "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+              },
+              "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -423,6 +537,15 @@
           "at": "2026-10-13T17:53:08Z",
           "by": "Rand Lee",
           "note": "AskUserQuestion 2026-10-13: 'I am fine to lock. tuning requires slightly rewording/updating.'"
+        },
+        {
+          "event": "questions_tuned",
+          "gate": "plan",
+          "at": "2026-10-13",
+          "by": "anchor-tuning (lint-8fyq-tune-2)",
+          "question_set_digest": "86bc0e8bc63923adbbbe5bbbf68b0c559359c0a1b706c60d23d07655f0ac929b",
+          "result_sha256": "9ca6531ae5589f240341a9aee70e5c079bde2b47d12e6653589a1cb5bd49a65e",
+          "oracle_sha256": "f3b4bd117203fa882c7fdfd8affc71bb408f2bdda064ec4fe6d002c9d6f58749"
         }
       ]
     },
@@ -600,7 +723,39 @@
           "Decision point 2 checks for other work in progress and silently closes the release bead when release is deferred."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The concrete requirement is absent from `item.text`, including when the item only mentions the same topic.",
+                "unclear": "Part of `item.text` is garbled or missing, so presence cannot be judged.",
+                "yes": "The concrete requirement appears in `item.text`, verbatim or paraphrased."
+              },
+              "instructions": "List to yourself the concrete requirement in `anchor.statement` (for example a recipient such as `omega-prime@hermes`, a command such as `atm send`, a limit on which files change, or a required end state such as a PR left ready to merge). Is that concrete requirement present in `item.text`? A paraphrase counts; a topic mention does not. When `anchor.statement` applies under a condition (for example when there are breaking changes, or when CI is green), the requirement is present only if `item.text` states what happens under that condition; doing a related step without addressing the condition does not count. Judge presence only, not conflict.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+                "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+                "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+              },
+              "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only. Leaving a required step unmentioned, or marking a step done without saying what else happens, is silence, not contradiction. Anything `anchor.statement` itself names as allowed or as an exception is not a contradiction.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+                "unclear": "The item text is too vague to tell what part of the system it touches.",
+                "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+              },
+              "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -627,6 +782,15 @@
           "at": "2026-10-13T17:53:08Z",
           "by": "Rand Lee",
           "note": "AskUserQuestion 2026-10-13: 'I am fine to lock. tuning requires slightly rewording/updating.'"
+        },
+        {
+          "event": "questions_tuned",
+          "gate": "plan",
+          "at": "2026-10-13",
+          "by": "anchor-tuning (lint-8fyq-tune-2)",
+          "question_set_digest": "86bc0e8bc63923adbbbe5bbbf68b0c559359c0a1b706c60d23d07655f0ac929b",
+          "result_sha256": "9ca6531ae5589f240341a9aee70e5c079bde2b47d12e6653589a1cb5bd49a65e",
+          "oracle_sha256": "f3b4bd117203fa882c7fdfd8affc71bb408f2bdda064ec4fe6d002c9d6f58749"
         }
       ]
     },
@@ -651,7 +815,39 @@
           "If an environment will not install, the dev messages the team-lead and waits."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The concrete requirement is absent from `item.text`, including when the item only mentions the same topic.",
+                "unclear": "Part of `item.text` is garbled or missing, so presence cannot be judged.",
+                "yes": "The concrete requirement appears in `item.text`, verbatim or paraphrased."
+              },
+              "instructions": "List to yourself the concrete requirement in `anchor.statement` (for example a recipient such as `omega-prime@hermes`, a command such as `atm send`, a limit on which files change, or a required end state such as a PR left ready to merge). Is that concrete requirement present in `item.text`? A paraphrase counts; a topic mention does not. When `anchor.statement` applies under a condition (for example when there are breaking changes, or when CI is green), the requirement is present only if `item.text` states what happens under that condition; doing a related step without addressing the condition does not count. Judge presence only, not conflict.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+                "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+                "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+              },
+              "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only. Leaving a required step unmentioned, or marking a step done without saying what else happens, is silence, not contradiction. Anything `anchor.statement` itself names as allowed or as an exception is not a contradiction.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+                "unclear": "The item text is too vague to tell what part of the system it touches.",
+                "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+              },
+              "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -678,6 +874,15 @@
           "at": "2026-10-13T17:53:08Z",
           "by": "Rand Lee",
           "note": "AskUserQuestion 2026-10-13: 'I am fine to lock. tuning requires slightly rewording/updating.'"
+        },
+        {
+          "event": "questions_tuned",
+          "gate": "plan",
+          "at": "2026-10-13",
+          "by": "anchor-tuning (lint-8fyq-tune-2)",
+          "question_set_digest": "86bc0e8bc63923adbbbe5bbbf68b0c559359c0a1b706c60d23d07655f0ac929b",
+          "result_sha256": "9ca6531ae5589f240341a9aee70e5c079bde2b47d12e6653589a1cb5bd49a65e",
+          "oracle_sha256": "f3b4bd117203fa882c7fdfd8affc71bb408f2bdda064ec4fe6d002c9d6f58749"
         }
       ]
     },
@@ -702,7 +907,39 @@
           "When CI on the develop PR is green, the lead merges the PR to develop itself."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The concrete requirement is absent from `item.text`, including when the item only mentions the same topic.",
+                "unclear": "Part of `item.text` is garbled or missing, so presence cannot be judged.",
+                "yes": "The concrete requirement appears in `item.text`, verbatim or paraphrased."
+              },
+              "instructions": "List to yourself the concrete requirement in `anchor.statement` (for example a recipient such as `omega-prime@hermes`, a command such as `atm send`, a limit on which files change, or a required end state such as a PR left ready to merge). Is that concrete requirement present in `item.text`? A paraphrase counts; a topic mention does not. When `anchor.statement` applies under a condition (for example when there are breaking changes, or when CI is green), the requirement is present only if `item.text` states what happens under that condition; doing a related step without addressing the condition does not count. Judge presence only, not conflict.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+                "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+                "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+              },
+              "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only. Leaving a required step unmentioned, or marking a step done without saying what else happens, is silence, not contradiction. Anything `anchor.statement` itself names as allowed or as an exception is not a contradiction.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+                "unclear": "The item text is too vague to tell what part of the system it touches.",
+                "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+              },
+              "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -729,6 +966,15 @@
           "at": "2026-10-13T17:53:08Z",
           "by": "Rand Lee",
           "note": "AskUserQuestion 2026-10-13: 'I am fine to lock. tuning requires slightly rewording/updating.'"
+        },
+        {
+          "event": "questions_tuned",
+          "gate": "plan",
+          "at": "2026-10-13",
+          "by": "anchor-tuning (lint-8fyq-tune-2)",
+          "question_set_digest": "86bc0e8bc63923adbbbe5bbbf68b0c559359c0a1b706c60d23d07655f0ac929b",
+          "result_sha256": "9ca6531ae5589f240341a9aee70e5c079bde2b47d12e6653589a1cb5bd49a65e",
+          "oracle_sha256": "f3b4bd117203fa882c7fdfd8affc71bb408f2bdda064ec4fe6d002c9d6f58749"
         }
       ]
     },
