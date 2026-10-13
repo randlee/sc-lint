@@ -13,52 +13,15 @@ from typing import Any
 
 import pytest
 from conftest import ProductArtifacts
-
-ROOT = Path(__file__).resolve().parents[2]
-KIT = ROOT / "packages" / "sc-lint-adoption"
-INSTALL = KIT / "install.py"
-FIXTURES = ROOT / "tests" / "fixtures" / "adoption"
-SUBPROCESS_TIMEOUT_SECONDS = 60
-WORKED_EXAMPLE_TIMEOUT_SECONDS = 300
-
-
-def copy_fixture(name: str) -> Path:
-    temporary = Path(tempfile.mkdtemp())
-    destination = temporary / "consumer"
-    shutil.copytree(FIXTURES / name, destination)
-    return destination
-
-
-def run_subprocess(
-    arguments: list[str],
-    *,
-    timeout: float = SUBPROCESS_TIMEOUT_SECONDS,
-    **options: Any,
-) -> subprocess.CompletedProcess[str]:
-    try:
-        return subprocess.run(
-            arguments, stdin=subprocess.DEVNULL, timeout=timeout, **options
-        )
-    except subprocess.TimeoutExpired as error:
-        raise AssertionError(
-            f"subprocess timed out after {timeout}s: {arguments!r}\n"
-            f"stdout: {error.stdout!r}\nstderr: {error.stderr!r}"
-        ) from error
-
-
-def run(
-    *arguments: str,
-    cwd: Path | None = None,
-    timeout: float = SUBPROCESS_TIMEOUT_SECONDS,
-) -> subprocess.CompletedProcess[str]:
-    return run_subprocess(
-        ["python3", str(INSTALL), *arguments],
-        cwd=cwd,
-        timeout=timeout,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+from install_helpers import FIXTURES
+from install_helpers import INSTALL
+from install_helpers import KIT
+from install_helpers import ROOT
+from install_helpers import WORKED_EXAMPLE_TIMEOUT_SECONDS
+from install_helpers import copy_fixture
+from install_helpers import run
+from install_helpers import run_subprocess
+from install_helpers import write_input
 
 
 def test_run_subprocess_stdin_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -93,14 +56,6 @@ def test_run_subprocess_timeout_reports_command_and_output() -> None:
     assert repr(command) in message
     assert "ready" in message
     assert "warning" in message
-
-
-def write_input(consumer: Path, **overrides: object) -> Path:
-    data = json.loads((FIXTURES / "install.json").read_text())
-    data.update(overrides)
-    path = consumer.parent / "install.json"
-    path.write_text(json.dumps(data))
-    return path
 
 
 def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> None:
@@ -493,7 +448,32 @@ def test_generated_catalogs_are_current_and_vendored_only() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     assert not (consumer / "analyzer-catalog").exists()
-    assert (consumer / "plugins" / "sc-lint" / "analyzer-catalog" / "portability.json").is_file()
+    assert not (consumer / "schema.d").exists()
+    plugin = consumer / "plugins" / "sc-lint"
+    assert (plugin / "analyzer-catalog" / "portability.json").is_file()
+    assert not (plugin / "schema.d").exists()
+    assert (plugin / "install.schema.json").is_file()
+
+
+def test_schema_merge_conflict_names_fragment_and_property(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    overlay = kit / "schema.d" / "zzz-conflict.json"
+    overlay.parent.mkdir()
+    overlay.write_text(json.dumps({"properties": {"minimum_version": {"type": "integer"}}}))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "zzz-conflict.json" in result.stderr
+    assert "properties.minimum_version.type" in result.stderr
 
 
 def test_schema_analyzer_keys_match_rust_catalogs() -> None:

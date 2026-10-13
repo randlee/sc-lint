@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -21,11 +20,10 @@ use syn::Stmt;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-use crate::CrateId;
 use crate::Finding;
-use crate::NodeId;
-use crate::OwnerId;
 use crate::RuleId;
+use crate::findings::PortabilityFinding;
+use crate::findings::convert_findings;
 use crate::predicates::attr_is_cfg_attr_not_unix_allow_dead_code;
 use crate::predicates::attr_is_cfg_unix;
 use crate::predicates::attr_is_platform_cfg;
@@ -47,10 +45,8 @@ use crate::predicates::use_tree_contains_std_os_unix;
 use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
-use sc_lint_analyzer_support::PackageName;
 use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
-use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::classify_scope;
 use sc_lint_analyzer_support::count_scanned_crates as count_crates;
 use sc_lint_analyzer_support::discover_source_files;
@@ -154,18 +150,6 @@ impl AnalyzerPortabilityKeys {
     }
 }
 
-#[derive(Debug, Clone)]
-struct PortabilityFinding {
-    rule_id: RuleId,
-    kind: &'static str,
-    message: String,
-    source_path: PathBuf,
-    line: usize,
-    package: PackageName,
-    target: TargetName,
-    node_label: String,
-}
-
 pub(crate) fn analyze_portability(
     root: &Path,
     document: &toml::Table,
@@ -202,42 +186,7 @@ pub(crate) fn analyze_portability(
         ));
     }
 
-    findings.sort_by(|left, right| {
-        left.rule_id
-            .as_str()
-            .cmp(right.rule_id.as_str())
-            .then_with(|| left.source_path.cmp(&right.source_path))
-            .then_with(|| left.line.cmp(&right.line))
-            .then_with(|| left.message.cmp(&right.message))
-    });
-
-    Ok(findings
-        .into_iter()
-        .map(|finding| {
-            let source_path = RepoRelativePath::parse(
-                &sc_lint_analyzer_support::relative_slash_path(root, &finding.source_path),
-            )
-            .expect("discovered source files must be repository-relative");
-            (
-                Finding {
-                    rule_id: finding.rule_id,
-                    kind: finding.kind.into(),
-                    message: format!(
-                        "{}:{}: {}",
-                        finding.source_path.display(),
-                        finding.line,
-                        finding.message
-                    ),
-                    owner_ids: vec![OwnerId::new(CrateId::from_parts(
-                        finding.package.as_str(),
-                        finding.target.as_str(),
-                    ))],
-                    node_ids: vec![NodeId::new(finding.node_label)],
-                },
-                Some(source_path),
-            )
-        })
-        .collect())
+    Ok(convert_findings(root, findings))
 }
 
 pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {

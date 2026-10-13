@@ -37,16 +37,16 @@ CATALOG_DIRECTORY = ROOT / "analyzer-catalog"
 SCHEMA_DIRECTORY = ROOT / "schema.d"
 
 
-def merge_schema(base: dict, overlay: dict, label: str = "") -> dict:
+def merge_schema(base: dict, overlay: dict, fragment: Path, label: str = "") -> dict:
     result = dict(base)
     for key, value in overlay.items():
         path = f"{label}.{key}" if label else key
         if key not in result:
             result[key] = value
         elif isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = merge_schema(result[key], value, path)
+            result[key] = merge_schema(result[key], value, fragment, path)
         elif result[key] != value:
-            raise ValueError(f"schema conflict at {path}")
+            raise ValueError(f"schema conflict in {fragment.name} at {path}")
     return result
 
 
@@ -55,7 +55,7 @@ def load_schema() -> dict:
     if not SCHEMA_DIRECTORY.exists():
         return schema
     for overlay_path in sorted(SCHEMA_DIRECTORY.glob("*.json")):
-        schema = merge_schema(schema, json.loads(overlay_path.read_text()))
+        schema = merge_schema(schema, json.loads(overlay_path.read_text()), overlay_path)
     return schema
 
 
@@ -187,7 +187,11 @@ def justfile_collisions(targets: dict[Path, bytes]) -> list[str]:
 
 
 def package_files() -> dict[Path, bytes]:
-    return {Path("plugins/sc-lint") / source.relative_to(ROOT): source.read_bytes() for source in ROOT.rglob("*") if source.is_file()}
+    return {
+        Path("plugins/sc-lint") / source.relative_to(ROOT): source.read_bytes()
+        for source in ROOT.rglob("*")
+        if source.is_file()
+    }
 
 
 def desired(data: dict, repo: Path, input_path: Path) -> Desired:
