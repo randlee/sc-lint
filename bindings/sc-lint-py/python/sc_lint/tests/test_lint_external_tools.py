@@ -404,6 +404,22 @@ allow = ["MIT"]
         self.assertIn("cause=dependency-key-not-found", diagnostics[0])
         self.assertIn("action=", diagnostics[0])
 
+    def test_cargo_shear_validation_rejects_blank_and_non_string_reasons(self) -> None:
+        metadata = CargoShearWorkspaceMetadata(
+            {}, frozenset({f"{APP_PACKAGE}.serde", f"{APP_PACKAGE}.regex"})
+        )
+
+        diagnostics = validate_unused_dependency_allowlist(
+            {f"{APP_PACKAGE}.serde": "   ", f"{APP_PACKAGE}.regex": 3}, metadata
+        )
+
+        self.assertEqual(len(diagnostics), 2)
+        self.assertIn("key='synthetic-app.serde' cause=blank-reason", diagnostics[0])
+        self.assertIn("key='synthetic-app.regex' cause=non-string-reason", diagnostics[1])
+        self.assertTrue(
+            all('action="supply a nonblank string reason"' in diagnostic for diagnostic in diagnostics)
+        )
+
     def test_cargo_shear_validation_accepts_only_declared_canonical_keys(self) -> None:
         metadata = CargoShearWorkspaceMetadata(
             {}, frozenset({f"{APP_PACKAGE}.serde", "workspace.shared"})

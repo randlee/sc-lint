@@ -283,10 +283,22 @@ def validate_unused_dependency_allowlist(
         ]
 
     diagnostics: list[str] = []
-    for key in configured:
+    for key, reason in configured.items():
         if not isinstance(key, str):
             continue
-        if is_path_like_dependency_key(key):
+        if not isinstance(reason, str):
+            diagnostics.append(
+                f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
+                f'key={key!r} cause=non-string-reason '
+                'action="supply a nonblank string reason"'
+            )
+        elif not reason.strip():
+            diagnostics.append(
+                f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
+                f'key={key!r} cause=blank-reason '
+                'action="supply a nonblank string reason"'
+            )
+        elif is_path_like_dependency_key(key):
             diagnostics.extend(
                 (
                     f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
