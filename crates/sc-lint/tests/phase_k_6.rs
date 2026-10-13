@@ -142,16 +142,23 @@ fn run_bootstrap(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) 
 }
 
 #[cfg(windows)]
+fn powershell_executable() -> PathBuf {
+    let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
+    let search_path = std::env::split_paths(&inherited_path).collect::<Vec<_>>();
+    search_path
+        .iter()
+        .map(|directory| directory.join("pwsh.exe"))
+        .find(|candidate| candidate.is_file())
+        .expect("pwsh.exe on Windows PATH")
+}
+
+#[cfg(windows)]
 fn powershell_command() -> Command {
+    let pwsh = powershell_executable();
     let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
     let system32 = PathBuf::from(&system_root).join("System32");
     let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
     let search_path = std::env::split_paths(&inherited_path).collect::<Vec<_>>();
-    let pwsh = search_path
-        .iter()
-        .map(|directory| directory.join("pwsh.exe"))
-        .find(|candidate| candidate.is_file())
-        .expect("pwsh.exe on Windows PATH");
     let mut path = search_path;
     path.retain(|directory| directory == pwsh.parent().expect("pwsh parent"));
     path.push(system32.clone());
@@ -170,6 +177,11 @@ fn powershell_command() -> Command {
         }
     }
     command
+}
+
+#[cfg(windows)]
+fn inherited_powershell_command() -> Command {
+    Command::new(powershell_executable())
 }
 
 #[cfg(windows)]
@@ -373,6 +385,21 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .current_dir(&root)
             .output()
             .expect("run direct PowerShell managed product control");
+        let powershell_builtin = powershell_command()
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
+            .arg("Write-Output 'powershell-builtin-control'; exit 0")
+            .current_dir(&root)
+            .output()
+            .expect("run cleared-environment PowerShell built-in control");
+        let inherited_direct_powershell = inherited_powershell_command()
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
+            .arg(format!(
+                "& '{}' version; exit $LASTEXITCODE",
+                managed_binary.display()
+            ))
+            .current_dir(&root)
+            .output()
+            .expect("run inherited-environment direct PowerShell managed product control");
         let output = powershell_command()
             .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
             .arg(root.join(".sc-lint/bootstrap.ps1"))
@@ -383,10 +410,20 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .env("LOCALAPPDATA", &local_app_data)
             .output()
             .expect("run PowerShell consumer bootstrap");
+        let inherited_output = inherited_powershell_command()
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+            .arg(root.join(".sc-lint/bootstrap.ps1"))
+            .args(["exec", "--", "sc-lint", "version"])
+            .current_dir(&root)
+            .env_remove("SC_LINT_BIN")
+            .env_remove("SC_LINT_INSTALL_DIR")
+            .env("LOCALAPPDATA", &local_app_data)
+            .output()
+            .expect("run inherited-environment PowerShell consumer bootstrap");
 
         assert!(
             output.status.success(),
-            "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}; direct PowerShell status={:?}, stdout={:?}, stderr={:?}",
+            "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}; direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}",
             output.status.code(),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
@@ -395,7 +432,16 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             String::from_utf8_lossy(&direct.stderr),
             direct_powershell.status.code(),
             String::from_utf8_lossy(&direct_powershell.stdout),
-            String::from_utf8_lossy(&direct_powershell.stderr)
+            String::from_utf8_lossy(&direct_powershell.stderr),
+            powershell_builtin.status.code(),
+            String::from_utf8_lossy(&powershell_builtin.stdout),
+            String::from_utf8_lossy(&powershell_builtin.stderr),
+            inherited_direct_powershell.status.code(),
+            String::from_utf8_lossy(&inherited_direct_powershell.stdout),
+            String::from_utf8_lossy(&inherited_direct_powershell.stderr),
+            inherited_output.status.code(),
+            String::from_utf8_lossy(&inherited_output.stdout),
+            String::from_utf8_lossy(&inherited_output.stderr)
         );
         assert!(
             String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
