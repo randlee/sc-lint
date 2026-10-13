@@ -317,7 +317,7 @@ def validate_unused_dependency_allowlist(
             diagnostics.extend(
                 (
                     f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
-                    f'key={key!r} cause=path-like-key action="replace with a canonical dependency key"',
+                    f'key={key!r} cause=path-like-key',
                     PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key),
                 )
             )

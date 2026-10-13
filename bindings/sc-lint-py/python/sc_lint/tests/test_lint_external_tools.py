@@ -438,6 +438,8 @@ allow = ["MIT"]
         self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", diagnostics[0])
         self.assertIn("field=cargo_shear.allowed_unused_dependencies", diagnostics[0])
         self.assertIn("key=", diagnostics[0])
+        self.assertIn("cause=path-like-key", diagnostics[0])
+        self.assertNotIn("action=", diagnostics[0])
         self.assertEqual(diagnostics[1], PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key))
 
     def test_cargo_shear_validation_rejects_stale_keys_with_correction(self) -> None:
@@ -557,6 +559,8 @@ allow = ["MIT"]
                 diagnostics = stderr.getvalue().splitlines()
                 self.assertEqual(result, 2)
                 self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", diagnostics[0])
+                self.assertIn("cause=path-like-key", diagnostics[0])
+                self.assertNotIn("action=", diagnostics[0])
                 self.assertEqual(
                     diagnostics[1], PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key)
                 )
