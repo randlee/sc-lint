@@ -26,6 +26,17 @@ second consumer runner or copy atm-core policy values into product defaults.
    stays unchanged. Validated adapter pairs cover their enclosing differently
    named module declarations and inherited-private implementation items, while
    unrelated and separately Unix-gated public items retain normal parity checks.
+   The installer rejects unknown rule names using a deterministic artifact
+   generated from the Rust RuleCatalog values; normal Rust tests verify artifact
+   parity. Python contains no independent analyzer rule catalog or rule
+   implementation. Installer field/type validation and rendering remain glue;
+   Rust alone evaluates filesystem/cfg and policy semantics.
+   Manifest findings under `--rule manifests` use the contiguous public IDs:
+   `SCB-MANIFEST-003` for a disallowed configured dependency, `-004` for
+   configured ownership violation, `-005` for configured section violation,
+   and `-006` for stale or inconsistent policy, including record-lock and
+   active-owner coverage defects. All default to failure and belong to
+   `manifests`; existing `-001`/`-002` remain unchanged.
 2. Extend REQ-SCB-017 to aggregate incoming dependent allowlists per canonical
    owner package. For records i of owner P, runtime permissions are the union of R_i =
    `allowed_dependents`. Dev-only permissions union each supplied D_i =
@@ -34,6 +45,9 @@ second consumer runner or copy atm-core policy values into product defaults.
    another record's grant. Normal/build dominates mixed edges. Staleness uses
    only edge categories to which an entry contributes and is deduplicated by
    canonical owner/dependent; preserve the upstream active-record gate.
+   `SCB-DEPENDENCY-004` reports a stale
+   canonical owner/dependent permission once, defaults to failure, and belongs
+   to `dependencies`.
    REQ-SCB-019's third-party exclusion does not prevent explicitly configured
    manifest policy under `--rule manifests`; package edges remain distinct.
 3. Extend inventory validation under REQ-SCB-020/023. Preserve existing local
@@ -41,8 +55,11 @@ second consumer runner or copy atm-core policy values into product defaults.
    participate in dependent-policy validation. Report each new semantic defect
    as a structured validation finding after parsing, with record/field context.
    Preserve fatal syntax, schema, layout and I/O errors and public loader
-   signatures. A combined-invalid fixture must demonstrate that one semantic
-   defect does not hide the others (#377).
+   signatures. `SCB-BOUNDARY-004` reports each inventory semantic defect,
+   defaults to failure, and remains selected by both `boundaries` and
+   `dependencies` families. Structural loader failures remain fatal. A
+   combined-invalid fixture must demonstrate that one semantic defect does not
+   hide the others (#377).
 4. Extend the existing Rust consumer lint executor with the named lint-profile
    membership and host/all/platform selector required by #199. Existing list
    forms remain accepted. Named profile membership is an ordered list of step

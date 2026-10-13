@@ -63,7 +63,9 @@ family.
   allows no dependent in that edge category; normal/build dominates mixed
   normal/dev edges. Staleness considers only categories to which an entry
   contributes, is deduplicated by canonical owner/dependent, and retains the
-  upstream active-record gate.
+  upstream active-record gate. `SCB-DEPENDENCY-004` reports a stale
+  canonical owner/dependent permission once, defaults to failure, and belongs
+  to the `dependencies` filter family.
   (Amended 2026-10-12, Accepted,
   [ADR-017, change 2](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -85,7 +87,12 @@ family.
   build edges are unchanged. This package-edge scope does not exclude
   explicitly configured manifest policy, including third-party dependencies,
   under `--rule manifests`; that policy remains distinct from package-edge
-  enforcement under `--rule dependencies`.
+  enforcement under `--rule dependencies`. Manifest findings use
+  `SCB-MANIFEST-003` for a disallowed configured dependency, `-004` for a
+  configured ownership violation, `-005` for a configured section violation,
+  and `-006` for stale or inconsistent policy, including record-lock and
+  active-owner coverage defects. All default to failure and belong to the
+  `manifests` filter family; existing `-001`/`-002` remain unchanged.
   (Amended 2026-10-10, Accepted, #203; amended 2026-10-12, Accepted,
   [ADR-017, change 2](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -102,6 +109,9 @@ family.
   Existing syntax, schema, layout and I/O failures remain fatal, and public
   loader signatures remain unchanged. Preserve local composition-root symbols;
   only resolved external crate-qualified roots undergo dependent-policy checks.
+  `SCB-BOUNDARY-004` reports each semantic inventory defect, defaults to
+  failure, and remains selected by both `boundaries` and `dependencies` filter
+  families; structural loader failures remain fatal.
   (Amended 2026-10-10, Accepted, #203; amended 2026-10-12, Accepted,
   [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 

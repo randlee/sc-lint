@@ -1,6 +1,6 @@
 # Phase K accepted anchor questions
 
-These are the independently tuned question sets installed in the question beads. They supersede anchor-question-drafts.md. Each choice rubric is included so the full decision criteria remain visible.
+These are the independently tuned question sets installed in the question beads. Each choice rubric is included so the full decision criteria remain visible.
 
 ## ANC-001
 
@@ -74,11 +74,11 @@ When atm-core already tests a reported failure being ported, Phase K regression 
 
 **relevant**
 
-Does `item.text` work on or investigate existing atm-core test coverage for a reported failure, or plan sc-lint regression coverage for that failure? Investigating which atm-core test exists is relevant as a prerequisite even when the item does not yet plan a sc-lint test or say it will reuse the test. If the item explicitly establishes that no atm-core test exists for this failure, the conditional reuse duty does not apply. Judge applicability only.
+Judge whether `item.text` itself adds or changes sc-lint test coverage for a reported failure with an existing applicable atm-core test, or investigates that upstream test as groundwork. A happy-path-only test that omits the upstream failure remains relevant because it changes coverage for the same reported behavior. A docs-only item that only describes or executes already-existing cases, without changing coverage, is outside this anchor. If no upstream test exists, the conditional duty does not apply.
 
-- **yes:** The item investigates existing atm-core tests for a reported failure, or implements or changes regression coverage for that failure, without ruling out an applicable atm-core test.
-- **no:** The item is unrelated, or expressly establishes that no atm-core test covers this failure.
-- **unclear:** The item does not identify whether it concerns tests for a reported failure.
+- **yes:** The item adds or changes tests or regression coverage for the reported behavior, even with only a happy-path case that omits the upstream failure, or investigates the upstream test as groundwork.
+- **no:** The item only documents or executes already-existing tests without adding or changing regression coverage, is unrelated, or expressly establishes no applicable upstream test exists.
+- **unclear:** The item mentions failure tests but it is unclear whether it undertakes regression coverage work or only documents existing coverage.
 
 **addressed**
 
@@ -90,11 +90,11 @@ Does `item.text` explicitly plan to reuse the upstream failing input and expecte
 
 **contradicted**
 
-Does `item.text` explicitly reject or replace reuse of an existing applicable atm-core test case for the reported failure, even if it adds independently invented failing tests? The anchor requires reusing that upstream case through the sc-lint interface. Silence about reuse is omission, not contradiction; absence of any upstream case is outside this conditional duty. Judge explicit conflict only.
+Does `item.text` affirmatively reject, omit, or replace reuse of an available applicable atm-core failure test while adding or changing sc-lint regression coverage? Adding independent failure tests in its place conflicts. A docs-only file fence saying no test cases will be added or changed is not an affirmative rejection of upstream reuse in implementing coverage. Silence is not conflict.
 
-- **yes:** An applicable atm-core failure test exists, but the item explicitly omits, rejects, or replaces its case with different tests rather than reusing it through sc-lint.
-- **no:** The item states no decision against reusing an applicable upstream failure case, or explicitly establishes that no such case exists.
-- **unclear:** The item may replace the upstream case, but the stated test choice does not settle that.
+- **yes:** The item undertakes regression coverage for a failure with an applicable upstream test, and explicitly rejects or replaces that upstream case.
+- **no:** No incompatible coverage choice is stated, including a docs-only instruction not to edit tests or a case where no upstream test exists.
+- **unclear:** The item may replace an applicable upstream case, but that coverage choice is unresolved.
 
 ### Development gate
 
@@ -202,11 +202,11 @@ When a Phase K rule is implemented in Rust, its Python binding must not independ
 
 **relevant**
 
-Use the specific behavioral distinction in the criteria to judge `item.text`; do not infer missing behavior. Is the governed work present? Investigating it or omitting its constraint still touches its subject.
+Does `item.text` undertake, describe as its work, or investigate an added or modified Python binding for a Phase K rule implemented in Rust? A binding described as forwarding to or duplicating Rust is relevant. A docs-only item that merely describes previously delivered bindings or executes their existing examples, with no binding change, is outside this anchor even if it names Python bindings. Judge applicability only.
 
-- **yes:** Classify yes when the work touches Python bindings for any Phase K rule implemented in Rust, including investigations and incomplete changes.
-- **no:** Classify no when the work is unrelated or explicitly says no Python binding for a Rust-implemented rule is created or changed.
-- **unclear:** Classify unclear when the text does not establish whether this subject is touched.
+- **yes:** The item adds, changes, or investigates a Python binding for a Rust-implemented rule, or describes that binding behavior as the work being delivered.
+- **no:** The item only updates documentation or verifies existing examples without creating/changing bindings, changes only Rust code, or is unrelated.
+- **unclear:** The item mentions bindings but does not establish whether it undertakes binding work or only describes existing behavior.
 
 **addressed**
 
@@ -266,11 +266,11 @@ Phase K lint behavior must support consumer repositories beyond atm-core without
 
 **relevant**
 
-Assess relevant for the single work item against this approved requirement: Phase K lint behavior must support consumer repositories beyond atm-core without hard-coded atm-core repository identities or policies. Classify whether this item operates in the anchor scope even if its method is missing or wrong. Explicit absence of the governing trigger is out of scope.
+Judge the work item, not the list of features it describes. If it exclusively updates documentation and executes examples of already-delivered lint behavior, without changing consumer-facing lint rules, configuration, or tools, answer no. Otherwise, an item that describes, adds, changes, or investigates consumer-facing Phase K lint behavior across repositories is relevant even when its method is missing or wrong.
 
-- **yes:** The work touches consumer-facing Phase K lint behavior, configuration, or tools across repositories, including investigations and incomplete changes.
-- **no:** The work is unrelated or explicitly says no consumer-facing lint behavior, configuration, or tool behavior is touched.
-- **unclear:** The text does not establish whether this subject is touched.
+- **yes:** The item undertakes or investigates consumer-facing lint behavior, configuration, or tool work across repositories, or describes the rule it is implementing.
+- **no:** The item exclusively documents or checks examples of already-delivered behavior without changing consumer-facing behavior, is unrelated, or explicitly rules out a governed change.
+- **unclear:** The item mentions such behavior but does not establish whether it is undertaking governed work or only documenting existing behavior.
 
 **addressed**
 
@@ -330,11 +330,11 @@ Optional consumer policy must be opt-in: sc-lint enforces it when supplied and p
 
 **relevant**
 
-Compare the work with the approved anchor scope. Does `item.text` touch optional consumer policies, including manifests, allowlists, configuration tables, and other supported forms? Omission or noncompliance remains relevant. Assess subject applicability only.
+Judge the activity in `item.text`, not the subject words it mentions. Is this item adding, changing, or investigating introduction or change of optional consumer-policy behavior, including supported manifests, allowlists, or configuration tables? An item that only updates documentation or runs examples of already delivered behavior, with no scoped implementation/test/configuration change, is outside this anchor. Omission within scoped work remains relevant. An express statement that no optional consumer-policy mechanism or behavior is introduced or changed is also outside scope.
 
-- **yes:** The work touches optional consumer policies, including manifests, allowlists, configuration tables, and other supported forms, including investigations and incomplete changes.
-- **no:** The work is unrelated or explicitly says no optional consumer policy mechanism is introduced or changed.
-- **unclear:** The text does not establish whether this subject is touched.
+- **yes:** It adds, changes, or investigates introduction or change of optional consumer-policy behavior, including supported manifests, allowlists, or configuration tables, including work whose required method is omitted.
+- **no:** It only documents or executes examples of already delivered behavior without a scoped change, is unrelated, or expressly establishes that no optional consumer-policy mechanism or behavior is introduced or changed.
+- **unclear:** The text does not establish whether it undertakes scoped work or only describes existing behavior.
 
 **addressed**
 
@@ -394,19 +394,19 @@ Existing simpler consumers must continue to run sc-lint without atm-core-specifi
 
 **relevant**
 
-Judge only whether `item.text` touches consumer configuration or boundary-check compatibility for existing simpler sc-lint consumers. Omission or conflict remains relevant. Work explicitly outside the governing subject is not relevant.
+Does `item.text` address compatibility of sc-lint consumer configuration, CLI operation, or boundary checking for existing simpler consumers? A statement that a simpler consumer remains runnable with ordinary settings is relevant preservation even without an explicit code-change verb. Investigation, omission, or conflict in that subject remains relevant. Answer no if the item expressly states consumer configuration and boundary checking are untouched, or limits work to documenting/verifying already-delivered compatibility.
 
-- **yes:** It changes, investigates, or defines consumer configuration or boundary-check compatibility for existing simpler sc-lint consumers.
-- **no:** It is unrelated, or explicitly establishes that the item does not change consumer configuration or boundary checking.
-- **unclear:** The governed subject cannot be determined.
+- **yes:** The item states, plans, changes, preserves, or investigates simpler-consumer configuration, CLI, or boundary-check compatibility as governed work, including a statement that the CLI remains runnable without atm-core settings.
+- **no:** The item expressly leaves consumer configuration and boundary checking untouched, limits its work to documentation or execution of existing examples without such changes, or is unrelated.
+- **unclear:** It mentions simpler consumers but does not resolve whether it addresses governed compatibility or only describes existing behavior in documentation.
 
 **addressed**
 
-Does `item.text` state that existing simpler consumers can run the sc-lint behavior under discussion without needing atm-core-specific configuration? Judge explicit inclusion of this compatibility obligation. A description of preserved behavior or its planned preservation counts; ordinary optional consumer settings and intended bug-fix result changes are allowed. Do not infer preservation from unrelated work.
+Does `item.text` state as part of a changed sc-lint behavior that existing simpler consumers can run without atm-core-specific configuration? Merely investigating how they invoke the tool, or documenting already-delivered compatibility, does not address a new compatibility obligation. Ordinary optional settings and intended bug-fix result changes are allowed.
 
-- **yes:** The item explicitly says a simpler consumer runs, remains able to run, or will run the relevant sc-lint check or CLI without an atm-core manifest or other atm-core-specific configuration. This may describe one concrete simpler consumer or general compatibility.
-- **no:** The item omits that compatibility content, only mentions consumers, requires atm-core configuration, or concerns unrelated work without stating the obligation.
-- **unclear:** The text discusses continued operation but leaves it uncertain whether atm-core-specific configuration is required.
+- **yes:** The item carries forward simpler-consumer operation without atm-core-specific configuration as part of the configuration, boundary, or CLI behavior it changes or preserves.
+- **no:** The item only investigates simpler-consumer use, only documents already-delivered compatibility, omits preservation in governed work, or requires atm-core-specific configuration.
+- **unclear:** The item concerns a changed consumer behavior but leaves whether atm-core-specific configuration is required uncertain.
 
 **contradicted**
 

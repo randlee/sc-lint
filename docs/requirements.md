@@ -11,6 +11,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
+- [docs/sc-lint/adr/ADR-017-phase-k-consumer-contracts.md](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
@@ -590,6 +591,13 @@ The product should support both:
   consumer once installed.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
 
+Phase K's Accepted ADR-017 extends existing adoption and CLI contracts: the
+persisted installer input may declare exact cargo-tool versions and rustup
+targets for ordinary bootstrap setup, while direct binary setup retains its
+meaning and lint never installs tools. The managed-wheel helper owns
+inspection, installation and verification; absent declarations add no work.
+This is an amendment to those contracts, not a new product default.
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
@@ -618,7 +626,7 @@ The completed Phase `D` execution line required:
   - TOML-backed package dependency policy in boundary inventory records
   - direct workspace package-edge allowlist and forbidden-edge enforcement
   - a dedicated `dependencies` rule filter for package-edge policy
-  - stable fail-only `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-003` rule
+  - stable fail-only `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-004` rule
     coverage in the default `analyze_workspace` path
   - in-scope direct workspace edges across normal, dev, build, and
     target-specific dependency sections
