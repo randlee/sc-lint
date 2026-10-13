@@ -51,12 +51,20 @@ use sc_lint_analyzer_support::discover_source_files;
 use sc_lint_analyzer_support::item_attrs;
 use sc_lint_analyzer_support::item_identifier;
 use sc_lint_analyzer_support::item_name_hint_is_tests;
+use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
 
 mod findings;
 
 use self::findings::PortabilityFinding;
 use self::findings::convert_findings;
+
+pub(super) fn repo_relative_source_path(
+    root: &Path,
+    source_path: &Path,
+) -> Option<RepoRelativePath> {
+    RepoRelativePath::parse(&relative_slash_path(root, source_path)).ok()
+}
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 struct RepoPortabilityConfig {

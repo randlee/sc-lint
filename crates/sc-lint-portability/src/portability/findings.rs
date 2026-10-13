@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use sc_lint_analyzer_support::RepoRelativePath;
 
+use super::repo_relative_source_path;
 use crate::CrateId;
 use crate::Finding;
 use crate::NodeId;
@@ -37,10 +38,7 @@ pub(super) fn convert_findings(
     findings
         .into_iter()
         .map(|finding| {
-            let source_path = RepoRelativePath::parse(
-                &sc_lint_analyzer_support::relative_slash_path(root, &finding.source_path),
-            )
-            .expect("discovered source files must be repository-relative");
+            let source_path = repo_relative_source_path(root, &finding.source_path);
             (
                 Finding {
                     rule_id: finding.rule_id,
@@ -57,7 +55,7 @@ pub(super) fn convert_findings(
                     ))],
                     node_ids: vec![NodeId::new(finding.node_label)],
                 },
-                Some(source_path),
+                source_path,
             )
         })
         .collect()

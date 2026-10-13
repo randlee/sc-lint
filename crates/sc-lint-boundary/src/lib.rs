@@ -725,17 +725,7 @@ pub fn analyze_workspace_configured(
     let findings: Vec<_> = std::mem::take(&mut report.findings)
         .into_iter()
         .map(|finding| {
-            let path = matches!(
-                finding.rule_id,
-                RuleId::ScbManifest001 | RuleId::ScbManifest002
-            )
-            .then(|| {
-                finding.owner_ids.first().map(|owner| {
-                    RepoRelativePath::parse(owner.as_str())
-                        .expect("manifest finding paths must be repository-relative")
-                })
-            })
-            .flatten();
+            let path = manifest_finding_path(&finding);
             (finding, path)
         })
         .collect();
@@ -744,6 +734,16 @@ pub fn analyze_workspace_configured(
     report.findings = findings;
     report.status = status;
     Ok(report)
+}
+
+fn manifest_finding_path(finding: &Finding) -> Option<RepoRelativePath> {
+    matches!(
+        finding.rule_id,
+        RuleId::ScbManifest001 | RuleId::ScbManifest002
+    )
+    .then(|| finding.owner_ids.first())
+    .flatten()
+    .and_then(|owner| RepoRelativePath::parse(owner.as_str()).ok())
 }
 
 fn legacy_family_rule_filter(selected: Option<&BTreeSet<CatalogRuleId>>) -> Option<RuleFilter> {

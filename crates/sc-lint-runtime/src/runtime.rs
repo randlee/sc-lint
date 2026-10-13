@@ -33,6 +33,13 @@ use sc_lint_analyzer_support::discover_source_files;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
 
+pub(super) fn repo_relative_source_path(
+    root: &Path,
+    source_path: &Path,
+) -> Option<RepoRelativePath> {
+    RepoRelativePath::parse(&relative_slash_path(root, source_path)).ok()
+}
+
 #[derive(Debug, Clone)]
 struct RuntimeFinding {
     rule_id: RuleId,
@@ -85,9 +92,7 @@ pub(crate) fn analyze_runtime_liveness(
     Ok(findings
         .into_iter()
         .map(|finding| {
-            let source_path =
-                RepoRelativePath::parse(&relative_slash_path(root, &finding.source_path))
-                    .expect("discovered source files must be repository-relative");
+            let source_path = repo_relative_source_path(root, &finding.source_path);
             (
                 Finding {
                     rule_id: finding.rule_id,
@@ -104,7 +109,7 @@ pub(crate) fn analyze_runtime_liveness(
                     ))],
                     node_ids: vec![NodeId::new(finding.node_label)],
                 },
-                Some(source_path),
+                source_path,
             )
         })
         .collect())

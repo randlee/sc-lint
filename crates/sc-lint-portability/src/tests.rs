@@ -8,6 +8,14 @@ use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
 use tempfile::TempDir;
 
+#[test]
+fn outside_source_path_has_no_repository_relative_path() {
+    let root = TempDir::new().unwrap();
+    let outside_source = root.path().join("..\u{2f}outside.rs");
+
+    assert!(super::portability::repo_relative_source_path(root.path(), &outside_source).is_none());
+}
+
 use super::*;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OwnerId;

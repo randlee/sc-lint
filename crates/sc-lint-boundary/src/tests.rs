@@ -61,6 +61,19 @@ fn fixture_display_path(relative_path: &str) -> String {
 }
 
 #[test]
+fn malformed_manifest_owner_has_no_repository_relative_path() {
+    let finding = Finding {
+        rule_id: RuleId::ScbManifest001,
+        kind: "manifest_error".into(),
+        message: "invalid manifest path".to_string(),
+        owner_ids: vec![OwnerId::new("/outside/Cargo.toml")],
+        node_ids: Vec::new(),
+    };
+
+    assert!(manifest_finding_path(&finding).is_none());
+}
+
+#[test]
 fn findings_report_text_is_stable() {
     let report = super::FindingsReport {
         tool: "sc-lint-boundary",
