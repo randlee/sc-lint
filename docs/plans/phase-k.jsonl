@@ -1,0 +1,9 @@
+{"sprint": "k-1"}
+{"sprint": "k-2", "depends_on": ["k-1"]}
+{"sprint": "k-3", "depends_on": ["k-1"]}
+{"sprint": "k-4", "depends_on": ["k-3"]}
+{"sprint": "k-6"}
+{"sprint": "k-7", "depends_on": ["k-1", "k-6"]}
+{"sprint": "k-8"}
+{"sprint": "k-9", "depends_on": ["k-7"]}
+{"sprint": "k-10", "depends_on": ["k-2", "k-4", "k-8", "k-9"]}

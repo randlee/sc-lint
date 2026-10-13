@@ -570,24 +570,13 @@ fn managed_payload_validation_issue_with_timeout(
     }
 }
 
-/// Probe the supported CLI help contract rather than assuming backend binaries
-/// expose a version flag. This checks that the companion can execute and that
-/// it is the expected analyzer CLI with its documented `analyze` command.
+/// Probe the supported CLI help contract and analyzer command surface.
 fn backend_cli_failure(binary: &Path, expected_name: &str, timeout: Duration) -> Option<String> {
     let Some(expected_about) = backend_about(expected_name) else {
         return Some(format!("unknown backend companion `{expected_name}`"));
     };
-    let (mut child, reader) = match spawn_backend_help(binary, expected_name) {
-        Ok(probe) => probe,
-        Err(problem) => return Some(problem),
-    };
-    let process_id = child.id();
-    let status = match wait_for_backend_help(&mut child, binary, expected_name, timeout) {
-        Ok(status) => status,
-        Err(problem) => return Some(problem),
-    };
-    let output = match finish_backend_output(reader, process_id, binary, expected_name) {
-        Ok(output) => output,
+    let (status, output) = match run_backend_probe(binary, expected_name, "--help", timeout) {
+        Ok(result) => result,
         Err(problem) => return Some(problem),
     };
     backend_help_contract_failure(
@@ -599,13 +588,55 @@ fn backend_cli_failure(binary: &Path, expected_name: &str, timeout: Duration) ->
     )
 }
 
-fn spawn_backend_help(
+pub(crate) fn probe_backend_version(binary: &Path, expected_name: &str) -> Result<Version, String> {
+    let (status, output) =
+        run_backend_probe(binary, expected_name, "--version", BACKEND_PROBE_TIMEOUT)?;
+    if !status.success() {
+        return Err(format!("`--version` probe exited with {status}"));
+    }
+    let output = String::from_utf8(output)
+        .map_err(|error| format!("`--version` probe output was not UTF-8: {error}"))?;
+    let mut fields = output.split_whitespace();
+    let reported_name = fields
+        .next()
+        .ok_or_else(|| "`--version` probe returned no identity or version".to_string())?;
+    let reported_version = fields
+        .next()
+        .ok_or_else(|| "`--version` probe returned no version".to_string())?;
+    if reported_name != expected_name {
+        return Err(format!(
+            "`--version` probe reported backend `{reported_name}`, expected `{expected_name}`"
+        ));
+    }
+    if fields.next().is_some() {
+        return Err("`--version` probe returned unexpected trailing output".to_string());
+    }
+    Version::parse(reported_version).map_err(|error| {
+        format!("`--version` probe reported invalid version `{reported_version}`: {error}")
+    })
+}
+
+fn run_backend_probe(
     binary: &Path,
     expected_name: &str,
+    argument: &str,
+    timeout: Duration,
+) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
+    let (mut child, reader) = spawn_backend_probe(binary, expected_name, argument)?;
+    let process_id = child.id();
+    let status = wait_for_backend_probe(&mut child, binary, expected_name, argument, timeout)?;
+    let output = finish_backend_output(reader, process_id, binary, expected_name, argument)?;
+    Ok((status, output))
+}
+
+fn spawn_backend_probe(
+    binary: &Path,
+    expected_name: &str,
+    argument: &str,
 ) -> Result<(Child, ProbeOutputReader), String> {
     let mut command = Command::new(binary);
     command
-        .arg("--help")
+        .arg(argument)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     #[cfg(unix)]
@@ -622,18 +653,19 @@ fn spawn_backend_help(
     let Some(stdout) = child.stdout.take() else {
         terminate_probe_processes(&mut child);
         return Err(format!(
-            "backend companion `{expected_name}` at `{}` did not provide a readable help stream",
-            binary.display()
+            "backend companion `{expected_name}` at `{}` did not provide a readable `{argument}` stream",
+            binary.display(),
         ));
     };
     let reader = thread::spawn(move || read_probe_output(stdout));
     Ok((child, reader))
 }
 
-fn wait_for_backend_help(
+fn wait_for_backend_probe(
     child: &mut Child,
     binary: &Path,
     expected_name: &str,
+    argument: &str,
     timeout: Duration,
 ) -> Result<std::process::ExitStatus, String> {
     let deadline = Instant::now() + timeout;
@@ -646,7 +678,7 @@ fn wait_for_backend_help(
             Ok(None) => {
                 terminate_probe_processes(child);
                 return Err(format!(
-                    "backend companion `{expected_name}` at `{}` timed out after {} ms during its `--help` probe; process-tree cleanup was attempted",
+                    "backend companion `{expected_name}` at `{}` timed out after {} ms during its `{argument}` probe; process-tree cleanup was attempted",
                     binary.display(),
                     timeout.as_millis()
                 ));
@@ -667,6 +699,7 @@ fn finish_backend_output(
     process_id: u32,
     binary: &Path,
     expected_name: &str,
+    argument: &str,
 ) -> Result<Vec<u8>, String> {
     // A descendant can outlive the direct child while holding stdout open.
     // Give the reader a short chance to drain normal output, then stop the
@@ -677,18 +710,18 @@ fn finish_backend_output(
     }
     if !reader.is_finished() && !terminate_probe_process_tree(process_id) {
         return Err(format!(
-            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its help process exited",
+            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited",
             binary.display()
         ));
     }
     match reader.join() {
         Ok(Ok(output)) => Ok(output),
         Ok(Err(error)) => Err(format!(
-            "could not read help output from backend companion `{expected_name}` at `{}`: {error}",
+            "could not read `{argument}` output from backend companion `{expected_name}` at `{}`: {error}",
             binary.display()
         )),
         Err(_) => Err(format!(
-            "help output reader panicked for backend companion `{expected_name}` at `{}`",
+            "`{argument}` output reader panicked for backend companion `{expected_name}` at `{}`",
             binary.display()
         )),
     }
@@ -1250,7 +1283,7 @@ fn reject_running_managed_binary(target: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn probe_version(binary: &Path) -> Result<Version, String> {
+pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
     if !binary.is_file() {
         return Err("binary was not found".to_string());
     }

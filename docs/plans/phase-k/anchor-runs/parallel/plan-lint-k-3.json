@@ -1,0 +1,870 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261013T151529Z-lint-k-3",
+  "gate": "plan",
+  "created_at": "2026-10-13T15:15:29+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plans/phase-k-parallel/docs/plans/phase-k/anchors.json",
+  "plan": "phase-k",
+  "item": {
+    "id": "lint-k-3",
+    "title": "",
+    "source": "/var/folders/3q/0f7c3v_j6ps28gtz8xfz99km0000gn/T//plan-anchoring-lint-k-3.rtOpVD/item.txt",
+    "chars": 9077,
+    "truncated": false,
+    "chars_before_reduction": 9077,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.13.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When atm-core source implements a reported failure and can be adapted to a consumer-neutral sc-lint interface, Phase K must reuse its source logic.",
+      "quote": "This plan should use code and TESTS directly from atm-core repo where it makes sense.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Phase K planning, session 01a12885-fd21-7043-a747-0d6f9e4d9869 Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "68a52546340f26d6b935750f23829731824c0cc6c9e551bb04a376c312310db7",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Does `item.text` work on a reported failure whose behavior could fall under the anchor’s conditional reuse duty? An item stays relevant when silent about where source comes from. The conditional duty is not triggered when the item explicitly establishes that no adaptable atm-core implementation exists. Judge applicability only, never whether reuse is planned.",
+          "criteria": {
+            "yes": "The item implements, investigates, or changes a reported failure behavior and does not rule out applicable atm-core source.",
+            "no": "The item is unrelated, or expressly establishes that no atm-core source for this behavior can fit sc-lint.",
+            "unclear": "The item is too vague to identify whether it concerns a reported failure behavior."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does `item.text` plan to reuse applicable atm-core source logic for the reported behavior, adapted to a reusable sc-lint interface? Judge the plan stated, not conflict.",
+          "criteria": {
+            "yes": "It says to port, copy, fork, or otherwise reuse the existing source logic as the implementation starting point.",
+            "no": "It only studies or mentions atm-core, omits source reuse, or proposes a fresh implementation.",
+            "unclear": "It proposes a related implementation but leaves whether source logic is reused uncertain."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly choose a fresh implementation rather than reuse applicable atm-core source for the reported behavior? Silence is not conflict.",
+          "criteria": {
+            "yes": "It rejects, replaces, or rewrites from scratch adaptable existing atm-core source.",
+            "no": "It does not reject applicable source reuse, including when the item is silent or no applicable source exists.",
+            "unclear": "Its approach may bypass suitable source, but the text does not settle that."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3036,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 11414
+    },
+    {
+      "anchor_id": "ANC-002",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When atm-core already tests a reported failure being ported, Phase K regression coverage must reuse that test case through the sc-lint interface.",
+      "quote": "This plan should use code and TESTS directly from atm-core repo where it makes sense.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Phase K planning, session 01a12885-fd21-7043-a747-0d6f9e4d9869 Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "db43bec5a3f6c714d74d8c3266038f9211ab84ac24c65cb0b5d64880dd0fcee2",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Judge whether `item.text` itself adds or changes sc-lint test coverage for a reported failure with an existing applicable atm-core test, or investigates that upstream test as groundwork. A happy-path-only test that omits the upstream failure remains relevant because it changes coverage for the same reported behavior. A docs-only item that only describes or executes already-existing cases, without changing coverage, is outside this anchor. If no upstream test exists, the conditional duty does not apply.",
+          "criteria": {
+            "yes": "The item adds or changes tests or regression coverage for the reported behavior, even with only a happy-path case that omits the upstream failure, or investigates the upstream test as groundwork.",
+            "no": "The item only documents or executes already-existing tests without adding or changing regression coverage, is unrelated, or expressly establishes no applicable upstream test exists.",
+            "unclear": "The item mentions failure tests but it is unclear whether it undertakes regression coverage work or only documents existing coverage."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly plan to reuse the upstream failing input and expected result in a sc-lint regression test through its interface? Judge presence of this specific obligation, not conflict.",
+          "criteria": {
+            "yes": "It plans to reuse the upstream failing input and expected result in a sc-lint regression test through its interface in substance, even with different words.",
+            "no": "It is silent, only mentions the topic, or uses a different approach without including that duty.",
+            "unclear": "It alludes to the duty but does not establish whether the specific behavior is planned."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` affirmatively reject, omit, or replace reuse of an available applicable atm-core failure test while adding or changing sc-lint regression coverage? Adding independent failure tests in its place conflicts. A docs-only file fence saying no test cases will be added or changed is not an affirmative rejection of upstream reuse in implementing coverage. Silence is not conflict.",
+          "criteria": {
+            "yes": "The item undertakes regression coverage for a failure with an applicable upstream test, and explicitly rejects or replaces that upstream case.",
+            "no": "No incompatible coverage choice is stated, including a docs-only instruction not to edit tests or a case where no upstream test exists.",
+            "unclear": "The item may replace an applicable upstream case, but that coverage choice is unresolved."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.89,
+          "probabilities": {
+            "yes": 0.9299999999999999,
+            "no": 0.06,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.95,
+          "probabilities": {
+            "yes": 0.03,
+            "no": 0.97,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.89,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3160,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 12160
+    },
+    {
+      "anchor_id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Phase K tool logic must use Rust when Rust fits the tool's sc-lint crate boundary.",
+      "quote": "We should implement tools in rust as appropriate w/ minimal python bindings.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Phase K planning, session 01a12885-fd21-7043-a747-0d6f9e4d9869 Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "1ddd5495c4e54262375736af7b8ad96cc7650dab319dd6c8d23e550c41773942",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Does `item.text` concern implementation language of substantive Phase K lint tool logic when Rust fits the sc-lint crate boundary? The item remains relevant when it omits the required behavior. If it explicitly establishes that the work contains only packaging glue and no substantive lint tool logic suited to Rust, the conditional duty does not apply. Judge applicability only.",
+          "criteria": {
+            "yes": "The item plans, investigates, or changes implementation language of substantive Phase K lint tool logic when Rust fits the sc-lint crate boundary and does not rule out the condition.",
+            "no": "The item is unrelated or explicitly establishes that the work contains only packaging glue and no substantive lint tool logic suited to Rust.",
+            "unclear": "The item may touch the governed subject, but its applicability is unresolved."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly plan to put substantive tool logic in Rust where the sc-lint crate boundary fits? Judge presence of this specific obligation, not conflict.",
+          "criteria": {
+            "yes": "It plans to put substantive tool logic in Rust where the sc-lint crate boundary fits in substance, even with different words.",
+            "no": "It is silent, only mentions the topic, or uses a different approach without including that duty.",
+            "unclear": "It alludes to the duty but does not establish whether the specific behavior is planned."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly put substantive lint tool logic in a non-Rust language while acknowledging that Rust fits the tool and sc-lint crate boundary? The reason or alternate language does not change this conflict. Silence about language is omission, and work for which Rust does not fit is outside the conditional duty. Judge explicit conflict only.",
+          "criteria": {
+            "yes": "The item acknowledges Rust is appropriate for substantive tool logic but chooses a non-Rust implementation of that logic.",
+            "no": "The item states no incompatible language choice, or establishes that Rust is not appropriate for the work.",
+            "unclear": "The item may bypass an appropriate Rust implementation, but either suitability or language choice remains unresolved."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.04,
+            "no": 0.96,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.94,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3096,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 11723
+    },
+    {
+      "anchor_id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When a Phase K rule is implemented in Rust, its Python binding must not independently implement the same rule.",
+      "quote": "We should implement tools in rust as appropriate w/ minimal python bindings.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Phase K planning, session 01a12885-fd21-7043-a747-0d6f9e4d9869 Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "a55c346a7b41dabb3f62d8c44618672d517f1d67176fe5eda38aab69073ade40",
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Classify the Python work by role before answering. A binding is the callable adapter exposing a Rust rule to Python; the adoption installer is configuration glue, and a test call to an existing adapter is not a binding edit. Is binding work for this Rust rule actually in the item?",
+          "criteria": {
+            "yes": "The item undertakes or investigates implementation of that callable binding, whether compliant or duplicative.",
+            "no": "It confines Python changes to installer/configuration code, tests only an unchanged binding, changes only Rust, or is unrelated.",
+            "unclear": "Python work is described but its relation to a callable binding cannot be distinguished."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does a planned new or modified Python binding explicitly delegate the substantive Rust-rule decision to Rust, leaving Python with argument/result adaptation only? A binding merely named, investigated, or tested unchanged does not state this plan. An unstated delegation is omission, not uncertainty.",
+          "criteria": {
+            "yes": "The binding work explicitly states that substantive matching or permission decisions come from Rust; conversion and basic type checks remain allowed.",
+            "no": "There is no new/modified binding, or the item adds/investigates one without explicitly planning Rust delegation, or it instead proposes an independent rule decision.",
+            "unclear": "The item explicitly describes a delegation step but leaves it ambiguous whether substantive rule decisions still occur in Python."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Is there an explicit plan for a Python callable binding to decide the same lint rule independently of its Rust implementation? Treat installer value-shape checks and existing binding test calls as different activities.",
+          "criteria": {
+            "yes": "The binding independently implements the Rust rule decision.",
+            "no": "No duplicate decision in a changed binding is stated.",
+            "unclear": "The changed binding may duplicate the Rust decision but the text leaves this uncertain."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.88,
+          "probabilities": {
+            "yes": 0.92,
+            "no": 0.08,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.88,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3047,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 11565
+    },
+    {
+      "anchor_id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Phase K lint behavior must support consumer repositories beyond atm-core without hard-coded atm-core repository identities or policies.",
+      "quote": "sc-lint is a general purpose linting tool that is used on many repos.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Phase K planning, session 01a12885-fd21-7043-a747-0d6f9e4d9869 Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "bb8c1f2a2eb6b795e4f173e3e4593d8b7e6ffaa0d4ef1aad4707425ef6d81034",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Judge the work item, not the list of features it describes. If it exclusively updates documentation and executes examples of already-delivered lint behavior, without changing consumer-facing lint rules, configuration, or tools, answer no. Otherwise, an item that describes, adds, changes, or investigates consumer-facing Phase K lint behavior across repositories is relevant even when its method is missing or wrong.",
+          "criteria": {
+            "yes": "The item undertakes or investigates consumer-facing lint behavior, configuration, or tool work across repositories, or describes the rule it is implementing.",
+            "no": "The item exclusively documents or checks examples of already-delivered behavior without changing consumer-facing behavior, is unrelated, or explicitly rules out a governed change.",
+            "unclear": "The item mentions such behavior but does not establish whether it is undertaking governed work or only documenting existing behavior."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Assess addressed for the single work item against this approved requirement: Phase K lint behavior must support consumer repositories beyond atm-core without hard-coded atm-core repository identities or policies. Classify whether its planned behavior explicitly carries the complete requirement. Mere topic naming or an incomplete requirement does not carry it.",
+          "criteria": {
+            "yes": "behavior supports repositories beyond atm-core, with no hard-coded atm-core repository identity or private policy; consumer configuration may select policies and generic repository-neutral rules may need none. Equivalent substantive wording counts.",
+            "no": "The behavior is absent, merely topical, incomplete, or replaced by an incompatible alternative.",
+            "unclear": "The text alludes to the specific behavior but its meaning is unresolved."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Assess contradicted for the single work item against this approved requirement: Phase K lint behavior must support consumer repositories beyond atm-core without hard-coded atm-core repository identities or policies. Classify only an explicit incompatible decision. Missing description is not an incompatible decision.",
+          "criteria": {
+            "yes": "the behavior depends on hard-coded atm-core identity OR embeds atm-core-specific policy, even without an identity check.",
+            "no": "No incompatible behavior is stated; silence and missing detail alone count no.",
+            "unclear": "Stated behavior might be incompatible but cannot be resolved."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.92,
+          "probabilities": {
+            "yes": 0.05,
+            "no": 0.95,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.92,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3115,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 12076
+    },
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Optional consumer policy must be opt-in: sc-lint enforces it when supplied and preserves that policy's prior result when absent.",
+      "quote": "I would make these optional if possible, if the manifest/allow list exists, it is used, if it is absent then current behavior.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Session 01a12885-fd21-7043-a747-0d6f9e4d9869: Rand approved the four proposed constraints (optional policy manifests, compatibility, concrete gap closure, minimal scope) with: yes, those are all aligned with the goals. Pending live rubric, not gate-ready. Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "4ccdc3cb3919b05c909743b673506302e14e4531e62f1a3654d4524dc8b72f1e",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Judge the activity in `item.text`, not the subject words it mentions. Is this item adding, changing, or investigating introduction or change of optional consumer-policy behavior, including supported manifests, allowlists, or configuration tables? An item that only updates documentation or runs examples of already delivered behavior, with no scoped implementation/test/configuration change, is outside this anchor. Omission within scoped work remains relevant. An express statement that no optional consumer-policy mechanism or behavior is introduced or changed is also outside scope.",
+          "criteria": {
+            "yes": "It adds, changes, or investigates introduction or change of optional consumer-policy behavior, including supported manifests, allowlists, or configuration tables, including work whose required method is omitted.",
+            "no": "It only documents or executes examples of already delivered behavior without a scoped change, is unrelated, or expressly establishes that no optional consumer-policy mechanism or behavior is introduced or changed.",
+            "unclear": "The text does not establish whether it undertakes scoped work or only describes existing behavior."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Compare the work with the approved anchor scope. Does `item.text` explicitly commit to behavior satisfying: supplied optional policy is enforced AND absence preserves that policy’s prior result on identical input; both branches are necessary? Judge specific compliance only.",
+          "criteria": {
+            "yes": "supplied optional policy is enforced AND absence preserves that policy’s prior result on identical input; both branches are necessary. Equivalent substantive wording counts.",
+            "no": "The behavior is absent, merely topical, incomplete, or replaced by an incompatible alternative.",
+            "unclear": "The text alludes to the specific behavior but its meaning is unresolved."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Compare the work with the approved anchor scope. Does `item.text` explicitly choose behavior that conflicts because a supplied optional policy is ignored OR absence changes that policy’s prior result solely due to the new optional mechanism? Omission, investigation, and topical mention alone do not conflict.",
+          "criteria": {
+            "yes": "a supplied optional policy is ignored OR absence changes that policy’s prior result solely due to the new optional mechanism.",
+            "no": "No incompatible behavior is stated; silence and missing detail alone count no.",
+            "unclear": "Stated behavior might be incompatible but cannot be resolved."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.98,
+            "no": 0.01,
+            "unclear": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.02,
+            "no": 0.98,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3139,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 12126
+    },
+    {
+      "anchor_id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Existing simpler consumers must continue to run sc-lint without atm-core-specific configuration.",
+      "quote": "atm-core is the promary consumer of sc-lint-boundary.  other consumers use it, but they are much simpler boundary problems.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Session 01a12885-fd21-7043-a747-0d6f9e4d9869: Rand approved the four proposed constraints (optional policy manifests, compatibility, concrete gap closure, minimal scope) with: yes, those are all aligned with the goals. Pending live rubric, not gate-ready. Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "c426d35a3d88045d79870d7d1b8a671b31b1d421751c11924f255bab0544d1f4",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "ANC-007 applies to consumer setup and operation: configuration-file discovery/selection, CLI launch, and boundary-check compatibility for existing simpler users. Does item.text undertake one of these? Generic bootstrap config selection counts without atm-core policy. A note about existing behavior in docs alone does not count.",
+          "criteria": {
+            "yes": "The planned work changes, preserves as a deliverable, or investigates config selection, CLI operation, or boundary checks available to simpler consumers.",
+            "no": "It explicitly limits work to docs/examples or unrelated internal packaging, with no changed consumer configuration or checking.",
+            "unclear": "It mentions a wrapper or consumer behavior but leaves whether consumer-facing selection/operation changes unresolved."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does `item.text` state as part of a changed sc-lint behavior that existing simpler consumers can run without atm-core-specific configuration? Merely investigating how they invoke the tool, or documenting already-delivered compatibility, does not address a new compatibility obligation. Ordinary optional settings and intended bug-fix result changes are allowed.",
+          "criteria": {
+            "yes": "The item carries forward simpler-consumer operation without atm-core-specific configuration as part of the configuration, boundary, or CLI behavior it changes or preserves.",
+            "no": "The item only investigates simpler-consumer use, only documents already-delivered compatibility, omits preservation in governed work, or requires atm-core-specific configuration.",
+            "unclear": "The item concerns a changed consumer behavior but leaves whether atm-core-specific configuration is required uncertain."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` state an incompatible planned choice: make running sc-lint by an existing simpler consumer depend on any atm-core-specific configuration? Silence or incomplete discussion is not conflict.",
+          "criteria": {
+            "yes": "It explicitly commits to make running sc-lint by an existing simpler consumer depend on any atm-core-specific configuration.",
+            "no": "It contains no incompatible action; silence alone is not a violation.",
+            "unclear": "A conflicting action is possible but cannot be established."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.89,
+          "probabilities": {
+            "yes": 0.93,
+            "no": 0.07,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.89,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3075,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 11799
+    },
+    {
+      "anchor_id": "ANC-008",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each Phase K gap-fix sprint must include an issue-linked regression test reproducing its reported consumer failure.",
+      "quote": "yes, those are all aligned with the goals.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Session 01a12885-fd21-7043-a747-0d6f9e4d9869: Rand approved the four proposed constraints (optional policy manifests, compatibility, concrete gap closure, minimal scope) with: yes, those are all aligned with the goals. Pending live rubric, not gate-ready. Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "563b3be4fb36cf50f5ba72cb3ac76dd8ce0caf8a91c2eb720f0bf2376b0e1f2e",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Read `item.text` for applicability to a Phase K sprint that fixes a reported consumer gap; compliance is a separate judgment. Omission or conflict remains relevant. Work explicitly outside the governing subject is not relevant. Decide from the described action and its scope; do not infer missing commitments.",
+          "criteria": {
+            "yes": "The subject a Phase K sprint that fixes a reported consumer gap is involved, regardless of whether the duty is stated or obeyed.",
+            "no": "It is unrelated, or explicitly establishes that the item is not a sprint fixing a reported consumer gap.",
+            "unclear": "The governed subject cannot be determined."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Is the anchor-specific behavior present in the planned method or constraint: cite the reporting GitHub issue and include an issue-linked regression test reproducing its reported failure? Topic labels and incomplete descriptions do not carry this duty. Decide from the described action and its scope; do not infer missing commitments.",
+          "criteria": {
+            "yes": "The text explicitly states cite the reporting GitHub issue and include an issue-linked regression test reproducing its reported failure as a planned action or constraint.",
+            "no": "The obligation is omitted, only its topic is mentioned, or an incompatible approach replaces it.",
+            "unclear": "The text alludes to compliance but leaves the required behavior uncertain."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly reject or defer an issue-linked regression test that reproduces the reported consumer failure within its Phase K gap-fix sprint? Judge incompatible choices only. Omitting discussion of issues or tests is silence, not conflict.",
+          "criteria": {
+            "yes": "The item deliberately omits the reporting GitHub issue link, deliberately skips or defers reproduction of the reported failure beyond this sprint, or substitutes only a generic success test. Any such explicit incompatible decision counts.",
+            "no": "There is no explicit incompatible decision; a missing issue/test discussion by itself does not count.",
+            "unclear": "A possibly incompatible decision is described, but it is uncertain whether the required issue-linked failure reproduction is rejected."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3096,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 11790
+    },
+    {
+      "anchor_id": "ANC-009",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Phase K sprints must keep changes within the planned consumer gaps, excluding unrelated tooling, skill changes and new process.",
+      "quote": "fix the stack with ONLY changes that are in scope",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-12",
+      "context": "Session 01a12885-fd21-7043-a747-0d6f9e4d9869: Rand approved the four proposed constraints (optional policy manifests, compatibility, concrete gap closure, minimal scope) with: yes, those are all aligned with the goals. Pending live rubric, not gate-ready. Rand approved the exact pass/fail examples in anchor-fixture-review.md after opening that file in VS Code (approval: anchor-fixture-approval.json). The examples clarify the previously approved intent, not new goals.",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "d16c6912ec5f9c3cd7f0277f892b0aaf6389eb499df711f201a254419518e85a",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "type": "choice",
+          "instructions": "Does `item.text` concern a sprint’s proposed or delivered changes or their scope in this Phase K review? A sprint gap fix, an investigation of sprint scope, and an unrelated addition proposed for a sprint all touch this constraint. It also applies when the proposed sprint contains only unrelated work. An activity explicitly outside Phase K is not governed. Judge applicability only.",
+          "criteria": {
+            "yes": "It describes a sprint gap fix, its change scope, or additions to sprint work. A sprint in this review is relevant unless the text explicitly places it outside Phase K.",
+            "no": "It describes a different activity explicitly outside the Phase K sprint or unrelated system work with no Phase K scope connection.",
+            "unclear": "Whether the activity belongs to a Phase K sprint cannot be determined."
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly limit the sprint to its planned consumer-gap work? An in-scope lint-rule fix and regression test together with an explicit exclusion of unrelated changes carries this constraint. Equivalent scope language counts; the item need not repeat every excluded category verbatim. Judge inclusion of the scope limit only.",
+          "criteria": {
+            "yes": "The sprint includes its gap fix or direct supporting work and explicitly limits changes to that work, or says no unrelated tool or workflow changes. Phrases such as only in-scope changes, nothing outside the planned gaps, and no unrelated tooling, skills, or process carry the same scope limit.",
+            "no": "It only mentions or fixes a gap without an explicit scope limit, merely investigates scope, describes unrelated work without the constraint, or adds changes outside the planned gaps.",
+            "unclear": "It mentions limiting scope but does not establish whether unrelated changes are excluded."
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "instructions": "Does `item.text` explicitly include changes outside the planned consumer gaps within a Phase K sprint? This includes unrelated tooling, skill changes, or new process, whether accompanying a gap fix or proposed alone as Phase K work. Judge incompatible scope decisions only. A separate activity explicitly outside Phase K cannot violate this sprint scope constraint; silence about scope is not conflict.",
+          "criteria": {
+            "yes": "A Phase K sprint includes work outside its planned consumer gaps, such as unrelated tooling, skill changes, or new process.",
+            "no": "No incompatible Phase K scope decision is stated, the description is silent, or the activity is explicitly outside Phase K. Tool/test support directly needed for the planned gap is allowed.",
+            "unclear": "It is uncertain whether the proposed extra changes belong to the Phase K sprint or directly support its planned consumer gap."
+          }
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.91,
+          "probabilities": {
+            "yes": 0.06,
+            "no": 0.94,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.91,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 3199,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 9077,
+      "item_shortened": false,
+      "request_bytes": 12310
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 9
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 9
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

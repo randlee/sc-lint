@@ -1,0 +1,8 @@
+{
+  "action": "replace",
+  "before": "atm-core supplies the failing literal fixture and whole-file workaround, but no per-rule exclusion implementation to port. Reuse that fixture; implement the new per-rule filtering in sc-lint.",
+  "after": "For #385, use any adaptable atm-core implementation logic for the reported failure as the sc-lint implementation starting point; the cited named_pipe_name and whole-file workaround supply regression input, not an exclusion implementation. Reuse the fixture and implement filtering in sc-lint where no applicable upstream implementation exists.",
+  "authority": "ANC-001@3, approved before failing runs",
+  "reason": "Independent triage found ambiguity; conditional source reuse already required, no new scope.",
+  "growth_chars": 152
+}

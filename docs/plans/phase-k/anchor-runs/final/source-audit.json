@@ -1,0 +1,68 @@
+{
+  "pass": true,
+  "items": [
+    {
+      "bead": "lint-k-1",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T034016Z-lint-k-1.json",
+      "source_sha256": "d159cfaf1aa00778130e94961276285506a490155e8777308c472279f395a7af",
+      "chars": 6605,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-2",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T033844Z-lint-k-2.json",
+      "source_sha256": "539c09ba0c28bfc4726f38c5cc2e9627f017efa349c0d456524ae7c12b453827",
+      "chars": 6011,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-3",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T033851Z-lint-k-3.json",
+      "source_sha256": "8761d699e6da97fea598e2898dfe428592e270bbc033f8039e65cd5f4f6b713a",
+      "chars": 8753,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-4",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T033836Z-lint-k-4.json",
+      "source_sha256": "6cc0e6d4bdbe0e7e54dbd340f59fcba071b01e4091ed9f464102ad27b60b37fd",
+      "chars": 10650,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-6",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T033905Z-lint-k-6.json",
+      "source_sha256": "0011e83171396e5bc9443f1c1eb73caa4156935981084aacc27a108eaf269368",
+      "chars": 2975,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-7",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T033935Z-lint-k-7.json",
+      "source_sha256": "d0ea9c1973bf5fa067c56134c6334dd29cd153ba65fc1818303adcff279cfbc1",
+      "chars": 5729,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-8",
+      "run": "docs/plans/phase-k/anchor-runs/user-rerun/plan-20261013T041348Z-lint-k-8.json",
+      "source_sha256": "8469d5b2a6be78a6e781bbe5d0adba179ef2fc2ae0a5f710a0477815dd0d0820",
+      "chars": 5602,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-9",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T033852Z-lint-k-9.json",
+      "source_sha256": "e9afec0f5612a0ba751538b489b81db2b51c51b591ddc982e0df8c16a1ca667e",
+      "chars": 10950,
+      "pass": true
+    },
+    {
+      "bead": "lint-k-10",
+      "run": "docs/plans/phase-k/anchor-runs/qa-r3/plan-20261013T033858Z-lint-k-10.json",
+      "source_sha256": "1b3552e4584d97de634a069d0077f57444c9def9f1a1ac6758960eddddf56155",
+      "chars": 8416,
+      "pass": true
+    }
+  ]
+}

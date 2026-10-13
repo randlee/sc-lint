@@ -1,0 +1,14 @@
+# Final plan QA: PASS
+
+`validate-plan --root lint-phase-k` exit 0: plan valid, 9 sprints (run from the plans/phase-k worktree at integrate/phase-k 7ae3906ae99e718853f933b33065321d43405731; only docs/plans/phase-k files changed since c79c210, governing docs unchanged; k-5 deferred/scope-excluded). Step b clean.
+
+None. The single carried finding is fixed.
+
+Round 4 fix verification (plan-scope-reviewer only, 1 carried id): 1 fixed, 0 open, 0 regressed.
+- R1-line-095 (lint-k-8, PLAN-SCOPE-018) fixed: root description holds no migration template and names lint-k-8 D3/AC2 as the sole authoritative diagnostic; k-8 D3 holds the single literal template (interpolate only {key}); k-8 AC2 asserts the emitted diagnostic equals it exactly after {key} substitution; no second diagnostic string in root, k-8 or k-10; k-10 D1 Unreleased note and root compatibility statement still name the rejection and SC_LINT_CARGO_SHEAR_CONFIG_INVALID (no regression).
+- Cumulative: rounds 2-4 verified all 133 round-1 findings fixed; none open.
+
+- plan-scope-reviewer (fix verification, round 4): 1 fixed, 0 open, 0 regressed
+- No other reviewer ran (fix-verification precedence).
+
+- Non-finding observations carried from round 3 (author discretion): k-9 D1 plan_consumer_lint signature has no parameter for the lint_profiles name-to-members map; serialized spelling of SkipReason variants vs unsupported_cross_command/unsupported_cross_target strings unstated; k-3 description repeats the acceptance_criteria field; k-8 D3 has two redundant exit-2 sentences.

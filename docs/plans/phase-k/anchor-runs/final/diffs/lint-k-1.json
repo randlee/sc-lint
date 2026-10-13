@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "lint-k-1",
+    "prev": "plan-20261013T032821Z-lint-k-1",
+    "next": "plan-20261013T034016Z-lint-k-1",
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [],
+    "item_size": {
+      "before_chars": 6342,
+      "after_chars": 6605,
+      "delta_chars": 263,
+      "grew": true
+    },
+    "pass_before": true,
+    "pass_after": true
+  },
+  "error": null
+}
