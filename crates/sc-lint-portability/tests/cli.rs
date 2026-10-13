@@ -44,37 +44,13 @@ fn invalid_analyzer_config_exits_three_and_prefixes_error() {
 }
 
 #[test]
-fn issue372_cli_configured_pair_suppresses_the_declared_unix_module() {
-    let root = TempDir::new().unwrap();
-    fs::write(
-        root.path().join("Cargo.toml"),
-        "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
-    )
-    .unwrap();
-    let source_dir = root.path().join("crates/example/src");
-    fs::create_dir_all(&source_dir).unwrap();
-    fs::write(
-        root.path().join("crates/example/Cargo.toml"),
-        "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
-    )
-    .unwrap();
-    fs::write(
-        source_dir.join("lib.rs"),
-        "#[cfg(unix)] mod unix_socket;\n#[cfg(windows)] mod named_pipe;\n",
-    )
-    .unwrap();
-    fs::write(source_dir.join("unix_socket.rs"), "fn connect() {}\n").unwrap();
-    fs::write(source_dir.join("named_pipe.rs"), "fn connect() {}\n").unwrap();
-    let config = root.path().join("sc-lint.toml");
-    fs::write(
-        &config,
-        "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"crates/example/src/unix_socket.rs\"\nwindows_module = \"crates/example/src/named_pipe.rs\"\nreason = \"Private transport adapters\"\n",
-    )
-    .unwrap();
+fn issue372_cli_configured_pair() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/issue372");
+    let config = fixture.join("sc-lint.toml");
 
     let output = Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
         .args(["analyze", "--root"])
-        .arg(root.path())
+        .arg(&fixture)
         .arg("--config")
         .arg(&config)
         .output()
