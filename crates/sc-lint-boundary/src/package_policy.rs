@@ -171,8 +171,8 @@ fn collect_policy_findings(
         }
 
         for edge in &policy.forbidden_edges {
-            if direct_edges.contains(&edge) && forbidden_findings.insert(edge.clone()) {
-                findings.push(forbidden_edge_finding(&edge));
+            if direct_edges.contains(edge) && forbidden_findings.insert(edge.clone()) {
+                findings.push(forbidden_edge_finding(edge));
             }
         }
     }

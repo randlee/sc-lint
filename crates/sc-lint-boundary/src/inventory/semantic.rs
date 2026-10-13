@@ -206,137 +206,14 @@ pub(crate) fn validate_inventory(
     let mut ambiguous_boundary_ids = BTreeSet::new();
 
     for record in raw.records {
-        let mut valid = true;
-        let public_value = record
-            .public
-            .facade
-            .as_deref()
-            .or(record.public.trait_name.as_deref())
-            .expect("structural loader validation requires a public surface");
-        let public_surfaces = match parse_public_surfaces(public_value) {
-            Ok(paths) => paths,
-            Err(error) => {
-                diagnostics.push(path_diagnostic(&record, "public", error));
-                valid = false;
-                Vec::new()
-            }
-        };
-
-        let owner_context = format!("owner_package for boundary `{}`", record.boundary_id);
-        let owner = resolver
-            .resolve_if_known(record.owner_package.as_ref(), &owner_context)
-            .ok()
-            .flatten();
-        if let Some(owner) = &owner {
-            let key = (owner.clone(), record.name.clone());
-            if let Some(previous) = owner_names.get(&key).cloned() {
-                ambiguous_boundary_ids.insert(previous.clone());
-                ambiguous_boundary_ids.insert(record.boundary_id.to_string());
-                if let Some(previous_record) = records.iter().find(|previous_record| {
-                    previous_record.record.boundary_id.to_string() == previous
-                }) {
-                    diagnostics.push(InventoryDiagnostic::new(
-                        &previous_record.record,
-                        "name",
-                        InventoryDiagnosticKind::DuplicateOwnerName,
-                        format!(
-                            "canonical owner `{owner}` and name `{}` are also declared by boundary `{}`",
-                            previous_record.record.name, record.boundary_id
-                        ),
-                        "give each boundary for an owner a distinct name",
-                    ));
-                }
-                diagnostics.push(InventoryDiagnostic::new(
-                    &record,
-                    "name",
-                    InventoryDiagnosticKind::DuplicateOwnerName,
-                    format!(
-                        "canonical owner `{owner}` and name `{}` are already declared by boundary `{previous}`",
-                        record.name
-                    ),
-                    "give each boundary for an owner a distinct name",
-                ));
-                valid = false;
-            } else {
-                owner_names.insert(key, record.boundary_id.to_string());
-            }
-        }
-
-        if record.implementation.visibility == Visibility::TraitOnly
-            && matches!(
-                record.implementation.constructor,
-                Some(Constructor::Public | Constructor::Private | Constructor::PubCrate)
-            )
-        {
-            diagnostics.push(InventoryDiagnostic::new(
-                &record,
-                "implementation.constructor",
-                InventoryDiagnosticKind::TraitOnlyConstructor,
-                "trait_only boundaries cannot declare a concrete constructor",
-                "omit implementation.constructor or set it to `none`",
-            ));
-            valid = false;
-        }
-
-        let mut composition_roots = Vec::new();
-        for (index, root) in record.composition.roots.iter().enumerate() {
-            match PublicRustPath::parse(root) {
-                Ok(path) => {
-                    validate_external_root(
-                        &record,
-                        &path,
-                        resolver,
-                        index,
-                        &mut diagnostics,
-                        &mut valid,
-                    );
-                    composition_roots.push(path);
-                }
-                Err(error) => {
-                    diagnostics.push(path_diagnostic(
-                        &record,
-                        format!("composition.roots[{index}]"),
-                        error,
-                    ));
-                    valid = false;
-                }
-            }
-        }
-
-        for edge in &record.dependencies.forbidden_edges {
-            let from_context = format!(
-                "dependencies.forbidden_edges[].from for boundary `{}`",
-                record.boundary_id
-            );
-            let to_context = format!(
-                "dependencies.forbidden_edges[].to for boundary `{}`",
-                record.boundary_id
-            );
-            let from = resolver.resolve_if_known(edge.from.as_ref(), &from_context);
-            let to = resolver.resolve_if_known(edge.to.as_ref(), &to_context);
-            if matches!((from, to), (Ok(Some(from)), Ok(Some(to))) if from == to) {
-                diagnostics.push(InventoryDiagnostic::new(
-                    &record,
-                    "dependencies.forbidden_edges",
-                    InventoryDiagnosticKind::SelfForbiddenEdge,
-                    format!(
-                        "forbidden edge `{}` -> `{}` resolves to the same workspace package",
-                        edge.from, edge.to
-                    ),
-                    "remove the self edge or name two distinct workspace packages",
-                ));
-                valid = false;
-            }
-        }
-
-        if valid {
-            records.push(ValidatedRecord {
-                record,
-                public_surfaces,
-                composition_roots,
-                owner,
-            });
-        }
+        validate_record(
+            record,
+            resolver,
+            &mut owner_names,
+            &mut ambiguous_boundary_ids,
+            &mut records,
+            &mut diagnostics,
+        );
     }
 
     records
@@ -356,6 +233,183 @@ pub(crate) fn validate_inventory(
         },
         diagnostics,
     )
+}
+
+fn validate_record(
+    record: BoundaryRecord,
+    resolver: &WorkspacePackageResolver,
+    owner_names: &mut BTreeMap<(WorkspacePackageName, String), String>,
+    ambiguous_boundary_ids: &mut BTreeSet<String>,
+    records: &mut Vec<ValidatedRecord>,
+    diagnostics: &mut Vec<InventoryDiagnostic>,
+) {
+    let diagnostic_count = diagnostics.len();
+    let public_surfaces = validate_public_surfaces(&record, diagnostics);
+    let owner = validate_owner_name(
+        &record,
+        resolver,
+        owner_names,
+        ambiguous_boundary_ids,
+        records,
+        diagnostics,
+    );
+    validate_trait_constructor(&record, diagnostics);
+    let composition_roots = validate_composition_roots(&record, resolver, diagnostics);
+    validate_forbidden_edges(&record, resolver, diagnostics);
+    if diagnostics.len() == diagnostic_count {
+        records.push(ValidatedRecord {
+            record,
+            public_surfaces,
+            composition_roots,
+            owner,
+        });
+    }
+}
+
+fn validate_public_surfaces(
+    record: &BoundaryRecord,
+    diagnostics: &mut Vec<InventoryDiagnostic>,
+) -> Vec<PublicRustPath> {
+    let public_value = record
+        .public
+        .facade
+        .as_deref()
+        .or(record.public.trait_name.as_deref())
+        .expect("structural loader validation requires a public surface");
+    match parse_public_surfaces(public_value) {
+        Ok(paths) => paths,
+        Err(error) => {
+            diagnostics.push(path_diagnostic(record, "public", error));
+            Vec::new()
+        }
+    }
+}
+
+fn validate_owner_name(
+    record: &BoundaryRecord,
+    resolver: &WorkspacePackageResolver,
+    owner_names: &mut BTreeMap<(WorkspacePackageName, String), String>,
+    ambiguous_boundary_ids: &mut BTreeSet<String>,
+    records: &[ValidatedRecord],
+    diagnostics: &mut Vec<InventoryDiagnostic>,
+) -> Option<WorkspacePackageName> {
+    let context = format!("owner_package for boundary `{}`", record.boundary_id);
+    let owner = resolver
+        .resolve_if_known(record.owner_package.as_ref(), &context)
+        .ok()
+        .flatten();
+    let owner = owner?;
+    let key = (owner.clone(), record.name.clone());
+    let Some(previous) = owner_names.get(&key).cloned() else {
+        owner_names.insert(key, record.boundary_id.to_string());
+        return Some(owner);
+    };
+    ambiguous_boundary_ids.insert(previous.clone());
+    ambiguous_boundary_ids.insert(record.boundary_id.to_string());
+    if let Some(previous_record) = records
+        .iter()
+        .find(|previous_record| previous_record.record.boundary_id.to_string() == previous)
+    {
+        diagnostics.push(duplicate_owner_name_diagnostic(
+            &previous_record.record,
+            &owner,
+            record.boundary_id.as_ref(),
+        ));
+    }
+    diagnostics.push(InventoryDiagnostic::new(
+        record,
+        "name",
+        InventoryDiagnosticKind::DuplicateOwnerName,
+        format!(
+            "canonical owner `{owner}` and name `{}` are already declared by boundary `{previous}`",
+            record.name
+        ),
+        "give each boundary for an owner a distinct name",
+    ));
+    Some(owner)
+}
+
+fn duplicate_owner_name_diagnostic(
+    record: &BoundaryRecord,
+    owner: &WorkspacePackageName,
+    duplicate: &str,
+) -> InventoryDiagnostic {
+    InventoryDiagnostic::new(
+        record,
+        "name",
+        InventoryDiagnosticKind::DuplicateOwnerName,
+        format!(
+            "canonical owner `{owner}` and name `{}` are also declared by boundary `{duplicate}`",
+            record.name
+        ),
+        "give each boundary for an owner a distinct name",
+    )
+}
+
+fn validate_trait_constructor(record: &BoundaryRecord, diagnostics: &mut Vec<InventoryDiagnostic>) {
+    if record.implementation.visibility == Visibility::TraitOnly
+        && matches!(
+            record.implementation.constructor,
+            Some(Constructor::Public | Constructor::Private | Constructor::PubCrate)
+        )
+    {
+        diagnostics.push(InventoryDiagnostic::new(
+            record,
+            "implementation.constructor",
+            InventoryDiagnosticKind::TraitOnlyConstructor,
+            "trait_only boundaries cannot declare a concrete constructor",
+            "omit implementation.constructor or set it to `none`",
+        ));
+    }
+}
+
+fn validate_composition_roots(
+    record: &BoundaryRecord,
+    resolver: &WorkspacePackageResolver,
+    diagnostics: &mut Vec<InventoryDiagnostic>,
+) -> Vec<PublicRustPath> {
+    let mut roots = Vec::new();
+    for (index, root) in record.composition.roots.iter().enumerate() {
+        match PublicRustPath::parse(root) {
+            Ok(path) => {
+                validate_external_root(record, &path, resolver, index, diagnostics);
+                roots.push(path);
+            }
+            Err(error) => diagnostics.push(path_diagnostic(
+                record,
+                format!("composition.roots[{index}]"),
+                error,
+            )),
+        }
+    }
+    roots
+}
+
+fn validate_forbidden_edges(
+    record: &BoundaryRecord,
+    resolver: &WorkspacePackageResolver,
+    diagnostics: &mut Vec<InventoryDiagnostic>,
+) {
+    let context = format!(
+        "dependencies.forbidden_edges for boundary `{}`",
+        record.boundary_id
+    );
+    for edge in &record.dependencies.forbidden_edges {
+        let from = resolver.resolve_if_known(edge.from.as_ref(), &context);
+        let to = resolver.resolve_if_known(edge.to.as_ref(), &context);
+        if matches!((from, to), (Ok(Some(from)), Ok(Some(to))) if from == to) {
+            diagnostics.push(InventoryDiagnostic::new(
+                record,
+                "dependencies.forbidden_edges",
+                InventoryDiagnosticKind::SelfForbiddenEdge,
+                format!(
+                    "forbidden edge `{}` -> `{}` resolves to the same workspace package",
+                    edge.from, edge.to
+                ),
+                "remove the self edge or name two distinct workspace packages",
+            ));
+        }
+    }
 }
 
 fn parse_public_surfaces(value: &str) -> Result<Vec<PublicRustPath>, SemanticPathError> {
@@ -390,7 +444,6 @@ fn validate_external_root(
     resolver: &WorkspacePackageResolver,
     index: usize,
     diagnostics: &mut Vec<InventoryDiagnostic>,
-    valid: &mut bool,
 ) {
     let root_context = format!("composition root for boundary `{}`", record.boundary_id);
     let root_package = resolver.resolve_if_known(root.first().as_str(), &root_context);
@@ -421,7 +474,6 @@ fn validate_external_root(
         ),
         "add the external package to dependencies.allowed_dependencies or keep the root owner-local",
     ));
-    *valid = false;
 }
 
 #[cfg(test)]
