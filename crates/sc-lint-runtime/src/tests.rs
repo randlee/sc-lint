@@ -10,11 +10,7 @@ use std::path::Path;
 
 use tempfile::TempDir;
 
-#[test]
-#[ignore]
-fn emit_installer_catalog() {
-    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
-        .expect("catalog output path must be provided");
+fn installer_catalog() -> serde_json::Value {
     let families = RUNTIME_CATALOG
         .families
         .iter()
@@ -25,17 +21,33 @@ fn emit_installer_catalog() {
             )
         })
         .collect::<BTreeMap<_, _>>();
+    serde_json::json!({
+        "analyzer": RUNTIME_CATALOG.analyzer.as_str(),
+        "rules": RUNTIME_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+        "families": families,
+        "own_keys": RUNTIME_CATALOG.own_keys,
+    })
+}
+
+#[test]
+#[ignore]
+fn emit_installer_catalog() {
+    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
+        .expect("catalog output path must be provided");
     std::fs::write(
         output,
-        serde_json::to_vec_pretty(&serde_json::json!({
-            "analyzer": RUNTIME_CATALOG.analyzer.as_str(),
-            "rules": RUNTIME_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
-            "families": families,
-            "own_keys": RUNTIME_CATALOG.own_keys,
-        }))
-        .unwrap(),
+        serde_json::to_vec_pretty(&installer_catalog()).unwrap(),
     )
     .unwrap();
+}
+
+#[test]
+fn installer_catalog_matches_rust() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/sc-lint-adoption/analyzer-catalog/runtime.json");
+    let actual: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+
+    assert_eq!(actual, installer_catalog());
 }
 
 #[test]

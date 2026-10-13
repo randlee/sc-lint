@@ -22,8 +22,6 @@ use syn::visit::Visit;
 
 use crate::Finding;
 use crate::RuleId;
-use crate::findings::PortabilityFinding;
-use crate::findings::convert_findings;
 use crate::predicates::attr_is_cfg_attr_not_unix_allow_dead_code;
 use crate::predicates::attr_is_cfg_unix;
 use crate::predicates::attr_is_platform_cfg;
@@ -54,6 +52,11 @@ use sc_lint_analyzer_support::item_attrs;
 use sc_lint_analyzer_support::item_identifier;
 use sc_lint_analyzer_support::item_name_hint_is_tests;
 use sc_lint_analyzer_support::span_start_line;
+
+mod findings;
+
+use self::findings::PortabilityFinding;
+use self::findings::convert_findings;
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 struct RepoPortabilityConfig {

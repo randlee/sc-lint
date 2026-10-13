@@ -12,11 +12,7 @@ use super::*;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OwnerId;
 
-#[test]
-#[ignore]
-fn emit_installer_catalog() {
-    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
-        .expect("catalog output path must be provided");
+fn installer_catalog() -> serde_json::Value {
     let families = PORTABILITY_CATALOG
         .families
         .iter()
@@ -27,17 +23,33 @@ fn emit_installer_catalog() {
             )
         })
         .collect::<BTreeMap<_, _>>();
+    serde_json::json!({
+        "analyzer": PORTABILITY_CATALOG.analyzer.as_str(),
+        "rules": PORTABILITY_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+        "families": families,
+        "own_keys": PORTABILITY_CATALOG.own_keys,
+    })
+}
+
+#[test]
+#[ignore]
+fn emit_installer_catalog() {
+    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
+        .expect("catalog output path must be provided");
     fs::write(
         output,
-        serde_json::to_vec_pretty(&serde_json::json!({
-            "analyzer": PORTABILITY_CATALOG.analyzer.as_str(),
-            "rules": PORTABILITY_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
-            "families": families,
-            "own_keys": PORTABILITY_CATALOG.own_keys,
-        }))
-        .unwrap(),
+        serde_json::to_vec_pretty(&installer_catalog()).unwrap(),
     )
     .unwrap();
+}
+
+#[test]
+fn installer_catalog_matches_rust() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/sc-lint-adoption/analyzer-catalog/portability.json");
+    let actual: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+
+    assert_eq!(actual, installer_catalog());
 }
 
 #[test]

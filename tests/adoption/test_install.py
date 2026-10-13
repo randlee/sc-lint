@@ -455,6 +455,30 @@ def test_generated_catalogs_are_current_and_vendored_only() -> None:
     assert (plugin / "install.schema.json").is_file()
 
 
+def test_install_omits_internal_schema_and_catalog(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    fragment = kit / "schema.d" / "phase-k.json"
+    fragment.parent.mkdir()
+    fragment.write_text(json.dumps({"properties": {"phase_k_fixture": {"type": "string"}}}))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not (consumer / "analyzer-catalog").exists()
+    assert not (consumer / "schema.d").exists()
+    plugin = consumer / "plugins" / "sc-lint"
+    assert (plugin / "analyzer-catalog" / "portability.json").is_file()
+    assert (plugin / "schema.d" / "phase-k.json").is_file()
+
+
 def test_schema_merge_conflict_names_fragment_and_property(tmp_path: Path) -> None:
     kit = tmp_path / "kit"
     shutil.copytree(KIT, kit)
