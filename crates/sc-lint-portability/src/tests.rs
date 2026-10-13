@@ -1818,6 +1818,164 @@ fn catalog_lists_every_rule_id() {
     );
 }
 
+#[test]
+fn issue372_separate_adapter_pair_suppresses_only_the_enclosing_module() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/unix_socket.rs"
+        windows_module = "crates/example/src/named_pipe.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        #[cfg(unix)]
+        mod unix_socket;
+        #[cfg(windows)]
+        mod named_pipe;
+        #[cfg(unix)]
+        pub fn unrelated_public_api() {}
+        #[cfg(unix)]
+        pub(crate) fn unrelated_restricted_api() {}
+        "#,
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+    assert_eq!(port010.len(), 2);
+    assert!(port010[0].message.contains("unrelated_public_api"));
+    assert!(port010[1].message.contains("unrelated_restricted_api"));
+    assert!(
+        port010
+            .iter()
+            .all(|finding| !finding.message.contains("unix_socket"))
+    );
+}
+
+#[test]
+fn issue372_invalid_adapter_matrix_reports_semantic_error_before_filtering() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/missing.rs"
+        windows_module = "crates/example/src/named_pipe.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+
+    let error = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-001"),
+    )
+    .unwrap_err();
+
+    assert!(matches!(error, PortabilityError::AdapterConfig(_)));
+    assert!(error.to_string().contains("ADAPTER_MISSING"));
+}
+
+#[test]
+fn issue372_invalid_adapter_matrix_covers_path_duplicate_cfg_and_test_cases() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        #[cfg(unix)] mod unix_socket;
+        #[cfg(windows)] mod named_pipe;
+        #[cfg(test)] mod test_only;
+        "#,
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+    fixture.write_source("example", "test_only.rs", "fn connect() {}");
+
+    let analyze = |unix_module: &str, windows_module: &str| {
+        fixture.write_lint_config(&format!(
+            "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"{unix_module}\"\nwindows_module = \"{windows_module}\"\nreason = \"Private transport adapters\"\n"
+        ));
+        analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        })
+        .unwrap_err()
+        .to_string()
+    };
+
+    assert!(analyze("/tmp/socket.rs", "crates/example/src/named_pipe.rs").contains("ADAPTER_PATH"));
+    assert!(
+        analyze(
+            "crates/example/src/unix_socket.rs",
+            "crates/example/src/unix_socket.rs"
+        )
+        .contains("ADAPTER_DUPLICATE")
+    );
+    assert!(
+        analyze(
+            "crates/example/src/named_pipe.rs",
+            "crates/example/src/unix_socket.rs"
+        )
+        .contains("ADAPTER_CFG")
+    );
+    assert!(
+        analyze(
+            "crates/example/src/test_only.rs",
+            "crates/example/src/named_pipe.rs"
+        )
+        .contains("ADAPTER_TEST")
+    );
+}
+
+#[test]
+fn issue372_empty_adapter_list_preserves_prior_findings() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "#[cfg(unix)] fn unix_only() {}");
+
+    let absent = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+    fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\nplatform_adapters = []\n");
+    let empty = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(absent.findings, empty.findings);
+}
+
 struct WorkspaceFixture {
     tempdir: TempDir,
 }

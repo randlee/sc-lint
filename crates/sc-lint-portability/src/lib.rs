@@ -16,6 +16,7 @@ use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
 
+mod platform_adapters;
 mod portability;
 mod predicates;
 #[cfg(test)]
@@ -41,7 +42,12 @@ pub const PORTABILITY_CATALOG: RuleCatalog = RuleCatalog {
     rules: ALL_PORT_IDS,
     families: &[],
     default_fail: ALL_PORT_IDS,
-    own_keys: &["config_home_env", "unix_path_prefixes", "targets"],
+    own_keys: &[
+        "config_home_env",
+        "unix_path_prefixes",
+        "targets",
+        "platform_adapters",
+    ],
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,6 +126,8 @@ pub enum PortabilityError {
     },
     #[error(transparent)]
     AnalyzerConfig(#[from] AnalyzerConfigError),
+    #[error(transparent)]
+    AdapterConfig(#[from] platform_adapters::AdapterConfigError),
 }
 
 pub fn analyze_workspace(
@@ -138,13 +146,20 @@ pub fn analyze_workspace_configured(
     let settings = analyzer_settings_from(&PORTABILITY_CATALOG, &document, rule_filter)?;
     let analyzer_keys = portability::AnalyzerPortabilityKeys::from_settings(&settings)?;
     portability::validate_legacy_portability_config(&document)?;
+    let platform_adapters =
+        platform_adapters::validate(&options.root, analyzer_keys.platform_adapter_records())?;
     let (findings, scanned_crates) = if settings.enabled {
-        let findings =
-            portability::analyze_portability(&options.root, &document, &settings, &analyzer_keys)
-                .map_err(|source| PortabilityError::AnalyzeFindings {
-                root: options.root.clone(),
-                source: source.into(),
-            })?;
+        let findings = portability::analyze_portability(
+            &options.root,
+            &document,
+            &settings,
+            &analyzer_keys,
+            &platform_adapters,
+        )
+        .map_err(|source| PortabilityError::AnalyzeFindings {
+            root: options.root.clone(),
+            source: source.into(),
+        })?;
         let scanned_crates =
             portability::count_scanned_crates(&options.root).map_err(|source| {
                 PortabilityError::CountScannedCrates {

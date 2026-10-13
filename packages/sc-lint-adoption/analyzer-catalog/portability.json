@@ -4,7 +4,8 @@
   "own_keys": [
     "config_home_env",
     "unix_path_prefixes",
-    "targets"
+    "targets",
+    "platform_adapters"
   ],
   "rules": [
     "PORT-001",

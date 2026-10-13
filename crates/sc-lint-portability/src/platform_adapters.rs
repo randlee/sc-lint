@@ -1,0 +1,433 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
+
+use sc_lint_analyzer_support::AnalyzerConfigError;
+use sc_lint_analyzer_support::AnalyzerSettings;
+use sc_lint_analyzer_support::FileContext;
+use sc_lint_analyzer_support::RelativePathError;
+use sc_lint_analyzer_support::RepoRelativePath;
+use sc_lint_analyzer_support::attr_is_cfg_test;
+use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::span_start_line;
+use syn::Item;
+use syn::ItemMod;
+use syn::spanned::Spanned;
+use thiserror::Error;
+
+use crate::predicates::attr_is_cfg_unix;
+use crate::predicates::attr_is_cfg_windows;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct PlatformAdapterRecord {
+    unix_module: String,
+    windows_module: String,
+    reason: String,
+}
+
+pub(super) fn parse_records(
+    settings: &AnalyzerSettings,
+) -> Result<Vec<PlatformAdapterRecord>, AnalyzerConfigError> {
+    let Some(tables) = settings.own_tables("platform_adapters")? else {
+        return Ok(Vec::new());
+    };
+
+    tables
+        .into_iter()
+        .enumerate()
+        .map(|(index, table)| {
+            for key in table.keys() {
+                if !matches!(key.as_str(), "unix_module" | "windows_module" | "reason") {
+                    return Err(AnalyzerConfigError::UnknownKey {
+                        analyzer: "portability",
+                        key: format!("platform_adapters[{index}].{key}"),
+                    });
+                }
+            }
+            let field = |name: &str| match table.get(name) {
+                Some(toml::Value::String(value)) if !value.trim().is_empty() => Ok(value.clone()),
+                _ => Err(AnalyzerConfigError::WrongType {
+                    analyzer: "portability",
+                    key: format!("platform_adapters[{index}].{name}"),
+                    expected: "a non-empty string",
+                }),
+            };
+            Ok(PlatformAdapterRecord {
+                unix_module: field("unix_module")?,
+                windows_module: field("windows_module")?,
+                reason: field("reason")?,
+            })
+        })
+        .collect()
+}
+
+#[derive(Debug, Error)]
+pub enum AdapterConfigError {
+    #[error(
+        "ADAPTER_PATH index {index} field `{field}` value `{value}` is invalid ({cause}); use a confined repository-relative .rs file"
+    )]
+    Path {
+        index: usize,
+        field: &'static str,
+        value: String,
+        cause: RelativePathError,
+    },
+    #[error(
+        "ADAPTER_MISSING index {index} field `{field}` value `{value}` must name an existing confined .rs file; use a repository-relative implementation file"
+    )]
+    Missing {
+        index: usize,
+        field: &'static str,
+        value: String,
+    },
+    #[error(
+        "ADAPTER_DUPLICATE index {index} field `{field}` value `{value}` resolves to an adapter module already used by this configuration; use distinct files"
+    )]
+    Duplicate {
+        index: usize,
+        field: &'static str,
+        value: String,
+    },
+    #[error(
+        "ADAPTER_CFG index {index} field `{field}` value `{value}` must be declared by an out-of-line module with #[cfg({platform})]; declare the production platform module"
+    )]
+    Cfg {
+        index: usize,
+        field: &'static str,
+        value: String,
+        platform: &'static str,
+    },
+    #[error(
+        "ADAPTER_TEST index {index} field `{field}` value `{value}` resolves to a test-only module; supply a production counterpart"
+    )]
+    Test {
+        index: usize,
+        field: &'static str,
+        value: String,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct NonEmptyReason(String);
+
+#[derive(Debug, Clone)]
+struct PlatformAdapterPair {
+    unix: RepoRelativePath,
+    windows: RepoRelativePath,
+    reason: NonEmptyReason,
+    unix_declaration: ModuleDeclaration,
+}
+
+#[derive(Debug, Clone)]
+struct ModuleDeclaration {
+    source_path: PathBuf,
+    line: usize,
+    is_test_only: bool,
+    is_unix: bool,
+    is_windows: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct PlatformAdapters {
+    unix_declarations: BTreeSet<(PathBuf, usize)>,
+}
+
+impl PlatformAdapters {
+    pub(super) fn suppresses_port010(&self, source_path: &Path, line: usize) -> bool {
+        self.unix_declarations
+            .contains(&(source_path.to_path_buf(), line))
+    }
+}
+
+pub(super) fn validate(
+    root: &Path,
+    records: &[PlatformAdapterRecord],
+) -> Result<PlatformAdapters, AdapterConfigError> {
+    if records.is_empty() {
+        return Ok(PlatformAdapters::default());
+    }
+
+    let root = root
+        .canonicalize()
+        .map_err(|_| AdapterConfigError::Missing {
+            index: 0,
+            field: "unix_module",
+            value: root.display().to_string(),
+        })?;
+    let declarations =
+        collect_declarations(root.as_path()).map_err(|_| AdapterConfigError::Missing {
+            index: 0,
+            field: "unix_module",
+            value: root.display().to_string(),
+        })?;
+    let mut used_files = BTreeSet::new();
+    let pairs = records
+        .iter()
+        .enumerate()
+        .map(|(index, record)| {
+            validate_record(&root, &declarations, &mut used_files, index, record)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(PlatformAdapters {
+        unix_declarations: pairs
+            .into_iter()
+            .map(|pair| {
+                let _ = (&pair.unix, &pair.windows, &pair.reason.0);
+                (
+                    pair.unix_declaration.source_path,
+                    pair.unix_declaration.line,
+                )
+            })
+            .collect(),
+    })
+}
+
+fn validate_record(
+    root: &Path,
+    declarations: &BTreeMap<PathBuf, ModuleDeclaration>,
+    used_files: &mut BTreeSet<PathBuf>,
+    index: usize,
+    record: &PlatformAdapterRecord,
+) -> Result<PlatformAdapterPair, AdapterConfigError> {
+    let unix = validate_path(root, index, "unix_module", &record.unix_module)?;
+    let windows = validate_path(root, index, "windows_module", &record.windows_module)?;
+    let unix_path = canonical_module_path(root, index, "unix_module", &unix)?;
+    let windows_path = canonical_module_path(root, index, "windows_module", &windows)?;
+    ensure_distinct(index, record, used_files, &unix_path, &windows_path)?;
+    let unix_declaration = validate_declaration(
+        declarations,
+        index,
+        "unix_module",
+        &record.unix_module,
+        &unix_path,
+        "unix",
+    )?;
+    validate_declaration(
+        declarations,
+        index,
+        "windows_module",
+        &record.windows_module,
+        &windows_path,
+        "windows",
+    )?;
+    Ok(PlatformAdapterPair {
+        unix,
+        windows,
+        reason: NonEmptyReason(record.reason.clone()),
+        unix_declaration,
+    })
+}
+
+fn ensure_distinct(
+    index: usize,
+    record: &PlatformAdapterRecord,
+    used_files: &mut BTreeSet<PathBuf>,
+    unix_path: &Path,
+    windows_path: &Path,
+) -> Result<(), AdapterConfigError> {
+    if unix_path == windows_path || !used_files.insert(unix_path.to_path_buf()) {
+        return Err(AdapterConfigError::Duplicate {
+            index,
+            field: "unix_module",
+            value: record.unix_module.clone(),
+        });
+    }
+    if !used_files.insert(windows_path.to_path_buf()) {
+        return Err(AdapterConfigError::Duplicate {
+            index,
+            field: "windows_module",
+            value: record.windows_module.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_path(
+    root: &Path,
+    index: usize,
+    field: &'static str,
+    value: &str,
+) -> Result<RepoRelativePath, AdapterConfigError> {
+    let path = RepoRelativePath::parse(value).map_err(|cause| AdapterConfigError::Path {
+        index,
+        field,
+        value: value.to_owned(),
+        cause,
+    })?;
+    if root
+        .join(path.as_str())
+        .extension()
+        .and_then(|value| value.to_str())
+        != Some("rs")
+    {
+        return Err(AdapterConfigError::Missing {
+            index,
+            field,
+            value: value.to_owned(),
+        });
+    }
+    Ok(path)
+}
+
+fn canonical_module_path(
+    root: &Path,
+    index: usize,
+    field: &'static str,
+    path: &RepoRelativePath,
+) -> Result<PathBuf, AdapterConfigError> {
+    let candidate = root.join(path.as_str());
+    let canonical = candidate
+        .canonicalize()
+        .map_err(|_| AdapterConfigError::Missing {
+            index,
+            field,
+            value: path.to_string(),
+        })?;
+    if !canonical.starts_with(root) || !canonical.is_file() {
+        return Err(AdapterConfigError::Missing {
+            index,
+            field,
+            value: path.to_string(),
+        });
+    }
+    Ok(canonical)
+}
+
+fn collect_declarations(root: &Path) -> anyhow::Result<BTreeMap<PathBuf, ModuleDeclaration>> {
+    let mut declarations = BTreeMap::new();
+    for context in discover_source_files(root)? {
+        if context.is_test_file {
+            continue;
+        }
+        let source = fs::read_to_string(&context.source_path)?;
+        let file = syn::parse_file(&source)?;
+        let module_dir = module_dir(&context.source_path)?;
+        collect_file_declarations(&file.items, &context, &module_dir, &mut declarations)?;
+    }
+    Ok(declarations)
+}
+
+fn module_dir(source_path: &Path) -> anyhow::Result<PathBuf> {
+    let parent = source_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("source has no parent"))?;
+    match source_path.file_name().and_then(|name| name.to_str()) {
+        Some("lib.rs" | "main.rs" | "mod.rs") => Ok(parent.to_path_buf()),
+        Some(_) => Ok(parent.join(source_path.file_stem().unwrap_or_default())),
+        None => Ok(parent.to_path_buf()),
+    }
+}
+
+fn collect_file_declarations(
+    items: &[Item],
+    context: &FileContext,
+    module_dir: &Path,
+    declarations: &mut BTreeMap<PathBuf, ModuleDeclaration>,
+) -> anyhow::Result<()> {
+    for item in items {
+        let Item::Mod(item_mod) = item else {
+            continue;
+        };
+        if let Some((_, items)) = &item_mod.content {
+            collect_file_declarations(
+                items,
+                context,
+                &module_dir.join(item_mod.ident.to_string()),
+                declarations,
+            )?;
+            continue;
+        }
+        let Some(path) = resolve_module_source(&context.source_path, module_dir, item_mod)? else {
+            continue;
+        };
+        let canonical = path.canonicalize()?;
+        declarations.insert(
+            canonical,
+            ModuleDeclaration {
+                source_path: context.source_path.clone(),
+                line: span_start_line(item_mod.span()),
+                is_test_only: item_mod.attrs.iter().any(attr_is_cfg_test),
+                is_unix: item_mod.attrs.iter().any(attr_is_cfg_unix),
+                is_windows: item_mod.attrs.iter().any(attr_is_cfg_windows),
+            },
+        );
+    }
+    Ok(())
+}
+
+fn resolve_module_source(
+    declaring_source: &Path,
+    module_dir: &Path,
+    item_mod: &ItemMod,
+) -> anyhow::Result<Option<PathBuf>> {
+    for attr in &item_mod.attrs {
+        if !attr.path().is_ident("path") {
+            continue;
+        }
+        let syn::Meta::NameValue(value) = &attr.meta else {
+            return Ok(None);
+        };
+        let syn::Expr::Lit(value) = &value.value else {
+            return Ok(None);
+        };
+        let syn::Lit::Str(value) = &value.lit else {
+            return Ok(None);
+        };
+        return Ok(Some(
+            declaring_source
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("source has no parent"))?
+                .join(value.value()),
+        ));
+    }
+
+    let flat = module_dir.join(format!("{}.rs", item_mod.ident));
+    let nested = module_dir.join(item_mod.ident.to_string()).join("mod.rs");
+    match (flat.is_file(), nested.is_file()) {
+        (true, false) => Ok(Some(flat)),
+        (false, true) => Ok(Some(nested)),
+        _ => Ok(None),
+    }
+}
+
+fn validate_declaration(
+    declarations: &BTreeMap<PathBuf, ModuleDeclaration>,
+    index: usize,
+    field: &'static str,
+    value: &str,
+    canonical_path: &Path,
+    platform: &'static str,
+) -> Result<ModuleDeclaration, AdapterConfigError> {
+    let declaration = declarations
+        .get(canonical_path)
+        .ok_or_else(|| AdapterConfigError::Cfg {
+            index,
+            field,
+            value: value.to_owned(),
+            platform,
+        })?;
+    if declaration.is_test_only {
+        return Err(AdapterConfigError::Test {
+            index,
+            field,
+            value: value.to_owned(),
+        });
+    }
+    let valid_cfg = match platform {
+        "unix" => declaration.is_unix,
+        "windows" => declaration.is_windows,
+        _ => false,
+    };
+    if !valid_cfg {
+        return Err(AdapterConfigError::Cfg {
+            index,
+            field,
+            value: value.to_owned(),
+            platform,
+        });
+    }
+    Ok(declaration.clone())
+}
