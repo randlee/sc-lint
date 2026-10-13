@@ -1,0 +1,17 @@
+{
+  "schema": "sc-compose/beads/v1",
+  "operation": "validate",
+  "working_directory": ".",
+  "bead_variables": {},
+  "template": ".atm-bd/formula/upgrade-sc-compose.formula.toml.j2",
+  "rendered_formula": "target/upgrade-samples/upgrade-sc-compose.formula.toml",
+  "formula_name": "upgrade-sc-compose",
+  "compose_variables": {
+    "parent": "lint-sample",
+    "ref": "upgrade",
+    "phase": "x",
+    "from_version": "1.0.0",
+    "to_version": "1.0.1",
+    "priority": 2
+  }
+}

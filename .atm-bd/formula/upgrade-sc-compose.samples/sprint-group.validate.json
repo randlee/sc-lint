@@ -1,0 +1,20 @@
+{
+  "schema": "sc-compose/beads/v1",
+  "operation": "validate",
+  "working_directory": ".",
+  "bead_variables": {},
+  "template": ".claude/skills/atm-bd-orchestration/formulas/sprint-group.formula.toml.j2",
+  "rendered_formula": "target/upgrade-samples/sprint-group.formula.toml",
+  "formula_name": "sprint-group",
+  "compose_variables": {
+    "parent": "lint-sample",
+    "ref": "s1",
+    "phase": "x",
+    "sprint": "x-1",
+    "stack": "phase-x",
+    "layer": 1,
+    "difficulty": "fast",
+    "priority": 2,
+    "edge_option": "C"
+  }
+}
