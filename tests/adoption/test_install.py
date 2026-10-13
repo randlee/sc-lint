@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -645,7 +646,7 @@ def test_installer_has_no_rule_constants() -> None:
 
 
 def test_schema_analyzer_keys_match_rust_catalogs() -> None:
-    schema = json.loads((KIT / "install.schema.json").read_text())
+    schema = runpy.run_path(str(INSTALL), run_name="sc_lint_adoption_install")["load_schema"]()
     tables = schema["properties"]["analyzers"]["properties"]
     common = {"enabled", "reason", "exclude_rules", "fail_rules", "exclude_paths", "exclude_paths_by_rule"}
     for name, crate in [
