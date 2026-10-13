@@ -1,0 +1,13 @@
+[tool.sc-lint.lint_profiles]
+ci = ["format", "native-check", "windows-check"]
+[[tool.sc-lint.lint]]
+name = "format"
+command = ["cargo", "fmt", "--check"]
+[[tool.sc-lint.lint]]
+name = "native-check"
+command = ["cargo", "check", "--workspace"]
+[[tool.sc-lint.lint]]
+name = "windows-check"
+command = ["cargo", "check", "--workspace"]
+platform = "windows"
+target = "x86_64-pc-windows-msvc"

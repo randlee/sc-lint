@@ -1,0 +1,20 @@
+#!/bin/sh
+# Tool fixture: a stand-in `cargo` for planner execution tests. It records its
+# argv and exits per environment; it never compiles anything.
+#   SC_LINT_SHIM_LOG        file that receives one argv line per invocation
+#   SC_LINT_SHIM_NO_XWIN=1  `cargo xwin --version` fails (xwin not installed)
+#   SC_LINT_SHIM_FAIL_VERB  exit 1 when the first argument (or the verb after
+#                           `xwin`) equals this value
+set -eu
+printf '%s\n' "$*" >> "${SC_LINT_SHIM_LOG:?SC_LINT_SHIM_LOG must name the argv log}"
+if [ "${1:-}" = xwin ] && [ "${2:-}" = --version ]; then
+    [ "${SC_LINT_SHIM_NO_XWIN:-0}" != 1 ] || exit 1
+    exit 0
+fi
+verb="$1"
+if [ "$verb" = xwin ]; then verb="${2:-}"; fi
+if [ -n "${SC_LINT_SHIM_FAIL_VERB:-}" ] && [ "$verb" = "$SC_LINT_SHIM_FAIL_VERB" ]; then
+    printf '%s\n' "shim: $verb failed as requested" >&2
+    exit 1
+fi
+exit 0

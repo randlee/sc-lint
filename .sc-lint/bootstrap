@@ -4,7 +4,7 @@
 set -eu
 
 usage() {
-    printf '%s\n' 'usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>' >&2
+    printf '%s\n' 'usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml; .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>' >&2
     exit 2
 }
 
@@ -72,8 +72,13 @@ fi
 
 config=""
 selector=""
+scope=""
+positional=0
 flags=""
 
+# `lint [selector] [scope]`: one positional is always the selector (a step,
+# named profile or `all`; `lint windows` selects a step named windows), two are
+# selector then platform scope, and no other count is valid.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --config)
@@ -82,7 +87,15 @@ while [ "$#" -gt 0 ]; do
             shift 2
             ;;
         --check|--dry-run) flags="$flags $1"; shift ;;
-        *) [ -z "$selector" ] || usage; selector="$1"; shift ;;
+        *)
+            case "$positional" in
+                0) selector="$1" ;;
+                1) scope="$1" ;;
+                *) usage ;;
+            esac
+            positional=$((positional + 1))
+            shift
+            ;;
     esac
 done
 # Re-expose the mode flags as "$@" for the setup/upgrade paths below.
@@ -91,7 +104,13 @@ set -- $flags
 
 [ -n "$config" ] || usage
 case "$operation" in setup|lint|test|upgrade) ;; *) usage ;; esac
-case "$operation" in lint|test) ;; *) [ -z "$selector" ] || usage ;; esac
+case "$operation" in
+    lint) ;;
+    test) [ "$positional" -le 1 ] || usage ;;
+    *) [ "$positional" -eq 0 ] || usage ;;
+esac
+# A scope needs a selector in front of it; scope-only input is a usage error.
+if [ "$positional" -eq 2 ] && { [ -z "$selector" ] || [ -z "$scope" ]; }; then usage; fi
 
 minimum_version() {
     sed -n 's/^[[:space:]]*minimum_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$config" | head -n 1
@@ -337,8 +356,10 @@ case "$operation" in
         ensure_product "$@"
         activate_product_env
         provision_venv install || exit $?
-        if [ -n "$selector" ]; then exec "$product_binary" lint --consumer --config "$config" ci --profile "$selector"; fi
-        exec "$product_binary" lint --consumer --config "$config" ci
+        set -- lint --consumer --config "$config" ci
+        if [ -n "$selector" ]; then set -- "$@" --profile "$selector"; fi
+        if [ -n "$scope" ]; then set -- "$@" --platform-scope "$scope"; fi
+        exec "$product_binary" "$@"
         ;;
     test)
         ensure_product "$@"

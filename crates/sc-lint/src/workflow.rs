@@ -14,6 +14,12 @@ use crate::config::CONSUMER_SELECTOR_ALL;
 use crate::config::ConsumerProfile;
 use crate::config::LoadedConfig;
 use crate::consts;
+use crate::profile_plan::PlanDecision;
+use crate::profile_plan::PlannedStep;
+use crate::profile_plan::Platform;
+use crate::profile_plan::PlatformScope;
+use crate::profile_plan::SkipRecord;
+use crate::profile_plan::plan_consumer_lint;
 
 pub const WINDOWS_XWIN_TARGET: &str = "x86_64-pc-windows-msvc";
 
@@ -47,6 +53,16 @@ impl StepPlan {
         self
     }
 
+    /// Converts a planned consumer lint command into the executable step form.
+    pub(crate) fn from_planned(step: &PlannedStep) -> Self {
+        Self::new(
+            step.name(),
+            ConsumerProfile::Lint.as_str(),
+            step.command().clone(),
+            step.args().iter().cloned(),
+        )
+    }
+
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
@@ -72,6 +88,8 @@ pub(crate) struct StepReport {
     name: String,
     kind: String,
     command: String,
+    platform: Option<Platform>,
+    target: Option<String>,
 }
 
 impl StepReport {
@@ -80,22 +98,61 @@ impl StepReport {
             name: step.name().to_string(),
             kind: step.kind().to_string(),
             command: step.display_command(),
+            platform: None,
+            target: None,
         }
     }
 
+    /// Records the declared platform and target of a planned step on its report.
+    pub(crate) fn for_planned(mut self, step: &PlannedStep) -> Self {
+        self.platform = step.platform();
+        self.target = step.target().map(|target| target.as_str().to_string());
+        self
+    }
+
     fn to_json(&self) -> Value {
-        json!({
+        let mut row = json!({
             "name": self.name,
             "kind": self.kind,
             "command": self.command,
             "status": "pass",
-        })
+        });
+        // Platform-tagged steps also report where they were declared to run.
+        if let (Some(platform), Some(fields)) = (self.platform, row.as_object_mut()) {
+            fields.insert("platform".to_string(), json!(platform.as_str()));
+            fields.insert("target".to_string(), json!(self.target));
+        }
+        row
     }
+}
+
+/// JSON row for a selected step that was skipped on this host.
+fn skipped_row(record: &SkipRecord) -> Value {
+    json!({
+        "name": record.name,
+        "status": "skipped",
+        "host": record.host.as_str(),
+        "platform": record.platform.as_str(),
+        "target": record.target.as_ref().map(|target| target.as_str()),
+        "reason": record.reason.as_str(),
+    })
 }
 
 /// Seam for injecting step execution in tests and alternate runtimes.
 pub(crate) trait SystemAdapter {
     fn cargo_xwin_available(&self, repo_root: &Path) -> bool;
+    /// The platform planning treats as the local host.
+    fn host_platform(&self) -> Platform;
+    /// Runs one command chosen by the consumer lint planner.
+    #[expect(
+        clippy::result_large_err,
+        reason = "The adapter seam preserves the shared top-level CliError contract across orchestration tests and production execution."
+    )]
+    fn run_planned_step(
+        &self,
+        repo_root: &Path,
+        step: &PlannedStep,
+    ) -> Result<StepReport, CliError>;
     #[expect(
         clippy::result_large_err,
         reason = "The adapter seam preserves the shared top-level CliError contract across orchestration tests and production execution."
@@ -114,6 +171,19 @@ impl SystemAdapter for HostSystemAdapter {
             .arg("--version")
             .output()
             .is_ok_and(|output| output.status.success())
+    }
+
+    fn host_platform(&self) -> Platform {
+        Platform::host()
+    }
+
+    fn run_planned_step(
+        &self,
+        repo_root: &Path,
+        step: &PlannedStep,
+    ) -> Result<StepReport, CliError> {
+        self.run_step(repo_root, &StepPlan::from_planned(step))
+            .map(|report| report.for_planned(step))
     }
 
     fn run_step(&self, repo_root: &Path, step: &StepPlan) -> Result<StepReport, CliError> {
@@ -183,13 +253,9 @@ pub fn run_lint_profile(
 pub fn run_consumer_lint_profile(
     loaded_config: &LoadedConfig,
     selector: Option<&str>,
+    scope: PlatformScope,
 ) -> Result<CommandSuccess, CliError> {
-    run_consumer_profile_with(
-        loaded_config,
-        ConsumerProfile::Lint,
-        selector,
-        &HostSystemAdapter,
-    )
+    run_consumer_lint_with(loaded_config, selector, scope, &HostSystemAdapter)
 }
 
 #[expect(
@@ -275,6 +341,9 @@ pub(crate) fn run_consumer_profile_with(
     selector: Option<&str>,
     adapter: &dyn SystemAdapter,
 ) -> Result<CommandSuccess, CliError> {
+    if profile == ConsumerProfile::Lint {
+        return run_consumer_lint_with(loaded_config, selector, PlatformScope::Host, adapter);
+    }
     let (root, configured_steps) = loaded_config.consumer_profile(profile, selector)?;
     let plans = configured_steps
         .iter()
@@ -294,6 +363,62 @@ pub(crate) fn run_consumer_profile_with(
         "step_count": steps.len(),
         "steps": steps.into_iter().map(|step| step.to_json()).collect::<Vec<_>>(),
     })))
+}
+
+/// Plans the selected consumer lint steps for this host, then runs them
+/// sequentially and fail-fast; skipped steps are reported in declaration order.
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer lint execution retains the shared top-level CliError contract."
+)]
+pub(crate) fn run_consumer_lint_with(
+    loaded_config: &LoadedConfig,
+    selector: Option<&str>,
+    scope: PlatformScope,
+    adapter: &dyn SystemAdapter,
+) -> Result<CommandSuccess, CliError> {
+    let input = loaded_config.consumer_lint_inputs(selector)?;
+    let decisions = plan_consumer_lint(
+        &input.steps,
+        input.selector.as_ref(),
+        scope,
+        adapter.host_platform(),
+    )?;
+    let rows = run_decisions(input.root, adapter, &decisions)?;
+    Ok(CommandSuccess::direct(json!({
+        "status": "pass",
+        "profile": ConsumerProfile::Lint.as_str(),
+        "selector": selector.unwrap_or(CONSUMER_SELECTOR_ALL),
+        "step_count": rows.len(),
+        "steps": rows,
+    })))
+}
+
+/// Executes planned steps in order, failing on the first failed step. A step
+/// that needs `cargo xwin` fails when it is missing; it is never skipped.
+#[expect(
+    clippy::result_large_err,
+    reason = "Step execution stays within the top-level CliError contract."
+)]
+fn run_decisions(
+    root: &Path,
+    adapter: &dyn SystemAdapter,
+    decisions: &[PlanDecision],
+) -> Result<Vec<Value>, CliError> {
+    decisions
+        .iter()
+        .map(|decision| match decision {
+            PlanDecision::Skip(record) => Ok(skipped_row(record)),
+            PlanDecision::Run(step) => {
+                if step.uses_cargo_xwin() {
+                    ensure_xwin_available(step.name(), adapter.cargo_xwin_available(root))?;
+                }
+                adapter
+                    .run_planned_step(root, step)
+                    .map(|report| report.to_json())
+            }
+        })
+        .collect()
 }
 
 #[expect(

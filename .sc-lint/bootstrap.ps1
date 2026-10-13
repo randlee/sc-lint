@@ -5,7 +5,7 @@ $Operation = if ($InvocationArguments.Count -gt 0) { $InvocationArguments[0] } e
 $Rest = if ($InvocationArguments.Count -gt 1) { @($InvocationArguments | Select-Object -Skip 1) } else { @() }
 
 function Stop-Usage {
-    [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap.ps1 exec [--config sc-lint.toml] -- <argv...>")
+    [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap.ps1 lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml; .sc-lint/bootstrap.ps1 exec [--config sc-lint.toml] -- <argv...>")
     exit 2
 }
 
@@ -100,7 +100,11 @@ for ($index = 0; $index -lt $Rest.Count; $index++) {
     if ($index -ne $configIndex -and $index -ne ($configIndex + 1)) { $remaining += $Rest[$index] }
 }
 $selector = @($remaining | Where-Object { $_ -notin @("--check", "--dry-run") })
-if ($selector.Count -gt 1 -or ($Operation -notin @("lint", "test") -and $selector.Count -ne 0)) { Stop-Usage }
+# `lint [selector] [scope]`: one positional is always the selector, two are
+# selector then platform scope; scope-only or more than two is a usage error.
+$maxPositional = switch ($Operation) { "lint" { 2 } "test" { 1 } default { 0 } }
+if ($selector.Count -gt $maxPositional) { Stop-Usage }
+if ($selector.Count -eq 2 -and (-not $selector[0] -or -not $selector[1])) { Stop-Usage }
 
 $installDirectory = if ($env:SC_LINT_INSTALL_DIR) { $env:SC_LINT_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "sc-lint\\bin" }
 $managedBinary = Join-Path $installDirectory "sc-lint.exe"
@@ -357,7 +361,10 @@ switch ($Operation) {
         Ensure-Product
         Enter-ProductEnvironment
         Install-Venv "install"
-        if ($selector.Count -eq 1) { & $productBinary lint --consumer --config $Config ci --profile $selector[0] } else { & $productBinary lint --consumer --config $Config ci }
+        $lintArguments = @("lint", "--consumer", "--config", $Config, "ci")
+        if ($selector.Count -ge 1 -and $selector[0]) { $lintArguments += @("--profile", $selector[0]) }
+        if ($selector.Count -eq 2) { $lintArguments += @("--platform-scope", $selector[1]) }
+        & $productBinary @lintArguments
     }
     "test" {
         Ensure-Product
