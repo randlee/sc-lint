@@ -3223,12 +3223,20 @@ fn lint_rows(names: &[&str]) -> String {
 }
 
 fn selected_names(loaded: &LoadedConfig, selector: Option<&str>) -> Vec<String> {
+    selected_names_for_host(loaded, selector, Platform::Linux)
+}
+
+fn selected_names_for_host(
+    loaded: &LoadedConfig,
+    selector: Option<&str>,
+    host: Platform,
+) -> Vec<String> {
     let input = loaded.consumer_lint_inputs(selector).expect("selection");
     let decisions = plan_consumer_lint(
         &input.steps,
         input.selector.as_ref(),
         PlatformScope::Host,
-        Platform::Linux,
+        host,
     )
     .expect("plan");
     decisions
@@ -3662,12 +3670,12 @@ fn test_profiles_exact_json_toml_roundtrip() {
     let profiles = fragment["profiles"].as_object().expect("profiles object");
     let expected_names: Vec<&str> = profiles.keys().map(String::as_str).collect();
     assert_eq!(
-        selected_names(&loaded, Some("all")).len(),
+        selected_names_for_host(&loaded, Some("all"), Platform::host()).len(),
         expected_names.len() - usize::from(cfg!(not(windows))),
         "windows-tagged step only joins `all` on a Windows host"
     );
     assert_eq!(
-        selected_names(&loaded, Some("ci")),
+        selected_names_for_host(&loaded, Some("ci"), Platform::host()),
         fragment["lint_profiles"]["ci"]
             .as_array()
             .expect("ci members")
