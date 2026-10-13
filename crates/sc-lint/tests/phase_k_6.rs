@@ -1,4 +1,6 @@
 use std::fs;
+#[cfg(windows)]
+use std::path::PathBuf;
 #[cfg(unix)]
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -56,6 +58,37 @@ fn run_bootstrap(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) 
         command.env(name, value);
     }
     command.output().expect("run consumer bootstrap")
+}
+
+#[cfg(windows)]
+fn powershell_command() -> Command {
+    let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
+    let system32 = PathBuf::from(&system_root).join("System32");
+    let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
+    let search_path = std::env::split_paths(&inherited_path).collect::<Vec<_>>();
+    let pwsh = search_path
+        .iter()
+        .map(|directory| directory.join("pwsh.exe"))
+        .find(|candidate| candidate.is_file())
+        .expect("pwsh.exe on Windows PATH");
+    let mut path = search_path;
+    path.retain(|directory| directory == pwsh.parent().expect("pwsh parent"));
+    path.push(system32.clone());
+    let mut command = Command::new(&pwsh);
+    command
+        .env_clear()
+        .env("SystemRoot", &system_root)
+        .env(
+            "PATH",
+            std::env::join_paths(path).expect("valid Windows PATH"),
+        )
+        .env("ComSpec", system32.join("cmd.exe"));
+    for name in ["TEMP", "TMP"] {
+        if let Some(value) = std::env::var_os(name) {
+            command.env(name, value);
+        }
+    }
+    command
 }
 
 #[cfg(unix)]
@@ -206,7 +239,7 @@ fn bootstrap_exec_uses_managed_product() {
     let managed_binary = managed.join("sc-lint.exe");
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), &managed_binary).expect("managed product copy");
 
-    let output = Command::new("pwsh")
+    let output = powershell_command()
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(root.join(".sc-lint/bootstrap.ps1"))
         .args(["exec", "--", "sc-lint", "version"])
@@ -391,7 +424,7 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     let log_path = log.to_str().expect("log path");
     let managed_path = managed.to_str().expect("managed path");
     let child_path = child.to_str().expect("child path");
-    let output = Command::new("pwsh")
+    let output = powershell_command()
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(root.join(".sc-lint/bootstrap.ps1"))
         .args(["exec", "--", child_path, "two words", "tail"])
