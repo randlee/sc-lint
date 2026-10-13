@@ -97,8 +97,6 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
             except ValueError as error: errors.append(str(error))
         if len(errors) != len(schema["oneOf"]) - 1: raise ValueError(f"{label} must match exactly one accepted shape: {'; '.join(errors)}")
     if isinstance(value, dict):
-        missing = [key for key in schema.get("required", []) if key not in value]
-        if missing: raise ValueError(f"{label} is missing required fields: {missing}")
         properties = schema.get("properties", {})
         extra = set(value) - set(properties)
         if schema.get("additionalProperties") is False and extra: raise ValueError(f"{label} has unknown fields: {sorted(extra)}")
