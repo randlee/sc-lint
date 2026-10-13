@@ -526,34 +526,36 @@ fn dependency_policy_allows_direct_workspace_dependency() {
 
 #[test]
 fn issue376_union_matrix() {
-    let fixture = WorkspaceFixture::new();
-    fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r"]);
-    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
-    fixture.write(
-        "crates/q/Cargo.toml",
-        &path_dependency_manifest("q", "p", "../p", "0.1.0"),
+    let (fallback_fixture, fallback_options) = issue376_fixture(false);
+    assert_issue376_union_row(
+        &fallback_fixture,
+        &fallback_options,
+        &["q"],
+        None,
+        &["r_lib"],
+        None,
     );
-    fixture.write(
-        "crates/r/Cargo.toml",
-        &(good_member_manifest("r", "")
-            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    assert_issue376_union_row(
+        &fallback_fixture,
+        &fallback_options,
+        &["q"],
+        Some(&[]),
+        &["r_lib"],
+        None,
     );
-    for package in ["p", "q", "r"] {
-        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
-    }
-    write_policy_record(&fixture, "p/a.toml", "A", &["q"], Some(&["r"]), "active");
-    write_policy_record(&fixture, "p/b.toml", "B", &["q"], Some(&[]), "active");
 
-    let options = AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-        rule: Some(RuleFilter::Dependencies),
-    };
-    let report = analyze_workspace(&options).expect("union policy analyzes");
-    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
-
+    let (fixture, options) = issue376_fixture(true);
+    assert_issue376_union_row(
+        &fixture,
+        &options,
+        &["q"],
+        Some(&["s_lib"]),
+        &["r-pkg"],
+        None,
+    );
     write_policy_record(&fixture, "p/a.toml", "A", &["q"], Some(&[]), "active");
-    let report = analyze_workspace(&options).expect("missing dev edge analyzes");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], Some(&[]), "active");
+    let report = analyze_workspace(&options).expect("missing dev grants analyze");
     assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(
         report
@@ -561,8 +563,119 @@ fn issue376_union_matrix() {
             .iter()
             .filter(|finding| finding.rule_id == RuleId::ScbDependency002)
             .count(),
-        1
+        2,
+        "only dev-only r and s edges should be rejected: {:#?}",
+        report.findings
     );
+
+    assert_issue376_union_row(
+        &fixture,
+        &options,
+        &["q"],
+        Some(&["s_lib"]),
+        &["r-pkg"],
+        None,
+    );
+    let record = fixture.root().join("boundaries/p/a.toml");
+    let contents = fs::read_to_string(&record).expect("read policy record");
+    fs::write(
+        record,
+        contents.replace(
+            "forbidden_edges = []",
+            "forbidden_edges = [{ from = \"q\", to = \"p\" }]",
+        ),
+    )
+    .expect("write forbidden policy");
+    let report = analyze_workspace(&options).expect("forbidden edge analyzes");
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::ScbDependency002)
+            .count(),
+        0,
+        "the incoming permissions remain valid: {:#?}",
+        report.findings
+    );
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::ScbDependency003)
+            .count(),
+        1,
+        "forbidden edges take precedence over allowlists: {:#?}",
+        report.findings
+    );
+}
+
+fn issue376_fixture(with_explicit_dev: bool) -> (WorkspaceFixture, AnalyzeOptions) {
+    let fixture = WorkspaceFixture::new();
+    let mut members = vec!["crates/p", "crates/q", "crates/r"];
+    if with_explicit_dev {
+        members.push("crates/s");
+    }
+    fixture.write_workspace_root_with_members(&members);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &identity_member_manifest(
+            "q-pkg",
+            "q_lib",
+            "[dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }\n\n[dev-dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }",
+        ),
+    );
+    fixture.write(
+        "crates/r/Cargo.toml",
+        &identity_member_manifest(
+            "r-pkg",
+            "r_lib",
+            "[dev-dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }",
+        ),
+    );
+    if with_explicit_dev {
+        fixture.write(
+            "crates/s/Cargo.toml",
+            &identity_member_manifest(
+                "s-pkg",
+                "s_lib",
+                "[dev-dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }",
+            ),
+        );
+    }
+    for package in members
+        .iter()
+        .map(|member| member.trim_start_matches("crates/"))
+    {
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    (fixture, options)
+}
+
+fn assert_issue376_union_row(
+    fixture: &WorkspaceFixture,
+    options: &AnalyzeOptions,
+    first_runtime: &[&str],
+    first_dev: Option<&[&str]>,
+    second_runtime: &[&str],
+    second_dev: Option<&[&str]>,
+) {
+    write_policy_record(fixture, "p/a.toml", "A", first_runtime, first_dev, "active");
+    write_policy_record(
+        fixture,
+        "p/b.toml",
+        "B",
+        second_runtime,
+        second_dev,
+        "active",
+    );
+    let report = analyze_workspace(options).expect("union policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
 }
 
 #[test]
