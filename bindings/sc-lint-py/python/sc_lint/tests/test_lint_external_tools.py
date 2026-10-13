@@ -31,7 +31,6 @@ from sc_lint.lint_cargo_shear import parse_sections
 from sc_lint.lint_cargo_shear import PATH_KEY_MIGRATION_DIAGNOSTIC
 from sc_lint.lint_cargo_shear import validate_unused_dependency_allowlist
 from sc_lint.lint_codespell import build_command as build_codespell_command
-from sc_lint.lint_common import WorkspaceCrate
 from sc_lint.lint_common import write_console_output
 from sc_lint.lint_common import workspace_crate_section_lines
 
