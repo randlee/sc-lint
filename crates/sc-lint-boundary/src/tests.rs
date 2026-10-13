@@ -719,6 +719,48 @@ fn issue376_stale_active_gate() {
 
 #[test]
 fn issue377_semantic_mutations() {
+    // Valid Rust raw identifiers, owner-local roots, and roots in an explicitly
+    // allowed dependency are all accepted by the semantic inventory pass.
+    let valid_fixture = WorkspaceFixture::new();
+    valid_fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    valid_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    valid_fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    valid_fixture.write_source("p", "lib.rs", "pub struct P;");
+    valid_fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&valid_fixture, "p/a.toml", "A", &[], None, "active");
+    let valid_record = valid_fixture.root().join("boundaries/p/a.toml");
+    let valid_contents = fs::read_to_string(&valid_record).expect("read valid record");
+    fs::write(
+        &valid_record,
+        valid_contents
+            .replace(
+                "roots = [\"run\"]",
+                "roots = [\"r#type\", \"p::LocalRoot\", \"q::ExternalRoot\"]",
+            )
+            .replace(
+                "allowed_dependencies = []",
+                "allowed_dependencies = [\"q\"]",
+            ),
+    )
+    .expect("write valid roots");
+    let valid_report = analyze_workspace(&AnalyzeOptions {
+        root: valid_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("valid roots analyze");
+    assert_eq!(
+        valid_report.status,
+        ReportStatus::Pass,
+        "{:#?}",
+        valid_report.findings
+    );
+    assert!(
+        valid_report.findings.is_empty(),
+        "{:#?}",
+        valid_report.findings
+    );
+
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
     fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
@@ -773,6 +815,87 @@ fn issue377_semantic_mutations() {
         ])
     );
     assert_eq!(report.status, ReportStatus::Fail);
+
+    let diagnostic_contexts = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbBoundary004)
+        .map(|finding| {
+            let field = finding
+                .message
+                .split(" field `")
+                .nth(1)
+                .and_then(|tail| tail.split('`').next())
+                .expect("diagnostic includes field context");
+            (finding.kind.as_str(), field.to_string())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        diagnostic_contexts,
+        vec![
+            ("invalid_public_path", "composition.roots[0]".into()),
+            ("unapproved_composition_root", "composition.roots[1]".into()),
+            ("self_forbidden_edge", "dependencies.forbidden_edges".into()),
+            (
+                "trait_only_constructor",
+                "implementation.constructor".into()
+            ),
+            ("invalid_identifier", "public".into()),
+            ("duplicate_owner_name", "name".into()),
+        ],
+        "diagnostics retain deterministic record/field context: {:#?}",
+        report.findings
+    );
+    assert!(report.findings.iter().all(|finding| {
+        finding.message.contains("boundary `BOUNDARY-PA`")
+            || finding.message.contains("boundary `BOUNDARY-PB`")
+    }));
+
+    let duplicate_fixture = WorkspaceFixture::new();
+    duplicate_fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    duplicate_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    duplicate_fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    duplicate_fixture.write_source("p", "lib.rs", "pub struct P;");
+    duplicate_fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&duplicate_fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&duplicate_fixture, "p/b.toml", "B", &["q"], None, "active");
+    let duplicate_record = duplicate_fixture.root().join("boundaries/p/b.toml");
+    let duplicate_contents = fs::read_to_string(&duplicate_record).expect("read duplicate record");
+    fs::write(
+        &duplicate_record,
+        duplicate_contents.replace("name = \"B\"", "name = \"A\""),
+    )
+    .expect("write duplicate owner name");
+    let duplicate_report = analyze_workspace(&AnalyzeOptions {
+        root: duplicate_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("duplicate names are semantic findings");
+    assert_eq!(duplicate_report.status, ReportStatus::Fail);
+    assert_eq!(
+        duplicate_report
+            .findings
+            .iter()
+            .map(|finding| finding.kind.as_str())
+            .collect::<Vec<_>>(),
+        vec!["duplicate_owner_name", "duplicate_owner_name"],
+        "both distinct boundary IDs are excluded from downstream analysis: {:#?}",
+        duplicate_report.findings
+    );
+    assert!(duplicate_report.findings.iter().all(|finding| {
+        finding.message.contains("field `name`:") && finding.kind == "duplicate_owner_name"
+    }));
+    assert!(
+        duplicate_report.findings[0]
+            .message
+            .contains("boundary `BOUNDARY-PA`")
+    );
+    assert!(
+        duplicate_report.findings[1]
+            .message
+            .contains("boundary `BOUNDARY-PB`")
+    );
 }
 
 #[test]
@@ -796,15 +919,113 @@ fn issue377_aggregates_and_keeps_fatal_errors() {
     })
     .expect("semantic defect is not fatal");
     assert_eq!(report.findings[0].kind, "invalid_identifier");
+    assert!(report.findings[0].message.contains("field `public`:"));
+    assert_eq!(report.status, ReportStatus::Fail);
 
     fs::write(&record, "not valid = [toml").expect("write malformed record");
+    let malformed = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("malformed TOML remains fatal")
+    .to_string();
     assert!(
-        analyze_workspace(&AnalyzeOptions {
-            root: fixture.root().to_path_buf(),
-            format: OutputFormat::Json,
-            rule: Some(RuleFilter::Dependencies),
-        })
-        .is_err()
+        malformed.contains("failed to parse TOML file"),
+        "{malformed}"
+    );
+
+    let schema_fixture = WorkspaceFixture::new();
+    schema_fixture.write_workspace_root_with_members(&["crates/p"]);
+    schema_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    schema_fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&schema_fixture, "p/a.toml", "A", &[], None, "active");
+    let schema_record = schema_fixture.root().join("boundaries/p/a.toml");
+    let schema_contents = fs::read_to_string(&schema_record).expect("read schema record");
+    fs::write(
+        &schema_record,
+        format!("{schema_contents}\nunknown_root_field = true\n"),
+    )
+    .expect("write unknown schema field");
+    let schema_error = analyze_workspace(&AnalyzeOptions {
+        root: schema_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("schema violation remains fatal")
+    .to_string();
+    assert!(
+        schema_error.contains("failed to parse TOML file"),
+        "{schema_error}"
+    );
+
+    let layout_fixture = WorkspaceFixture::new();
+    layout_fixture.write_workspace_root_with_members(&["crates/p"]);
+    layout_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    layout_fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&layout_fixture, "p/nested/a.toml", "A", &[], None, "active");
+    let layout_record = layout_fixture.root().join("boundaries/p/nested/a.toml");
+    let layout_contents = fs::read_to_string(&layout_record).expect("read layout record");
+    fs::write(
+        &layout_record,
+        layout_contents.replace("owner_package = \"p\"", "owner_package = \"nested\""),
+    )
+    .expect("write nested-layout record");
+    let layout_error = analyze_workspace(&AnalyzeOptions {
+        root: layout_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("invalid inventory layout remains fatal")
+    .to_string();
+    assert!(
+        layout_error.contains("must use boundaries/<owner-package>/<boundary>.toml layout"),
+        "{layout_error}"
+    );
+
+    let duplicate_id_fixture = WorkspaceFixture::new();
+    duplicate_id_fixture.write_workspace_root_with_members(&["crates/p"]);
+    duplicate_id_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    duplicate_id_fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&duplicate_id_fixture, "p/a.toml", "A", &[], None, "active");
+    write_policy_record(&duplicate_id_fixture, "p/b.toml", "B", &[], None, "active");
+    let duplicate_a = duplicate_id_fixture.root().join("boundaries/p/a.toml");
+    let duplicate_b = duplicate_id_fixture.root().join("boundaries/p/b.toml");
+    let duplicate_a_contents = fs::read_to_string(&duplicate_a).expect("read first duplicate id");
+    let duplicate_b_contents = fs::read_to_string(&duplicate_b).expect("read second duplicate id");
+    fs::write(
+        &duplicate_b,
+        duplicate_b_contents.replace("BOUNDARY-PB", "BOUNDARY-PA"),
+    )
+    .expect("write duplicate id");
+    let duplicate_id_error = analyze_workspace(&AnalyzeOptions {
+        root: duplicate_id_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("duplicate boundary ids remain fatal")
+    .to_string();
+    assert!(
+        duplicate_id_error.contains("duplicate boundary_id"),
+        "{duplicate_id_error}"
+    );
+    assert!(duplicate_a_contents.contains("BOUNDARY-PA"));
+
+    let io_fixture = WorkspaceFixture::new();
+    io_fixture.write_workspace_root_with_members(&["crates/p"]);
+    io_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    io_fixture.write_source("p", "lib.rs", "pub struct P;");
+    io_fixture.write("boundaries", "not a directory");
+    let io_error = analyze_workspace(&AnalyzeOptions {
+        root: io_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("inventory I/O failure remains fatal")
+    .to_string();
+    assert!(
+        io_error.contains("failed to read boundary directory"),
+        "{io_error}"
     );
 }
 
