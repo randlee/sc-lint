@@ -520,6 +520,8 @@ def main(argv: list[str]) -> int:
                 policy,
                 metadata.manifest_packages
                 if metadata is not None
+                # Preserve absent-table parity: without metadata, retain the
+                # existing manifest resolver for child-finding package mapping.
                 else manifest_to_package_name(repo_root),
             )
         )
