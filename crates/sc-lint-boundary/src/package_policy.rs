@@ -302,6 +302,7 @@ fn collect_incoming_policy_findings(
     let runtime_incoming = index_incoming_edges(runtime_edges);
     let dev_incoming = index_incoming_edges(dev_edges);
     let mut findings = Vec::new();
+    let mut stale_permissions = BTreeSet::new();
     for (owner, (record, runtime_allowed, dev_allowed)) in owners {
         for dependent in runtime_incoming.get(&owner).into_iter().flatten() {
             if !runtime_allowed.contains(dependent) {
@@ -311,6 +312,37 @@ fn collect_incoming_policy_findings(
         for dependent in dev_incoming.get(&owner).into_iter().flatten() {
             if !dev_allowed.contains(dependent) {
                 findings.push(disallowed_dependent_finding(record, dependent, &owner));
+            }
+        }
+    }
+    for (record, policy) in policies {
+        let runtime_live = runtime_incoming.get(&policy.owner);
+        let dev_live = dev_incoming.get(&policy.owner);
+        for dependent in &policy.allowed_dependents {
+            let dev_permission = policy.allowed_dev_dependents.is_none();
+            let is_live = runtime_live.is_some_and(|edges| edges.contains(dependent))
+                || (dev_permission && dev_live.is_some_and(|edges| edges.contains(dependent)));
+            if !is_live && stale_permissions.insert((policy.owner.clone(), dependent.clone())) {
+                findings.push(stale_allowed_dependent_finding(
+                    record,
+                    dependent,
+                    &policy.owner,
+                    "dependencies.allowed_dependents",
+                ));
+            }
+        }
+        if let Some(dev_dependents) = &policy.allowed_dev_dependents {
+            for dependent in dev_dependents {
+                if !dev_live.is_some_and(|edges| edges.contains(dependent))
+                    && stale_permissions.insert((policy.owner.clone(), dependent.clone()))
+                {
+                    findings.push(stale_allowed_dependent_finding(
+                        record,
+                        dependent,
+                        &policy.owner,
+                        "dependencies.allowed_dev_dependents",
+                    ));
+                }
             }
         }
     }
@@ -403,6 +435,27 @@ fn disallowed_dependent_finding(
         message: format!(
             "workspace package `{}` directly depends on `{}` but `{}` is not listed in `{}` allowed_dependents",
             dependent, owner, dependent, record.boundary_id
+        ),
+        owner_ids: vec![
+            OwnerId::new(dependent.as_ref()),
+            OwnerId::new(owner.as_ref()),
+        ],
+        node_ids: Vec::new(),
+    }
+}
+
+fn stale_allowed_dependent_finding(
+    record: &BoundaryRecord,
+    dependent: &WorkspacePackageName,
+    owner: &WorkspacePackageName,
+    field: &str,
+) -> Finding {
+    Finding {
+        rule_id: RuleId::ScbDependency004,
+        kind: "stale_allowed_dependent".into(),
+        message: format!(
+            "boundary `{}` {field} grants `{dependent}` access to `{owner}` but no matching direct workspace edge exists",
+            record.boundary_id
         ),
         owner_ids: vec![
             OwnerId::new(dependent.as_ref()),
