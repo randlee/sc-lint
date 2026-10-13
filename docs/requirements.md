@@ -11,6 +11,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
+- [docs/sc-lint/adr/ADR-017-phase-k-consumer-contracts.md](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
@@ -560,16 +561,27 @@ The product should support both:
 
 - `REQ-PRODUCT-023`
   A versioned, reusable, analyzer-agnostic adoption kit must install one
-  drift-detectable consumer end state. Analyzer selection is the sole
-  repo-specific declarative input in `[tool.sc-lint.analyzers]`; profiles
-  select applicable analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry
-  carries the common keys `enabled`, `reason`, `exclude_rules`, `fail_rules`
-  and `exclude_paths` plus that analyzer's own keys (portability:
-  `config_home_env`, `unix_path_prefixes`); each analyzer reads only its own
-  table, and an unknown key is rejected by the analyzer (exit 3) and by the kit
-  installer. Installation is idempotent and `--dry-run` is
-  non-mutating, reporting drift or a managed-file conflict rather than writing.
-  (Amended 2026-10-10, Accepted, #201, #202.)
+  drift-detectable consumer end state. Analyzer selection and optional analyzer
+  policy are declared in `[tool.sc-lint.analyzers]`; profiles select applicable
+  analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry carries the common
+  keys `enabled`, `reason`, `exclude_rules`, `fail_rules`, `exclude_paths` and
+  `exclude_paths_by_rule`, plus that analyzer's own keys. Portability accepts
+  `config_home_env`, `unix_path_prefixes` and reviewed `platform_adapters`;
+  boundary accepts optional manifest dependency allowlists, global dependency
+  ownership and manifest section rules. Each analyzer reads only its own table.
+  Unknown analyzer-level keys, unknown rule names and malformed values are
+  rejected by the analyzer (exit 3) and by the kit installer. Optional manifest
+  records retain upstream nested value shapes and ignored unknown nested keys;
+  an absent or empty family adds no checks, while a present empty dependency
+  allowlist allows none. Per-rule path exclusions filter findings using paths
+  supplied by analyzer-owned adapters without changing the shared Finding schema.
+  Validated platform pairs cover enclosing module declarations and
+  inherited-private items while retaining normal parity checks for unrelated
+  and separately Unix-gated public items. Missing optional fields preserve
+  existing behavior. Installation is idempotent and `--dry-run` is non-mutating,
+  reporting drift or a managed-file conflict rather than writing.
+  (Amended 2026-10-10, Accepted, #201, #202; amended 2026-10-12, Accepted,
+  [ADR-017, changes 1 and compatibility](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-PRODUCT-024`
   The version-matched `sc-lint` wheel delivers every consumer-run helper and
@@ -578,6 +590,13 @@ The product should support both:
   `just test [layer]` is sc-lint's recommended `test` recipe, owned by the
   consumer once installed.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
+
+Phase K's Accepted ADR-017 extends existing adoption and CLI contracts: the
+persisted installer input may declare exact cargo-tool versions and rustup
+targets for ordinary bootstrap setup, while direct binary setup retains its
+meaning and lint never installs tools. The managed-wheel helper owns
+inspection, installation and verification; absent declarations add no work.
+This is an amendment to those contracts, not a new product default.
 
 ## Current Detailed Requirement Areas
 
@@ -607,7 +626,7 @@ The completed Phase `D` execution line required:
   - TOML-backed package dependency policy in boundary inventory records
   - direct workspace package-edge allowlist and forbidden-edge enforcement
   - a dedicated `dependencies` rule filter for package-edge policy
-  - stable fail-only `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-003` rule
+  - stable fail-only `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-004` rule
     coverage in the default `analyze_workspace` path
   - in-scope direct workspace edges across normal, dev, build, and
     target-specific dependency sections

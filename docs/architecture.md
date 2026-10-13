@@ -14,6 +14,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
+- [docs/sc-lint/adr/ADR-017-phase-k-consumer-contracts.md](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
 
 For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -388,8 +389,8 @@ Current intended distribution is:
   - boundary declarations and attribute-driven boundary policy
   - current owned extensions:
     - `SCB-CALLER-001` named-caller allowlist enforcement
-    - `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and
-      `SCB-DEPENDENCY-003` direct workspace package-edge policy
+    - `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-004` direct workspace
+      package-edge policy, including stale configured permissions
     - dedicated operator-visible `dependencies` rule filter, separate from
       both source-graph boundary checks and manifest policy
     - direct-edge scope includes normal, dev, build, and target-specific
@@ -620,15 +621,18 @@ distribution authority.
 `sc-lint` should treat some rule families as consumer-proven first and
 productized second.
 
-Current planned promotion path from `atm-core`:
+Consumer-proven rule families already shipped in dedicated product crates:
 
-- reusable analyzer families to backport into dedicated tool crates:
-  - `sc-lint-portability`
-    - `PORT-004`
-    - `PORT-005`
-  - `sc-lint-runtime`
-    - `SCB-RUNTIME-001`
-    - `SCB-RUNTIME-002`
+- `sc-lint-portability`: `PORT-004`, `PORT-005`
+- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`
+
+Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
+source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer
+policy, and consumer-declared setup data owned by the adoption kit/managed
+wheel. The top-level CLI remains the sole consumer lint executor; Python
+bindings do not decide lint rules. Final current-facing and offline user docs
+are reconciled by k-10 after implementation. See the
+[Phase K intent](./plans/phase-k/intent.md) and ADR-017 for the exact scope.
 - consumer-local policy families that stay outside `sc-lint` unless extracted
   as a configurable framework:
   - duplicate semantic string-literal policy

@@ -122,3 +122,19 @@ extension point for repo-specific enforcement.
 3. Extends Decision 1: an analyzer reading its own
    `[tool.sc-lint.analyzers.<name>]` table at run time (#201) is analyzer
    behaviour, not installation configuration.
+
+## Amendment 2026-10-12 — declared tools and consumer execution
+
+Accepted by Rand through [ADR-017](./ADR-017-phase-k-consumer-contracts.md),
+accepted changes 4–6. Consumers may declare exact cargo-tool versions and
+rustup targets in the existing persisted `.sc-lint/install.json`; product
+defaults choose none. Ordinary bootstrap setup calls managed-wheel
+`sc_lint.setup_tools` for the approved inspect/install/verify flow. Python
+installation ownership, direct binary setup semantics and the existing
+interpreter policy remain unchanged; no second tool manifest, Rust installation
+engine or setup hooks are introduced. Dry-run never provisions the helper or
+tools. The existing Rust consumer executor gains ordered named lint profiles
+and separate platform scope, and bootstrap gains direct managed `exec` without
+profile recursion. ADR-017 specifies exact translation, failure, compatibility
+and dry-run behavior; it does not add generic test groups, parallel execution,
+keep-going or test argument forwarding.
