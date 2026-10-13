@@ -588,8 +588,13 @@ The product should support both:
   input from Rand. The formula's steps are the plan; a run adds no other work.
 
 - `REQ-PRODUCT-026`
-  The upgrade changes only the repo's own version pin
-  (`.claude/lib/sc_compose_dependency.py` for sc-compose) and edits no other
+  The upgrade changes only the repo's own version constants in
+  `.claude/lib/sc_compose_dependency.py` for sc-compose: the wheel pin
+  (`SC_COMPOSE_WHEEL_PIN`) and the minimum floors and install specs
+  (`MIN_SC_COMPOSE`, `MIN_SC_COMPOSE_TEXT`, `MIN_SC_COMPOSE_BINDING`,
+  `MIN_SC_COMPOSE_BINDING_TEXT`, `SC_COMPOSE_INSTALL`,
+  `SC_COMPOSE_BINDING_INSTALL`), which all require the new version
+  (ANC-016), plus repo-owned files a changelog item requires. It edits no other
   skill's or kit's pin or files; those keep their own minimum versions.
 
 - `REQ-PRODUCT-027`
@@ -604,11 +609,16 @@ The product should support both:
   It compares the rendering tests and the rendered output of every formula the
   team pours, from committed sample requests. The upgrade is breaking when a
   test passing on the old version fails on the new one or a rendered formula
-  differs. quality-mgr re-runs the comparison independently.
+  differs. The verdict is one of NOT_BREAKING; BREAKING_FIXED, a minor break
+  fixed in repo-owned files with no public interface, kit-file or architecture
+  change and listed in the PR (ANC-017); or BREAKING, any other break.
+  quality-mgr re-runs the comparison independently.
 
 - `REQ-PRODUCT-029`
-  When breaking, the run stops with a ready PR to `develop` whose description
-  carries the failing tests and diffs. When not breaking and no other work is
+  When BREAKING, the run stops with a ready PR to `develop` whose description
+  carries the failing tests, diffs and an impact assessment. When
+  BREAKING_FIXED, it stops with a green PR to `develop` whose description
+  announces each fixed break and the fix. When NOT_BREAKING and no other work is
   in progress, it continues to a patch bump, publish-preflight GO and a PR to
   `main`; with other work in progress it stops after `develop`.
 

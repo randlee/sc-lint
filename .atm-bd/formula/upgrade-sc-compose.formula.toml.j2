@@ -28,7 +28,8 @@ Run (the lead, no input from Rand):
    `.claude/skills/atm-beads/scripts/validate-plan --phase <phase>`.
 4. `bd create --id <parent>-plan-qa --type task -l phase-<phase>,stage:plan-review
    --title "phase-<phase>: plan review"`, `bd update <parent>-plan-qa --parent
-   <parent>`, `bd dep add <parent>.<ref>-sprint <parent>-plan-qa`, then close it
+   <parent>`, `bd dep add <parent>.<ref>-sprint <parent>-plan-qa` and
+   `bd dep add <parent>.<ref>-upgrade <parent>-plan-qa`, then close it
    with reason "formula plan-reviewed in phase-j at <commit of this formula on
    develop>". This is the one QA gate the lead closes: the formula is the plan
    and is not re-reviewed per run.
@@ -44,8 +45,9 @@ omega-prime@hermes with `atm send omega-prime@hermes --stdin <<'EOF'`. The
 only waits on Rand are his merges of the PRs to develop and main; no agent
 merges to develop or main.
 
-The only version constant changed is SC_COMPOSE_WHEEL_PIN; the kit-owned-file
-rule is in the upgrade step's deliverable 2. `sc-compose bead` exits 0 on refusal; read
+The version constants changed are SC_COMPOSE_WHEEL_PIN and the minimum floors
+in the upgrade step's deliverable 1; the kit-owned-file rule is in its
+deliverable 2. `sc-compose bead` exits 0 on refusal; read
 payload.outcome, never the exit code.
 #}
 formula = "upgrade-sc-compose"

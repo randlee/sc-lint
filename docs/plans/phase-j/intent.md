@@ -24,4 +24,4 @@ The whole process runs unattended. Every escalation goes to
 
 ## Anchors
 
-Anchors for this plan live in `anchors.json` (record of truth) and are rendered to `anchors.md`. Requirements and ADRs that govern this plan are listed there too, under their own IDs.
+Anchors for this plan live in `anchors.json` (record of truth) and are rendered to `anchors.md`. The requirements that govern this plan are REQ-PRODUCT-025..031 in `docs/requirements.md`; no ADR governs it (see the Phase J note in `docs/architecture.md`).
