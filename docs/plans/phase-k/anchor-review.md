@@ -1,6 +1,6 @@
 # Phase K anchor review
 
-All nine sprint descriptions pass at threshold 0.6 using the accepted question sets. All nine locked anchors are satisfied by at least one sprint. The source audit confirms that each run used the complete current bead description; no item was truncated. Quality-mgr round 3 returned FAIL with one important finding. Its diagnostic-string duplication is corrected, but that correction has not received independent QA verification; this is anchor approval only.
+All nine sprint descriptions pass at threshold 0.6 using the accepted question sets. All nine locked anchors are satisfied by at least one sprint. The source audit confirms that each run used the complete current bead description; no item was truncated. Quality-mgr final targeted verification returned PASS with zero open findings. The diagnostic-string duplication identified in round 3 is corrected and independently verified.
 
 Rand’s intent: “This plan should use code and TESTS directly from atm-core repo where it makes sense”; “We should implement tools in rust as appropriate w/ minimal python bindings”; and “sc-lint is a general purpose linting tool that is used on many repos.”
 
@@ -14,7 +14,7 @@ Rand’s intent: “This plan should use code and TESTS directly from atm-core r
 | lint-k-4 | PASS | [plan-20261013T033836Z-lint-k-4](anchor-runs/qa-r3/plan-20261013T033836Z-lint-k-4.json) |
 | lint-k-6 | PASS | [plan-20261013T033905Z-lint-k-6](anchor-runs/qa-r3/plan-20261013T033905Z-lint-k-6.json) |
 | lint-k-7 | PASS | [plan-20261013T033935Z-lint-k-7](anchor-runs/qa-r3/plan-20261013T033935Z-lint-k-7.json) |
-| lint-k-8 | PASS | [plan-20261013T034542Z-lint-k-8](anchor-runs/qa-r3/plan-20261013T034542Z-lint-k-8.json) |
+| lint-k-8 | PASS | [plan-20261013T041348Z-lint-k-8](anchor-runs/user-rerun/plan-20261013T041348Z-lint-k-8.json) |
 | lint-k-9 | PASS | [plan-20261013T033852Z-lint-k-9](anchor-runs/qa-r3/plan-20261013T033852Z-lint-k-9.json) |
 | lint-k-10 | PASS | [plan-20261013T033858Z-lint-k-10](anchor-runs/qa-r3/plan-20261013T033858Z-lint-k-10.json) |
 
@@ -30,6 +30,7 @@ Rand’s intent: “This plan should use code and TESTS directly from atm-core r
 
 ## Adoption status
 
-Plan schema validation passes for nine sprints. ADR-017 is Accepted. QA round 3 cleared seven of its eight carried findings. The remaining root/sprint diagnostic-string mismatch now has one source in k8 D3 and an exact-output assertion. The QA bead remains open; a further verification requires an exception to the three-round cap. No implementation has been dispatched. `just lint` and `just test` both passed after the final correction.
+Plan schema validation passes for nine sprints. ADR-017 is Accepted. Following Rand’s direction to fix the finding and run the anchor review, quality-mgr verified R1-line-095 as fixed, with no regressions or remaining findings. The root points to the single diagnostic in k8 D3; AC2 requires exact-output equality. [Final QA report](anchor-runs/final/quality-final.md) records PASS. All nine current descriptions match their passing anchor runs and all anchors are covered. No implementation has been dispatched. `just lint` and `just test` passed after the plan correction.
+
 
 Historical raw runs and tuning proof are retained in `anchor-runs/history.tar.gz`; current run JSON remains directly readable.
