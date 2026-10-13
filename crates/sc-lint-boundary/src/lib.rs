@@ -667,14 +667,23 @@ pub fn analyze_workspace(
     let workspace_packages = workspace_packages(&metadata);
     let resolver =
         inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
-    let (inventory, semantic_diagnostics) = inventory::validate_inventory(inventory, &resolver);
+    let known_non_workspace_packages =
+        known_non_workspace_packages(&metadata, &inventory, &workspace_packages);
+    let validate_package_policy =
+        options.rule.is_none() || options.rule == Some(RuleFilter::Dependencies);
+    let (inventory, semantic_diagnostics) = inventory::validate_inventory(
+        inventory,
+        &resolver,
+        &known_non_workspace_packages,
+        validate_package_policy,
+    )
+    .map_err(|error| BoundaryError::package_policy(root, error))?;
     let semantic_findings = semantic_diagnostics
         .iter()
         .map(inventory::InventoryDiagnostic::finding)
         .collect::<Vec<_>>();
     if options.rule == Some(RuleFilter::Dependencies) {
-        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
-            .map_err(|e| BoundaryError::package_policy(root, e))?;
+        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory);
         let mut findings = semantic_findings;
         findings.extend(dependency_report.findings);
         return Ok(findings_report(dependency_report.scanned_crates, findings));
@@ -699,8 +708,7 @@ pub fn analyze_workspace(
         findings.extend(analysis::analyze_named_callers(&graph, &raw_inventory));
     }
     if filter.is_none() {
-        let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
-            .map_err(|e| BoundaryError::package_policy(root, e))?;
+        let package_report = package_policy::analyze_package_policy(&metadata, &inventory);
         findings.extend(package_report.findings);
         let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
             .map_err(|e| BoundaryError::manifest_policy(root, e))?;
@@ -843,7 +851,11 @@ fn load_validated_inventory(
         .map_err(|error| BoundaryError::inventory_load(root, error))?;
     let packages = workspace_packages(metadata);
     let resolver = inventory::WorkspacePackageResolver::from_workspace_packages(&packages);
-    Ok(inventory::validate_inventory(raw, &resolver).0)
+    let known_non_workspace_packages = known_non_workspace_packages(metadata, &raw, &packages);
+    let (inventory, _) =
+        inventory::validate_inventory(raw, &resolver, &known_non_workspace_packages, true)
+            .map_err(|error| BoundaryError::package_policy(root, error))?;
+    Ok(inventory)
 }
 
 fn manifest_finding_path(finding: &Finding) -> Option<RepoRelativePath> {
@@ -871,7 +883,11 @@ fn analyze_inventory_semantics(root: &Path) -> std::result::Result<FindingsRepor
     let workspace_packages = workspace_packages(&metadata);
     let resolver =
         inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
-    let (_, diagnostics) = inventory::validate_inventory(inventory, &resolver);
+    let known_non_workspace_packages =
+        known_non_workspace_packages(&metadata, &inventory, &workspace_packages);
+    let (_, diagnostics) =
+        inventory::validate_inventory(inventory, &resolver, &known_non_workspace_packages, false)
+            .map_err(|error| BoundaryError::package_policy(root, error))?;
     Ok(findings_report(
         workspace_packages.len(),
         diagnostics
@@ -879,6 +895,30 @@ fn analyze_inventory_semantics(root: &Path) -> std::result::Result<FindingsRepor
             .map(inventory::InventoryDiagnostic::finding)
             .collect(),
     ))
+}
+
+fn known_non_workspace_packages(
+    metadata: &cargo_metadata::Metadata,
+    inventory: &inventory::BoundaryInventory,
+    workspace_packages: &[&cargo_metadata::Package],
+) -> BTreeSet<String> {
+    let workspace_package_names = workspace_packages
+        .iter()
+        .map(|package| package.name.to_string())
+        .collect::<BTreeSet<_>>();
+    metadata
+        .packages
+        .iter()
+        .map(|package| package.name.to_string())
+        .filter(|package| !workspace_package_names.contains(package))
+        .chain(
+            inventory
+                .records
+                .iter()
+                .filter(|record| !record.status.state.requires_workspace_package())
+                .map(|record| record.owner_package.to_string()),
+        )
+        .collect()
 }
 
 fn legacy_family_rule_filter(selected: Option<&BTreeSet<CatalogRuleId>>) -> Option<RuleFilter> {

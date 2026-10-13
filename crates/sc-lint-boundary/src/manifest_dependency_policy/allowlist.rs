@@ -101,8 +101,8 @@ fn analyze_allowlist(
 fn has_exactly_one_active_record(inventory: &ValidatedInventory, package: &Package) -> bool {
     inventory
         .records()
-        .filter(|record| record.status.state.requires_workspace_package())
-        .filter(|record| record.owner_package.as_ref() == package.name.as_str())
+        .filter_map(|record| record.policy())
+        .filter(|policy| policy.owner.as_ref() == package.name.as_str())
         .count()
         == 1
 }
@@ -174,7 +174,7 @@ fn validate_record_locks(
     for record_path in &allowlist.records {
         let record_path = record_path.display();
         let Some(record) = inventory.records().find(|record| {
-            relative(root, &record.record_path).ok().as_deref() == Some(record_path.as_str())
+            relative(root, record.record_path()).ok().as_deref() == Some(record_path.as_str())
         }) else {
             findings.push(stale(
                 owner,
@@ -182,21 +182,26 @@ fn validate_record_locks(
             ));
             continue;
         };
-        if record.owner_package.as_ref() != package.name.as_str() {
+        let Some(policy) = record.policy() else {
+            findings.push(stale(
+                owner,
+                &format!("record lock `{record_path}` is not an active boundary record"),
+            ));
+            continue;
+        };
+        if policy.owner.as_ref() != package.name.as_str() {
             findings.push(stale(
                 owner,
                 &format!("record lock `{record_path}` belongs to a different owner"),
             ));
             continue;
         }
-        let declared_runtime = record
-            .dependencies
+        let declared_runtime = policy
             .allowed_dependencies
             .iter()
             .map(|value| DependencyPackageName(value.to_string()))
             .collect::<BTreeSet<_>>();
-        let declared_development = record
-            .dependencies
+        let declared_development = policy
             .allowed_dev_dependencies
             .iter()
             .map(|value| DependencyPackageName(value.to_string()))
@@ -228,13 +233,10 @@ fn missing_active_owner_allowlists(
     configured: &BTreeSet<String>,
 ) -> Result<Vec<Finding>> {
     let mut findings = Vec::new();
-    for record in inventory
-        .records()
-        .filter(|record| record.status.state.requires_workspace_package())
-    {
+    for record in inventory.records().filter_map(|record| record.policy()) {
         let Some(package) = packages
             .iter()
-            .find(|package| package.name.as_str() == record.owner_package.as_ref())
+            .find(|package| package.name.as_str() == record.owner.as_ref())
         else {
             continue;
         };

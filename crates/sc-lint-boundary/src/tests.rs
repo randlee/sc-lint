@@ -5,6 +5,7 @@ use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -1204,6 +1205,51 @@ fn dependency_policy_resolves_owner_and_policy_aliases_to_canonical_packages() {
     assert_eq!(
         report.findings[0].message,
         "forbidden workspace dependency edge `app-pkg -> api-pkg` is present"
+    );
+}
+
+#[test]
+fn validated_inventory_exposes_canonical_package_policy_fields() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app-dir", "crates/api-dir"]);
+    fixture.write(
+        "crates/app-dir/Cargo.toml",
+        &identity_member_manifest("app-pkg", "app_lib", ""),
+    );
+    fixture.write(
+        "crates/api-dir/Cargo.toml",
+        &identity_member_manifest("api-pkg", "api_lib", ""),
+    );
+    fixture.write_boundary_record("app-dir", "app-dir", "app_lib", &["api_lib"], &[], &[]);
+    fixture.write_source("app-dir", "lib.rs", "pub struct App;");
+    fixture.write_source("api-dir", "lib.rs", "pub struct Api;");
+
+    let raw = inventory::load_boundary_inventory(fixture.root()).expect("load inventory");
+    let metadata = graph::load_metadata(fixture.root()).expect("load workspace metadata");
+    let workspace_packages = workspace_packages(&metadata);
+    let resolver =
+        inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
+    let known_non_workspace_packages =
+        known_non_workspace_packages(&metadata, &raw, &workspace_packages);
+    let (validated, diagnostics) =
+        inventory::validate_inventory(raw, &resolver, &known_non_workspace_packages, true)
+            .expect("validate inventory");
+
+    assert!(diagnostics.is_empty());
+    let policy = validated
+        .records()
+        .next()
+        .and_then(inventory::ValidatedRecord::policy)
+        .expect("active record has canonical policy");
+    assert_eq!(
+        policy.owner,
+        inventory::WorkspacePackageName::from_package_name("app-pkg")
+    );
+    assert_eq!(
+        policy.allowed_dependencies,
+        BTreeSet::from([inventory::WorkspacePackageName::from_package_name(
+            "api-pkg"
+        )])
     );
 }
 

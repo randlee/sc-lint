@@ -14,7 +14,9 @@ mod types;
 
 pub(crate) use dependency_policy::WorkspacePackageName;
 pub(crate) use semantic::InventoryDiagnostic;
+pub(crate) use semantic::ValidatedDependencyPolicy;
 pub(crate) use semantic::ValidatedInventory;
+pub(crate) use semantic::ValidatedRecord;
 pub(crate) use semantic::validate_inventory;
 pub(crate) use types::BoundaryInventory;
 pub(crate) use types::BoundaryRecord;
