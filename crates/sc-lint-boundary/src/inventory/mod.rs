@@ -9,6 +9,7 @@ use anyhow::Result;
 use serde::Deserialize;
 
 mod dependency_policy;
+mod semantic;
 mod types;
 
 pub(crate) use dependency_policy::WorkspacePackageName;
