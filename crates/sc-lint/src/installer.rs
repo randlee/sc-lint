@@ -1328,6 +1328,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn swapped_real_backend_is_rejected_from_staged_and_installed_bundles() {
+        build_release_binaries();
         let fixture = TempDir::new().expect("fixture");
         let staged_root = fixture.path().join("staged");
         let staged_bin = staged_root.join("bin");
@@ -1672,24 +1673,7 @@ mod tests {
         let payload_dir = fixture.path().join("payload");
         let archive_root = payload_dir.join(format!("sc-lint_{version}_{}", target.triple));
         let bin_dir = archive_root.join("bin");
-        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let build_status = Command::new("cargo")
-            .args([
-                "build",
-                "--quiet",
-                "-p",
-                "sc-lint",
-                "-p",
-                "sc-lint-boundary",
-                "-p",
-                "sc-lint-portability",
-                "-p",
-                "sc-lint-runtime",
-            ])
-            .current_dir(&workspace_root)
-            .status()
-            .expect("build release backend binaries");
-        assert!(build_status.success(), "backend binaries build");
+        build_release_binaries();
         fs::create_dir_all(&release_dir).expect("release directory");
         fs::create_dir_all(&bin_dir).expect("archive bin directory");
         let debug_dir = built_cli_binary()
@@ -1926,6 +1910,31 @@ mod tests {
             name.to_string()
         };
         debug_dir.join(name)
+    }
+
+    #[cfg(unix)]
+    fn build_release_binaries() {
+        // `cargo test -p sc-lint --lib` builds the test executable but not the
+        // companion backend executables this fixture copies from target/debug.
+        // Build them explicitly so the test works with a fresh target dir.
+        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let build_status = Command::new("cargo")
+            .args([
+                "build",
+                "--quiet",
+                "-p",
+                "sc-lint",
+                "-p",
+                "sc-lint-boundary",
+                "-p",
+                "sc-lint-portability",
+                "-p",
+                "sc-lint-runtime",
+            ])
+            .current_dir(&workspace_root)
+            .status()
+            .expect("build release backend binaries");
+        assert!(build_status.success(), "backend binaries build");
     }
 
     #[cfg(unix)]
