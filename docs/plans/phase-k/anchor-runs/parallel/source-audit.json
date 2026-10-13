@@ -1,11 +1,11 @@
 [
   {
     "bead": "lint-k-1",
-    "description_sha256": "cf46586a6746cc259c14f14240193f59205fd82f25b8e58b3df312c9b30f4941",
+    "description_sha256": "fe36418e999056e9369278323e9c35d28fd96b6dd52667fff1740f165b6f1a2e",
     "source_equal_after_trailing_whitespace_normalization": true,
     "source_available": true,
     "pass": true,
-    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151423Z-lint-k-1.json"
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T162229Z-lint-k-1.json"
   },
   {
     "bead": "lint-k-2",
