@@ -18,9 +18,11 @@ const BOOTSTRAP_POWERSHELL: &str = include_str!("../assets/bootstrap.ps1");
 
 const DECLARED_TOOLS: &str = r#"{"minimum_version":"0.7.0","profiles":{"ci":["cargo","check"]},"ci":{"os":["linux"],"enabled":false},"analyzers":{},"tools":{"cargo":{"cargo-xwin":"0.18.4"},"rustup_targets":["x86_64-pc-windows-msvc"]}}"#;
 const WITHOUT_TOOLS: &str = r#"{"minimum_version":"0.7.0","profiles":{"ci":["cargo","check"]},"ci":{"os":["linux"],"enabled":false},"analyzers":{}}"#;
-const EMPTY_TOOLS: &str = r#"{"minimum_version":"0.7.0","profiles":{},"ci":{"enabled":false},"analyzers":{},"tools":{}}"#;
+const EMPTY_TOOLS: &str =
+    r#"{"minimum_version":"0.7.0","profiles":{},"ci":{"enabled":false},"analyzers":{},"tools":{}}"#;
 const EMPTY_COLLECTIONS: &str = r#"{"minimum_version":"0.7.0","profiles":{},"ci":{"enabled":false},"analyzers":{},"tools":{"cargo":{},"rustup_targets":[]}}"#;
-const MALFORMED_TOOLS: &str = r#"{"minimum_version":"0.7.0","profiles":{},"ci":{"enabled":false},"analyzers":{},"tools":[]}"#;
+const MALFORMED_TOOLS: &str =
+    r#"{"minimum_version":"0.7.0","profiles":{},"ci":{"enabled":false},"analyzers":{},"tools":[]}"#;
 
 const STUB_HELPER: &str = "import json, os, sys\n\nif __name__ == '__main__':\n    with open(os.environ['SC_LINT_HELPER_LOG'], 'a', encoding='utf-8') as handle:\n        handle.write(json.dumps({'argv': sys.argv[1:], 'cwd': os.getcwd(), 'cargo_home': os.environ.get('CARGO_HOME')}) + '\\n')\n    sys.exit(int(os.environ.get('SC_LINT_HELPER_STATUS', '0')))\n";
 
@@ -247,7 +249,11 @@ fn bootstrap_setup_hands_declared_tools_to_the_managed_helper_with_exact_config(
                 &arguments,
                 &[("SC_LINT_HELPER_LOG", log_path), ("CARGO_HOME", cargo_home)],
             );
-            assert!(output.status.success(), "{arguments:?}: {}", stderr(&output));
+            assert!(
+                output.status.success(),
+                "{arguments:?}: {}",
+                stderr(&output)
+            );
             let calls = helper_calls(&log);
             assert_eq!(calls.len(), 1, "{arguments:?}: {calls:?}");
             assert_eq!(calls[0]["argv"], expected, "{arguments:?}");
