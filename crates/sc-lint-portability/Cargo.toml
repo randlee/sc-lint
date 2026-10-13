@@ -14,10 +14,6 @@ readme = "README.md"
 name = "sc-lint-portability"
 path = "src/main.rs"
 
-[[test]]
-name = "issue385"
-path = "tests/fixtures/issue385.rs"
-
 [lib]
 name = "sc_lint_portability"
 path = "src/lib.rs"
