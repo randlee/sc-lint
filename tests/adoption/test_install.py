@@ -1,13 +1,16 @@
 """Integration tests for the vendorable adoption kit."""
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+from textwrap import dedent
 from pathlib import Path
 from typing import Any
 
@@ -535,6 +538,82 @@ def test_schema_merge_conflict_names_fragment_and_property(tmp_path: Path) -> No
     assert result.returncode == 2
     assert "zzz-conflict.json" in result.stderr
     assert "properties.minimum_version.type" in result.stderr
+
+
+def test_schema_fragments_merge_in_sorted_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    earlier = tmp_path / "aaa-conflict.json"
+    later = tmp_path / "zzz-conflict.json"
+    earlier.write_text(json.dumps({"properties": {"minimum_version": {"type": "integer"}}}))
+    later.write_text(json.dumps({"properties": {"minimum_version": {"type": "boolean"}}}))
+
+    module_name = "sc_lint_adoption_installer_under_test"
+    module_spec = importlib.util.spec_from_file_location(module_name, INSTALL)
+    assert module_spec is not None
+    assert module_spec.loader is not None
+    installer = importlib.util.module_from_spec(module_spec)
+    monkeypatch.setitem(sys.modules, module_name, installer)
+    module_spec.loader.exec_module(installer)
+
+    class ReverseSchemaDirectory:
+        def exists(self) -> bool:
+            return True
+
+        def glob(self, _pattern: str) -> list[Path]:
+            return [later, earlier]
+
+    monkeypatch.setattr(installer, "SCHEMA_DIRECTORY", ReverseSchemaDirectory())
+    with pytest.raises(ValueError, match=r"aaa-conflict\.json at properties\.minimum_version\.type"):
+        installer.load_schema()
+
+
+def test_baseline_sc_lint_config_rendering_is_unchanged() -> None:
+    consumer = copy_fixture("empty-workspace")
+    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 0, result.stderr
+
+    expected = dedent(
+        '''\
+        [tool.sc-lint]
+        minimum_version = "0.5.0"
+
+        [tool.sc-lint.analyzers.runtime]
+        enabled = false
+        reason = "non-tokio"
+
+        [tool.sc-lint.analyzers.portability]
+        enabled = true
+        targets = ["linux"]
+
+        [[tool.sc-lint.lint]]
+        name = "ci"
+        command = ["cargo", "check"]
+
+        [[tool.sc-lint.test]]
+        name = "unit"
+        command = ["cargo", "test"]
+        '''
+    )
+    assert (consumer / "sc-lint.toml").read_text() == expected
+
+
+def test_installer_has_no_rule_constants() -> None:
+    catalog_ids = {
+        rule_id
+        for catalog_path in (KIT / "analyzer-catalog").glob("*.json")
+        for catalog in [json.loads(catalog_path.read_text())]
+        for rule_id in catalog["rules"]
+    }
+    source_constants = {
+        node.value
+        for node in ast.walk(ast.parse(INSTALL.read_text()))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+    assert catalog_ids
+    assert not (catalog_ids & source_constants), (
+        "executable install.py contains analyzer catalog IDs; generated catalog data "
+        "and test fixtures are intentionally not scanned"
+    )
 
 
 def test_schema_analyzer_keys_match_rust_catalogs() -> None:
