@@ -94,6 +94,8 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
         properties = schema.get("properties", {})
         extra = set(value) - set(properties)
         if schema.get("additionalProperties") is False and extra: raise ValueError(f"{label} has unknown fields: {sorted(extra)}")
+        missing = set(schema.get("required", [])) - set(value)
+        if missing: raise ValueError(f"{label} has missing required fields: {sorted(missing)}")
         for key, item in value.items():
             if key in properties:
                 _schema_value(item, properties[key], f"{label}.{key}")
