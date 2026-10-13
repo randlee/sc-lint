@@ -1889,39 +1889,43 @@ mod tests {
     }
 
     fn built_cli_binary() -> PathBuf {
-        let test_binary = env::current_exe().expect("test executable");
-        let debug_dir = test_binary
-            .parent()
-            .and_then(Path::parent)
-            .expect("target debug directory");
-        debug_dir.join(ReleaseTarget::binary_name())
+        built_artifact_directory().join(ReleaseTarget::binary_name())
     }
 
     #[cfg(unix)]
     fn built_backend_binary(name: &str) -> PathBuf {
-        let test_binary = env::current_exe().expect("test executable");
-        let debug_dir = test_binary
-            .parent()
-            .and_then(Path::parent)
-            .expect("target debug directory");
         let name = if cfg!(windows) {
             format!("{name}.exe")
         } else {
             name.to_string()
         };
-        debug_dir.join(name)
+        built_artifact_directory().join(name)
+    }
+
+    fn built_artifact_directory() -> PathBuf {
+        env::current_exe()
+            .expect("test executable")
+            .parent()
+            .and_then(Path::parent)
+            .expect("target debug directory")
+            .to_path_buf()
     }
 
     #[cfg(unix)]
     fn build_release_binaries() {
         // `cargo test -p sc-lint --lib` builds the test executable but not the
         // companion backend executables this fixture copies from target/debug.
-        // Build them explicitly so the test works with a fresh target dir.
+        // Derive Cargo's target directory from the test executable so an
+        // explicit `cargo test --target-dir` is honored by this nested build.
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let artifact_directory = built_artifact_directory();
+        let target_dir = artifact_directory.parent().expect("Cargo target directory");
         let build_status = Command::new("cargo")
+            .arg("build")
+            .arg("--quiet")
+            .arg("--target-dir")
+            .arg(target_dir)
             .args([
-                "build",
-                "--quiet",
                 "-p",
                 "sc-lint",
                 "-p",
