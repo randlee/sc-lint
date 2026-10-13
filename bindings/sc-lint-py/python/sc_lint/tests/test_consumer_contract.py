@@ -93,7 +93,9 @@ class ConsumerContractTests(unittest.TestCase):
         ):
             contents = path.read_text(encoding="utf-8")
             self.assertIn('"--config"', contents)
-            self.assertIn("ValueFromRemainingArguments = $true", contents)
+            self.assertIn("$InvocationArguments = @($args)", contents)
+            self.assertIn("$Rest = if ($InvocationArguments.Count -gt 1)", contents)
+            self.assertNotIn("[CmdletBinding()]", contents)
             self.assertIn("Invoke-VerifiedReleaseLauncher", contents)
             self.assertIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", contents)
             self.assertIn("compatibility check", contents)
@@ -159,9 +161,11 @@ if ($missingResult -ne $false -or $existingResult -ne $true -or $missingErrors.C
         contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertIn('[string[]]$Rest', contents)
+        self.assertIn("$InvocationArguments = @($args)", contents)
+        self.assertIn("$Rest = if ($InvocationArguments.Count -gt 1)", contents)
+        self.assertIn('$execArguments = @($Rest[($index + 1)..($Rest.Count - 1)])', contents)
         self.assertIn('[Array]::IndexOf($Rest, "--config")', contents)
-        self.assertNotIn('[Array]::IndexOf($args, "--config")', contents)
+        self.assertNotIn("[CmdletBinding()]", contents)
         self.assertIn('$candidate = Join-Path $extract "sc-lint.exe"', contents)
         self.assertIn(
             'Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"',

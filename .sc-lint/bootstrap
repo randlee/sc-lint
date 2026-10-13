@@ -4,13 +4,62 @@
 set -eu
 
 usage() {
-    printf '%s\n' 'usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]' >&2
+    printf '%s\n' 'usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>' >&2
     exit 2
 }
 
 operation="${1:-}"
 [ -n "$operation" ] || usage
 shift
+
+# Directly execute a managed product command or an arbitrary consumer command.
+# This path intentionally does not run setup or profile dispatch.
+if [ "$operation" = exec ]; then
+    exec_config=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --config)
+                [ "$#" -ge 2 ] || usage
+                exec_config="$2"
+                shift 2
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *) usage ;;
+        esac
+    done
+    [ "$#" -gt 0 ] || usage
+
+    if [ -n "${SC_LINT_BIN:-}" ]; then
+        exec_binary="$SC_LINT_BIN"
+    else
+        exec_install_dir="${SC_LINT_INSTALL_DIR:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/sc-lint/bin}"
+        exec_binary="$exec_install_dir/sc-lint"
+    fi
+    if [ ! -f "$exec_binary" ] || [ ! -x "$exec_binary" ]; then
+        printf '%s\n' "sc-lint binary is unavailable at $exec_binary; run just setup" >&2
+        exit 1
+    fi
+
+    export SC_LINT_BIN="$exec_binary"
+    case "$exec_binary" in
+        */*) exec_binary_dir="${exec_binary%/*}"; [ -n "$exec_binary_dir" ] || exec_binary_dir="/" ;;
+        *) exec_binary_dir="." ;;
+    esac
+    PATH="$exec_binary_dir:${PATH:-}"
+    export PATH
+    if [ "$1" = sc-lint ]; then
+        shift
+        if [ -n "$exec_config" ]; then
+            exec "$exec_binary" --config "$exec_config" "$@"
+        fi
+        exec "$exec_binary" "$@"
+    fi
+    exec "$@"
+fi
+
 config=""
 selector=""
 flags=""
