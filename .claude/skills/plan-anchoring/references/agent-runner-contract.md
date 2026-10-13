@@ -8,7 +8,7 @@ description: Resolve one trusted harness agent, validate one fenced request and 
 
 The planner resolves a harness agent once with
 `scripts/anchor_runner_contract.py resolve`. The resolver reads the selected
-plugin root's registry and agent frontmatter as data, verifies confinement,
+installation root's registry and agent frontmatter as data, verifies confinement,
 regular-file status, identity, version, harness-role model, and SHA-256, and
 returns an immutable runtime descriptor. A failed supplied root or registry
 fails closed; callers do not search for another installation.

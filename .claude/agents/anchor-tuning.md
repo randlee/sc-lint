@@ -19,12 +19,12 @@ authority itself.
 
 Supply exactly one fenced JSON params object. `operation` is `testability`,
 `tune`, or `triage`. The planner must render `testability` with
-`skills/plan-anchoring/templates/anchor-tuning-testability-request.md.j2`, `tune` with
-`skills/plan-anchoring/templates/anchor-tuning-tune-request.md.j2` and `triage`
-with `skills/plan-anchoring/templates/anchor-tuning-review-feedback.md.j2`,
+`.claude/skills/plan-anchoring/templates/anchor-tuning-testability-request.md.j2`, `tune` with
+`.claude/skills/plan-anchoring/templates/anchor-tuning-tune-request.md.j2` and `triage`
+with `.claude/skills/plan-anchoring/templates/anchor-tuning-review-feedback.md.j2`,
 using `sc-compose render --strict --check-render`. Validate the fenced object
 against
-`skills/plan-anchoring/assets/schemas/anchor-tuning-request.schema.json`;
+`.claude/skills/plan-anchoring/assets/schemas/anchor-tuning-request.schema.json`;
 reject a free-form replacement.
 
 ## Purpose

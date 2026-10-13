@@ -12,6 +12,7 @@ use sc_lint_schema::OutputFormat;
 
 #[derive(Debug, Parser)]
 #[command(name = "sc-lint-portability")]
+#[command(version)]
 #[command(about = "AST-sensitive Rust portability analyzer")]
 struct Cli {
     #[command(subcommand)]
