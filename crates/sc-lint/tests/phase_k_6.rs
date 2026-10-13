@@ -153,23 +153,28 @@ fn powershell_executable() -> PathBuf {
 }
 
 #[cfg(windows)]
+fn restricted_windows_test_path() -> std::ffi::OsString {
+    let pwsh = powershell_executable();
+    let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
+    let system32 = PathBuf::from(system_root).join("System32");
+    let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
+    let mut path = std::env::split_paths(&inherited_path)
+        .filter(|directory| directory == pwsh.parent().expect("pwsh parent"))
+        .collect::<Vec<_>>();
+    path.push(system32);
+    std::env::join_paths(path).expect("valid Windows PATH")
+}
+
+#[cfg(windows)]
 fn powershell_command() -> Command {
     let pwsh = powershell_executable();
     let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
     let system32 = PathBuf::from(&system_root).join("System32");
-    let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
-    let search_path = std::env::split_paths(&inherited_path).collect::<Vec<_>>();
-    let mut path = search_path;
-    path.retain(|directory| directory == pwsh.parent().expect("pwsh parent"));
-    path.push(system32.clone());
     let mut command = Command::new(&pwsh);
     command
         .env_clear()
         .env("SystemRoot", &system_root)
-        .env(
-            "PATH",
-            std::env::join_paths(path).expect("valid Windows PATH"),
-        )
+        .env("PATH", restricted_windows_test_path())
         .env("ComSpec", system32.join("cmd.exe"));
     for name in ["TEMP", "TMP"] {
         if let Some(value) = std::env::var_os(name) {
@@ -185,28 +190,22 @@ fn inherited_powershell_command() -> Command {
 }
 
 #[cfg(windows)]
+fn inherited_powershell_command_with_restricted_path() -> Command {
+    let mut command = inherited_powershell_command();
+    command.env("PATH", restricted_windows_test_path());
+    command
+}
+
+#[cfg(windows)]
 fn cmd_command() -> Command {
     let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
     let system32 = PathBuf::from(&system_root).join("System32");
-    let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
-    let search_path = std::env::split_paths(&inherited_path).collect::<Vec<_>>();
-    let pwsh = search_path
-        .iter()
-        .map(|directory| directory.join("pwsh.exe"))
-        .find(|candidate| candidate.is_file())
-        .expect("pwsh.exe on Windows PATH");
-    let mut path = search_path;
-    path.retain(|directory| directory == pwsh.parent().expect("pwsh parent"));
-    path.push(system32.clone());
 
     let mut command = Command::new(system32.join("cmd.exe"));
     command
         .env_clear()
         .env("SystemRoot", &system_root)
-        .env(
-            "PATH",
-            std::env::join_paths(path).expect("valid Windows PATH"),
-        )
+        .env("PATH", restricted_windows_test_path())
         .env("ComSpec", system32.join("cmd.exe"));
     for name in ["TEMP", "TMP"] {
         if let Some(value) = std::env::var_os(name) {
@@ -385,6 +384,18 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .current_dir(&root)
             .output()
             .expect("run direct PowerShell managed product control");
+        let inherited_restricted_direct_powershell =
+            inherited_powershell_command_with_restricted_path()
+                .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
+                .arg(format!(
+                    "& '{}' version; exit $LASTEXITCODE",
+                    managed_binary.display()
+                ))
+                .current_dir(&root)
+                .env_remove("SC_LINT_BIN")
+                .env_remove("SC_LINT_INSTALL_DIR")
+                .output()
+                .expect("run inherited PowerShell managed product control with restricted PATH");
         let powershell_builtin = powershell_command()
             .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
             .arg("Write-Output 'powershell-builtin-control'; exit 0")
@@ -420,9 +431,19 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .env("LOCALAPPDATA", &local_app_data)
             .output()
             .expect("run inherited-environment PowerShell consumer bootstrap");
+        let inherited_restricted_output = inherited_powershell_command_with_restricted_path()
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+            .arg(root.join(".sc-lint/bootstrap.ps1"))
+            .args(["exec", "--", "sc-lint", "version"])
+            .current_dir(&root)
+            .env_remove("SC_LINT_BIN")
+            .env_remove("SC_LINT_INSTALL_DIR")
+            .env("LOCALAPPDATA", &local_app_data)
+            .output()
+            .expect("run inherited PowerShell bootstrap with restricted PATH");
 
         eprintln!(
-            "Windows native execution controls for {name}: direct cmd status={:?}, stdout={:?}, stderr={:?}; cleared direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared bootstrap status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}",
+            "Windows native execution controls for {name}: direct cmd status={:?}, stdout={:?}, stderr={:?}; cleared direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; inherited restricted-PATH direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared bootstrap status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}; inherited restricted-PATH bootstrap status={:?}, stdout={:?}, stderr={:?}",
             direct.status.code(),
             String::from_utf8_lossy(&direct.stdout),
             String::from_utf8_lossy(&direct.stderr),
@@ -435,12 +456,18 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             inherited_direct_powershell.status.code(),
             String::from_utf8_lossy(&inherited_direct_powershell.stdout),
             String::from_utf8_lossy(&inherited_direct_powershell.stderr),
+            inherited_restricted_direct_powershell.status.code(),
+            String::from_utf8_lossy(&inherited_restricted_direct_powershell.stdout),
+            String::from_utf8_lossy(&inherited_restricted_direct_powershell.stderr),
             output.status.code(),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
             inherited_output.status.code(),
             String::from_utf8_lossy(&inherited_output.stdout),
-            String::from_utf8_lossy(&inherited_output.stderr)
+            String::from_utf8_lossy(&inherited_output.stderr),
+            inherited_restricted_output.status.code(),
+            String::from_utf8_lossy(&inherited_restricted_output.stdout),
+            String::from_utf8_lossy(&inherited_restricted_output.stderr)
         );
 
         assert!(
