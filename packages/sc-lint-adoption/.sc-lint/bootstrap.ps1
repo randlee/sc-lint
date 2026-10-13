@@ -109,6 +109,23 @@ $productBinaryOverride = $false
 # Python helper package (sc_lint wheel) provisioned next to the config file.
 $venvDirectory = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $Config).Path) ".sc-lint\venv"
 $venvPython = Join-Path $venvDirectory "Scripts\python.exe"
+# Consumer-declared tools (ADR-017 change 6) persist in the installer input next
+# to the config file; the managed wheel helper sc_lint.setup_tools owns them.
+$installInput = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $Config).Path) ".sc-lint\install.json"
+# Seed-interpreter probe (stdlib JSON only): exit 0 when the tools object is
+# absent or every collection is empty, 3 when the managed helper must run.
+$toolsProbe = @'
+import json, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as handle:
+        data = json.load(handle)
+except (OSError, ValueError):
+    sys.exit(3)
+tools = data.get('tools', {}) if isinstance(data, dict) else None
+empty = {'cargo': {}, 'rustup_targets': []}
+declared = not isinstance(tools, dict) or any(key not in empty or tools[key] != empty[key] for key in tools)
+sys.exit(3 if declared else 0)
+'@
 
 function Get-MinimumVersion {
     $minimumLine = Select-String -Path $Config -Pattern '^\s*minimum_version\s*=\s*"([^"]+)"' | Select-Object -First 1
@@ -134,6 +151,12 @@ function Get-VenvMode {
     return "install"
 }
 
+function Get-SeedPython {
+    $seedPython = Get-Command "python" -ErrorAction SilentlyContinue
+    if (-not $seedPython) { $seedPython = Get-Command "python3" -ErrorAction SilentlyContinue }
+    return $seedPython
+}
+
 # Ensure .sc-lint/venv holds sc-lint>=minimum_version. SC_LINT_WHEEL_DIR selects
 # an offline wheel directory instead of PyPI.
 function Install-Venv {
@@ -149,8 +172,7 @@ function Install-Venv {
         return
     }
     if (-not (Test-Path -LiteralPath $venvPython -PathType Leaf)) {
-        $hostPython = Get-Command "python" -ErrorAction SilentlyContinue
-        if (-not $hostPython) { $hostPython = Get-Command "python3" -ErrorAction SilentlyContinue }
+        $hostPython = Get-SeedPython
         if (-not $hostPython) {
             [Console]::Error.WriteLine("setup: could not create $venvDirectory (CLI.SC_LINT_PYTHON_UNAVAILABLE)")
             exit 4
@@ -169,6 +191,53 @@ function Install-Venv {
         [Console]::Error.WriteLine("setup: could not install sc-lint==$version into $venvDirectory (CLI.SC_LINT_PYTHON_UNAVAILABLE)")
         exit 4
     }
+}
+
+# Run the managed sc_lint.setup_tools helper only when the persisted installer
+# input declares tools. Dry-run and check forward --check and never provision
+# the helper or any tool.
+function Install-DeclaredTools {
+    param([string]$Mode)
+    $previousExitCode = $LASTEXITCODE
+    if (-not (Test-Path -LiteralPath $installInput -PathType Leaf)) { return }
+    $probePython = $null
+    $seedPython = Get-SeedPython
+    if ($seedPython) {
+        $probePython = $seedPython.Source
+    } elseif (Test-Path -LiteralPath $venvPython -PathType Leaf) {
+        $probePython = $venvPython
+    }
+    if (-not $probePython) {
+        [Console]::Error.WriteLine("setup: no Python is available to read the tools declaration in $installInput (SETUP_TOOLS.INSPECTION_UNAVAILABLE); install Python 3, then run just setup")
+        exit 4
+    }
+    & $probePython -c $toolsProbe $installInput
+    $toolsStatus = $LASTEXITCODE
+    if ($toolsStatus -eq 0) {
+        $global:LASTEXITCODE = $previousExitCode
+        return
+    }
+    if ($toolsStatus -ne 3) {
+        [Console]::Error.WriteLine("setup: could not read the tools declaration in $installInput (SETUP_TOOLS.INSPECTION_UNAVAILABLE); run just setup")
+        exit 4
+    }
+    $helperReady = $false
+    if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
+        & $venvPython -c "import sc_lint.setup_tools" 2>$null | Out-Null
+        $helperReady = ($LASTEXITCODE -eq 0)
+    }
+    if (-not $helperReady) {
+        if ($Mode -eq "install") {
+            [Console]::Error.WriteLine("setup: $installInput declares tools, but the sc-lint wheel in $venvDirectory does not provide sc_lint.setup_tools (SETUP_TOOLS.INSPECTION_UNAVAILABLE); raise minimum_version, then run just setup")
+        } else {
+            [Console]::Error.WriteLine("setup: $installInput declares tools that cannot be inspected because sc_lint.setup_tools is unavailable in $venvDirectory (SETUP_TOOLS.INSPECTION_UNAVAILABLE); run just setup")
+        }
+        exit 4
+    }
+    $helperArguments = @("-m", "sc_lint.setup_tools", "--config", $Config)
+    if ($Mode -ne "install") { $helperArguments += "--check" }
+    & $venvPython @helperArguments
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 function Resolve-ProductBinary {
@@ -279,7 +348,9 @@ switch ($Operation) {
         Ensure-Product
         & $productBinary --config $Config setup @remaining
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        Install-Venv (Get-VenvMode $remaining)
+        $setupMode = Get-VenvMode $remaining
+        Install-Venv $setupMode
+        Install-DeclaredTools $setupMode
     }
     "lint" {
         Ensure-Product

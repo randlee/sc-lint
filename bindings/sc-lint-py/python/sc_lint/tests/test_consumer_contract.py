@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sc_lint.lint_common import discover_repo_root
 
+import json
 from pathlib import Path
 import re
 import shutil
@@ -188,6 +189,65 @@ if ($missingResult -ne $false -or $existingResult -ne $true -or $missingErrors.C
         )
         self.assertIn('"$launcher" --config "$config" "$command" "$@"', contents)
         self.assertNotIn('mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new"', contents)
+
+    def test_only_bootstrap_setup_hands_declared_tools_to_the_managed_helper(self) -> None:
+        posix = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
+        self.assertIn('install_input="$(cd "$(dirname "$config")" && pwd)/.sc-lint/install.json"', posix)
+        self.assertIn('"$venv_python" -m sc_lint.setup_tools --config "$config"\n', posix)
+        self.assertIn('"$venv_python" -m sc_lint.setup_tools --config "$config" --check\n', posix)
+        self.assertEqual(posix.count('provision_tools "$setup_mode"'), 1)
+        self.assertLess(
+            posix.index('provision_venv "$setup_mode" || exit $?'),
+            posix.index('provision_tools "$setup_mode"'),
+        )
+        self.assertLess(posix.index("    setup)\n"), posix.index('provision_tools "$setup_mode"'))
+        self.assertLess(posix.index('provision_tools "$setup_mode"'), posix.index("    lint)\n"))
+
+        windows = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(encoding="utf-8")
+        self.assertIn('$installInput = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $Config).Path) ".sc-lint\\install.json"', windows)
+        self.assertIn('$helperArguments = @("-m", "sc_lint.setup_tools", "--config", $Config)', windows)
+        self.assertIn('if ($Mode -ne "install") { $helperArguments += "--check" }', windows)
+        self.assertEqual(windows.count("        Install-DeclaredTools $setupMode\n"), 1)
+        self.assertLess(windows.index("        Install-Venv $setupMode\n"), windows.index("        Install-DeclaredTools $setupMode\n"))
+        self.assertLess(windows.index('    "setup" {'), windows.index("        Install-DeclaredTools $setupMode\n"))
+        self.assertLess(windows.index("        Install-DeclaredTools $setupMode\n"), windows.index('    "lint" {'))
+        for contents in (posix, windows):
+            self.assertNotIn("cargo install", contents)
+            self.assertNotIn("rustup target", contents)
+
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell Core is required")
+    def test_windows_tools_probe_passes_through_powershell_to_the_seed_python(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(encoding="utf-8")
+        match = re.search(r"(?ms)^\$toolsProbe = @'\n.*?^'@$", contents)
+        self.assertIsNotNone(match, "the PowerShell tools probe must remain a literal here-string")
+        cases = {
+            "absent": {"minimum_version": "0.7.0"},
+            "empty": {"tools": {"cargo": {}, "rustup_targets": []}},
+            "declared": {"tools": {"cargo": {"cargo-xwin": "0.18.4"}}},
+            "malformed": {"tools": []},
+        }
+        with tempfile.TemporaryDirectory(prefix="sc-lint-pwsh-tools-probe-") as temporary:
+            root = Path(temporary)
+            for name, data in cases.items():
+                (root / f"{name}.json").write_text(json.dumps(data), encoding="utf-8")
+            calls = "\n".join(
+                f"& $python -c $toolsProbe '{root / name}.json'; $codes += $LASTEXITCODE" for name in cases
+            )
+            script = root / "tools_probe.ps1"
+            script.write_text(
+                f"$python = '{sys.executable}'\n{match.group(0)}\n$codes = @()\n{calls}\n"
+                "Write-Output ($codes -join '|')\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script)],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.strip(), "0|0|3|3", result.stderr)
 
     def test_root_helpers_match_the_generated_product_assets(self) -> None:
         generated_posix = (
