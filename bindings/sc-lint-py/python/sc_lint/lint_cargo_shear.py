@@ -3,10 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import argparse
+import json
 from pathlib import Path
+from pathlib import PureWindowsPath
 import shutil
 import subprocess
 import sys
+import tomllib
 
 from sc_lint.lint_common import discover_repo_root
 from sc_lint.lint_common import load_lint_config
@@ -18,6 +21,25 @@ from sc_lint.lint_common import write_console_output
 ERROR_SECTIONS = {"unlinked_files", "empty_files"}
 UNUSED_DEPENDENCY_SECTION = "unused_dependency"
 SUMMARY_SECTION = "summary"
+CARGO_SHEAR_ALLOWLIST_FIELD = "cargo_shear.allowed_unused_dependencies"
+CARGO_SHEAR_CONFIG_ERROR = "SC_LINT_CARGO_SHEAR_CONFIG_INVALID"
+PATH_KEY_MIGRATION_DIAGNOSTIC = (
+    'Invalid allowed_unused_dependencies key "{key}": path-like keys are no '
+    'longer supported; use <package>.<dependency-key> (the dependency rename '
+    'alias when present, otherwise its package name), or workspace.<dependency-key> '
+    'only for a virtual-root workspace dependency. Package roots use their '
+    'package name, including a package named workspace.'
+)
+
+
+@dataclass(frozen=True)
+class CargoShearWorkspaceMetadata:
+    manifest_packages: dict[str, str]
+    allowed_unused_dependency_keys: frozenset[str]
+
+
+class CargoShearMetadataError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -155,6 +177,138 @@ def load_policy_config(repo_root: Path) -> dict[str, dict[str, str]]:
     }
 
 
+def configured_unused_dependency_allowlist(
+    repo_root: Path,
+) -> tuple[bool, object]:
+    config = load_lint_config(repo_root)
+    cargo_shear = config.get("cargo_shear", {})
+    if not isinstance(cargo_shear, dict) or "allowed_unused_dependencies" not in cargo_shear:
+        return False, {}
+    return True, cargo_shear["allowed_unused_dependencies"]
+
+
+def load_cargo_shear_workspace_metadata(
+    repo_root: Path,
+) -> CargoShearWorkspaceMetadata:
+    completed = subprocess.run(
+        ["cargo", "metadata", "--offline", "--format-version", "1", "--no-deps"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise CargoShearMetadataError(detail or "cargo metadata exited unsuccessfully")
+
+    try:
+        metadata = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise CargoShearMetadataError(f"cargo metadata returned invalid JSON: {error}") from error
+    packages = metadata.get("packages")
+    if not isinstance(packages, list):
+        raise CargoShearMetadataError("cargo metadata did not return a package list")
+
+    resolved_root = repo_root.resolve()
+    manifest_packages: dict[str, str] = {}
+    allowed_keys: set[str] = set()
+    for package in packages:
+        if not isinstance(package, dict):
+            continue
+        package_name = package.get("name")
+        manifest_path = package.get("manifest_path")
+        if not isinstance(package_name, str) or not isinstance(manifest_path, str):
+            continue
+        try:
+            relative_manifest = Path(manifest_path).resolve().relative_to(resolved_root).as_posix()
+        except ValueError:
+            continue
+        manifest_packages[relative_manifest] = package_name
+        manifest_packages[Path(manifest_path).resolve().as_posix()] = package_name
+        dependencies = package.get("dependencies", [])
+        if not isinstance(dependencies, list):
+            continue
+        for dependency in dependencies:
+            if not isinstance(dependency, dict):
+                continue
+            dependency_name = dependency.get("rename") or dependency.get("name")
+            if isinstance(dependency_name, str):
+                allowed_keys.add(f"{package_name}.{dependency_name}")
+
+    root_manifest_path = resolved_root / "Cargo.toml"
+    try:
+        root_manifest = tomllib.loads(root_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise CargoShearMetadataError(f"could not read workspace root Cargo.toml: {error}") from error
+
+    # A virtual workspace has no package name of its own. Only that root may
+    # use the reserved `workspace.<dependency>` spelling.
+    if "package" not in root_manifest:
+        workspace = root_manifest.get("workspace", {})
+        workspace_dependencies = workspace.get("dependencies", {}) if isinstance(workspace, dict) else {}
+        if isinstance(workspace_dependencies, dict):
+            for dependency_name in workspace_dependencies:
+                if isinstance(dependency_name, str):
+                    allowed_keys.add(f"workspace.{dependency_name}")
+        manifest_packages["Cargo.toml"] = "workspace"
+        manifest_packages[root_manifest_path.as_posix()] = "workspace"
+
+    return CargoShearWorkspaceMetadata(
+        manifest_packages=manifest_packages,
+        allowed_unused_dependency_keys=frozenset(allowed_keys),
+    )
+
+
+def is_path_like_dependency_key(key: str) -> bool:
+    return (
+        "/" in key
+        or "\\" in key
+        or key.startswith((".", "~"))
+        or bool(PureWindowsPath(key).drive)
+    )
+
+
+def validate_unused_dependency_allowlist(
+    configured: object,
+    metadata: CargoShearWorkspaceMetadata,
+) -> list[str]:
+    if not isinstance(configured, dict):
+        return [
+            f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
+            'cause=expected-table action="declare a TOML table of canonical dependency keys and reasons"'
+        ]
+
+    diagnostics: list[str] = []
+    for key in configured:
+        if not isinstance(key, str):
+            continue
+        if is_path_like_dependency_key(key):
+            diagnostics.extend(
+                (
+                    f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
+                    f'key={key!r} cause=path-like-key action="replace with a canonical dependency key"',
+                    PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key),
+                )
+            )
+        elif key not in metadata.allowed_unused_dependency_keys:
+            diagnostics.append(
+                f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
+                f'key={key!r} cause=dependency-key-not-found '
+                'action="remove the stale key or use <package>.<dependency-key> from Cargo metadata"'
+            )
+    return diagnostics
+
+
+def render_metadata_failure(error: Exception) -> str:
+    detail = str(error).replace("\n", " ").strip()
+    return (
+        f'{CARGO_SHEAR_CONFIG_ERROR} field={CARGO_SHEAR_ALLOWLIST_FIELD} '
+        f'cause=cargo-metadata-failed detail={detail!r} '
+        'action="fix the workspace metadata so cargo metadata --offline --format-version 1 --no-deps succeeds"'
+    )
+
+
 def evaluate_policy(sections: list[ShearSection], policy: dict[str, dict[str, str]]) -> tuple[list[ShearPolicyFinding], list[str]]:
     findings: list[ShearPolicyFinding] = []
     downgraded: list[str] = []
@@ -287,6 +441,22 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv[1:])
     repo_root = discover_repo_root(args.root)
 
+    allowlist_supplied, configured_allowlist = configured_unused_dependency_allowlist(
+        repo_root
+    )
+    metadata: CargoShearWorkspaceMetadata | None = None
+    if allowlist_supplied:
+        try:
+            metadata = load_cargo_shear_workspace_metadata(repo_root)
+        except (CargoShearMetadataError, OSError) as error:
+            write_console_output(sys.stderr, f"{render_metadata_failure(error)}\n")
+            return 2
+        diagnostics = validate_unused_dependency_allowlist(configured_allowlist, metadata)
+        if diagnostics:
+            for diagnostic in diagnostics:
+                write_console_output(sys.stderr, f"{diagnostic}\n")
+            return 2
+
     if shutil.which("cargo-shear") is None:
         print("cargo-shear is not installed; install it to run this lint", file=sys.stderr)
         return 2
@@ -312,7 +482,9 @@ def main(argv: list[str]) -> int:
             evaluate_unused_dependency_policy(
                 sections,
                 policy,
-                manifest_to_package_name(repo_root),
+                metadata.manifest_packages
+                if metadata is not None
+                else manifest_to_package_name(repo_root),
             )
         )
         if only_unused_dependencies:
