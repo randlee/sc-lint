@@ -1,0 +1,11 @@
+{
+  "lint-k-1": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151423Z-lint-k-1.json",
+  "lint-k-2": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151443Z-lint-k-2.json",
+  "lint-k-3": "docs/plans/phase-k/anchor-runs/parallel/plan-lint-k-3.json",
+  "lint-k-4": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151527Z-lint-k-4.json",
+  "lint-k-6": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151622Z-lint-k-6.json",
+  "lint-k-7": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151604Z-lint-k-7.json",
+  "lint-k-8": "docs/plans/phase-k/anchor-runs/user-rerun/plan-20261013T041348Z-lint-k-8.json",
+  "lint-k-9": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151651Z-lint-k-9.json",
+  "lint-k-10": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151708Z-lint-k-10.json"
+}

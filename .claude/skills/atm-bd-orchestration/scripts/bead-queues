@@ -176,7 +176,7 @@ def build(args, repo: Path) -> dict:
     if root not in by_id:
         raise Fail(f"root bead {root} does not exist or lacks the label {label}")
     branch = branch or meta(by_id[root]).get("integration_branch")
-    ready = {b["id"] for b in bd_json("ready", "-l", label, "-n", "0", "--json")}
+    ready = {b["id"] for b in bd_json("ready", "-l", label, "--exclude-label", "anchor", "-n", "0", "--json")}
     actor, team = atm_caller(args, repo)
     atm = ["atm", "task", "list", "--all", "--json", "--as", actor] + (["--team", team] if team else [])
     tasks = {t["task_id"]: t for t in run_json(atm)}
