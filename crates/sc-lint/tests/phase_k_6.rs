@@ -83,6 +83,15 @@ fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -
 }
 
 #[cfg(windows)]
+fn write_windows_stale_status_bootstrap(path: &Path) {
+    fs::write(
+        path,
+        format!("$global:LASTEXITCODE = 37\n{BOOTSTRAP_POWERSHELL}"),
+    )
+    .expect("PowerShell bootstrap with stale status");
+}
+
+#[cfg(windows)]
 fn windows_log_value<'a>(captured: &'a str, name: &str) -> &'a str {
     captured
         .lines()
@@ -420,6 +429,11 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
     fs::create_dir_all(&override_directory).expect("override directory");
     let override_binary = override_directory.join("sc-lint.exe");
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), &override_binary).expect("override product copy");
+    let system32 = std::env::var_os("SystemRoot")
+        .map(PathBuf::from)
+        .expect("Windows SystemRoot")
+        .join("System32");
+    let path = std::env::join_paths([&override_directory, &system32]).expect("valid test PATH");
 
     let output = powershell_command()
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
@@ -434,7 +448,8 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
             "SC_LINT_INSTALL_DIR",
             fixture.path().join("missing-install-dir"),
         )
-        .env("SC_LINT_BIN", &override_binary)
+        .env("PATH", path)
+        .env("SC_LINT_BIN", "sc-lint.exe")
         .output()
         .expect("run PowerShell consumer bootstrap");
 
@@ -447,6 +462,111 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
         String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
         "stdout: {}",
         String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn bootstrap_exec_does_not_fall_back_when_windows_sc_lint_bin_override_is_missing() {
+    let fixture = TempDir::new().expect("fixture root");
+    let root = windows_consumer_fixture(fixture.path(), "simple-consumer", false);
+    let managed = fixture.path().join("managed");
+    fs::create_dir_all(&managed).expect("managed directory");
+    fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
+        .expect("managed product copy");
+    let missing_override = fixture.path().join("missing-override.exe");
+
+    let output = powershell_command()
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+        .arg(root.join(".sc-lint/bootstrap.ps1"))
+        .args(["exec", "--", "sc-lint", "version"])
+        .current_dir(&root)
+        .env("SC_LINT_INSTALL_DIR", &managed)
+        .env("SC_LINT_BIN", &missing_override)
+        .output()
+        .expect("run PowerShell consumer bootstrap");
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty(), "stdout: {:?}", output.stdout);
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains(&format!(
+            "sc-lint binary is unavailable at {}; run just setup",
+            missing_override.display()
+        )),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn bootstrap_exec_returns_zero_for_non_native_command_after_stale_status() {
+    let fixture = TempDir::new().expect("fixture root");
+    let root = windows_consumer_fixture(fixture.path(), "simple-consumer", false);
+    let managed = fixture.path().join("managed");
+    fs::create_dir_all(&managed).expect("managed directory");
+    fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
+        .expect("managed product copy");
+    let child = fixture.path().join("consumer-command.ps1");
+    fs::write(&child, "Write-Output 'non-native command ran'\n").expect("PowerShell child");
+    let bootstrap = fixture.path().join("bootstrap-with-stale-status.ps1");
+    write_windows_stale_status_bootstrap(&bootstrap);
+
+    let output = powershell_command()
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+        .arg(bootstrap)
+        .args(["exec", "--"])
+        .arg(child)
+        .current_dir(&root)
+        .env("SC_LINT_INSTALL_DIR", managed)
+        .output()
+        .expect("run PowerShell consumer bootstrap");
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("non-native command ran"),
+        "stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn bootstrap_exec_returns_127_for_launch_failure_after_stale_status() {
+    let fixture = TempDir::new().expect("fixture root");
+    let root = windows_consumer_fixture(fixture.path(), "simple-consumer", false);
+    let managed = fixture.path().join("managed");
+    fs::create_dir_all(&managed).expect("managed directory");
+    fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
+        .expect("managed product copy");
+    let missing = fixture.path().join("missing-command.exe");
+    let bootstrap = fixture.path().join("bootstrap-with-stale-status.ps1");
+    write_windows_stale_status_bootstrap(&bootstrap);
+
+    let output = powershell_command()
+        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+        .arg(bootstrap)
+        .args(["exec", "--"])
+        .arg(missing)
+        .current_dir(&root)
+        .env("SC_LINT_INSTALL_DIR", managed)
+        .output()
+        .expect("run PowerShell consumer bootstrap");
+
+    assert_eq!(
+        output.status.code(),
+        Some(127),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !output.stderr.is_empty(),
+        "launch failure should be reported to stderr"
     );
 }
 

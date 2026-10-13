@@ -32,8 +32,11 @@ if ($Operation -eq "exec") {
     }
     if (-not $separatorFound -or $execArguments.Count -eq 0) { Stop-Usage }
 
-    if ($env:SC_LINT_BIN) {
-        $execBinary = $env:SC_LINT_BIN
+    $execBinary = $null
+    $hasExecBinaryOverride = -not [string]::IsNullOrWhiteSpace($env:SC_LINT_BIN)
+    if ($hasExecBinaryOverride) {
+        $resolvedExecBinary = Get-Command -Name $env:SC_LINT_BIN -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($resolvedExecBinary) { $execBinary = $resolvedExecBinary.Path }
     } else {
         if ($env:SC_LINT_INSTALL_DIR) {
             $execInstallDirectory = $env:SC_LINT_INSTALL_DIR
@@ -43,23 +46,50 @@ if ($Operation -eq "exec") {
         }
         $execBinary = Join-Path $execInstallDirectory "sc-lint.exe"
     }
-    if (-not (Test-Path -LiteralPath $execBinary -PathType Leaf)) {
+    if (-not $execBinary) {
+        [Console]::Error.WriteLine("sc-lint binary is unavailable at $($env:SC_LINT_BIN); run just setup")
+        exit 1
+    }
+    $resolvedExecBinary = Get-Command -Name $execBinary -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $resolvedExecBinary -or -not (Test-Path -LiteralPath $resolvedExecBinary.Path -PathType Leaf)) {
         [Console]::Error.WriteLine("sc-lint binary is unavailable at $execBinary; run just setup")
         exit 1
     }
+    $execBinary = $resolvedExecBinary.Path
 
     $env:SC_LINT_BIN = $execBinary
     $env:PATH = (Split-Path -Parent $execBinary) + [IO.Path]::PathSeparator + $env:PATH
-    if ($execArguments[0] -ceq "sc-lint") {
-        $invokeArguments = @()
-        if ($execConfig) { $invokeArguments += @("--config", $execConfig) }
-        if ($execArguments.Count -gt 1) { $invokeArguments += @($execArguments | Select-Object -Skip 1) }
-        & $execBinary @invokeArguments
-    } else {
-        $childArguments = @($execArguments | Select-Object -Skip 1)
-        & $execArguments[0] @childArguments
+    # PowerShell retains LASTEXITCODE between native invocations. Clear it so
+    # non-native commands and launch failures cannot inherit a stale status.
+    $global:LASTEXITCODE = $null
+    $execSucceeded = $false
+    try {
+        if ($execArguments[0] -ceq "sc-lint") {
+            $invokeArguments = @()
+            if ($execConfig) { $invokeArguments += @("--config", $execConfig) }
+            if ($execArguments.Count -gt 1) { $invokeArguments += @($execArguments | Select-Object -Skip 1) }
+            & $execBinary @invokeArguments
+            $execSucceeded = $?
+        } elseif ([IO.Path]::GetExtension($execArguments[0]) -in @(".cmd", ".bat")) {
+            # PowerShell's direct batch-file invocation reports success even
+            # when the batch file exits nonzero. Route batch commands through
+            # cmd.exe so LASTEXITCODE preserves ERRORLEVEL.
+            $commandProcessor = if ($env:ComSpec) { $env:ComSpec } else { Join-Path $env:SystemRoot "System32\cmd.exe" }
+            $childArguments = @($execArguments | Select-Object -Skip 1)
+            & $commandProcessor /d /c $execArguments[0] @childArguments
+            $execSucceeded = $?
+        } else {
+            $childArguments = @($execArguments | Select-Object -Skip 1)
+            & $execArguments[0] @childArguments
+            $execSucceeded = $?
+        }
+    } catch {
+        [Console]::Error.WriteLine($_.Exception.Message)
+        $execSucceeded = $false
     }
-    exit $LASTEXITCODE
+    if ($null -ne $LASTEXITCODE) { exit $LASTEXITCODE }
+    if (-not $execSucceeded) { exit 127 }
+    exit 0
 }
 
 $configIndex = [Array]::IndexOf($Rest, "--config")
