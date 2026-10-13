@@ -102,7 +102,10 @@ class ExternalLintToolTests(unittest.TestCase):
             )
 
     def test_build_runtime_config_strips_deprecated_keys(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
+        with (
+            tempfile.TemporaryDirectory() as tempdir,
+            tempfile.TemporaryDirectory(prefix="atm-lint-deny-") as runtime_dir,
+        ):
             repo_root = Path(tempdir)
             (repo_root / "deny.toml").write_text(
                 """\
@@ -117,7 +120,11 @@ allow = ["MIT"]
                 encoding="utf-8",
             )
 
-            runtime_path = build_runtime_config(repo_root)
+            with patch(
+                "sc_lint.lint_cargo_deny.tempfile.mkdtemp",
+                return_value=runtime_dir,
+            ):
+                runtime_path = build_runtime_config(repo_root)
             text = runtime_path.read_text(encoding="utf-8")
 
             self.assertNotIn('vulnerability = "deny"', text)
@@ -1450,7 +1457,10 @@ shear/unlinked_files
             stderr="deny failure: \u03bb\n",
         )
 
-        with tempfile.TemporaryDirectory() as tempdir:
+        with (
+            tempfile.TemporaryDirectory() as tempdir,
+            tempfile.TemporaryDirectory(prefix="atm-lint-deny-") as runtime_dir,
+        ):
             repo_root = Path(tempdir)
             create_non_ascii_workspace(repo_root)
             (repo_root / "deny.toml").write_text("[advisories]\n", encoding="utf-8")
@@ -1464,6 +1474,10 @@ shear/unlinked_files
                 patch("sc_lint.lint_cargo_deny.subprocess.run", return_value=completed),
                 patch("sc_lint.lint_cargo_deny.sys.stdout", stdout),
                 patch("sc_lint.lint_cargo_deny.sys.stderr", stderr),
+                patch(
+                    "sc_lint.lint_cargo_deny.tempfile.mkdtemp",
+                    return_value=runtime_dir,
+                ),
             ):
                 result = lint_cargo_deny.main(["lint-cargo-deny", "--root", str(repo_root)])
 
