@@ -560,16 +560,27 @@ The product should support both:
 
 - `REQ-PRODUCT-023`
   A versioned, reusable, analyzer-agnostic adoption kit must install one
-  drift-detectable consumer end state. Analyzer selection is the sole
-  repo-specific declarative input in `[tool.sc-lint.analyzers]`; profiles
-  select applicable analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry
-  carries the common keys `enabled`, `reason`, `exclude_rules`, `fail_rules`
-  and `exclude_paths` plus that analyzer's own keys (portability:
-  `config_home_env`, `unix_path_prefixes`); each analyzer reads only its own
-  table, and an unknown key is rejected by the analyzer (exit 3) and by the kit
-  installer. Installation is idempotent and `--dry-run` is
-  non-mutating, reporting drift or a managed-file conflict rather than writing.
-  (Amended 2026-10-10, Accepted, #201, #202.)
+  drift-detectable consumer end state. Analyzer selection and optional analyzer
+  policy are declared in `[tool.sc-lint.analyzers]`; profiles select applicable
+  analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry carries the common
+  keys `enabled`, `reason`, `exclude_rules`, `fail_rules`, `exclude_paths` and
+  `exclude_paths_by_rule`, plus that analyzer's own keys. Portability accepts
+  `config_home_env`, `unix_path_prefixes` and reviewed `platform_adapters`;
+  boundary accepts optional manifest dependency allowlists, global dependency
+  ownership and manifest section rules. Each analyzer reads only its own table.
+  Unknown analyzer-level keys, unknown rule names and malformed values are
+  rejected by the analyzer (exit 3) and by the kit installer. Optional manifest
+  records retain upstream nested value shapes and ignored unknown nested keys;
+  an absent or empty family adds no checks, while a present empty dependency
+  allowlist allows none. Per-rule path exclusions filter findings using paths
+  supplied by analyzer-owned adapters without changing the shared Finding schema.
+  Validated platform pairs cover enclosing module declarations and
+  inherited-private items while retaining normal parity checks for unrelated
+  and separately Unix-gated public items. Missing optional fields preserve
+  existing behavior. Installation is idempotent and `--dry-run` is non-mutating,
+  reporting drift or a managed-file conflict rather than writing.
+  (Amended 2026-10-10, Accepted, #201, #202; amended 2026-10-12, Accepted,
+  [ADR-017, changes 1 and compatibility](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-PRODUCT-024`
   The version-matched `sc-lint` wheel delivers every consumer-run helper and

@@ -95,3 +95,17 @@ now defines how shared tooling is vendored into consumers.
 4. "Rust may validate the schema but contains no selection policy" stands:
    each analyzer reads and applies only its own table.
 5. Decision 4: "ADR-012 unchanged" reads "ADR-012 as amended 2026-10-10".
+
+## Amendment 2026-10-12 — Phase K consumer contracts
+
+Accepted by Rand through [ADR-017](./ADR-017-phase-k-consumer-contracts.md).
+Its accepted changes 1, 4 and 6 extend Decision 7 and the analyzer-key
+amendment: optional per-rule path exclusions, reviewed platform adapters,
+boundary manifest policies, named lint-profile/platform selection and
+consumer-declared tool provisioning are supported. Strict analyzer-level keys
+remain; optional manifest records retain their upstream nested-field behavior.
+These declarations are consumer-owned inputs, not product defaults. The kit
+continues to render/validate; Rust owns lint execution and analyzer semantics,
+and Python owns installation. Missing optional declarations preserve prior
+behavior. ADR-017 is authoritative for the exact contracts and compatibility
+exceptions; the existing adoption path and managed-file rules remain unchanged.

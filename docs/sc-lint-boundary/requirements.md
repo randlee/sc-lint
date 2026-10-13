@@ -53,10 +53,19 @@ family.
 
 - `REQ-SCB-017`
   A direct workspace package dependency from workspace package `Y` to owner
-  package `X` must fail with `SCB-DEPENDENCY-002` when `Y` is not listed in
-  `dependencies.allowed_dependents` for the owner record. An empty
-  `allowed_dependents` list means no external workspace package may directly
-  depend on that owner package.
+  package `X` must fail with `SCB-DEPENDENCY-002` when the canonical dependent
+  is absent from the owner's effective incoming allowlist. Aggregate permissions
+  per canonical owner package: runtime permissions union every record's
+  `dependencies.allowed_dependents` (R_i); dev-only permissions union each
+  supplied `dependencies.allowed_dev_dependents` (D_i), falling back to R_i
+  only for records omitting D_i. Explicit D_i=[] grants nothing from that
+  record and does not revoke another record's grant. An empty effective union
+  allows no dependent in that edge category; normal/build dominates mixed
+  normal/dev edges. Staleness considers only categories to which an entry
+  contributes, is deduplicated by canonical owner/dependent, and retains the
+  upstream active-record gate.
+  (Amended 2026-10-12, Accepted,
+  [ADR-017, change 2](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-SCB-018`
   A direct workspace package dependency that matches an exact
@@ -73,8 +82,12 @@ family.
   dependencies outside the workspace-member set are out of scope until a later
   scheduled sprint adds them explicitly. `[dev-dependencies]` edges may also be
   allowed by `dependencies.allowed_dev_dependencies` (REQ-SCB-016); normal and
-  build edges are unchanged.
-  (Amended 2026-10-10, Accepted, #203.)
+  build edges are unchanged. This package-edge scope does not exclude
+  explicitly configured manifest policy, including third-party dependencies,
+  under `--rule manifests`; that policy remains distinct from package-edge
+  enforcement under `--rule dependencies`.
+  (Amended 2026-10-10, Accepted, #203; amended 2026-10-12, Accepted,
+  [ADR-017, change 2](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-SCB-020`
   Package dependency policy entries must be validated at inventory load.
@@ -82,8 +95,15 @@ family.
   package names inside one dependency-policy record, and unknown fields under
   `[dependencies]` are hard errors. A boundary record may carry one opaque
   `extensions` table (`[extensions.<namespace>]`), which is parsed as TOML and
-  ignored; every other unknown record field is still a hard error.
-  (Amended 2026-10-10, Accepted, #203.)
+  ignored; every other unknown record field is still a hard error. The optional
+  `allowed_dev_dependents` field follows REQ-SCB-017. New semantic defects
+  covered by ADR-017 are reported individually after parsing as structured
+  findings with record/field context; one defect must not hide another.
+  Existing syntax, schema, layout and I/O failures remain fatal, and public
+  loader signatures remain unchanged. Preserve local composition-root symbols;
+  only resolved external crate-qualified roots undergo dependent-policy checks.
+  (Amended 2026-10-10, Accepted, #203; amended 2026-10-12, Accepted,
+  [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-SCB-021`
   Package dependency policy is a boundary-inventory rule family owned by
@@ -131,7 +151,11 @@ family.
 
 - `REQ-SCB-023`
   A boundary's `[public]` section must define exactly one non-empty `facade` or
-  `trait` value.
+  `trait` value. Preserve these structural load errors; report additional
+  semantic defects under ADR-017 individually after parsing with record/field
+  context, including all defects in a combined-invalid fixture.
+  (Extended 2026-10-12, Accepted,
+  [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-SCB-014`
   Sprint comparison for inventory parity must use parsed ordering, not lexical

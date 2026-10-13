@@ -268,8 +268,12 @@ specialized backend tools and mixed Rust/Python implementations.
   that limited initial profile membership to `xwin check` alone.
 
 - `REQ-CLI-015`
-  `xwin`-backed preflight must not be part of the `ci` lint profile because
-  the product relies on real Windows CI runners for authoritative validation.
+  `xwin`-backed preflight must not be part of the source-maintainer `ci` lint
+  profile because the product relies on real Windows CI runners for
+  authoritative validation. Explicit consumer platform selection follows
+  REQ-CLI-023 and does not change this source-maintainer profile.
+  (Clarified 2026-10-12, Accepted,
+  [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-016`
   `sc-lint compatibility check` must load exactly
@@ -300,7 +304,13 @@ specialized backend tools and mixed Rust/Python implementations.
   are distinct values in machine output. Failed activation or post-install
   verification must retain the last working managed binary; if restoration
   itself cannot be verified, the command must report a distinct recovery error
-  identifying the manual backup location.
+  identifying the manual backup location. This direct binary setup contract is
+  unchanged by consumer tool provisioning: ordinary bootstrap setup invokes
+  the managed-wheel Python helper using the persisted `.sc-lint/install.json`
+  tools object. Exact cargo versions and rustup targets, CARGO_HOME handling,
+  inspect/install/verify and non-mutating dry-run follow
+  [ADR-017, change 6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts)
+  (Accepted, Rand, 2026-10-12); lint execution never installs tools.
 
 - `REQ-CLI-020`
   Installer failures must retain the standard `CliError` envelope and stable
@@ -311,10 +321,16 @@ specialized backend tools and mixed Rust/Python implementations.
   promise that the previous managed installation was restored.
 
 - `REQ-CLI-021`
-  The product bootstrap asset must expose only `ensure`, `setup`, and
-  `upgrade`, require an explicit `--config sc-lint.toml`, and delegate to the
-  installed `sc-lint` command. E.3 owns rendering this asset into consumer
-  repositories and the generated Justfile contract.
+  The original E.3 product bootstrap contract exposed `ensure`, `setup`, and
+  `upgrade`, required explicit `--config sc-lint.toml`, and delegated to the
+  installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
+  as amended. ADR-017 adds bootstrap `exec` through the existing managed
+  installation/environment, preserving argv and child exit status without
+  re-entering consumer profile dispatch. Lint accepts a selector followed by
+  optional platform scope. No setup hooks or interpreter-selection policy is
+  added. The product-owned assets remain the source of consumer bootstrap.
+  (Amended 2026-10-12, Accepted,
+  [ADR-017, changes 4–6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-022`
   `sc-lint init --just [--check|--dry-run]` must materialize only the
@@ -331,8 +347,20 @@ specialized backend tools and mixed Rust/Python implementations.
   sc-lint.toml ci` runs the complete configured `[[tool.sc-lint.lint]]` profile,
   and `sc-lint test --config sc-lint.toml` runs the complete configured
   `[[tool.sc-lint.test]]` profile. Each profile item has a unique non-empty
-  `name` and a non-empty argv `command` array. These commands do not discover
-  a source checkout or execute `.just` scripts.
+  `name` and a non-empty argv `command` array. They do not discover a source
+  checkout; consumer-owned command entries remain governed by ADR-016
+  Decision 4. Optional named lint profiles contain ordered step names;
+  existing list forms and `--profile all` retain their meanings. Platform
+  selection is separate: `--platform-scope host|all|linux|macos|windows`.
+  Platform denotes the intended target OS and must match its target triple.
+  Only literal cargo check/clippy target commands are translated: native
+  targets use cargo, while Linux/macOS to `x86_64-pc-windows-msvc` uses cargo
+  xwin. Other cross combinations report explicit unsupported skips; missing
+  tools or command failures in supported combinations are failures. Missing
+  optional declarations preserve existing behavior. Generic test groups,
+  parallel execution, keep-going and test argument forwarding are not added.
+  (Extended 2026-10-12, Accepted,
+  [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-024`
   `sc-lint docs` must discover the installed offline documentation bundle
