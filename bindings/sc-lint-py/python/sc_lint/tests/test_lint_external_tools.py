@@ -188,6 +188,40 @@ allow = ["MIT"]
         self.assertEqual(runner.call_count, 3)
         self.assertEqual([call.args for call in sleeper.call_args_list], [(2,), (2,)])
 
+    def test_cargo_deny_main_retries_dns_failure_and_forwards_only_final_result(self) -> None:
+        dns_failure = subprocess.CompletedProcess(
+            ["cargo-deny"], 1, "intermediate DNS output\ncould not resolve hostname\n", ""
+        )
+        final = subprocess.CompletedProcess(
+            ["cargo-deny"], 7, "final stdout\n", "final stderr\n"
+        )
+        version = subprocess.CompletedProcess(
+            ["cargo-deny", "--version"], 0, "cargo-deny 0.20.0\n", ""
+        )
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with (
+            patch("sc_lint.lint_cargo_deny.discover_repo_root", return_value=Path("/repo")),
+            patch("sc_lint.lint_cargo_deny.shutil.which", return_value="cargo-deny"),
+            patch("sc_lint.lint_cargo_deny.workspace_crate_section_lines", return_value=["workspace crates:"]),
+            patch("sc_lint.lint_cargo_deny.build_runtime_config", return_value=Path("/repo/deny.toml")),
+            patch("sc_lint.lint_cargo_deny.subprocess.run", side_effect=[version, dns_failure, final]) as run_mock,
+            patch("sc_lint.lint_cargo_deny.time.sleep") as sleep_mock,
+            patch("sc_lint.lint_cargo_deny.sys.stdout", stdout),
+            patch("sc_lint.lint_cargo_deny.sys.stderr", stderr),
+        ):
+            result = lint_cargo_deny.main(["lint-cargo-deny", "--root", "/repo"])
+
+        self.assertEqual(result, 7)
+        self.assertEqual(stdout.getvalue(), "workspace crates:\nfinal stdout\n")
+        self.assertEqual(
+            stderr.getvalue(),
+            "cargo-deny DNS failure (attempt 1/3); retrying in 2s\nfinal stderr\n",
+        )
+        self.assertEqual(run_mock.call_count, 3)
+        sleep_mock.assert_called_once_with(2)
+
     def test_cargo_deny_stops_after_three_dns_failures(self) -> None:
         failure = subprocess.CompletedProcess(
             ["cargo-deny"], 9, "", "could not resolve hostname\n"
