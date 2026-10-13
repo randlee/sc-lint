@@ -210,6 +210,25 @@ class BeadQueuesTests(unittest.TestCase):
             self.ws.close(bead, reason)
         assert q.queues() == {"container_closable": {sprint}}
 
+    def test_anchor_beads_are_not_actionable_ready_work(self):
+        q = Queues(self.ws, "anchor")
+        anchor = f"{q.root}-anchor"
+        normal = f"{q.root}-normal"
+        held = f"{q.root}-held"
+        phase_label = f"phase-{q.phase}"
+        child(self.ws, anchor, q.root, "--type", "decision", "-l", f"{phase_label},anchor")
+        child(self.ws, normal, q.root, "-l", f"{phase_label},stage:dev")
+        child(self.ws, held, q.root, "-l", f"{phase_label},stage:dev")
+        self.ws.bd("dep", "add", held, anchor)
+        anchor_before = self.ws.snapshot(anchor)
+
+        raw_ready = self.ws.ready()
+        assert anchor in raw_ready                                # reference state stays visible to bd itself
+        assert normal in raw_ready and held not in raw_ready      # its dependency still blocks ordinary work
+        got = q.queues()
+        assert got == {"needs_dev": {normal}}                    # no anchor in actionable or cron queues
+        self.ws.unchanged(anchor_before)                          # never close, defer or otherwise rewrite it
+
     def test_sanity_pass_with_no_qa_bead(self):
         q = Queues(self.ws, "nq")
         sprint = q.sprint(1)
