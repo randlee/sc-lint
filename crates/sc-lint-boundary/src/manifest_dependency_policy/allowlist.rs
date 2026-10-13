@@ -60,16 +60,26 @@ pub(crate) fn analyze(
             ));
             continue;
         }
-        let actual = package
+        let runtime_actual = package
             .dependencies
             .iter()
             .filter(|dependency| {
                 matches!(
                     dependency.kind,
-                    DependencyKind::Normal | DependencyKind::Development | DependencyKind::Build
+                    DependencyKind::Normal | DependencyKind::Build
                 )
             })
             .map(|dependency| DependencyPackageName(dependency.name.clone()))
+            .collect::<BTreeSet<_>>();
+        let dev_actual = package
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.kind == DependencyKind::Development)
+            .map(|dependency| DependencyPackageName(dependency.name.clone()))
+            .collect::<BTreeSet<_>>();
+        let actual = runtime_actual
+            .union(&dev_actual)
+            .cloned()
             .collect::<BTreeSet<_>>();
         for dependency in actual.difference(&allowlist.allowed) {
             findings.push(Finding {
@@ -107,16 +117,29 @@ pub(crate) fn analyze(
                 ));
                 continue;
             }
-            let declared = record
+            let declared_runtime = record
                 .dependencies
                 .allowed_dependencies
                 .iter()
                 .map(|value| DependencyPackageName(value.to_string()))
                 .collect::<BTreeSet<_>>();
-            if declared != allowlist.allowed {
+            let declared_dev = record
+                .dependencies
+                .allowed_dev_dependencies
+                .iter()
+                .map(|value| DependencyPackageName(value.to_string()))
+                .collect::<BTreeSet<_>>();
+            let declared = declared_runtime
+                .union(&declared_dev)
+                .cloned()
+                .collect::<BTreeSet<_>>();
+            if declared != allowlist.allowed
+                || (!declared_dev.is_empty()
+                    && (declared_runtime != runtime_actual || declared_dev != dev_actual))
+            {
                 findings.push(stale(
                     &owner,
-                    &format!("record lock `{record_path}` must align with the allowlist"),
+                    &format!("record lock `{record_path}` must align with the allowlist and dependency sections"),
                 ));
             }
         }

@@ -84,7 +84,10 @@ fn dependency_sections(manifest: &Table) -> Vec<(String, &Table)> {
         }
     }
     if let Some(targets) = manifest.get("target").and_then(Value::as_table) {
-        for (target, target_table) in targets {
+        let mut target_names = targets.keys().collect::<Vec<_>>();
+        target_names.sort();
+        for target in target_names {
+            let target_table = &targets[target];
             let Some(target_table) = target_table.as_table() else {
                 continue;
             };

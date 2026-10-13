@@ -72,6 +72,8 @@ fn source_mentions_dependency(source: &str, crate_name: &str) -> bool {
     source.lines().any(|line| {
         let line = line.trim_start();
         !line.starts_with("//")
+            && !line.starts_with("/*")
+            && !line.starts_with('*')
             && (line.contains(&format!("{crate_name}::"))
                 || line.contains(&format!("use {crate_name}"))
                 || line.contains(&format!("extern crate {crate_name}")))

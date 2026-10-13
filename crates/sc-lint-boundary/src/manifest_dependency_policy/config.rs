@@ -18,9 +18,6 @@ pub(crate) struct PolicyPath(pub(crate) PathBuf);
 
 impl PolicyPath {
     pub(crate) fn parse(value: &str) -> Result<Self> {
-        if value.trim().is_empty() {
-            anyhow::bail!("policy path must not be empty");
-        }
         let mut normalized = PathBuf::new();
         for component in PathBuf::from(value.replace('\\', "/")).components() {
             match component {
@@ -171,9 +168,8 @@ fn optional_strings(table: &Table, key: &str, prefix: &str, required: bool) -> R
         .map(|(index, value)| {
             value
                 .as_str()
-                .filter(|value| !value.trim().is_empty())
                 .map(ToOwned::to_owned)
-                .with_context(|| format!("{prefix}.{key}[{index}] must be a non-empty string"))
+                .with_context(|| format!("{prefix}.{key}[{index}] must be a string"))
         })
         .collect()
 }
@@ -188,7 +184,9 @@ fn optional_paths(
         return Ok(Vec::new());
     };
     match value {
-        Value::String(value) if single_allowed => Ok(vec![PolicyPath::parse(value)?]),
+        Value::String(value) if single_allowed && !value.trim().is_empty() => {
+            Ok(vec![PolicyPath::parse(value)?])
+        }
         Value::Array(_) => optional_strings(table, key, prefix, false)?
             .into_iter()
             .map(|value| PolicyPath::parse(&value))
