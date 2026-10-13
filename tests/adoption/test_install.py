@@ -478,6 +478,7 @@ def test_generated_catalogs_are_current_and_vendored_only() -> None:
         text=True,
         capture_output=True,
         check=False,
+        timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
     )
     assert result.returncode == 0, result.stderr
 
