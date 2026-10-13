@@ -16,6 +16,7 @@ use sc_lint_schema::ReportStatus;
 use super::AnalyzerConfigError;
 use super::AnalyzerName;
 use super::CatalogRuleId;
+use super::RelativePathError;
 use super::RepoRelativePath;
 use super::RuleCatalog;
 use super::analyzer_settings_from;
@@ -465,6 +466,22 @@ fn repo_relative_paths_normalize_separators_and_reject_escape_or_absolute_paths(
     assert!(RepoRelativePath::parse("../outside.rs").is_err());
     assert!(RepoRelativePath::parse("/outside.rs").is_err());
     assert!(RepoRelativePath::parse("C:\\outside.rs").is_err());
+}
+
+#[test]
+fn relative_path_errors_use_the_documented_interface_name() {
+    assert_eq!(
+        RepoRelativePath::parse("").unwrap_err(),
+        RelativePathError::Empty
+    );
+    assert_eq!(
+        RepoRelativePath::parse("/outside.rs").unwrap_err(),
+        RelativePathError::Absolute
+    );
+    assert_eq!(
+        RepoRelativePath::parse("../outside.rs").unwrap_err(),
+        RelativePathError::EscapesRoot
+    );
 }
 
 #[test]

@@ -6,10 +6,10 @@ use thiserror::Error;
 pub struct RepoRelativePath(String);
 
 impl RepoRelativePath {
-    pub fn parse(value: &str) -> Result<Self, RepoRelativePathError> {
+    pub fn parse(value: &str) -> Result<Self, RelativePathError> {
         let value = value.replace('\\', "/");
         if value.starts_with('/') || is_windows_absolute(&value) {
-            return Err(RepoRelativePathError::Absolute);
+            return Err(RelativePathError::Absolute);
         }
 
         let mut segments = Vec::new();
@@ -18,14 +18,14 @@ impl RepoRelativePath {
                 "" | "." => {}
                 ".." => {
                     if segments.pop().is_none() {
-                        return Err(RepoRelativePathError::EscapesRoot);
+                        return Err(RelativePathError::EscapesRoot);
                     }
                 }
                 _ => segments.push(segment),
             }
         }
         if segments.is_empty() {
-            return Err(RepoRelativePathError::Empty);
+            return Err(RelativePathError::Empty);
         }
         Ok(Self(segments.join("/")))
     }
@@ -48,7 +48,7 @@ impl fmt::Display for RepoRelativePath {
 }
 
 #[derive(Debug, Clone, Copy, Error, PartialEq, Eq)]
-pub enum RepoRelativePathError {
+pub enum RelativePathError {
     #[error("repository-relative path must not be empty")]
     Empty,
     #[error("repository-relative path must not be absolute")]
