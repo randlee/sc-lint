@@ -202,27 +202,27 @@ When a Phase K rule is implemented in Rust, its Python binding must not independ
 
 **relevant**
 
-Does `item.text` undertake, describe as its work, or investigate an added or modified Python binding for a Phase K rule implemented in Rust? A binding described as forwarding to or duplicating Rust is relevant. A docs-only item that merely describes previously delivered bindings or executes their existing examples, with no binding change, is outside this anchor even if it names Python bindings. Judge applicability only.
+Classify the Python work by role before answering. A binding is the callable adapter exposing a Rust rule to Python; the adoption installer is configuration glue, and a test call to an existing adapter is not a binding edit. Is binding work for this Rust rule actually in the item?
 
-- **yes:** The item adds, changes, or investigates a Python binding for a Rust-implemented rule, or describes that binding behavior as the work being delivered.
-- **no:** The item only updates documentation or verifies existing examples without creating/changing bindings, changes only Rust code, or is unrelated.
-- **unclear:** The item mentions bindings but does not establish whether it undertakes binding work or only describes existing behavior.
+- **yes:** The item undertakes or investigates implementation of that callable binding, whether compliant or duplicative.
+- **no:** It confines Python changes to installer/configuration code, tests only an unchanged binding, changes only Rust, or is unrelated.
+- **unclear:** Python work is described but its relation to a callable binding cannot be distinguished.
 
 **addressed**
 
-Use the specific behavioral distinction in the criteria to judge `item.text`; do not infer missing behavior. Does the planned method state the complete obligation, including every conditional branch?
+Does a planned new or modified Python binding explicitly delegate the substantive Rust-rule decision to Rust, leaving Python with argument/result adaptation only? A binding merely named, investigated, or tested unchanged does not state this plan. An unstated delegation is omission, not uncertainty.
 
-- **yes:** Classify yes when python delegates substantive decisions for the Rust-implemented rule to Rust without a second independent implementation; argument conversion, type checking, and result shaping may remain in Python. Equivalent substantive wording counts.
-- **no:** Classify no when the behavior is absent, merely topical, incomplete, or replaced by an incompatible alternative.
-- **unclear:** Classify unclear when the text alludes to the specific behavior but its meaning is unresolved.
+- **yes:** The binding work explicitly states that substantive matching or permission decisions come from Rust; conversion and basic type checks remain allowed.
+- **no:** There is no new/modified binding, or the item adds/investigates one without explicitly planning Rust delegation, or it instead proposes an independent rule decision.
+- **unclear:** The item explicitly describes a delegation step but leaves it ambiguous whether substantive rule decisions still occur in Python.
 
 **contradicted**
 
-Use the specific behavioral distinction in the criteria to judge `item.text`; do not infer missing behavior. Is there an affirmative decision for an incompatible method? Silence alone says no.
+Is there an explicit plan for a Python callable binding to decide the same lint rule independently of its Rust implementation? Treat installer value-shape checks and existing binding test calls as different activities.
 
-- **yes:** Classify yes when python independently decides the same substantive rule already implemented in Rust.
-- **no:** Classify no when no incompatible behavior is stated; silence and missing detail alone count no.
-- **unclear:** Classify unclear when stated behavior might be incompatible but cannot be resolved.
+- **yes:** The binding independently implements the Rust rule decision.
+- **no:** No duplicate decision in a changed binding is stated.
+- **unclear:** The changed binding may duplicate the Rust decision but the text leaves this uncertain.
 
 ### Development gate
 
@@ -394,11 +394,11 @@ Existing simpler consumers must continue to run sc-lint without atm-core-specifi
 
 **relevant**
 
-Does `item.text` address compatibility of sc-lint consumer configuration, CLI operation, or boundary checking for existing simpler consumers? A statement that a simpler consumer remains runnable with ordinary settings is relevant preservation even without an explicit code-change verb. Investigation, omission, or conflict in that subject remains relevant. Answer no if the item expressly states consumer configuration and boundary checking are untouched, or limits work to documenting/verifying already-delivered compatibility.
+ANC-007 applies to consumer setup and operation: configuration-file discovery/selection, CLI launch, and boundary-check compatibility for existing simpler users. Does item.text undertake one of these? Generic bootstrap config selection counts without atm-core policy. A note about existing behavior in docs alone does not count.
 
-- **yes:** The item states, plans, changes, preserves, or investigates simpler-consumer configuration, CLI, or boundary-check compatibility as governed work, including a statement that the CLI remains runnable without atm-core settings.
-- **no:** The item expressly leaves consumer configuration and boundary checking untouched, limits its work to documentation or execution of existing examples without such changes, or is unrelated.
-- **unclear:** It mentions simpler consumers but does not resolve whether it addresses governed compatibility or only describes existing behavior in documentation.
+- **yes:** The planned work changes, preserves as a deliverable, or investigates config selection, CLI operation, or boundary checks available to simpler consumers.
+- **no:** It explicitly limits work to docs/examples or unrelated internal packaging, with no changed consumer configuration or checking.
+- **unclear:** It mentions a wrapper or consumer behavior but leaves whether consumer-facing selection/operation changes unresolved.
 
 **addressed**
 

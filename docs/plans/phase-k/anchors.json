@@ -2976,42 +2976,25 @@
               }
             },
             {
-              "event_index": 4,
-              "previous_event_sha256": "c94c763c24d3c4202b112394b686f55c1b53d09d23464179fdb3bdc10f52c08c",
-              "event": "question_set_sealed",
-              "protocol_version": "plan-anchor/question-tournament/2.0.0",
               "authority": {
-                "intent_id": "phase-k-intent",
-                "intent_version": 3,
-                "intent_sha256": "076f46ac1fba20eb8a57b51159e3f8128571dd3186053103daf4b5494813d2c3",
                 "anchor_id": "ANC-004",
+                "anchor_record_sha256": "b04ca8218f25e36a98afb3ba9ea2fe657931efda46eb5955b05e95f1f1b17394",
                 "anchor_version": 3,
-                "anchor_record_sha256": "b04ca8218f25e36a98afb3ba9ea2fe657931efda46eb5955b05e95f1f1b17394"
-              },
-              "oracle": {
-                "sha256": "86798aadc1d257229bb85f143d544e8f0ac3fd5a7481d32f20711379c0c42114",
-                "case_ids": [
-                  "approved-pass",
-                  "approved-fail",
-                  "paraphrase",
-                  "silent",
-                  "topical",
-                  "direct-conflict",
-                  "irrelevant",
-                  "boundary",
-                  "nonfixture-format",
-                  "nonfixture-duplicate",
-                  "adapter-validation",
-                  "docs-only-binding-guide",
-                  "docs-plus-binding-change"
-                ],
-                "case_count": 13,
-                "repeat_count": 2
+                "intent_id": "phase-k-intent",
+                "intent_sha256": "076f46ac1fba20eb8a57b51159e3f8128571dd3186053103daf4b5494813d2c3",
+                "intent_version": 3
               },
               "candidate": {
                 "candidate_id": "v1",
                 "question_sha256": "5f2c4578bd0afc30f2cba766052d4f3e6a70bccc965500116b7a9ec1387f9466"
               },
+              "decision": {
+                "question_set_sha256": "5f2c4578bd0afc30f2cba766052d4f3e6a70bccc965500116b7a9ec1387f9466",
+                "reason_code": "TOURNAMENT.ACCEPTED",
+                "status": "sealed"
+              },
+              "event": "question_set_sealed",
+              "event_index": 4,
               "evidence": {
                 "canonical_request_sha256": [
                   "9af1e050c72824b8554ec8f5fb2588c50a136ce92939d2ffbb627566f47d7a7b",
@@ -3098,32 +3081,228 @@
                   "ANC-004-plan-docscope-v1__docs-plus-binding-change__r2"
                 ]
               },
+              "oracle": {
+                "case_count": 13,
+                "case_ids": [
+                  "approved-pass",
+                  "approved-fail",
+                  "paraphrase",
+                  "silent",
+                  "topical",
+                  "direct-conflict",
+                  "irrelevant",
+                  "boundary",
+                  "nonfixture-format",
+                  "nonfixture-duplicate",
+                  "adapter-validation",
+                  "docs-only-binding-guide",
+                  "docs-plus-binding-change"
+                ],
+                "repeat_count": 2,
+                "sha256": "86798aadc1d257229bb85f143d544e8f0ac3fd5a7481d32f20711379c0c42114"
+              },
+              "previous_event_sha256": "c94c763c24d3c4202b112394b686f55c1b53d09d23464179fdb3bdc10f52c08c",
+              "protocol_version": "plan-anchor/question-tournament/2.0.0",
               "score": {
+                "confidence": {
+                  "cells_at_or_above_threshold": 35,
+                  "mean": 0.929,
+                  "median": 0.98,
+                  "minimum": 0.25,
+                  "p10": 0.77,
+                  "threshold": 0.8,
+                  "total_cells": 39
+                },
                 "exact_role_cells": 39,
-                "total_role_cells": 39,
                 "exact_semantic_verdicts": 13,
-                "total_semantic_verdicts": 13,
+                "regressions": 0,
                 "stable_cases": 13,
                 "total_cases": 13,
+                "total_role_cells": 39,
+                "total_semantic_verdicts": 13
+              },
+              "supersedes": {
+                "decision_sha256": "dbe066819d992f7d05de88f5d45c02ec2d99dc4e677a4becd34d0120af6816fa",
+                "protocol_version": "plan-anchor/question-tournament/2.0.0"
+              }
+            },
+            {
+              "event_index": 5,
+              "previous_event_sha256": "fc82568559e0e0acc4904eb6a7dca43a57b403b829602eaa0b89a16eed81353f",
+              "event": "question_set_sealed",
+              "protocol_version": "plan-anchor/question-tournament/2.0.0",
+              "authority": {
+                "intent_id": "phase-k-intent",
+                "intent_version": 3,
+                "intent_sha256": "076f46ac1fba20eb8a57b51159e3f8128571dd3186053103daf4b5494813d2c3",
+                "anchor_id": "ANC-004",
+                "anchor_version": 3,
+                "anchor_record_sha256": "b04ca8218f25e36a98afb3ba9ea2fe657931efda46eb5955b05e95f1f1b17394"
+              },
+              "oracle": {
+                "sha256": "aa4d2b694973672c7b981fe583c6612319158d66d87adc0767c961134020987a",
+                "case_ids": [
+                  "approved-pass",
+                  "approved-fail",
+                  "paraphrase",
+                  "silent",
+                  "topical",
+                  "direct-conflict",
+                  "irrelevant",
+                  "boundary",
+                  "nonfixture-format",
+                  "nonfixture-duplicate",
+                  "adapter-validation",
+                  "docs-only-binding-guide",
+                  "docs-plus-binding-change",
+                  "installer-only",
+                  "existing-binding-test",
+                  "binding-forward",
+                  "binding-duplicate"
+                ],
+                "case_count": 17,
+                "repeat_count": 2
+              },
+              "candidate": {
+                "candidate_id": "v4",
+                "question_sha256": "fcb67184f7988eee5bd3a4aab4f8044414e8367e9e7dd7270a2dd8a6bf8f36fb"
+              },
+              "evidence": {
+                "canonical_request_sha256": [
+                  "f2936111fd2045b2e8d8bbd63ec2200596f5ab51990a6e804c9ac7ff03606468",
+                  "f2936111fd2045b2e8d8bbd63ec2200596f5ab51990a6e804c9ac7ff03606468",
+                  "ce50977cb6c60c4041bd848b4f42639d0cc2cf894b1dff0072656eb9241cebc2",
+                  "ce50977cb6c60c4041bd848b4f42639d0cc2cf894b1dff0072656eb9241cebc2",
+                  "32b79f862715d002982b10d081fc17fb3126c8d94cc7b594a8a6344236118574",
+                  "32b79f862715d002982b10d081fc17fb3126c8d94cc7b594a8a6344236118574",
+                  "5c6a3e5414d6234a646ba10a0c1021555ed0d0152dee2c780a2c13dfb1f20fff",
+                  "5c6a3e5414d6234a646ba10a0c1021555ed0d0152dee2c780a2c13dfb1f20fff",
+                  "77fdce0caa190606fe362582ffb7c1290ba07da13265ad652df33094bdd0336a",
+                  "77fdce0caa190606fe362582ffb7c1290ba07da13265ad652df33094bdd0336a",
+                  "446c958eb8e2cbf58b391066da3561ee8a42ea9176b8e908f41bfab625133723",
+                  "446c958eb8e2cbf58b391066da3561ee8a42ea9176b8e908f41bfab625133723",
+                  "b5ea07230e53571e2b5d102d4358b2a3644ac53d3cc11ca402e35e6eb258583b",
+                  "b5ea07230e53571e2b5d102d4358b2a3644ac53d3cc11ca402e35e6eb258583b",
+                  "889a82153e6bf15b7bd9b36a4f1161c90f0d2ba29a252b32339fe801cc190a29",
+                  "889a82153e6bf15b7bd9b36a4f1161c90f0d2ba29a252b32339fe801cc190a29",
+                  "96bdc98018c86288a00a63411e53ab185c318253ca791a53a0134b5a481386d5",
+                  "96bdc98018c86288a00a63411e53ab185c318253ca791a53a0134b5a481386d5",
+                  "26e25b94fc5af9947e7315420323e4a2651aa7cf4f6ffbd2a2ebb4eb43be2a86",
+                  "26e25b94fc5af9947e7315420323e4a2651aa7cf4f6ffbd2a2ebb4eb43be2a86",
+                  "b6e953c7d56a1591940538027674b55644b1f5387b0aea867b3cc9cde6d597fd",
+                  "b6e953c7d56a1591940538027674b55644b1f5387b0aea867b3cc9cde6d597fd",
+                  "595abfeb88d6ec596e5a9a907549f66cfa19354ae7fd74133d74a9504f5989f5",
+                  "595abfeb88d6ec596e5a9a907549f66cfa19354ae7fd74133d74a9504f5989f5",
+                  "b55df08e1a42d5026aa782964289314bb2244adc97b0f1608a2eecfba68521a8",
+                  "b55df08e1a42d5026aa782964289314bb2244adc97b0f1608a2eecfba68521a8",
+                  "37bf3780354c3e7342efd602e4431069bae0db17b44aa9643abfb57a200b34c4",
+                  "37bf3780354c3e7342efd602e4431069bae0db17b44aa9643abfb57a200b34c4",
+                  "f99879e6b228eb461a66fb7d4c233b011bc3dcab6373b56f419bca6b617e077f",
+                  "f99879e6b228eb461a66fb7d4c233b011bc3dcab6373b56f419bca6b617e077f",
+                  "275dd57773c683b64a37d2dbee45c27c72373f9e46c43a62ee7a385b2a51efa6",
+                  "275dd57773c683b64a37d2dbee45c27c72373f9e46c43a62ee7a385b2a51efa6",
+                  "94c07c275bb2fa1b48a031bd547e50ea7352326a47d0b445d6b3d5fefa03990d",
+                  "94c07c275bb2fa1b48a031bd547e50ea7352326a47d0b445d6b3d5fefa03990d"
+                ],
+                "raw_response_sha256": [
+                  "1a0da2fd3db3fe3ee040e5866b3891b0d21c03de2943e5567ad721d9e1594218",
+                  "06b7553c93bac35c624d039e7850d5973d021e220a7f5aca40341b93afc2078a",
+                  "7412454c00767daeb27031eb4e697f82d3c70a6165de2b0d15f4ba25a8d77064",
+                  "42180972a760a712161cf070a18a1f502dee581f69fac4f3dffb4bfcd0d75d35",
+                  "ea975b33def9748f70bcfa48199763dabe79cf1d108b56020f6b60a0148432db",
+                  "ea975b33def9748f70bcfa48199763dabe79cf1d108b56020f6b60a0148432db",
+                  "005d512914816748719941e011b38b3cd6a5aa57db7b9a427aee717923dd851e",
+                  "005d512914816748719941e011b38b3cd6a5aa57db7b9a427aee717923dd851e",
+                  "45585ec09d5e83b32d2fafbb27c8f719cdee54fd67930c3c93134b10460d9f01",
+                  "1ee83425b026c1011e7a3493edceb9b9feee0da5fc47ddb067a905f28fb488e0",
+                  "5908b006b2036b175687101e4cfbe24a59176e5e82a5c52feb141a63ab374b91",
+                  "5908b006b2036b175687101e4cfbe24a59176e5e82a5c52feb141a63ab374b91",
+                  "3d78694f3733078d512b083d97b8ac9bc168ed16eda7fcb522b566e967b97ac3",
+                  "3d78694f3733078d512b083d97b8ac9bc168ed16eda7fcb522b566e967b97ac3",
+                  "86e3576e3197a06d4ef3c0fc6fbce8a845df436a223752118b97c8dfc07ee15f",
+                  "86e3576e3197a06d4ef3c0fc6fbce8a845df436a223752118b97c8dfc07ee15f",
+                  "a2f319a4ae10b416404a99af218608ad2357bf80fa90269678d5f2ca9edf8997",
+                  "68dcd270895588cab17656925f286e6caeb2d08d4edd37ba164ce218a7859162",
+                  "7b2e617c171208a21691ca199e3bf9224b139a23a2c9f4ab088159ae8d468e64",
+                  "98cdd612d2655c6d3fdd0da2b8693acc736fb5e37ee7b59eedbbe2afd461f8c9",
+                  "b982707abd48311229a22efef8d910e687de76c9830d9ff5e2c1f585c242b6bf",
+                  "b982707abd48311229a22efef8d910e687de76c9830d9ff5e2c1f585c242b6bf",
+                  "e0ac69c83c6049358076acff075126289e4d4011229bc4527c75943badf666f5",
+                  "e0ac69c83c6049358076acff075126289e4d4011229bc4527c75943badf666f5",
+                  "97d1fc9ef8c546cf361412a06aa578ffdf88e05e6f9e36f34a70fa5dcab35521",
+                  "97d1fc9ef8c546cf361412a06aa578ffdf88e05e6f9e36f34a70fa5dcab35521",
+                  "e3406af33835449f836ac190529905b177f2828dfd5f9a88eaa591f15bc2627a",
+                  "c9f29ae99a42fd315f9340e8f5ec16417af583195a09792652fb18876be6037a",
+                  "b6a7970a9d7d7adfe2d7b1fe243d834c8750e536e9dbf13c4593edc6a610a6eb",
+                  "9447fd40cdc7018f37fa22bd01b0f375706564782e1d76829ce13ec49012c699",
+                  "879f775fedce3cf16272a4bbff6b6aaf0e229d452a261c24e8b15addc4c045d9",
+                  "d93cdf5d78cce97e0f90b02434a0a78e06d118be1d5ece9251ca280c12986f1b",
+                  "0ad3b92282a71592983860da22582db0c829b1c913cfbb8b069cab2e5beb2180",
+                  "bd76821f7a301d91c13c01540c5504160c98f66ebe3806f86ff891ae8d72d2f4"
+                ],
+                "run_ids": [
+                  "ANC-004-plan-installer-scope-v4__approved-pass__r1",
+                  "ANC-004-plan-installer-scope-v4__approved-pass__r2",
+                  "ANC-004-plan-installer-scope-v4__approved-fail__r1",
+                  "ANC-004-plan-installer-scope-v4__approved-fail__r2",
+                  "ANC-004-plan-installer-scope-v4__paraphrase__r1",
+                  "ANC-004-plan-installer-scope-v4__paraphrase__r2",
+                  "ANC-004-plan-installer-scope-v4__silent__r1",
+                  "ANC-004-plan-installer-scope-v4__silent__r2",
+                  "ANC-004-plan-installer-scope-v4__topical__r1",
+                  "ANC-004-plan-installer-scope-v4__topical__r2",
+                  "ANC-004-plan-installer-scope-v4__direct-conflict__r1",
+                  "ANC-004-plan-installer-scope-v4__direct-conflict__r2",
+                  "ANC-004-plan-installer-scope-v4__irrelevant__r1",
+                  "ANC-004-plan-installer-scope-v4__irrelevant__r2",
+                  "ANC-004-plan-installer-scope-v4__boundary__r1",
+                  "ANC-004-plan-installer-scope-v4__boundary__r2",
+                  "ANC-004-plan-installer-scope-v4__nonfixture-format__r1",
+                  "ANC-004-plan-installer-scope-v4__nonfixture-format__r2",
+                  "ANC-004-plan-installer-scope-v4__nonfixture-duplicate__r1",
+                  "ANC-004-plan-installer-scope-v4__nonfixture-duplicate__r2",
+                  "ANC-004-plan-installer-scope-v4__adapter-validation__r1",
+                  "ANC-004-plan-installer-scope-v4__adapter-validation__r2",
+                  "ANC-004-plan-installer-scope-v4__docs-only-binding-guide__r1",
+                  "ANC-004-plan-installer-scope-v4__docs-only-binding-guide__r2",
+                  "ANC-004-plan-installer-scope-v4__docs-plus-binding-change__r1",
+                  "ANC-004-plan-installer-scope-v4__docs-plus-binding-change__r2",
+                  "ANC-004-plan-installer-scope-v4__installer-only__r1",
+                  "ANC-004-plan-installer-scope-v4__installer-only__r2",
+                  "ANC-004-plan-installer-scope-v4__existing-binding-test__r1",
+                  "ANC-004-plan-installer-scope-v4__existing-binding-test__r2",
+                  "ANC-004-plan-installer-scope-v4__binding-forward__r1",
+                  "ANC-004-plan-installer-scope-v4__binding-forward__r2",
+                  "ANC-004-plan-installer-scope-v4__binding-duplicate__r1",
+                  "ANC-004-plan-installer-scope-v4__binding-duplicate__r2"
+                ]
+              },
+              "score": {
+                "exact_role_cells": 51,
+                "total_role_cells": 51,
+                "exact_semantic_verdicts": 17,
+                "total_semantic_verdicts": 17,
+                "stable_cases": 17,
+                "total_cases": 17,
                 "regressions": 0,
                 "confidence": {
                   "threshold": 0.8,
-                  "cells_at_or_above_threshold": 35,
-                  "total_cells": 39,
-                  "minimum": 0.25,
-                  "p10": 0.77,
-                  "median": 0.98,
-                  "mean": 0.929
+                  "cells_at_or_above_threshold": 47,
+                  "total_cells": 51,
+                  "minimum": 0.1,
+                  "p10": 0.86,
+                  "median": 1.0,
+                  "mean": 0.951
                 }
               },
               "decision": {
                 "status": "sealed",
-                "question_set_sha256": "5f2c4578bd0afc30f2cba766052d4f3e6a70bccc965500116b7a9ec1387f9466",
+                "question_set_sha256": "fcb67184f7988eee5bd3a4aab4f8044414e8367e9e7dd7270a2dd8a6bf8f36fb",
                 "reason_code": "TOURNAMENT.ACCEPTED"
               },
               "supersedes": {
                 "protocol_version": "plan-anchor/question-tournament/2.0.0",
-                "decision_sha256": "dbe066819d992f7d05de88f5d45c02ec2d99dc4e677a4becd34d0120af6816fa"
+                "decision_sha256": "f9460b4404b403e852598be907822e5d284f374212bf135cb4f6105fed403700"
               }
             }
           ]
@@ -4710,43 +4889,25 @@
               }
             },
             {
-              "event_index": 2,
-              "previous_event_sha256": "cd74e8903944d9184efe1db75018eea163c5453c566ce8481c0224f70203209f",
-              "event": "question_set_sealed",
-              "protocol_version": "plan-anchor/question-tournament/2.0.0",
               "authority": {
-                "intent_id": "phase-k-intent",
-                "intent_version": 3,
-                "intent_sha256": "076f46ac1fba20eb8a57b51159e3f8128571dd3186053103daf4b5494813d2c3",
                 "anchor_id": "ANC-007",
+                "anchor_record_sha256": "82b735dff3a1028e677f8f1ccc4242f194c9f48aaf07d4c67f7ddf54eebb3207",
                 "anchor_version": 3,
-                "anchor_record_sha256": "82b735dff3a1028e677f8f1ccc4242f194c9f48aaf07d4c67f7ddf54eebb3207"
-              },
-              "oracle": {
-                "sha256": "344776d3d97754cf3753060db96daa35d59c736b25cc446afea412e1ed04bfde",
-                "case_ids": [
-                  "approved-pass",
-                  "approved-fail",
-                  "minimal-compliant",
-                  "silent",
-                  "topical",
-                  "direct-conflict",
-                  "irrelevant",
-                  "boundary",
-                  "nonboundary-compliant",
-                  "nonboundary-conflict",
-                  "ordinary-config-allowed",
-                  "optional-atm-config-allowed",
-                  "docs-only-existing-behavior",
-                  "docs-plus-scoped-change"
-                ],
-                "case_count": 14,
-                "repeat_count": 2
+                "intent_id": "phase-k-intent",
+                "intent_sha256": "076f46ac1fba20eb8a57b51159e3f8128571dd3186053103daf4b5494813d2c3",
+                "intent_version": 3
               },
               "candidate": {
                 "candidate_id": "v7",
                 "question_sha256": "c4ea6fab339fb2e7a27465007210830b408118fbfddb97a62f485243f0f22be3"
               },
+              "decision": {
+                "question_set_sha256": "c4ea6fab339fb2e7a27465007210830b408118fbfddb97a62f485243f0f22be3",
+                "reason_code": "TOURNAMENT.ACCEPTED",
+                "status": "sealed"
+              },
+              "event": "question_set_sealed",
+              "event_index": 2,
               "evidence": {
                 "canonical_request_sha256": [
                   "93a4a311c93dc89a81f2f8344ab2f2bdd3293cc5a70b18e01d3e5e9d8614edd5",
@@ -4839,32 +5000,222 @@
                   "ANC-007-plan-docscope-v7__docs-plus-scoped-change__r2"
                 ]
               },
+              "oracle": {
+                "case_count": 14,
+                "case_ids": [
+                  "approved-pass",
+                  "approved-fail",
+                  "minimal-compliant",
+                  "silent",
+                  "topical",
+                  "direct-conflict",
+                  "irrelevant",
+                  "boundary",
+                  "nonboundary-compliant",
+                  "nonboundary-conflict",
+                  "ordinary-config-allowed",
+                  "optional-atm-config-allowed",
+                  "docs-only-existing-behavior",
+                  "docs-plus-scoped-change"
+                ],
+                "repeat_count": 2,
+                "sha256": "344776d3d97754cf3753060db96daa35d59c736b25cc446afea412e1ed04bfde"
+              },
+              "previous_event_sha256": "cd74e8903944d9184efe1db75018eea163c5453c566ce8481c0224f70203209f",
+              "protocol_version": "plan-anchor/question-tournament/2.0.0",
               "score": {
+                "confidence": {
+                  "cells_at_or_above_threshold": 36,
+                  "mean": 0.9098,
+                  "median": 0.99,
+                  "minimum": 0.48,
+                  "p10": 0.59,
+                  "threshold": 0.8,
+                  "total_cells": 42
+                },
                 "exact_role_cells": 42,
-                "total_role_cells": 42,
                 "exact_semantic_verdicts": 14,
-                "total_semantic_verdicts": 14,
+                "regressions": 0,
                 "stable_cases": 14,
                 "total_cases": 14,
+                "total_role_cells": 42,
+                "total_semantic_verdicts": 14
+              },
+              "supersedes": {
+                "decision_sha256": "f09bda057646630ef1b21938c1ea9b72c1a72d18e87d576f882fea48658fa918",
+                "protocol_version": "plan-anchor/question-tournament/2.0.0"
+              }
+            },
+            {
+              "event_index": 3,
+              "previous_event_sha256": "f30e045c5c767c27b8ddc2df032e5e43ac1b49530fa97c995b111e41a5d3ccd8",
+              "event": "question_set_sealed",
+              "protocol_version": "plan-anchor/question-tournament/2.0.0",
+              "authority": {
+                "intent_id": "phase-k-intent",
+                "intent_version": 3,
+                "intent_sha256": "076f46ac1fba20eb8a57b51159e3f8128571dd3186053103daf4b5494813d2c3",
+                "anchor_id": "ANC-007",
+                "anchor_version": 3,
+                "anchor_record_sha256": "82b735dff3a1028e677f8f1ccc4242f194c9f48aaf07d4c67f7ddf54eebb3207"
+              },
+              "oracle": {
+                "sha256": "5bfd99be36b7f5d1418db369e774dca99b572b3a66e69d42b641a82e0657467d",
+                "case_ids": [
+                  "approved-pass",
+                  "approved-fail",
+                  "minimal-compliant",
+                  "silent",
+                  "topical",
+                  "direct-conflict",
+                  "irrelevant",
+                  "boundary",
+                  "nonboundary-compliant",
+                  "nonboundary-conflict",
+                  "ordinary-config-allowed",
+                  "optional-atm-config-allowed",
+                  "docs-only-existing-behavior",
+                  "docs-plus-scoped-change",
+                  "generic-installer-selection-silent",
+                  "generic-installer-selection-preserved"
+                ],
+                "case_count": 16,
+                "repeat_count": 2
+              },
+              "candidate": {
+                "candidate_id": "v2",
+                "question_sha256": "66f82c44b127578e2eea2c833806e79c83b0919ddd51ac9ead77126c598b5434"
+              },
+              "evidence": {
+                "canonical_request_sha256": [
+                  "3df458cc519046063fd7867b6bfa8da8eafe2f970e57681443737ca36ff20e9a",
+                  "3df458cc519046063fd7867b6bfa8da8eafe2f970e57681443737ca36ff20e9a",
+                  "81c37fc2620ad5e299502993097f16388bdb9efb5ade75bd9c080f09ab0599b2",
+                  "81c37fc2620ad5e299502993097f16388bdb9efb5ade75bd9c080f09ab0599b2",
+                  "10f765b64e6662bdf43d7f610851f00c1bae99f08151365af86d9a43c76933b3",
+                  "10f765b64e6662bdf43d7f610851f00c1bae99f08151365af86d9a43c76933b3",
+                  "ae2124512aa3b356650b9a2e31b47fdcb1bd62601af49c1aec99a61c5193f289",
+                  "ae2124512aa3b356650b9a2e31b47fdcb1bd62601af49c1aec99a61c5193f289",
+                  "479dc8cd302a28bc4a537b25db397e298d88f2175ec54c743de9b40482632704",
+                  "479dc8cd302a28bc4a537b25db397e298d88f2175ec54c743de9b40482632704",
+                  "0bdd3a6f57f0f4920adda052502f6ca13d62eba9e725d227b8cd0cb7c190f806",
+                  "0bdd3a6f57f0f4920adda052502f6ca13d62eba9e725d227b8cd0cb7c190f806",
+                  "8769ad83eee33460d0689fb1f023d3688da3cbe4850af8fffb8d9654a653efd6",
+                  "8769ad83eee33460d0689fb1f023d3688da3cbe4850af8fffb8d9654a653efd6",
+                  "4c98b59f0812359148fa443ee24515e00f6450947c0c7736e7ddf29026bcd249",
+                  "4c98b59f0812359148fa443ee24515e00f6450947c0c7736e7ddf29026bcd249",
+                  "dfd8cfa0673449e30e9fc0b780875f64aad85761822b5e387c703cadf3573554",
+                  "dfd8cfa0673449e30e9fc0b780875f64aad85761822b5e387c703cadf3573554",
+                  "7575ab938b4b623b8785417fee37d6c7437526e99605c8f19a97e9bdbe42db72",
+                  "7575ab938b4b623b8785417fee37d6c7437526e99605c8f19a97e9bdbe42db72",
+                  "a34aa37e9e766154be83ff77a7016834da4d152429df26b23ca6915ed49d2bf8",
+                  "a34aa37e9e766154be83ff77a7016834da4d152429df26b23ca6915ed49d2bf8",
+                  "549ac01e8dc820a5b8cf251b4b9ad710f7d364b1167458f5c8c6de2bb87730d8",
+                  "549ac01e8dc820a5b8cf251b4b9ad710f7d364b1167458f5c8c6de2bb87730d8",
+                  "484240587291c687a56d3c8af987e11078c30b7549307b19fe9a5a67bb945f62",
+                  "484240587291c687a56d3c8af987e11078c30b7549307b19fe9a5a67bb945f62",
+                  "cc8544de37296725306a3e327a50f8a25c90c6d5047d31a80055882d30e8b28e",
+                  "cc8544de37296725306a3e327a50f8a25c90c6d5047d31a80055882d30e8b28e",
+                  "df26cf15a6722706400268eabeaaa8ff1668f77409f982555e782b971c144e46",
+                  "df26cf15a6722706400268eabeaaa8ff1668f77409f982555e782b971c144e46",
+                  "30b73ba17e4f2865ca21b059b569e23efe9cd215b888ab69bf73ad4ba39ecfdc",
+                  "30b73ba17e4f2865ca21b059b569e23efe9cd215b888ab69bf73ad4ba39ecfdc"
+                ],
+                "raw_response_sha256": [
+                  "55830605064de2c0ab9192f84a0292a282e64bd6bb6cdc8a75f7867a6f218fec",
+                  "4be1cdb8e44221807061910e802039fc8df682ebead21462017adac4b54899b6",
+                  "0626cfa7a8bd13e5b776951beb32f2f076984a4d4e610c850e0cec585082ef50",
+                  "3b14ac6c93fd5fb0dd34c82934e53f42cf63d3d29f3cfa1e2e930fb6d0c88711",
+                  "7fc1ed406dc8298700232dfe231d49e413c99e9b0b97ad3b3ea678ee833d073e",
+                  "fb7f616aa9177321ad21f2f5eacb55934707b1ff2f44069f96cf879f20828c23",
+                  "7810d9a8032f90718aa09c13d8bd1452ccfd9072838c25bbd2f5a9ba70e3ef75",
+                  "8476a409e9d2be70e4c03fd29b0474b7352843f3ff2664485a64185362d903d6",
+                  "74c38b14a81f6117d8fe8e7229664eb31e7e03130c876b31027c7a45a65a78b8",
+                  "6e28d2b8d58935788e227ab6dfdaff51c37eca41c9ba33bee8e46dbdbf505f0c",
+                  "3154a4edd974df7ac6cd0694324dee2b56eb21929292235209f8a4eb7b97d57f",
+                  "3154a4edd974df7ac6cd0694324dee2b56eb21929292235209f8a4eb7b97d57f",
+                  "26fcd206afe7cd80af1336d3b33889cbed3d50ee34f9958a532b4588909cdf35",
+                  "26fcd206afe7cd80af1336d3b33889cbed3d50ee34f9958a532b4588909cdf35",
+                  "a115ead606a7c7dd750efe55922837a28cac360bd2da187b1be82def2b359472",
+                  "a115ead606a7c7dd750efe55922837a28cac360bd2da187b1be82def2b359472",
+                  "406a15e98190bcb125b59a95e157de6d83778f661c7e4f2ba831eba878cfa785",
+                  "7b312ddffad862f9c5f7d8b6b3f30f99244e1e4a434a55aa2a024cbdaee34979",
+                  "b8d94681f89c1e1812b7b2a51935a1d1fe43e69ed3c74cb1474347cb4632c484",
+                  "b8d94681f89c1e1812b7b2a51935a1d1fe43e69ed3c74cb1474347cb4632c484",
+                  "a2687e75b1618f1bb06fd8b31efc035b95791c9c8e50a79d1710a8191901387c",
+                  "6a85450355f1442c83ee854cc23d85c2fb7783177962abea21551959e168a7be",
+                  "f4f8afdb98dc38bf49b88c20047a0f67af00960d95b0120f677e4782db8c3151",
+                  "8c53b0d27da5e7d765fd7b5500baaf31e0b2b7e35ab9bc2933aa442cd2df8363",
+                  "4d2fc6fd22ebed6f0fed2ea82b8a9a1c91ea919d209a67a56688655f254b94eb",
+                  "a28fe95cc9fb6a431ecbcc31c542a08ef767629761a041f6318265cd12f5a34a",
+                  "f2f59dca2042a444eb9188192a90f199002930e29ef15723ef1dec3280698b7c",
+                  "f2f59dca2042a444eb9188192a90f199002930e29ef15723ef1dec3280698b7c",
+                  "24e411b0d836208e129a84692e9cab67ce3fff213ed8728878b02a077a25c181",
+                  "14871b679e6acf8d15f8585bbb3719ff41b77616767cac3fcbe1a2e210c5d5f3",
+                  "9bb5f8d0536085abb7e75822ac848ae468aab6fd961510b17c6776fd352422fd",
+                  "9bb5f8d0536085abb7e75822ac848ae468aab6fd961510b17c6776fd352422fd"
+                ],
+                "run_ids": [
+                  "ANC-007-plan-config-wrapper-v2__approved-pass__r1",
+                  "ANC-007-plan-config-wrapper-v2__approved-pass__r2",
+                  "ANC-007-plan-config-wrapper-v2__approved-fail__r1",
+                  "ANC-007-plan-config-wrapper-v2__approved-fail__r2",
+                  "ANC-007-plan-config-wrapper-v2__minimal-compliant__r1",
+                  "ANC-007-plan-config-wrapper-v2__minimal-compliant__r2",
+                  "ANC-007-plan-config-wrapper-v2__silent__r1",
+                  "ANC-007-plan-config-wrapper-v2__silent__r2",
+                  "ANC-007-plan-config-wrapper-v2__topical__r1",
+                  "ANC-007-plan-config-wrapper-v2__topical__r2",
+                  "ANC-007-plan-config-wrapper-v2__direct-conflict__r1",
+                  "ANC-007-plan-config-wrapper-v2__direct-conflict__r2",
+                  "ANC-007-plan-config-wrapper-v2__irrelevant__r1",
+                  "ANC-007-plan-config-wrapper-v2__irrelevant__r2",
+                  "ANC-007-plan-config-wrapper-v2__boundary__r1",
+                  "ANC-007-plan-config-wrapper-v2__boundary__r2",
+                  "ANC-007-plan-config-wrapper-v2__nonboundary-compliant__r1",
+                  "ANC-007-plan-config-wrapper-v2__nonboundary-compliant__r2",
+                  "ANC-007-plan-config-wrapper-v2__nonboundary-conflict__r1",
+                  "ANC-007-plan-config-wrapper-v2__nonboundary-conflict__r2",
+                  "ANC-007-plan-config-wrapper-v2__ordinary-config-allowed__r1",
+                  "ANC-007-plan-config-wrapper-v2__ordinary-config-allowed__r2",
+                  "ANC-007-plan-config-wrapper-v2__optional-atm-config-allowed__r1",
+                  "ANC-007-plan-config-wrapper-v2__optional-atm-config-allowed__r2",
+                  "ANC-007-plan-config-wrapper-v2__docs-only-existing-behavior__r1",
+                  "ANC-007-plan-config-wrapper-v2__docs-only-existing-behavior__r2",
+                  "ANC-007-plan-config-wrapper-v2__docs-plus-scoped-change__r1",
+                  "ANC-007-plan-config-wrapper-v2__docs-plus-scoped-change__r2",
+                  "ANC-007-plan-config-wrapper-v2__generic-installer-selection-silent__r1",
+                  "ANC-007-plan-config-wrapper-v2__generic-installer-selection-silent__r2",
+                  "ANC-007-plan-config-wrapper-v2__generic-installer-selection-preserved__r1",
+                  "ANC-007-plan-config-wrapper-v2__generic-installer-selection-preserved__r2"
+                ]
+              },
+              "score": {
+                "exact_role_cells": 48,
+                "total_role_cells": 48,
+                "exact_semantic_verdicts": 16,
+                "total_semantic_verdicts": 16,
+                "stable_cases": 16,
+                "total_cases": 16,
                 "regressions": 0,
                 "confidence": {
                   "threshold": 0.8,
-                  "cells_at_or_above_threshold": 36,
-                  "total_cells": 42,
-                  "minimum": 0.48,
-                  "p10": 0.59,
+                  "cells_at_or_above_threshold": 40,
+                  "total_cells": 48,
+                  "minimum": 0.46,
+                  "p10": 0.61,
                   "median": 0.99,
-                  "mean": 0.9098
+                  "mean": 0.9123
                 }
               },
               "decision": {
                 "status": "sealed",
-                "question_set_sha256": "c4ea6fab339fb2e7a27465007210830b408118fbfddb97a62f485243f0f22be3",
+                "question_set_sha256": "66f82c44b127578e2eea2c833806e79c83b0919ddd51ac9ead77126c598b5434",
                 "reason_code": "TOURNAMENT.ACCEPTED"
               },
               "supersedes": {
                 "protocol_version": "plan-anchor/question-tournament/2.0.0",
-                "decision_sha256": "f09bda057646630ef1b21938c1ea9b72c1a72d18e87d576f882fea48658fa918"
+                "decision_sha256": "03ef661ea8f277de7588e433ed25564d61b1a2abb399a21c2ae40f087a7e6745"
               }
             }
           ]
