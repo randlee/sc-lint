@@ -343,6 +343,40 @@ allow = ["MIT"]
         self.assertNotIn("workspace.virtual_only", metadata.allowed_unused_dependency_keys)
         self.assertEqual(metadata.manifest_packages["Cargo.toml"], "workspace")
 
+    def test_cargo_shear_metadata_collects_dependencies_for_out_of_root_members(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir, tempfile.TemporaryDirectory() as member_tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                "[workspace]\nmembers = []\nresolver = \"2\"\n",
+                encoding="utf-8",
+            )
+            member_manifest = Path(member_tempdir) / "member" / "Cargo.toml"
+            completed = subprocess.CompletedProcess(
+                ["cargo", "metadata"],
+                0,
+                json.dumps(
+                    {
+                        "packages": [
+                            {
+                                "name": "external-member",
+                                "manifest_path": str(member_manifest),
+                                "dependencies": [
+                                    {"name": "serde", "rename": None, "kind": None}
+                                ],
+                            }
+                        ]
+                    }
+                ),
+                "",
+            )
+            with patch(
+                "sc_lint.lint_cargo_shear.subprocess.run", return_value=completed
+            ):
+                metadata = load_cargo_shear_workspace_metadata(repo_root)
+
+        self.assertIn("external-member.serde", metadata.allowed_unused_dependency_keys)
+        self.assertNotIn(member_manifest.as_posix(), metadata.manifest_packages)
+
     def test_cargo_shear_validation_reports_exact_path_key_migration(self) -> None:
         metadata = CargoShearWorkspaceMetadata(
             {"crates/app/Cargo.toml": APP_PACKAGE},

@@ -217,8 +217,20 @@ def load_cargo_shear_workspace_metadata(
         if not isinstance(package, dict):
             continue
         package_name = package.get("name")
+        if not isinstance(package_name, str):
+            continue
+
+        dependencies = package.get("dependencies", [])
+        if isinstance(dependencies, list):
+            for dependency in dependencies:
+                if not isinstance(dependency, dict):
+                    continue
+                dependency_name = dependency.get("rename") or dependency.get("name")
+                if isinstance(dependency_name, str):
+                    allowed_keys.add(f"{package_name}.{dependency_name}")
+
         manifest_path = package.get("manifest_path")
-        if not isinstance(package_name, str) or not isinstance(manifest_path, str):
+        if not isinstance(manifest_path, str):
             continue
         try:
             relative_manifest = Path(manifest_path).resolve().relative_to(resolved_root).as_posix()
@@ -226,15 +238,6 @@ def load_cargo_shear_workspace_metadata(
             continue
         manifest_packages[relative_manifest] = package_name
         manifest_packages[Path(manifest_path).resolve().as_posix()] = package_name
-        dependencies = package.get("dependencies", [])
-        if not isinstance(dependencies, list):
-            continue
-        for dependency in dependencies:
-            if not isinstance(dependency, dict):
-                continue
-            dependency_name = dependency.get("rename") or dependency.get("name")
-            if isinstance(dependency_name, str):
-                allowed_keys.add(f"{package_name}.{dependency_name}")
 
     root_manifest_path = resolved_root / "Cargo.toml"
     try:
