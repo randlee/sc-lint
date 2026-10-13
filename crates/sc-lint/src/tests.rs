@@ -2968,141 +2968,167 @@ fn matrix_steps() -> Vec<ConsumerProfileStep> {
     ]
 }
 
-/// Expected decisions for every injected host and scope over [`matrix_steps`].
-fn matrix_expectations() -> Vec<(Platform, PlatformScope, Vec<String>)> {
+type MatrixRow = (Platform, PlatformScope, Vec<String>);
+
+fn labels(items: &[&str]) -> Vec<String> {
+    items
+        .iter()
+        .map(|item| match item.split_once(':') {
+            Some(("run", name)) => run_label(name),
+            Some(("cmd", name)) => cross_command_label(name),
+            Some(("tgt", name)) => cross_target_label(name),
+            _ => panic!("bad expectation label `{item}`"),
+        })
+        .collect()
+}
+
+/// Expected decisions for every scope on a Linux host over [`matrix_steps`].
+fn linux_matrix_rows() -> Vec<MatrixRow> {
     use Platform::{Linux, MacOS, Windows};
-    let run = run_label;
-    let cmd = cross_command_label;
-    let tgt = cross_target_label;
-    let named = PlatformScope::Named;
-    let host_linux = vec![run("plain"), run("linux-tool"), run("linux-check")];
-    let host_mac = vec![run("plain"), run("mac-tool"), run("mac-check")];
-    let host_windows = vec![
-        run("plain"),
-        run("win-tool"),
-        run("win-check"),
-        run("win-gnu"),
-    ];
+    let host = labels(&["run:plain", "run:linux-tool", "run:linux-check"]);
     vec![
-        (Linux, PlatformScope::Host, host_linux.clone()),
-        (Linux, named(Linux), host_linux),
+        (Linux, PlatformScope::Host, host.clone()),
+        (Linux, PlatformScope::Named(Linux), host),
         (
             Linux,
             PlatformScope::All,
-            vec![
-                run("plain"),
-                run("linux-tool"),
-                cmd("mac-tool"),
-                cmd("win-tool"),
-                run("linux-check"),
-                tgt("mac-check"),
-                run("win-check"),
-                tgt("win-gnu"),
-            ],
+            labels(&[
+                "run:plain",
+                "run:linux-tool",
+                "cmd:mac-tool",
+                "cmd:win-tool",
+                "run:linux-check",
+                "tgt:mac-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
         ),
         (
             Linux,
-            named(MacOS),
-            vec![
-                run("plain"),
-                run("linux-tool"),
-                cmd("mac-tool"),
-                run("linux-check"),
-                tgt("mac-check"),
-            ],
+            PlatformScope::Named(MacOS),
+            labels(&[
+                "run:plain",
+                "run:linux-tool",
+                "cmd:mac-tool",
+                "run:linux-check",
+                "tgt:mac-check",
+            ]),
         ),
         (
             Linux,
-            named(Windows),
-            vec![
-                run("plain"),
-                run("linux-tool"),
-                cmd("win-tool"),
-                run("linux-check"),
-                run("win-check"),
-                tgt("win-gnu"),
-            ],
-        ),
-        (MacOS, PlatformScope::Host, host_mac.clone()),
-        (MacOS, named(MacOS), host_mac),
-        (
-            MacOS,
-            PlatformScope::All,
-            vec![
-                run("plain"),
-                cmd("linux-tool"),
-                run("mac-tool"),
-                cmd("win-tool"),
-                tgt("linux-check"),
-                run("mac-check"),
-                run("win-check"),
-                tgt("win-gnu"),
-            ],
-        ),
-        (
-            MacOS,
-            named(Linux),
-            vec![
-                run("plain"),
-                cmd("linux-tool"),
-                run("mac-tool"),
-                tgt("linux-check"),
-                run("mac-check"),
-            ],
-        ),
-        (
-            MacOS,
-            named(Windows),
-            vec![
-                run("plain"),
-                run("mac-tool"),
-                cmd("win-tool"),
-                run("mac-check"),
-                run("win-check"),
-                tgt("win-gnu"),
-            ],
-        ),
-        (Windows, PlatformScope::Host, host_windows.clone()),
-        (Windows, named(Windows), host_windows),
-        (
-            Windows,
-            PlatformScope::All,
-            vec![
-                run("plain"),
-                cmd("linux-tool"),
-                cmd("mac-tool"),
-                run("win-tool"),
-                tgt("linux-check"),
-                tgt("mac-check"),
-                run("win-check"),
-                run("win-gnu"),
-            ],
-        ),
-        (
-            Windows,
-            named(Linux),
-            vec![
-                run("plain"),
-                cmd("linux-tool"),
-                run("win-tool"),
-                tgt("linux-check"),
-                run("win-check"),
-                run("win-gnu"),
-            ],
-        ),
-        (
-            Windows,
-            named(MacOS),
-            vec![
-                run("plain"),
-                cmd("mac-tool"),
-                run("win-tool"),
-                tgt("mac-check"),
-                run("win-check"),
-                run("win-gnu"),
-            ],
+            PlatformScope::Named(Windows),
+            labels(&[
+                "run:plain",
+                "run:linux-tool",
+                "cmd:win-tool",
+                "run:linux-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
         ),
     ]
+}
+
+/// Expected decisions for every scope on a macOS host over [`matrix_steps`].
+fn macos_matrix_rows() -> Vec<MatrixRow> {
+    use Platform::{Linux, MacOS, Windows};
+    let host = labels(&["run:plain", "run:mac-tool", "run:mac-check"]);
+    vec![
+        (MacOS, PlatformScope::Host, host.clone()),
+        (MacOS, PlatformScope::Named(MacOS), host),
+        (
+            MacOS,
+            PlatformScope::All,
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "run:mac-tool",
+                "cmd:win-tool",
+                "tgt:linux-check",
+                "run:mac-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
+        ),
+        (
+            MacOS,
+            PlatformScope::Named(Linux),
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "run:mac-tool",
+                "tgt:linux-check",
+                "run:mac-check",
+            ]),
+        ),
+        (
+            MacOS,
+            PlatformScope::Named(Windows),
+            labels(&[
+                "run:plain",
+                "run:mac-tool",
+                "cmd:win-tool",
+                "run:mac-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
+        ),
+    ]
+}
+
+/// Expected decisions for every scope on a Windows host over [`matrix_steps`].
+fn windows_matrix_rows() -> Vec<MatrixRow> {
+    use Platform::{Linux, MacOS, Windows};
+    let host = labels(&["run:plain", "run:win-tool", "run:win-check", "run:win-gnu"]);
+    vec![
+        (Windows, PlatformScope::Host, host.clone()),
+        (Windows, PlatformScope::Named(Windows), host),
+        (
+            Windows,
+            PlatformScope::All,
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "cmd:mac-tool",
+                "run:win-tool",
+                "tgt:linux-check",
+                "tgt:mac-check",
+                "run:win-check",
+                "run:win-gnu",
+            ]),
+        ),
+        (
+            Windows,
+            PlatformScope::Named(Linux),
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "run:win-tool",
+                "tgt:linux-check",
+                "run:win-check",
+                "run:win-gnu",
+            ]),
+        ),
+        (
+            Windows,
+            PlatformScope::Named(MacOS),
+            labels(&[
+                "run:plain",
+                "cmd:mac-tool",
+                "run:win-tool",
+                "tgt:mac-check",
+                "run:win-check",
+                "run:win-gnu",
+            ]),
+        ),
+    ]
+}
+
+fn matrix_expectations() -> Vec<MatrixRow> {
+    let mut rows = linux_matrix_rows();
+    rows.extend(macos_matrix_rows());
+    rows.extend(windows_matrix_rows());
+    rows
 }
 
 #[test]
@@ -3269,12 +3295,6 @@ fn test_profile_selection_order_and_no_duplicates() {
 
 fn invalid_profile_cases() -> Vec<(&'static str, String, &'static str)> {
     let rows = lint_rows(&["fmt", "spell"]);
-    let msvc = "x86_64-pc-windows-msvc";
-    let targeted = |command: &str, platform: &str, target: &str| {
-        format!(
-            "{rows}[[tool.sc-lint.lint]]\nname = \"w\"\ncommand = {command}\nplatform = \"{platform}\"\ntarget = \"{target}\"\n"
-        )
-    };
     let profiles = |table: &str| format!("[tool.sc-lint.lint_profiles]\n{table}\n\n{rows}");
     vec![
         ("empty", profiles("fast = []"), "PROFILE.EMPTY_MEMBERS"),
@@ -3298,6 +3318,18 @@ fn invalid_profile_cases() -> Vec<(&'static str, String, &'static str)> {
             profiles("all = [\"fmt\"]"),
             "PROFILE.AMBIGUOUS_NAME",
         ),
+    ]
+}
+
+fn invalid_step_cases() -> Vec<(&'static str, String, &'static str)> {
+    let rows = lint_rows(&["fmt", "spell"]);
+    let msvc = "x86_64-pc-windows-msvc";
+    let targeted = |command: &str, platform: &str, target: &str| {
+        format!(
+            "{rows}[[tool.sc-lint.lint]]\nname = \"w\"\ncommand = {command}\nplatform = \"{platform}\"\ntarget = \"{target}\"\n"
+        )
+    };
+    vec![
         (
             "unknown-field",
             format!(
@@ -3358,7 +3390,10 @@ fn invalid_profile_cases() -> Vec<(&'static str, String, &'static str)> {
 
 #[test]
 fn test_profile_rejects_invalid_members_and_targets() {
-    for (label, rows, detail_code) in invalid_profile_cases() {
+    for (label, rows, detail_code) in invalid_profile_cases()
+        .into_iter()
+        .chain(invalid_step_cases())
+    {
         let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
         let error = loaded.expect_err(label);
         assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE, "{label}");
