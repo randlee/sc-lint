@@ -29,10 +29,18 @@
     ],
     "manifests": [
       "SCB-MANIFEST-001",
-      "SCB-MANIFEST-002"
+      "SCB-MANIFEST-002",
+      "SCB-MANIFEST-003",
+      "SCB-MANIFEST-004",
+      "SCB-MANIFEST-005",
+      "SCB-MANIFEST-006"
     ]
   },
-  "own_keys": [],
+  "own_keys": [
+    "manifest_dependency_allowlists",
+    "global_dependency_ownership",
+    "manifest_section_rules"
+  ],
   "rules": [
     "SCB-CYCLE-001",
     "SCB-CYCLE-002",
@@ -47,6 +55,10 @@
     "SCB-DEPENDENCY-003",
     "SCB-DEPENDENCY-004",
     "SCB-MANIFEST-001",
-    "SCB-MANIFEST-002"
+    "SCB-MANIFEST-002",
+    "SCB-MANIFEST-003",
+    "SCB-MANIFEST-004",
+    "SCB-MANIFEST-005",
+    "SCB-MANIFEST-006"
   ]
 }

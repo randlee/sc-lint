@@ -38,6 +38,7 @@ use thiserror::Error;
 mod analysis;
 mod graph;
 mod inventory;
+mod manifest_dependency_policy;
 mod manifest_policy;
 mod package_policy;
 mod render;
@@ -168,6 +169,10 @@ pub enum RuleId {
     ScbDependency004,
     ScbManifest001,
     ScbManifest002,
+    ScbManifest003,
+    ScbManifest004,
+    ScbManifest005,
+    ScbManifest006,
 }
 
 impl RuleId {
@@ -187,6 +192,10 @@ impl RuleId {
             Self::ScbDependency004 => "SCB-DEPENDENCY-004",
             Self::ScbManifest001 => "SCB-MANIFEST-001",
             Self::ScbManifest002 => "SCB-MANIFEST-002",
+            Self::ScbManifest003 => "SCB-MANIFEST-003",
+            Self::ScbManifest004 => "SCB-MANIFEST-004",
+            Self::ScbManifest005 => "SCB-MANIFEST-005",
+            Self::ScbManifest006 => "SCB-MANIFEST-006",
         }
     }
 }
@@ -292,6 +301,10 @@ pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbDependency004),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
+    rule(RuleId::ScbManifest003),
+    rule(RuleId::ScbManifest004),
+    rule(RuleId::ScbManifest005),
+    rule(RuleId::ScbManifest006),
 ];
 
 /// Every id except SCB-CYCLE-002/003: the set `analysis::finding_is_failure` fails on.
@@ -308,6 +321,10 @@ pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbDependency004),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
+    rule(RuleId::ScbManifest003),
+    rule(RuleId::ScbManifest004),
+    rule(RuleId::ScbManifest005),
+    rule(RuleId::ScbManifest006),
 ];
 
 /// Families keep today's CLI spellings (kebab-case, as clap rendered the old
@@ -351,11 +368,22 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
         ),
         (
             "manifests",
-            &[rule(RuleId::ScbManifest001), rule(RuleId::ScbManifest002)],
+            &[
+                rule(RuleId::ScbManifest001),
+                rule(RuleId::ScbManifest002),
+                rule(RuleId::ScbManifest003),
+                rule(RuleId::ScbManifest004),
+                rule(RuleId::ScbManifest005),
+                rule(RuleId::ScbManifest006),
+            ],
         ),
     ],
     default_fail: DEFAULT_FAIL_IDS,
-    own_keys: &[],
+    own_keys: &[
+        "manifest_dependency_allowlists",
+        "global_dependency_ownership",
+        "manifest_section_rules",
+    ],
 };
 
 fn disabled_report() -> FindingsReport {
@@ -739,6 +767,8 @@ pub fn analyze_workspace_configured(
     if !settings.enabled {
         return Ok(disabled_report());
     }
+    let policy_config = manifest_dependency_policy::parse_policy(&settings)
+        .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
     if settings.rule_filter.as_ref().is_some_and(|selected| {
         selected.len() == 1 && selected.contains(&rule(RuleId::ScbBoundary004))
     }) {
@@ -747,6 +777,34 @@ pub fn analyze_workspace_configured(
     let mut options = options.clone();
     options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
     let mut report = analyze_workspace(&options)?;
+    if manifest_policy_selected(&settings) && !policy_config.is_empty() {
+        let metadata = graph::load_metadata(&options.root)
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
+        let inventory = if policy_config.requires_inventory() {
+            Some(load_validated_inventory(&options.root, &metadata)?)
+        } else {
+            None
+        };
+        report.findings.extend(
+            manifest_dependency_policy::analyze_policy(
+                &options.root,
+                &metadata,
+                inventory.as_ref(),
+                &policy_config,
+            )
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
+        );
+        report.findings.sort_by(|left, right| {
+            analysis::finding_sort_key(left)
+                .cmp(&analysis::finding_sort_key(right))
+                .then_with(|| left.message.cmp(&right.message))
+        });
+        report.status = if report.findings.iter().any(analysis::finding_is_failure) {
+            ReportStatus::Fail
+        } else {
+            ReportStatus::Pass
+        };
+    }
     let findings: Vec<_> = std::mem::take(&mut report.findings)
         .into_iter()
         .map(|finding| {
@@ -761,10 +819,42 @@ pub fn analyze_workspace_configured(
     Ok(report)
 }
 
+fn manifest_policy_selected(settings: &sc_lint_analyzer_support::AnalyzerSettings) -> bool {
+    let manifest_policy_ids = [
+        rule(RuleId::ScbManifest003),
+        rule(RuleId::ScbManifest004),
+        rule(RuleId::ScbManifest005),
+        rule(RuleId::ScbManifest006),
+    ];
+    settings.rule_filter.as_ref().is_none_or(|selected| {
+        manifest_policy_ids
+            .iter()
+            .any(|rule| selected.contains(rule))
+    })
+}
+
+fn load_validated_inventory(
+    root: &Path,
+    metadata: &cargo_metadata::Metadata,
+) -> std::result::Result<inventory::ValidatedInventory, BoundaryError> {
+    let raw = inventory::load_boundary_inventory(root)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    inventory::validate_owner_crate_paths(&raw, metadata)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    let packages = workspace_packages(metadata);
+    let resolver = inventory::WorkspacePackageResolver::from_workspace_packages(&packages);
+    Ok(inventory::validate_inventory(raw, &resolver).0)
+}
+
 fn manifest_finding_path(finding: &Finding) -> Option<RepoRelativePath> {
     matches!(
         finding.rule_id,
-        RuleId::ScbManifest001 | RuleId::ScbManifest002
+        RuleId::ScbManifest001
+            | RuleId::ScbManifest002
+            | RuleId::ScbManifest003
+            | RuleId::ScbManifest004
+            | RuleId::ScbManifest005
+            | RuleId::ScbManifest006
     )
     .then(|| finding.owner_ids.first())
     .flatten()
