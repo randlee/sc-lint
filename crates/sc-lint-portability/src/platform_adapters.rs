@@ -25,7 +25,7 @@ use crate::predicates::attr_is_cfg_windows;
 pub(super) struct PlatformAdapterRecord {
     unix_module: String,
     windows_module: String,
-    reason: String,
+    reason: NonEmptyReason,
 }
 
 pub(super) fn parse_records(
@@ -58,7 +58,13 @@ pub(super) fn parse_records(
             Ok(PlatformAdapterRecord {
                 unix_module: field("unix_module")?,
                 windows_module: field("windows_module")?,
-                reason: field("reason")?,
+                reason: field("reason").map(NonEmptyReason::new)?.ok_or_else(|| {
+                    AnalyzerConfigError::WrongType {
+                        analyzer: "portability",
+                        key: format!("platform_adapters[{index}].reason"),
+                        expected: "a non-empty string",
+                    }
+                })?,
             })
         })
         .collect()
@@ -131,15 +137,14 @@ pub enum AdapterPathCause {
     NotRustSource,
 }
 
-#[derive(Debug, Clone)]
-struct NonEmptyReason(String);
+/// A platform adapter's required justification: never empty or blank.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct NonEmptyReason(String);
 
-#[derive(Debug, Clone)]
-struct PlatformAdapterPair {
-    unix: RepoRelativePath,
-    windows: RepoRelativePath,
-    reason: NonEmptyReason,
-    unix_declaration: ModuleDeclaration,
+impl NonEmptyReason {
+    pub(super) fn new(value: String) -> Option<Self> {
+        (!value.trim().is_empty()).then_some(Self(value))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -186,7 +191,7 @@ pub(super) fn validate(
     let mut validate_pair = |root: &Path,
                              record: &PlatformAdapterRecord,
                              index: usize|
-     -> Result<PlatformAdapterPair, AdapterConfigError> {
+     -> Result<ModuleDeclaration, AdapterConfigError> {
         let unix = validate_path(root, index, "unix_module", &record.unix_module)?;
         let windows = validate_path(root, index, "windows_module", &record.windows_module)?;
         let unix_path = canonical_module_path(root, index, "unix_module", &unix)?;
@@ -208,31 +213,18 @@ pub(super) fn validate(
             &windows_path,
             "windows",
         )?;
-        Ok(PlatformAdapterPair {
-            unix,
-            windows,
-            reason: NonEmptyReason(record.reason.clone()),
-            unix_declaration,
-        })
+        Ok(unix_declaration)
     };
-    let pairs = records
+    let unix_declarations = records
         .iter()
         .enumerate()
-        .map(|(index, record)| validate_pair(&root, record, index))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|(index, record)| {
+            validate_pair(&root, record, index)
+                .map(|declaration| (declaration.source_path, declaration.line))
+        })
+        .collect::<Result<_, _>>()?;
 
-    Ok(PlatformAdapters {
-        unix_declarations: pairs
-            .into_iter()
-            .map(|pair| {
-                let _ = (&pair.unix, &pair.windows, &pair.reason.0);
-                (
-                    pair.unix_declaration.source_path,
-                    pair.unix_declaration.line,
-                )
-            })
-            .collect(),
-    })
+    Ok(PlatformAdapters { unix_declarations })
 }
 
 fn ensure_distinct(

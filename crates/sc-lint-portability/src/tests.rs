@@ -2211,3 +2211,12 @@ fn trim_indentation(input: &str) -> String {
     }
     output
 }
+
+#[test]
+fn platform_adapter_reason_rejects_empty_and_blank_text() {
+    use crate::platform_adapters::NonEmptyReason;
+
+    assert_eq!(NonEmptyReason::new(String::new()), None);
+    assert_eq!(NonEmptyReason::new(" \t\n".to_owned()), None);
+    assert!(NonEmptyReason::new("Reviewed private transport adapter.".to_owned()).is_some());
+}
