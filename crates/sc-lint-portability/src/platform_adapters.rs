@@ -163,12 +163,42 @@ pub(super) fn validate(
             value: root.display().to_string(),
         })?;
     let mut used_files = BTreeSet::new();
+    let mut validate_pair = |root: &Path,
+                             record: &PlatformAdapterRecord,
+                             index: usize|
+     -> Result<PlatformAdapterPair, AdapterConfigError> {
+        let unix = validate_path(root, index, "unix_module", &record.unix_module)?;
+        let windows = validate_path(root, index, "windows_module", &record.windows_module)?;
+        let unix_path = canonical_module_path(root, index, "unix_module", &unix)?;
+        let windows_path = canonical_module_path(root, index, "windows_module", &windows)?;
+        ensure_distinct(index, record, &mut used_files, &unix_path, &windows_path)?;
+        let unix_declaration = validate_declaration(
+            &declarations,
+            index,
+            "unix_module",
+            &record.unix_module,
+            &unix_path,
+            "unix",
+        )?;
+        validate_declaration(
+            &declarations,
+            index,
+            "windows_module",
+            &record.windows_module,
+            &windows_path,
+            "windows",
+        )?;
+        Ok(PlatformAdapterPair {
+            unix,
+            windows,
+            reason: NonEmptyReason(record.reason.clone()),
+            unix_declaration,
+        })
+    };
     let pairs = records
         .iter()
         .enumerate()
-        .map(|(index, record)| {
-            validate_record(&root, &declarations, &mut used_files, index, record)
-        })
+        .map(|(index, record)| validate_pair(&root, record, index))
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(PlatformAdapters {
@@ -182,42 +212,6 @@ pub(super) fn validate(
                 )
             })
             .collect(),
-    })
-}
-
-fn validate_record(
-    root: &Path,
-    declarations: &BTreeMap<PathBuf, ModuleDeclaration>,
-    used_files: &mut BTreeSet<PathBuf>,
-    index: usize,
-    record: &PlatformAdapterRecord,
-) -> Result<PlatformAdapterPair, AdapterConfigError> {
-    let unix = validate_path(root, index, "unix_module", &record.unix_module)?;
-    let windows = validate_path(root, index, "windows_module", &record.windows_module)?;
-    let unix_path = canonical_module_path(root, index, "unix_module", &unix)?;
-    let windows_path = canonical_module_path(root, index, "windows_module", &windows)?;
-    ensure_distinct(index, record, used_files, &unix_path, &windows_path)?;
-    let unix_declaration = validate_declaration(
-        declarations,
-        index,
-        "unix_module",
-        &record.unix_module,
-        &unix_path,
-        "unix",
-    )?;
-    validate_declaration(
-        declarations,
-        index,
-        "windows_module",
-        &record.windows_module,
-        &windows_path,
-        "windows",
-    )?;
-    Ok(PlatformAdapterPair {
-        unix,
-        windows,
-        reason: NonEmptyReason(record.reason.clone()),
-        unix_declaration,
     })
 }
 
