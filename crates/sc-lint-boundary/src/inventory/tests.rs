@@ -1,4 +1,5 @@
 use super::load_boundary_inventory;
+use std::collections::BTreeSet;
 use tempfile::TempDir;
 
 struct InventoryFixture {
@@ -1043,6 +1044,36 @@ fn loads_allowed_dev_dependencies() {
     });
 
     load_boundary_inventory(fixture.root()).expect("allowed dev dependencies load");
+}
+
+#[test]
+fn preserves_optional_allowed_dev_dependents() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+
+    let inventory = load_boundary_inventory(fixture.root()).expect("inventory loads");
+    assert!(
+        inventory.records[0]
+            .dependencies
+            .allowed_dev_dependents
+            .is_none()
+    );
+
+    fixture.rewrite_valid_boundary(|contents| {
+        contents.replace(
+            "forbidden_edges = []",
+            "allowed_dev_dependents = []\nforbidden_edges = []",
+        )
+    });
+    let inventory = load_boundary_inventory(fixture.root()).expect("inventory loads");
+    assert_eq!(
+        inventory.records[0]
+            .dependencies
+            .allowed_dev_dependents
+            .as_ref()
+            .map(BTreeSet::len),
+        Some(0)
+    );
 }
 
 #[test]

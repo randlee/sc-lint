@@ -52,6 +52,7 @@ struct ResolvedDependencyPolicy {
     allowed_dependencies: BTreeSet<WorkspacePackageName>,
     allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
     allowed_dependents: BTreeSet<WorkspacePackageName>,
+    allowed_dev_dependents: Option<BTreeSet<WorkspacePackageName>>,
     forbidden_edges: BTreeSet<PackageEdge>,
 }
 
@@ -136,14 +137,17 @@ fn collect_policy_findings(
         .collect::<BTreeSet<_>>();
     let mut findings = Vec::new();
     let mut forbidden_findings = BTreeSet::new();
-    let incoming_edges = index_incoming_edges(&direct_edges);
+    let policies = inventory
+        .records
+        .iter()
+        .filter(|record| record.status.state.requires_workspace_package())
+        .map(|record| {
+            resolve_dependency_policy(resolver, known_non_workspace_packages, record)
+                .map(|policy| (record, policy))
+        })
+        .collect::<Result<Vec<_>>>()?;
 
-    for record in &inventory.records {
-        if !record.status.state.requires_workspace_package() {
-            continue;
-        }
-        let policy = resolve_dependency_policy(resolver, known_non_workspace_packages, record)?;
-
+    for (record, policy) in &policies {
         for edge in runtime_edges
             .iter()
             .filter(|edge| edge.from == policy.owner)
@@ -168,22 +172,18 @@ fn collect_policy_findings(
             }
         }
 
-        for dependent in incoming_edges.get(&policy.owner).into_iter().flatten() {
-            if !policy.allowed_dependents.contains(dependent) {
-                findings.push(disallowed_dependent_finding(
-                    record,
-                    dependent,
-                    &policy.owner,
-                ));
-            }
-        }
-
-        for edge in policy.forbidden_edges {
+        for edge in &policy.forbidden_edges {
             if direct_edges.contains(&edge) && forbidden_findings.insert(edge.clone()) {
                 findings.push(forbidden_edge_finding(&edge));
             }
         }
     }
+
+    findings.extend(collect_incoming_policy_findings(
+        &policies,
+        runtime_edges,
+        dev_edges,
+    ));
 
     findings.sort_by(|left, right| {
         left.rule_id
@@ -228,6 +228,20 @@ fn resolve_dependency_policy(
             "dependencies.allowed_dependents",
             &record.dependencies.allowed_dependents,
         )?,
+        allowed_dev_dependents: record
+            .dependencies
+            .allowed_dev_dependents
+            .as_ref()
+            .map(|references| {
+                resolve_policy_references(
+                    resolver,
+                    known_non_workspace_packages,
+                    record,
+                    "dependencies.allowed_dev_dependents",
+                    references,
+                )
+            })
+            .transpose()?,
         forbidden_edges: record
             .dependencies
             .forbidden_edges
@@ -255,6 +269,52 @@ fn resolve_dependency_policy(
             })
             .collect::<Result<BTreeSet<_>>>()?,
     })
+}
+
+fn collect_incoming_policy_findings(
+    policies: &[(&BoundaryRecord, ResolvedDependencyPolicy)],
+    runtime_edges: &BTreeSet<PackageEdge>,
+    dev_edges: &BTreeSet<PackageEdge>,
+) -> Vec<Finding> {
+    let mut owners = BTreeMap::<
+        WorkspacePackageName,
+        (
+            &BoundaryRecord,
+            BTreeSet<WorkspacePackageName>,
+            BTreeSet<WorkspacePackageName>,
+        ),
+    >::new();
+    for (record, policy) in policies {
+        let entry = owners
+            .entry(policy.owner.clone())
+            .or_insert_with(|| (*record, BTreeSet::new(), BTreeSet::new()));
+        entry.1.extend(policy.allowed_dependents.iter().cloned());
+        entry.2.extend(
+            policy
+                .allowed_dev_dependents
+                .as_ref()
+                .unwrap_or(&policy.allowed_dependents)
+                .iter()
+                .cloned(),
+        );
+    }
+
+    let runtime_incoming = index_incoming_edges(runtime_edges);
+    let dev_incoming = index_incoming_edges(dev_edges);
+    let mut findings = Vec::new();
+    for (owner, (record, runtime_allowed, dev_allowed)) in owners {
+        for dependent in runtime_incoming.get(&owner).into_iter().flatten() {
+            if !runtime_allowed.contains(dependent) {
+                findings.push(disallowed_dependent_finding(record, dependent, &owner));
+            }
+        }
+        for dependent in dev_incoming.get(&owner).into_iter().flatten() {
+            if !dev_allowed.contains(dependent) {
+                findings.push(disallowed_dependent_finding(record, dependent, &owner));
+            }
+        }
+    }
+    findings
 }
 
 fn resolve_policy_references(
