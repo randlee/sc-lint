@@ -6,21 +6,23 @@ Intent: `docs/plans/phase-j/intent.md`
 
 | ID | Status | Summary | Stated |
 | --- | --- | --- | --- |
-| ANC-001 | proposed | No input from Rand | 2026-10-13 |
-| ANC-002 | proposed | Only the needed file changes | 2026-10-13 |
-| ANC-003 | proposed | Test that it works | 2026-10-13 |
-| ANC-004 | proposed | No edits to other skills | 2026-10-13 |
-| ANC-005 | proposed | Read the changelog | 2026-10-13 |
-| ANC-006 | proposed | Handle deprecations | 2026-10-13 |
-| ANC-007 | proposed | Execute formula steps in order | 2026-10-13 |
-| ANC-008 | proposed | Breaking: stop at ready develop PR | 2026-10-13 |
-| ANC-009 | proposed | Breaking: impact assessment in PR | 2026-10-13 |
-| ANC-010 | proposed | No WIP: PR to main passed preflight | 2026-10-13 |
-| ANC-011 | proposed | No WIP: patch version bump | 2026-10-13 |
-| ANC-012 | proposed | Decision points message omega-prime | 2026-10-13 |
-| ANC-013 | proposed | Escalations go to omega-prime | 2026-10-13 |
-| ANC-014 | proposed | Green protected PR: notify omega-prime | 2026-10-13 |
-| ANC-015 | proposed | rand-lee reviews develop/main PRs | 2026-10-13 |
+| ANC-001 | locked | No input from Rand | 2026-10-13 |
+| ANC-002 | locked | Only the needed file changes | 2026-10-13 |
+| ANC-003 | locked | Test that it works | 2026-10-13 |
+| ANC-004 | locked | No edits to other skills | 2026-10-13 |
+| ANC-005 | locked | Read the changelog | 2026-10-13 |
+| ANC-006 | locked | Handle deprecations | 2026-10-13 |
+| ANC-007 | locked | Execute formula steps in order | 2026-10-13 |
+| ANC-008 | locked | Breaking: stop at ready develop PR | 2026-10-13 |
+| ANC-009 | locked | Breaking: impact assessment in PR | 2026-10-13 |
+| ANC-010 | locked | No WIP: PR to main passed preflight | 2026-10-13 |
+| ANC-011 | locked | No WIP: patch version bump | 2026-10-13 |
+| ANC-012 | locked | Decision points message omega-prime | 2026-10-13 |
+| ANC-013 | locked | Escalations go to omega-prime | 2026-10-13 |
+| ANC-014 | locked | Green protected PR: notify omega-prime | 2026-10-13 |
+| ANC-015 | locked | rand-lee reviews develop/main PRs | 2026-10-13 |
+| ANC-016 | locked | Floors move to the new version | 2026-10-13 |
+| ANC-017 | locked | Minor break: fix and announce | 2026-10-13 |
 
 ## ANC-001
 
@@ -28,7 +30,7 @@ Anchor: An sc-compose version upgrade run must complete without any step that wa
 
 > I want upgrades of dependent libraries to be completed atonamously with no input from me.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 3.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 3.
 
 Summary: No input from Rand
 
@@ -44,7 +46,7 @@ Anchor: An sc-compose version upgrade must change only the repository files that
 
 > the responsibliity is to make the 2-3 file changes necessary and be done
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Only the needed file changes
 
@@ -60,7 +62,7 @@ Anchor: An sc-compose version upgrade must run the repository's test suite after
 
 > you are writing a formula that likely needs to edit 3-4 lines in the repo. and test that it works
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Test that it works
 
@@ -76,7 +78,7 @@ Anchor: An sc-compose version upgrade must not change any file under another ski
 
 > we can not micromanage other skills.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 3.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 3.
 
 Summary: No edits to other skills
 
@@ -92,7 +94,7 @@ Anchor: The sc-compose version upgrade agent must read the sc-compose CHANGELOG.
 
 > the agent should read the change-log or other appropriate documentation.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Read the changelog
 
@@ -108,7 +110,7 @@ Anchor: For each deprecation or recommended change listed in the new sc-compose 
 
 > if there are recommended changes, deprrecations, those should be handled.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Handle deprecations
 
@@ -124,7 +126,7 @@ Anchor: An sc-compose version upgrade must execute only the steps poured from th
 
 > The purpose of using a formula is to have the planning work done ahead of time.  we can directly build and execute the sprint steps in order.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Execute formula steps in order
 
@@ -140,7 +142,7 @@ Anchor: When an sc-compose version upgrade has breaking changes, it must not ope
 
 > no if there are breaking changes, proceed with completing the work and STOP with pr ready to merge to develop AND an impace accessment.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Breaking: stop at ready develop PR
 
@@ -156,7 +158,7 @@ Anchor: When an sc-compose upgrade has breaking changes, its PR to develop must 
 
 > no if there are breaking changes, proceed with completing the work and STOP with pr ready to merge to develop AND an impace accessment.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Breaking: impact assessment in PR
 
@@ -172,7 +174,7 @@ Anchor: When no other work is in progress, an sc-compose version upgrade must en
 
 > if there is NOT other work in progress, I expect this to end up in a pr to main that has passed publish-preflight and has a patch++ version bump ready to publish as soon as I approve the pr to main.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: No WIP: PR to main passed preflight
 
@@ -188,7 +190,7 @@ Anchor: When no other work is in progress, the sc-compose version upgrade's PR t
 
 > if there is NOT other work in progress, I expect this to end up in a pr to main that has passed publish-preflight and has a patch++ version bump ready to publish as soon as I approve the pr to main.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: No WIP: patch version bump
 
@@ -204,7 +206,7 @@ Anchor: Every decision point in the upgrade-sc-compose formula must contain an e
 
 > at every decision point, there should be explicit instruction to send to omega-prime@hermes.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Decision points message omega-prime
 
@@ -220,7 +222,7 @@ Anchor: Every escalation from an sc-compose version upgrade run must be sent wit
 
 > Since the entire process will run unattended, all escelation will be to omega-prime@hermes
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Escalations go to omega-prime
 
@@ -236,7 +238,7 @@ Anchor: When CI is green on an sc-compose version upgrade PR to develop or main,
 
 > regarding protected branch merge to develop AND to master, when ci is green (after preflight and release-candidate tagging is done), notify omega-prime@hermes to notify me to complete the pr.
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: Green protected PR: notify omega-prime
 
@@ -252,7 +254,7 @@ Anchor: Every PR to develop or main must have GitHub user rand-lee added as a re
 
 > add github/rand-lee as reviewer for any pr to develop or main
 
-Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: proposed. Version 2.
+Said by Rand Lee, phase-j sc-compose upgrade formula, 2026-10-13. Status: locked. Version 2.
 
 Summary: rand-lee reviews develop/main PRs
 
@@ -261,3 +263,35 @@ Scope: the upgrade-sc-compose formula (.atm-bd/formula/upgrade-sc-compose.formul
 Fixtures:
 - pass: The develop PR is opened and rand-lee is added with gh api .../requested_reviewers -f 'reviewers[]=rand-lee'.
 - fail: The PR to main is opened with no reviewer requested.
+
+## ANC-016
+
+Anchor: An sc-compose version upgrade must raise the repository's minimum required sc-compose version to the new version.
+
+> I would require 1.7.1 sc-compose for floor.
+
+Said by Rand Lee, AskUserQuestion answer 2026-10-13 on #342 floor pins, 2026-10-13. Status: locked. Version 2.
+
+Summary: Floors move to the new version
+
+Scope: the upgrade-sc-compose formula (.atm-bd/formula/upgrade-sc-compose.formula.toml.j2) and every bead poured from it
+
+Fixtures:
+- pass: Deliverable 1 sets SC_COMPOSE_WHEEL_PIN and the MIN_SC_COMPOSE floors and install strings to the new version 1.7.1.
+- fail: Deliverable 1 bumps SC_COMPOSE_WHEEL_PIN only; the minimum-version floors stay at 1.6.1.
+
+## ANC-017
+
+Anchor: When an sc-compose upgrade's breaking change is minor, the upgrade must fix it and announce the fix in its PR to develop.
+
+> If the breaking change is minor, we should fix and announce in pr.
+
+Said by Rand Lee, AskUserQuestion answer 2026-10-13 on BREAKING CI, 2026-10-13. Status: locked. Version 2.
+
+Summary: Minor break: fix and announce
+
+Scope: the upgrade-sc-compose formula (.atm-bd/formula/upgrade-sc-compose.formula.toml.j2) and every bead poured from it
+
+Fixtures:
+- pass: A minor break found in B is fixed in a repo-owned file in this layer, and the PR description lists each break and its fix.
+- fail: A minor break found in B is left failing and the PR to develop is opened with CI red and no mention of it.
