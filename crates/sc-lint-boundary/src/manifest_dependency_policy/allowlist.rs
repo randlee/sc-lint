@@ -6,6 +6,7 @@ use anyhow::Context;
 use anyhow::Result;
 use cargo_metadata::DependencyKind;
 use cargo_metadata::Metadata;
+use cargo_metadata::Package;
 
 use super::config::DependencyPackageName;
 use super::config::ManifestAllowlist;
@@ -13,6 +14,12 @@ use crate::Finding;
 use crate::OwnerId;
 use crate::RuleId;
 use crate::inventory::ValidatedInventory;
+
+struct ActualDependencies {
+    runtime: BTreeSet<DependencyPackageName>,
+    development: BTreeSet<DependencyPackageName>,
+    all: BTreeSet<DependencyPackageName>,
+}
 
 pub(crate) fn analyze(
     root: &Path,
@@ -26,7 +33,33 @@ pub(crate) fn analyze(
     let inventory =
         inventory.context("manifest dependency allowlists require validated boundary inventory")?;
     let packages = crate::workspace_packages(metadata);
-    let manifests = packages
+    let manifests = manifest_packages(root, &packages)?;
+    let mut configured = BTreeSet::new();
+    let mut findings = Vec::new();
+
+    for allowlist in allowlists {
+        findings.extend(analyze_allowlist(
+            root,
+            inventory,
+            &manifests,
+            &mut configured,
+            allowlist,
+        ));
+    }
+    findings.extend(missing_active_owner_allowlists(
+        root,
+        inventory,
+        &packages,
+        &configured,
+    )?);
+    Ok(findings)
+}
+
+fn manifest_packages<'a>(
+    root: &Path,
+    packages: &[&'a Package],
+) -> Result<BTreeMap<String, &'a Package>> {
+    packages
         .iter()
         .map(|package| {
             Ok((
@@ -34,33 +67,49 @@ pub(crate) fn analyze(
                 *package,
             ))
         })
-        .collect::<Result<BTreeMap<_, _>>>()?;
-    let mut configured = BTreeSet::new();
-    let mut findings = Vec::new();
+        .collect()
+}
 
-    for allowlist in allowlists {
-        let owner = allowlist.owner.display();
-        if !configured.insert(owner.clone()) {
-            findings.push(stale(&owner, "duplicate allowlist owner"));
-            continue;
-        }
-        let Some(package) = manifests.get(&owner) else {
-            findings.push(stale(&owner, "owner manifest is not a workspace member"));
-            continue;
-        };
-        let active_records = inventory
-            .records()
-            .filter(|record| record.status.state.requires_workspace_package())
-            .filter(|record| record.owner_package.as_ref() == package.name.as_str())
-            .collect::<Vec<_>>();
-        if active_records.len() != 1 {
-            findings.push(stale(
-                &owner,
-                "owner must have exactly one active boundary record",
-            ));
-            continue;
-        }
-        let runtime_actual = package
+fn analyze_allowlist(
+    root: &Path,
+    inventory: &ValidatedInventory,
+    manifests: &BTreeMap<String, &Package>,
+    configured: &mut BTreeSet<String>,
+    allowlist: &ManifestAllowlist,
+) -> Vec<Finding> {
+    let owner = allowlist.owner.display();
+    if !configured.insert(owner.clone()) {
+        return vec![stale(&owner, "duplicate allowlist owner")];
+    }
+    let Some(package) = manifests.get(&owner) else {
+        return vec![stale(&owner, "owner manifest is not a workspace member")];
+    };
+    if !has_exactly_one_active_record(inventory, package) {
+        return vec![stale(
+            &owner,
+            "owner must have exactly one active boundary record",
+        )];
+    }
+    let actual = ActualDependencies::from_package(package);
+    let mut findings = compare_dependencies(&owner, &actual, allowlist);
+    findings.extend(validate_record_locks(
+        root, inventory, package, &owner, &actual, allowlist,
+    ));
+    findings
+}
+
+fn has_exactly_one_active_record(inventory: &ValidatedInventory, package: &Package) -> bool {
+    inventory
+        .records()
+        .filter(|record| record.status.state.requires_workspace_package())
+        .filter(|record| record.owner_package.as_ref() == package.name.as_str())
+        .count()
+        == 1
+}
+
+impl ActualDependencies {
+    fn from_package(package: &Package) -> Self {
+        let runtime = package
             .dependencies
             .iter()
             .filter(|dependency| {
@@ -71,80 +120,114 @@ pub(crate) fn analyze(
             })
             .map(|dependency| DependencyPackageName(dependency.name.clone()))
             .collect::<BTreeSet<_>>();
-        let dev_actual = package
+        let development = package
             .dependencies
             .iter()
             .filter(|dependency| dependency.kind == DependencyKind::Development)
             .map(|dependency| DependencyPackageName(dependency.name.clone()))
             .collect::<BTreeSet<_>>();
-        let actual = runtime_actual
-            .union(&dev_actual)
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        for dependency in actual.difference(&allowlist.allowed) {
-            findings.push(Finding {
-                rule_id: RuleId::ScbManifest003,
-                kind: "manifest_dependency_not_allowlisted".into(),
-                message: format!(
-                    "{owner}: remove dependency `{}` or review/add its permission",
-                    dependency.0
-                ),
-                owner_ids: vec![OwnerId::new(owner.clone())],
-                node_ids: Vec::new(),
-            });
-        }
-        for dependency in allowlist.allowed.difference(&actual) {
-            findings.push(stale(
-                &owner,
-                &format!("remove unused permission `{}`", dependency.0),
-            ));
-        }
-        for record_path in &allowlist.records {
-            let record_path = record_path.display();
-            let Some(record) = inventory.records().find(|record| {
-                relative(root, &record.record_path).ok().as_deref() == Some(record_path.as_str())
-            }) else {
-                findings.push(stale(
-                    &owner,
-                    &format!("record lock `{record_path}` does not name a boundary record"),
-                ));
-                continue;
-            };
-            if record.owner_package.as_ref() != package.name.as_str() {
-                findings.push(stale(
-                    &owner,
-                    &format!("record lock `{record_path}` belongs to a different owner"),
-                ));
-                continue;
-            }
-            let declared_runtime = record
-                .dependencies
-                .allowed_dependencies
-                .iter()
-                .map(|value| DependencyPackageName(value.to_string()))
-                .collect::<BTreeSet<_>>();
-            let declared_dev = record
-                .dependencies
-                .allowed_dev_dependencies
-                .iter()
-                .map(|value| DependencyPackageName(value.to_string()))
-                .collect::<BTreeSet<_>>();
-            let declared = declared_runtime
-                .union(&declared_dev)
-                .cloned()
-                .collect::<BTreeSet<_>>();
-            if declared != allowlist.allowed
-                || (!declared_dev.is_empty()
-                    && (declared_runtime != runtime_actual || declared_dev != dev_actual))
-            {
-                findings.push(stale(
-                    &owner,
-                    &format!("record lock `{record_path}` must align with the allowlist and dependency sections"),
-                ));
-            }
+        let all = runtime.union(&development).cloned().collect();
+        Self {
+            runtime,
+            development,
+            all,
         }
     }
+}
 
+fn compare_dependencies(
+    owner: &str,
+    actual: &ActualDependencies,
+    allowlist: &ManifestAllowlist,
+) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    for dependency in actual.all.difference(&allowlist.allowed) {
+        findings.push(Finding {
+            rule_id: RuleId::ScbManifest003,
+            kind: "manifest_dependency_not_allowlisted".into(),
+            message: format!(
+                "{owner}: remove dependency `{}` or review/add its permission",
+                dependency.0
+            ),
+            owner_ids: vec![OwnerId::new(owner.to_owned())],
+            node_ids: Vec::new(),
+        });
+    }
+    for dependency in allowlist.allowed.difference(&actual.all) {
+        findings.push(stale(
+            owner,
+            &format!("remove unused permission `{}`", dependency.0),
+        ));
+    }
+    findings
+}
+
+fn validate_record_locks(
+    root: &Path,
+    inventory: &ValidatedInventory,
+    package: &Package,
+    owner: &str,
+    actual: &ActualDependencies,
+    allowlist: &ManifestAllowlist,
+) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    for record_path in &allowlist.records {
+        let record_path = record_path.display();
+        let Some(record) = inventory.records().find(|record| {
+            relative(root, &record.record_path).ok().as_deref() == Some(record_path.as_str())
+        }) else {
+            findings.push(stale(
+                owner,
+                &format!("record lock `{record_path}` does not name a boundary record"),
+            ));
+            continue;
+        };
+        if record.owner_package.as_ref() != package.name.as_str() {
+            findings.push(stale(
+                owner,
+                &format!("record lock `{record_path}` belongs to a different owner"),
+            ));
+            continue;
+        }
+        let declared_runtime = record
+            .dependencies
+            .allowed_dependencies
+            .iter()
+            .map(|value| DependencyPackageName(value.to_string()))
+            .collect::<BTreeSet<_>>();
+        let declared_development = record
+            .dependencies
+            .allowed_dev_dependencies
+            .iter()
+            .map(|value| DependencyPackageName(value.to_string()))
+            .collect::<BTreeSet<_>>();
+        let declared = declared_runtime
+            .union(&declared_development)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if declared != allowlist.allowed
+            || (!declared_development.is_empty()
+                && (declared_runtime != actual.runtime
+                    || declared_development != actual.development))
+        {
+            findings.push(stale(
+                owner,
+                &format!(
+                    "record lock `{record_path}` must align with the allowlist and dependency sections"
+                ),
+            ));
+        }
+    }
+    findings
+}
+
+fn missing_active_owner_allowlists(
+    root: &Path,
+    inventory: &ValidatedInventory,
+    packages: &[&Package],
+    configured: &BTreeSet<String>,
+) -> Result<Vec<Finding>> {
+    let mut findings = Vec::new();
     for record in inventory
         .records()
         .filter(|record| record.status.state.requires_workspace_package())
