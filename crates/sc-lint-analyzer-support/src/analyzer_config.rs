@@ -433,24 +433,31 @@ impl AnalyzerSettings {
         }
     }
 
-    pub fn own_tables(
-        &self,
-        key: &str,
-    ) -> Result<Option<BTreeMap<String, toml::Table>>, AnalyzerConfigError> {
-        let Some(value) = self.own_table(key)? else {
-            return Ok(None);
+    /// Borrow analyzer-owned array entries, validating only their table shape.
+    pub fn own_tables(&self, key: &str) -> Result<Option<Vec<&toml::Table>>, AnalyzerConfigError> {
+        let values = match self.own.get(key) {
+            None => return Ok(None),
+            Some(toml::Value::Array(values)) => values,
+            Some(_) => {
+                return Err(AnalyzerConfigError::WrongType {
+                    analyzer: self.analyzer.as_str(),
+                    key: key.to_owned(),
+                    expected: "an array of tables",
+                });
+            }
         };
-        value
+        values
             .iter()
-            .map(|(name, value)| match value {
-                toml::Value::Table(table) => Ok((name.clone(), table.clone())),
+            .enumerate()
+            .map(|(index, value)| match value {
+                toml::Value::Table(table) => Ok(table),
                 _ => Err(AnalyzerConfigError::WrongType {
                     analyzer: self.analyzer.as_str(),
-                    key: format!("{key}.{name}"),
+                    key: format!("{key}[{index}]"),
                     expected: "a table",
                 }),
             })
-            .collect::<Result<BTreeMap<_, _>, _>>()
+            .collect::<Result<Vec<_>, _>>()
             .map(Some)
     }
 

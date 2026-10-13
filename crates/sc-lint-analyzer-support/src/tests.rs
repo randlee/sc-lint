@@ -399,44 +399,59 @@ fn per_rule_path_exclusions_validate_table_and_values() {
 }
 
 #[test]
-fn own_tables_require_nested_tables_with_indexed_errors() {
-    let directory = config_dir(
-        "[tool.sc-lint.analyzers.example]\n[tool.sc-lint.analyzers.example.extension]\n[tool.sc-lint.analyzers.example.extension.alpha]\nenabled = true\n",
-    );
-    let settings = load_analyzer_settings(
-        &RuleCatalog {
-            own_keys: &["extension"],
-            ..CATALOG
-        },
-        directory.path(),
-        None,
-        None,
-    )
-    .unwrap();
-    assert!(
-        settings
-            .own_tables("extension")
-            .unwrap()
-            .unwrap()
-            .contains_key("alpha")
-    );
+fn own_tables_preserve_absent_and_empty_arrays() {
+    for (config, expected) in [("", None), ("extension = []", Some(Vec::new()))] {
+        let directory = config_dir(&format!("[tool.sc-lint.analyzers.example]\n{config}\n"));
+        let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+        assert_eq!(settings.own_tables("extension").unwrap(), expected);
+    }
+}
 
-    let invalid = config_dir(
-        "[tool.sc-lint.analyzers.example]\n[tool.sc-lint.analyzers.example.extension]\nalpha = true\n",
+#[test]
+fn own_tables_borrow_array_entries_in_order_without_parsing_their_fields() {
+    let directory = config_dir(
+        "[[tool.sc-lint.analyzers.example.extension]]\nname = 'first'\nunknown = [1, 2]\n\
+         [[tool.sc-lint.analyzers.example.extension]]\nname = 'second'\n",
     );
-    let settings = load_analyzer_settings(
-        &RuleCatalog {
-            own_keys: &["extension"],
-            ..CATALOG
-        },
-        invalid.path(),
-        None,
-        None,
-    )
-    .unwrap();
-    let error = settings.own_tables("extension").unwrap_err();
-    assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
-    assert!(error.to_string().contains("`extension.alpha`"));
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+    let tables: Vec<&toml::Table> = settings.own_tables("extension").unwrap().unwrap();
+    assert_eq!(tables.len(), 2);
+    assert_eq!(tables[0]["name"].as_str(), Some("first"));
+    assert_eq!(tables[1]["name"].as_str(), Some("second"));
+    let repeated = settings.own_tables("extension").unwrap().unwrap();
+    assert!(std::ptr::eq(tables[0], repeated[0]));
+    assert!(std::ptr::eq(tables[1], repeated[1]));
+}
+
+#[test]
+fn own_tables_reject_non_arrays_and_report_invalid_entry_indices() {
+    for (value, key, expected) in [
+        ("{}", "extension", "an array of tables"),
+        ("{ alpha = {} }", "extension", "an array of tables"),
+        ("true", "extension", "an array of tables"),
+        ("[false]", "extension[0]", "a table"),
+        ("[{}, 'invalid']", "extension[1]", "a table"),
+        ("[{}, []]", "extension[1]", "a table"),
+    ] {
+        let directory = config_dir(&format!(
+            "[tool.sc-lint.analyzers.example]\nextension = {value}\n"
+        ));
+        let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+        let error = settings.own_tables("extension").unwrap_err();
+        assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+        match error {
+            AnalyzerConfigError::WrongType {
+                analyzer,
+                key: actual_key,
+                expected: actual_expected,
+            } => {
+                assert_eq!(analyzer, "example");
+                assert_eq!(actual_key, key);
+                assert_eq!(actual_expected, expected);
+            }
+            other => panic!("expected WrongType, got {other:?}"),
+        }
+    }
 }
 
 #[test]
