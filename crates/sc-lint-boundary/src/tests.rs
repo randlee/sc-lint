@@ -1029,6 +1029,136 @@ fn issue377_aggregates_and_keeps_fatal_errors() {
     );
 }
 
+/// Issue #376 reporter's reproducer: package `p` owns two records; `q`
+/// depends on `p` at runtime and `r` dev-depends on `p`. Record A lists `q`,
+/// record B lists nothing and no list names `r`. The consumer saw findings on
+/// record B for `q` and on both records for `r`, and never a stale entry.
+#[test]
+fn issue_376_reported_consumer_reproducer() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r", "crates/s"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &path_dependency_manifest("q", "p", "../p", "0.1.0"),
+    );
+    fixture.write(
+        "crates/r/Cargo.toml",
+        &(good_member_manifest("r", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write("crates/s/Cargo.toml", &good_member_manifest("s", ""));
+    for package in ["p", "q", "r", "s"] {
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], None, "active");
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    let mentions =
+        |finding: &Finding, package: &str| finding.message.contains(&format!("`{package}`"));
+
+    // Expected: one dev-edge finding for `r`, none for record B's runtime `q`.
+    let report = analyze_workspace(&options).expect("reproducer analyzes");
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert!(mentions(&report.findings[0], "r"), "{:#?}", report.findings);
+    assert!(!report.findings.iter().any(|finding| mentions(finding, "q")));
+
+    // Listing `r` in `allowed_dev_dependents` clears the dev edge.
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], Some(&["r"]), "active");
+    let report = analyze_workspace(&options).expect("dev allowlist analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+
+    // A listed dependent with no live edge to `p` is reported as stale.
+    write_policy_record(
+        &fixture,
+        "p/a.toml",
+        "A",
+        &["q", "s"],
+        Some(&["r"]),
+        "active",
+    );
+    let report = analyze_workspace(&options).expect("stale entry analyzes");
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id.as_str(), "SCB-DEPENDENCY-004");
+    assert!(mentions(&report.findings[0], "s"), "{:#?}", report.findings);
+}
+
+/// Issue #377 reporter's reproducer: each defect is a one-line change to a
+/// valid record. The consumer saw every mutated inventory pass; each must be
+/// a validation finding instead.
+#[test]
+fn issue_377_reported_consumer_reproducer() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    let record = fixture.root().join("boundaries/p/a.toml");
+    let reset = || {
+        write_policy_record(&fixture, "p/a.toml", "A", &[], None, "active");
+        write_policy_record(&fixture, "p/b.toml", "B", &[], None, "active");
+    };
+    reset();
+    let report = analyze_workspace(&options).expect("valid records analyze");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+
+    let valid = fs::read_to_string(&record).expect("read valid record");
+    for (defect, from, to) in [
+        ("identifier", "facade = \"run\"", "facade = \"not-valid\""),
+        ("module path", "module = \"p\"", "module = \"p::\""),
+        (
+            "implementation type",
+            "type = \"Runner\"",
+            "type = \"not-valid\"",
+        ),
+        (
+            "composition root path",
+            "roots = [\"run\"]",
+            "roots = [\"api::\"]",
+        ),
+        (
+            "trait_only constructor",
+            "type = \"Runner\"\nmodule = \"p\"\nvisibility = \"public\"\nconstructor = \"none\"",
+            "visibility = \"trait_only\"\nconstructor = \"public\"",
+        ),
+        (
+            "self edge",
+            "forbidden_edges = []",
+            "forbidden_edges = [\"p -> p\"]",
+        ),
+        ("duplicate name", "name = \"A\"", "name = \"B\""),
+        (
+            "composition root",
+            "roots = [\"run\"]",
+            "roots = [\"q::Root\"]",
+        ),
+    ] {
+        reset();
+        assert!(
+            valid.contains(from),
+            "{defect}: fixture line `{from}` not found"
+        );
+        fs::write(&record, valid.replace(from, to)).expect("write mutated record");
+        let report = analyze_workspace(&options).expect("defect is a finding, not a load error");
+        assert_eq!(
+            report.status,
+            ReportStatus::Fail,
+            "{defect}: {:#?}",
+            report.findings
+        );
+    }
+}
+
 #[test]
 fn dependency_policy_resolves_owner_and_policy_aliases_to_canonical_packages() {
     let fixture = WorkspaceFixture::new();

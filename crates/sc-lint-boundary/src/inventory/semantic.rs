@@ -245,6 +245,7 @@ fn validate_record(
 ) {
     let diagnostic_count = diagnostics.len();
     let public_surfaces = validate_public_surfaces(&record, diagnostics);
+    validate_implementation_names(&record, diagnostics);
     let owner = validate_owner_name(
         &record,
         resolver,
@@ -282,6 +283,28 @@ fn validate_public_surfaces(
             diagnostics.push(path_diagnostic(record, "public", error));
             Vec::new()
         }
+    }
+}
+
+fn validate_implementation_names(
+    record: &BoundaryRecord,
+    diagnostics: &mut Vec<InventoryDiagnostic>,
+) {
+    if let Some(Err(error)) = record
+        .implementation
+        .implementation_type
+        .as_deref()
+        .map(RustIdent::parse)
+    {
+        diagnostics.push(path_diagnostic(record, "implementation.type", error));
+    }
+    if let Some(Err(error)) = record
+        .implementation
+        .module
+        .as_deref()
+        .map(PublicRustPath::parse)
+    {
+        diagnostics.push(path_diagnostic(record, "implementation.module", error));
     }
 }
 
