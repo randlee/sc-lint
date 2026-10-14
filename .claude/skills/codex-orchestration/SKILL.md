@@ -92,7 +92,8 @@ Before starting a sprint:
    `.claude/skills/codex-orchestration/ruthless-boundary-qa-assignment.json.j2`
    exist for first-pass boundary optimization review.
 10. Every agent pane exports `BEADS_ACTOR` equal to its `ATM_IDENTITY` (the
-    pane name, not an alias), and bead assignee values use those same names.
+    agent's ATM identity, which may differ from the pane name or alias), and
+    bead assignee values use those same identity names.
 
 ## Beads
 
