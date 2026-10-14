@@ -99,6 +99,10 @@ pub(super) fn spawn_backend_probe(
         ));
     };
     let (sender, reader) = mpsc::sync_channel(1);
+    // The reader is intentionally detached: a descendant that escaped the probe
+    // process group can retain stdout after a timeout, leaving this thread blocked
+    // until it closes the pipe. `finish_backend_output` bounds the caller's wait,
+    // but cannot reclaim that escaped descendant or reader thread here.
     thread::spawn(move || {
         let _ = sender.send(read_probe_output(stdout));
     });
