@@ -610,6 +610,26 @@ exclude_paths = ["crates/example/src/lib.rs", "docs\\guide\\index.md"]
 
     assert!(settings.path_excluded("crates\\example\\src\\lib.rs"));
     assert!(settings.path_excluded("docs\\guide\\index.md"));
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                config_finding(ConfigRule::One),
+                Some(RepoRelativePath::parse("crates\\example\\src\\lib.rs").unwrap()),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::parse("docs\\guide\\index.md").unwrap()),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::parse("docs\\guide\\readme.md").unwrap()),
+            ),
+        ],
+        config_rule_id,
+    );
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule_id, ConfigRule::Two);
+    assert_eq!(status, ReportStatus::Pass);
 
     let per_rule = config_dir(
         r#"[tool.sc-lint.analyzers.example.exclude_paths_by_rule]
@@ -622,17 +642,26 @@ exclude_paths = ["crates/example/src/lib.rs", "docs\\guide\\index.md"]
         vec![
             (
                 config_finding(ConfigRule::One),
-                Some(RepoRelativePath::parse("crates\\example\\src\\lib.rs").unwrap()),
+                Some(RepoRelativePath::from_raw_for_test(
+                    "crates\\example\\src\\lib.rs",
+                )),
             ),
             (
                 config_finding(ConfigRule::Two),
-                Some(RepoRelativePath::parse("docs\\guide\\index.md").unwrap()),
+                Some(RepoRelativePath::from_raw_for_test("docs\\guide\\index.md")),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::from_raw_for_test(
+                    "docs\\guide\\readme.md",
+                )),
             ),
         ],
         config_rule_id,
     );
 
-    assert!(findings.is_empty());
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule_id, ConfigRule::Two);
     assert_eq!(status, ReportStatus::Pass);
 }
 
