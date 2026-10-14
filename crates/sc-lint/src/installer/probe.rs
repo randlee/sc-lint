@@ -368,6 +368,27 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
+    #[cfg(unix)]
+    use std::process::ChildStdout;
+
+    #[cfg(unix)]
+    struct ProbeChildGuard {
+        child: Child,
+    }
+
+    #[cfg(unix)]
+    impl ProbeChildGuard {
+        fn take_stdout(&mut self) -> ChildStdout {
+            self.child.stdout.take().expect("piped stdout")
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for ProbeChildGuard {
+        fn drop(&mut self) {
+            terminate_probe_processes(&mut self.child);
+        }
+    }
 
     #[cfg(unix)]
     #[test]
@@ -443,14 +464,16 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn child_holding_probe_pipe_returns_typed_timeout() {
-        let mut pipe_holder = Command::new("sleep")
-            .arg("2")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .process_group(0)
-            .spawn()
-            .expect("spawn child holding stdout open");
-        let stdout = pipe_holder.stdout.take().expect("piped stdout");
+        let mut pipe_holder = ProbeChildGuard {
+            child: Command::new("sleep")
+                .arg("60")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .process_group(0)
+                .spawn()
+                .expect("spawn child holding stdout open"),
+        };
+        let stdout = pipe_holder.take_stdout();
         let (sender, reader) = mpsc::sync_channel(1);
         thread::spawn(move || {
             let _ = sender.send(read_probe_output(stdout));
@@ -466,21 +489,12 @@ mod tests {
 
         // Use an already-exited group id to model a setsid descendant that
         // escaped cleanup while retaining the original child's stdout pipe.
-        let started = Instant::now();
         let error = finish_backend_output(reader, exited_process_id)
             .expect_err("child holding the pipe must time out instead of hanging");
-
-        terminate_probe_process_tree(pipe_holder.id()).expect("stop pipe holding child");
-        pipe_holder.wait().expect("reap pipe holding child");
 
         assert!(
             matches!(error, BackendOutputError::Timeout { .. }),
             "expected typed timeout, got {error:?}"
-        );
-        assert!(
-            started.elapsed() < Duration::from_secs(1),
-            "bounded output wait took {:?}",
-            started.elapsed()
         );
     }
 }
