@@ -1,6 +1,7 @@
 //! Shared, rule-neutral support for `sc-lint` AST analyzer crates.
 
 mod analyzer_config;
+mod relative_path;
 mod render;
 mod source_scan;
 
@@ -12,6 +13,8 @@ pub use analyzer_config::RuleCatalog;
 pub use analyzer_config::analyzer_settings_from;
 pub use analyzer_config::load_analyzer_settings;
 pub use analyzer_config::read_config_document;
+pub use relative_path::RelativePathError;
+pub use relative_path::RepoRelativePath;
 pub use render::render_findings_report;
 pub use source_scan::FileContext;
 pub use source_scan::PackageName;

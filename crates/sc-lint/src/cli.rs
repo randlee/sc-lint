@@ -5,6 +5,9 @@ use clap::Subcommand;
 use clap::ValueEnum;
 use serde::Serialize;
 
+use crate::profile_plan::Platform;
+use crate::profile_plan::PlatformScope;
+
 #[derive(Debug, Clone, Parser)]
 #[command(name = "sc-lint")]
 #[command(about = "Stable top-level CLI for the sc-lint tool family")]
@@ -37,9 +40,12 @@ pub enum Command {
         /// Run the explicitly configured consumer profile instead of the source-maintainer profile.
         #[arg(long)]
         consumer: bool,
-        /// Run only the named consumer lint profile step (`all` runs every step in declaration order).
+        /// Run only the named consumer lint step or named lint profile (`all` runs every step in declaration order).
         #[arg(long, requires = "consumer")]
         profile: Option<String>,
+        /// Consumer platform selection: `host` (default) runs unannotated and host-tagged steps; `all` also reports unsupported cross-platform steps; `linux`, `macos` or `windows` adds that platform's steps.
+        #[arg(long = "platform-scope", value_enum, requires = "consumer")]
+        platform_scope: Option<PlatformScopeArg>,
         /// Run only these rules (`<RULE-ID|family>[,...]`); forwarded unchanged to sc-boundary, sc-portability or sc-runtime.
         #[arg(long = "rule-filter", conflicts_with = "consumer")]
         rule_filter: Option<String>,
@@ -103,6 +109,33 @@ pub enum Command {
     },
     Version,
     Ci,
+}
+
+/// Command-line spelling of a consumer `--platform-scope`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum PlatformScopeArg {
+    #[value(name = "host")]
+    Host,
+    #[value(name = "all")]
+    All,
+    #[value(name = "linux")]
+    Linux,
+    #[value(name = "macos")]
+    Macos,
+    #[value(name = "windows")]
+    Windows,
+}
+
+impl From<PlatformScopeArg> for PlatformScope {
+    fn from(value: PlatformScopeArg) -> Self {
+        match value {
+            PlatformScopeArg::Host => Self::Host,
+            PlatformScopeArg::All => Self::All,
+            PlatformScopeArg::Linux => Self::Named(Platform::Linux),
+            PlatformScopeArg::Macos => Self::Named(Platform::MacOS),
+            PlatformScopeArg::Windows => Self::Named(Platform::Windows),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

@@ -9,9 +9,15 @@ use anyhow::Result;
 use serde::Deserialize;
 
 mod dependency_policy;
+mod semantic;
 mod types;
 
 pub(crate) use dependency_policy::WorkspacePackageName;
+pub(crate) use semantic::InventoryDiagnostic;
+pub(crate) use semantic::ValidatedDependencyPolicy;
+pub(crate) use semantic::ValidatedInventory;
+pub(crate) use semantic::ValidatedRecord;
+pub(crate) use semantic::validate_inventory;
 pub(crate) use types::BoundaryInventory;
 pub(crate) use types::BoundaryRecord;
 pub(crate) use types::CallersSection;
@@ -154,12 +160,13 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
 
     for path in boundary_paths {
         let raw_record: types::RawBoundaryRecord = parse_toml_file(&path)?;
-        let record = types::BoundaryRecord::try_from(raw_record).with_context(|| {
+        let mut record = types::BoundaryRecord::try_from(raw_record).with_context(|| {
             format!(
                 "failed to validate dependency policy in `{}`",
                 path.display()
             )
         })?;
+        record.record_path = path.clone();
         validate_boundary_schema(&record, &path)?;
         validate_boundary_path(&record, &path, &boundaries_root)?;
         if let Some(previous_path) =

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -7,12 +8,15 @@ use sc_lint_schema::ReportStatus;
 use serde::Serialize;
 use thiserror::Error;
 
+use crate::RepoRelativePath;
+
 const COMMON_KEYS: &[&str] = &[
     "enabled",
     "reason",
     "exclude_rules",
     "fail_rules",
     "exclude_paths",
+    "exclude_paths_by_rule",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -60,6 +64,7 @@ pub struct AnalyzerSettings {
     pub exclude_rules: BTreeSet<CatalogRuleId>,
     pub fail_rules: BTreeSet<CatalogRuleId>,
     pub exclude_paths: Vec<String>,
+    pub exclude_paths_by_rule: BTreeMap<CatalogRuleId, Vec<String>>,
     pub rule_filter: Option<BTreeSet<CatalogRuleId>>,
     own: toml::Table,
 }
@@ -189,6 +194,7 @@ pub fn analyzer_settings_from(
         None => catalog.default_fail.iter().copied().collect(),
     };
     let exclude_paths = read_strings(table, "exclude_paths", analyzer)?.unwrap_or_default();
+    let exclude_paths_by_rule = read_rule_path_exclusions(catalog, table)?;
     let rule_filter = parse_rule_filter(catalog, rule_filter)?;
 
     Ok(AnalyzerSettings {
@@ -197,6 +203,7 @@ pub fn analyzer_settings_from(
         exclude_rules,
         fail_rules,
         exclude_paths,
+        exclude_paths_by_rule,
         rule_filter,
         own: table
             .iter()
@@ -302,6 +309,44 @@ fn read_strings(
     read_string_values(table.get(key), key, analyzer)
 }
 
+fn read_rule_path_exclusions(
+    catalog: &RuleCatalog,
+    table: &toml::Table,
+) -> Result<BTreeMap<CatalogRuleId, Vec<String>>, AnalyzerConfigError> {
+    let Some(value) = table.get("exclude_paths_by_rule") else {
+        return Ok(BTreeMap::new());
+    };
+    let toml::Value::Table(exclusions) = value else {
+        return Err(AnalyzerConfigError::WrongType {
+            analyzer: catalog.analyzer.as_str(),
+            key: "exclude_paths_by_rule".to_owned(),
+            expected: "a table mapping exact rule ids to arrays of strings",
+        });
+    };
+
+    exclusions
+        .iter()
+        .map(|(rule, patterns)| {
+            let Some(rule_id) = catalog
+                .rules
+                .iter()
+                .copied()
+                .find(|candidate| candidate.as_str() == rule)
+            else {
+                return Err(AnalyzerConfigError::UnknownRule {
+                    analyzer: catalog.analyzer.as_str(),
+                    key: "exclude_paths_by_rule",
+                    rule: rule.clone(),
+                });
+            };
+            let key = format!("exclude_paths_by_rule.{rule}");
+            let patterns = read_string_values(Some(patterns), &key, catalog.analyzer.as_str())?
+                .unwrap_or_default();
+            Ok((rule_id, patterns))
+        })
+        .collect()
+}
+
 fn read_string_value(
     value: Option<&toml::Value>,
     key: &str,
@@ -376,6 +421,46 @@ impl AnalyzerSettings {
         read_string_values(self.own.get(key), key, self.analyzer.as_str())
     }
 
+    pub fn own_table(&self, key: &str) -> Result<Option<&toml::Table>, AnalyzerConfigError> {
+        match self.own.get(key) {
+            None => Ok(None),
+            Some(toml::Value::Table(value)) => Ok(Some(value)),
+            Some(_) => Err(AnalyzerConfigError::WrongType {
+                analyzer: self.analyzer.as_str(),
+                key: key.to_owned(),
+                expected: "a table",
+            }),
+        }
+    }
+
+    /// Borrow analyzer-owned array entries, validating only their table shape.
+    pub fn own_tables(&self, key: &str) -> Result<Option<Vec<&toml::Table>>, AnalyzerConfigError> {
+        let values = match self.own.get(key) {
+            None => return Ok(None),
+            Some(toml::Value::Array(values)) => values,
+            Some(_) => {
+                return Err(AnalyzerConfigError::WrongType {
+                    analyzer: self.analyzer.as_str(),
+                    key: key.to_owned(),
+                    expected: "an array of tables",
+                });
+            }
+        };
+        values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| match value {
+                toml::Value::Table(table) => Ok(table),
+                _ => Err(AnalyzerConfigError::WrongType {
+                    analyzer: self.analyzer.as_str(),
+                    key: format!("{key}[{index}]"),
+                    expected: "a table",
+                }),
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    }
+
     pub fn path_excluded(&self, relative: &str) -> bool {
         self.exclude_paths
             .iter()
@@ -385,26 +470,56 @@ impl AnalyzerSettings {
     pub fn apply<R: Serialize>(
         &self,
         findings: Vec<Finding<R>>,
-        id: impl Fn(&R) -> &'static str,
+        id: impl Fn(&R) -> CatalogRuleId,
+    ) -> (Vec<Finding<R>>, ReportStatus) {
+        self.apply_with_paths(findings.into_iter().map(|finding| (finding, None)), id)
+    }
+
+    pub fn apply_with_paths<R: Serialize>(
+        &self,
+        findings: impl IntoIterator<Item = (Finding<R>, Option<RepoRelativePath>)>,
+        id: impl Fn(&R) -> CatalogRuleId,
     ) -> (Vec<Finding<R>>, ReportStatus) {
         let kept: Vec<Finding<R>> = findings
             .into_iter()
-            .filter(|finding| match &self.rule_filter {
-                Some(selected) => selected.contains(&CatalogRuleId::new(id(&finding.rule_id))),
-                None => !self
-                    .exclude_rules
-                    .contains(&CatalogRuleId::new(id(&finding.rule_id))),
+            .filter(|(finding, path)| {
+                let rule_id = id(&finding.rule_id);
+                rule_is_included(self, rule_id)
+                    && !path
+                        .as_ref()
+                        .is_some_and(|path| self.path_excluded(path.as_str()))
+                    && !path
+                        .as_ref()
+                        .is_some_and(|path| self.path_excluded_by_rule(rule_id, path))
             })
+            .map(|(finding, _)| finding)
             .collect();
-        let status = if kept.iter().any(|finding| {
-            self.fail_rules
-                .contains(&CatalogRuleId::new(id(&finding.rule_id)))
-        }) {
+        let status = if kept
+            .iter()
+            .any(|finding| self.fail_rules.contains(&id(&finding.rule_id)))
+        {
             ReportStatus::Fail
         } else {
             ReportStatus::Pass
         };
         (kept, status)
+    }
+
+    fn path_excluded_by_rule(&self, rule_id: CatalogRuleId, path: &RepoRelativePath) -> bool {
+        self.exclude_paths_by_rule
+            .get(&rule_id)
+            .is_some_and(|patterns| {
+                patterns
+                    .iter()
+                    .any(|pattern| glob_match(pattern, path.as_str()))
+            })
+    }
+}
+
+fn rule_is_included(settings: &AnalyzerSettings, rule_id: CatalogRuleId) -> bool {
+    match &settings.rule_filter {
+        Some(selected) => selected.contains(&rule_id),
+        None => !settings.exclude_rules.contains(&rule_id),
     }
 }
 

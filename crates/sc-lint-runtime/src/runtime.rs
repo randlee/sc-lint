@@ -25,12 +25,20 @@ use crate::RuleId;
 use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageName;
+use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
 use sc_lint_analyzer_support::classify_scope;
 use sc_lint_analyzer_support::discover_source_files;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
+
+pub(super) fn repo_relative_source_path(
+    root: &Path,
+    source_path: &Path,
+) -> Option<RepoRelativePath> {
+    RepoRelativePath::parse(&relative_slash_path(root, source_path)).ok()
+}
 
 #[derive(Debug, Clone)]
 struct RuntimeFinding {
@@ -46,15 +54,12 @@ struct RuntimeFinding {
 
 pub(crate) fn analyze_runtime_liveness(
     root: &Path,
-    settings: &AnalyzerSettings,
-) -> Result<Vec<Finding>> {
+    _settings: &AnalyzerSettings,
+) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let source_files = discover_source_files(root)?;
     let mut findings = Vec::new();
 
     for file_context in source_files {
-        if settings.path_excluded(&relative_slash_path(root, &file_context.source_path)) {
-            continue;
-        }
         let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
             || {
                 format!(
@@ -86,20 +91,26 @@ pub(crate) fn analyze_runtime_liveness(
 
     Ok(findings
         .into_iter()
-        .map(|finding| Finding {
-            rule_id: finding.rule_id,
-            kind: finding.kind.into(),
-            message: format!(
-                "{}:{}: {}",
-                finding.source_path.display(),
-                finding.line,
-                finding.message
-            ),
-            owner_ids: vec![OwnerId::new(CrateId::from_parts(
-                finding.package.as_str(),
-                finding.target.as_str(),
-            ))],
-            node_ids: vec![NodeId::new(finding.node_label)],
+        .map(|finding| {
+            let source_path = repo_relative_source_path(root, &finding.source_path);
+            (
+                Finding {
+                    rule_id: finding.rule_id,
+                    kind: finding.kind.into(),
+                    message: format!(
+                        "{}:{}: {}",
+                        finding.source_path.display(),
+                        finding.line,
+                        finding.message
+                    ),
+                    owner_ids: vec![OwnerId::new(CrateId::from_parts(
+                        finding.package.as_str(),
+                        finding.target.as_str(),
+                    ))],
+                    node_ids: vec![NodeId::new(finding.node_label)],
+                },
+                source_path,
+            )
         })
         .collect())
 }

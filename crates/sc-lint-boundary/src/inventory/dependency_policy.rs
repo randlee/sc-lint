@@ -69,6 +69,8 @@ pub(crate) struct RawStructuredForbiddenPackageEdge {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawDependenciesSection {
     pub(crate) allowed_dependents: Vec<String>,
+    #[serde(default)]
+    pub(crate) allowed_dev_dependents: Option<Vec<String>>,
     pub(crate) allowed_dependencies: Vec<String>,
     #[serde(default)]
     pub(crate) allowed_dev_dependencies: Vec<String>,
@@ -109,6 +111,7 @@ pub(crate) struct ForbiddenPackageEdge {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PackageDependencyPolicy {
     pub(crate) allowed_dependents: BTreeSet<WorkspacePackageName>,
+    pub(crate) allowed_dev_dependents: Option<BTreeSet<WorkspacePackageName>>,
     pub(crate) allowed_dependencies: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
     pub(crate) forbidden_edges: Vec<ForbiddenPackageEdge>,
@@ -153,6 +156,10 @@ impl RawDependenciesSection {
     ) -> std::result::Result<PackageDependencyPolicy, DependencyPolicyError> {
         let allowed_dependents =
             validate_package_list(boundary_id, "allowed_dependents", self.allowed_dependents)?;
+        let allowed_dev_dependents = self
+            .allowed_dev_dependents
+            .map(|packages| validate_package_list(boundary_id, "allowed_dev_dependents", packages))
+            .transpose()?;
         let allowed_dependencies = validate_package_list(
             boundary_id,
             "allowed_dependencies",
@@ -194,6 +201,7 @@ impl RawDependenciesSection {
 
         Ok(PackageDependencyPolicy {
             allowed_dependents,
+            allowed_dev_dependents,
             allowed_dependencies,
             allowed_dev_dependencies,
             forbidden_edges,
@@ -286,6 +294,7 @@ impl TryFrom<RawBoundaryRecord> for BoundaryRecord {
     fn try_from(value: RawBoundaryRecord) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             dependencies: value.dependencies.validate(&value.boundary_id)?,
+            record_path: std::path::PathBuf::new(),
             boundary_id: value.boundary_id,
             owner_package: value.owner_package,
             owner_crate_path: value.owner_crate_path,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sc_lint.lint_common import discover_repo_root
 
+import json
 from pathlib import Path
 import re
 import shutil
@@ -93,7 +94,9 @@ class ConsumerContractTests(unittest.TestCase):
         ):
             contents = path.read_text(encoding="utf-8")
             self.assertIn('"--config"', contents)
-            self.assertIn("ValueFromRemainingArguments = $true", contents)
+            self.assertIn("$InvocationArguments = @($args)", contents)
+            self.assertIn("$Rest = if ($InvocationArguments.Count -gt 1)", contents)
+            self.assertNotIn("[CmdletBinding()]", contents)
             self.assertIn("Invoke-VerifiedReleaseLauncher", contents)
             self.assertIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", contents)
             self.assertIn("compatibility check", contents)
@@ -159,9 +162,11 @@ if ($missingResult -ne $false -or $existingResult -ne $true -or $missingErrors.C
         contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertIn('[string[]]$Rest', contents)
+        self.assertIn("$InvocationArguments = @($args)", contents)
+        self.assertIn("$Rest = if ($InvocationArguments.Count -gt 1)", contents)
+        self.assertIn('$execArguments = @($Rest[($index + 1)..($Rest.Count - 1)])', contents)
         self.assertIn('[Array]::IndexOf($Rest, "--config")', contents)
-        self.assertNotIn('[Array]::IndexOf($args, "--config")', contents)
+        self.assertNotIn("[CmdletBinding()]", contents)
         self.assertIn('$candidate = Join-Path $extract "sc-lint.exe"', contents)
         self.assertIn(
             'Join-Path (Join-Path (Join-Path $extract "sc-lint_${version}_x86_64-pc-windows-msvc") "bin") "sc-lint.exe"',
@@ -184,6 +189,65 @@ if ($missingResult -ne $false -or $existingResult -ne $true -or $missingErrors.C
         )
         self.assertIn('"$launcher" --config "$config" "$command" "$@"', contents)
         self.assertNotIn('mv "$staging/extract/sc-lint" "$install_dir/.sc-lint-new"', contents)
+
+    def test_only_bootstrap_setup_hands_declared_tools_to_the_managed_helper(self) -> None:
+        posix = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
+        self.assertIn('install_input="$(cd "$(dirname "$config")" && pwd)/.sc-lint/install.json"', posix)
+        self.assertIn('"$venv_python" -m sc_lint.setup_tools --config "$config"\n', posix)
+        self.assertIn('"$venv_python" -m sc_lint.setup_tools --config "$config" --check\n', posix)
+        self.assertEqual(posix.count('provision_tools "$setup_mode"'), 1)
+        self.assertLess(
+            posix.index('provision_venv "$setup_mode" || exit $?'),
+            posix.index('provision_tools "$setup_mode"'),
+        )
+        self.assertLess(posix.index("    setup)\n"), posix.index('provision_tools "$setup_mode"'))
+        self.assertLess(posix.index('provision_tools "$setup_mode"'), posix.index("    lint)\n"))
+
+        windows = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(encoding="utf-8")
+        self.assertIn('$installInput = Join-Path (Split-Path -Parent (Resolve-Path -LiteralPath $Config).Path) ".sc-lint\\install.json"', windows)
+        self.assertIn('$helperArguments = @("-m", "sc_lint.setup_tools", "--config", $Config)', windows)
+        self.assertIn('if ($Mode -ne "install") { $helperArguments += "--check" }', windows)
+        self.assertEqual(windows.count("        Install-DeclaredTools $setupMode\n"), 1)
+        self.assertLess(windows.index("        Install-Venv $setupMode\n"), windows.index("        Install-DeclaredTools $setupMode\n"))
+        self.assertLess(windows.index('    "setup" {'), windows.index("        Install-DeclaredTools $setupMode\n"))
+        self.assertLess(windows.index("        Install-DeclaredTools $setupMode\n"), windows.index('    "lint" {'))
+        for contents in (posix, windows):
+            self.assertNotIn("cargo install", contents)
+            self.assertNotIn("rustup target", contents)
+
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell Core is required")
+    def test_windows_tools_probe_passes_through_powershell_to_the_seed_python(self) -> None:
+        contents = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(encoding="utf-8")
+        match = re.search(r"(?ms)^\$toolsProbe = @'\n.*?^'@$", contents)
+        self.assertIsNotNone(match, "the PowerShell tools probe must remain a literal here-string")
+        cases = {
+            "absent": {"minimum_version": "0.7.0"},
+            "empty": {"tools": {"cargo": {}, "rustup_targets": []}},
+            "declared": {"tools": {"cargo": {"cargo-xwin": "0.18.4"}}},
+            "malformed": {"tools": []},
+        }
+        with tempfile.TemporaryDirectory(prefix="sc-lint-pwsh-tools-probe-") as temporary:
+            root = Path(temporary)
+            for name, data in cases.items():
+                (root / f"{name}.json").write_text(json.dumps(data), encoding="utf-8")
+            calls = "\n".join(
+                f"& $python -c $toolsProbe '{root / name}.json'; $codes += $LASTEXITCODE" for name in cases
+            )
+            script = root / "tools_probe.ps1"
+            script.write_text(
+                f"$python = '{sys.executable}'\n{match.group(0)}\n$codes = @()\n{calls}\n"
+                "Write-Output ($codes -join '|')\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", str(script)],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.strip(), "0|0|3|3", result.stderr)
 
     def test_root_helpers_match_the_generated_product_assets(self) -> None:
         generated_posix = (
@@ -351,6 +415,107 @@ class PosixBootstrapConsumerStepEnvironmentTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 last = log.read_text(encoding="utf-8").splitlines()[-1]
                 self.assertEqual(last, f"bin={fake} path={fake}")
+
+
+class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
+    """`lint [selector] [scope]`: one token is always the selector, two are
+    selector then scope; scope-only and three or more tokens are usage errors."""
+
+    USAGE_GRAMMAR = "lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml"
+
+    def _run_lint(self, tokens: list[str]) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            install_dir = tmp / "managed"
+            install_dir.mkdir()
+            log = tmp / "argv.log"
+            fake = install_dir / "sc-lint"
+            fake.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{log}'\nexit 0\n", encoding="utf-8")
+            fake.chmod(0o755)
+            consumer = tmp / "consumer"
+            venv_bin = consumer / ".sc-lint/venv/bin"
+            venv_bin.mkdir(parents=True)
+            (venv_bin / "python3").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            (venv_bin / "python3").chmod(0o755)
+            config = consumer / "sc-lint.toml"
+            config.write_text((ROOT / "sc-lint.toml").read_text(encoding="utf-8"), encoding="utf-8")
+            try:
+                result = subprocess.run(
+                    ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "lint", *tokens, "--config", str(config)],
+                    cwd=tmp,
+                    env={"PATH": "/usr/bin:/bin", "HOME": str(tmp), "SC_LINT_INSTALL_DIR": str(install_dir)},
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as error:
+                self.fail(f"bootstrap lint {tokens} timed out; stdout={error.stdout!r}; stderr={error.stderr!r}")
+            calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+            return result, [call.replace(str(config), "CONFIG") for call in calls]
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX bootstrap")
+    def test_bootstrap_selector_scope_grammar_parity(self) -> None:
+        accepted = {
+            (): "lint --consumer --config CONFIG ci",
+            ("fast",): "lint --consumer --config CONFIG ci --profile fast",
+            ("all",): "lint --consumer --config CONFIG ci --profile all",
+            ("ci", "all"): "lint --consumer --config CONFIG ci --profile ci --platform-scope all",
+            ("fmt", "windows"): "lint --consumer --config CONFIG ci --profile fmt --platform-scope windows",
+        }
+        for tokens, expected in accepted.items():
+            with self.subTest(tokens=tokens):
+                result, calls = self._run_lint(list(tokens))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(calls[-1], expected)
+        # Scope-only (an empty selector before a scope) and extra tokens are usage errors
+        # that never reach the product binary's lint.
+        for tokens in (["", "all"], ["a", ""], ["a", "b", "c"], ["a", "b", "c", "d"]):
+            with self.subTest(tokens=tokens):
+                result, calls = self._run_lint(tokens)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(self.USAGE_GRAMMAR, result.stderr)
+                self.assertFalse(any(call.startswith("lint ") for call in calls), calls)
+        # test accepts at most one selector.
+        self.assertEqual(self._run_test_tokens(["a", "b"]).returncode, 2)
+
+    def _run_test_tokens(self, tokens: list[str]) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            consumer = tmp / "consumer"
+            consumer.mkdir()
+            config = consumer / "sc-lint.toml"
+            config.write_text((ROOT / "sc-lint.toml").read_text(encoding="utf-8"), encoding="utf-8")
+            return subprocess.run(
+                ["sh", str(ROOT / "crates/sc-lint/assets/bootstrap"), "test", *tokens, "--config", str(config)],
+                cwd=tmp,
+                env={"PATH": "/usr/bin:/bin", "HOME": str(tmp)},
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=30,
+            )
+
+    def test_windows_bootstrap_declares_the_same_grammar(self) -> None:
+        sh = (ROOT / "crates/sc-lint/assets/bootstrap").read_text(encoding="utf-8")
+        ps1 = (ROOT / "crates/sc-lint/assets/bootstrap.ps1").read_text(encoding="utf-8")
+        self.assertIn(self.USAGE_GRAMMAR.replace("lint [", ".sc-lint/bootstrap lint ["), sh)
+        self.assertIn(self.USAGE_GRAMMAR.replace("lint [", ".sc-lint/bootstrap.ps1 lint ["), ps1)
+        self.assertIn('"lint" { 2 } "test" { 1 } default { 0 }', ps1)
+        self.assertIn('-not $selector[0] -or -not $selector[1]', ps1)
+        self.assertIn('@("--profile", $selector[0])', ps1)
+        self.assertIn('@("--platform-scope", $selector[1])', ps1)
+        for source in (sh, ps1):
+            self.assertIn("--platform-scope", source)
+            self.assertIn("--consumer", source)
+
+    def test_executable_help_documents_selector_and_scope(self) -> None:
+        from sc_lint.print_help import render_help
+
+        text = render_help("example")
+        self.assertIn("lint <selector> <scope>", text)
+        for scope in ("host", "all", "linux", "macos", "windows"):
+            self.assertIn(scope, text)
 
 
 if __name__ == "__main__":

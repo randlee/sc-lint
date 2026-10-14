@@ -42,3 +42,24 @@ fn invalid_analyzer_config_exits_three_and_prefixes_error() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.starts_with("error: portability: `unix_path_prefixes`"));
 }
+
+#[test]
+fn issue372_cli_configured_pair() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/issue372");
+    let config = fixture.join("sc-lint.toml");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
+        .args(["analyze", "--root"])
+        .arg(&fixture)
+        .arg("--config")
+        .arg(&config)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        !String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("PORT-010")
+    );
+}

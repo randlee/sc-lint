@@ -1,0 +1,280 @@
+//! Backend and version probes for installed sc-lint binaries.
+
+use super::*;
+
+/// Probe the supported CLI help contract and analyzer command surface.
+pub(super) fn backend_cli_failure(
+    binary: &Path,
+    expected_name: &str,
+    timeout: Duration,
+) -> Option<String> {
+    let Some(expected_about) = backend_about(expected_name) else {
+        return Some(format!("unknown backend companion `{expected_name}`"));
+    };
+    let (status, output) = match run_backend_probe(binary, expected_name, "--help", timeout) {
+        Ok(result) => result,
+        Err(problem) => return Some(problem),
+    };
+    backend_help_contract_failure(
+        &output,
+        status.success(),
+        binary,
+        expected_name,
+        expected_about,
+    )
+}
+
+pub(crate) fn probe_backend_version(binary: &Path, expected_name: &str) -> Result<Version, String> {
+    let (status, output) =
+        run_backend_probe(binary, expected_name, "--version", BACKEND_PROBE_TIMEOUT)?;
+    if !status.success() {
+        return Err(format!("`--version` probe exited with {status}"));
+    }
+    let output = String::from_utf8(output)
+        .map_err(|error| format!("`--version` probe output was not UTF-8: {error}"))?;
+    let mut fields = output.split_whitespace();
+    let reported_name = fields
+        .next()
+        .ok_or_else(|| "`--version` probe returned no identity or version".to_string())?;
+    let reported_version = fields
+        .next()
+        .ok_or_else(|| "`--version` probe returned no version".to_string())?;
+    if reported_name != expected_name {
+        return Err(format!(
+            "`--version` probe reported backend `{reported_name}`, expected `{expected_name}`"
+        ));
+    }
+    if fields.next().is_some() {
+        return Err("`--version` probe returned unexpected trailing output".to_string());
+    }
+    Version::parse(reported_version).map_err(|error| {
+        format!("`--version` probe reported invalid version `{reported_version}`: {error}")
+    })
+}
+
+pub(super) fn run_backend_probe(
+    binary: &Path,
+    expected_name: &str,
+    argument: &str,
+    timeout: Duration,
+) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
+    let (mut child, reader) = spawn_backend_probe(binary, expected_name, argument)?;
+    let process_id = child.id();
+    let status = wait_for_backend_probe(&mut child, binary, expected_name, argument, timeout)?;
+    let output = finish_backend_output(reader, process_id, binary, expected_name, argument)?;
+    Ok((status, output))
+}
+
+pub(super) fn spawn_backend_probe(
+    binary: &Path,
+    expected_name: &str,
+    argument: &str,
+) -> Result<(Child, ProbeOutputReader), String> {
+    let mut command = Command::new(binary);
+    command
+        .arg(argument)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(unix)]
+    command.process_group(0);
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return Err(format!(
+                "could not start backend companion `{expected_name}` at `{}`: {error}",
+                binary.display()
+            ));
+        }
+    };
+    let Some(stdout) = child.stdout.take() else {
+        terminate_probe_processes(&mut child);
+        return Err(format!(
+            "backend companion `{expected_name}` at `{}` did not provide a readable `{argument}` stream",
+            binary.display(),
+        ));
+    };
+    let reader = thread::spawn(move || read_probe_output(stdout));
+    Ok((child, reader))
+}
+
+pub(super) fn wait_for_backend_probe(
+    child: &mut Child,
+    binary: &Path,
+    expected_name: &str,
+    argument: &str,
+    timeout: Duration,
+) -> Result<std::process::ExitStatus, String> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if Instant::now() < deadline => {
+                thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
+            }
+            Ok(None) => {
+                terminate_probe_processes(child);
+                return Err(format!(
+                    "backend companion `{expected_name}` at `{}` timed out after {} ms during its `{argument}` probe; process-tree cleanup was attempted",
+                    binary.display(),
+                    timeout.as_millis()
+                ));
+            }
+            Err(error) => {
+                terminate_probe_processes(child);
+                return Err(format!(
+                    "could not wait for backend companion `{expected_name}` at `{}`: {error}",
+                    binary.display()
+                ));
+            }
+        }
+    }
+}
+
+pub(super) fn finish_backend_output(
+    reader: ProbeOutputReader,
+    process_id: u32,
+    binary: &Path,
+    expected_name: &str,
+    argument: &str,
+) -> Result<Vec<u8>, String> {
+    // A descendant can outlive the direct child while holding stdout open.
+    // Give the reader a short chance to drain normal output, then stop the
+    // process group instead of waiting indefinitely for EOF.
+    let drain_deadline = Instant::now() + Duration::from_millis(50);
+    while !reader.is_finished() && Instant::now() < drain_deadline {
+        thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
+    }
+    if !reader.is_finished() && !terminate_probe_process_tree(process_id) {
+        return Err(format!(
+            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited",
+            binary.display()
+        ));
+    }
+    match reader.join() {
+        Ok(Ok(output)) => Ok(output),
+        Ok(Err(error)) => Err(format!(
+            "could not read `{argument}` output from backend companion `{expected_name}` at `{}`: {error}",
+            binary.display()
+        )),
+        Err(_) => Err(format!(
+            "`{argument}` output reader panicked for backend companion `{expected_name}` at `{}`",
+            binary.display()
+        )),
+    }
+}
+
+pub(super) fn backend_help_contract_failure(
+    output: &[u8],
+    successful_exit: bool,
+    binary: &Path,
+    expected_name: &str,
+    expected_about: &str,
+) -> Option<String> {
+    if !successful_exit {
+        return Some(format!(
+            "backend companion `{expected_name}` at `{}` exited unsuccessfully",
+            binary.display()
+        ));
+    }
+    let help = String::from_utf8_lossy(output);
+    let healthy = help.contains(expected_about)
+        && help
+            .lines()
+            .any(|line| line.trim_start().starts_with("Usage:") && line.contains("<COMMAND>"))
+        && help
+            .lines()
+            .any(|line| line.trim_start().starts_with("analyze "));
+    if healthy {
+        None
+    } else {
+        Some(format!(
+            "backend companion `{expected_name}` at `{}` did not satisfy the documented `--help` contract",
+            binary.display()
+        ))
+    }
+}
+
+pub(super) fn backend_about(name: &str) -> Option<&'static str> {
+    match name {
+        crate::consts::TOOL_BOUNDARY => Some("AST-sensitive Rust boundary analyzer"),
+        crate::consts::TOOL_PORTABILITY => Some("AST-sensitive Rust portability analyzer"),
+        crate::consts::TOOL_RUNTIME => Some("AST-sensitive Rust runtime analyzer"),
+        _ => None,
+    }
+}
+
+pub(super) fn read_probe_output(mut stdout: impl Read) -> io::Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(BACKEND_PROBE_OUTPUT_LIMIT.min(4096));
+    let mut buffer = [0u8; 4096];
+    loop {
+        let count = stdout.read(&mut buffer)?;
+        if count == 0 {
+            return Ok(output);
+        }
+        let remaining = BACKEND_PROBE_OUTPUT_LIMIT.saturating_sub(output.len());
+        output.extend_from_slice(&buffer[..count.min(remaining)]);
+    }
+}
+
+pub(super) fn terminate_probe_processes(child: &mut Child) {
+    let process_id = child.id();
+    let _ = terminate_probe_process_tree(process_id);
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[cfg(unix)]
+pub(super) fn terminate_probe_process_tree(process_id: u32) -> bool {
+    let process_group = format!("-{process_id}");
+    Command::new("/bin/kill")
+        .args(["-KILL", "--", &process_group])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+#[cfg(windows)]
+pub(super) fn terminate_probe_process_tree(process_id: u32) -> bool {
+    Command::new("taskkill")
+        .args(["/PID", &process_id.to_string(), "/T", "/F"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+#[cfg(not(any(unix, windows)))]
+pub(super) fn terminate_probe_process_tree(_process_id: u32) -> bool {
+    false
+}
+
+pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
+    if !binary.is_file() {
+        return Err("binary was not found".to_string());
+    }
+    let output = Command::new(binary)
+        .args(["--json", "version"])
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(format!("version probe exited with {}", output.status));
+    }
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).map_err(|error| error.to_string())?;
+    let data = envelope
+        .get("data")
+        .ok_or_else(|| "version probe did not include data".to_string())?;
+    if envelope.get("ok").and_then(Value::as_bool) != Some(true)
+        || envelope.get("command").and_then(Value::as_str) != Some("version")
+        || data.get("tool").and_then(Value::as_str) != Some(crate::consts::SERVICE_NAME)
+        || data.get("contract_schema").and_then(Value::as_str) != Some(VERSION_PROBE_SCHEMA)
+    {
+        return Err("version probe did not implement sc-lint-version-v1".to_string());
+    }
+    let version = data
+        .get("version")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "version probe did not include a version".to_string())?;
+    Version::parse(version).map_err(|error| error.to_string())
+}

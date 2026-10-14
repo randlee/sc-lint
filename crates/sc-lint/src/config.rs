@@ -18,6 +18,13 @@ pub(crate) use crate::consumer_integration::run_consumer_init;
 #[cfg(test)]
 pub(crate) use crate::consumer_integration::run_consumer_init_at;
 use crate::error::ErrorCode;
+pub(crate) use crate::profile_plan::ConsumerProfileStep;
+use crate::profile_plan::LintPlanInput;
+use crate::profile_plan::LintProfiles;
+use crate::profile_plan::ProfileName;
+use crate::profile_plan::decode_lint_step_fields;
+use crate::profile_plan::profile_plan_config_error;
+use crate::profile_plan::validate_lint_step;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
@@ -58,29 +65,12 @@ enum LoadedConfigMode {
     Consumer(ConsumerRequirement),
 }
 
-/// A command is decoded and validated at the TOML boundary, so profile
-/// orchestration never needs to split shell strings or infer consumer policy.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ConsumerProfileStep {
-    name: String,
-    command: Vec<String>,
-}
-
-impl ConsumerProfileStep {
-    pub(crate) fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub(crate) fn command(&self) -> &[String] {
-        &self.command
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ConsumerRequirement {
     compatibility: CompatibilityRequirement,
     root: PathBuf,
     lint: Vec<ConsumerProfileStep>,
+    lint_profiles: LintProfiles,
     test: Vec<ConsumerProfileStep>,
 }
 
@@ -331,6 +321,67 @@ impl LoadedConfig {
         Ok((&requirement.root, std::slice::from_ref(step)))
     }
 
+    /// Resolves a consumer lint selector to planner input.
+    ///
+    /// `None` and `all` select every declared step. Otherwise the selector names
+    /// a step first, then a `[tool.sc-lint.lint_profiles]` profile (collisions
+    /// are rejected at load, so a name is never both).
+    #[expect(
+        clippy::result_large_err,
+        reason = "Consumer lint selection retains the shared top-level CliError contract."
+    )]
+    pub(crate) fn consumer_lint_inputs(
+        &self,
+        selector: Option<&str>,
+    ) -> Result<LintPlanInput<'_>, CliError> {
+        let LoadedConfigMode::Consumer(requirement) = &self.mode else {
+            return Err(CliError::internal(
+                "consumer profile execution requires a consumer configuration",
+            ));
+        };
+        let steps = &requirement.lint;
+        let root = requirement.root.as_path();
+        let Some(name) = selector.filter(|name| *name != CONSUMER_SELECTOR_ALL) else {
+            return Ok(LintPlanInput {
+                root,
+                steps: steps.clone(),
+                selector: None,
+            });
+        };
+        if steps.iter().any(|step| step.name() == name) {
+            let selector = Some(ProfileName::parse(name.to_string())?);
+            return Ok(LintPlanInput {
+                root,
+                steps: steps.clone(),
+                selector,
+            });
+        }
+        if let Some(members) = requirement.lint_profiles.resolve(name, steps) {
+            return Ok(LintPlanInput {
+                root,
+                steps: members,
+                selector: None,
+            });
+        }
+        let mut available: Vec<&str> = steps.iter().map(ConsumerProfileStep::name).collect();
+        available.extend(requirement.lint_profiles.names());
+        Err(consumer_profile_error(
+            self.config_path
+                .as_deref()
+                .unwrap_or_else(|| Path::new(CONFIG_FILENAME)),
+            ConsumerProfile::Lint.as_str(),
+            format!(
+                "consumer `lint` profile has no step or profile named `{name}`; configured: {}",
+                available.join(", ")
+            ),
+        )
+        .with_detail("selector", json!(name))
+        .with_detail("available", json!(available))
+        .with_suggested_action(format!(
+            "Pass one of the configured step or profile names or `{CONSUMER_SELECTOR_ALL}`."
+        )))
+    }
+
     #[expect(
         clippy::result_large_err,
         reason = "Compatibility configuration errors are deliberately surfaced through CliError."
@@ -386,6 +437,8 @@ impl LoadedConfig {
             .ok_or_else(|| missing_consumer_field(&config_path, "[tool.sc-lint]"))?;
         let compatibility = compatibility_requirement_from_file(sc_lint, &config_path)?;
         let lint = validate_consumer_profile("lint", &sc_lint.lint, &config_path)?;
+        let lint_profiles = LintProfiles::parse(&sc_lint.lint_profiles, &lint)
+            .map_err(|error| profile_plan_config_error(error, &config_path))?;
         let test = validate_consumer_profile("test", &sc_lint.test, &config_path)?;
         let root = config_path
             .parent()
@@ -401,6 +454,7 @@ impl LoadedConfig {
                 compatibility,
                 root,
                 lint,
+                lint_profiles,
                 test,
             }),
         })
@@ -558,14 +612,23 @@ struct ScLintConfigFile {
     minimum_version: Option<String>,
     #[serde(default)]
     lint: Vec<ConsumerProfileStepFile>,
+    /// Named lint profiles: an ordered list of declared lint step names.
+    #[serde(default)]
+    lint_profiles: std::collections::BTreeMap<String, Vec<String>>,
     #[serde(default)]
     test: Vec<ConsumerProfileStepFile>,
 }
 
+/// One raw `[[tool.sc-lint.lint|test]]` row. `platform`, `target` and any other
+/// key stay raw so Rust alone decides their meaning (see `profile_plan`).
 #[derive(Debug, Clone, Deserialize)]
 struct ConsumerProfileStepFile {
     name: Option<String>,
     command: Option<Vec<String>>,
+    platform: Option<toml::Value>,
+    target: Option<toml::Value>,
+    #[serde(flatten)]
+    extra: std::collections::BTreeMap<String, toml::Value>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -773,10 +836,23 @@ fn validate_consumer_profile(
                 format!("consumer `{profile}` profile step `{name}` has an empty command argument"),
             ));
         }
-        steps.push(ConsumerProfileStep {
-            name: name.to_string(),
-            command: command.clone(),
-        });
+        let (platform, target) = if profile == ConsumerProfile::Lint.as_str() {
+            decode_lint_step_fields(
+                name,
+                step.platform.as_ref(),
+                step.target.as_ref(),
+                &step.extra,
+            )
+            .map_err(|error| profile_plan_config_error(error, path))?
+        } else {
+            (None, None)
+        };
+        let declared = ConsumerProfileStep::new(name, command.clone(), platform, target);
+        if profile == ConsumerProfile::Lint.as_str() {
+            validate_lint_step(&declared)
+                .map_err(|error| profile_plan_config_error(error, path))?;
+        }
+        steps.push(declared);
     }
     Ok(steps)
 }

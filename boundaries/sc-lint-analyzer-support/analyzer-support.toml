@@ -28,6 +28,8 @@ roots = [
   "read_config_document",
   "analyzer_settings_from",
   "relative_slash_path",
+  "RepoRelativePath",
+  "RelativePathError",
 ]
 
 [dependencies]
@@ -50,7 +52,7 @@ forbidden_test_bypasses = []
 
 [enforcement]
 lint_rules = ["LINT-SC-ANALYZER-SUPPORT-ISOLATION"]
-review_gates = ["rule_neutral_support_only", "no_cross_analyzer_dependencies"]
+review_gates = ["rule_neutral_support_only", "no_cross_analyzer_dependencies", "generated_catalog_matches_rust", "installer_has_no_rule_constants"]
 
 [status]
 state = "concrete_landed"

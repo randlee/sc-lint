@@ -30,7 +30,18 @@ use crate::cli::OutputMode;
 use crate::command::CommandContext;
 use crate::command::ConsumerInitRequest;
 use crate::config::ConsumerProfile;
+use crate::config::ConsumerProfileStep;
 use crate::config::LoadedConfig;
+use crate::profile_plan::CargoVerb;
+use crate::profile_plan::PROFILE_PLAN_ERROR_CODE;
+use crate::profile_plan::PlanDecision;
+use crate::profile_plan::PlannedStep;
+use crate::profile_plan::Platform;
+use crate::profile_plan::PlatformScope;
+use crate::profile_plan::ProfileName;
+use crate::profile_plan::ProfilePlanDetailCode;
+use crate::profile_plan::Target;
+use crate::profile_plan::plan_consumer_lint;
 use crate::workflow;
 
 const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
@@ -314,6 +325,7 @@ fn consumer_commands_require_an_explicit_consumer_mode() {
             target: LintTarget::Ci,
             consumer: true,
             profile: None,
+            platform_scope: None,
             rule_filter: None,
         })
     ));
@@ -577,8 +589,8 @@ fn consumer_missing_backend_is_a_structured_recovery_error() {
     ]);
     let context = CommandContext::from_cli(&cli).expect("consumer context");
     let loaded = LoadedConfig::load(&cli, &context).expect("consumer config");
-    let error =
-        workflow::run_consumer_lint_profile(&loaded, None).expect_err("missing backend fails");
+    let error = workflow::run_consumer_lint_profile(&loaded, None, PlatformScope::Host)
+        .expect_err("missing backend fails");
     assert_eq!(error.code(), "CLI.SC_LINT_BACKEND_NOT_FOUND");
     assert_eq!(error.documentation.as_deref(), Some("sc-lint docs setup"));
     assert!(!error.to_string().to_ascii_lowercase().contains("traceback"));
@@ -2779,15 +2791,20 @@ fn step_names(steps: &[Value]) -> Vec<String> {
 
 struct FakeSystemAdapter {
     xwin_available: bool,
+    host: crate::profile_plan::Platform,
     failures: HashMap<&'static str, &'static str>,
     invocations: RefCell<Vec<String>>,
+    /// Program and argv of every planned (consumer lint) step, in run order.
+    planned_argv: RefCell<Vec<Vec<String>>>,
 }
 
 impl FakeSystemAdapter {
     fn new(xwin_available: bool) -> Self {
         Self {
             xwin_available,
+            host: crate::profile_plan::Platform::host(),
             failures: HashMap::new(),
+            planned_argv: RefCell::new(Vec::new()),
             // Tests need to observe step order without requiring Sync, so
             // RefCell is sufficient for this single-threaded fake.
             invocations: RefCell::new(Vec::new()),
@@ -2795,9 +2812,41 @@ impl FakeSystemAdapter {
     }
 }
 
+impl FakeSystemAdapter {
+    /// Injects the host the planner should plan for.
+    fn on_host(mut self, host: crate::profile_plan::Platform) -> Self {
+        self.host = host;
+        self
+    }
+}
+
 impl workflow::SystemAdapter for FakeSystemAdapter {
     fn cargo_xwin_available(&self, _repo_root: &Path) -> bool {
         self.xwin_available
+    }
+
+    fn host_platform(&self) -> crate::profile_plan::Platform {
+        self.host
+    }
+
+    fn run_planned_step(
+        &self,
+        _repo_root: &Path,
+        step: &crate::profile_plan::PlannedStep,
+    ) -> Result<workflow::StepReport, CliError> {
+        self.invocations.borrow_mut().push(step.name().to_string());
+        let argv = std::iter::once(step.command())
+            .chain(step.args())
+            .map(|part| part.to_string_lossy().into_owned())
+            .collect();
+        self.planned_argv.borrow_mut().push(argv);
+        if let Some(message) = self.failures.get(step.name()) {
+            return Err(CliError::backend_failure(*message));
+        }
+        Ok(
+            workflow::StepReport::success(&workflow::StepPlan::from_planned(step))
+                .for_planned(step),
+        )
     }
 
     fn run_step(
@@ -2812,5 +2861,995 @@ impl workflow::SystemAdapter for FakeSystemAdapter {
         }
 
         Ok(workflow::StepReport::success(step))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Consumer platform/profile planning and execution (Phase K, k-9).
+// ---------------------------------------------------------------------------
+
+const PROFILE_FIXTURES: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/platform-profile-execution"
+);
+
+fn profile_fixture(relative: &str) -> PathBuf {
+    Path::new(PROFILE_FIXTURES).join(relative)
+}
+
+fn plan_step(
+    name: &str,
+    command: &[&str],
+    platform: Option<Platform>,
+    target: Option<&str>,
+) -> ConsumerProfileStep {
+    ConsumerProfileStep::new(
+        name,
+        command.iter().map(|part| (*part).to_string()).collect(),
+        platform,
+        target.map(|triple| Target::parse(triple.to_string()).expect("valid target triple")),
+    )
+}
+
+fn profile_name(value: &str) -> ProfileName {
+    ProfileName::parse(value.to_string()).expect("valid profile name")
+}
+
+fn decision_labels(decisions: &[PlanDecision]) -> Vec<String> {
+    decisions
+        .iter()
+        .map(|decision| match decision {
+            PlanDecision::Run(step) => format!("run:{}", step.name()),
+            PlanDecision::Skip(record) => format!("{}:{}", record.reason.as_str(), record.name),
+        })
+        .collect()
+}
+
+fn argv_of(step: &PlannedStep) -> Vec<String> {
+    std::iter::once(step.command())
+        .chain(step.args())
+        .map(|part| part.to_string_lossy().into_owned())
+        .collect()
+}
+
+fn planned_argv(decisions: &[PlanDecision], name: &str) -> Vec<String> {
+    decisions
+        .iter()
+        .find_map(|decision| match decision {
+            PlanDecision::Run(step) if step.name() == name => Some(argv_of(step)),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no planned run for step `{name}`"))
+}
+
+fn run_label(name: &str) -> String {
+    format!("run:{name}")
+}
+
+fn cross_command_label(name: &str) -> String {
+    format!("unsupported_cross_command:{name}")
+}
+
+fn cross_target_label(name: &str) -> String {
+    format!("unsupported_cross_target:{name}")
+}
+
+fn matrix_steps() -> Vec<ConsumerProfileStep> {
+    let msvc = "x86_64-pc-windows-msvc";
+    vec![
+        plan_step("plain", &["cargo", "fmt", "--check"], None, None),
+        plan_step("linux-tool", &["./check.sh"], Some(Platform::Linux), None),
+        plan_step("mac-tool", &["./check.sh"], Some(Platform::MacOS), None),
+        plan_step("win-tool", &["check.cmd"], Some(Platform::Windows), None),
+        plan_step(
+            "linux-check",
+            &["cargo", "check"],
+            Some(Platform::Linux),
+            Some("x86_64-unknown-linux-gnu"),
+        ),
+        plan_step(
+            "mac-check",
+            &["cargo", "check"],
+            Some(Platform::MacOS),
+            Some("aarch64-apple-darwin"),
+        ),
+        plan_step(
+            "win-check",
+            &["cargo", "clippy", "--workspace", "--", "-D", "warnings"],
+            Some(Platform::Windows),
+            Some(msvc),
+        ),
+        plan_step(
+            "win-gnu",
+            &["cargo", "check"],
+            Some(Platform::Windows),
+            Some("x86_64-pc-windows-gnu"),
+        ),
+    ]
+}
+
+type MatrixRow = (Platform, PlatformScope, Vec<String>);
+
+fn labels(items: &[&str]) -> Vec<String> {
+    items
+        .iter()
+        .map(|item| match item.split_once(':') {
+            Some(("run", name)) => run_label(name),
+            Some(("cmd", name)) => cross_command_label(name),
+            Some(("tgt", name)) => cross_target_label(name),
+            _ => panic!("bad expectation label `{item}`"),
+        })
+        .collect()
+}
+
+/// Expected decisions for every scope on a Linux host over [`matrix_steps`].
+fn linux_matrix_rows() -> Vec<MatrixRow> {
+    use Platform::{Linux, MacOS, Windows};
+    let host = labels(&["run:plain", "run:linux-tool", "run:linux-check"]);
+    vec![
+        (Linux, PlatformScope::Host, host.clone()),
+        (Linux, PlatformScope::Named(Linux), host),
+        (
+            Linux,
+            PlatformScope::All,
+            labels(&[
+                "run:plain",
+                "run:linux-tool",
+                "cmd:mac-tool",
+                "cmd:win-tool",
+                "run:linux-check",
+                "tgt:mac-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
+        ),
+        (
+            Linux,
+            PlatformScope::Named(MacOS),
+            labels(&[
+                "run:plain",
+                "run:linux-tool",
+                "cmd:mac-tool",
+                "run:linux-check",
+                "tgt:mac-check",
+            ]),
+        ),
+        (
+            Linux,
+            PlatformScope::Named(Windows),
+            labels(&[
+                "run:plain",
+                "run:linux-tool",
+                "cmd:win-tool",
+                "run:linux-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
+        ),
+    ]
+}
+
+/// Expected decisions for every scope on a macOS host over [`matrix_steps`].
+fn macos_matrix_rows() -> Vec<MatrixRow> {
+    use Platform::{Linux, MacOS, Windows};
+    let host = labels(&["run:plain", "run:mac-tool", "run:mac-check"]);
+    vec![
+        (MacOS, PlatformScope::Host, host.clone()),
+        (MacOS, PlatformScope::Named(MacOS), host),
+        (
+            MacOS,
+            PlatformScope::All,
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "run:mac-tool",
+                "cmd:win-tool",
+                "tgt:linux-check",
+                "run:mac-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
+        ),
+        (
+            MacOS,
+            PlatformScope::Named(Linux),
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "run:mac-tool",
+                "tgt:linux-check",
+                "run:mac-check",
+            ]),
+        ),
+        (
+            MacOS,
+            PlatformScope::Named(Windows),
+            labels(&[
+                "run:plain",
+                "run:mac-tool",
+                "cmd:win-tool",
+                "run:mac-check",
+                "run:win-check",
+                "tgt:win-gnu",
+            ]),
+        ),
+    ]
+}
+
+/// Expected decisions for every scope on a Windows host over [`matrix_steps`].
+fn windows_matrix_rows() -> Vec<MatrixRow> {
+    use Platform::{Linux, MacOS, Windows};
+    let host = labels(&["run:plain", "run:win-tool", "run:win-check", "run:win-gnu"]);
+    vec![
+        (Windows, PlatformScope::Host, host.clone()),
+        (Windows, PlatformScope::Named(Windows), host),
+        (
+            Windows,
+            PlatformScope::All,
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "cmd:mac-tool",
+                "run:win-tool",
+                "tgt:linux-check",
+                "tgt:mac-check",
+                "run:win-check",
+                "run:win-gnu",
+            ]),
+        ),
+        (
+            Windows,
+            PlatformScope::Named(Linux),
+            labels(&[
+                "run:plain",
+                "cmd:linux-tool",
+                "run:win-tool",
+                "tgt:linux-check",
+                "run:win-check",
+                "run:win-gnu",
+            ]),
+        ),
+        (
+            Windows,
+            PlatformScope::Named(MacOS),
+            labels(&[
+                "run:plain",
+                "cmd:mac-tool",
+                "run:win-tool",
+                "tgt:mac-check",
+                "run:win-check",
+                "run:win-gnu",
+            ]),
+        ),
+    ]
+}
+
+fn matrix_expectations() -> Vec<MatrixRow> {
+    let mut rows = linux_matrix_rows();
+    rows.extend(macos_matrix_rows());
+    rows.extend(windows_matrix_rows());
+    rows
+}
+
+#[test]
+fn test_profile_platform_scope_matrix() {
+    let steps = matrix_steps();
+    let expectations = matrix_expectations();
+    assert_eq!(expectations.len(), 15, "every host crosses every scope");
+    for (host, scope, expected) in expectations {
+        let decisions = plan_consumer_lint(&steps, None, scope, host)
+            .unwrap_or_else(|error| panic!("{host} {scope:?}: {error}"));
+        assert_eq!(decision_labels(&decisions), expected, "{host} {scope:?}");
+    }
+
+    // Execution matrix: argv for the same declarations on each host.
+    let linux =
+        plan_consumer_lint(&steps, None, PlatformScope::All, Platform::Linux).expect("linux plan");
+    let windows = plan_consumer_lint(&steps, None, PlatformScope::All, Platform::Windows)
+        .expect("windows plan");
+    let clippy = |xwin: &[&str]| -> Vec<String> {
+        let mut argv = vec!["cargo"];
+        argv.extend(xwin);
+        argv.extend([
+            "clippy",
+            "--workspace",
+            "--target",
+            "x86_64-pc-windows-msvc",
+        ]);
+        argv.extend(["--", "-D", "warnings"]);
+        argv.into_iter().map(str::to_string).collect()
+    };
+    assert_eq!(planned_argv(&linux, "win-check"), clippy(&["xwin"]));
+    assert_eq!(planned_argv(&windows, "win-check"), clippy(&[]));
+    assert_eq!(
+        planned_argv(&windows, "win-gnu"),
+        ["cargo", "check", "--target", "x86_64-pc-windows-gnu"]
+    );
+    assert_eq!(
+        planned_argv(&linux, "plain"),
+        ["cargo", "fmt", "--check"],
+        "untagged steps keep their declared argv"
+    );
+    let macos =
+        plan_consumer_lint(&steps, None, PlatformScope::Host, Platform::MacOS).expect("macos plan");
+    assert_eq!(
+        planned_argv(&macos, "mac-check"),
+        ["cargo", "check", "--target", "aarch64-apple-darwin"],
+        "same-host targets use plain cargo"
+    );
+    let xwin = linux.iter().find_map(|decision| match decision {
+        PlanDecision::Run(step) if step.name() == "win-check" => Some(step),
+        _ => None,
+    });
+    assert!(xwin.expect("xwin step").uses_cargo_xwin());
+    assert_eq!(
+        xwin.and_then(PlannedStep::cargo_verb),
+        Some(CargoVerb::Clippy)
+    );
+}
+
+fn consumer_toml(rows: &str) -> String {
+    format!(
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n{rows}\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n"
+    )
+}
+
+fn load_consumer_toml(text: &str) -> (TempDir, Result<LoadedConfig, CliError>) {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(&config_path, text).expect("consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "lint",
+        "ci",
+        "--consumer",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer context");
+    let loaded = LoadedConfig::load(&cli, &context);
+    (fixture, loaded)
+}
+
+fn lint_rows(names: &[&str]) -> String {
+    names
+        .iter()
+        .map(|name| {
+            format!(
+                "[[tool.sc-lint.lint]]\nname = \"{name}\"\ncommand = [\"cargo\", \"--version\"]\n\n"
+            )
+        })
+        .collect()
+}
+
+fn selected_names(loaded: &LoadedConfig, selector: Option<&str>) -> Vec<String> {
+    selected_names_for_host(loaded, selector, Platform::Linux)
+}
+
+fn selected_names_for_host(
+    loaded: &LoadedConfig,
+    selector: Option<&str>,
+    host: Platform,
+) -> Vec<String> {
+    let input = loaded.consumer_lint_inputs(selector).expect("selection");
+    let decisions = plan_consumer_lint(
+        &input.steps,
+        input.selector.as_ref(),
+        PlatformScope::Host,
+        host,
+    )
+    .expect("plan");
+    decisions
+        .iter()
+        .map(|decision| match decision {
+            PlanDecision::Run(step) => step.name().to_string(),
+            PlanDecision::Skip(record) => record.name.clone(),
+        })
+        .collect()
+}
+
+#[test]
+fn test_profile_selection_order_and_no_duplicates() {
+    let rows = lint_rows(&["a", "b", "c", "d", "e"]);
+    let text = consumer_toml(&format!(
+        "[tool.sc-lint.lint_profiles]\npick = [\"e\", \"b\", \"d\"]\nsingle = [\"c\"]\n\n{rows}"
+    ));
+    let (_fixture, loaded) = load_consumer_toml(&text);
+    let loaded = loaded.expect("valid profile configuration");
+
+    // A named profile selects its own order, not declaration order.
+    assert_eq!(selected_names(&loaded, Some("pick")), ["e", "b", "d"]);
+    assert_eq!(selected_names(&loaded, Some("single")), ["c"]);
+    // A step name selects exactly that step; `all` and absent keep declaration order.
+    assert_eq!(selected_names(&loaded, Some("c")), ["c"]);
+    assert_eq!(
+        selected_names(&loaded, Some("all")),
+        ["a", "b", "c", "d", "e"]
+    );
+    assert_eq!(selected_names(&loaded, None), ["a", "b", "c", "d", "e"]);
+
+    // The planner itself never returns a step twice and rejects duplicate declarations.
+    let twice = vec![
+        plan_step("a", &["cargo", "check"], None, None),
+        plan_step("a", &["cargo", "check"], None, None),
+    ];
+    let error = plan_consumer_lint(&twice, None, PlatformScope::Host, Platform::Linux)
+        .expect_err("duplicate declarations are rejected");
+    assert_eq!(error.detail_code, ProfilePlanDetailCode::DuplicateMember);
+    let unique = vec![
+        plan_step("a", &["cargo", "check"], None, None),
+        plan_step("b", &["cargo", "check"], None, None),
+    ];
+    let decisions = plan_consumer_lint(&unique, None, PlatformScope::All, Platform::Linux)
+        .expect("unique plan");
+    assert_eq!(decision_labels(&decisions), ["run:a", "run:b"]);
+    let only_b = plan_consumer_lint(
+        &unique,
+        Some(&profile_name("b")),
+        PlatformScope::All,
+        Platform::Linux,
+    )
+    .expect("single-step selection");
+    assert_eq!(decision_labels(&only_b), ["run:b"]);
+    let unknown = plan_consumer_lint(
+        &unique,
+        Some(&profile_name("zzz")),
+        PlatformScope::All,
+        Platform::Linux,
+    )
+    .expect_err("unknown selector");
+    assert_eq!(unknown.detail_code, ProfilePlanDetailCode::UnknownMember);
+}
+
+fn invalid_profile_cases() -> Vec<(&'static str, String, &'static str)> {
+    let rows = lint_rows(&["fmt", "spell"]);
+    let profiles = |table: &str| format!("[tool.sc-lint.lint_profiles]\n{table}\n\n{rows}");
+    vec![
+        ("empty", profiles("fast = []"), "PROFILE.EMPTY_MEMBERS"),
+        (
+            "dup",
+            profiles("fast = [\"fmt\", \"fmt\"]"),
+            "PROFILE.DUPLICATE_MEMBER",
+        ),
+        (
+            "unknown",
+            profiles("fast = [\"fmt\", \"nope\"]"),
+            "PROFILE.UNKNOWN_MEMBER",
+        ),
+        (
+            "step-collision",
+            profiles("fmt = [\"spell\"]"),
+            "PROFILE.AMBIGUOUS_NAME",
+        ),
+        (
+            "reserved",
+            profiles("all = [\"fmt\"]"),
+            "PROFILE.AMBIGUOUS_NAME",
+        ),
+    ]
+}
+
+fn invalid_step_cases() -> Vec<(&'static str, String, &'static str)> {
+    let rows = lint_rows(&["fmt", "spell"]);
+    let msvc = "x86_64-pc-windows-msvc";
+    let targeted = |command: &str, platform: &str, target: &str| {
+        format!(
+            "{rows}[[tool.sc-lint.lint]]\nname = \"w\"\ncommand = {command}\nplatform = \"{platform}\"\ntarget = \"{target}\"\n"
+        )
+    };
+    vec![
+        (
+            "unknown-field",
+            format!(
+                "{rows}[[tool.sc-lint.lint]]\nname = \"w\"\ncommand = [\"cargo\", \"check\"]\nplatfrom = \"linux\"\n"
+            ),
+            "PROFILE.UNKNOWN_STEP_FIELD",
+        ),
+        (
+            "bad-platform",
+            format!(
+                "{rows}[[tool.sc-lint.lint]]\nname = \"w\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"beos\"\n"
+            ),
+            "PROFILE.UNKNOWN_STEP_FIELD",
+        ),
+        (
+            "target-without-platform",
+            format!(
+                "{rows}[[tool.sc-lint.lint]]\nname = \"w\"\ncommand = [\"cargo\", \"check\"]\ntarget = \"{msvc}\"\n"
+            ),
+            "PROFILE.TARGET_REQUIRES_PLATFORM",
+        ),
+        (
+            "os-mismatch",
+            targeted("[\"cargo\", \"check\"]", "linux", msvc),
+            "PROFILE.TARGET_OS_MISMATCH",
+        ),
+        (
+            "malformed-target",
+            targeted("[\"cargo\", \"check\"]", "windows", "Not A Triple"),
+            "PROFILE.TARGET_OS_MISMATCH",
+        ),
+        (
+            "wrapper",
+            targeted("[\"just\", \"check\"]", "windows", msvc),
+            "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
+        ),
+        (
+            "embedded-target",
+            targeted(
+                "[\"cargo\", \"check\", \"--target=x86_64-pc-windows-msvc\"]",
+                "windows",
+                msvc,
+            ),
+            "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
+        ),
+        (
+            "other-verb",
+            targeted("[\"cargo\", \"build\"]", "windows", msvc),
+            "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
+        ),
+        (
+            "toolchain-override",
+            targeted("[\"cargo\", \"+nightly\", \"check\"]", "windows", msvc),
+            "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
+        ),
+    ]
+}
+
+#[test]
+fn test_profile_rejects_invalid_members_and_targets() {
+    for (label, rows, detail_code) in invalid_profile_cases()
+        .into_iter()
+        .chain(invalid_step_cases())
+    {
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
+        let error = loaded.expect_err(label);
+        assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE, "{label}");
+        assert_eq!(error.kind, CliErrorKind::Config, "{label}");
+        assert_eq!(error.details["detail_code"], detail_code, "{label}");
+        assert!(error.suggested_action.is_some(), "{label}: recovery");
+        assert!(error.cause.is_some(), "{label}: cause");
+        assert!(error.documentation.is_some(), "{label}: docs");
+    }
+
+    // A profile is a flat list of step names: nesting is a shape error, not a panic.
+    let rows = lint_rows(&["fmt"]);
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&format!(
+        "[tool.sc-lint.lint_profiles]\nfast = [[\"fmt\"]]\n\n{rows}"
+    )));
+    assert_eq!(
+        loaded.expect_err("nested profile").code(),
+        "CLI.SC_LINT_CONFIG_MALFORMED"
+    );
+
+    // The planner API returns structured errors for invalid input, never a panic.
+    let orphan = [plan_step(
+        "w",
+        &["cargo", "check"],
+        None,
+        Some("x86_64-pc-windows-msvc"),
+    )];
+    let error = plan_consumer_lint(&orphan, None, PlatformScope::All, Platform::Linux)
+        .expect_err("target needs a platform");
+    assert_eq!(
+        error.detail_code,
+        ProfilePlanDetailCode::TargetRequiresPlatform
+    );
+    assert_eq!(error.code, PROFILE_PLAN_ERROR_CODE);
+    assert_eq!(
+        ProfileName::parse(String::new())
+            .expect_err("empty")
+            .detail_code,
+        ProfilePlanDetailCode::AmbiguousName
+    );
+    assert!(Target::parse("not a triple".to_string()).is_err());
+    assert_eq!(
+        CargoVerb::from_argv(&["cargo".to_string(), "build".to_string()]),
+        None
+    );
+    let all_codes = [
+        ProfilePlanDetailCode::EmptyMembers,
+        ProfilePlanDetailCode::DuplicateMember,
+        ProfilePlanDetailCode::UnknownMember,
+        ProfilePlanDetailCode::AmbiguousName,
+        ProfilePlanDetailCode::UnknownStepField,
+        ProfilePlanDetailCode::TargetRequiresPlatform,
+        ProfilePlanDetailCode::TargetOsMismatch,
+        ProfilePlanDetailCode::UnsupportedCommandShape,
+    ];
+    assert_eq!(
+        all_codes.map(ProfilePlanDetailCode::as_str),
+        [
+            "PROFILE.EMPTY_MEMBERS",
+            "PROFILE.DUPLICATE_MEMBER",
+            "PROFILE.UNKNOWN_MEMBER",
+            "PROFILE.AMBIGUOUS_NAME",
+            "PROFILE.UNKNOWN_STEP_FIELD",
+            "PROFILE.TARGET_REQUIRES_PLATFORM",
+            "PROFILE.TARGET_OS_MISMATCH",
+            "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
+        ]
+    );
+}
+
+fn load_named_membership() -> (TempDir, LoadedConfig) {
+    let text = fs::read_to_string(profile_fixture("named-membership.toml")).expect("fixture");
+    let fixture = TempDir::new().expect("fixture dir");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(&config_path, text).expect("consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "lint",
+        "ci",
+        "--consumer",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("named membership config loads");
+    (fixture, loaded)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Tests surface the shared CliError contract unchanged."
+)]
+fn lint_rows_for(
+    loaded: &LoadedConfig,
+    selector: Option<&str>,
+    scope: PlatformScope,
+    adapter: &FakeSystemAdapter,
+) -> Result<Vec<Value>, CliError> {
+    let success = workflow::run_consumer_lint_with(loaded, selector, scope, adapter)?;
+    Ok(success.data["steps"]
+        .as_array()
+        .expect("steps array")
+        .clone())
+}
+
+#[test]
+fn test_resolve_task_names_all_includes_new_targets() {
+    let (_fixture, loaded) = load_named_membership();
+    let all = selected_names(&loaded, Some("all"));
+    for name in ["fmt", "version", "manifests", "spell", "pytests"] {
+        assert!(
+            all.contains(&name.to_string()),
+            "`all` lacks {name}: {all:?}"
+        );
+    }
+    assert_eq!(all, selected_names(&loaded, None));
+    // Declaration order is preserved for `all`; the windows-tagged probe only
+    // joins on a Windows host, so it is omitted for this Linux host plan.
+    assert_eq!(
+        all,
+        ["fmt", "clippy", "version", "manifests", "spell", "pytests"]
+    );
+}
+
+#[test]
+fn test_resolve_task_names_rejects_unknown_target() {
+    let (_fixture, loaded) = load_named_membership();
+    let error = loaded
+        .consumer_lint_inputs(Some("not-a-step-or-profile"))
+        .expect_err("unknown selector is rejected");
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert_eq!(error.details["selector"], "not-a-step-or-profile");
+    let available = error.details["available"].to_string();
+    assert!(
+        available.contains("fast") && available.contains("manifests"),
+        "{available}"
+    );
+}
+
+#[test]
+fn test_resolve_task_names_fast_is_low_latency_subset() {
+    let (_fixture, loaded) = load_named_membership();
+    assert_eq!(
+        selected_names(&loaded, Some("fast")),
+        ["fmt", "version", "manifests", "spell", "pytests"]
+    );
+    assert_eq!(selected_names(&loaded, Some("ci")), ["spell", "fmt"]);
+    assert!(!selected_names(&loaded, Some("fast")).contains(&"clippy".to_string()));
+}
+
+#[test]
+fn test_profile_emits_structured_skips_and_skip_only_success() {
+    let rows = lint_rows(&["fmt"]);
+    let text = consumer_toml(&format!(
+        "{rows}[[tool.sc-lint.lint]]\nname = \"mac-only\"\ncommand = [\"./mac.sh\"]\nplatform = \"macos\"\n\n\
+         [[tool.sc-lint.lint]]\nname = \"win-cross\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-gnu\"\n"
+    ));
+    let (_fixture, loaded) = load_consumer_toml(&text);
+    let loaded = loaded.expect("config loads");
+    let linux = FakeSystemAdapter::new(true).on_host(Platform::Linux);
+    let rows = lint_rows_for(&loaded, None, PlatformScope::All, &linux).expect("plan runs");
+    assert_eq!(rows.len(), 3, "{rows:?}");
+    assert_eq!(rows[0]["status"], "pass");
+    assert_eq!(
+        rows[1],
+        json!({
+            "status": "skipped", "name": "mac-only", "host": "linux",
+            "platform": "macos", "target": null, "reason": "unsupported_cross_command",
+        })
+    );
+    assert_eq!(
+        rows[2],
+        json!({
+            "status": "skipped", "name": "win-cross", "host": "linux",
+            "platform": "windows", "target": "x86_64-pc-windows-gnu",
+            "reason": "unsupported_cross_target",
+        })
+    );
+    assert_eq!(
+        *linux.invocations.borrow(),
+        ["fmt"],
+        "skipped steps never run"
+    );
+
+    // Selecting only skipped steps is a successful run with no executions.
+    let only = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    let skipped = lint_rows_for(&loaded, Some("mac-only"), PlatformScope::All, &only)
+        .expect("skip-only run succeeds");
+    assert_eq!(skipped.len(), 1, "{skipped:?}");
+    assert_eq!(skipped[0]["status"], "skipped");
+    assert_eq!(skipped[0]["reason"], "unsupported_cross_command");
+    assert!(only.invocations.borrow().is_empty(), "nothing executed");
+}
+
+fn write_neutral_cargo_workspace(root: &Path) {
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"neutral\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+    )
+    .expect("neutral manifest");
+    fs::create_dir_all(root.join("src")).expect("neutral src");
+    fs::write(root.join("src/lib.rs"), "pub fn neutral() {}\n").expect("neutral lib");
+}
+
+#[test]
+fn test_supported_execution_failure_is_nonzero() {
+    let rows = lint_rows(&["first", "second"]);
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
+    let loaded = loaded.expect("config loads");
+
+    // A failing supported step is a non-zero backend failure and stops the run.
+    let mut failing = FakeSystemAdapter::new(true).on_host(Platform::Linux);
+    failing.failures.insert("first", "first step exploded");
+    let error = lint_rows_for(&loaded, None, PlatformScope::Host, &failing)
+        .expect_err("failing step fails the run");
+    assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
+    assert_eq!(*failing.invocations.borrow(), ["first"], "fail-fast");
+
+    // A supported cross target without cargo-xwin is a capability failure, never a skip.
+    let msvc = format!(
+        "{rows}[[tool.sc-lint.lint]]\nname = \"win\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\n"
+    );
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&msvc));
+    let loaded = loaded.expect("windows config loads");
+    let no_xwin = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    let error = lint_rows_for(&loaded, Some("win"), PlatformScope::All, &no_xwin)
+        .expect_err("missing xwin fails");
+    assert_eq!(error.kind, CliErrorKind::Capability);
+    assert_eq!(error.exit_code(), crate::consts::EXIT_CAPABILITY);
+    assert!(no_xwin.invocations.borrow().is_empty());
+}
+
+#[test]
+fn test_supported_execution_failure_on_real_host_is_nonzero() {
+    // An invented triple for the host's own OS is planned as same-host cargo
+    // and really executed; cargo cannot build it, so the run must fail.
+    let (platform, triple) = match Platform::host() {
+        Platform::Linux => ("linux", "invented-unknown-linux-gnu"),
+        Platform::MacOS => ("macos", "invented-apple-darwin"),
+        Platform::Windows => ("windows", "invented-pc-windows-msvc"),
+    };
+    let rows = format!(
+        "[[tool.sc-lint.lint]]\nname = \"invented\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"{platform}\"\ntarget = \"{triple}\"\n"
+    );
+    let (fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
+    let loaded = loaded.expect("config loads");
+    write_neutral_cargo_workspace(fixture.path());
+    let error = workflow::run_consumer_lint_profile(&loaded, None, PlatformScope::Host)
+        .expect_err("a real failing cargo invocation is non-zero");
+    assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    assert_ne!(error.exit_code(), 0);
+}
+
+#[test]
+fn test_profiles_exact_json_toml_roundtrip() {
+    let fragment: Value = serde_json::from_str(
+        &fs::read_to_string(profile_fixture("roundtrip-fragment.json")).expect("json fixture"),
+    )
+    .expect("fragment json");
+    let toml_text = fs::read_to_string(profile_fixture("roundtrip-fragment.toml")).expect("toml");
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&toml_text));
+    let loaded = loaded.expect("round-trip fragment loads");
+
+    // Every JSON profile entry is present, in the same order and shape, once loaded.
+    let profiles = fragment["profiles"].as_object().expect("profiles object");
+    let expected_names: Vec<&str> = profiles.keys().map(String::as_str).collect();
+    assert_eq!(
+        selected_names_for_host(&loaded, Some("all"), Platform::host()).len(),
+        expected_names.len() - usize::from(cfg!(not(windows))),
+        "windows-tagged step only joins `all` on a Windows host"
+    );
+    assert_eq!(
+        selected_names_for_host(&loaded, Some("ci"), Platform::host()),
+        fragment["lint_profiles"]["ci"]
+            .as_array()
+            .expect("ci members")
+            .iter()
+            .filter_map(Value::as_str)
+            .filter(|name| cfg!(windows) || *name != "windows-check")
+            .collect::<Vec<_>>()
+    );
+    let input = loaded.consumer_lint_inputs(Some("all")).expect("inputs");
+    let windows = input
+        .steps
+        .iter()
+        .find(|step| step.name() == "windows-check")
+        .expect("windows step");
+    assert_eq!(windows.platform(), Some(Platform::Windows));
+    assert_eq!(
+        windows.target().map(Target::as_str),
+        fragment["profiles"]["windows-check"]["target"].as_str()
+    );
+    assert_eq!(
+        windows.command(),
+        ["cargo", "check", "--workspace"],
+        "command argv keeps its exact order"
+    );
+}
+
+#[test]
+fn test_installer_shape_only_rust_semantic_rejection() {
+    let dir = profile_fixture("semantic-invalid");
+    let expected: Value =
+        serde_json::from_str(&fs::read_to_string(dir.join("expected.json")).expect("expected"))
+            .expect("expected json");
+    let cases = expected.as_object().expect("expected cases");
+    assert_eq!(cases.len(), 6);
+    for (case, detail_code) in cases {
+        // The installer fragment is shape-valid JSON; only the Rust loader rejects it.
+        let json: Value = serde_json::from_str(
+            &fs::read_to_string(dir.join(format!("{case}.json"))).expect("case json"),
+        )
+        .expect("shape-valid case json");
+        assert!(json["profiles"].is_object(), "{case}");
+        let toml_text = fs::read_to_string(dir.join(format!("{case}.toml"))).expect("case toml");
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&toml_text));
+        let error = loaded.expect_err(case);
+        assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE, "{case}");
+        assert_eq!(&error.details["detail_code"], detail_code, "{case}");
+    }
+}
+
+// Black-box reproductions of the two field reports. They spawn the built
+// product binary and use only the public CLI surface, so they fail by
+// assertion (not compilation) against a build without profile support.
+
+fn issue_product_binary() -> PathBuf {
+    let name = if cfg!(windows) {
+        "sc-lint.exe"
+    } else {
+        "sc-lint"
+    };
+    std::env::current_exe()
+        .expect("test executable path")
+        .parent()
+        .and_then(Path::parent)
+        .map(|target_dir| target_dir.join(name))
+        .expect("sc-lint executable path")
+}
+
+fn issue_run_consumer_lint(
+    config_text: &str,
+    lint_args: &[&str],
+    envs: &[(&str, OsString)],
+) -> (TempDir, std::process::Output) {
+    let fixture = TempDir::new().expect("issue fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(&config_path, config_text).expect("issue config");
+    let output = ProcessCommand::new(issue_product_binary())
+        .args(["--json", "--config"])
+        .arg(&config_path)
+        .args(["lint", "ci", "--consumer"])
+        .args(lint_args)
+        .envs(envs.iter().map(|(key, value)| (*key, value)))
+        .output()
+        .expect("run sc-lint product binary");
+    (fixture, output)
+}
+
+fn issue_failure_context(output: &std::process::Output) -> String {
+    format!(
+        "exit={:?}\nstdout={}\nstderr={}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+}
+
+#[test]
+fn test_issue_199_named_membership_reproduces_then_passes() {
+    let config = fs::read_to_string(profile_fixture("named-membership.toml")).expect("fixture");
+    let (_fixture, output) = issue_run_consumer_lint(&config, &["--profile", "fast"], &[]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "`--profile fast` must select the named membership\n{}",
+        issue_failure_context(&output)
+    );
+    let envelope: Value = serde_json::from_slice(&output.stdout).expect("success envelope");
+    let steps = envelope["data"]["steps"].as_array().expect("steps array");
+    assert_eq!(
+        step_names(steps),
+        ["fmt", "version", "manifests", "spell", "pytests"],
+        "membership order is the profile order, not declaration order"
+    );
+    assert!(
+        steps.iter().all(|step| step["status"] == "pass"),
+        "{steps:?}"
+    );
+    assert_eq!(envelope["data"]["selector"], "fast");
+}
+
+#[cfg(unix)]
+#[test]
+fn test_issue_197_cross_target_execution_reproduces_then_passes() {
+    let config = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n\
+        [[tool.sc-lint.lint]]\nname = \"win-clippy\"\ncommand = [\"cargo\", \"clippy\", \"--workspace\", \"--\", \"-D\", \"warnings\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\n\n\
+        [[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n";
+    let tools = profile_fixture("tools");
+    let path = std::env::join_paths(std::iter::once(tools).chain(std::env::split_paths(
+        &std::env::var_os("PATH").expect("PATH is set"),
+    )))
+    .expect("shimmed PATH");
+
+    let log_dir = TempDir::new().expect("shim log dir");
+    let log = log_dir.path().join("argv.log");
+    let envs = [
+        ("PATH", path.clone()),
+        ("SC_LINT_SHIM_LOG", log.clone().into_os_string()),
+    ];
+    let (_fixture, output) =
+        issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "cross-target step must execute\n{}",
+        issue_failure_context(&output)
+    );
+    let argv = fs::read_to_string(&log).expect("shim recorded argv");
+    let expected = if Platform::host() == Platform::Windows {
+        "clippy --workspace --target x86_64-pc-windows-msvc -- -D warnings"
+    } else {
+        "xwin clippy --workspace --target x86_64-pc-windows-msvc -- -D warnings"
+    };
+    assert!(
+        argv.lines().any(|line| line == expected),
+        "expected `{expected}` in recorded argv:\n{argv}"
+    );
+
+    // Planted negative: without cargo-xwin the run is a capability failure,
+    // and the clippy step never ran (it was not silently skipped).
+    if Platform::host() != Platform::Windows {
+        let missing_log = log_dir.path().join("missing-xwin.log");
+        let envs = [
+            ("PATH", path),
+            ("SC_LINT_SHIM_LOG", missing_log.clone().into_os_string()),
+            ("SC_LINT_SHIM_NO_XWIN", OsString::from("1")),
+        ];
+        let (_fixture, output) =
+            issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
+        assert_eq!(
+            output.status.code(),
+            Some(i32::from(crate::consts::EXIT_CAPABILITY)),
+            "{}",
+            issue_failure_context(&output)
+        );
+        let recorded = fs::read_to_string(&missing_log).expect("probe argv");
+        assert!(!recorded.contains("clippy"), "{recorded}");
     }
 }

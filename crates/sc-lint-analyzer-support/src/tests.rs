@@ -16,6 +16,8 @@ use sc_lint_schema::ReportStatus;
 use super::AnalyzerConfigError;
 use super::AnalyzerName;
 use super::CatalogRuleId;
+use super::RelativePathError;
+use super::RepoRelativePath;
 use super::RuleCatalog;
 use super::analyzer_settings_from;
 use super::load_analyzer_settings;
@@ -73,10 +75,10 @@ enum ConfigRule {
     Two,
 }
 
-fn config_rule_id(rule: &ConfigRule) -> &'static str {
+fn config_rule_id(rule: &ConfigRule) -> CatalogRuleId {
     match rule {
-        ConfigRule::One => "EXAMPLE-001",
-        ConfigRule::Two => "EXAMPLE-002",
+        ConfigRule::One => CatalogRuleId::new("EXAMPLE-001"),
+        ConfigRule::Two => CatalogRuleId::new("EXAMPLE-002"),
     }
 }
 
@@ -121,6 +123,7 @@ fn missing_config_yields_defaults() {
     assert_eq!(settings.fail_rules, rule_set(&["EXAMPLE-001"]));
     assert!(settings.exclude_rules.is_empty());
     assert!(settings.exclude_paths.is_empty());
+    assert!(settings.exclude_paths_by_rule.is_empty());
     assert_eq!(settings.rule_filter, None);
     assert_eq!(settings.own_string("extension").unwrap(), None);
 }
@@ -350,6 +353,234 @@ fn settings_apply_filtering_and_failure_policy() {
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].rule_id, ConfigRule::One);
     assert_eq!(status, ReportStatus::Pass);
+}
+
+#[test]
+fn per_rule_path_exclusions_require_exact_catalog_rule_ids() {
+    let directory = config_dir(
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\n\"EXAMPLE-002\" = [\"fixtures/**\"]\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                config_finding(ConfigRule::One),
+                Some(RepoRelativePath::parse("fixtures/input.rs").unwrap()),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::parse("fixtures/input.rs").unwrap()),
+            ),
+        ],
+        config_rule_id,
+    );
+
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule_id, ConfigRule::One);
+    assert_eq!(status, ReportStatus::Fail);
+
+    let family = config_dir(
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\nexample = [\"fixtures/**\"]\n",
+    );
+    let error = load_analyzer_settings(&CATALOG, family.path(), None, None).unwrap_err();
+    assert_eq!(error.code(), "ANALYZER_CONFIG.UNKNOWN_RULE");
+}
+
+#[test]
+fn per_rule_path_exclusions_validate_table_and_values() {
+    for contents in [
+        "[tool.sc-lint.analyzers.example]\nexclude_paths_by_rule = [\"EXAMPLE-001\"]\n",
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\n\"EXAMPLE-001\" = \"fixtures/**\"\n",
+        "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\n\"EXAMPLE-001\" = [1]\n",
+    ] {
+        let directory = config_dir(contents);
+        let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+        assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+    }
+}
+
+#[test]
+fn own_tables_preserve_absent_and_empty_arrays() {
+    for (config, expected) in [("", None), ("extension = []", Some(Vec::new()))] {
+        let directory = config_dir(&format!("[tool.sc-lint.analyzers.example]\n{config}\n"));
+        let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+        assert_eq!(settings.own_tables("extension").unwrap(), expected);
+    }
+}
+
+#[test]
+fn own_tables_borrow_array_entries_in_order_without_parsing_their_fields() {
+    let directory = config_dir(
+        "[[tool.sc-lint.analyzers.example.extension]]\nname = 'first'\nunknown = [1, 2]\n\
+         [[tool.sc-lint.analyzers.example.extension]]\nname = 'second'\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+    let tables: Vec<&toml::Table> = settings.own_tables("extension").unwrap().unwrap();
+    assert_eq!(tables.len(), 2);
+    assert_eq!(tables[0]["name"].as_str(), Some("first"));
+    assert_eq!(tables[1]["name"].as_str(), Some("second"));
+    let repeated = settings.own_tables("extension").unwrap().unwrap();
+    assert!(std::ptr::eq(tables[0], repeated[0]));
+    assert!(std::ptr::eq(tables[1], repeated[1]));
+}
+
+#[test]
+fn own_tables_reject_non_arrays_and_report_invalid_entry_indices() {
+    for (value, key, expected) in [
+        ("{}", "extension", "an array of tables"),
+        ("{ alpha = {} }", "extension", "an array of tables"),
+        ("true", "extension", "an array of tables"),
+        ("[false]", "extension[0]", "a table"),
+        ("[{}, 'invalid']", "extension[1]", "a table"),
+        ("[{}, []]", "extension[1]", "a table"),
+    ] {
+        let directory = config_dir(&format!(
+            "[tool.sc-lint.analyzers.example]\nextension = {value}\n"
+        ));
+        let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+        let error = settings.own_tables("extension").unwrap_err();
+        assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+        match error {
+            AnalyzerConfigError::WrongType {
+                analyzer,
+                key: actual_key,
+                expected: actual_expected,
+            } => {
+                assert_eq!(analyzer, "example");
+                assert_eq!(actual_key, key);
+                assert_eq!(actual_expected, expected);
+            }
+            other => panic!("expected WrongType, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn issue385_config_matrix() {
+    for (config, expected_code) in [
+        ("exclude_paths_by_rule = []", "ANALYZER_CONFIG.WRONG_TYPE"),
+        (
+            "exclude_paths_by_rule = { example = [\"fixtures/**\"] }",
+            "ANALYZER_CONFIG.UNKNOWN_RULE",
+        ),
+        (
+            "exclude_paths_by_rule = { \"EXAMPLE-999\" = [\"fixtures/**\"] }",
+            "ANALYZER_CONFIG.UNKNOWN_RULE",
+        ),
+        (
+            "exclude_paths_by_rule = { \"EXAMPLE-001\" = \"fixtures/**\" }",
+            "ANALYZER_CONFIG.WRONG_TYPE",
+        ),
+        (
+            "exclude_paths_by_rule = { \"EXAMPLE-001\" = [1] }",
+            "ANALYZER_CONFIG.WRONG_TYPE",
+        ),
+    ] {
+        let directory = config_dir(&format!("[tool.sc-lint.analyzers.example]\n{config}\n"));
+        let error = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap_err();
+        assert_eq!(error.code(), expected_code, "config: {config}");
+    }
+
+    let directory = config_dir(
+        "[tool.sc-lint.analyzers.example]\n\
+         fail_rules = [\"EXAMPLE-001\"]\n\
+         exclude_paths_by_rule = { \"EXAMPLE-001\" = [\"fixtures/**\"] }\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+    let fixture_path = Some(RepoRelativePath::parse("fixtures/config.toml").unwrap());
+
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (config_finding(ConfigRule::One), fixture_path.clone()),
+            (config_finding(ConfigRule::Two), fixture_path.clone()),
+            (config_finding(ConfigRule::One), None),
+        ],
+        config_rule_id,
+    );
+    assert_eq!(findings.len(), 2);
+    assert_eq!(findings[0].rule_id, ConfigRule::Two);
+    assert_eq!(findings[1].rule_id, ConfigRule::One);
+    assert_eq!(status, ReportStatus::Fail);
+
+    let (findings, status) = settings.apply_with_paths(
+        vec![(config_finding(ConfigRule::One), fixture_path.clone())],
+        config_rule_id,
+    );
+    assert!(findings.is_empty());
+    assert_eq!(status, ReportStatus::Pass);
+
+    let empty_map = config_dir("[tool.sc-lint.analyzers.example]\nexclude_paths_by_rule = {}\n");
+    let empty_map_settings =
+        load_analyzer_settings(&CATALOG, empty_map.path(), None, None).unwrap();
+    assert!(empty_map_settings.exclude_paths_by_rule.is_empty());
+    let (findings, status) = empty_map_settings.apply_with_paths(
+        vec![(config_finding(ConfigRule::One), fixture_path.clone())],
+        config_rule_id,
+    );
+    assert_eq!(findings.len(), 1);
+    assert_eq!(status, ReportStatus::Fail);
+
+    let no_map = TempDir::new().unwrap();
+    let no_map_settings = load_analyzer_settings(&CATALOG, no_map.path(), None, None).unwrap();
+    let (no_map_findings, no_map_status) = no_map_settings.apply_with_paths(
+        vec![(config_finding(ConfigRule::One), fixture_path.clone())],
+        config_rule_id,
+    );
+    assert_eq!(findings[0].rule_id, no_map_findings[0].rule_id);
+    assert_eq!(status, no_map_status);
+
+    for (config, expected) in [("", None), ("extension = []", Some(Vec::new()))] {
+        let directory = config_dir(&format!("[tool.sc-lint.analyzers.example]\n{config}\n"));
+        let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+        assert_eq!(settings.own_tables("extension").unwrap(), expected);
+    }
+
+    for (config, expected_key, expected_type) in [
+        ("extension = {}", "extension", "an array of tables"),
+        ("extension = [false]", "extension[0]", "a table"),
+    ] {
+        let directory = config_dir(&format!("[tool.sc-lint.analyzers.example]\n{config}\n"));
+        let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+        let error = settings.own_tables("extension").unwrap_err();
+        assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+        assert!(matches!(
+            error,
+            AnalyzerConfigError::WrongType {
+                key,
+                expected,
+                ..
+            } if key == expected_key && expected == expected_type
+        ));
+    }
+}
+
+#[test]
+fn repo_relative_paths_normalize_separators_and_reject_escape_or_absolute_paths() {
+    assert_eq!(
+        RepoRelativePath::parse("crates\\example/./src/lib.rs")
+            .unwrap()
+            .as_str(),
+        "crates/example/src/lib.rs"
+    );
+    assert!(RepoRelativePath::parse("../outside.rs").is_err());
+    assert!(RepoRelativePath::parse("/outside.rs").is_err());
+    assert!(RepoRelativePath::parse("C:\\outside.rs").is_err());
+}
+
+#[test]
+fn relative_path_errors_use_the_documented_interface_name() {
+    assert_eq!(
+        RepoRelativePath::parse("").unwrap_err(),
+        RelativePathError::Empty
+    );
+    assert_eq!(
+        RepoRelativePath::parse("/outside.rs").unwrap_err(),
+        RelativePathError::Absolute
+    );
+    assert_eq!(
+        RepoRelativePath::parse("../outside.rs").unwrap_err(),
+        RelativePathError::EscapesRoot
+    );
 }
 
 #[test]

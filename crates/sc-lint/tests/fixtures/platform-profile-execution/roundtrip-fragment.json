@@ -1,0 +1,1 @@
+{"profiles":{"format":["cargo","fmt","--check"],"native-check":["cargo","check","--workspace"],"windows-check":{"command":["cargo","check","--workspace"],"platform":"windows","target":"x86_64-pc-windows-msvc"}},"lint_profiles":{"ci":["format","native-check","windows-check"]}}

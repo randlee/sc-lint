@@ -1,0 +1,6 @@
+[tool.sc-lint.analyzers.portability]
+
+[[tool.sc-lint.analyzers.portability.platform_adapters]]
+unix_module = "crates/example/src/unix_socket.rs"
+windows_module = "crates/example/src/named_pipe.rs"
+reason = "Private transport adapters"

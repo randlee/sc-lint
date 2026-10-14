@@ -85,6 +85,10 @@ fn main() -> Result<ExitCode> {
                     eprintln!("error: {}", analyzer_config_message(&error));
                     return Ok(ExitCode::from(analyzer_config_exit_code(&error)));
                 }
+                Err(sc_lint_portability::PortabilityError::AdapterConfig(error)) => {
+                    eprintln!("error: {error}");
+                    return Ok(ExitCode::from(3));
+                }
                 Err(error) => return Err(error.into()),
             };
             match OutputFormat::from(format) {
