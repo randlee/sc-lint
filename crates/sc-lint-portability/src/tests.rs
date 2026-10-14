@@ -1871,6 +1871,52 @@ fn issue372_retains_public_and_unrelated_parity() {
 }
 
 #[test]
+fn issue372_adapter_pair_inherits_enclosing_cfg_before_path_exclusions() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        exclude_paths = ["crates/example/src/unix/transport.rs"]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/unix/transport.rs"
+        windows_module = "crates/example/src/windows/transport.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        #[cfg(unix)]
+        mod unix {
+            mod transport;
+        }
+
+        #[cfg(windows)]
+        mod windows {
+            mod transport;
+        }
+        "#,
+    );
+    fixture.write_source("example", "unix/transport.rs", "fn connect() {}");
+    fixture.write_source("example", "windows/transport.rs", "fn connect() {}");
+
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-001"),
+    )
+    .expect("enclosing cfg validates before excluding a configured adapter file");
+
+    assert!(report.findings.is_empty());
+}
+
+#[test]
 fn issue372_invalid_adapter_matrix_reports_semantic_error_before_filtering() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

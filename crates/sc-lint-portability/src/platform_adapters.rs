@@ -156,6 +156,23 @@ struct ModuleDeclaration {
     is_windows: bool,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct EnclosingCfg {
+    is_test_only: bool,
+    is_unix: bool,
+    is_windows: bool,
+}
+
+impl EnclosingCfg {
+    fn including(self, item_mod: &ItemMod) -> Self {
+        Self {
+            is_test_only: self.is_test_only || item_mod.attrs.iter().any(attr_is_cfg_test),
+            is_unix: self.is_unix || item_mod.attrs.iter().any(attr_is_cfg_unix),
+            is_windows: self.is_windows || item_mod.attrs.iter().any(attr_is_cfg_windows),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub(super) struct PlatformAdapters {
     unix_declarations: BTreeSet<(PathBuf, usize)>,
@@ -312,7 +329,13 @@ fn collect_declarations(root: &Path) -> anyhow::Result<BTreeMap<PathBuf, ModuleD
         let source = fs::read_to_string(&context.source_path)?;
         let file = syn::parse_file(&source)?;
         let module_dir = module_dir(&context.source_path)?;
-        collect_file_declarations(&file.items, &context, &module_dir, &mut declarations)?;
+        collect_file_declarations(
+            &file.items,
+            &context,
+            &module_dir,
+            EnclosingCfg::default(),
+            &mut declarations,
+        )?;
     }
     Ok(declarations)
 }
@@ -332,17 +355,20 @@ fn collect_file_declarations(
     items: &[Item],
     context: &FileContext,
     module_dir: &Path,
+    enclosing_cfg: EnclosingCfg,
     declarations: &mut BTreeMap<PathBuf, ModuleDeclaration>,
 ) -> anyhow::Result<()> {
     for item in items {
         let Item::Mod(item_mod) = item else {
             continue;
         };
+        let declaration_cfg = enclosing_cfg.including(item_mod);
         if let Some((_, items)) = &item_mod.content {
             collect_file_declarations(
                 items,
                 context,
                 &module_dir.join(item_mod.ident.to_string()),
+                declaration_cfg,
                 declarations,
             )?;
             continue;
@@ -356,9 +382,9 @@ fn collect_file_declarations(
             ModuleDeclaration {
                 source_path: context.source_path.clone(),
                 line: span_start_line(item_mod.span()),
-                is_test_only: item_mod.attrs.iter().any(attr_is_cfg_test),
-                is_unix: item_mod.attrs.iter().any(attr_is_cfg_unix),
-                is_windows: item_mod.attrs.iter().any(attr_is_cfg_windows),
+                is_test_only: declaration_cfg.is_test_only,
+                is_unix: declaration_cfg.is_unix,
+                is_windows: declaration_cfg.is_windows,
             },
         );
     }
