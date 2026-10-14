@@ -8,6 +8,10 @@
 | Deciders | team-lead, clint |
 | Relates to | REQ-LOG-001 through REQ-LOG-009 |
 
+`ARCH-` and `RULE-` identifiers belong to the arch-qa reviewer namespace and
+identify review findings, not decisions in this ADR. This ADR's decisions use
+`ADR-008-D<n>` identifiers.
+
 ## Context
 sc-lint uses sc-observability for structured JSON logging. The crate has both a library target (`sc_lint`) and a binary target (`sc-lint`) in a single Cargo.toml. This creates tension between keeping the library free of observability dependencies and providing a clean logging API for the binary.
 
@@ -17,10 +21,10 @@ sc-lint uses sc-observability for structured JSON logging. The crate has both a 
 sc-observability lives in `[dependencies]` rather than being scoped to the binary only. This is an accepted trade-off: Cargo does not support binary-only dependencies in a mixed lib+bin crate. Enforcement is by convention and arch-qa, not the build system.
 
 ### ADR-008-D1 — sc-observability imports confined to binary modules
-No lib crate module (anything other than `main.rs` and `logging.rs`) may import sc-observability. Library types must not hold or reference sc-observability types directly. Violations are tracked as `ARCH-010` findings.
+No lib crate module (anything other than `main.rs` and `logging.rs`) may import sc-observability. Library types must not hold or reference sc-observability types directly. Violations are reported as architecture review findings.
 
 ### ADR-008-D2 — No custom emit_* wrapper functions
-Custom wrapper functions named `emit_*` are forbidden. The single approved dispatch helper is `dispatch_event` (formerly `emit_event`, renamed per `ARCH-006/011`). This prevents proliferation of logging indirection.
+Custom wrapper functions named `emit_*` are forbidden. The single approved dispatch helper is `dispatch_event` (formerly `emit_event`). This prevents proliferation of logging indirection.
 
 ### CLI-LAYER-OWNS-LOGGER-INITIALIZATION
 The logger must be initialized in `main.rs` before any operation. Library code must not initialize or depend on a logger being present. Functions accessible from library code must not require or assume logging is initialized.
@@ -41,4 +45,5 @@ and deprecated event-emission APIs must be replaced by explicit `log` or
 ## Consequences
 - Library types are clean of sc-observability imports ✓
 - The binary module tree can use sc-observability freely ✓
-- ARCH-004 means sc-observability is a compile-time dependency even for library consumers (accepted) ✗
+- sc-observability remains a compile-time dependency for library consumers, as
+  accepted in ADR-008-D3.
