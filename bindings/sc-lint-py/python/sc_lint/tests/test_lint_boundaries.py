@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
 
+from sc_lint import lint_boundaries
 from sc_lint.lint_boundaries import RULE_ID
 from sc_lint.lint_boundaries import delegation_argv
 from sc_lint.lint_boundaries import run
@@ -119,6 +121,21 @@ class LintBoundariesTests(unittest.TestCase):
             messages = validate_inventory(repo_root)
             self.assertEqual(len(messages), 1)
             self.assertIn("invalid Rust identifier `not-valid`", messages[0])
+
+    def test_module_exposes_only_the_delegation_surface(self) -> None:
+        tree = ast.parse(Path(lint_boundaries.__file__).read_text(encoding="utf-8"))
+        defined: set[str] = set()
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                defined.add(node.name)
+            elif isinstance(node, ast.Assign):
+                defined.update(t.id for t in node.targets if isinstance(t, ast.Name))
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                defined.add(node.target.id)
+        self.assertEqual(
+            defined,
+            {"RULE_ID", "delegation_argv", "rust_report", "validate_inventory", "run", "main"},
+        )
 
 
 if __name__ == "__main__":
