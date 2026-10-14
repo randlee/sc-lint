@@ -1819,7 +1819,7 @@ fn catalog_lists_every_rule_id() {
 }
 
 #[test]
-fn issue372_retains_public_and_unrelated_parity() {
+fn issue372_separate_adapter_pair() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -1914,6 +1914,88 @@ fn issue372_adapter_pair_inherits_enclosing_cfg_before_path_exclusions() {
     .expect("enclosing cfg validates before excluding a configured adapter file");
 
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn issue372_retains_public_and_unrelated_parity() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/unix_socket.rs"
+        windows_module = "crates/example/src/named_pipe.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        #[cfg(unix)]
+        mod unix_socket;
+        #[cfg(windows)]
+        mod named_pipe;
+        #[cfg(unix)]
+        mod unpaired_unix_only;
+        use std::os::unix::net::UnixStream;
+        #[cfg(unix)]
+        pub fn unrelated_public_api() {}
+        #[cfg(unix)]
+        pub(crate) fn unrelated_restricted_api() {}
+        #[cfg(unix)]
+        pub fn unrelated_sibling_api() {}
+        pub mod nested {
+            #[cfg(unix)]
+            pub fn unrelated_child_api() {}
+        }
+        "#,
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+    fixture.write_source("example", "unpaired_unix_only.rs", "fn only_unix() {}");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+    for name in [
+        "unrelated_public_api",
+        "unrelated_restricted_api",
+        "unrelated_sibling_api",
+        "unrelated_child_api",
+        "unpaired_unix_only",
+    ] {
+        assert!(
+            port010.iter().any(|finding| finding.message.contains(name)),
+            "PORT-010 must retain `{name}`: {port010:#?}"
+        );
+    }
+    assert!(
+        port010
+            .iter()
+            .all(|finding| !finding.message.contains("unix_socket")),
+        "the adapter pair must suppress only its own module: {port010:#?}"
+    );
+    let port004 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port004)
+        .count();
+    assert_eq!(
+        port004, 1,
+        "other rules are retained: {:#?}",
+        report.findings
+    );
 }
 
 #[test]
@@ -2174,7 +2256,15 @@ fn issue372_filter_precedence_and_empty() {
     })
     .unwrap();
 
-    assert_eq!(absent.findings, empty.findings);
+    assert!(
+        !absent.findings.is_empty(),
+        "the fixture must produce a finding"
+    );
+    assert_eq!(
+        serde_json::to_vec(&absent.findings).unwrap(),
+        serde_json::to_vec(&empty.findings).unwrap(),
+        "absent and [] platform_adapters must serialize byte-equivalent findings"
+    );
 
     fixture.write_lint_config(
         "[tool.sc-lint.analyzers.portability]\n\
@@ -2192,6 +2282,69 @@ fn issue372_filter_precedence_and_empty() {
     )
     .expect("filtering keeps optional adapter validation independent");
     assert!(excluded.findings.is_empty());
+
+    fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\n");
+    let nonmatching = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-004"),
+    )
+    .expect("a valid rule selector with no matching findings is not an error");
+    assert!(
+        nonmatching.findings.is_empty(),
+        "a non-matching --rule-filter must select nothing: {:#?}",
+        nonmatching.findings
+    );
+}
+
+#[test]
+fn issue372_filter_keeps_configured_pair_valid_when_adapter_file_is_excluded() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        exclude_paths = ["crates/example/src/unix_socket.rs"]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/unix_socket.rs"
+        windows_module = "crates/example/src/named_pipe.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        #[cfg(unix)]
+        mod unix_socket;
+        #[cfg(windows)]
+        mod named_pipe;
+        "#,
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-010"),
+    )
+    .expect("excluding a configured adapter file keeps its pair valid");
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| !finding.message.contains("unix_socket")),
+        "{:#?}",
+        report.findings
+    );
 }
 
 struct WorkspaceFixture {
