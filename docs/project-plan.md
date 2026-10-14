@@ -30,6 +30,8 @@ The project focus is:
   - see [docs/plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md](./plans/release-0.6.0/lint-spx.19-inventory-qa1-docs-tests.md)
 - release 0.6.0 PR #115 QA-2 gate (`lint-spx.20`; verdict: FAIL)
   - record: `bd show lint-spx.20` (QA bead; no sprint document)
+- release 0.6.0 pre-existing boundary inventory debt surfaced by QA-1 `lint-spx.16` (not 0.6.0 gating; `lint-spx.21`)
+  - record: `bd show lint-spx.21` (sprint bead; no sprint document)
 - release 0.6.0 QA-2 parity assertions and records (`lint-spx.27`)
   - see [docs/plans/release-0.6.0/lint-spx.27-inventory-qa2-parity-assertions.md](./plans/release-0.6.0/lint-spx.27-inventory-qa2-parity-assertions.md)
 - release 0.6.0 QA-3 gate (`lint-spx.28`; verdict: FAIL)
