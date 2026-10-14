@@ -46,6 +46,31 @@ upgrade:
 The `bootstrap_command` expression dispatches to the product-owned PowerShell
 companion on Windows and to the POSIX helper elsewhere.
 
+## Select lint steps and run managed commands
+
+`just lint` accepts a step name, named profile, or `all` as its first
+argument. An optional second argument selects platform scope. For example,
+`just lint ci windows` selects the `ci` profile's Windows steps. The supported
+scopes are `host` (the default), `all`, `linux`, `macos`, and `windows`; a scope
+needs a selector before it. The equivalent direct helper form is:
+
+```sh
+.sc-lint/bootstrap lint ci windows --config sc-lint.toml
+```
+
+Use `exec` to run a command with the managed product environment while
+preserving its arguments and exit status:
+
+```sh
+.sc-lint/bootstrap exec -- cargo --version
+```
+
+An alternate configuration can be named before the `--` separator, as in
+`.sc-lint/bootstrap exec --config config/sc-lint.toml -- cargo --version`.
+`exec` does not run setup or select a lint profile. See
+[profiles, platform scope, and declared tools](./using-sc-lint.md#profiles-platform-scope-and-declared-tools)
+for step, target, profile, and tool declaration syntax.
+
 `setup` installs the configured floor when no compatible product is present,
 then preflights it. The installer stages the complete product bundle, checks
 launcher and companion identities/health, activates atomically, and retains

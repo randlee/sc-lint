@@ -7,8 +7,9 @@ All notable changes to sc-lint are documented here.
 ### Compatibility
 
 - Tightened boundary inventory validation and stale-entry diagnostics can
-  reject previously accepted invalid declarations. Review the recovery steps
-  in [troubleshooting](docs-bundle/troubleshooting.md#cargo-shear-exception-migration)
+  reject previously accepted invalid declarations, including
+  `SCB-DEPENDENCY-004`, `SCB-BOUNDARY-004`, and `SCB-MANIFEST-006`. Review the
+  [boundary inventory and stale-policy recovery steps](docs-bundle/packages/sc-lint-boundary.md#recovering-inventory-and-stale-policy-findings)
   before upgrading.
 - Previously accepted path-like cargo-shear
   `allowed_unused_dependencies` keys are rejected with
