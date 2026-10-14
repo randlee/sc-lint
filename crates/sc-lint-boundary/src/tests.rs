@@ -756,13 +756,13 @@ fn issue376_stale_dependent_diagnostic_has_record_cause_category_and_recovery() 
     for (finding, path, field, categories) in [
         (
             runtime_and_fallback_dev,
-            fixture.root().join("boundaries/p/a.toml"),
+            Path::new("boundaries").join("p").join("a.toml"),
             "dependencies.allowed_dependents",
             "runtime and fallback dev",
         ),
         (
             dev_only,
-            fixture.root().join("boundaries/p/b.toml"),
+            Path::new("boundaries").join("p").join("b.toml"),
             "dependencies.allowed_dev_dependents",
             "dev",
         ),
