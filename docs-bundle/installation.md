@@ -45,10 +45,11 @@ The bootstrap's explicit, managed, and `PATH` binary selection is described in
 ## CI
 
 CI should install one pinned release, run `sc-lint --json version`, and then
-use the same commands as local development. The repository's
-`.github/actions/setup-sc-lint` action is a repository workflow component; it
-is not a published reusable consumer action. Consumer workflows can install a
-verified release archive or use the generated Just integration. Do not run
+use the same commands as local development. Consumer workflows can use the
+shipped reusable Action, `randlee/sc-lint@v1`, with an explicit `version` input
+(see [CI](./ci.md#reusable-github-action)); install a verified release archive;
+or use the generated Just integration. The repository's `.github/actions/*`
+composites are repository-only and are not consumer actions. Do not run
 `cargo run -p sc-lint` in a consumer CI job.
 
 ## Verify an installation

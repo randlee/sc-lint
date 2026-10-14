@@ -1,8 +1,63 @@
 # Continuous integration
 
-Use the same complete lint and test operations as local development. Install a
-verified release archive or use the generated Just integration; this
-repository does not publish a reusable consumer GitHub Action.
+Use the same complete lint and test operations as local development. Use the
+shipped reusable GitHub Action, `randlee/sc-lint@v1`, for managed adoption; or
+install a verified release archive; or use the generated Just integration.
+
+## Reusable GitHub Action
+
+`randlee/sc-lint@v1` installs a verified release archive, checks the checksum
+against the release's `checksums.txt`, runs the compatibility preflight, and
+then runs the consumer contract. Choose the operation with `operation`: `setup`
+installs and preflights the release, while `lint` (the default) and `test` run
+the consumer commands after the preflight.
+
+```yaml
+- uses: randlee/sc-lint@v1
+  with:
+    operation: lint
+    version: 0.7.3
+```
+
+`version` is required. It is the exact released product SemVer, without a
+leading `v`, and it selects the verified artifact. Do not infer it from Cargo
+metadata or a checkout.
+
+For a reproducible or high-assurance workflow, pin `uses:` to an immutable full
+commit SHA and keep `version` explicit:
+
+```yaml
+- uses: randlee/sc-lint@<full-commit-sha>
+  with:
+    operation: test
+    version: 0.7.3
+```
+
+The `v1` tag identifies the Action interface and is a movable tag, refreshed
+after each release is published. The `version` input identifies the release
+artifact. Neither implies the other.
+
+The Action publishes these outputs:
+
+- `binary-path`: the absolute path of the verified `sc-lint` binary.
+- `docs-path`: the absolute path of the shipped offline `sc-lint-docs`
+  directory. Documentation discovery never reaches the network.
+- `version`: the verified release version the Action selected.
+
+Inputs `artifact-url` and `checksums-url` take an exact archive and checksum
+manifest URL for a release mirror or an offline runner. The Action does not
+fall back to a package manager, Cargo, a source checkout, or an analyzer package
+name. When an artifact cannot be reached, it reports
+`ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`.
+
+Stable failure codes are `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`,
+`ACTION.SC_LINT_CHECKSUM_MISMATCH`, `ACTION.SC_LINT_COMPATIBILITY_FAILED`, and
+`ACTION.SC_LINT_COMMAND_FAILED`. Each has a recovery step in
+[troubleshooting](./troubleshooting.md).
+
+The repository's `.github/actions/*` composites are repository-only workflow
+components for this project's own CI. Consumers use `randlee/sc-lint@v1`, not
+those paths.
 
 ## Machine-readable checks
 
