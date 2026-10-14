@@ -53,6 +53,25 @@ reports `SCB-DEPENDENCY-002`; adding `sample-cli` to a second record for the
 same canonical owner grants it because the incoming lists combine. A separate
 record with an explicit empty dev list does not remove that grant.
 
+The package-edge rules can be selected with `--rule-filter dependencies`;
+manifest rules can be selected with `--rule-filter manifests`. The complete
+analyzer runs both. `--rule-filter` accepts rule IDs or families and selects
+from the full rule set; it takes precedence over `exclude_rules`, while path
+exclusions still apply and `fail_rules` still determines the verdict. The
+`exclude_paths_by_rule` map takes exact rule IDs and drops only that rule's
+findings at matching paths. For example, excluding one manifest rule does not
+suppress a different rule reported for the same manifest. See
+[configuration](../configuration.md) for the complete filter contract.
+
+`SCB-DEPENDENCY-004` identifies a stale incoming permission. In a neutral
+fixture, suppose two records describe the canonical owner `sample-api` and one
+allows `sample-cli`, but no live edge of the permission's category points from
+`sample-cli` to `sample-api`. The analyzer reports the unused owner/dependent
+permission once, even if multiple records supplied it. The finding belongs to
+`dependencies` and fails by default. Remove the stale permission or restore the
+intended direct edge; package-edge checks cover direct workspace members, not
+transitive or external-crate reachability.
+
 Manifest checks run on the complete analyzer and with
 `--rule-filter manifests`. `SCB-MANIFEST-001` checks required workspace-inherited
 package fields and `-002` checks internal path-dependency version alignment.
@@ -61,11 +80,23 @@ dependencies, `-004` for ownership violations, `-005` for section violations,
 and `-006` for stale or inconsistent policy (including record-lock and active
 owner coverage defects). These policy findings fail by default. Boundary
 inventory semantic defects are reported as `SCB-BOUNDARY-004` with record/field
-context; malformed syntax, schema/layout, and I/O errors remain fatal. An
-unresolved workspace package name also fails instead of being silently skipped.
-Optional policy configuration is inactive when absent, while a present empty
-allowlist permits no entries. See [configuration](../configuration.md) for
-rule and path filters.
+context; malformed syntax, schema/layout, and I/O errors remain fatal. A
+combined-invalid inventory can therefore report each semantic defect as a
+finding rather than stopping at the first one. For example, if a neutral
+`sample-api` fixture has both a malformed semantic module path and an invalid
+implementation type, both defects are reported with their record and field
+context. A local composition-root symbol such as `run` remains local and is
+preserved; only a resolved external crate-qualified root such as
+`sample_client::Api` participates in dependent-policy validation. An unresolved
+workspace package name also fails instead of being silently skipped.
+
+ADR-017 additions remain compatible with existing consumers: omitted
+`exclude_paths_by_rule` and `platform_adapters` retain prior behavior, and an
+absent optional manifest-policy family adds no manifest checks. Existing
+inventory permission fields keep their established semantics. When a policy
+record is present, an explicitly empty allowlist permits no entries; an empty
+dependency list is restrictive, not an instruction to infer permissions. See
+[configuration](../configuration.md) for the public keys and filters.
 
 These optional records live in the boundary analyzer table, not in Cargo
 manifests. This neutral example allows two direct package dependencies for one
@@ -106,6 +137,17 @@ package reference rather than silently skipping the record. Prefer Cargo
 package names in new inventory; directory and library-name matches are
 compatibility fallbacks. Once resolved, policy comparisons use the canonical
 Cargo package identity, including when a manifest dependency uses a rename.
+
+The companion portability analyzer also uses the shared per-rule path filter.
+When two platform files implement the same private adapter under different
+module names, a reviewed `platform_adapters` pair identifies those files and a
+reason; only the paired modules and their enclosed private implementation get
+that treatment. For example, a fixture may pair `src/platform/unix.rs` with
+`src/platform/windows.rs` while leaving a separately Unix-gated public item
+subject to ordinary parity checks. See the canonical
+[portability guide](./sc-lint-portability.md) and
+[configuration guide](../configuration.md) for the accepted shape and filter
+behavior.
 
 ## Related packages
 
