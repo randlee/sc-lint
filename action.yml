@@ -3,7 +3,7 @@ description: Install a verified sc-lint release and run the consumer setup, lint
 author: sc-lint maintainers
 inputs:
   operation:
-    description: Consumer operation: setup, lint, or test.
+    description: "Consumer operation: setup, lint, or test."
     required: false
     default: lint
   version:
