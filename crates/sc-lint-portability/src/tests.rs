@@ -2374,6 +2374,25 @@ fn issue372_filter_precedence_and_empty() {
     );
 
     for pattern in ["crates/example/src/lib.rs", r"crates\\example\\src\\lib.rs"] {
+        fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\n");
+        let baseline = analyze_workspace_configured(
+            &AnalyzeOptions {
+                root: fixture.root().to_path_buf(),
+                format: OutputFormat::Json,
+            },
+            None,
+            Some("PORT-010"),
+        )
+        .expect("an unexcluded filtered baseline is valid");
+        assert!(
+            baseline
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id == RuleId::Port010),
+            "the unexcluded fixture must report PORT-010 before pattern {pattern:?}: {:#?}",
+            baseline.findings
+        );
+
         fixture.write_lint_config(&format!(
             "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"{pattern}\"]\n\
              [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]\n\

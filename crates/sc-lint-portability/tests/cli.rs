@@ -239,12 +239,26 @@ exclude_paths = ["crates\\example\\src\\lib.rs"]
 #[test]
 fn cli_excludes_per_rule_windows_separator_paths_with_a_rule_filter() {
     let root = excluded_workspace();
+    let args = ["--format", "json", "--rule-filter", "PORT-006"];
+    let baseline = run_excluded_workspace(&root, "[tool.sc-lint.analyzers.portability]\n", &args);
+    assert_eq!(baseline.status.code(), Some(0));
+    let baseline_report: serde_json::Value = serde_json::from_slice(&baseline.stdout).unwrap();
+    assert_eq!(baseline_report["status"], "fail");
+    assert!(
+        baseline_report["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|finding| finding["rule_id"] == "PORT-006"),
+        "the unexcluded fixture must report PORT-006: {baseline_report}"
+    );
+
     let output = run_excluded_workspace(
         &root,
         r#"[tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
 "PORT-006" = ["crates\\example\\src\\lib.rs"]
 "#,
-        &["--format", "json", "--rule-filter", "PORT-006"],
+        &args,
     );
 
     assert_eq!(output.status.code(), Some(0));
