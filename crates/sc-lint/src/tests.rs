@@ -3717,16 +3717,6 @@ fn test_profile_emits_structured_skips_and_skip_only_success() {
     assert!(only.invocations.borrow().is_empty(), "nothing executed");
 }
 
-fn write_neutral_cargo_workspace(root: &Path) {
-    fs::write(
-        root.join("Cargo.toml"),
-        "[package]\nname = \"neutral\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
-    )
-    .expect("neutral manifest");
-    fs::create_dir_all(root.join("src")).expect("neutral src");
-    fs::write(root.join("src/lib.rs"), "pub fn neutral() {}\n").expect("neutral lib");
-}
-
 #[test]
 fn test_supported_execution_failure_is_nonzero() {
     let rows = lint_rows(&["first", "second"]);
@@ -3754,28 +3744,6 @@ fn test_supported_execution_failure_is_nonzero() {
     assert_eq!(error.kind, CliErrorKind::Capability);
     assert_eq!(error.exit_code(), crate::consts::EXIT_CAPABILITY);
     assert!(no_xwin.invocations.borrow().is_empty());
-}
-
-#[test]
-#[serial]
-fn test_supported_execution_failure_on_real_host_is_nonzero() {
-    // An invented triple for the host's own OS is planned as same-host cargo
-    // and really executed; cargo cannot build it, so the run must fail.
-    let (platform, triple) = match Platform::host() {
-        Platform::Linux => ("linux", "invented-unknown-linux-gnu"),
-        Platform::MacOS => ("macos", "invented-apple-darwin"),
-        Platform::Windows => ("windows", "invented-pc-windows-msvc"),
-    };
-    let rows = format!(
-        "[[tool.sc-lint.lint]]\nname = \"invented\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"{platform}\"\ntarget = \"{triple}\"\n"
-    );
-    let (fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
-    let loaded = loaded.expect("config loads");
-    write_neutral_cargo_workspace(fixture.path());
-    let error = workflow::run_consumer_lint_profile(&loaded, None, PlatformScope::Host)
-        .expect_err("a real failing cargo invocation is non-zero");
-    assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_ne!(error.exit_code(), 0);
 }
 
 #[test]

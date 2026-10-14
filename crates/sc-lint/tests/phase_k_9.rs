@@ -1,9 +1,15 @@
 use std::ffi::OsString;
 use std::fs;
+use std::io;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
+use std::process::Stdio;
+use std::thread;
+use std::time::Duration;
+use std::time::Instant;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -98,16 +104,139 @@ fn main() {
 
 fn run_consumer_lint(config_text: &str, lint_args: &[&str], envs: &[(&str, OsString)]) -> Output {
     let fixture = TempDir::new().expect("issue fixture");
+    fs::write(
+        fixture.path().join("Cargo.toml"),
+        "[package]\nname = \"neutral\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+    )
+    .expect("neutral manifest");
+    fs::create_dir_all(fixture.path().join("src")).expect("neutral src");
+    fs::write(fixture.path().join("src/lib.rs"), "pub fn neutral() {}\n").expect("neutral lib");
     let config_path = fixture.path().join("sc-lint.toml");
     fs::write(&config_path, config_text).expect("issue config");
-    Command::new(env!("CARGO_BIN_EXE_sc-lint"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sc-lint"));
+    command
+        .current_dir(fixture.path())
         .args(["--json", "--config"])
         .arg(&config_path)
         .args(["lint", "ci", "--consumer"])
         .args(lint_args)
         .envs(envs.iter().map(|(key, value)| (*key, value)))
-        .output()
-        .expect("run sc-lint product binary")
+        .env("CARGO_TARGET_DIR", fixture.path().join("cargo-target"));
+    run_command_with_timeout(&mut command, Duration::from_secs(300))
+        .unwrap_or_else(|error| panic!("run sc-lint product binary: {error}"))
+}
+
+fn run_command_with_timeout(command: &mut Command, timeout: Duration) -> io::Result<Output> {
+    let display = format!("{command:?}");
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+    let stdout_reader = thread::spawn(move || read_child_output(stdout));
+    let stderr_reader = thread::spawn(move || read_child_output(stderr));
+    let started = Instant::now();
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return Ok(Output {
+                    status,
+                    stdout: join_child_output(stdout_reader)?,
+                    stderr: join_child_output(stderr_reader)?,
+                });
+            }
+            Ok(None) => {}
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let stdout = join_child_output(stdout_reader).unwrap_or_default();
+                let stderr = join_child_output(stderr_reader).unwrap_or_default();
+                return Err(io::Error::new(
+                    error.kind(),
+                    format!(
+                        "waiting for command {display} failed: {error}; stdout: {}; stderr: {}",
+                        String::from_utf8_lossy(&stdout),
+                        String::from_utf8_lossy(&stderr)
+                    ),
+                ));
+            }
+        }
+
+        if started.elapsed() >= timeout {
+            let _ = child.kill();
+            let _status = child.wait()?;
+            let stdout = join_child_output(stdout_reader)?;
+            let stderr = join_child_output(stderr_reader)?;
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!(
+                    "command {display} timed out after {timeout:?}; stdout: {}; stderr: {}",
+                    String::from_utf8_lossy(&stdout),
+                    String::from_utf8_lossy(&stderr)
+                ),
+            ));
+        }
+
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn read_child_output(mut stream: impl Read) -> io::Result<Vec<u8>> {
+    let mut output = Vec::new();
+    stream.read_to_end(&mut output)?;
+    Ok(output)
+}
+
+fn join_child_output(reader: thread::JoinHandle<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
+    reader
+        .join()
+        .map_err(|_| io::Error::other("child output reader panicked"))?
+}
+
+#[test]
+fn issue_timeout_child_process() {
+    if std::env::var_os("SC_LINT_TEST_TIMEOUT_CHILD").is_some() {
+        println!("timeout child stdout");
+        eprintln!("timeout child stderr");
+        thread::sleep(Duration::from_secs(60));
+    }
+}
+
+#[test]
+fn issue_command_timeout_kills_child_and_reports_output() {
+    let mut command = Command::new(std::env::current_exe().expect("test executable"));
+    command
+        .args(["--exact", "issue_timeout_child_process", "--nocapture"])
+        .env("SC_LINT_TEST_TIMEOUT_CHILD", "1");
+    let error = run_command_with_timeout(&mut command, Duration::from_millis(100))
+        .expect_err("a sleeping child exceeds the deadline");
+    let message = error.to_string();
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut, "{message}");
+    assert!(message.contains("issue_timeout_child_process"), "{message}");
+    assert!(message.contains("timeout child stdout"), "{message}");
+    assert!(message.contains("timeout child stderr"), "{message}");
+}
+
+#[test]
+fn test_supported_execution_failure_on_real_host_is_nonzero() {
+    let (platform, triple) = match std::env::consts::OS {
+        "linux" => ("linux", "invented-unknown-linux-gnu"),
+        "macos" => ("macos", "invented-apple-darwin"),
+        "windows" => ("windows", "invented-pc-windows-msvc"),
+        other => panic!("unsupported test host: {other}"),
+    };
+    let config = format!(
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"invented\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"{platform}\"\ntarget = \"{triple}\"\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n"
+    );
+    let output = run_consumer_lint(&config, &[], &[]);
+    assert_eq!(
+        output.status.code(),
+        Some(EXIT_BACKEND_FAILURE),
+        "a real failing cargo invocation is bounded and non-zero\n{}",
+        issue_failure_context(&output)
+    );
 }
 
 #[test]
