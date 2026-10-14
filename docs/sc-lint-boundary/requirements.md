@@ -145,7 +145,8 @@ family.
 
 - `REQ-SCB-012`
   The default planning metadata source for inventory parity is
-  `boundaries/planning.toml`.
+  `boundaries/planning.toml`; nested `boundaries/**/planning.toml` is an
+  explicit load error and is never silently ignored.
 
 - `REQ-SCB-013`
   When `boundaries/` exists, `boundaries/planning.toml` must define
