@@ -19,6 +19,45 @@ fn run_analyzer(config: &str, extra_args: &[&str]) -> std::process::Output {
     command.output().unwrap()
 }
 
+fn excluded_workspace() -> TempDir {
+    let root = TempDir::new().unwrap();
+    fs::write(
+        root.path().join("Cargo.toml"),
+        "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
+    )
+    .unwrap();
+    let package = root.path().join("crates/example");
+    fs::create_dir_all(package.join("src")).unwrap();
+    fs::write(
+        package.join("Cargo.toml"),
+        "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join("src/lib.rs"),
+        "pub fn path() { let _ = \"/home/user/file\"; }\n",
+    )
+    .unwrap();
+    root
+}
+
+fn run_excluded_workspace(
+    root: &TempDir,
+    config: &str,
+    extra_args: &[&str],
+) -> std::process::Output {
+    let config_path = root.path().join("sc-lint.toml");
+    fs::write(&config_path, config).unwrap();
+    Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
+        .args(["analyze", "--root"])
+        .arg(root.path())
+        .arg("--config")
+        .arg(config_path)
+        .args(extra_args)
+        .output()
+        .unwrap()
+}
+
 fn run_invalid_adapter_config(config: &str) -> std::process::Output {
     let root = TempDir::new().unwrap();
     fs::write(
@@ -165,39 +204,9 @@ fn issue372_cli_configured_pair() {
 
 #[test]
 fn cli_excludes_windows_separator_paths_with_a_rule_filter() {
-    let root = TempDir::new().unwrap();
-    fs::write(
-        root.path().join("Cargo.toml"),
-        "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
-    )
-    .unwrap();
-    let package = root.path().join("crates/example");
-    fs::create_dir_all(package.join("src")).unwrap();
-    fs::write(
-        package.join("Cargo.toml"),
-        "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
-    )
-    .unwrap();
-    fs::write(
-        package.join("src/lib.rs"),
-        "pub fn path() { let _ = \"/home/user/file\"; }\n",
-    )
-    .unwrap();
-    let config_path = root.path().join("sc-lint.toml");
-    let run = |config: &str| {
-        fs::write(&config_path, config).unwrap();
-        Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
-            .args(["analyze", "--root"])
-            .arg(root.path())
-            .arg("--config")
-            .arg(&config_path)
-            .args(["--format", "json"])
-            .args(["--rule-filter", "PORT-006"])
-            .output()
-            .unwrap()
-    };
-
-    let baseline = run("[tool.sc-lint.analyzers.portability]\n");
+    let root = excluded_workspace();
+    let args = ["--format", "json", "--rule-filter", "PORT-006"];
+    let baseline = run_excluded_workspace(&root, "[tool.sc-lint.analyzers.portability]\n", &args);
     assert_eq!(baseline.status.code(), Some(0));
     let baseline_report: serde_json::Value = serde_json::from_slice(&baseline.stdout).unwrap();
     assert!(
@@ -210,10 +219,12 @@ fn cli_excludes_windows_separator_paths_with_a_rule_filter() {
     );
     assert_eq!(baseline_report["status"], "fail");
 
-    let excluded = run(
+    let excluded = run_excluded_workspace(
+        &root,
         r#"[tool.sc-lint.analyzers.portability]
 exclude_paths = ["crates\\example\\src\\lib.rs"]
 "#,
+        &args,
     );
 
     assert_eq!(excluded.status.code(), Some(0));
@@ -223,4 +234,21 @@ exclude_paths = ["crates\\example\\src\\lib.rs"]
         excluded_report["findings"].as_array().unwrap().is_empty(),
         "excluded file was still reported"
     );
+}
+
+#[test]
+fn cli_excludes_per_rule_windows_separator_paths_with_a_rule_filter() {
+    let root = excluded_workspace();
+    let output = run_excluded_workspace(
+        &root,
+        r#"[tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
+"PORT-006" = ["crates\\example\\src\\lib.rs"]
+"#,
+        &["--format", "json", "--rule-filter", "PORT-006"],
+    );
+
+    assert_eq!(output.status.code(), Some(0));
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["status"], "pass");
+    assert!(report["findings"].as_array().unwrap().is_empty());
 }
