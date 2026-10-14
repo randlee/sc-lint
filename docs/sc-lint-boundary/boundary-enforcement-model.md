@@ -428,6 +428,8 @@ Default behavior should be:
 - TOML planning metadata is authoritative
 - `boundaries/planning.toml` is the default authoritative planning-metadata
   file
+- it is the sole planning-metadata path: a nested `boundaries/**/planning.toml`
+  is an explicit load error, not silently ignored
 - when `boundaries/` exists, `boundaries/planning.toml` is required and must
   define `[planning].current_sprint`; when `boundaries/` is absent, loading
   returns an empty inventory and does not require planning metadata
