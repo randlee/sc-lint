@@ -11,6 +11,7 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+- [docs/sc-lint/adr/ADR-013-analyzer-shared-support.md](./sc-lint/adr/ADR-013-analyzer-shared-support.md)
 - [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
@@ -56,6 +57,23 @@ Dependency rules:
   functions for it rather than implementing it in (c)
 
 Each change in a phase lands in the lowest layer that can carry it.
+
+## Crate documentation
+
+Crate-specific requirements and architecture are indexed from the [product
+requirements](./requirements.md). The pages are:
+
+| Crate | Requirements | Architecture |
+| --- | --- | --- |
+| `sc-lint` | [requirements](./sc-lint/requirements.md) | [architecture](./sc-lint/architecture.md) |
+| `sc-lint-analyzer-support` | [requirements](./sc-lint-analyzer-support/requirements.md) | [architecture](./sc-lint-analyzer-support/architecture.md) |
+| `sc-lint-attributes` | [requirements](./sc-lint-attributes/requirements.md) | [architecture](./sc-lint-attributes/architecture.md) |
+| `sc-lint-boundary` | [requirements](./sc-lint-boundary/requirements.md) | [architecture](./sc-lint-boundary/architecture.md) |
+| `sc-lint-directives` | [requirements](./sc-lint-directives/requirements.md) | [architecture](./sc-lint-directives/architecture.md) |
+| `sc-lint-portability` | [requirements](./sc-lint-portability/requirements.md) | [architecture](./sc-lint-portability/architecture.md) |
+| `sc-lint-runtime` | [requirements](./sc-lint-runtime/requirements.md) | [architecture](./sc-lint-runtime/architecture.md) |
+| `sc-lint-schema` | [requirements](./sc-lint-schema/requirements.md) | [architecture](./sc-lint-schema/architecture.md) |
+| `sc-lint-py` | [requirements](./sc-lint-py/requirements.md) | [architecture](./sc-lint-py/architecture.md) |
 
 Supporting surfaces outside the four layers:
 

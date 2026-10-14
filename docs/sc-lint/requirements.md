@@ -20,6 +20,20 @@ The detailed requirement authorities for this crate are:
 - [../requirements.md](../requirements.md)
 - [logging.md](./logging.md)
 
+## Requirement Traceability
+
+The canonical requirement statements are owned by the product and CLI
+requirements. This crate-local index makes their application to this package
+explicit without defining duplicate requirements:
+
+- `REQ-PRODUCT-001` and `REQ-PRODUCT-002` define the stable CLI and its
+  parsing, configuration, output, and exit-code ownership.
+- `REQ-PRODUCT-002A` through `REQ-PRODUCT-002DA` define machine-mode and
+  envelope stability.
+- `REQ-CLI-001` through `REQ-CLI-024` define command-specific CLI behavior.
+- `REQ-LOG-001` through `REQ-LOG-009` define the logging contract in
+  [logging.md](./logging.md).
+
 ## Scope Rules
 
 - the crate must remain the canonical top-level entry point for end users

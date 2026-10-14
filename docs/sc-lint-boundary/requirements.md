@@ -170,3 +170,8 @@ family.
 - `REQ-SCB-014`
   Sprint comparison for inventory parity must use parsed ordering, not lexical
   string comparison.
+
+## Stable consumer interfaces
+
+Rule IDs and this analyzer's JSON output are stable consumer contracts
+(`REQ-PRODUCT-002`, [ADR-011](../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)).
