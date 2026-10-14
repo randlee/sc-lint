@@ -1938,7 +1938,6 @@ fn issue372_retains_public_and_unrelated_parity() {
     fixture.write_lint_config(
         r#"
         [tool.sc-lint.analyzers.portability]
-        exclude_paths = ["crates/example/src/unix_socket.rs"]
         [[tool.sc-lint.analyzers.portability.platform_adapters]]
         unix_module = "crates/example/src/unix_socket.rs"
         windows_module = "crates/example/src/named_pipe.rs"
