@@ -600,6 +600,72 @@ fn exclude_paths_support_segment_and_recursive_wildcards() {
 }
 
 #[test]
+fn exclude_paths_match_backslash_candidates_for_global_and_per_rule_patterns() {
+    let global = config_dir(
+        r#"[tool.sc-lint.analyzers.example]
+exclude_paths = ["crates/example/src/lib.rs", "docs\\guide\\index.md"]
+"#,
+    );
+    let settings = load_analyzer_settings(&CATALOG, global.path(), None, None).unwrap();
+
+    assert!(settings.path_excluded("crates\\example\\src\\lib.rs"));
+    assert!(settings.path_excluded("docs\\guide\\index.md"));
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                config_finding(ConfigRule::One),
+                Some(RepoRelativePath::parse("crates\\example\\src\\lib.rs").unwrap()),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::parse("docs\\guide\\index.md").unwrap()),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::parse("docs\\guide\\readme.md").unwrap()),
+            ),
+        ],
+        config_rule_id,
+    );
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule_id, ConfigRule::Two);
+    assert_eq!(status, ReportStatus::Pass);
+
+    let per_rule = config_dir(
+        r#"[tool.sc-lint.analyzers.example.exclude_paths_by_rule]
+"EXAMPLE-001" = ["crates/example/src/lib.rs"]
+"EXAMPLE-002" = ["docs\\guide\\index.md"]
+"#,
+    );
+    let settings = load_analyzer_settings(&CATALOG, per_rule.path(), None, None).unwrap();
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                config_finding(ConfigRule::One),
+                Some(RepoRelativePath::from_raw_for_test(
+                    "crates\\example\\src\\lib.rs",
+                )),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::from_raw_for_test("docs\\guide\\index.md")),
+            ),
+            (
+                config_finding(ConfigRule::Two),
+                Some(RepoRelativePath::from_raw_for_test(
+                    "docs\\guide\\readme.md",
+                )),
+            ),
+        ],
+        config_rule_id,
+    );
+
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].rule_id, ConfigRule::Two);
+    assert_eq!(status, ReportStatus::Pass);
+}
+
+#[test]
 fn exclude_paths_handle_dense_segment_wildcards_without_backtracking() {
     let pattern = format!("{}b", "*a".repeat(64));
     let directory = config_dir(&format!(

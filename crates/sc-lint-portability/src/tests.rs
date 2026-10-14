@@ -366,25 +366,25 @@ fn exclude_paths_drops_findings_from_matching_files() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
-    fixture.write_lint_config(
-        r#"[tool.sc-lint.analyzers.portability]
-exclude_paths = ["crates\\example\\src\\**"]
-"#,
-    );
     fixture.write_source(
         "example",
         "lib.rs",
         "pub fn path() { let _ = \"/home/user/file\"; }",
     );
 
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-    })
-    .unwrap();
+    for pattern in ["crates/example/src/**", r"crates\\example\\src\\**"] {
+        fixture.write_lint_config(&format!(
+            "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"{pattern}\"]\n"
+        ));
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        })
+        .unwrap();
 
-    assert_eq!(report.status, ReportStatus::Pass);
-    assert!(report.findings.is_empty());
+        assert_eq!(report.status, ReportStatus::Pass, "pattern: {pattern}");
+        assert!(report.findings.is_empty(), "pattern: {pattern}");
+    }
 }
 
 #[test]
@@ -421,33 +421,39 @@ fn issue385_rule_path_exclusion_retains_other_rule() {
         1
     );
 
-    fixture.write_lint_config(
-        "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"crates/example/src/lib.rs\"]\n",
-    );
-    let whole_file_excluded = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-    })
-    .unwrap();
+    for pattern in ["crates/example/src/lib.rs", r"crates\\example\\src\\lib.rs"] {
+        fixture.write_lint_config(&format!(
+            "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"{pattern}\"]\n"
+        ));
+        let whole_file_excluded = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        })
+        .unwrap();
 
-    assert_eq!(whole_file_excluded.status, ReportStatus::Pass);
-    assert!(whole_file_excluded.findings.is_empty());
+        assert_eq!(
+            whole_file_excluded.status,
+            ReportStatus::Pass,
+            "pattern: {pattern}"
+        );
+        assert!(
+            whole_file_excluded.findings.is_empty(),
+            "pattern: {pattern}"
+        );
 
-    fixture.write_lint_config(
-        r#"
-        [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
-        "PORT-007" = ["crates\\example\\src\\lib.rs"]
-        "#,
-    );
-    let report = analyze_workspace(&AnalyzeOptions {
-        root: fixture.root().to_path_buf(),
-        format: OutputFormat::Json,
-    })
-    .unwrap();
+        fixture.write_lint_config(&format!(
+            "[tool.sc-lint.analyzers.portability.exclude_paths_by_rule]\n\"PORT-007\" = [\"{pattern}\"]\n"
+        ));
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        })
+        .unwrap();
 
-    assert_eq!(report.status, ReportStatus::Fail);
-    assert_eq!(report.findings.len(), 1);
-    assert_eq!(report.findings[0].rule_id, RuleId::Port006);
+        assert_eq!(report.status, ReportStatus::Fail, "pattern: {pattern}");
+        assert_eq!(report.findings.len(), 1, "pattern: {pattern}");
+        assert_eq!(report.findings[0].rule_id, RuleId::Port006);
+    }
 }
 
 #[test]
@@ -2367,24 +2373,57 @@ fn issue372_filter_precedence_and_empty() {
         "absent and [] platform_adapters must serialize byte-equivalent findings"
     );
 
-    fixture.write_lint_config(
-        r#"
-        [tool.sc-lint.analyzers.portability]
-        exclude_paths = ["crates\\example\\src\\lib.rs"]
-        [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
-        "PORT-010" = ["crates\\example\\src\\lib.rs"]
-        "#,
-    );
-    let excluded = analyze_workspace_configured(
-        &AnalyzeOptions {
-            root: fixture.root().to_path_buf(),
-            format: OutputFormat::Json,
-        },
-        None,
-        Some("PORT-010"),
-    )
-    .expect("filtering keeps optional adapter validation independent");
-    assert!(excluded.findings.is_empty());
+    for pattern in ["crates/example/src/lib.rs", r"crates\\example\\src\\lib.rs"] {
+        fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\n");
+        let baseline = analyze_workspace_configured(
+            &AnalyzeOptions {
+                root: fixture.root().to_path_buf(),
+                format: OutputFormat::Json,
+            },
+            None,
+            Some("PORT-010"),
+        )
+        .expect("an unexcluded filtered baseline is valid");
+        assert!(
+            baseline
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id == RuleId::Port010),
+            "the unexcluded fixture must report PORT-010 before pattern {pattern:?}: {:#?}",
+            baseline.findings
+        );
+
+        fixture.write_lint_config(&format!(
+            "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"{pattern}\"]\n\
+             [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]\n\
+             \"PORT-010\" = [\"{pattern}\"]\n"
+        ));
+        let excluded = analyze_workspace_configured(
+            &AnalyzeOptions {
+                root: fixture.root().to_path_buf(),
+                format: OutputFormat::Json,
+            },
+            None,
+            Some("PORT-010"),
+        )
+        .expect("filtering keeps optional adapter validation independent");
+        assert!(excluded.findings.is_empty(), "pattern: {pattern}");
+
+        fixture.write_lint_config(&format!(
+            "[tool.sc-lint.analyzers.portability.exclude_paths_by_rule]\n\
+             \"PORT-010\" = [\"{pattern}\"]\n"
+        ));
+        let per_rule_only = analyze_workspace_configured(
+            &AnalyzeOptions {
+                root: fixture.root().to_path_buf(),
+                format: OutputFormat::Json,
+            },
+            None,
+            Some("PORT-010"),
+        )
+        .expect("a per-rule exclusion works with a rule filter");
+        assert!(per_rule_only.findings.is_empty(), "pattern: {pattern}");
+    }
 
     fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\n");
     let nonmatching = analyze_workspace_configured(

@@ -30,8 +30,9 @@ The [upgrade guide](./upgrade.md) explains health probes and rollback behavior.
 
 ```sh
 tar -xzf sc-lint_0.7.3_x86_64-unknown-linux-gnu.tar.gz
+cd sc-lint_0.7.3_x86_64-unknown-linux-gnu
 install -d /usr/local/bin /usr/local/share/sc-lint
-install -m 0755 sc-lint sc-lint-boundary sc-lint-portability sc-lint-runtime /usr/local/bin/
+install -m 0755 bin/sc-lint bin/sc-lint-boundary bin/sc-lint-portability bin/sc-lint-runtime /usr/local/bin/
 cp -R share/sc-lint/sc-lint-docs /usr/local/share/sc-lint/
 sc-lint docs --path
 ```

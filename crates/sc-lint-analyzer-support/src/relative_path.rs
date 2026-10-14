@@ -6,6 +6,11 @@ use thiserror::Error;
 pub struct RepoRelativePath(String);
 
 impl RepoRelativePath {
+    #[cfg(test)]
+    pub(crate) fn from_raw_for_test(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+
     pub fn parse(value: &str) -> Result<Self, RelativePathError> {
         let value = value.replace('\\', "/");
         if value.starts_with('/') || is_windows_absolute(&value) {
