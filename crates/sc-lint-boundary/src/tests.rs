@@ -719,6 +719,69 @@ fn issue376_stale_active_gate() {
 }
 
 #[test]
+fn issue376_stale_dependent_diagnostic_has_record_cause_category_and_recovery() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r"]);
+    for package in ["p", "q", "r"] {
+        fixture.write(
+            &format!("crates/{package}/Cargo.toml"),
+            &good_member_manifest(package, ""),
+        );
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], Some(&["r"]), "active");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("stale policy analyzes");
+    let stale = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbDependency004)
+        .collect::<Vec<_>>();
+    assert_eq!(stale.len(), 2);
+
+    let runtime_and_fallback_dev = stale
+        .iter()
+        .find(|finding| finding.message.contains("`q`"))
+        .expect("runtime allowlist permission is reported");
+    let dev_only = stale
+        .iter()
+        .find(|finding| finding.message.contains("`r`"))
+        .expect("dev allowlist permission is reported");
+    for (finding, path, field, categories) in [
+        (
+            runtime_and_fallback_dev,
+            fixture.root().join("boundaries/p/a.toml"),
+            "dependencies.allowed_dependents",
+            "runtime and fallback dev",
+        ),
+        (
+            dev_only,
+            fixture.root().join("boundaries/p/b.toml"),
+            "dependencies.allowed_dev_dependents",
+            "dev",
+        ),
+    ] {
+        assert!(finding.message.contains(&path.display().to_string()));
+        assert!(finding.message.contains(field));
+        assert!(finding.message.contains(categories));
+        assert!(
+            finding
+                .message
+                .contains("no live direct workspace edge exists in any granted category")
+        );
+        assert!(finding.message.contains(
+            "remove the obsolete permission or restore the intended direct workspace edge"
+        ));
+    }
+}
+
+#[test]
 fn issue376_owner_unions_explicit_dev_permissions_before_stale_checking() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);

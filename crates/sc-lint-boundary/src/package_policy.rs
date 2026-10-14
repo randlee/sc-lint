@@ -198,38 +198,162 @@ fn collect_incoming_policy_findings(
     let runtime_incoming = index_incoming_edges(runtime_edges);
     let dev_incoming = index_incoming_edges(dev_edges);
     let mut findings = Vec::new();
-    let mut stale_permissions = BTreeSet::new();
-    for (owner, (record, runtime_allowed, dev_allowed)) in owners {
-        if !active_owners.contains(&owner) {
+    for (owner, (record, runtime_allowed, dev_allowed)) in &owners {
+        if !active_owners.contains(owner) {
             continue;
         }
-        for dependent in runtime_incoming.get(&owner).into_iter().flatten() {
+        for dependent in runtime_incoming.get(owner).into_iter().flatten() {
             if !runtime_allowed.contains(dependent) {
-                findings.push(disallowed_dependent_finding(record, dependent, &owner));
+                findings.push(disallowed_dependent_finding(record, dependent, owner));
             }
         }
-        for dependent in dev_incoming.get(&owner).into_iter().flatten() {
+        for dependent in dev_incoming.get(owner).into_iter().flatten() {
             if !dev_allowed.contains(dependent) {
-                findings.push(disallowed_dependent_finding(record, dependent, &owner));
+                findings.push(disallowed_dependent_finding(record, dependent, owner));
             }
         }
-        for dependent in runtime_allowed.union(&dev_allowed) {
-            let is_live = runtime_allowed.contains(dependent)
-                && runtime_incoming
-                    .get(&owner)
-                    .is_some_and(|edges| edges.contains(dependent))
-                || dev_allowed.contains(dependent)
-                    && dev_incoming
-                        .get(&owner)
-                        .is_some_and(|edges| edges.contains(dependent));
-            if !is_live && stale_permissions.insert((owner.clone(), dependent.clone())) {
-                findings.push(stale_allowed_dependent_finding(
-                    record,
-                    dependent,
-                    &owner,
-                    "dependencies.allowed_dependents",
-                ));
+    }
+    findings.extend(collect_stale_dependent_findings(
+        policies,
+        &owners,
+        &active_owners,
+        &runtime_incoming,
+        &dev_incoming,
+    ));
+    findings
+}
+
+type PermissionKey = (WorkspacePackageName, WorkspacePackageName);
+
+struct PermissionRecordIndex<'a> {
+    runtime: BTreeMap<PermissionKey, &'a ValidatedRecord>,
+    dev: BTreeMap<PermissionKey, &'a ValidatedRecord>,
+    fallback_dev: BTreeSet<PermissionKey>,
+    explicit_dev: BTreeSet<PermissionKey>,
+}
+
+fn collect_stale_dependent_findings(
+    policies: &[(&ValidatedRecord, &ValidatedDependencyPolicy)],
+    owners: &BTreeMap<
+        WorkspacePackageName,
+        (
+            &ValidatedRecord,
+            BTreeSet<WorkspacePackageName>,
+            BTreeSet<WorkspacePackageName>,
+        ),
+    >,
+    active_owners: &BTreeSet<WorkspacePackageName>,
+    runtime_incoming: &BTreeMap<WorkspacePackageName, BTreeSet<WorkspacePackageName>>,
+    dev_incoming: &BTreeMap<WorkspacePackageName, BTreeSet<WorkspacePackageName>>,
+) -> Vec<Finding> {
+    let records = index_permission_records(policies);
+    collect_stale_findings_from_owners(
+        owners,
+        active_owners,
+        runtime_incoming,
+        dev_incoming,
+        &records,
+    )
+}
+
+fn index_permission_records<'a>(
+    policies: &[(&'a ValidatedRecord, &ValidatedDependencyPolicy)],
+) -> PermissionRecordIndex<'a> {
+    let mut records = PermissionRecordIndex {
+        runtime: BTreeMap::new(),
+        dev: BTreeMap::new(),
+        fallback_dev: BTreeSet::new(),
+        explicit_dev: BTreeSet::new(),
+    };
+    for (record, policy) in policies {
+        for dependent in &policy.allowed_dependents {
+            let key = (policy.owner.clone(), dependent.clone());
+            records.runtime.entry(key.clone()).or_insert(*record);
+            if policy.allowed_dev_dependents.is_none() {
+                records.fallback_dev.insert(key.clone());
             }
+            if policy
+                .allowed_dev_dependents
+                .as_ref()
+                .unwrap_or(&policy.allowed_dependents)
+                .contains(dependent)
+            {
+                records.dev.entry(key).or_insert(*record);
+            }
+        }
+        if let Some(dependents) = &policy.allowed_dev_dependents {
+            for dependent in dependents {
+                let key = (policy.owner.clone(), dependent.clone());
+                records.dev.entry(key.clone()).or_insert(*record);
+                records.explicit_dev.insert(key);
+            }
+        }
+    }
+    records
+}
+
+fn collect_stale_findings_from_owners(
+    owners: &BTreeMap<
+        WorkspacePackageName,
+        (
+            &ValidatedRecord,
+            BTreeSet<WorkspacePackageName>,
+            BTreeSet<WorkspacePackageName>,
+        ),
+    >,
+    active_owners: &BTreeSet<WorkspacePackageName>,
+    runtime_incoming: &BTreeMap<WorkspacePackageName, BTreeSet<WorkspacePackageName>>,
+    dev_incoming: &BTreeMap<WorkspacePackageName, BTreeSet<WorkspacePackageName>>,
+    records: &PermissionRecordIndex<'_>,
+) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    let mut stale_permissions = BTreeSet::new();
+    for (owner, (_, runtime_allowed, dev_allowed)) in owners {
+        if !active_owners.contains(owner) {
+            continue;
+        }
+        for dependent in runtime_allowed.union(dev_allowed) {
+            let key = (owner.clone(), dependent.clone());
+            let runtime_live = runtime_allowed.contains(dependent)
+                && runtime_incoming
+                    .get(owner)
+                    .is_some_and(|edges| edges.contains(dependent));
+            let dev_live = dev_allowed.contains(dependent)
+                && dev_incoming
+                    .get(owner)
+                    .is_some_and(|edges| edges.contains(dependent));
+            if runtime_live || dev_live || !stale_permissions.insert(key.clone()) {
+                continue;
+            }
+
+            let (record, field) = if let Some(record) = records.runtime.get(&key) {
+                (*record, "dependencies.allowed_dependents")
+            } else {
+                (
+                    *records
+                        .dev
+                        .get(&key)
+                        .expect("aggregated dev permission has a source record"),
+                    "dependencies.allowed_dev_dependents",
+                )
+            };
+            let has_runtime = runtime_allowed.contains(dependent);
+            let has_dev = dev_allowed.contains(dependent);
+            let categories = match (has_runtime, has_dev) {
+                (true, true)
+                    if records.fallback_dev.contains(&key)
+                        && !records.explicit_dev.contains(&key) =>
+                {
+                    "runtime and fallback dev"
+                }
+                (true, true) => "runtime and dev",
+                (true, false) => "runtime",
+                (false, true) => "dev",
+                (false, false) => continue,
+            };
+            findings.push(stale_allowed_dependent_finding(
+                record, dependent, owner, field, categories,
+            ));
         }
     }
     findings
@@ -301,13 +425,15 @@ fn stale_allowed_dependent_finding(
     dependent: &WorkspacePackageName,
     owner: &WorkspacePackageName,
     field: &str,
+    categories: &str,
 ) -> Finding {
     Finding {
         rule_id: RuleId::ScbDependency004,
         kind: "stale_allowed_dependent".into(),
         message: format!(
-            "boundary `{}` {field} grants `{dependent}` access to `{owner}` but no matching direct workspace edge exists",
-            record.boundary_id()
+            "boundary record `{}` (`{}`) field `{field}` grants `{dependent}` permission to depend on `{owner}` for {categories} categories, but no live direct workspace edge exists in any granted category; remove the obsolete permission or restore the intended direct workspace edge",
+            record.record_path().display(),
+            record.boundary_id(),
         ),
         owner_ids: vec![
             OwnerId::new(dependent.as_ref()),
