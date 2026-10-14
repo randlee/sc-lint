@@ -146,6 +146,13 @@ pub(super) fn finish_backend_output(
     reader: ProbeOutputReader,
     process_id: u32,
 ) -> Result<Vec<u8>, BackendOutputError> {
+    finish_backend_output_after_stop(reader, || terminate_probe_process_tree(process_id))
+}
+
+fn finish_backend_output_after_stop(
+    reader: ProbeOutputReader,
+    stop_process_tree: impl FnOnce() -> io::Result<ProbeTreeStop>,
+) -> Result<Vec<u8>, BackendOutputError> {
     // A descendant can outlive the direct child while holding stdout open.
     // Give the reader a short chance to drain normal output, then stop the
     // process group instead of waiting indefinitely for EOF.
@@ -156,7 +163,7 @@ pub(super) fn finish_backend_output(
         }
         Err(RecvTimeoutError::Timeout) => {}
     }
-    terminate_probe_process_tree(process_id).map_err(BackendOutputError::ProcessTreeStop)?;
+    stop_process_tree().map_err(BackendOutputError::ProcessTreeStop)?;
     match reader.recv_timeout(BACKEND_OUTPUT_STOP_TIMEOUT) {
         Ok(result) => format_probe_output_result(result),
         Err(RecvTimeoutError::Timeout) => Err(BackendOutputError::Timeout {
@@ -478,7 +485,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn never_sending_reader_returns_typed_timeout() {
+        let (_sender, reader) = mpsc::sync_channel(1);
+        let mut stop_attempted = false;
+
+        let error = finish_backend_output_after_stop(reader, || {
+            stop_attempted = true;
+            Ok(ProbeTreeStop::AlreadyStopped)
+        })
+        .expect_err("a connected reader that never sends must time out");
+
+        assert!(
+            stop_attempted,
+            "the process tree must be stopped after drain timeout"
+        );
+        assert!(
+            matches!(
+                error,
+                BackendOutputError::Timeout { wait } if wait == BACKEND_OUTPUT_STOP_TIMEOUT
+            ),
+            "expected typed timeout, got {error:?}"
+        );
+    }
+
     #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     #[test]
     fn child_holding_probe_pipe_returns_typed_timeout() {
         let directory = tempdir().expect("temporary probe directory");
