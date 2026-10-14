@@ -6,6 +6,7 @@ import os
 import runpy
 from pathlib import Path
 import stat
+import subprocess
 import tomllib
 from typing import Any
 
@@ -98,6 +99,60 @@ def test_cargo_target_directory_respects_cargo_target_dir(monkeypatch: pytest.Mo
     expected = tmp_path / "custom-target"
     monkeypatch.setenv("CARGO_TARGET_DIR", str(expected))
     assert cargo_target_directory() == expected.resolve()
+
+
+@pytest.mark.parametrize(
+    ("result", "expected_message"),
+    [
+        (
+            subprocess.CompletedProcess([], 1, "", "metadata failure"),
+            "could not locate the Cargo target directory: `cargo metadata` exited 1\nmetadata failure",
+        ),
+        (
+            subprocess.CompletedProcess([], 0, "{}", ""),
+            "cargo metadata did not report a target_directory: 'target_directory'",
+        ),
+    ],
+)
+def test_cargo_target_directory_reports_clear_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    result: subprocess.CompletedProcess[str],
+    expected_message: str,
+) -> None:
+    monkeypatch.setitem(globals(), "run_subprocess", lambda *_args, **_kwargs: result)
+
+    with pytest.raises(pytest.fail.Exception) as error:
+        cargo_target_directory()
+
+    assert str(error.value) == expected_message
+
+
+@pytest.mark.parametrize(
+    ("result", "expected_message"),
+    [
+        (
+            subprocess.CompletedProcess([], 1, "", "build failure"),
+            "could not build the sc-lint-portability analyzer (cargo build exited 1)\nbuild failure",
+        ),
+        (
+            subprocess.CompletedProcess([], 0, "", ""),
+            "cargo build succeeded but the sc-lint-portability analyzer was not found at its reported target path",
+        ),
+    ],
+)
+def test_portability_binary_reports_clear_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    result: subprocess.CompletedProcess[str],
+    expected_message: str,
+) -> None:
+    monkeypatch.setitem(globals(), "cargo_target_directory", lambda: tmp_path)
+    monkeypatch.setitem(globals(), "run_subprocess", lambda *_args, **_kwargs: result)
+
+    with pytest.raises(pytest.fail.Exception) as error:
+        portability_binary()
+
+    assert str(error.value).startswith(expected_message)
 
 
 def test_issue372_installer_roundtrip() -> None:
