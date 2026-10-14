@@ -72,6 +72,7 @@ fn issue377_rule_registration_and_dispatch() {
     let fixture = Fixture::new();
     fixture.write_workspace();
     fixture.write_boundary("not-valid");
+    fixture.write_stale_consumer_boundary();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
     let mut child = Command::new(binary)
         .args([
@@ -117,6 +118,43 @@ fn issue377_rule_registration_and_dispatch() {
     assert_eq!(output["data"]["status"], "fail");
     assert_eq!(output["data"]["findings"][0]["rule_id"], "SCB-BOUNDARY-004");
     assert_eq!(output["data"]["findings"][0]["kind"], "invalid_identifier");
+
+    let output = Command::new(binary)
+        .args([
+            "--json",
+            "--root",
+            fixture.root().to_str().expect("utf-8 root"),
+            "lint",
+            "sc-boundary",
+            "--rule-filter",
+            "dependencies",
+        ])
+        .output()
+        .expect("sc-lint starts");
+    assert_eq!(
+        output.status.code(),
+        Some(10),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let output: Value = serde_json::from_slice(&output.stdout).expect("JSON output");
+    assert_eq!(output["data"]["status"], "fail");
+    let findings = output["data"]["findings"]
+        .as_array()
+        .expect("findings array");
+    let rule_ids = findings
+        .iter()
+        .map(|finding| finding["rule_id"].as_str().expect("rule id"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rule_ids,
+        ["SCB-BOUNDARY-004", "SCB-DEPENDENCY-004"],
+        "dependencies-family findings must include both new ids in stable order"
+    );
+    assert_eq!(
+        findings[1]["kind"], "stale_allowed_dependent",
+        "the stale dependent fixture must dispatch SCB-DEPENDENCY-004"
+    );
 }
 
 struct Fixture(TempDir);
@@ -133,9 +171,10 @@ impl Fixture {
     fn write_workspace(&self) {
         fs::create_dir_all(self.root().join("crates/example/src")).expect("crate directory");
         fs::create_dir_all(self.root().join("boundaries/example")).expect("boundary directory");
+        fs::create_dir_all(self.root().join("crates/consumer/src")).expect("consumer directory");
         fs::write(
             self.root().join("Cargo.toml"),
-            "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
+            "[workspace]\nmembers = [\"crates/example\", \"crates/consumer\"]\nresolver = \"2\"\n",
         )
         .expect("workspace manifest");
         fs::write(
@@ -144,10 +183,20 @@ impl Fixture {
         )
         .expect("crate manifest");
         fs::write(
+            self.root().join("crates/consumer/Cargo.toml"),
+            "[package]\nname = \"consumer\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        )
+        .expect("consumer manifest");
+        fs::write(
             self.root().join("crates/example/src/lib.rs"),
             "pub struct Example;\n",
         )
         .expect("crate source");
+        fs::write(
+            self.root().join("crates/consumer/src/lib.rs"),
+            "pub struct Consumer;\n",
+        )
+        .expect("consumer source");
         fs::write(
             self.root().join("boundaries/planning.toml"),
             "[planning]\ncurrent_sprint = \"K.3\"\n",
@@ -163,5 +212,15 @@ impl Fixture {
             ),
         )
         .expect("boundary inventory");
+    }
+
+    fn write_stale_consumer_boundary(&self) {
+        fs::create_dir_all(self.root().join("boundaries/consumer"))
+            .expect("consumer boundary directory");
+        fs::write(
+            self.root().join("boundaries/consumer/consumer.toml"),
+            "boundary_id = \"BOUNDARY-Consumer\"\nowner_package = \"consumer\"\nowner_crate_path = \"consumer\"\nname = \"Consumer\"\n\n[public]\nfacade = \"Consumer\"\n\n[implementation]\ntype = \"Consumer\"\nmodule = \"consumer\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = [\"Consumer\"]\n\n[dependencies]\nallowed_dependents = [\"example\"]\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n",
+        )
+        .expect("consumer boundary inventory");
     }
 }
