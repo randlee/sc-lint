@@ -377,6 +377,35 @@ class TemplateContractTests(unittest.TestCase):
                 self.assertEqual(payload["pr"], 123)
                 self.assertEqual(payload["findings"], {"blocking": 1, "important": 2, "minor": 3})
 
+    def test_lead_acceptance_gate_is_encoded_in_skill_and_templates(self) -> None:
+        """lint-spx.26: a bead close is completion, not acceptance.
+
+        The lead records `lead-accepted:` on a prerequisite before dispatching
+        dependent QA or merge work. The skill is the authority; the dev and QA
+        templates tell the assignee what the gate means and refuse when it is
+        missing.
+        """
+        skill_dir = REPO / ".claude/skills/codex-orchestration"
+        skill = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+        dev = (skill_dir / "dev-template.xml.j2").read_text(encoding="utf-8")
+        qa = (skill_dir / "qa-template.xml.j2").read_text(encoding="utf-8")
+
+        self.assertIn("5. **Lead acceptance gate.**", skill)
+        self.assertIn('--notes "lead-accepted: <full-sha> <date>"', skill)
+        self.assertIn("A dependent bead whose prerequisite lacks a", skill)
+        self.assertIn("`lead-accepted:` note is not dispatched", skill)
+        self.assertIn("no extra gate beads are created", skill)
+
+        self.assertIn("`lead-accepted:` note) on this bead before any dependent QA or merge is dispatched", dev)
+
+        step = re.search(r'<step id="a2">.*?</step>', qa, re.S)
+        self.assertIsNotNone(step, "qa-template.xml.j2 must carry the acceptance check step a2")
+        self.assertIn("bd show", step.group(0))
+        self.assertIn("lead-accepted:", step.group(0))
+        self.assertIn("atm task close", step.group(0))
+        self.assertIn("refused", step.group(0))
+        self.assertIn("do not review", step.group(0))
+
     def test_qa_template_renders_strict_xml_with_typed_values(self) -> None:
         adversarial = 'quoted "value" \\ path\nline <tag>& snowman ☃ ]]> twice ]]>'
         attribute_adversarial = 'quoted "value" \\ path <tag>& snowman ☃ ]]> twice ]]>'

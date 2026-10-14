@@ -130,6 +130,19 @@ This is the one lifecycle contract for development, fix, and QA work.
    reports stable finding ids but does not create beads. If a lead rejects
    completed work, the lead reopens its bead or creates a child bead; the lead
    never closes a bead on acceptance.
+5. **Lead acceptance gate.** An assignee's bead close only claims completion.
+   `bd ready` can list a QA or merge bead as soon as its prerequisite closes,
+   before the lead has reviewed that completion. So the lead dispatches a
+   dependent QA or merge bead only after recording acceptance on each
+   prerequisite: `bd update <prereq> --notes "lead-accepted: <full-sha> <date>"`,
+   with the reviewed commit. A dependent bead whose prerequisite lacks a
+   `lead-accepted:` note is not dispatched, even when `bd ready` lists it. An
+   assignee whose assignment finds a missing note on a prerequisite refuses the
+   task with `atm task close <id> refused "<reason>"` and leaves the bead open.
+   Rejection reopens the prerequisite (`bd update <prereq> --status open`) or
+   adds a child bead, and the reopened bead needs a new acceptance note before
+   anything depends on it again. This gate is a dispatch rule, not a new bead
+   per task: no extra gate beads are created.
 
 ## Sprint Flow
 
