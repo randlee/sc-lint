@@ -403,9 +403,13 @@ fn issue136_optional_config_matrix() {
     let error = analyze(&inventory_required, Some("manifests"))
         .expect_err("an allowlist policy loads the invalid boundary inventory");
     assert!(matches!(error, BoundaryError::InventoryLoad { .. }));
-    assert!(error.to_string().ends_with(
-        "boundaries/other/other.toml` is under owner directory `other` but declares owner_package `dep`"
-    ));
+    let record = std::path::Path::new("boundaries")
+        .join("other")
+        .join("other.toml");
+    assert!(error.to_string().ends_with(&format!(
+        "{}` is under owner directory `other` but declares owner_package `dep`",
+        record.display()
+    )));
 
     let empty = Fixture::new();
     empty.workspace();
