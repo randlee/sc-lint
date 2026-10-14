@@ -4847,6 +4847,88 @@ fn rule_filter_selects_exactly_the_rule() {
 }
 
 #[test]
+fn inventory_free_manifest_policy_runs_with_missing_or_invalid_boundaries() {
+    for invalid_boundaries in [false, true] {
+        for with_policy in [false, true] {
+            let fixture = inventory_free_policy_fixture(invalid_boundaries, with_policy);
+            let ownership = configured(fixture.root(), Some("SCB-MANIFEST-004"))
+                .expect("ownership policy does not require boundary inventory");
+            let sections = configured(fixture.root(), Some("SCB-MANIFEST-005"))
+                .expect("section policy does not require boundary inventory");
+
+            if with_policy {
+                assert_eq!(ownership.status, ReportStatus::Fail);
+                assert!(ownership.findings.iter().any(|finding| {
+                    finding.rule_id == RuleId::ScbManifest004
+                        && finding.message.contains("not permitted")
+                }));
+                assert_eq!(sections.status, ReportStatus::Fail);
+                assert_eq!(sections.findings.len(), 1);
+                assert_eq!(sections.findings[0].rule_id, RuleId::ScbManifest005);
+            } else {
+                assert_eq!(ownership.status, ReportStatus::Pass);
+                assert!(ownership.findings.is_empty());
+                assert_eq!(sections.status, ReportStatus::Pass);
+                assert!(sections.findings.is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn boundary_semantics_only_does_not_parse_unselected_manifest_policy() {
+    let fixture = undeclared_dependency_fixture();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            global_dependency_ownership = "not an array of tables"
+        "#,
+    );
+
+    configured(fixture.root(), Some("SCB-BOUNDARY-004"))
+        .expect("boundary semantic selection ignores unselected manifest policy");
+}
+
+fn inventory_free_policy_fixture(invalid_boundaries: bool, with_policy: bool) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/dep"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "dep", "../dep", "0.1.0"),
+    );
+    fixture.write("crates/dep/Cargo.toml", &good_member_manifest("dep", ""));
+    fixture.write_source("app", "lib.rs", "use dep::Thing;\npub struct App;");
+    fixture.write_source("dep", "lib.rs", "pub struct Thing;");
+    if invalid_boundaries {
+        fixture.write("boundaries/planning.toml", "not_planning = true\n");
+    }
+    if with_policy {
+        fixture.write(
+            "sc-lint.toml",
+            r#"
+                [tool.sc-lint.analyzers.boundary]
+                manifest_dependency_allowlists = "not selected by ownership or section rules"
+
+                [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+                dependency = "dep"
+                allowed_manifest_paths = []
+                allowed_source_roots = []
+                manifest_message = "not permitted"
+                source_message = "not permitted"
+
+                [[tool.sc-lint.analyzers.boundary.manifest_section_rules]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                dependency_package = "dep"
+                allowed_sections = ["dev-dependencies"]
+                message = "dependency belongs in dev-dependencies"
+            "#,
+        );
+    }
+    fixture
+}
+
+#[test]
 fn rule_filter_family_keeps_existing_cycles_behaviour() {
     let fixture = cycle_fixture();
 

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerSettings;
+use sc_lint_analyzer_support::CatalogRuleId;
 use toml::Table;
 use toml::Value;
 
@@ -75,23 +76,49 @@ impl ManifestPolicyConfig {
 
 pub(crate) fn parse_policy(
     settings: &AnalyzerSettings,
+    selected: Option<&BTreeSet<CatalogRuleId>>,
 ) -> std::result::Result<ManifestPolicyConfig, AnalyzerConfigError> {
+    let parse_all = selected.is_none();
+    let parse_allowlists = parse_all
+        || selected.is_some_and(|selected| {
+            ["SCB-MANIFEST-003", "SCB-MANIFEST-006"]
+                .iter()
+                .any(|id| selected.contains(&CatalogRuleId::new(id)))
+        });
+    let parse_ownership_rules = parse_all
+        || selected
+            .is_some_and(|selected| selected.contains(&CatalogRuleId::new("SCB-MANIFEST-004")));
+    let parse_sections = parse_all
+        || selected
+            .is_some_and(|selected| selected.contains(&CatalogRuleId::new("SCB-MANIFEST-005")));
     Ok(ManifestPolicyConfig {
-        allowlists: policy_tables(settings, "manifest_dependency_allowlists")?
-            .into_iter()
-            .enumerate()
-            .map(|(index, table)| parse_allowlist(table, index))
-            .collect::<std::result::Result<_, _>>()?,
-        ownership: policy_tables(settings, "global_dependency_ownership")?
-            .into_iter()
-            .enumerate()
-            .map(|(index, table)| parse_ownership(table, index))
-            .collect::<std::result::Result<_, _>>()?,
-        sections: policy_tables(settings, "manifest_section_rules")?
-            .into_iter()
-            .enumerate()
-            .map(|(index, table)| parse_section_rule(table, index))
-            .collect::<std::result::Result<_, _>>()?,
+        allowlists: if parse_allowlists {
+            policy_tables(settings, "manifest_dependency_allowlists")?
+                .into_iter()
+                .enumerate()
+                .map(|(index, table)| parse_allowlist(table, index))
+                .collect::<std::result::Result<_, _>>()?
+        } else {
+            Vec::new()
+        },
+        ownership: if parse_ownership_rules {
+            policy_tables(settings, "global_dependency_ownership")?
+                .into_iter()
+                .enumerate()
+                .map(|(index, table)| parse_ownership(table, index))
+                .collect::<std::result::Result<_, _>>()?
+        } else {
+            Vec::new()
+        },
+        sections: if parse_sections {
+            policy_tables(settings, "manifest_section_rules")?
+                .into_iter()
+                .enumerate()
+                .map(|(index, table)| parse_section_rule(table, index))
+                .collect::<std::result::Result<_, _>>()?
+        } else {
+            Vec::new()
+        },
     })
 }
 
