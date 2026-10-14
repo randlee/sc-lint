@@ -41,8 +41,9 @@ explicit without defining duplicate requirements:
 - `REQ-PRODUCT-002A` through `REQ-PRODUCT-002DA` define machine-mode and
   envelope stability; `NFR-004` records the cross-cutting stability property.
 - `REQ-CLI-001` through `REQ-CLI-024` define command-specific CLI behavior.
-- `REQ-LOG-001` through `REQ-LOG-009` define the logging contract in
-  [logging.md](./logging.md).
+- `REQ-LOG-001` through `REQ-LOG-009` are defined canonically in
+  [../requirements.md](../requirements.md); [logging.md](./logging.md) is the
+  design document that describes their coverage.
 
 ## Related Docs
 
