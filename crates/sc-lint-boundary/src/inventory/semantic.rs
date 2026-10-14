@@ -181,6 +181,7 @@ pub(crate) struct ValidatedForbiddenPackageEdge {
 struct ValidationContext<'a> {
     resolver: &'a WorkspacePackageResolver,
     known_non_workspace_packages: &'a BTreeSet<String>,
+    policy_owners: &'a BTreeSet<WorkspacePackageName>,
     validate_package_policy: bool,
 }
 
@@ -207,6 +208,10 @@ impl ValidatedRecord {
 
     pub(crate) fn policy(&self) -> Option<&ValidatedDependencyPolicy> {
         self.policy.as_ref()
+    }
+
+    pub(crate) fn requires_workspace_package(&self) -> bool {
+        self.record.status.state.requires_workspace_package()
     }
 }
 
@@ -255,9 +260,16 @@ pub(crate) fn validate_inventory(
     known_non_workspace_packages: &BTreeSet<String>,
     validate_package_policy: bool,
 ) -> Result<(ValidatedInventory, Vec<InventoryDiagnostic>)> {
+    let policy_owners = raw
+        .records
+        .iter()
+        .filter(|record| record.status.state.requires_workspace_package())
+        .filter_map(|record| resolved_workspace_owner(record, resolver))
+        .collect();
     let context = ValidationContext {
         resolver,
         known_non_workspace_packages,
+        policy_owners: &policy_owners,
         validate_package_policy,
     };
     let mut diagnostics = Vec::new();
@@ -319,7 +331,9 @@ fn validate_record(
     validate_forbidden_edges(&record, context.resolver, diagnostics);
     if diagnostics.len() == diagnostic_count {
         let policy = (context.validate_package_policy
-            && record.status.state.requires_workspace_package())
+            && owner
+                .as_ref()
+                .is_some_and(|owner| context.policy_owners.contains(owner)))
         .then(|| validate_dependency_policy(&record, context))
         .transpose()?;
         records.push(ValidatedRecord {
@@ -492,11 +506,7 @@ fn validate_owner_name(
     records: &[ValidatedRecord],
     diagnostics: &mut Vec<InventoryDiagnostic>,
 ) -> Option<WorkspacePackageName> {
-    let context = format!("owner_package for boundary `{}`", record.boundary_id);
-    let owner = resolver
-        .resolve_if_known(record.owner_package.as_ref(), &context)
-        .ok()
-        .flatten();
+    let owner = resolved_workspace_owner(record, resolver);
     let owner = owner?;
     let key = (owner.clone(), record.name.clone());
     let Some(previous) = owner_names.get(&key).cloned() else {
@@ -526,6 +536,17 @@ fn validate_owner_name(
         "give each boundary for an owner a distinct name",
     ));
     Some(owner)
+}
+
+fn resolved_workspace_owner(
+    record: &BoundaryRecord,
+    resolver: &WorkspacePackageResolver,
+) -> Option<WorkspacePackageName> {
+    let context = format!("owner_package for boundary `{}`", record.boundary_id);
+    resolver
+        .resolve_if_known(record.owner_package.as_ref(), &context)
+        .ok()
+        .flatten()
 }
 
 fn duplicate_owner_name_diagnostic(

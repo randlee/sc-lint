@@ -162,14 +162,20 @@ unix_path_prefixes = ["/srv/"]
 targets = ["linux", "macos", "windows"]
 ```
 
-`enabled`, `reason`, `exclude_rules`, `fail_rules`, and `exclude_paths` are
-common settings. `config_home_env`, `unix_path_prefixes`, and `targets` are
+`enabled`, `reason`, `exclude_rules`, `fail_rules`, `exclude_paths`, and
+`exclude_paths_by_rule` are common settings. `config_home_env`,
+`unix_path_prefixes`, `targets`, and `platform_adapters` are
 portability-specific. When both are present, `config_home_env` in the analyzer
 table takes precedence over the legacy `[portability].config_home_env` value.
 `unix_path_prefixes` adds prefixes to the built-in lists used by both PORT-001
 and PORT-006; configured prefixes never replace or disable the built-ins.
 `targets` is accepted for adopted configurations but is not interpreted by a
 rule yet.
+
+`platform_adapters` lists explicit Unix/Windows module pairs with a review
+reason when their private implementations provide the same interface. Adapter
+handling is limited to the paired modules and enclosed private items; unrelated
+items and separately Unix-gated public items remain subject to parity checks.
 
 Pass `--rule-filter PORT-001,PORT-006` to select rules. When provided, the
 filter determines the selected rules instead of `exclude_rules`. Invalid

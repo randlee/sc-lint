@@ -3,6 +3,7 @@ from __future__ import annotations
 from sc_lint.lint_common import discover_repo_root
 
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import venv
 
 
 ROOT = discover_repo_root()
@@ -478,6 +480,102 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
                 self.assertFalse(any(call.startswith("lint ") for call in calls), calls)
         # test accepts at most one selector.
         self.assertEqual(self._run_test_tokens(["a", "b"]).returncode, 2)
+
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell Core is required")
+    def test_windows_bootstrap_selector_scope_grammar_at_runtime(self) -> None:
+        accepted = {
+            (): "lint --consumer --config CONFIG ci",
+            ("fast",): "lint --consumer --config CONFIG ci --profile fast",
+            ("all",): "lint --consumer --config CONFIG ci --profile all",
+            ("ci", "all"): "lint --consumer --config CONFIG ci --profile ci --platform-scope all",
+            ("fmt", "windows"): "lint --consumer --config CONFIG ci --profile fmt --platform-scope windows",
+        }
+        rejected = (("", "all"), ("a", ""), ("a", "b", "c"), ("a", "b", "c", "d"))
+        with tempfile.TemporaryDirectory(prefix="sc-lint-pwsh-grammar-") as raw:
+            tmp = Path(raw)
+            consumer = tmp / "consumer"
+            state = consumer / ".sc-lint"
+            state.mkdir(parents=True)
+            config = consumer / "sc-lint.toml"
+            config.write_text((ROOT / "sc-lint.toml").read_text(encoding="utf-8"), encoding="utf-8")
+            venv.create(state / "venv", with_pip=False)
+            # bootstrap.ps1 provisions the venv unless it already imports sc_lint at
+            # minimum_version. Provisioning is not under test (the binary is faked too),
+            # so stand in for the installed wheel instead of reaching PyPI.
+            minimum = re.search(r'^minimum_version = "([^"]+)"', config.read_text(encoding="utf-8"), re.M)
+            self.assertIsNotNone(minimum)
+            venv_python = state / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            purelib = subprocess.run(
+                [str(venv_python), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.strip()
+            stub = Path(purelib) / "sc_lint"
+            stub.mkdir()
+            (stub / "__init__.py").write_text(f"__version__ = {minimum.group(1)!r}\n", encoding="utf-8")
+
+            log = tmp / "argv.log"
+            if os.name == "nt":
+                fake = tmp / "sc-lint.cmd"
+                fake.write_text(
+                    '@echo off\r\n'
+                    '>>"%SC_LINT_ARGV_LOG%" echo %*\r\n'
+                    'exit /b 0\r\n',
+                    encoding="utf-8",
+                )
+            else:
+                fake = tmp / "sc-lint.exe"
+                fake.write_text(
+                    "#!/bin/sh\n"
+                    'printf \'%s\\n\' "$*" >> "$SC_LINT_ARGV_LOG"\n'
+                    "exit 0\n",
+                    encoding="utf-8",
+                )
+                fake.chmod(0o755)
+
+            environment = os.environ.copy()
+            environment["SC_LINT_BIN"] = str(fake)
+            environment["SC_LINT_ARGV_LOG"] = str(log)
+            # A source-tree PYTHONPATH would shadow the stub with sc_lint 0.0.0+source.
+            environment.pop("PYTHONPATH", None)
+
+            def run(tokens: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    [
+                        "pwsh",
+                        "-NoLogo",
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-File",
+                        str(ROOT / "crates/sc-lint/assets/bootstrap.ps1"),
+                        "lint",
+                        *tokens,
+                        "--config",
+                        str(config),
+                    ],
+                    cwd=consumer,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=60,
+                )
+
+            for tokens, expected in accepted.items():
+                with self.subTest(tokens=tokens):
+                    result = run(tokens)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    calls = log.read_text(encoding="utf-8").splitlines()
+                    self.assertEqual(calls[-1].replace(str(config), "CONFIG"), expected)
+
+            for tokens in rejected:
+                with self.subTest(tokens=tokens):
+                    before = log.read_text(encoding="utf-8").splitlines()
+                    result = run(tokens)
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertIn(self.USAGE_GRAMMAR.replace("lint [", ".sc-lint/bootstrap.ps1 lint ["), result.stderr)
+                    self.assertEqual(log.read_text(encoding="utf-8").splitlines(), before)
 
     def _run_test_tokens(self, tokens: list[str]) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as raw:

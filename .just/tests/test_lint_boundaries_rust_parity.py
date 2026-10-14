@@ -39,6 +39,7 @@ class LintBoundariesRustParityTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
                 text=True,
+                timeout=60,
             )
             self.assertEqual(direct.returncode, 10, direct.stderr)
             report = json.loads(direct.stdout)["data"]

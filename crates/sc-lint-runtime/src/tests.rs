@@ -400,6 +400,82 @@ fn per_rule_path_exclusion_keeps_other_runtime_findings() {
 }
 
 #[test]
+fn issue385_runtime_paths() {
+    let fixture = runtime_fixture(None);
+    let baseline = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    let baseline_json = serde_json::to_vec(&baseline).unwrap();
+
+    fixture.write_lint_config("[tool.sc-lint.analyzers.runtime]\n");
+    assert_eq!(
+        serde_json::to_vec(&analyze_workspace(&analyze_options(&fixture)).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.write_lint_config("[tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]\n");
+    assert_eq!(
+        serde_json::to_vec(&analyze_workspace(&analyze_options(&fixture)).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.runtime]
+        exclude_paths = ["crates/example/src/lib.rs"]
+        [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+        "SCB-RUNTIME-001" = ["crates/other/src/lib.rs"]
+        "#,
+    );
+    let excluded = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert!(excluded.findings.is_empty());
+
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+        "SCB-RUNTIME-001" = ["crates/example/src/lib.rs"]
+        "#,
+    );
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &RUNTIME_CATALOG,
+        fixture.root(),
+        None,
+        None,
+    )
+    .unwrap();
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse(
+                        "crates\\example\\src\\lib.rs",
+                    )
+                    .unwrap(),
+                ),
+            ),
+            (baseline.findings[1].clone(), None),
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse(
+                        "crates/example/src/other.rs",
+                    )
+                    .unwrap(),
+                ),
+            ),
+        ],
+        |rule| sc_lint_analyzer_support::CatalogRuleId::new(rule.as_str()),
+    );
+    assert_eq!(
+        rule_ids(&FindingsReport {
+            findings,
+            ..baseline
+        }),
+        vec![RuleId::ScbRuntime002, RuleId::ScbRuntime001,]
+    );
+    assert_eq!(status, ReportStatus::Fail);
+}
+
+#[test]
 fn exclude_and_fail_rules_apply_to_runtime_findings() {
     let fixture = runtime_fixture(Some(
         "[tool.sc-lint.analyzers.runtime]\nexclude_rules = [\"SCB-RUNTIME-001\"]\nfail_rules = []\n",

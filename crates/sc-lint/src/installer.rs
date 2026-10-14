@@ -503,6 +503,14 @@ fn payload_validation_issue_with_timeout(
     entries: &[PayloadEntry],
     probe_timeout: Duration,
 ) -> Option<String> {
+    payload_validation_issue_with_probe(entries, probe_timeout, backend_cli_failure)
+}
+
+fn payload_validation_issue_with_probe(
+    entries: &[PayloadEntry],
+    probe_timeout: Duration,
+    mut probe: impl FnMut(&Path, &str, Duration) -> Option<String>,
+) -> Option<String> {
     for entry in entries {
         if entry.source.is_dir() {
             if !docs_bundle_complete(&entry.source) {
@@ -525,7 +533,7 @@ fn payload_validation_issue_with_timeout(
                 })
             })
         {
-            if let Some(problem) = backend_cli_failure(&entry.source, backend, probe_timeout) {
+            if let Some(problem) = probe(&entry.source, backend, probe_timeout) {
                 return Some(problem);
             }
         } else if !entry.source.is_file() {
@@ -550,6 +558,14 @@ fn managed_payload_validation_issue_with_timeout(
     binary: &Path,
     probe_timeout: Duration,
 ) -> Option<String> {
+    managed_payload_validation_issue_with_probe(binary, probe_timeout, backend_cli_failure)
+}
+
+fn managed_payload_validation_issue_with_probe(
+    binary: &Path,
+    probe_timeout: Duration,
+    mut probe: impl FnMut(&Path, &str, Duration) -> Option<String>,
+) -> Option<String> {
     let parent = binary.parent().unwrap_or_else(|| Path::new("."));
     for backend in MANAGED_BACKENDS {
         let name = if cfg!(windows) {
@@ -558,7 +574,7 @@ fn managed_payload_validation_issue_with_timeout(
             (*backend).to_string()
         };
         let path = parent.join(name);
-        if let Some(problem) = backend_cli_failure(&path, backend, probe_timeout) {
+        if let Some(problem) = probe(&path, backend, probe_timeout) {
             return Some(problem);
         }
     }
@@ -1407,8 +1423,10 @@ mod tests {
         let staged_bin = staged_root.join("bin");
         let staged_docs = staged_root.join("share/sc-lint/sc-lint-docs");
         let staged_pid_file = fixture.path().join("staged-child-pids");
+        let staged_ready_fifo = fixture.path().join("staged-probe-ready");
         fs::create_dir_all(&staged_bin).expect("staged bin");
         fs::create_dir_all(&staged_docs).expect("staged docs");
+        create_probe_ready_fifo(&staged_ready_fifo);
         fs::write(staged_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("staged launcher");
         for backend in [
@@ -1419,7 +1437,7 @@ mod tests {
         }
         write_hanging_noisy_stub(
             &staged_bin.join(crate::consts::TOOL_RUNTIME),
-            &staged_pid_file,
+            &staged_ready_fifo,
         );
         fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("staged docs manifest");
@@ -1427,9 +1445,27 @@ mod tests {
         let staged_launcher = staged_bin.join(ReleaseTarget::binary_name());
         let staged_managed = fixture.path().join("managed/bin/sc-lint");
         let probe_timeout = Duration::from_secs(5);
+        let staged_pid_file_for_probe = staged_pid_file.clone();
+        let staged_ready_fifo_for_probe = staged_ready_fifo.clone();
         let staged_is_complete = run_probe_with_watchdog(&staged_pid_file, move || {
             let entries = release_payload_candidates(&staged_launcher, &staged_managed);
-            payload_validation_issue_with_timeout(&entries, probe_timeout)
+            payload_validation_issue_with_probe(
+                &entries,
+                probe_timeout,
+                |path, backend, timeout| {
+                    if backend == crate::consts::TOOL_RUNTIME {
+                        hanging_backend_cli_failure_after_startup(
+                            path,
+                            backend,
+                            timeout,
+                            &staged_pid_file_for_probe,
+                            &staged_ready_fifo_for_probe,
+                        )
+                    } else {
+                        backend_cli_failure(path, backend, timeout)
+                    }
+                },
+            )
         });
         let staged_problem = staged_is_complete.expect("hanging staged companion is rejected");
         assert!(
@@ -1446,8 +1482,10 @@ mod tests {
         let installed_bin = installed_root.join("bin");
         let installed_docs = installed_root.join("share/sc-lint/sc-lint-docs");
         let installed_pid_file = fixture.path().join("installed-child-pids");
+        let installed_ready_fifo = fixture.path().join("installed-probe-ready");
         fs::create_dir_all(&installed_bin).expect("installed bin");
         fs::create_dir_all(&installed_docs).expect("installed docs");
+        create_probe_ready_fifo(&installed_ready_fifo);
         fs::write(installed_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("installed launcher");
         for backend in [
@@ -1458,14 +1496,32 @@ mod tests {
         }
         write_hanging_noisy_stub(
             &installed_bin.join(crate::consts::TOOL_RUNTIME),
-            &installed_pid_file,
+            &installed_ready_fifo,
         );
         fs::write(installed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("installed docs manifest");
         fs::write(installed_docs.join("README.md"), "# docs\n").expect("installed docs README");
         let installed_launcher = installed_bin.join(ReleaseTarget::binary_name());
+        let installed_pid_file_for_probe = installed_pid_file.clone();
+        let installed_ready_fifo_for_probe = installed_ready_fifo.clone();
         let installed_is_complete = run_probe_with_watchdog(&installed_pid_file, move || {
-            managed_payload_validation_issue_with_timeout(&installed_launcher, probe_timeout)
+            managed_payload_validation_issue_with_probe(
+                &installed_launcher,
+                probe_timeout,
+                |path, backend, timeout| {
+                    if backend == crate::consts::TOOL_RUNTIME {
+                        hanging_backend_cli_failure_after_startup(
+                            path,
+                            backend,
+                            timeout,
+                            &installed_pid_file_for_probe,
+                            &installed_ready_fifo_for_probe,
+                        )
+                    } else {
+                        backend_cli_failure(path, backend, timeout)
+                    }
+                },
+            )
         });
         let installed_problem =
             installed_is_complete.expect("hanging installed companion is rejected");
@@ -2082,14 +2138,14 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn write_hanging_noisy_stub(path: &Path, child_pid_file: &Path) {
+    fn write_hanging_noisy_stub(path: &Path, ready_fifo: &Path) {
         use std::os::unix::fs::PermissionsExt;
 
-        let child_pid_file = child_pid_file.to_string_lossy().replace('\'', "'\\''");
+        let ready_fifo = ready_fifo.to_string_lossy().replace('\'', "'\\''");
         fs::write(
             path,
             format!(
-                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{child_pid_file}'\nwait\n"
+                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
             ),
         )
         .expect("write hanging noisy backend");
@@ -2098,6 +2154,56 @@ mod tests {
             .permissions();
         permissions.set_mode(0o755);
         fs::set_permissions(path, permissions).expect("make hanging backend executable");
+    }
+
+    #[cfg(unix)]
+    fn create_probe_ready_fifo(path: &Path) {
+        let status = Command::new("mkfifo")
+            .arg(path)
+            .status()
+            .expect("start mkfifo for backend startup handshake");
+        assert!(status.success(), "mkfifo creates startup handshake");
+    }
+
+    #[cfg(unix)]
+    fn hanging_backend_cli_failure_after_startup(
+        binary: &Path,
+        expected_name: &str,
+        timeout: Duration,
+        child_pid_file: &Path,
+        ready_fifo: &Path,
+    ) -> Option<String> {
+        let (mut child, reader) =
+            spawn_backend_probe(binary, expected_name, "--help").expect("start backend probe");
+        let process_id = child.id();
+        fs::write(child_pid_file, process_id.to_string()).expect("record probe process group");
+
+        // The stub writes its parent and child pids to this FIFO only after
+        // both descendants exist. Opening it blocks until that point, so the
+        // production timeout starts after startup is established without
+        // adding time to the timeout being tested.
+        let ready_pids = fs::read_to_string(ready_fifo).expect("read backend startup handshake");
+        fs::write(child_pid_file, &ready_pids).expect("record backend process tree");
+        let pid_count = ready_pids.split_whitespace().count();
+        assert_eq!(pid_count, 3, "startup handshake includes both children");
+
+        let problem =
+            match wait_for_backend_probe(&mut child, binary, expected_name, "--help", timeout) {
+                Ok(status) => {
+                    terminate_probe_processes(&mut child);
+                    let _ =
+                        finish_backend_output(reader, process_id, binary, expected_name, "--help");
+                    panic!("hanging backend unexpectedly exited with {status}");
+                }
+                Err(problem) => problem,
+            };
+        let output = finish_backend_output(reader, process_id, binary, expected_name, "--help")
+            .expect("drain noisy output after process-tree cleanup");
+        assert!(
+            String::from_utf8_lossy(&output).contains("noisy-child"),
+            "the backend emitted noisy output before timeout"
+        );
+        Some(problem)
     }
 
     #[cfg(unix)]
@@ -2122,6 +2228,7 @@ mod tests {
                 );
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                terminate_test_probe_processes(child_pid_file);
                 let _ = worker.join();
                 panic!("probe worker exited without returning a result");
             }

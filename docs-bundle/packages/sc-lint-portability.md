@@ -22,6 +22,16 @@ The analyzer inspects the configured repository root and reports source path,
 rule, and portable remediation. It does not read consumer `sc-lint.toml`
 profiles directly; the top-level product orchestrates it.
 
+For equivalent private platform implementations with different module paths,
+`platform_adapters` records an explicit Unix/Windows pair and a review reason
+in `[tool.sc-lint.analyzers.portability]`. The analyzer compares the paired
+modules' declared interfaces and treats their enclosed private implementation
+items as the adapter; unrelated items and separately Unix-gated public items
+remain subject to normal parity checks. Keep the pair specific. Common
+`exclude_paths_by_rule` entries suppress only the named rule's findings at the
+listed paths; they do not hide other findings in the same file. See
+[configuration](../configuration.md) for syntax and filter precedence.
+
 ## Finding interpretation and CI
 
 Treat portability findings as required unless the source contains an explicit,

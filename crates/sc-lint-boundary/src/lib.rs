@@ -775,15 +775,21 @@ pub fn analyze_workspace_configured(
     if !settings.enabled {
         return Ok(disabled_report());
     }
-    let policy_config = manifest_dependency_policy::parse_policy(&settings)
-        .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
     if settings.rule_filter.as_ref().is_some_and(|selected| {
         selected.len() == 1 && selected.contains(&rule(RuleId::ScbBoundary004))
     }) {
         return analyze_inventory_semantics(&options.root);
     }
+    let policy_config = if manifest_policy_selected(&settings) {
+        manifest_dependency_policy::parse_policy(&settings, settings.rule_filter.as_ref())?
+    } else {
+        manifest_dependency_policy::ManifestPolicyConfig::default()
+    };
     let mut options = options.clone();
     options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
+    if inventory_free_manifest_policy_selected(&settings) {
+        return analyze_inventory_free_manifest_policy(&options, &settings, &policy_config);
+    }
     let mut report = analyze_workspace(&options)?;
     if manifest_policy_selected(&settings) && !policy_config.is_empty() {
         let metadata = graph::load_metadata(&options.root)
@@ -813,6 +819,35 @@ pub fn analyze_workspace_configured(
             ReportStatus::Pass
         };
     }
+    Ok(apply_configured_rule_filter(report, &settings))
+}
+
+fn analyze_inventory_free_manifest_policy(
+    options: &AnalyzeOptions,
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+    policy_config: &manifest_dependency_policy::ManifestPolicyConfig,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    let mut report = analyze_manifests_only(options)?;
+    if !policy_config.is_empty() {
+        let metadata = graph::load_metadata(&options.root)
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
+        report.findings.extend(
+            manifest_dependency_policy::analyze_policy(
+                &options.root,
+                &metadata,
+                None,
+                policy_config,
+            )
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
+        );
+    }
+    Ok(apply_configured_rule_filter(report, settings))
+}
+
+fn apply_configured_rule_filter(
+    mut report: FindingsReport,
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+) -> FindingsReport {
     let findings: Vec<_> = std::mem::take(&mut report.findings)
         .into_iter()
         .map(|finding| {
@@ -824,7 +859,7 @@ pub fn analyze_workspace_configured(
         settings.apply_with_paths(findings, |rule: &RuleId| CatalogRuleId::new(rule.as_str()));
     report.findings = findings;
     report.status = status;
-    Ok(report)
+    report
 }
 
 fn manifest_policy_selected(settings: &sc_lint_analyzer_support::AnalyzerSettings) -> bool {
@@ -838,6 +873,23 @@ fn manifest_policy_selected(settings: &sc_lint_analyzer_support::AnalyzerSetting
         manifest_policy_ids
             .iter()
             .any(|rule| selected.contains(rule))
+    })
+}
+
+fn inventory_free_manifest_policy_selected(
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+) -> bool {
+    let inventory_free_rules = [
+        rule(RuleId::ScbManifest001),
+        rule(RuleId::ScbManifest002),
+        rule(RuleId::ScbManifest004),
+        rule(RuleId::ScbManifest005),
+    ];
+    settings.rule_filter.as_ref().is_some_and(|selected| {
+        !selected.is_empty()
+            && selected
+                .iter()
+                .all(|selected_rule| inventory_free_rules.contains(selected_rule))
     })
 }
 

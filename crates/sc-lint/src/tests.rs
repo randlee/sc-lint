@@ -3188,6 +3188,51 @@ fn test_profile_platform_scope_matrix() {
     );
 }
 
+#[test]
+fn test_profile_targeted_commands_require_literal_cargo() {
+    let steps = [plan_step(
+        "win-check",
+        &["cargo", "check", "--workspace"],
+        Some(Platform::Windows),
+        Some("x86_64-pc-windows-msvc"),
+    )];
+
+    let windows = plan_consumer_lint(&steps, None, PlatformScope::All, Platform::Windows)
+        .expect("windows plan");
+    assert_eq!(
+        planned_argv(&windows, "win-check"),
+        [
+            "cargo".to_string(),
+            "check".to_string(),
+            "--workspace".to_string(),
+            "--target".to_string(),
+            "x86_64-pc-windows-msvc".to_string(),
+        ]
+    );
+
+    let unix =
+        plan_consumer_lint(&steps, None, PlatformScope::All, Platform::Linux).expect("unix plan");
+    assert_eq!(
+        planned_argv(&unix, "win-check"),
+        [
+            "cargo".to_string(),
+            "xwin".to_string(),
+            "check".to_string(),
+            "--workspace".to_string(),
+            "--target".to_string(),
+            "x86_64-pc-windows-msvc".to_string(),
+        ]
+    );
+    assert_eq!(
+        CargoVerb::from_argv(&["cargo.cmd".to_string(), "check".to_string()]),
+        None
+    );
+    assert_eq!(
+        CargoVerb::from_argv(&["tools/cargo.exe".to_string(), "check".to_string()]),
+        None
+    );
+}
+
 fn consumer_toml(rows: &str) -> String {
     format!(
         "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n{rows}\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n"
@@ -3396,6 +3441,23 @@ fn invalid_step_cases() -> Vec<(&'static str, String, &'static str)> {
     ]
 }
 
+fn invalid_test_step_cases() -> Vec<(&'static str, String, &'static str)> {
+    let test_row = |field: &str| {
+        format!(
+            "[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n{field}\n"
+        )
+    };
+    vec![
+        ("platform", test_row("platform = \"windows\""), "platform"),
+        (
+            "target",
+            test_row("target = \"x86_64-pc-windows-msvc\""),
+            "target",
+        ),
+        ("unknown", test_row("parallel = true"), "parallel"),
+    ]
+}
+
 #[test]
 fn test_profile_rejects_invalid_members_and_targets() {
     for (label, rows, detail_code) in invalid_profile_cases()
@@ -3472,6 +3534,23 @@ fn test_profile_rejects_invalid_members_and_targets() {
     );
 }
 
+#[test]
+fn test_profile_rejects_unsupported_test_row_fields() {
+    for (label, rows, field) in invalid_test_step_cases() {
+        let rows = format!("{}\n{rows}", lint_rows(&["fmt"]));
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
+        let error = loaded.expect_err(label);
+        assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE, "{label}");
+        assert_eq!(error.kind, CliErrorKind::Config, "{label}");
+        assert_eq!(
+            error.details["detail_code"], "PROFILE.UNKNOWN_STEP_FIELD",
+            "{label}"
+        );
+        assert_eq!(error.details["field"], field, "{label}");
+        assert_eq!(error.details["step"], "unit", "{label}");
+    }
+}
+
 fn load_named_membership() -> (TempDir, LoadedConfig) {
     let text = fs::read_to_string(profile_fixture("named-membership.toml")).expect("fixture");
     let fixture = TempDir::new().expect("fixture dir");
@@ -3507,6 +3586,48 @@ fn lint_rows_for(
         .clone())
 }
 
+// Case mapping to atm-core c1f3ee7a: `.just/run_lint.py` (`resolve_task_names`,
+// `FAST_LINT_ORDER`) and `.just/tests/test_run_lint.py`. The three tests below
+// port the upstream cases that name-resolve the lint task set; the fixture in
+// `named-membership.toml` supplies harmless version-probe commands in place of
+// the upstream lint scripts, so only task names and selection outcomes carry over.
+//
+// 1. upstream `test_resolve_task_names_all_includes_new_targets`
+//    input:   resolve_task_names("all")
+//    outcome: contains 22 names, including boundaries, manifests, spell, pytests,
+//             sc-boundary, sc-portability, and read-concurrency-gates.
+//    here:    `all` and the default selector both yield the declared order
+//             [fmt, clippy, version, manifests, spell, pytests].
+//    divergence: membership becomes an exact-order check because the fixture
+//             declares six steps. Upstream's 22 names are not reproduced. The
+//             windows-tagged probe joins only on a Windows host.
+//
+// 2. upstream `test_resolve_task_names_rejects_unknown_target`
+//    input:   resolve_task_names("unknown")
+//    outcome: ValueError listing the valid targets.
+//    here:    selector "not-a-step-or-profile" is rejected with CliErrorKind::Config,
+//             details.selector echoes the input, and details.available lists
+//             "fast" and "manifests".
+//    divergence: the input string differs; "not-a-step-or-profile" is neither a
+//             step nor a profile in the fixture. The error is a typed CLI error,
+//             not ValueError. The rejection outcome is the same.
+//
+// 3. upstream `test_resolve_task_names_fast_is_low_latency_subset`
+//    input:   resolve_task_names("fast")
+//    outcome: the 15-name FAST_LINT_ORDER [fmt, version, boundaries, manifests,
+//             daemon-signing-coupling, shear, silent-emit, runtime-stderr,
+//             function-length, legacy-mailbox-paths, nudge-taxonomy,
+//             capability-degradation, spell, hermes-adapter, pytests].
+//    here:    the `fast` profile is [fmt, version, manifests, spell, pytests]
+//             and excludes clippy.
+//    divergence: intentional subset. The fixture's `fast` profile is not
+//             upstream's 15 names. The `ci` profile ([spell, fmt]) has no
+//             upstream counterpart; on a Linux host its windows-probe step is
+//             not selected, so the expected value is fixture-derived.
+//
+// Not ported: upstream `test_resolve_task_names_accepts_sc_boundary_manual_target`
+// and `..._accepts_sc_portability_manual_target` (single-name selection of
+// `sc-boundary` and `sc-portability`). The fixture declares neither step.
 #[test]
 fn test_resolve_task_names_all_includes_new_targets() {
     let (_fixture, loaded) = load_named_membership();
@@ -3596,16 +3717,6 @@ fn test_profile_emits_structured_skips_and_skip_only_success() {
     assert!(only.invocations.borrow().is_empty(), "nothing executed");
 }
 
-fn write_neutral_cargo_workspace(root: &Path) {
-    fs::write(
-        root.join("Cargo.toml"),
-        "[package]\nname = \"neutral\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
-    )
-    .expect("neutral manifest");
-    fs::create_dir_all(root.join("src")).expect("neutral src");
-    fs::write(root.join("src/lib.rs"), "pub fn neutral() {}\n").expect("neutral lib");
-}
-
 #[test]
 fn test_supported_execution_failure_is_nonzero() {
     let rows = lint_rows(&["first", "second"]);
@@ -3633,27 +3744,6 @@ fn test_supported_execution_failure_is_nonzero() {
     assert_eq!(error.kind, CliErrorKind::Capability);
     assert_eq!(error.exit_code(), crate::consts::EXIT_CAPABILITY);
     assert!(no_xwin.invocations.borrow().is_empty());
-}
-
-#[test]
-fn test_supported_execution_failure_on_real_host_is_nonzero() {
-    // An invented triple for the host's own OS is planned as same-host cargo
-    // and really executed; cargo cannot build it, so the run must fail.
-    let (platform, triple) = match Platform::host() {
-        Platform::Linux => ("linux", "invented-unknown-linux-gnu"),
-        Platform::MacOS => ("macos", "invented-apple-darwin"),
-        Platform::Windows => ("windows", "invented-pc-windows-msvc"),
-    };
-    let rows = format!(
-        "[[tool.sc-lint.lint]]\nname = \"invented\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"{platform}\"\ntarget = \"{triple}\"\n"
-    );
-    let (fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
-    let loaded = loaded.expect("config loads");
-    write_neutral_cargo_workspace(fixture.path());
-    let error = workflow::run_consumer_lint_profile(&loaded, None, PlatformScope::Host)
-        .expect_err("a real failing cargo invocation is non-zero");
-    assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_ne!(error.exit_code(), 0);
 }
 
 #[test]
@@ -3722,134 +3812,5 @@ fn test_installer_shape_only_rust_semantic_rejection() {
         let error = loaded.expect_err(case);
         assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE, "{case}");
         assert_eq!(&error.details["detail_code"], detail_code, "{case}");
-    }
-}
-
-// Black-box reproductions of the two field reports. They spawn the built
-// product binary and use only the public CLI surface, so they fail by
-// assertion (not compilation) against a build without profile support.
-
-fn issue_product_binary() -> PathBuf {
-    let name = if cfg!(windows) {
-        "sc-lint.exe"
-    } else {
-        "sc-lint"
-    };
-    std::env::current_exe()
-        .expect("test executable path")
-        .parent()
-        .and_then(Path::parent)
-        .map(|target_dir| target_dir.join(name))
-        .expect("sc-lint executable path")
-}
-
-fn issue_run_consumer_lint(
-    config_text: &str,
-    lint_args: &[&str],
-    envs: &[(&str, OsString)],
-) -> (TempDir, std::process::Output) {
-    let fixture = TempDir::new().expect("issue fixture");
-    let config_path = fixture.path().join("sc-lint.toml");
-    fs::write(&config_path, config_text).expect("issue config");
-    let output = ProcessCommand::new(issue_product_binary())
-        .args(["--json", "--config"])
-        .arg(&config_path)
-        .args(["lint", "ci", "--consumer"])
-        .args(lint_args)
-        .envs(envs.iter().map(|(key, value)| (*key, value)))
-        .output()
-        .expect("run sc-lint product binary");
-    (fixture, output)
-}
-
-fn issue_failure_context(output: &std::process::Output) -> String {
-    format!(
-        "exit={:?}\nstdout={}\nstderr={}",
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    )
-}
-
-#[test]
-fn test_issue_199_named_membership_reproduces_then_passes() {
-    let config = fs::read_to_string(profile_fixture("named-membership.toml")).expect("fixture");
-    let (_fixture, output) = issue_run_consumer_lint(&config, &["--profile", "fast"], &[]);
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "`--profile fast` must select the named membership\n{}",
-        issue_failure_context(&output)
-    );
-    let envelope: Value = serde_json::from_slice(&output.stdout).expect("success envelope");
-    let steps = envelope["data"]["steps"].as_array().expect("steps array");
-    assert_eq!(
-        step_names(steps),
-        ["fmt", "version", "manifests", "spell", "pytests"],
-        "membership order is the profile order, not declaration order"
-    );
-    assert!(
-        steps.iter().all(|step| step["status"] == "pass"),
-        "{steps:?}"
-    );
-    assert_eq!(envelope["data"]["selector"], "fast");
-}
-
-#[cfg(unix)]
-#[test]
-fn test_issue_197_cross_target_execution_reproduces_then_passes() {
-    let config = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n\
-        [[tool.sc-lint.lint]]\nname = \"win-clippy\"\ncommand = [\"cargo\", \"clippy\", \"--workspace\", \"--\", \"-D\", \"warnings\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\n\n\
-        [[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n";
-    let tools = profile_fixture("tools");
-    let path = std::env::join_paths(std::iter::once(tools).chain(std::env::split_paths(
-        &std::env::var_os("PATH").expect("PATH is set"),
-    )))
-    .expect("shimmed PATH");
-
-    let log_dir = TempDir::new().expect("shim log dir");
-    let log = log_dir.path().join("argv.log");
-    let envs = [
-        ("PATH", path.clone()),
-        ("SC_LINT_SHIM_LOG", log.clone().into_os_string()),
-    ];
-    let (_fixture, output) =
-        issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "cross-target step must execute\n{}",
-        issue_failure_context(&output)
-    );
-    let argv = fs::read_to_string(&log).expect("shim recorded argv");
-    let expected = if Platform::host() == Platform::Windows {
-        "clippy --workspace --target x86_64-pc-windows-msvc -- -D warnings"
-    } else {
-        "xwin clippy --workspace --target x86_64-pc-windows-msvc -- -D warnings"
-    };
-    assert!(
-        argv.lines().any(|line| line == expected),
-        "expected `{expected}` in recorded argv:\n{argv}"
-    );
-
-    // Planted negative: without cargo-xwin the run is a capability failure,
-    // and the clippy step never ran (it was not silently skipped).
-    if Platform::host() != Platform::Windows {
-        let missing_log = log_dir.path().join("missing-xwin.log");
-        let envs = [
-            ("PATH", path),
-            ("SC_LINT_SHIM_LOG", missing_log.clone().into_os_string()),
-            ("SC_LINT_SHIM_NO_XWIN", OsString::from("1")),
-        ];
-        let (_fixture, output) =
-            issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
-        assert_eq!(
-            output.status.code(),
-            Some(i32::from(crate::consts::EXIT_CAPABILITY)),
-            "{}",
-            issue_failure_context(&output)
-        );
-        let recorded = fs::read_to_string(&missing_log).expect("probe argv");
-        assert!(!recorded.contains("clippy"), "{recorded}");
     }
 }

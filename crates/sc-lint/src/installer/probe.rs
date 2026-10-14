@@ -144,9 +144,11 @@ pub(super) fn finish_backend_output(
     while !reader.is_finished() && Instant::now() < drain_deadline {
         thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
     }
-    if !reader.is_finished() && !terminate_probe_process_tree(process_id) {
+    if !reader.is_finished()
+        && let Err(error) = terminate_probe_process_tree(process_id)
+    {
         return Err(format!(
-            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited",
+            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited: {error}",
             binary.display()
         ));
     }
@@ -223,30 +225,79 @@ pub(super) fn terminate_probe_processes(child: &mut Child) {
     let _ = child.wait();
 }
 
-#[cfg(unix)]
-pub(super) fn terminate_probe_process_tree(process_id: u32) -> bool {
-    let process_group = format!("-{process_id}");
-    Command::new("/bin/kill")
-        .args(["-KILL", "--", &process_group])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+/// What `terminate_probe_process_tree` found when it signalled a probe group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ProbeTreeStop {
+    /// The group existed and every member was sent SIGKILL.
+    Killed,
+    /// No process remained in the group, so there was nothing left to stop.
+    /// Only the Unix group signal can observe this; `taskkill` reports a missing
+    /// process as a failure, so the Windows path never constructs it.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    AlreadyStopped,
 }
 
+#[cfg(unix)]
+pub(super) fn terminate_probe_process_tree(process_id: u32) -> io::Result<ProbeTreeStop> {
+    let group = libc::pid_t::try_from(process_id)
+        .ok()
+        .filter(|group| *group > 0)
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("probe process id {process_id} cannot name a process group"),
+            )
+        })?;
+    // SAFETY: `kill` takes a plain pid and signal number and reads no memory;
+    // a negative pid addresses the process group whose id is `group`.
+    if unsafe { libc::kill(-group, libc::SIGKILL) } == 0 {
+        return Ok(ProbeTreeStop::Killed);
+    }
+    let error = io::Error::last_os_error();
+    if error.raw_os_error() == Some(libc::ESRCH) {
+        // ESRCH means the group has no members left; only other errors are failures.
+        Ok(ProbeTreeStop::AlreadyStopped)
+    } else {
+        Err(error)
+    }
+}
+
+/// `taskkill` exit code for a PID that names no running process.
+#[cfg_attr(not(windows), allow(dead_code))]
+const TASKKILL_NOT_FOUND: i32 = 128;
+
 #[cfg(windows)]
-pub(super) fn terminate_probe_process_tree(process_id: u32) -> bool {
-    Command::new("taskkill")
+pub(super) fn terminate_probe_process_tree(process_id: u32) -> io::Result<ProbeTreeStop> {
+    let status = Command::new("taskkill")
         .args(["/PID", &process_id.to_string(), "/T", "/F"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
+        .status()?;
+    classify_taskkill_exit(status.code())
+}
+
+/// Maps a `taskkill` exit code to the probe stop outcome. A process that already exited is
+/// `AlreadyStopped`, matching the Unix `ESRCH` case; any other failure remains an error.
+/// Kept free of Windows APIs so the classification is tested on every platform.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn classify_taskkill_exit(code: Option<i32>) -> io::Result<ProbeTreeStop> {
+    match code {
+        Some(0) => Ok(ProbeTreeStop::Killed),
+        Some(TASKKILL_NOT_FOUND) => Ok(ProbeTreeStop::AlreadyStopped),
+        Some(code) => Err(io::Error::other(format!(
+            "taskkill exited with exit code: {code}"
+        ))),
+        None => Err(io::Error::other(
+            "taskkill was terminated before it reported an exit code",
+        )),
+    }
 }
 
 #[cfg(not(any(unix, windows)))]
-pub(super) fn terminate_probe_process_tree(_process_id: u32) -> bool {
-    false
+pub(super) fn terminate_probe_process_tree(_process_id: u32) -> io::Result<ProbeTreeStop> {
+    Err(io::Error::other(
+        "process-tree termination is not supported on this platform",
+    ))
 }
 
 pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
@@ -277,4 +328,82 @@ pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
         .and_then(Value::as_str)
         .ok_or_else(|| "version probe did not include a version".to_string())?;
     Version::parse(version).map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[cfg(unix)]
+    use std::os::unix::process::ExitStatusExt;
+
+    #[cfg(unix)]
+    #[test]
+    fn reaped_probe_group_counts_as_already_stopped() {
+        let mut child = Command::new("sh")
+            .args(["-c", "exit 0"])
+            .process_group(0)
+            .spawn()
+            .expect("spawn probe group leader");
+        let process_id = child.id();
+        child.wait().expect("reap probe group leader");
+
+        assert_eq!(
+            terminate_probe_process_tree(process_id)
+                .expect("already-stopped group is not a failure"),
+            ProbeTreeStop::AlreadyStopped,
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn live_probe_group_is_killed_and_reported_as_stopped() {
+        let mut child = Command::new("sleep")
+            .arg("60")
+            .process_group(0)
+            .spawn()
+            .expect("spawn live probe group leader");
+        let process_id = child.id();
+
+        assert_eq!(
+            terminate_probe_process_tree(process_id).expect("live group can be killed"),
+            ProbeTreeStop::Killed,
+        );
+        let status = child.wait().expect("reap killed probe group leader");
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unrepresentable_probe_process_id_remains_an_error() {
+        let error = terminate_probe_process_tree(u32::MAX)
+            .expect_err("a process id that cannot name a group must stay an error");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn taskkill_success_counts_as_killed() {
+        assert_eq!(
+            classify_taskkill_exit(Some(0)).expect("success is not an error"),
+            ProbeTreeStop::Killed
+        );
+    }
+
+    #[test]
+    fn taskkill_for_an_exited_process_counts_as_already_stopped() {
+        assert_eq!(
+            classify_taskkill_exit(Some(TASKKILL_NOT_FOUND))
+                .expect("an exited process is not an error"),
+            ProbeTreeStop::AlreadyStopped
+        );
+    }
+
+    #[test]
+    fn other_taskkill_failures_remain_errors() {
+        for code in [Some(1), Some(5), Some(129), None] {
+            assert!(
+                classify_taskkill_exit(code).is_err(),
+                "exit {code:?} must stay an error"
+            );
+        }
+    }
 }

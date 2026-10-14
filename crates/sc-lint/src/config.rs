@@ -24,6 +24,7 @@ use crate::profile_plan::LintProfiles;
 use crate::profile_plan::ProfileName;
 use crate::profile_plan::decode_lint_step_fields;
 use crate::profile_plan::profile_plan_config_error;
+use crate::profile_plan::reject_test_step_fields;
 use crate::profile_plan::validate_lint_step;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
@@ -836,17 +837,7 @@ fn validate_consumer_profile(
                 format!("consumer `{profile}` profile step `{name}` has an empty command argument"),
             ));
         }
-        let (platform, target) = if profile == ConsumerProfile::Lint.as_str() {
-            decode_lint_step_fields(
-                name,
-                step.platform.as_ref(),
-                step.target.as_ref(),
-                &step.extra,
-            )
-            .map_err(|error| profile_plan_config_error(error, path))?
-        } else {
-            (None, None)
-        };
+        let (platform, target) = profile_step_fields(profile, name, step, path)?;
         let declared = ConsumerProfileStep::new(name, command.clone(), platform, target);
         if profile == ConsumerProfile::Lint.as_str() {
             validate_lint_step(&declared)
@@ -855,6 +846,44 @@ fn validate_consumer_profile(
         steps.push(declared);
     }
     Ok(steps)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Profile field validation preserves structured CLI configuration errors."
+)]
+fn profile_step_fields(
+    profile: &str,
+    name: &str,
+    step: &ConsumerProfileStepFile,
+    path: &Path,
+) -> Result<
+    (
+        Option<crate::profile_plan::Platform>,
+        Option<crate::profile_plan::Target>,
+    ),
+    CliError,
+> {
+    match profile {
+        "lint" => decode_lint_step_fields(
+            name,
+            step.platform.as_ref(),
+            step.target.as_ref(),
+            &step.extra,
+        )
+        .map_err(|error| profile_plan_config_error(error, path)),
+        "test" => {
+            reject_test_step_fields(
+                name,
+                step.platform.as_ref(),
+                step.target.as_ref(),
+                &step.extra,
+            )
+            .map_err(|error| profile_plan_config_error(error, path))?;
+            Ok((None, None))
+        }
+        _ => unreachable!("consumer profiles are lint or test"),
+    }
 }
 
 fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {

@@ -177,6 +177,7 @@ def test_consumer_profile_installed_wheel_and_binary(product_artifacts: ProductA
             text=True,
             capture_output=True,
             check=False,
+            timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
         )
         assert command.returncode == 0, f"{scope}: {command.stdout}\n{command.stderr}"
         return json.loads(command.stdout)["data"]["steps"]

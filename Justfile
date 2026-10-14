@@ -92,13 +92,12 @@ _source-venv:
     {{host_python}} bindings/sc-lint-py/python/sc_lint/source_venv.py
 
 # Run the complete source-maintainer test suite behind the consumer profile.
+# Every suite runs even after one fails (and cargo runs every test binary), so one
+# run reports every failure.
 [private]
 _source-test:
     cargo build --workspace
-    cargo test --workspace
-    {{python_cmd}} -m sc_lint.run_pytests
-    just _source-repo-pytests
-    node --test action/test/action.test.cjs
+    {{python_cmd}} -m sc_lint.run_all "cargo test --workspace --no-fail-fast" "{{python_cmd}} -m sc_lint.run_pytests" "just _source-repo-pytests" "node --test action/test/action.test.cjs"
 
 # Remove workspace build artifacts.
 clean:

@@ -25,7 +25,7 @@ use crate::predicates::attr_is_cfg_windows;
 pub(super) struct PlatformAdapterRecord {
     unix_module: String,
     windows_module: String,
-    reason: String,
+    reason: NonEmptyReason,
 }
 
 pub(super) fn parse_records(
@@ -58,7 +58,13 @@ pub(super) fn parse_records(
             Ok(PlatformAdapterRecord {
                 unix_module: field("unix_module")?,
                 windows_module: field("windows_module")?,
-                reason: field("reason")?,
+                reason: field("reason").map(NonEmptyReason::new)?.ok_or_else(|| {
+                    AnalyzerConfigError::WrongType {
+                        analyzer: "portability",
+                        key: format!("platform_adapters[{index}].reason"),
+                        expected: "a non-empty string",
+                    }
+                })?,
             })
         })
         .collect()
@@ -131,15 +137,14 @@ pub enum AdapterPathCause {
     NotRustSource,
 }
 
-#[derive(Debug, Clone)]
-struct NonEmptyReason(String);
+/// A platform adapter's required justification: never empty or blank.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct NonEmptyReason(String);
 
-#[derive(Debug, Clone)]
-struct PlatformAdapterPair {
-    unix: RepoRelativePath,
-    windows: RepoRelativePath,
-    reason: NonEmptyReason,
-    unix_declaration: ModuleDeclaration,
+impl NonEmptyReason {
+    pub(super) fn new(value: String) -> Option<Self> {
+        (!value.trim().is_empty()).then_some(Self(value))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -149,6 +154,30 @@ struct ModuleDeclaration {
     is_test_only: bool,
     is_unix: bool,
     is_windows: bool,
+}
+
+/// cfg flags from the module declarations that enclose a declaration.
+///
+/// Rust applies a `mod` attribute to the whole subtree the module declares, so
+/// a declaration inherits `test`, `unix` and `windows` gating from every
+/// enclosing module. Inline ancestors are threaded through
+/// `collect_file_declarations`; file-module ancestors are propagated afterward
+/// by `inherit_file_module_cfg`.
+#[derive(Debug, Clone, Copy, Default)]
+struct EnclosingCfg {
+    is_test_only: bool,
+    is_unix: bool,
+    is_windows: bool,
+}
+
+impl EnclosingCfg {
+    fn including(self, item_mod: &ItemMod) -> Self {
+        Self {
+            is_test_only: self.is_test_only || item_mod.attrs.iter().any(attr_is_cfg_test),
+            is_unix: self.is_unix || item_mod.attrs.iter().any(attr_is_cfg_unix),
+            is_windows: self.is_windows || item_mod.attrs.iter().any(attr_is_cfg_windows),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -186,7 +215,7 @@ pub(super) fn validate(
     let mut validate_pair = |root: &Path,
                              record: &PlatformAdapterRecord,
                              index: usize|
-     -> Result<PlatformAdapterPair, AdapterConfigError> {
+     -> Result<ModuleDeclaration, AdapterConfigError> {
         let unix = validate_path(root, index, "unix_module", &record.unix_module)?;
         let windows = validate_path(root, index, "windows_module", &record.windows_module)?;
         let unix_path = canonical_module_path(root, index, "unix_module", &unix)?;
@@ -208,31 +237,18 @@ pub(super) fn validate(
             &windows_path,
             "windows",
         )?;
-        Ok(PlatformAdapterPair {
-            unix,
-            windows,
-            reason: NonEmptyReason(record.reason.clone()),
-            unix_declaration,
-        })
+        Ok(unix_declaration)
     };
-    let pairs = records
+    let unix_declarations = records
         .iter()
         .enumerate()
-        .map(|(index, record)| validate_pair(&root, record, index))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|(index, record)| {
+            validate_pair(&root, record, index)
+                .map(|declaration| (declaration.source_path, declaration.line))
+        })
+        .collect::<Result<_, _>>()?;
 
-    Ok(PlatformAdapters {
-        unix_declarations: pairs
-            .into_iter()
-            .map(|pair| {
-                let _ = (&pair.unix, &pair.windows, &pair.reason.0);
-                (
-                    pair.unix_declaration.source_path,
-                    pair.unix_declaration.line,
-                )
-            })
-            .collect(),
-    })
+    Ok(PlatformAdapters { unix_declarations })
 }
 
 fn ensure_distinct(
@@ -320,9 +336,53 @@ fn collect_declarations(root: &Path) -> anyhow::Result<BTreeMap<PathBuf, ModuleD
         let source = fs::read_to_string(&context.source_path)?;
         let file = syn::parse_file(&source)?;
         let module_dir = module_dir(&context.source_path)?;
-        collect_file_declarations(&file.items, &context, &module_dir, &mut declarations)?;
+        collect_file_declarations(
+            &file.items,
+            &context,
+            &module_dir,
+            EnclosingCfg::default(),
+            &mut declarations,
+        )?;
     }
+    inherit_file_module_cfg(&mut declarations)?;
     Ok(declarations)
+}
+
+/// Propagates cfg flags from file modules to the declarations they contain.
+///
+/// Each file's declarations are collected with no enclosing cfg, so a
+/// declaration inside `unix.rs` does not yet see a `#[cfg(unix)]` on the
+/// `mod unix;` that declares that file. Each declaration is OR-ed with the
+/// flags of the declaration that declares its file. The pass repeats until no
+/// flag changes, so the flags reach every depth.
+fn inherit_file_module_cfg(
+    declarations: &mut BTreeMap<PathBuf, ModuleDeclaration>,
+) -> anyhow::Result<()> {
+    loop {
+        let mut updates = Vec::new();
+        for (child, declaration) in declarations.iter() {
+            let parent_path = declaration.source_path.canonicalize()?;
+            let Some(parent) = declarations.get(&parent_path) else {
+                continue;
+            };
+            let inherited = ModuleDeclaration {
+                is_test_only: declaration.is_test_only || parent.is_test_only,
+                is_unix: declaration.is_unix || parent.is_unix,
+                is_windows: declaration.is_windows || parent.is_windows,
+                ..declaration.clone()
+            };
+            if inherited.is_test_only != declaration.is_test_only
+                || inherited.is_unix != declaration.is_unix
+                || inherited.is_windows != declaration.is_windows
+            {
+                updates.push((child.clone(), inherited));
+            }
+        }
+        if updates.is_empty() {
+            return Ok(());
+        }
+        declarations.extend(updates);
+    }
 }
 
 fn module_dir(source_path: &Path) -> anyhow::Result<PathBuf> {
@@ -340,17 +400,20 @@ fn collect_file_declarations(
     items: &[Item],
     context: &FileContext,
     module_dir: &Path,
+    enclosing_cfg: EnclosingCfg,
     declarations: &mut BTreeMap<PathBuf, ModuleDeclaration>,
 ) -> anyhow::Result<()> {
     for item in items {
         let Item::Mod(item_mod) = item else {
             continue;
         };
+        let declaration_cfg = enclosing_cfg.including(item_mod);
         if let Some((_, items)) = &item_mod.content {
             collect_file_declarations(
                 items,
                 context,
                 &module_dir.join(item_mod.ident.to_string()),
+                declaration_cfg,
                 declarations,
             )?;
             continue;
@@ -364,9 +427,9 @@ fn collect_file_declarations(
             ModuleDeclaration {
                 source_path: context.source_path.clone(),
                 line: span_start_line(item_mod.span()),
-                is_test_only: item_mod.attrs.iter().any(attr_is_cfg_test),
-                is_unix: item_mod.attrs.iter().any(attr_is_cfg_unix),
-                is_windows: item_mod.attrs.iter().any(attr_is_cfg_windows),
+                is_test_only: declaration_cfg.is_test_only,
+                is_unix: declaration_cfg.is_unix,
+                is_windows: declaration_cfg.is_windows,
             },
         );
     }

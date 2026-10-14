@@ -1,0 +1,29 @@
+{
+  "manifest_dependency_allowlists": [
+    {
+      "owner_manifest_path": "Cargo.toml",
+      "allowed_dependencies": [],
+      "boundary_record_path": "boundaries/empty-workspace/empty-workspace.toml",
+      "upstream_extension": {"reviewed": true}
+    }
+  ],
+  "global_dependency_ownership": [
+    {
+      "dependency": "serde",
+      "allowed_manifest_paths": [],
+      "allowed_source_roots": [],
+      "manifest_message": "serde ownership fixture",
+      "source_message": "serde source fixture",
+      "upstream_extension": {"owner": "fixture"}
+    }
+  ],
+  "manifest_section_rules": [
+    {
+      "owner_manifest_path": "Cargo.toml",
+      "dependency_package": "serde",
+      "allowed_sections": [],
+      "message": "serde section fixture",
+      "upstream_extension": {"section": "fixture"}
+    }
+  ]
+}

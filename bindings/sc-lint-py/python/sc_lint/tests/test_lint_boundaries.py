@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
+from sc_lint import lint_boundaries
 from sc_lint.lint_boundaries import RULE_ID
 from sc_lint.lint_boundaries import delegation_argv
 from sc_lint.lint_boundaries import run
+from sc_lint.lint_boundaries import rust_report
 from sc_lint.lint_boundaries import validate_inventory
 
 
@@ -107,6 +111,20 @@ class LintBoundariesTests(unittest.TestCase):
         with mock.patch("sc_lint.lint_boundaries.subprocess.run", return_value=completed):
             self.assertEqual(validate_inventory(Path("/tmp/example")), ["Rust owns this"])
 
+    def test_rust_report_bounds_delegation_with_named_timeout(self) -> None:
+        argv = ["/bin/sc-lint", "--json", "lint", "sc-boundary"]
+        expired = subprocess.TimeoutExpired(cmd=argv, timeout=60)
+        with mock.patch("sc_lint.lint_boundaries.binary_path", return_value="/bin/sc-lint"):
+            with mock.patch(
+                "sc_lint.lint_boundaries.subprocess.run", side_effect=expired
+            ) as run_mock:
+                with self.assertRaises(RuntimeError) as error:
+                    rust_report(Path("/tmp/example"))
+        self.assertEqual(run_mock.call_args.kwargs["timeout"], 60)
+        self.assertIn(f"timed out after {60}s", str(error.exception))
+        self.assertIn("/bin/sc-lint", str(error.exception))
+        self.assertIn(RULE_ID, str(error.exception))
+
     def test_issue377_delegate_parity(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
@@ -119,6 +137,21 @@ class LintBoundariesTests(unittest.TestCase):
             messages = validate_inventory(repo_root)
             self.assertEqual(len(messages), 1)
             self.assertIn("invalid Rust identifier `not-valid`", messages[0])
+
+    def test_module_exposes_only_the_delegation_surface(self) -> None:
+        tree = ast.parse(Path(lint_boundaries.__file__).read_text(encoding="utf-8"))
+        defined: set[str] = set()
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                defined.add(node.name)
+            elif isinstance(node, ast.Assign):
+                defined.update(t.id for t in node.targets if isinstance(t, ast.Name))
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                defined.add(node.target.id)
+        self.assertEqual(
+            defined,
+            {"RULE_ID", "delegation_argv", "rust_report", "validate_inventory", "run", "main"},
+        )
 
 
 if __name__ == "__main__":

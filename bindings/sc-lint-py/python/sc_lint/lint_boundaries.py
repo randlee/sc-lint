@@ -28,12 +28,20 @@ def delegation_argv(repo_root: Path) -> list[str]:
 
 
 def rust_report(repo_root: Path) -> tuple[int, dict]:
-    completed = subprocess.run(
-        delegation_argv(repo_root),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    argv = delegation_argv(repo_root)
+    timeout_seconds = 60
+    try:
+        completed = subprocess.run(
+            argv,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(
+            f"sc-lint timed out after {timeout_seconds}s for {RULE_ID}: {argv!r}"
+        ) from error
     payload = completed.stdout or completed.stderr
     try:
         return completed.returncode, json.loads(payload)

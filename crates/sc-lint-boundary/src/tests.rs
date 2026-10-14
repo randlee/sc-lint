@@ -719,6 +719,145 @@ fn issue376_stale_active_gate() {
 }
 
 #[test]
+fn issue376_stale_dependent_diagnostic_has_record_cause_category_and_recovery() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r"]);
+    for package in ["p", "q", "r"] {
+        fixture.write(
+            &format!("crates/{package}/Cargo.toml"),
+            &good_member_manifest(package, ""),
+        );
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], Some(&["r"]), "active");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("stale policy analyzes");
+    let stale = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbDependency004)
+        .collect::<Vec<_>>();
+    assert_eq!(stale.len(), 2);
+
+    let runtime_and_fallback_dev = stale
+        .iter()
+        .find(|finding| finding.message.contains("`q`"))
+        .expect("runtime allowlist permission is reported");
+    let dev_only = stale
+        .iter()
+        .find(|finding| finding.message.contains("`r`"))
+        .expect("dev allowlist permission is reported");
+    for (finding, path, field, categories) in [
+        (
+            runtime_and_fallback_dev,
+            Path::new("boundaries").join("p").join("a.toml"),
+            "dependencies.allowed_dependents",
+            "runtime and fallback dev",
+        ),
+        (
+            dev_only,
+            Path::new("boundaries").join("p").join("b.toml"),
+            "dependencies.allowed_dev_dependents",
+            "dev",
+        ),
+    ] {
+        assert!(finding.message.contains(&path.display().to_string()));
+        assert!(finding.message.contains(field));
+        assert!(finding.message.contains(categories));
+        assert!(
+            finding
+                .message
+                .contains("no live direct workspace edge exists in any granted category")
+        );
+        assert!(finding.message.contains(
+            "remove the obsolete permission or restore the intended direct workspace edge"
+        ));
+    }
+}
+
+#[test]
+fn issue376_owner_unions_explicit_dev_permissions_before_stale_checking() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &(good_member_manifest("q", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(
+        &fixture,
+        "p/runtime.toml",
+        "Runtime",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    write_policy_record(
+        &fixture,
+        "p/development.toml",
+        "Development",
+        &["q"],
+        Some(&["q"]),
+        "active",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("owner policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+}
+
+#[test]
+fn issue376_owner_level_active_gate_retains_planned_record_permissions() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &(good_member_manifest("q", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(
+        &fixture,
+        "p/active.toml",
+        "Active",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    write_policy_record(
+        &fixture,
+        "p/planned.toml",
+        "Planned",
+        &["q"],
+        Some(&["q"]),
+        "planned",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("mixed-state owner policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+}
+
+#[test]
 fn issue377_semantic_mutations() {
     // Valid Rust raw identifiers, owner-local roots, and roots in an explicitly
     // allowed dependency are all accepted by the semantic inventory pass.
@@ -4651,6 +4790,42 @@ fn unknown_rule_filter_is_selector_error() {
 }
 
 #[test]
+fn manifest_policy_shape_errors_are_indexed_analyzer_config_errors() {
+    for (config, expected_key, explanation) in [
+        (
+            "manifest_dependency_allowlists = \"wrong\"",
+            "manifest_dependency_allowlists",
+            "use array-of-table entries",
+        ),
+        (
+            "manifest_dependency_allowlists = [\"wrong\"]",
+            "manifest_dependency_allowlists[0]",
+            "replace it with a table entry",
+        ),
+        (
+            "[[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]\nowner_manifest_path = 42",
+            "manifest_dependency_allowlists[0].owner_manifest_path",
+            "provide a quoted string",
+        ),
+    ] {
+        let fixture = undeclared_dependency_fixture();
+        fixture.write(
+            "sc-lint.toml",
+            &format!("[tool.sc-lint.analyzers.boundary]\n{config}\n"),
+        );
+
+        match configured(fixture.root(), None) {
+            Err(BoundaryError::AnalyzerConfig(error)) => {
+                assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+                assert!(error.to_string().contains(expected_key));
+                assert!(error.to_string().contains(explanation));
+            }
+            other => panic!("expected indexed analyzer config error, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn rule_filter_selects_exactly_the_rule() {
     let fixture = undeclared_dependency_fixture();
 
@@ -4669,6 +4844,88 @@ fn rule_filter_selects_exactly_the_rule() {
     assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(report.findings.len(), 1);
     assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+}
+
+#[test]
+fn inventory_free_manifest_policy_runs_with_missing_or_invalid_boundaries() {
+    for invalid_boundaries in [false, true] {
+        for with_policy in [false, true] {
+            let fixture = inventory_free_policy_fixture(invalid_boundaries, with_policy);
+            let ownership = configured(fixture.root(), Some("SCB-MANIFEST-004"))
+                .expect("ownership policy does not require boundary inventory");
+            let sections = configured(fixture.root(), Some("SCB-MANIFEST-005"))
+                .expect("section policy does not require boundary inventory");
+
+            if with_policy {
+                assert_eq!(ownership.status, ReportStatus::Fail);
+                assert!(ownership.findings.iter().any(|finding| {
+                    finding.rule_id == RuleId::ScbManifest004
+                        && finding.message.contains("not permitted")
+                }));
+                assert_eq!(sections.status, ReportStatus::Fail);
+                assert_eq!(sections.findings.len(), 1);
+                assert_eq!(sections.findings[0].rule_id, RuleId::ScbManifest005);
+            } else {
+                assert_eq!(ownership.status, ReportStatus::Pass);
+                assert!(ownership.findings.is_empty());
+                assert_eq!(sections.status, ReportStatus::Pass);
+                assert!(sections.findings.is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn boundary_semantics_only_does_not_parse_unselected_manifest_policy() {
+    let fixture = undeclared_dependency_fixture();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            global_dependency_ownership = "not an array of tables"
+        "#,
+    );
+
+    configured(fixture.root(), Some("SCB-BOUNDARY-004"))
+        .expect("boundary semantic selection ignores unselected manifest policy");
+}
+
+fn inventory_free_policy_fixture(invalid_boundaries: bool, with_policy: bool) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/dep"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "dep", "../dep", "0.1.0"),
+    );
+    fixture.write("crates/dep/Cargo.toml", &good_member_manifest("dep", ""));
+    fixture.write_source("app", "lib.rs", "use dep::Thing;\npub struct App;");
+    fixture.write_source("dep", "lib.rs", "pub struct Thing;");
+    if invalid_boundaries {
+        fixture.write("boundaries/planning.toml", "not_planning = true\n");
+    }
+    if with_policy {
+        fixture.write(
+            "sc-lint.toml",
+            r#"
+                [tool.sc-lint.analyzers.boundary]
+                manifest_dependency_allowlists = "not selected by ownership or section rules"
+
+                [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+                dependency = "dep"
+                allowed_manifest_paths = []
+                allowed_source_roots = []
+                manifest_message = "not permitted"
+                source_message = "not permitted"
+
+                [[tool.sc-lint.analyzers.boundary.manifest_section_rules]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                dependency_package = "dep"
+                allowed_sections = ["dev-dependencies"]
+                message = "dependency belongs in dev-dependencies"
+            "#,
+        );
+    }
+    fixture
 }
 
 #[test]
@@ -4852,4 +5109,89 @@ fn per_rule_path_exclusion_drops_only_matching_manifest_rule() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn issue385_boundary_manifest_paths() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+    let baseline = configured(fixture.root(), Some("manifests")).unwrap();
+    let baseline_json = serde_json::to_vec(&baseline).unwrap();
+
+    fixture
+        .workspace
+        .write("sc-lint.toml", "[tool.sc-lint.analyzers.boundary]\n");
+    assert_eq!(
+        serde_json::to_vec(&configured(fixture.root(), Some("manifests")).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        "[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n",
+    );
+    assert_eq!(
+        serde_json::to_vec(&configured(fixture.root(), Some("manifests")).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+        [tool.sc-lint.analyzers.boundary]
+        exclude_paths = ["crates/example/Cargo.toml"]
+        [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+        "SCB-MANIFEST-001" = ["crates/other/Cargo.toml"]
+        "#,
+    );
+    assert!(
+        configured(fixture.root(), Some("manifests"))
+            .unwrap()
+            .findings
+            .is_empty()
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+        [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+        "SCB-MANIFEST-001" = ["crates/example/Cargo.toml"]
+        "#,
+    );
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.root(),
+        None,
+        Some("manifests"),
+    )
+    .unwrap();
+    let (findings, status) = settings.apply_with_paths(
+        vec![
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse(
+                        "crates\\example\\Cargo.toml",
+                    )
+                    .unwrap(),
+                ),
+            ),
+            (baseline.findings[0].clone(), None),
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse("crates/example/other.toml")
+                        .unwrap(),
+                ),
+            ),
+        ],
+        |rule| sc_lint_analyzer_support::CatalogRuleId::new(rule.as_str()),
+    );
+    assert_eq!(findings.len(), 2);
+    assert_eq!(status, ReportStatus::Fail);
 }

@@ -715,6 +715,7 @@ dependencies = [
  "clap",
  "dunce",
  "etcetera",
+ "libc",
  "sc-lint-boundary",
  "sc-lint-schema",
  "sc-observability",
