@@ -899,6 +899,8 @@ mod tests {
     const MINIMAL_DOCS_MANIFEST: &str = "schema_version = 1\n\n[[guides]]\npath = \"README.md\"\n";
     #[cfg(unix)]
     const BACKEND_PROBE_TEST_WATCHDOG: Duration = Duration::from_secs(30);
+    #[cfg(unix)]
+    const BACKEND_OUTPUT_TEST_WAIT: Duration = Duration::from_secs(5);
 
     #[test]
     fn release_target_matches_the_published_release_matrix() {
@@ -2191,13 +2193,23 @@ mod tests {
             match wait_for_backend_probe(&mut child, binary, expected_name, "--help", timeout) {
                 Ok(status) => {
                     terminate_probe_processes(&mut child);
-                    let _ = finish_backend_output(reader, process_id);
+                    let _ = finish_backend_output_with_timeouts(
+                        reader,
+                        process_id,
+                        BACKEND_OUTPUT_TEST_WAIT,
+                        BACKEND_OUTPUT_TEST_WAIT,
+                    );
                     panic!("hanging backend unexpectedly exited with {status}");
                 }
                 Err(problem) => problem,
             };
-        let output = finish_backend_output(reader, process_id)
-            .expect("drain noisy output after process-tree cleanup");
+        let output = finish_backend_output_with_timeouts(
+            reader,
+            process_id,
+            BACKEND_OUTPUT_TEST_WAIT,
+            BACKEND_OUTPUT_TEST_WAIT,
+        )
+        .expect("drain noisy output after process-tree cleanup");
         assert!(
             String::from_utf8_lossy(&output).contains("noisy-child"),
             "the backend emitted noisy output before timeout"

@@ -146,17 +146,35 @@ pub(super) fn finish_backend_output(
     reader: ProbeOutputReader,
     process_id: u32,
 ) -> Result<Vec<u8>, BackendOutputError> {
-    finish_backend_output_after_stop(reader, || terminate_probe_process_tree(process_id))
+    finish_backend_output_with_timeouts(
+        reader,
+        process_id,
+        BACKEND_OUTPUT_DRAIN_TIMEOUT,
+        BACKEND_OUTPUT_STOP_TIMEOUT,
+    )
+}
+
+pub(super) fn finish_backend_output_with_timeouts(
+    reader: ProbeOutputReader,
+    process_id: u32,
+    drain_timeout: Duration,
+    stop_timeout: Duration,
+) -> Result<Vec<u8>, BackendOutputError> {
+    finish_backend_output_after_stop(reader, drain_timeout, stop_timeout, || {
+        terminate_probe_process_tree(process_id)
+    })
 }
 
 fn finish_backend_output_after_stop(
     reader: ProbeOutputReader,
+    drain_timeout: Duration,
+    stop_timeout: Duration,
     stop_process_tree: impl FnOnce() -> io::Result<ProbeTreeStop>,
 ) -> Result<Vec<u8>, BackendOutputError> {
     // A descendant can outlive the direct child while holding stdout open.
     // Give the reader a short chance to drain normal output, then stop the
     // process group instead of waiting indefinitely for EOF.
-    match reader.recv_timeout(BACKEND_OUTPUT_DRAIN_TIMEOUT) {
+    match reader.recv_timeout(drain_timeout) {
         Ok(result) => return format_probe_output_result(result),
         Err(RecvTimeoutError::Disconnected) => {
             return Err(BackendOutputError::ReaderStopped);
@@ -164,11 +182,9 @@ fn finish_backend_output_after_stop(
         Err(RecvTimeoutError::Timeout) => {}
     }
     stop_process_tree().map_err(BackendOutputError::ProcessTreeStop)?;
-    match reader.recv_timeout(BACKEND_OUTPUT_STOP_TIMEOUT) {
+    match reader.recv_timeout(stop_timeout) {
         Ok(result) => format_probe_output_result(result),
-        Err(RecvTimeoutError::Timeout) => Err(BackendOutputError::Timeout {
-            wait: BACKEND_OUTPUT_STOP_TIMEOUT,
-        }),
+        Err(RecvTimeoutError::Timeout) => Err(BackendOutputError::Timeout { wait: stop_timeout }),
         Err(RecvTimeoutError::Disconnected) => Err(BackendOutputError::ReaderStopped),
     }
 }
@@ -490,10 +506,15 @@ mod tests {
         let (_sender, reader) = mpsc::sync_channel(1);
         let mut stop_attempted = false;
 
-        let error = finish_backend_output_after_stop(reader, || {
-            stop_attempted = true;
-            Ok(ProbeTreeStop::AlreadyStopped)
-        })
+        let error = finish_backend_output_after_stop(
+            reader,
+            BACKEND_OUTPUT_DRAIN_TIMEOUT,
+            BACKEND_OUTPUT_STOP_TIMEOUT,
+            || {
+                stop_attempted = true;
+                Ok(ProbeTreeStop::AlreadyStopped)
+            },
+        )
         .expect_err("a connected reader that never sends must time out");
 
         assert!(
