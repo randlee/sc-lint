@@ -2,6 +2,22 @@
 
 All notable changes to sc-lint are documented here.
 
+## [Unreleased]
+
+### Compatibility
+
+- Tightened boundary inventory validation and stale-entry diagnostics can
+  reject previously accepted invalid declarations. Review the recovery steps
+  in [troubleshooting](docs-bundle/troubleshooting.md#cargo-shear-exception-migration)
+  before upgrading.
+- Previously accepted path-like cargo-shear
+  `allowed_unused_dependencies` keys are rejected with
+  `SC_LINT_CARGO_SHEAR_CONFIG_INVALID`. Use the canonical key
+  `{package}.{dependency_key}` (the dependency rename alias when present,
+  otherwise the package name), or `workspace.{dependency_key}` only for a
+  virtual-root workspace dependency. See the cargo-shear migration guidance
+  in [troubleshooting](docs-bundle/troubleshooting.md#cargo-shear-exception-migration).
+
 ## [0.7.3] — 2026-10-12
 
 Fixes found after publishing 0.7.2.

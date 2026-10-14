@@ -28,6 +28,17 @@ with no Rust configuration logic. `REQ-PRODUCT-019` obligations on the
 installed end state are unchanged; see the supersession note under that
 requirement.
 
+Phase K's accepted ADR-017 amendments describe delivered contracts, not new
+product defaults: analyzer `exclude_paths_by_rule`, explicit portability
+adapter pairs, optional boundary inventory policies, consumer named lint
+profiles and platform scopes, direct managed `exec`, and consumer-declared
+cargo tools/rustup targets provisioned by setup. Optional declarations remain
+inactive when absent. Consumer tools and policy values are never chosen from
+repository identity. User-facing syntax and recovery are maintained in the
+offline [configuration](../docs-bundle/configuration.md),
+[usage](../docs-bundle/using-sc-lint.md), and
+[troubleshooting](../docs-bundle/troubleshooting.md) guides.
+
 ## Product Purpose
 
 `sc-lint` is a standalone lint tool family for Rust repositories. It provides:

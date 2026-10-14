@@ -24,6 +24,10 @@ This repository currently ships these primary crates:
 
 The workspace version is managed from the root `Cargo.toml` via `version.workspace = true` in each crate.
 
+The current end-user operator manual is [`docs-bundle/README.md`](docs-bundle/README.md)
+and ships with the release for offline use. It is the canonical guide for
+configuration, consumer profiles, setup, CI, and recovery.
+
 ## Homebrew
 
 The primary supported Homebrew install path is:

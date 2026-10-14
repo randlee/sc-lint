@@ -20,18 +20,18 @@ documentation remains local and offline.
 
 ## Release archive
 
-> Release-archive and Homebrew documentation packaging are delivered by Sprint
-> E.5. Until that release lands, use the source bundle or the package path
-> documented by the installed release.
-
 Download the archive matching the host triple from the project release page,
-verify its published checksum, and put `sc-lint` on `PATH`. The archive's
-`sc-lint-docs/` directory must stay beside the executable. The Homebrew layout
-instead places it in the formula-owned `pkgshare` path shown above.
+verify its published checksum, and put `sc-lint` on `PATH`. Keep the launcher
+and three analyzer companions together, and preserve the archive's declared
+`share/sc-lint/sc-lint-docs/` path for the offline manual. Managed setup
+installs and checks the launcher, companions, and documentation bundle as one
+complete unit before activation.
 
 ```sh
 tar -xzf sc-lint_0.7.3_x86_64-unknown-linux-gnu.tar.gz
-install -m 0755 sc-lint /usr/local/bin/sc-lint
+install -d /usr/local/bin /usr/local/share/sc-lint
+install -m 0755 sc-lint sc-lint-boundary sc-lint-portability sc-lint-runtime /usr/local/bin/
+cp -R share/sc-lint/sc-lint-docs /usr/local/share/sc-lint/
 sc-lint docs --path
 ```
 
@@ -39,12 +39,14 @@ Never replace a working installation with an unverified archive. The
 product-owned `sc-lint setup` and `sc-lint upgrade` paths perform checksum and
 post-install verification for consumer repositories.
 
-## CI and GitHub Action
+## CI
 
 CI should install one pinned release, run `sc-lint --json version`, and then
-use the same commands as local development. A workflow may use the reusable
-project Action once E.6 publishes it, or install the release archive directly.
-Do not run `cargo run -p sc-lint` in a consumer CI job.
+use the same commands as local development. The repository's
+`.github/actions/setup-sc-lint` action is a repository workflow component; it
+is not a published reusable consumer action. Consumer workflows can install a
+verified release archive or use the generated Just integration. Do not run
+`cargo run -p sc-lint` in a consumer CI job.
 
 ## Verify an installation
 

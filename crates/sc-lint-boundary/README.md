@@ -25,8 +25,14 @@ Rule IDs include:
 - `SCB-DEPENDENCY-001`
 - `SCB-DEPENDENCY-002`
 - `SCB-DEPENDENCY-003`
+- `SCB-DEPENDENCY-004`
 - `SCB-MANIFEST-001`
 - `SCB-MANIFEST-002`
+- `SCB-MANIFEST-003`
+- `SCB-MANIFEST-004`
+- `SCB-MANIFEST-005`
+- `SCB-MANIFEST-006`
+- `SCB-BOUNDARY-004`
 
 Rule filters accept individual rule IDs and these kebab-case family names:
 
@@ -83,7 +89,10 @@ exclude_paths = ["crates/generated/**"]
 ```
 
 The table supports the common keys `enabled`, `reason`, `exclude_rules`,
-`fail_rules`, and `exclude_paths`; boundary has no analyzer-specific keys.
+`fail_rules`, `exclude_paths`, and `exclude_paths_by_rule`; boundary has no
+analyzer-specific keys. `exclude_paths_by_rule` maps an exact rule ID to path
+globs and filters findings from that rule without excluding other rules in the
+same file.
 Rule IDs and family names can be used in `--rule-filter`, `exclude_rules`,
 and `fail_rules`.
 
