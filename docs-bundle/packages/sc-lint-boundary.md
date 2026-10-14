@@ -97,12 +97,15 @@ declarations and source references beneath the allowed roots. Section strings
 match exactly, including target qualifiers. A present empty allowed list
 permits none. The records' messages appear with offending paths in findings.
 
+### Canonical package identity
+
 When resolving a package name from inventory or an edge, the analyzer checks
 Cargo package name first, then a unique workspace-member directory, then a
 unique library target name. If none resolves, it reports an unknown workspace
 package reference rather than silently skipping the record. Prefer Cargo
 package names in new inventory; directory and library-name matches are
-compatibility fallbacks.
+compatibility fallbacks. Once resolved, policy comparisons use the canonical
+Cargo package identity, including when a manifest dependency uses a rename.
 
 ## Related packages
 

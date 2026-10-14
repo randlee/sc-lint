@@ -16,6 +16,8 @@ The command manages `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and the
 Windows companion `.sc-lint/bootstrap.ps1` only.
 Conflicting user-owned files produce a structured error instead of an
 overwrite.
+The installer also rejects unresolved template variables before writing;
+details are in [Best practices](./best-practices.md#template-rendering).
 
 ## Public recipes
 

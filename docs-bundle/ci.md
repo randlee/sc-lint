@@ -33,6 +33,9 @@ then use the same documented local sequence without a preinstalled binary:
 checksum, and activates the complete managed product before later recipes run.
 Stable errors and recovery guidance are written to stderr for setup,
 preflight, and backend failures.
+The source-maintainer `pytests` task runs only tests bundled in the wheel; it
+does not collect tests from the consumer checkout. See the
+[detailed test-runner note](./best-practices.md#bundled-python-tests).
 
 The Rust consumer executor supports named lint profiles and platform scopes. A
 profile is an ordered list of existing lint step names, not a nested profile.

@@ -88,3 +88,5 @@ verdicts and JSON reports agree with the process status.
 Source maintainers use the repository's `just lint` and `just test` aggregate
 recipes, which include source-only checks. Consumers use the generated thin
 Justfile and never need to know analyzer package names or the source checkout.
+For the source-only identity-literal check and Windows console handling, see
+[the detailed behavior notes](./best-practices.md#identity-literals-and-captured-output).

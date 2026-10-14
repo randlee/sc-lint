@@ -26,6 +26,7 @@ and three analyzer companions together, and preserve the archive's declared
 `share/sc-lint/sc-lint-docs/` path for the offline manual. Managed setup
 installs and checks the launcher, companions, and documentation bundle as one
 complete unit before activation.
+The [upgrade guide](./upgrade.md) explains health probes and rollback behavior.
 
 ```sh
 tar -xzf sc-lint_0.7.3_x86_64-unknown-linux-gnu.tar.gz
@@ -38,6 +39,8 @@ sc-lint docs --path
 Never replace a working installation with an unverified archive. The
 product-owned `sc-lint setup` and `sc-lint upgrade` paths perform checksum and
 post-install verification for consumer repositories.
+The bootstrap's explicit, managed, and `PATH` binary selection is described in
+[the best-practices guide](./best-practices.md#binary-resolution-and-path-fallback).
 
 ## CI
 
