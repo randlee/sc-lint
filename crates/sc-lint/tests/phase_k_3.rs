@@ -1,5 +1,10 @@
 use std::fs;
+use std::io::Read;
 use std::process::Command;
+use std::process::Stdio;
+use std::thread;
+use std::time::Duration;
+use std::time::Instant;
 
 use sc_lint_boundary::ALL_BOUNDARY_IDS;
 use sc_lint_boundary::BOUNDARY_CATALOG;
@@ -7,6 +12,16 @@ use sc_lint_boundary::DEFAULT_FAIL_IDS;
 use sc_lint_boundary::RuleId;
 use serde_json::Value;
 use tempfile::TempDir;
+
+const CHILD_DEADLINE: Duration = Duration::from_secs(60);
+
+fn drain<R: Read + Send + 'static>(mut pipe: R) -> thread::JoinHandle<Vec<u8>> {
+    thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = pipe.read_to_end(&mut bytes);
+        bytes
+    })
+}
 
 #[test]
 fn issue377_rule_registration_and_dispatch() {
@@ -58,7 +73,7 @@ fn issue377_rule_registration_and_dispatch() {
     fixture.write_workspace();
     fixture.write_boundary("not-valid");
     let binary = env!("CARGO_BIN_EXE_sc-lint");
-    let output = Command::new(binary)
+    let mut child = Command::new(binary)
         .args([
             "--json",
             "--root",
@@ -68,15 +83,37 @@ fn issue377_rule_registration_and_dispatch() {
             "--rule-filter",
             RuleId::ScbBoundary004.as_str(),
         ])
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .expect("sc-lint starts");
+    let stdout = drain(child.stdout.take().expect("piped stdout"));
+    let stderr = drain(child.stderr.take().expect("piped stderr"));
+    let deadline = Instant::now() + CHILD_DEADLINE;
+    let status = loop {
+        if let Some(status) = child.try_wait().expect("poll sc-lint") {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!(
+                "sc-lint did not exit within {CHILD_DEADLINE:?} for {}: {}",
+                RuleId::ScbBoundary004.as_str(),
+                String::from_utf8_lossy(&stderr.join().expect("stderr reader"))
+            );
+        }
+        thread::sleep(Duration::from_millis(20));
+    };
+    let stdout = stdout.join().expect("stdout reader");
+    let stderr = stderr.join().expect("stderr reader");
     assert_eq!(
-        output.status.code(),
+        status.code(),
         Some(10),
         "{}",
-        String::from_utf8_lossy(&output.stderr)
+        String::from_utf8_lossy(&stderr)
     );
-    let output: Value = serde_json::from_slice(&output.stdout).expect("JSON output");
+    let output: Value = serde_json::from_slice(&stdout).expect("JSON output");
     assert_eq!(output["data"]["status"], "fail");
     assert_eq!(output["data"]["findings"][0]["rule_id"], "SCB-BOUNDARY-004");
     assert_eq!(output["data"]["findings"][0]["kind"], "invalid_identifier");
