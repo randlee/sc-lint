@@ -359,7 +359,7 @@ fn issue136_optional_config_matrix() {
     assert!(enforced.findings.iter().any(|finding| {
         finding
             .message
-            .contains("missing active-owner allowlist entry")
+            .contains("missing allowlist entry for active owner")
     }));
     let only_allowlist =
         analyze(&enforcement, Some("SCB-MANIFEST-003")).expect("rule filter selects policy rule");
@@ -388,9 +388,7 @@ fn issue136_optional_config_matrix() {
             .expect("inactive owner analyzes")
             .findings
             .iter()
-            .any(|finding| finding
-                .message
-                .contains("exactly one active boundary record"))
+            .any(|finding| finding.message.contains("inactive allowlist owner"))
     );
 
     let nonworkspace = Fixture::new();
@@ -411,7 +409,7 @@ fn issue136_optional_config_matrix() {
             .expect("nonworkspace owner analyzes")
             .findings
             .iter()
-            .any(|finding| finding.message.contains("not a workspace member"))
+            .any(|finding| finding.message.contains("non-workspace allowlist owner"))
     );
 
     for key in [
@@ -749,16 +747,16 @@ fn issue136_one_allowlist_covers_multiple_active_records_for_an_owner() {
     let fixture = Fixture::new();
     fixture.workspace();
     fixture.boundary_record(&[], &[]);
-    fixture.write_boundary_record(
-        "boundaries/app/extra.toml",
-        "BOUNDARY-App-Extra",
-        "app",
-        "app",
-        "App Extra",
-        "concrete_landed",
-        &[],
-        &[],
-    );
+    fixture.write_boundary_record(BoundaryRecord {
+        relative: "boundaries/app/extra.toml",
+        boundary_id: "BOUNDARY-App-Extra",
+        owner_package: "app",
+        owner_crate: "app",
+        name: "App Extra",
+        state: "concrete_landed",
+        allowed_dependencies: &[],
+        allowed_dev_dependencies: &[],
+    });
     fixture.write(
         "sc-lint.toml",
         r#"
@@ -782,6 +780,17 @@ fn issue136_one_allowlist_covers_multiple_active_records_for_an_owner() {
 }
 
 struct Fixture(TempDir);
+
+struct BoundaryRecord<'a> {
+    relative: &'a str,
+    boundary_id: &'a str,
+    owner_package: &'a str,
+    owner_crate: &'a str,
+    name: &'a str,
+    state: &'a str,
+    allowed_dependencies: &'a [&'a str],
+    allowed_dev_dependencies: &'a [&'a str],
+}
 
 impl Fixture {
     fn new() -> Self {
@@ -809,54 +818,44 @@ impl Fixture {
         );
     }
     fn boundary_record(&self, allowed_dependencies: &[&str], allowed_dev_dependencies: &[&str]) {
-        self.write_boundary_record(
-            "boundaries/app/app.toml",
-            "BOUNDARY-App",
-            "app",
-            "app",
-            "App",
-            "concrete_landed",
+        self.write_boundary_record(BoundaryRecord {
+            relative: "boundaries/app/app.toml",
+            boundary_id: "BOUNDARY-App",
+            owner_package: "app",
+            owner_crate: "app",
+            name: "App",
+            state: "concrete_landed",
             allowed_dependencies,
             allowed_dev_dependencies,
-        );
+        });
     }
     fn boundary_record_with_owner(&self, owner_package: &str, owner_crate: &str, state: &str) {
-        self.write_boundary_record(
-            "boundaries/app/app.toml",
-            "BOUNDARY-App",
+        self.write_boundary_record(BoundaryRecord {
+            relative: "boundaries/app/app.toml",
+            boundary_id: "BOUNDARY-App",
             owner_package,
             owner_crate,
-            "App",
+            name: "App",
             state,
-            &[],
-            &[],
-        );
+            allowed_dependencies: &[],
+            allowed_dev_dependencies: &[],
+        });
     }
-    fn write_boundary_record(
-        &self,
-        relative: &str,
-        boundary_id: &str,
-        owner_package: &str,
-        owner_crate: &str,
-        name: &str,
-        state: &str,
-        allowed_dependencies: &[&str],
-        allowed_dev_dependencies: &[&str],
-    ) {
-        let allowed_dependencies = toml_array(allowed_dependencies);
-        let allowed_dev_dependencies = toml_array(allowed_dev_dependencies);
+    fn write_boundary_record(&self, record: BoundaryRecord<'_>) {
+        let allowed_dependencies = toml_array(record.allowed_dependencies);
+        let allowed_dev_dependencies = toml_array(record.allowed_dev_dependencies);
         self.write(
             "boundaries/planning.toml",
             "[planning]\ncurrent_sprint = \"K.4\"\n",
         );
         self.write(
-            relative,
+            record.relative,
             &format!(
                 r#"
-                boundary_id = "{boundary_id}"
-                owner_package = "{owner_package}"
-                owner_crate_path = "{owner_crate}"
-                name = "{name}"
+                boundary_id = "{}"
+                owner_package = "{}"
+                owner_crate_path = "{}"
+                name = "{}"
 
                 [public]
                 facade = "App"
@@ -889,8 +888,13 @@ impl Fixture {
                 review_gates = []
 
                 [status]
-                state = "{state}"
-            "#
+                state = "{}"
+            "#,
+                record.boundary_id,
+                record.owner_package,
+                record.owner_crate,
+                record.name,
+                record.state,
             ),
         );
     }
