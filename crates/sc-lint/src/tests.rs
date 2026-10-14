@@ -3795,13 +3795,21 @@ fn test_issue_199_named_membership_reproduces_then_passes() {
     assert_eq!(envelope["data"]["selector"], "fast");
 }
 
-#[cfg(unix)]
 #[test]
 fn test_issue_197_cross_target_execution_reproduces_then_passes() {
-    let config = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n\
-        [[tool.sc-lint.lint]]\nname = \"win-clippy\"\ncommand = [\"cargo\", \"clippy\", \"--workspace\", \"--\", \"-D\", \"warnings\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\n\n\
-        [[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n";
     let tools = profile_fixture("tools");
+    // Command does not resolve a bare `cargo` to `cargo.cmd` on Windows, so the
+    // Windows shim is named by its full path; Unix finds the shim on PATH.
+    let cargo = if cfg!(windows) {
+        tools.join("cargo.cmd").display().to_string()
+    } else {
+        "cargo".to_string()
+    };
+    let config = format!(
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n\
+        [[tool.sc-lint.lint]]\nname = \"win-clippy\"\ncommand = [{cargo:?}, \"clippy\", \"--workspace\", \"--\", \"-D\", \"warnings\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\n\n\
+        [[tool.sc-lint.test]]\nname = \"test\"\ncommand = [{cargo:?}, \"test\"]\n"
+    );
     let path = std::env::join_paths(std::iter::once(tools).chain(std::env::split_paths(
         &std::env::var_os("PATH").expect("PATH is set"),
     )))
@@ -3814,7 +3822,7 @@ fn test_issue_197_cross_target_execution_reproduces_then_passes() {
         ("SC_LINT_SHIM_LOG", log.clone().into_os_string()),
     ];
     let (_fixture, output) =
-        issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
+        issue_run_consumer_lint(&config, &["--platform-scope", "windows"], &envs);
     assert_eq!(
         output.status.code(),
         Some(0),
@@ -3842,7 +3850,7 @@ fn test_issue_197_cross_target_execution_reproduces_then_passes() {
             ("SC_LINT_SHIM_NO_XWIN", OsString::from("1")),
         ];
         let (_fixture, output) =
-            issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
+            issue_run_consumer_lint(&config, &["--platform-scope", "windows"], &envs);
         assert_eq!(
             output.status.code(),
             Some(i32::from(crate::consts::EXIT_CAPABILITY)),
