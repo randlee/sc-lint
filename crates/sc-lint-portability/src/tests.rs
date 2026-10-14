@@ -2386,6 +2386,23 @@ fn issue372_filter_precedence_and_empty() {
     .expect("filtering keeps optional adapter validation independent");
     assert!(excluded.findings.is_empty());
 
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
+        "PORT-010" = ["crates\\example\\src\\lib.rs"]
+        "#,
+    );
+    let per_rule_only = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-010"),
+    )
+    .expect("a per-rule backslash exclusion works with a rule filter");
+    assert!(per_rule_only.findings.is_empty());
+
     fixture.write_lint_config("[tool.sc-lint.analyzers.portability]\n");
     let nonmatching = analyze_workspace_configured(
         &AnalyzeOptions {

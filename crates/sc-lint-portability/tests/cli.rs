@@ -58,38 +58,6 @@ fn run_invalid_adapter_config(config: &str) -> std::process::Output {
         .unwrap()
 }
 
-fn run_excluded_workspace(config: &str, extra_args: &[&str]) -> std::process::Output {
-    let root = TempDir::new().unwrap();
-    fs::write(
-        root.path().join("Cargo.toml"),
-        "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
-    )
-    .unwrap();
-    let package = root.path().join("crates/example");
-    fs::create_dir_all(package.join("src")).unwrap();
-    fs::write(
-        package.join("Cargo.toml"),
-        "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
-    )
-    .unwrap();
-    fs::write(
-        package.join("src/lib.rs"),
-        "pub fn path() { let _ = \"/home/user/file\"; }\n",
-    )
-    .unwrap();
-    let config_path = root.path().join("sc-lint.toml");
-    fs::write(&config_path, config).unwrap();
-
-    Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
-        .args(["analyze", "--root"])
-        .arg(root.path())
-        .arg("--config")
-        .arg(config_path)
-        .args(extra_args)
-        .output()
-        .unwrap()
-}
-
 #[test]
 fn unknown_rule_filter_exits_two_and_prefixes_error() {
     let output = run_analyzer(
@@ -197,18 +165,62 @@ fn issue372_cli_configured_pair() {
 
 #[test]
 fn cli_excludes_windows_separator_paths_with_a_rule_filter() {
-    let output = run_excluded_workspace(
+    let root = TempDir::new().unwrap();
+    fs::write(
+        root.path().join("Cargo.toml"),
+        "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
+    )
+    .unwrap();
+    let package = root.path().join("crates/example");
+    fs::create_dir_all(package.join("src")).unwrap();
+    fs::write(
+        package.join("Cargo.toml"),
+        "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join("src/lib.rs"),
+        "pub fn path() { let _ = \"/home/user/file\"; }\n",
+    )
+    .unwrap();
+    let config_path = root.path().join("sc-lint.toml");
+    let run = |config: &str| {
+        fs::write(&config_path, config).unwrap();
+        Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
+            .args(["analyze", "--root"])
+            .arg(root.path())
+            .arg("--config")
+            .arg(&config_path)
+            .args(["--format", "json"])
+            .args(["--rule-filter", "PORT-006"])
+            .output()
+            .unwrap()
+    };
+
+    let baseline = run("[tool.sc-lint.analyzers.portability]\n");
+    assert_eq!(baseline.status.code(), Some(0));
+    let baseline_report: serde_json::Value = serde_json::from_slice(&baseline.stdout).unwrap();
+    assert!(
+        baseline_report["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|finding| finding["rule_id"] == "PORT-006"),
+        "the unexcluded fixture must report PORT-006: {baseline_report}"
+    );
+    assert_eq!(baseline_report["status"], "fail");
+
+    let excluded = run(
         r#"[tool.sc-lint.analyzers.portability]
 exclude_paths = ["crates\\example\\src\\lib.rs"]
 "#,
-        &["--rule-filter", "PORT-006"],
     );
 
-    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(excluded.status.code(), Some(0));
+    let excluded_report: serde_json::Value = serde_json::from_slice(&excluded.stdout).unwrap();
+    assert_eq!(excluded_report["status"], "pass");
     assert!(
-        !String::from_utf8(output.stdout)
-            .unwrap()
-            .contains("PORT-006"),
+        excluded_report["findings"].as_array().unwrap().is_empty(),
         "excluded file was still reported"
     );
 }
