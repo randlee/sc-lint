@@ -93,7 +93,8 @@ def _schema_value(value: object, schema: dict, label: str) -> None:
         "array": lambda item: isinstance(item, list),
     }
     if kind is not None and not any(matches_type[name](value) for name in accepted_types):
-        expected = " or ".join(accepted_types)
+        articles = {"object": "an object", "string": "a string", "boolean": "a boolean", "array": "an array"}
+        expected = " or ".join(articles[name] for name in accepted_types)
         raise ValueError(f"{label} must be {expected}")
     if "pattern" in schema and isinstance(value, str) and not re.fullmatch(schema["pattern"], value): raise ValueError(f"{label} does not match {schema['pattern']}")
     if "oneOf" in schema:
