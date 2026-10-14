@@ -271,6 +271,250 @@ fn assert_failed_findings(
     }
 }
 
+#[test]
+fn issue136_optional_config_matrix() {
+    let absent = Fixture::new();
+    absent.workspace();
+    absent.remove_workspace_homepage();
+    let baseline = analyze(&absent, Some("manifests")).expect("absent policy analyzes");
+    assert!(
+        !baseline.findings.is_empty(),
+        "baseline preserves existing findings"
+    );
+
+    let empty = Fixture::new();
+    empty.workspace();
+    empty.remove_workspace_homepage();
+    empty.write(
+        "sc-lint.toml",
+        &policy(
+            "manifest_dependency_allowlists = []\n\
+             global_dependency_ownership = []\n\
+             manifest_section_rules = []",
+        ),
+    );
+    let present_empty = analyze(&empty, Some("manifests")).expect("empty policy analyzes");
+    assert_eq!(
+        serde_json::to_vec(&baseline.findings).expect("baseline serializes"),
+        serde_json::to_vec(&present_empty.findings).expect("empty policy serializes"),
+        "absent and present-empty policy preserve legacy findings byte-for-byte"
+    );
+
+    let enforcement = Fixture::new();
+    enforcement.workspace();
+    enforcement.boundary_record_for("app", "app", "concrete_landed");
+    enforcement.boundary_record_for("dep", "dep", "concrete_landed");
+    enforcement.write(
+        "sc-lint.toml",
+        &policy(
+            r#"
+                [[manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                allowed_dependencies = []
+
+                [[manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                allowed_dependencies = ["dep"]
+
+                [[global_dependency_ownership]]
+                dependency = "dep"
+                allowed_manifest_paths = []
+                allowed_source_roots = []
+                manifest_message = "dep is not declared here"
+                source_message = "dep is not imported here"
+
+                [[manifest_section_rules]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                dependency_package = "dep"
+                allowed_sections = []
+                message = "dep is forbidden in every section"
+            "#,
+        ),
+    );
+    let enforced = analyze(
+        &enforcement,
+        Some("SCB-MANIFEST-003,SCB-MANIFEST-004,SCB-MANIFEST-005,SCB-MANIFEST-006"),
+    )
+    .expect("policy enforces");
+    let ids = finding_ids(&enforced);
+    assert_eq!(
+        enforced.status,
+        ReportStatus::Fail,
+        "new rules default to fail"
+    );
+    for rule in [
+        RuleId::ScbManifest003,
+        RuleId::ScbManifest004,
+        RuleId::ScbManifest005,
+        RuleId::ScbManifest006,
+    ] {
+        assert!(ids.contains(&rule), "{rule:?} is enforced");
+    }
+    assert!(
+        enforced
+            .findings
+            .iter()
+            .any(|finding| { finding.message.contains("duplicate allowlist owner") })
+    );
+    assert!(enforced.findings.iter().any(|finding| {
+        finding
+            .message
+            .contains("missing active-owner allowlist entry")
+    }));
+    let only_allowlist =
+        analyze(&enforcement, Some("SCB-MANIFEST-003")).expect("rule filter selects policy rule");
+    assert!(
+        only_allowlist
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id == RuleId::ScbManifest003)
+    );
+
+    let inactive = Fixture::new();
+    inactive.workspace();
+    inactive.boundary_record_for("app", "app", "planned");
+    inactive.write(
+        "sc-lint.toml",
+        &policy(
+            r#"
+                [[manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                allowed_dependencies = ["dep"]
+            "#,
+        ),
+    );
+    assert!(
+        analyze(&inactive, Some("SCB-MANIFEST-006"))
+            .expect("inactive owner analyzes")
+            .findings
+            .iter()
+            .any(|finding| finding
+                .message
+                .contains("exactly one active boundary record"))
+    );
+
+    let nonworkspace = Fixture::new();
+    nonworkspace.workspace();
+    nonworkspace.boundary_record_for("app", "app", "concrete_landed");
+    nonworkspace.write(
+        "sc-lint.toml",
+        &policy(
+            r#"
+                [[manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/missing/Cargo.toml"
+                allowed_dependencies = []
+            "#,
+        ),
+    );
+    assert!(
+        analyze(&nonworkspace, Some("SCB-MANIFEST-006"))
+            .expect("nonworkspace owner analyzes")
+            .findings
+            .iter()
+            .any(|finding| finding.message.contains("not a workspace member"))
+    );
+
+    for key in [
+        "manifest_dependency_allowlists",
+        "global_dependency_ownership",
+        "manifest_section_rules",
+    ] {
+        let malformed = Fixture::new();
+        malformed.workspace();
+        malformed.write("sc-lint.toml", &policy(&format!("{key} = [\"invalid\"]")));
+        assert!(
+            analyze(&malformed, Some("manifests")).is_err(),
+            "{key} rejects non-table entries"
+        );
+    }
+
+    let ignored_nested = Fixture::new();
+    ignored_nested.workspace_with_renamed_dependency();
+    ignored_nested.boundary_record_for("app", "app", "concrete_landed");
+    ignored_nested.write(
+        "sc-lint.toml",
+        &policy(
+            r#"
+                [[manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                allowed_dependencies = ["dep"]
+                ignored = "ignored"
+
+                [manifest_dependency_allowlists.unused]
+                nested = true
+
+                [[manifest_section_rules]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                dependency_package = "dep"
+                allowed_sections = ["dependencies"]
+                message = "dep is allowed here"
+            "#,
+        ),
+    );
+    let renamed = analyze(
+        &ignored_nested,
+        Some("SCB-MANIFEST-003,SCB-MANIFEST-004,SCB-MANIFEST-005,SCB-MANIFEST-006"),
+    )
+    .expect("unknown nested keys and dependency aliases analyze");
+    assert!(
+        renamed.findings.is_empty(),
+        "alias policy applies to renamed dependencies"
+    );
+
+    let excluded = Fixture::new();
+    excluded.workspace();
+    excluded.boundary_record_for("app", "app", "concrete_landed");
+    excluded.write(
+        "sc-lint.toml",
+        &format!(
+            "{}\n\
+             [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n\
+             \"SCB-MANIFEST-003\" = [\"crates/app/Cargo.toml\"]",
+            policy(
+                r#"
+                    [[manifest_dependency_allowlists]]
+                    owner_manifest_path = "crates/app/Cargo.toml"
+                    allowed_dependencies = []
+                "#,
+            )
+        ),
+    );
+    assert!(
+        analyze(&excluded, Some("SCB-MANIFEST-003"))
+            .expect("path filtering analyzes")
+            .findings
+            .is_empty()
+    );
+
+    let restricted = Fixture::new();
+    restricted.workspace();
+    restricted.boundary_record_for("app", "app", "concrete_landed");
+    restricted.write(
+        "sc-lint.toml",
+        &policy(
+            r#"
+                [[manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                allowed_dependencies = []
+            "#,
+        ),
+    );
+    let unrelated = Fixture::new();
+    unrelated.workspace();
+    assert!(
+        finding_ids(
+            &analyze(&restricted, Some("SCB-MANIFEST-003")).expect("first workspace analyzes")
+        )
+        .contains(&RuleId::ScbManifest003)
+    );
+    assert!(
+        !finding_ids(
+            &analyze(&unrelated, Some("SCB-MANIFEST-003")).expect("second workspace analyzes")
+        )
+        .contains(&RuleId::ScbManifest003)
+    );
+}
+
 struct Fixture(TempDir);
 
 impl Fixture {
@@ -350,6 +594,121 @@ impl Fixture {
             ),
         );
     }
+    fn workspace_with_renamed_dependency(&self) {
+        self.workspace();
+        self.write(
+            "crates/app/Cargo.toml",
+            &package(
+                "app",
+                "[dependencies]\nrenamed = { package = \"dep\", path = \"../dep\" }\n",
+            ),
+        );
+        self.write(
+            "crates/app/src/lib.rs",
+            "use renamed::Dep;\npub fn make() -> Dep { Dep }\n",
+        );
+    }
+    fn remove_workspace_homepage(&self) {
+        let manifest =
+            fs::read_to_string(self.root().join("crates/app/Cargo.toml")).expect("app manifest");
+        self.write(
+            "crates/app/Cargo.toml",
+            &manifest.replace("homepage.workspace = true\n", ""),
+        );
+    }
+    fn boundary_record_for(&self, name: &str, owner: &str, state: &str) {
+        self.write(
+            "boundaries/planning.toml",
+            "[planning]\ncurrent_sprint = \"K.4\"\n",
+        );
+        self.write(
+            &format!("boundaries/{name}/{name}.toml"),
+            &format!(
+                r#"
+                boundary_id = "BOUNDARY-{name}"
+                owner_package = "{owner}"
+                owner_crate_path = "{owner}"
+                name = "{name}"
+
+                [public]
+                facade = "{name}"
+
+                [implementation]
+                type = "{name}"
+                module = "{owner}"
+                visibility = "public"
+                constructor = "none"
+
+                [composition]
+                roots = ["{name}"]
+
+                [dependencies]
+                allowed_dependents = []
+                allowed_dependencies = []
+                forbidden_edges = []
+
+                [references]
+                scope = "outside_owner_crate"
+                forbidden = []
+
+                [testing]
+                allowed_test_double_paths = []
+                forbidden_test_bypasses = []
+
+                [enforcement]
+                lint_rules = []
+                review_gates = []
+
+                [status]
+                state = "{state}"
+            "#,
+            ),
+        );
+    }
+}
+
+fn analyze(
+    fixture: &Fixture,
+    rule_filter: Option<&str>,
+) -> Result<sc_lint_boundary::FindingsReport, sc_lint_boundary::BoundaryError> {
+    analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        rule_filter,
+    )
+}
+
+fn finding_ids(report: &sc_lint_boundary::FindingsReport) -> Vec<RuleId> {
+    report
+        .findings
+        .iter()
+        .map(|finding| finding.rule_id)
+        .collect()
+}
+
+fn policy(contents: &str) -> String {
+    let contents = contents
+        .replace(
+            "[[manifest_dependency_allowlists]]",
+            "[[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]",
+        )
+        .replace(
+            "[[global_dependency_ownership]]",
+            "[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]",
+        )
+        .replace(
+            "[[manifest_section_rules]]",
+            "[[tool.sc-lint.analyzers.boundary.manifest_section_rules]]",
+        )
+        .replace(
+            "[manifest_dependency_allowlists.",
+            "[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists.",
+        );
+    format!("[tool.sc-lint.analyzers.boundary]\n{contents}")
 }
 
 fn package(name: &str, tail: &str) -> String {
