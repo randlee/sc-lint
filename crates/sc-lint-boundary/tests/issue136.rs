@@ -1,6 +1,7 @@
 use std::fs;
 
 use sc_lint_boundary::AnalyzeOptions;
+use sc_lint_boundary::BoundaryError;
 use sc_lint_boundary::RuleId;
 use sc_lint_boundary::analyze_workspace_configured;
 use sc_lint_schema::OutputFormat;
@@ -354,18 +355,62 @@ fn assert_failed_findings(
 
 #[test]
 fn issue136_optional_config_matrix() {
+    // Pre-existing findings the fixture plants: the app manifest drops
+    // homepage.workspace and its path dependency on dep carries no version.
+    let expected_baseline = [
+        (
+            RuleId::ScbManifest001,
+            "package_workspace_field_required",
+            "crates/app/Cargo.toml: set [package].homepage.workspace = true",
+        ),
+        (
+            RuleId::ScbManifest002,
+            "internal_path_dependency_version_mismatch",
+            "crates/app/Cargo.toml [dependencies.dep]: path dependency version must match target crate version \"0.1.0\"",
+        ),
+    ];
+    let missing_boundaries = Fixture::new();
+    missing_boundaries.workspace();
+    missing_boundaries.remove_workspace_homepage();
+    assert_failed_findings(
+        &analyze(&missing_boundaries, Some("manifests"))
+            .expect("absent policy analyzes without boundary records"),
+        &expected_baseline,
+    );
+
     let absent = Fixture::new();
     absent.workspace();
     absent.remove_workspace_homepage();
-    let baseline = analyze(&absent, Some("manifests")).expect("absent policy analyzes");
-    assert!(
-        !baseline.findings.is_empty(),
-        "baseline preserves existing findings"
+    // Invalid inventory: the record sits under `other/` but names owner `dep`.
+    absent.boundary_record_for("other", "dep", "concrete_landed");
+    let baseline = analyze(&absent, Some("manifests"))
+        .expect("absent policy never loads the invalid boundary inventory");
+    assert_failed_findings(&baseline, &expected_baseline);
+
+    let inventory_required = Fixture::new();
+    inventory_required.workspace();
+    inventory_required.boundary_record_for("other", "dep", "concrete_landed");
+    inventory_required.write(
+        "sc-lint.toml",
+        &policy(
+            r#"
+                [[manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                allowed_dependencies = ["dep"]
+            "#,
+        ),
     );
+    let error = analyze(&inventory_required, Some("manifests"))
+        .expect_err("an allowlist policy loads the invalid boundary inventory");
+    assert!(matches!(error, BoundaryError::InventoryLoad { .. }));
+    assert!(error.to_string().ends_with(
+        "boundaries/other/other.toml` is under owner directory `other` but declares owner_package `dep`"
+    ));
 
     let empty = Fixture::new();
     empty.workspace();
     empty.remove_workspace_homepage();
+    empty.boundary_record_for("other", "dep", "concrete_landed");
     empty.write(
         "sc-lint.toml",
         &policy(
@@ -493,17 +538,23 @@ fn issue136_optional_config_matrix() {
             .any(|finding| finding.message.contains("non-workspace allowlist owner"))
     );
 
-    for key in [
-        "manifest_dependency_allowlists",
-        "global_dependency_ownership",
-        "manifest_section_rules",
-    ] {
+    for (shape, expected) in malformed_policy_shapes() {
         let malformed = Fixture::new();
         malformed.workspace();
-        malformed.write("sc-lint.toml", &policy(&format!("{key} = [\"invalid\"]")));
+        malformed.write("sc-lint.toml", &policy(&shape));
+        let error =
+            analyze(&malformed, Some("manifests")).expect_err("malformed policy shape is rejected");
         assert!(
-            analyze(&malformed, Some("manifests")).is_err(),
-            "{key} rejects non-table entries"
+            matches!(error, BoundaryError::ManifestPolicyAnalysis { .. }),
+            "{shape}: {error:?}"
+        );
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "failed to analyze manifest policy for root `{}`: {expected}",
+                malformed.root().display()
+            ),
+            "{shape}"
         );
     }
 
@@ -1050,6 +1101,102 @@ impl Fixture {
             ),
         );
     }
+}
+
+/// Every policy family's malformed shapes: wrong outer type, non-table entry,
+/// each missing required field and each wrongly typed field, with the exact
+/// error the parser reports.
+fn malformed_policy_shapes() -> Vec<(String, String)> {
+    const OUTER: &str = "in [tool.sc-lint.analyzers.boundary] must be";
+    let mut shapes = Vec::new();
+    for key in [
+        "manifest_dependency_allowlists",
+        "global_dependency_ownership",
+        "manifest_section_rules",
+    ] {
+        for outer in ["\"invalid\"", "{ owner = \"app\" }", "3"] {
+            shapes.push((
+                format!("{key} = {outer}"),
+                format!("boundary: `{key}` {OUTER} an array of tables"),
+            ));
+        }
+        shapes.push((
+            format!("{key} = [\"invalid\"]"),
+            format!("boundary: `{key}[0]` {OUTER} a table"),
+        ));
+    }
+    shapes.extend([
+        (
+            "[[manifest_dependency_allowlists]]\nallowed_dependencies = []",
+            "manifest_dependency_allowlists[0].owner_manifest_path must be a non-empty string",
+        ),
+        (
+            "[[manifest_dependency_allowlists]]\nowner_manifest_path = 1\nallowed_dependencies = []",
+            "manifest_dependency_allowlists[0].owner_manifest_path must be a non-empty string",
+        ),
+        (
+            "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"",
+            "manifest_dependency_allowlists[0].allowed_dependencies must be an array of non-empty strings",
+        ),
+        (
+            "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nallowed_dependencies = \"dep\"",
+            "manifest_dependency_allowlists[0].allowed_dependencies must be an array of strings",
+        ),
+        (
+            "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nallowed_dependencies = [1]",
+            "manifest_dependency_allowlists[0].allowed_dependencies[0] must be a string",
+        ),
+        (
+            "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nallowed_dependencies = []\nboundary_record_path = 1",
+            "manifest_dependency_allowlists[0].boundary_record_path must be a non-empty string or an array of non-empty strings",
+        ),
+        (
+            "[[global_dependency_ownership]]\nmanifest_message = \"m\"\nsource_message = \"s\"",
+            "global_dependency_ownership[0].dependency must be a non-empty string",
+        ),
+        (
+            "[[global_dependency_ownership]]\ndependency = 1\nmanifest_message = \"m\"\nsource_message = \"s\"",
+            "global_dependency_ownership[0].dependency must be a non-empty string",
+        ),
+        (
+            "[[global_dependency_ownership]]\ndependency = \"dep\"\nsource_message = \"s\"",
+            "global_dependency_ownership[0].manifest_message must be a non-empty string",
+        ),
+        (
+            "[[global_dependency_ownership]]\ndependency = \"dep\"\nmanifest_message = \"m\"",
+            "global_dependency_ownership[0].source_message must be a non-empty string",
+        ),
+        (
+            "[[global_dependency_ownership]]\ndependency = \"dep\"\nallowed_manifest_paths = \"x\"\nmanifest_message = \"m\"\nsource_message = \"s\"",
+            "global_dependency_ownership[0].allowed_manifest_paths must be an array of strings",
+        ),
+        (
+            "[[global_dependency_ownership]]\ndependency = \"dep\"\nallowed_source_roots = [1]\nmanifest_message = \"m\"\nsource_message = \"s\"",
+            "global_dependency_ownership[0].allowed_source_roots[0] must be a string",
+        ),
+        (
+            "[[manifest_section_rules]]\ndependency_package = \"dep\"\nmessage = \"m\"",
+            "manifest_section_rules[0].owner_manifest_path must be a non-empty string",
+        ),
+        (
+            "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nmessage = \"m\"",
+            "manifest_section_rules[0].dependency_package must be a non-empty string",
+        ),
+        (
+            "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\ndependency_package = \"dep\"",
+            "manifest_section_rules[0].message must be a non-empty string",
+        ),
+        (
+            "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\ndependency_package = \"dep\"\nmessage = false",
+            "manifest_section_rules[0].message must be a non-empty string",
+        ),
+        (
+            "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\ndependency_package = \"dep\"\nallowed_sections = \"dependencies\"\nmessage = \"m\"",
+            "manifest_section_rules[0].allowed_sections must be an array of strings",
+        ),
+    ]
+    .map(|(shape, expected)| (shape.to_owned(), expected.to_owned())));
+    shapes
 }
 
 fn analyze(
