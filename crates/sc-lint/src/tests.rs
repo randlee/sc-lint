@@ -3189,11 +3189,10 @@ fn test_profile_platform_scope_matrix() {
 }
 
 #[test]
-fn test_profile_targeted_cargo_program_preserves_explicit_windows_shim() {
-    let cargo = profile_fixture("tools/cargo.cmd").display().to_string();
+fn test_profile_targeted_commands_require_literal_cargo() {
     let steps = [plan_step(
         "win-check",
-        &[&cargo, "check", "--workspace"],
+        &["cargo", "check", "--workspace"],
         Some(Platform::Windows),
         Some("x86_64-pc-windows-msvc"),
     )];
@@ -3203,7 +3202,7 @@ fn test_profile_targeted_cargo_program_preserves_explicit_windows_shim() {
     assert_eq!(
         planned_argv(&windows, "win-check"),
         [
-            cargo.clone(),
+            "cargo".to_string(),
             "check".to_string(),
             "--workspace".to_string(),
             "--target".to_string(),
@@ -3216,7 +3215,7 @@ fn test_profile_targeted_cargo_program_preserves_explicit_windows_shim() {
     assert_eq!(
         planned_argv(&unix, "win-check"),
         [
-            cargo,
+            "cargo".to_string(),
             "xwin".to_string(),
             "check".to_string(),
             "--workspace".to_string(),
@@ -3225,12 +3224,12 @@ fn test_profile_targeted_cargo_program_preserves_explicit_windows_shim() {
         ]
     );
     assert_eq!(
-        CargoVerb::from_argv(&["cargo.sh".to_string(), "check".to_string()]),
+        CargoVerb::from_argv(&["cargo.cmd".to_string(), "check".to_string()]),
         None
     );
     assert_eq!(
-        CargoVerb::from_argv(&["cargo.exe".to_string(), "check".to_string()]),
-        Some(CargoVerb::Check)
+        CargoVerb::from_argv(&["tools/cargo.exe".to_string(), "check".to_string()]),
+        None
     );
 }
 
@@ -3894,6 +3893,58 @@ fn issue_failure_context(output: &std::process::Output) -> String {
     )
 }
 
+fn issue_native_cargo_shim() -> TempDir {
+    let directory = TempDir::new().expect("native cargo shim directory");
+    let source = directory.path().join("cargo_shim.rs");
+    let executable = directory
+        .path()
+        .join(if cfg!(windows) { "cargo.exe" } else { "cargo" });
+    fs::write(
+        &source,
+        r#"
+use std::io::Write;
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(std::env::var_os("SC_LINT_SHIM_LOG").expect("shim log"))
+        .expect("open shim log");
+    writeln!(log, "{}", args.join(" ")).expect("write shim log");
+    let first = args.first().map(String::as_str);
+    let second = args.get(1).map(String::as_str);
+    if first == Some("xwin") && second == Some("--version") {
+        let no_xwin = std::env::var("SC_LINT_SHIM_NO_XWIN").is_ok_and(|value| value == "1");
+        std::process::exit(i32::from(no_xwin));
+    }
+    let verb = if first == Some("xwin") { second } else { first }.unwrap_or_default();
+    if let Ok(fail_verb) = std::env::var("SC_LINT_SHIM_FAIL_VERB")
+        && !fail_verb.is_empty()
+        && verb == fail_verb
+    {
+        eprintln!("shim: {verb} failed as requested");
+        std::process::exit(1);
+    }
+}
+"#,
+    )
+    .expect("write native cargo shim source");
+    let compilation = ProcessCommand::new("rustc")
+        .args(["--edition=2024"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .expect("compile native cargo shim");
+    assert!(
+        compilation.status.success(),
+        "native cargo shim compilation failed: {}",
+        String::from_utf8_lossy(&compilation.stderr)
+    );
+    directory
+}
+
 #[test]
 fn test_issue_199_named_membership_reproduces_then_passes() {
     let config = fs::read_to_string(profile_fixture("named-membership.toml")).expect("fixture");
@@ -3918,68 +3969,16 @@ fn test_issue_199_named_membership_reproduces_then_passes() {
     assert_eq!(envelope["data"]["selector"], "fast");
 }
 
-/// A stand-in `cargo` for planner execution tests. It records its argv and
-/// exits per environment; it never compiles anything.
-///   SC_LINT_SHIM_LOG        file that receives one argv line per invocation
-///   SC_LINT_SHIM_NO_XWIN=1  `cargo xwin --version` fails (xwin not installed)
-///   SC_LINT_SHIM_FAIL_VERB  exit 1 when the first argument (or the verb after
-///                           `xwin`) equals this value
-const CARGO_SHIM_SOURCE: &str = r#"
-use std::io::Write;
-
-fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let log = std::env::var_os("SC_LINT_SHIM_LOG").expect("SC_LINT_SHIM_LOG must name the argv log");
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log)
-        .expect("open argv log");
-    writeln!(file, "{}", args.join(" ")).expect("append argv line");
-
-    let first = args.first().map(String::as_str);
-    let second = args.get(1).map(String::as_str);
-    if first == Some("xwin") && second == Some("--version") {
-        let no_xwin = std::env::var("SC_LINT_SHIM_NO_XWIN").is_ok_and(|value| value == "1");
-        std::process::exit(i32::from(no_xwin));
-    }
-    let verb = if first == Some("xwin") { second } else { first }.unwrap_or_default();
-    if let Ok(fail_verb) = std::env::var("SC_LINT_SHIM_FAIL_VERB")
-        && !fail_verb.is_empty()
-        && verb == fail_verb
-    {
-        eprintln!("shim: {verb} failed as requested");
-        std::process::exit(1);
-    }
-}
-"#;
-
 #[test]
 fn test_issue_197_cross_target_execution_reproduces_then_passes() {
-    // A cross-target step must name a literal `cargo`, and Command resolves only
-    // `cargo.exe` on Windows, so the shim is a native executable on every host.
-    let tools = TempDir::new().expect("cargo shim dir");
-    let source = tools.path().join("cargo_shim.rs");
-    fs::write(&source, CARGO_SHIM_SOURCE).expect("cargo shim source");
-    let shim = tools
-        .path()
-        .join(format!("cargo{}", std::env::consts::EXE_SUFFIX));
-    let compilation = ProcessCommand::new("rustc")
-        .args(["--edition=2024"])
-        .arg(&source)
-        .arg("-o")
-        .arg(&shim)
-        .output()
-        .expect("compile native cargo shim");
-    assert!(
-        compilation.status.success(),
-        "native cargo shim compilation failed: {}",
-        String::from_utf8_lossy(&compilation.stderr)
+    let shim = issue_native_cargo_shim();
+    let cargo = "cargo";
+    let config = format!(
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n\
+        [[tool.sc-lint.lint]]\nname = \"win-clippy\"\ncommand = [{cargo:?}, \"clippy\", \"--workspace\", \"--\", \"-D\", \"warnings\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\n\n\
+        [[tool.sc-lint.test]]\nname = \"test\"\ncommand = [{cargo:?}, \"test\"]\n"
     );
-    let config = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n\
-        [[tool.sc-lint.lint]]\nname = \"win-clippy\"\ncommand = [\"cargo\", \"clippy\", \"--workspace\", \"--\", \"-D\", \"warnings\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\n\n\
-        [[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n";
-    let path = std::env::join_paths(std::iter::once(tools.path().to_path_buf()).chain(
+    let path = std::env::join_paths(std::iter::once(shim.path().to_path_buf()).chain(
         std::env::split_paths(&std::env::var_os("PATH").expect("PATH is set")),
     ))
     .expect("shimmed PATH");
@@ -3991,7 +3990,7 @@ fn test_issue_197_cross_target_execution_reproduces_then_passes() {
         ("SC_LINT_SHIM_LOG", log.clone().into_os_string()),
     ];
     let (_fixture, output) =
-        issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
+        issue_run_consumer_lint(&config, &["--platform-scope", "windows"], &envs);
     assert_eq!(
         output.status.code(),
         Some(0),
@@ -4009,6 +4008,26 @@ fn test_issue_197_cross_target_execution_reproduces_then_passes() {
         "expected `{expected}` in recorded argv:\n{argv}"
     );
 
+    let failed_log = log_dir.path().join("failed-clippy.log");
+    let envs = [
+        ("PATH", path.clone()),
+        ("SC_LINT_SHIM_LOG", failed_log.clone().into_os_string()),
+        ("SC_LINT_SHIM_FAIL_VERB", OsString::from("clippy")),
+    ];
+    let (_fixture, output) =
+        issue_run_consumer_lint(&config, &["--platform-scope", "windows"], &envs);
+    assert_eq!(
+        output.status.code(),
+        Some(i32::from(crate::consts::EXIT_BACKEND_FAILURE)),
+        "a failed native clippy invocation must be reported\n{}",
+        issue_failure_context(&output)
+    );
+    let recorded = fs::read_to_string(&failed_log).expect("failed shim recorded argv");
+    assert!(
+        recorded.lines().any(|line| line == expected),
+        "expected `{expected}` in recorded argv:\n{recorded}"
+    );
+
     // Planted negative: without cargo-xwin the run is a capability failure,
     // and the clippy step never ran (it was not silently skipped).
     if Platform::host() != Platform::Windows {
@@ -4019,7 +4038,7 @@ fn test_issue_197_cross_target_execution_reproduces_then_passes() {
             ("SC_LINT_SHIM_NO_XWIN", OsString::from("1")),
         ];
         let (_fixture, output) =
-            issue_run_consumer_lint(config, &["--platform-scope", "windows"], &envs);
+            issue_run_consumer_lint(&config, &["--platform-scope", "windows"], &envs);
         assert_eq!(
             output.status.code(),
             Some(i32::from(crate::consts::EXIT_CAPABILITY)),

@@ -303,7 +303,7 @@ impl fmt::Display for Target {
     }
 }
 
-/// The cargo verb of a `cargo check` or `cargo clippy` command.
+/// The cargo verb of a literal `cargo check` or `cargo clippy` command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CargoVerb {
     /// `cargo check`
@@ -313,14 +313,13 @@ pub enum CargoVerb {
 }
 
 impl CargoVerb {
-    /// Derives the verb from a `cargo check|clippy ...` argv.
+    /// Derives the verb only from a literal `cargo check|clippy ...` argv.
     ///
-    /// The program must be named `cargo`, `cargo.cmd`, or `cargo.exe`; an
-    /// explicit path to one of those names is accepted. Wrappers, toolchain
-    /// overrides (`cargo +nightly`) and other verbs yield `None`.
+    /// Wrappers, toolchain overrides (`cargo +nightly`) and other verbs yield
+    /// `None`.
     pub fn from_argv(argv: &[String]) -> Option<Self> {
         match argv {
-            [program, verb, ..] if is_cargo_program(program) => match verb.as_str() {
+            [program, verb, ..] if program == "cargo" => match verb.as_str() {
                 "check" => Some(Self::Check),
                 "clippy" => Some(Self::Clippy),
                 _ => None,
@@ -336,15 +335,6 @@ impl CargoVerb {
             Self::Clippy => "clippy",
         }
     }
-}
-
-fn is_cargo_program(program: &str) -> bool {
-    let path = Path::new(program);
-    path.file_stem().is_some_and(|stem| stem == "cargo")
-        && matches!(
-            path.extension().and_then(|extension| extension.to_str()),
-            None | Some("cmd" | "exe")
-        )
 }
 
 /// A command the planner decided to run on this host.
@@ -466,7 +456,7 @@ fn embeds_target(argv: &[String]) -> bool {
 /// # Errors
 /// Returns the first violated rule: `TARGET_REQUIRES_PLATFORM`,
 /// `TARGET_OS_MISMATCH`, or `UNSUPPORTED_COMMAND_SHAPE` (a target needs a
-/// cargo check|clippy command with no embedded `--target`).
+/// literal `cargo check|clippy` command with no embedded `--target`).
 pub(crate) fn validate_lint_step(step: &ConsumerProfileStep) -> Result<(), ProfilePlanError> {
     let Some(target) = step.target() else {
         return Ok(());
@@ -494,9 +484,9 @@ pub(crate) fn validate_lint_step(step: &ConsumerProfileStep) -> Result<(), Profi
         return Err(invalid_shape(
             name,
             format!(
-                "step `{name}` declares a target but its command is not a cargo check or cargo clippy command"
+                "step `{name}` declares a target but its command is not a literal `cargo check` or `cargo clippy`"
             ),
-            "Targets apply only to cargo check or cargo clippy commands; remove the target or use one of those commands.",
+            "Targets apply only to `[\"cargo\", \"check\"|\"clippy\", ...]`; remove the target or use that command.",
         ));
     }
     if embeds_target(step.command()) {
@@ -844,7 +834,7 @@ fn planned(
     })
 }
 
-/// Builds `<cargo-program> [xwin] <verb> <declared args> --target <triple> [-- <rest>]`.
+/// Builds `cargo [xwin] <verb> <declared args> --target <triple> [-- <rest>]`.
 ///
 /// Arguments after the verb are preserved literally; `--target` is inserted
 /// before a `--` separator so it stays a cargo flag.
@@ -853,15 +843,17 @@ fn targeted_argv(
     target: &Target,
     xwin: bool,
 ) -> Result<(OsString, Vec<OsString>), ProfilePlanError> {
-    let (Some(program), Some(verb), Some(tail)) = (
-        step.command().first(),
+    let (Some(verb), Some(tail)) = (
         CargoVerb::from_argv(step.command()),
         step.command().get(2..),
     ) else {
         return Err(invalid_shape(
             step.name(),
-            format!("step `{}` has no cargo check/clippy verb", step.name()),
-            "Use a `cargo check` or `cargo clippy` command.",
+            format!(
+                "step `{}` has no literal cargo check/clippy verb",
+                step.name()
+            ),
+            "Use a literal `cargo check` or `cargo clippy` command.",
         ));
     };
     let separator = tail
@@ -877,7 +869,7 @@ fn targeted_argv(
     args.push("--target".into());
     args.push(target.as_str().into());
     args.extend(tail[separator..].iter().map(OsString::from));
-    Ok((program.into(), args))
+    Ok(("cargo".into(), args))
 }
 
 /// A command is decoded and validated at the TOML boundary, so profile
