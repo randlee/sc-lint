@@ -213,7 +213,7 @@ impl BackendOutputError {
                 binary.display()
             ),
             Self::ProcessTreeStop(error) => format!(
-                "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited: {error}",
+                "could not stop backend companion `{expected_name}` at `{}` while stopping its probe process tree after output drain timed out during `{argument}`: {error}",
                 binary.display()
             ),
             Self::Timeout { wait } => format!(
@@ -528,6 +528,18 @@ mod tests {
             ),
             "expected typed timeout, got {error:?}"
         );
+    }
+
+    #[test]
+    fn process_tree_stop_error_names_the_output_drain_timeout() {
+        let error = BackendOutputError::ProcessTreeStop(io::Error::other("stop failed"));
+
+        let message = error.to_probe_message(Path::new("backend-bin"), "backend", "--help");
+
+        assert!(
+            message.contains("while stopping its probe process tree after output drain timed out")
+        );
+        assert!(!message.contains("process exited"));
     }
 
     #[cfg(target_os = "linux")]
