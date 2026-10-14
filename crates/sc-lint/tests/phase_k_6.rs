@@ -101,7 +101,12 @@ fn windows_log_value<'a>(captured: &'a str, name: &str) -> &'a str {
 
 #[cfg(windows)]
 fn assert_windows_logged_path(captured: &str, name: &str, expected: &Path) {
-    let actual = Path::new(windows_log_value(captured, name))
+    assert_windows_same_path(name, windows_log_value(captured, name), expected);
+}
+
+#[cfg(windows)]
+fn assert_windows_same_path(name: &str, logged: &str, expected: &Path) {
+    let actual = Path::new(logged)
         .canonicalize()
         .expect("canonical logged Windows path");
     let expected = expected
@@ -776,21 +781,10 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     assert_windows_logged_path(&captured, "cwd", &root);
     assert_windows_logged_path(&captured, "bin", &managed_binary);
     assert_eq!(windows_log_value(&captured, "custom"), "preserved");
-    assert!(
-        windows_log_value(&captured, "path")
-            .to_ascii_lowercase()
-            .starts_with(
-                &format!(
-                    "{};",
-                    managed
-                        .canonicalize()
-                        .expect("canonical managed path")
-                        .display()
-                )
-                .to_ascii_lowercase()
-            ),
-        "{captured}"
-    );
+    let (first_path_entry, _) = windows_log_value(&captured, "path")
+        .split_once(';')
+        .unwrap_or_else(|| panic!("managed directory must prefix the child PATH: {captured}"));
+    assert_windows_same_path("first path entry", first_path_entry, &managed);
     assert_eq!(windows_log_value(&captured, "arg1"), "two words");
     assert_eq!(windows_log_value(&captured, "arg2"), "tail");
 }
