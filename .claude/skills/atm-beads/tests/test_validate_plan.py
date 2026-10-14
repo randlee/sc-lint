@@ -128,6 +128,17 @@ class ValidatePlan(Repo):
         out = self.run_beads(VALID + [container("x-t-3")])
         self.assertEqual((out.returncode, out.stdout), (5, "x-t-3: stage:sprint bead of phase-t that the plan file does not list\n"))
 
+        folded = container("x-t-folded")
+        folded.update(status="closed", close_reason="folded into x-t-1")
+        out = self.run_beads(VALID + [folded])
+        self.assertEqual((out.returncode, out.stdout), (0, "plan valid: 2 sprints\n"), out.stderr)
+
+        closed = container("x-t-closed")
+        closed.update(status="closed", close_reason="completed")
+        out = self.run_beads(VALID + [closed])
+        self.assertEqual((out.returncode, out.stdout),
+                         (5, "x-t-closed: stage:sprint bead of phase-t that the plan file does not list\n"))
+
     def test_an_edge_to_the_predecessor_sprint_bead_also_satisfies_depends_on(self):
         beads = broken("x-t-2.group-dev", lambda b: b.update(dependencies=[{"dependency_type": "blocks", "id": "x-t-1"}]))
         self.assertEqual(self.run_beads(beads).returncode, 0)
