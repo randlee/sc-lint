@@ -401,6 +401,7 @@ fn issue385_rule_path_exclusion_retains_other_rule() {
         format: OutputFormat::Json,
     })
     .unwrap();
+    assert_eq!(baseline.status, ReportStatus::Fail);
     assert_eq!(
         baseline
             .findings
@@ -419,6 +420,18 @@ fn issue385_rule_path_exclusion_retains_other_rule() {
     );
 
     fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"crates/example/src/lib.rs\"]\n",
+    );
+    let whole_file_excluded = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .unwrap();
+
+    assert_eq!(whole_file_excluded.status, ReportStatus::Pass);
+    assert!(whole_file_excluded.findings.is_empty());
+
+    fixture.write_lint_config(
         r#"
         [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
         "PORT-007" = ["crates/example/src/lib.rs"]
@@ -430,6 +443,7 @@ fn issue385_rule_path_exclusion_retains_other_rule() {
     })
     .unwrap();
 
+    assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(report.findings.len(), 1);
     assert_eq!(report.findings[0].rule_id, RuleId::Port006);
 }
