@@ -128,6 +128,11 @@ fn loads_empty_inventory_without_boundaries_directory() {
 fn rejects_nested_planning_metadata() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
+
+    let inventory = load_boundary_inventory(fixture.root())
+        .expect("root planning metadata alone loads before nested metadata is added");
+    assert_eq!(inventory.planning.planning.current_sprint, "A.6");
+
     let nested_planning = "boundaries/sc-lint-boundary/planning.toml";
     fixture.write(nested_planning, "[planning]\ncurrent_sprint = \"A.6\"\n");
 
