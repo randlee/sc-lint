@@ -33,10 +33,9 @@ with open(os.environ["FAKE_GH_LOG"], "a") as log:
     log.write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")
 if os.environ.get("FAKE_GH_FAIL"):
     sys.exit("gh: HTTP 502")
-if sys.argv[1] == "stack" and os.getcwd() in os.environ.get("FAKE_GH_NOT_STACK", "").split(os.pathsep):
-    sys.exit("current branch is not part of a stack")
-key = {"api": "FAKE_GH_STACKS", "stack": "FAKE_GH_VIEW"}[sys.argv[1]]
-sys.stdout.write(open(os.environ[key]).read())
+if sys.argv[1] != "api":
+    sys.exit("unexpected gh " + sys.argv[1])
+sys.stdout.write(open(os.environ["FAKE_GH_STACKS"]).read())
 """
 
 
@@ -56,7 +55,7 @@ class Queues:
         self.worktree = ws.root / f"wt-{phase}"
         subprocess.run(["git", "worktree", "add", "-q", "-b", self.trunk, str(self.worktree)], cwd=ws.root, check=True)
         self.tasks([])
-        self.github([], [])
+        self.github([])
         self.state = self.dir / "state.json"
 
     def sprint(self, n: int) -> str:
@@ -70,16 +69,14 @@ class Queues:
                  "reminder_count": reminders} for t in task_ids]
         (self.dir / "tasks.json").write_text(json.dumps(rows))
 
-    def github(self, stacks: list[dict], layers: list[dict], trunk: str | None = None) -> None:
+    def github(self, stacks: list[dict]) -> None:
         (self.dir / "stacks.json").write_text(json.dumps([stacks]))   # --paginate --slurp: a list of pages
-        view = {"trunk": trunk or self.trunk, "currentBranch": self.trunk, "branches": layers}
-        (self.dir / "view.json").write_text(json.dumps(view))
 
     def run(self, *args: str, env: dict | None = None) -> subprocess.CompletedProcess:
         bin_dir = self.ws.root / "fake-bin"
         e = {**self.ws.env, "PATH": f"{bin_dir}{os.pathsep}{self.ws.env['PATH']}", "ATM_IDENTITY": "lead1",
              "FAKE_ATM_TASKS": str(self.dir / "tasks.json"), "FAKE_GH_STACKS": str(self.dir / "stacks.json"),
-             "FAKE_GH_VIEW": str(self.dir / "view.json"), "FAKE_GH_LOG": str(self.dir / "gh.log"), **(env or {})}
+             "FAKE_GH_LOG": str(self.dir / "gh.log"), **(env or {})}
         return subprocess.run([sys.executable, str(self.ws.scripts / "bead-queues"), "--phase", self.phase, *args],
                               cwd=self.ws.root, env=e, text=True, capture_output=True)
 
@@ -106,17 +103,10 @@ def child(ws: Workspace, bead: str, parent: str, *args: str) -> None:
     ws.bd("update", bead, "--parent", parent)
 
 
-def layer(number: int | None, name: str, rebase: bool = False) -> dict:
-    """One branch of `gh stack view --json`."""
-    pr_ = {"number": number, "url": f"https://x/pull/{number}", "state": "OPEN"} if number else None
-    return {"name": name, "head": "0" * 40, "base": "0" * 40, "isCurrent": False, "isMerged": False,
-            "isQueued": False, "needsRebase": rebase, "pr": pr_}
-
-
-def stack(number: int, *layers_: dict) -> dict:
-    """One open stack of `gh api .../stacks` (the list endpoint carries no base)."""
-    return {"number": number, "open": True, "base": None, "created_at": "2026-01-01T00:00:00Z",
-            "pull_requests": [{"number": b["pr"]["number"], "state": "open", "head": {"ref": b["name"]}} for b in layers_]}
+def stack(number: int, base: str | None, *prs: int) -> dict:
+    """One open stack of `gh api .../stacks`."""
+    return {"number": number, "open": True, "base": {"ref": base} if base else None, "created_at": "2026-01-01T00:00:00Z",
+            "pull_requests": [{"number": n, "state": "open", "head": {"ref": f"b{n}"}} for n in prs]}
 
 
 @unittest.skipUnless(not MISSING, SKIP_REASON)
@@ -251,52 +241,19 @@ class BeadQueuesTests(unittest.TestCase):
 
     def test_stack_rows(self):
         q = Queues(self.ws, "st")
-        l1, l2, l3, l4 = layer(1, "a"), layer(2, "b"), layer(3, "c", rebase=True), layer(4, "d")
-        q.github([stack(10, l1, l2, l3), stack(12, layer(9, "z"))], [l1, l2, l3, l4])
-        assert q.queues() == {"stack_incoherent": {"stack#10"}, "pr_unlinked": {"pr#4"}}   # stack 12 is elsewhere
-        q.github([stack(10, l1, layer(5, "e"))], [l1])
-        assert q.queues() == {"stack_incoherent": {"stack#10"}}      # #5 is on the stack, not in the local stack
-        q.github([stack(10, l1, l2), stack(11, l4)], [l1, l2, l4])
+        q.github([stack(10, q.trunk, 1, 2, 3), stack(12, "develop", 9)])
+        assert q.queues() == {}                                      # one stack on the trunk lands in one merge
+        q.github([stack(10, q.trunk, 1, 2), stack(11, q.trunk, 4), stack(13, None, 5)])
         assert q.queues() == {"stack_incoherent": {"stack#10", "stack#11"}}   # two stacks: not one merge
-        q.github([stack(10, l1, l2)], [l1, l2, layer(None, "f")])
-        assert q.queues() == {"stack_incoherent": {"stack#10"}}      # a layer with no PR
-        q.github([], [l1])                                           # layer 0 waits unlinked on the trunk
-        assert q.queues() == {}
-        q.github([], [l1, l2])
-        assert q.queues() == {"pr_unlinked": {"pr#1", "pr#2"}}
         calls = (q.dir / "gh.log").read_text().splitlines()
-        assert all(c.startswith(f"{q.worktree} ") for c in calls if c.split()[1] == "stack")   # the trunk worktree
-        assert {c.split()[1] for c in calls} == {"stack", "api"}      # never `gh pr ...`
-
-    def test_stack_view_falls_back_to_a_layer_worktree(self):
-        """gh-stack 0.1 does not count the trunk as a stack member: view from a worktree on an open stack's layer."""
-        q = Queues(self.ws, "lw")
-        l1, l2 = layer(1, "lw-a"), layer(2, "lw-b", rebase=True)
-        q.github([stack(10, l1, l2)], [l1, l2])
-        env = {"FAKE_GH_NOT_STACK": str(q.worktree)}
-        proc = q.run(env=env)
-        assert "stack not checked: integrate/phase-lw: " in proc.stdout and "not part of a stack" in proc.stdout, proc.stdout
-        top = self.ws.root / "wt-lw-b"
-        subprocess.run(["git", "worktree", "add", "-q", "-b", "lw-b", str(top)], cwd=self.ws.root, check=True)
-        (q.dir / "gh.log").unlink()
-        fresh = q.dir / "fresh.json"
-        proc = q.run("--json", "--min-age", "0", "--state-file", str(fresh), env=env)
-        assert proc.returncode == 0 and proc.stdout, (proc.stderr, q.run(env=env).stdout)
-        assert {(r["queue"], r["id"]) for r in json.loads(proc.stdout)["rows"]} == {("stack_incoherent", "stack#10")}
-        views = [c.split()[0] for c in (q.dir / "gh.log").read_text().splitlines() if c.split()[1] == "stack"]
-        assert views == [str(q.worktree), str(top)], views         # trunk first, then the top layer
+        assert {c.split()[1] for c in calls} == {"api"}               # never `gh stack ...` or `gh pr ...`
 
     def test_stack_not_checked_keeps_the_report(self):
         q = Queues(self.ws, "nc")
         dev = group(q.sprint(1))[0]
-        for env, why in (({"FAKE_GH_FAIL": "1"}, "gh: HTTP 502"), ({}, "trunk develop")):
-            q.github([], [layer(1, "a"), layer(2, "b")], trunk="develop")
-            proc = q.run(env=env)
-            assert proc.returncode == 0, proc.stderr
-            assert "stack not checked:" in proc.stdout and why in proc.stdout and dev in proc.stdout
-        subprocess.run(["git", "worktree", "remove", str(q.worktree)], cwd=self.ws.root, check=True)
-        proc = q.run()
-        assert proc.returncode == 0 and f"stack not checked: no worktree on {q.trunk} or on an open stack's layer" in proc.stdout
+        proc = q.run(env={"FAKE_GH_FAIL": "1"})
+        assert proc.returncode == 0, proc.stderr
+        assert "stack not checked:" in proc.stdout and "gh: HTTP 502" in proc.stdout and dev in proc.stdout
 
     def test_cron_contract(self):
         q = Queues(self.ws, "cr")
