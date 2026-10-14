@@ -56,8 +56,10 @@ Windows module paths, with a review reason, for equivalent implementations
 whose names differ.
 Only the configured pair and its enclosed private implementation receive the
 adapter treatment; separately Unix-gated public items remain subject to parity
-checks. Boundary and runtime have no analyzer-specific keys; boundary's
-package-edge and manifest policies are supplied by its inventory. Any unknown
+checks. Boundary accepts the optional manifest dependency policy families
+`manifest_dependency_allowlists`, `global_dependency_ownership` and
+`manifest_section_rules`; its package-edge policy is supplied by its
+inventory. Runtime has no analyzer-specific keys. Any unknown
 key, unknown rule, or wrong value type is a configuration error (exit 3)
 identifying the analyzer and field.
 
@@ -83,8 +85,10 @@ verdict. Unknown selectors are usage errors (exit 2). A lint-fail verdict exits
 10; malformed analyzer configuration exits 3. The report remains available in
 text or JSON output.
 
-Boundary package-edge and manifest policy are expressed in the boundary
-inventory, not analyzer tables. Optional policy records add policy checks only
+Boundary package-edge policy is expressed in the boundary inventory records.
+Boundary manifest dependency policy is declared in the
+`[[tool.sc-lint.analyzers.boundary.<family>]]` tables of `sc-lint.toml`, not
+in Cargo manifests. Optional policy records add policy checks only
 when present; an explicitly empty allowlist allows no entries. See the
 [boundary guide](./packages/sc-lint-boundary.md) for neutral examples.
 
