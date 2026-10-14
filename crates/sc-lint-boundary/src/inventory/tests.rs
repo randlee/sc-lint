@@ -125,6 +125,22 @@ fn loads_empty_inventory_without_boundaries_directory() {
 }
 
 #[test]
+fn rejects_nested_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let nested_planning = "boundaries/sc-lint-boundary/planning.toml";
+    fixture.write(nested_planning, "[planning]\ncurrent_sprint = \"A.6\"\n");
+
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root()).expect_err("nested planning metadata fails")
+    );
+    assert!(error.contains("allows planning metadata only"));
+    assert!(error.contains("boundaries/planning.toml"));
+    assert!(error.contains(nested_planning));
+}
+
+#[test]
 fn loads_hyphenated_owner_package_with_matching_underscore_crate_path() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
