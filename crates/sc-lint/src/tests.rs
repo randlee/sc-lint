@@ -3188,6 +3188,52 @@ fn test_profile_platform_scope_matrix() {
     );
 }
 
+#[test]
+fn test_profile_targeted_cargo_program_preserves_explicit_windows_shim() {
+    let cargo = profile_fixture("tools/cargo.cmd").display().to_string();
+    let steps = [plan_step(
+        "win-check",
+        &[&cargo, "check", "--workspace"],
+        Some(Platform::Windows),
+        Some("x86_64-pc-windows-msvc"),
+    )];
+
+    let windows = plan_consumer_lint(&steps, None, PlatformScope::All, Platform::Windows)
+        .expect("windows plan");
+    assert_eq!(
+        planned_argv(&windows, "win-check"),
+        [
+            cargo.clone(),
+            "check".to_string(),
+            "--workspace".to_string(),
+            "--target".to_string(),
+            "x86_64-pc-windows-msvc".to_string(),
+        ]
+    );
+
+    let unix =
+        plan_consumer_lint(&steps, None, PlatformScope::All, Platform::Linux).expect("unix plan");
+    assert_eq!(
+        planned_argv(&unix, "win-check"),
+        [
+            cargo,
+            "xwin".to_string(),
+            "check".to_string(),
+            "--workspace".to_string(),
+            "--target".to_string(),
+            "x86_64-pc-windows-msvc".to_string(),
+        ]
+    );
+    assert_eq!(
+        CargoVerb::from_argv(&["cargo.sh".to_string(), "check".to_string()]),
+        None
+    );
+    assert_eq!(
+        CargoVerb::from_argv(&["cargo.exe".to_string(), "check".to_string()]),
+        Some(CargoVerb::Check)
+    );
+}
+
 fn consumer_toml(rows: &str) -> String {
     format!(
         "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n{rows}\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"test\"]\n"
