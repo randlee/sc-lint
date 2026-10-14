@@ -156,6 +156,13 @@ struct ModuleDeclaration {
     is_windows: bool,
 }
 
+/// cfg flags from the module declarations that enclose a declaration.
+///
+/// Rust applies a `mod` attribute to the whole subtree the module declares, so
+/// a declaration inherits `test`, `unix` and `windows` gating from every
+/// enclosing module. Inline ancestors are threaded through
+/// `collect_file_declarations`; file-module ancestors are propagated afterward
+/// by `inherit_file_module_cfg`.
 #[derive(Debug, Clone, Copy, Default)]
 struct EnclosingCfg {
     is_test_only: bool,
@@ -337,7 +344,45 @@ fn collect_declarations(root: &Path) -> anyhow::Result<BTreeMap<PathBuf, ModuleD
             &mut declarations,
         )?;
     }
+    inherit_file_module_cfg(&mut declarations)?;
     Ok(declarations)
+}
+
+/// Propagates cfg flags from file modules to the declarations they contain.
+///
+/// Each file's declarations are collected with no enclosing cfg, so a
+/// declaration inside `unix.rs` does not yet see a `#[cfg(unix)]` on the
+/// `mod unix;` that declares that file. Each declaration is OR-ed with the
+/// flags of the declaration that declares its file. The pass repeats until no
+/// flag changes, so the flags reach every depth.
+fn inherit_file_module_cfg(
+    declarations: &mut BTreeMap<PathBuf, ModuleDeclaration>,
+) -> anyhow::Result<()> {
+    loop {
+        let mut updates = Vec::new();
+        for (child, declaration) in declarations.iter() {
+            let parent_path = declaration.source_path.canonicalize()?;
+            let Some(parent) = declarations.get(&parent_path) else {
+                continue;
+            };
+            let inherited = ModuleDeclaration {
+                is_test_only: declaration.is_test_only || parent.is_test_only,
+                is_unix: declaration.is_unix || parent.is_unix,
+                is_windows: declaration.is_windows || parent.is_windows,
+                ..declaration.clone()
+            };
+            if inherited.is_test_only != declaration.is_test_only
+                || inherited.is_unix != declaration.is_unix
+                || inherited.is_windows != declaration.is_windows
+            {
+                updates.push((child.clone(), inherited));
+            }
+        }
+        if updates.is_empty() {
+            return Ok(());
+        }
+        declarations.extend(updates);
+    }
 }
 
 fn module_dir(source_path: &Path) -> anyhow::Result<PathBuf> {

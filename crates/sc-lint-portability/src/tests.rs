@@ -1924,6 +1924,7 @@ fn issue372_retains_public_and_unrelated_parity() {
     fixture.write_lint_config(
         r#"
         [tool.sc-lint.analyzers.portability]
+        exclude_paths = ["crates/example/src/unix_socket.rs"]
         [[tool.sc-lint.analyzers.portability.platform_adapters]]
         unix_module = "crates/example/src/unix_socket.rs"
         windows_module = "crates/example/src/named_pipe.rs"
@@ -1994,6 +1995,91 @@ fn issue372_retains_public_and_unrelated_parity() {
     assert_eq!(
         port004, 1,
         "other rules are retained: {:#?}",
+        report.findings
+    );
+}
+
+#[test]
+fn issue372_nested_file_module_inherits_enclosing_cfg() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/unix/transport.rs"
+        windows_module = "crates/example/src/windows/transport.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(unix)]\nmod unix;\n#[cfg(windows)]\nmod windows;\n",
+    );
+    fixture.write_source("example", "unix.rs", "mod transport;\n");
+    fixture.write_source("example", "windows.rs", "mod transport;\n");
+    fixture.write_source("example", "unix/transport.rs", "fn connect() {}");
+    fixture.write_source("example", "windows/transport.rs", "fn connect() {}");
+
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        None,
+    )
+    .expect("a file module declared under cfg(unix) inherits the gate for its adapter pair");
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| !finding.message.contains("transport")),
+        "{:#?}",
+        report.findings
+    );
+}
+
+#[test]
+fn issue372_excluded_configured_file_keeps_pair_valid() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        exclude_paths = ["crates/example/src/unix_socket.rs"]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/unix_socket.rs"
+        windows_module = "crates/example/src/named_pipe.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(unix)]\nmod unix_socket;\n#[cfg(windows)]\nmod named_pipe;\n",
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+
+    let report = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        None,
+    )
+    .expect("excluding a configured adapter file keeps its pair valid");
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| !finding.message.contains("unix_socket")),
+        "{:#?}",
         report.findings
     );
 }
