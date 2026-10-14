@@ -3712,6 +3712,7 @@ fn test_supported_execution_failure_is_nonzero() {
 }
 
 #[test]
+#[serial]
 fn test_supported_execution_failure_on_real_host_is_nonzero() {
     // An invented triple for the host's own OS is planned as same-host cargo
     // and really executed; cargo cannot build it, so the run must fail.
