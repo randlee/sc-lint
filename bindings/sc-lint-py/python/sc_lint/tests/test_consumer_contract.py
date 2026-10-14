@@ -499,6 +499,21 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
             config = consumer / "sc-lint.toml"
             config.write_text((ROOT / "sc-lint.toml").read_text(encoding="utf-8"), encoding="utf-8")
             venv.create(state / "venv", with_pip=False)
+            # bootstrap.ps1 provisions the venv unless it already imports sc_lint at
+            # minimum_version. Provisioning is not under test (the binary is faked too),
+            # so stand in for the installed wheel instead of reaching PyPI.
+            minimum = re.search(r'^minimum_version = "([^"]+)"', config.read_text(encoding="utf-8"), re.M)
+            self.assertIsNotNone(minimum)
+            venv_python = state / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            purelib = subprocess.run(
+                [str(venv_python), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.strip()
+            stub = Path(purelib) / "sc_lint"
+            stub.mkdir()
+            (stub / "__init__.py").write_text(f"__version__ = {minimum.group(1)!r}\n", encoding="utf-8")
 
             log = tmp / "argv.log"
             if os.name == "nt":
@@ -522,12 +537,8 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
             environment = os.environ.copy()
             environment["SC_LINT_BIN"] = str(fake)
             environment["SC_LINT_ARGV_LOG"] = str(log)
-            environment["PYTHONPATH"] = os.pathsep.join(
-                filter(
-                    None,
-                    [str(ROOT / "bindings/sc-lint-py/python"), environment.get("PYTHONPATH")],
-                )
-            )
+            # A source-tree PYTHONPATH would shadow the stub with sc_lint 0.0.0+source.
+            environment.pop("PYTHONPATH", None)
 
             def run(tokens: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
                 return subprocess.run(
