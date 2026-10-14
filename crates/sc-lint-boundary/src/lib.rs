@@ -775,8 +775,7 @@ pub fn analyze_workspace_configured(
     if !settings.enabled {
         return Ok(disabled_report());
     }
-    let policy_config = manifest_dependency_policy::parse_policy(&settings)
-        .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
+    let policy_config = manifest_dependency_policy::parse_policy(&settings)?;
     if settings.rule_filter.as_ref().is_some_and(|selected| {
         selected.len() == 1 && selected.contains(&rule(RuleId::ScbBoundary004))
     }) {

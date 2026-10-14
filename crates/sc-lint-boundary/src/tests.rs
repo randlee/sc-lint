@@ -4790,6 +4790,42 @@ fn unknown_rule_filter_is_selector_error() {
 }
 
 #[test]
+fn manifest_policy_shape_errors_are_indexed_analyzer_config_errors() {
+    for (config, expected_key, explanation) in [
+        (
+            "manifest_dependency_allowlists = \"wrong\"",
+            "manifest_dependency_allowlists",
+            "use array-of-table entries",
+        ),
+        (
+            "manifest_dependency_allowlists = [\"wrong\"]",
+            "manifest_dependency_allowlists[0]",
+            "replace it with a table entry",
+        ),
+        (
+            "[[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]\nowner_manifest_path = 42",
+            "manifest_dependency_allowlists[0].owner_manifest_path",
+            "provide a quoted string",
+        ),
+    ] {
+        let fixture = undeclared_dependency_fixture();
+        fixture.write(
+            "sc-lint.toml",
+            &format!("[tool.sc-lint.analyzers.boundary]\n{config}\n"),
+        );
+
+        match configured(fixture.root(), None) {
+            Err(BoundaryError::AnalyzerConfig(error)) => {
+                assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+                assert!(error.to_string().contains(expected_key));
+                assert!(error.to_string().contains(explanation));
+            }
+            other => panic!("expected indexed analyzer config error, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn rule_filter_selects_exactly_the_rule() {
     let fixture = undeclared_dependency_fixture();
 
