@@ -820,7 +820,7 @@ fn issue376_owner_unions_explicit_dev_permissions_before_stale_checking() {
 }
 
 #[test]
-fn issue376_mixed_active_owner_states_union_permissions() {
+fn issue376_owner_level_active_gate_retains_planned_record_permissions() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
     fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
@@ -841,11 +841,11 @@ fn issue376_mixed_active_owner_states_union_permissions() {
     );
     write_policy_record(
         &fixture,
-        "p/stub.toml",
-        "Stub",
+        "p/planned.toml",
+        "Planned",
         &["q"],
         Some(&["q"]),
-        "stub_landed",
+        "planned",
     );
 
     let report = analyze_workspace(&AnalyzeOptions {
