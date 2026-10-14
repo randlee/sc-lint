@@ -133,8 +133,15 @@ fn rejects_nested_planning_metadata() {
         .expect("root planning metadata alone loads before nested metadata is added");
     assert_eq!(inventory.planning.planning.current_sprint, "A.6");
 
-    let nested_planning = "boundaries/sc-lint-boundary/planning.toml";
-    fixture.write(nested_planning, "[planning]\ncurrent_sprint = \"A.6\"\n");
+    let nested_planning = Path::new("boundaries")
+        .join("sc-lint-boundary")
+        .join("planning.toml");
+    fixture.write(
+        nested_planning
+            .to_str()
+            .expect("fixture relative path is valid UTF-8"),
+        "[planning]\ncurrent_sprint = \"A.6\"\n",
+    );
 
     let error = format!(
         "{:#}",
