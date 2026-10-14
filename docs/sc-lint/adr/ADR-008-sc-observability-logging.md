@@ -6,6 +6,7 @@
 | Status | Accepted |
 | Date | 2026-05-10 |
 | Deciders | team-lead, clint |
+| Relates to | REQ-LOG-001 through REQ-LOG-009 |
 
 ## Context
 sc-lint uses sc-observability for structured JSON logging. The crate has both a library target (`sc_lint`) and a binary target (`sc-lint`) in a single Cargo.toml. This creates tension between keeping the library free of observability dependencies and providing a clean logging API for the binary.
