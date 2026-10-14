@@ -178,7 +178,9 @@ pub(super) fn validate(
     let canonical_root = root
         .canonicalize()
         .map_err(|source| scan_error(source.into()))?;
-    let declarations = collect_declarations(canonical_root.as_path()).map_err(scan_error)?;
+    // Discover declaring files from the same root the analyzer scans so their
+    // source paths match its lookups; Windows canonical paths are verbatim.
+    let declarations = collect_declarations(root).map_err(scan_error)?;
     let root = canonical_root;
     let mut used_files = BTreeSet::new();
     let mut validate_pair = |root: &Path,
