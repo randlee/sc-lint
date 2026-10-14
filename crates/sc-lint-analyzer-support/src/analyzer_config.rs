@@ -524,6 +524,8 @@ fn rule_is_included(settings: &AnalyzerSettings, rule_id: CatalogRuleId) -> bool
 }
 
 fn glob_match(pattern: &str, path: &str) -> bool {
+    let pattern = pattern.replace('\\', "/");
+    let path = path.replace('\\', "/");
     let pattern: Vec<&str> = pattern.split('/').collect();
     let path: Vec<&str> = path.split('/').collect();
     // `**` matches any run of path segments; inside a segment `*` matches any
