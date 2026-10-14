@@ -15,12 +15,67 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from urllib.parse import unquote, urlsplit
 from unittest import mock
 from xml.etree import ElementTree
 
 from sc_lint.lint_common import discover_repo_root
 
 REPO = discover_repo_root()
+
+
+def _local_markdown_targets(root: Path, source: Path) -> set[Path]:
+    """Return local Markdown targets linked from one document."""
+    content = source.read_text(encoding="utf-8")
+    targets: set[Path] = set()
+    for match in re.finditer(r"\[[^\]]*\]\(([^)]+)\)", content):
+        raw_target = match.group(1).strip().split(maxsplit=1)[0].strip("<>")
+        parsed = urlsplit(raw_target)
+        if parsed.scheme or parsed.netloc or not parsed.path:
+            continue
+        target = (source.parent / unquote(parsed.path)).resolve()
+        try:
+            target.relative_to(root.resolve())
+        except ValueError:
+            continue
+        if target.suffix.lower() == ".md" and target.is_file():
+            targets.add(target)
+    return targets
+
+
+def _reachable_markdown(root: Path, indexes: list[Path]) -> set[Path]:
+    """Walk local Markdown links starting at convention index documents."""
+    reachable: set[Path] = set()
+    pending = [path.resolve() for path in indexes if path.is_file()]
+    while pending:
+        source = pending.pop()
+        if source in reachable:
+            continue
+        reachable.add(source)
+        pending.extend(_local_markdown_targets(root, source) - reachable)
+    return reachable
+
+
+def _unlinked_governance_docs(root: Path, kind: str) -> set[Path]:
+    """Find ADR or REQ/NFR sources outside their convention indexes' link graph."""
+    docs = root / "docs"
+    if kind == "adr":
+        indexes = list(docs.rglob("architecture.md"))
+        sources = set(docs.rglob("ADR-*.md"))
+    elif kind == "requirements":
+        indexes = list(docs.rglob("requirements.md"))
+        sources = {
+            path for path in docs.rglob("*.md")
+            if "requirements" in path.stem.casefold()
+            or re.search(
+                r"(?m)^\s*(?:[-*]\s*)?(?:#{1,6}\s*)?`?(?:REQ|NFR)-[A-Z0-9]+(?:-[A-Z0-9]+)*`?(?:\s*:\s*.*)?\s*$",
+                path.read_text(encoding="utf-8"),
+            )
+        }
+    else:
+        raise ValueError(f"unknown governance document kind: {kind}")
+    reachable = _reachable_markdown(root, indexes)
+    return {path for path in sources if path.resolve() not in reachable}
 
 
 def load(name: str, relative: str):
@@ -163,7 +218,6 @@ class ReviewerPromptTests(unittest.TestCase):
             "ATM-QA-",
             "ATM_HOME",
             "Phase-AM",
-            "docs/sc-lint/",
             "crates/atm/",
         )
         for prompt in (arch, req):
@@ -183,6 +237,70 @@ class ReviewerPromptTests(unittest.TestCase):
         self.assertIn("REQ/NFR ids cited by the plan", req)
         self.assertIn('"requirement_verdicts": [', req)
         self.assertNotIn("ATM-QA-", req)
+
+    def test_reviewer_prompts_have_no_atm_core_product_residue(self) -> None:
+        names = (
+            "arch-qa.md",
+            "req-qa.md",
+            "quality-mgr.md",
+            "ruthless-boundary-qa.md",
+            "flaky-test-qa.md",
+            "qa-triage.md",
+            "rust-service-hardening-agent.md",
+        )
+        forbidden = re.compile(
+            r"atm-core|crates/atm[\w/-]*|atm-daemon|atm-observability|"
+            r"Legacy Daemon Exemption|No Daemon Remodeling|Tokio/Axum|"
+            r"mailbox-locking|sysinfo hot paths|ATM_HOME|ATM-[A-Z]|"
+            r"integrate/phase-(?!k\b)[A-Z]\b|Phase-(?!K\b)(?:AM|[A-JL-Z])\b|"
+            r"phase-R|R\.1[0-9]",
+            re.IGNORECASE,
+        )
+        for name in names:
+            prompt = (REPO / ".claude/agents" / name).read_text(encoding="utf-8")
+            with self.subTest(agent=name):
+                self.assertIsNone(forbidden.search(prompt))
+
+    def test_architecture_and_requirement_examples_use_sc_lint_evidence(self) -> None:
+        arch = (REPO / ".claude/agents/arch-qa.md").read_text(encoding="utf-8")
+        req = (REPO / ".claude/agents/req-qa.md").read_text(encoding="utf-8")
+        self.assertIn('"id": "SCB-BOUNDARY-001"', arch)
+        self.assertIn("crates/sc-lint-boundary/src/analysis.rs", arch)
+        self.assertNotIn("ARCH-001", arch)
+        self.assertNotIn("src/module.rs", arch)
+        self.assertIn('"id": "REQ-SCB-001"', req)
+        self.assertIn("docs/sc-lint-boundary/requirements.md:9", req)
+        self.assertIn("crates/sc-lint-boundary/src/tests.rs", req)
+        self.assertNotIn('"id": "REQ-001"', req)
+        self.assertNotIn("src/module.rs", req)
+
+    def test_governance_documents_are_reachable_from_convention_indexes(self) -> None:
+        self.assertEqual(_unlinked_governance_docs(REPO, "adr"), set())
+        self.assertEqual(_unlinked_governance_docs(REPO, "requirements"), set())
+
+    def test_unlinked_governance_documents_fail_the_drift_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            docs = root / "docs"
+            (docs / "adr").mkdir(parents=True)
+            (docs / "architecture.md").write_text("# Architecture\n", encoding="utf-8")
+            (docs / "requirements.md").write_text("# Requirements\n", encoding="utf-8")
+            adr = docs / "adr" / "ADR-001-example.md"
+            adr.write_text("# ADR-001\n", encoding="utf-8")
+            requirements = docs / "product-spec.md"
+            requirements.write_text("- `REQ-TEST-001`\n", encoding="utf-8")
+
+            self.assertEqual(_unlinked_governance_docs(root, "adr"), {adr})
+            self.assertEqual(_unlinked_governance_docs(root, "requirements"), {requirements})
+
+            (docs / "architecture.md").write_text(
+                "[ADR](adr/ADR-001-example.md)\n", encoding="utf-8"
+            )
+            (docs / "requirements.md").write_text(
+                "[Product spec](product-spec.md)\n", encoding="utf-8"
+            )
+            self.assertEqual(_unlinked_governance_docs(root, "adr"), set())
+            self.assertEqual(_unlinked_governance_docs(root, "requirements"), set())
 
 
 class TemplateContractTests(unittest.TestCase):

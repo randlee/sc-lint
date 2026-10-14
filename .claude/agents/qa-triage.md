@@ -30,13 +30,13 @@ with free-form input.
 ```json
 {
   "triage_mode": "initial_pass",
-  "phase_id": "phase-R",
-  "integration_branch": "integrate/phase-R",
-  "integration_worktree_path": "/abs/integrate-phase-R",
-  "structure_path": "/abs/integrate-phase-R/.sprints/R/structure.ttl",
-  "events_path": "/abs/integrate-phase-R/.sprints/R/events.ttl",
+  "phase_id": "phase-K",
+  "integration_branch": "integrate/phase-k",
+  "integration_worktree_path": "/abs/integrate-phase-k",
+  "structure_path": "/abs/integrate-phase-k/.sprints/K/structure.ttl",
+  "events_path": "/abs/integrate-phase-k/.sprints/K/events.ttl",
   "finding_id": "FTQ-001",
-  "found_in": "R-S1",
+  "found_in": "K-S1",
   "found_at": "2026-07-25T16:26:33Z",
   "title": "Process-global shutdown state in tests",
   "description": "Global OnceLock / static shutdown state leaks across test cases.",
@@ -48,25 +48,25 @@ with free-form input.
   "sweep_scope": "crate",
   "worktrees": [
     {
-      "branch": "R.15",
+      "branch": "K.15",
       "path": "/abs/worktree-r15",
       "head_sha": "879bf41",
       "order_index": 15
     },
     {
-      "branch": "R.16",
+      "branch": "K.16",
       "path": "/abs/worktree-r16",
       "head_sha": "c7b4455",
       "order_index": 16
     },
     {
-      "branch": "R.17",
+      "branch": "K.17",
       "path": "/abs/worktree-r17",
       "head_sha": "9421e9f",
       "order_index": 17
     }
   ],
-  "triage_root": "/abs/integrate-phase-R/.triage",
+  "triage_root": "/abs/integrate-phase-k/.triage",
   "references": [
     "PR #194",
     "QA report comment url"
@@ -86,7 +86,7 @@ Input rules:
   `severity`, `pattern`, `worktrees`, `integration_branch`,
   `integration_worktree_path`, and `triage_root` are required.
 - `found_in` is required and must be the declared sprint local id (for example,
-  `R-S1`) that will render as `triage:R-S1`.
+  `K-S1`) that will render as `triage:K-S1`.
 - `found_at` is required and must be the authoritative QA discovery/result time
   in UTC RFC3339 form ending in `Z` (for example, `2026-07-25T16:26:33Z`).
 - `worktrees` must already be listed in the desired promotion order. Do not
@@ -279,7 +279,7 @@ cat > /tmp/triage-record-vars.json <<'JSON'
   "finding_id": "FTQ-001",
   "title": "Process-global shutdown state in tests",
   "description": "Global OnceLock / static shutdown state leaks across test cases.",
-  "phase_id": "phase-R",
+  "phase_id": "phase-K",
   "triage_mode": "followup_pass",
   "category": "FTQ",
   "severity": "important",
@@ -288,30 +288,30 @@ cat > /tmp/triage-record-vars.json <<'JSON'
   "status": "fixed_partial",
   "dispatch_ready": true,
   "triaged_at": "2026-07-25T16:30:00Z",
-  "found_in": "R-S1",
+  "found_in": "K-S1",
   "found_at": "2026-07-25T16:26:33Z",
-  "occurrences": ["R17-1"],
-  "occurrence_files": ["crates/atm-daemon/src/tests.rs"],
+  "occurrences": ["K17-1"],
+  "occurrence_files": ["crates/sc-lint-boundary/src/tests.rs"],
   "occurrence_lines": ["28"],
   "occurrence_snippets": ["static DISPATCHER: OnceLock<...>"],
   "occurrence_statuses": ["open"],
   "occurrence_closed": ["false"],
-  "occurrence_branches": ["R.17"],
+  "occurrence_branches": ["K.17"],
   "occurrence_head_shas": ["9421e9f"],
-  "occurrence_worktree_ids": ["R17/9421e9f"],
-  "worktrees": ["R17/9421e9f"],
-  "worktree_paths": [".worktrees/R17"],
-  "worktree_branches": ["R.17"],
+  "occurrence_worktree_ids": ["K17/9421e9f"],
+  "worktrees": ["K17/9421e9f"],
+  "worktree_paths": [".worktrees/K17"],
+  "worktree_branches": ["K.17"],
   "worktree_head_shas": ["9421e9f"],
   "worktree_order_indices": ["17"]
 }
 JSON
 
-INTEGRATION_WORKTREE_PATH=/abs/integrate-phase-R
+INTEGRATION_WORKTREE_PATH=/abs/integrate-phase-k
 TRIAGE_ROOT="$INTEGRATION_WORKTREE_PATH/.triage"
-PHASE_ID=phase-R
-STRUCTURE_PATH="$INTEGRATION_WORKTREE_PATH/.sprints/R/structure.ttl"
-EVENTS_PATH="$INTEGRATION_WORKTREE_PATH/.sprints/R/events.ttl"
+PHASE_ID=phase-K
+STRUCTURE_PATH="$INTEGRATION_WORKTREE_PATH/.sprints/K/structure.ttl"
+EVENTS_PATH="$INTEGRATION_WORKTREE_PATH/.sprints/K/events.ttl"
 FINDING_ID=FTQ-001
 OUTPUT="$TRIAGE_ROOT/$PHASE_ID/findings/$FINDING_ID.ttl"
 mkdir -p "$(dirname "$OUTPUT")"
@@ -361,24 +361,24 @@ Return fenced JSON only.
   "success": true,
   "data": {
     "triage_mode": "followup_pass",
-    "phase_id": "phase-R",
-    "integration_branch": "integrate/phase-R",
-    "integration_worktree_path": "/abs/integrate-phase-R",
+    "phase_id": "phase-K",
+    "integration_branch": "integrate/phase-k",
+    "integration_worktree_path": "/abs/integrate-phase-k",
     "finding_id": "FTQ-001",
     "status": "open | fixed | fixed_partial | regressed",
     "repeatable": true,
     "sweep_scope": "crate",
-    "highest_open_branch": "R.17",
-    "highest_fixed_branch": "R.16",
-    "promote_to_branch": "R.17",
+    "highest_open_branch": "K.17",
+    "highest_fixed_branch": "K.16",
+    "promote_to_branch": "K.17",
     "dispatch_ready": true,
-    "ttl_path": "/abs/integrate-phase-R/.triage/phase-R/findings/FTQ-001.ttl",
+    "ttl_path": "/abs/integrate-phase-k/.triage/phase-K/findings/FTQ-001.ttl",
     "dispatch_blocked_pending_triage_commit": true,
     "occurrences": [
       {
-        "branch": "R.17",
+        "branch": "K.17",
         "head_sha": "9421e9f",
-        "file": "crates/atm-daemon/src/tests.rs",
+        "file": "crates/sc-lint-boundary/src/tests.rs",
         "line": 28,
         "snippet": "static DISPATCHER: OnceLock<...>",
         "status": "open"
@@ -386,17 +386,17 @@ Return fenced JSON only.
     ],
     "branch_states": [
       {
-        "branch": "R.15",
+        "branch": "K.15",
         "head_sha": "879bf41",
         "status": "absent"
       },
       {
-        "branch": "R.16",
+        "branch": "K.16",
         "head_sha": "c7b4455",
         "status": "fixed"
       },
       {
-        "branch": "R.17",
+        "branch": "K.17",
         "head_sha": "9421e9f",
         "status": "open"
       }
@@ -467,7 +467,7 @@ On failure, return fenced JSON:
 - Treat `integration_worktree_path` as the only canonical phase triage root.
 - Do not update shared aggregate files from this agent.
 - Do not commit triage artifacts from this agent.
-- Do not hardcode branch names like `R.17`.
+- Do not hardcode branch names like `K.17`.
 - Do not infer promotion order from branch naming.
 - Do not create dev tasks or assign work.
 - Do not collapse multiple occurrences into one row; preserve all concrete

@@ -96,10 +96,10 @@ Return fenced JSON only.
   },
   "requirement_verdicts": [
     {
-      "id": "REQ-001",
+      "id": "REQ-SCB-001",
       "status": "referenced | applicable-but-unreferenced | violated | met | partial",
       "sections_read": ["Requirement"],
-      "evidence_refs": ["docs/requirements.md:10", "src/module.rs:42"]
+      "evidence_refs": ["docs/sc-lint-boundary/requirements.md:9", "crates/sc-lint-boundary/src/tests.rs:1748"]
     }
   ],
   "baselines_read": [
@@ -114,17 +114,17 @@ Return fenced JSON only.
       "item": "named deliverable or acceptance criterion",
       "status": "present | partially-present | absent | not-verifiable",
       "closure_state": "closed | open | not-applicable",
-      "evidence_refs": ["docs/path.md:10", "src/module.rs:42"],
+      "evidence_refs": ["docs/sc-lint-boundary/requirements.md:9", "crates/sc-lint-boundary/src/tests.rs:1748"],
       "notes": "short evidence-based explanation"
     }
   ],
   "findings": [
     {
-      "id": "REQ-001",
+      "id": "REQ-SCB-001",
       "severity": "Blocking | Important | Minor",
       "category": "requirements | deliverable-missing | acceptance-gap | implementation-drift",
-      "source_refs": ["docs/<crate>/requirements.md:123"],
-      "target_refs": ["src/module.rs:42"],
+      "source_refs": ["docs/sc-lint-boundary/requirements.md:9"],
+      "target_refs": ["crates/sc-lint-boundary/src/tests.rs:1748"],
       "issue": "clear statement of the requirements mismatch",
       "required_correction": "specific corrective action",
       "compliance_result": "non-compliant | partially-compliant"
