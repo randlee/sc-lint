@@ -3541,6 +3541,48 @@ fn lint_rows_for(
         .clone())
 }
 
+// Case mapping to atm-core c1f3ee7a: `.just/run_lint.py` (`resolve_task_names`,
+// `FAST_LINT_ORDER`) and `.just/tests/test_run_lint.py`. The three tests below
+// port the upstream cases that name-resolve the lint task set; the fixture in
+// `named-membership.toml` supplies harmless version-probe commands in place of
+// the upstream lint scripts, so only task names and selection outcomes carry over.
+//
+// 1. upstream `test_resolve_task_names_all_includes_new_targets`
+//    input:   resolve_task_names("all")
+//    outcome: contains 22 names, including boundaries, manifests, spell, pytests,
+//             sc-boundary, sc-portability, and read-concurrency-gates.
+//    here:    `all` and the default selector both yield the declared order
+//             [fmt, clippy, version, manifests, spell, pytests].
+//    divergence: membership becomes an exact-order check because the fixture
+//             declares six steps. Upstream's 22 names are not reproduced. The
+//             windows-tagged probe joins only on a Windows host.
+//
+// 2. upstream `test_resolve_task_names_rejects_unknown_target`
+//    input:   resolve_task_names("unknown")
+//    outcome: ValueError listing the valid targets.
+//    here:    selector "not-a-step-or-profile" is rejected with CliErrorKind::Config,
+//             details.selector echoes the input, and details.available lists
+//             "fast" and "manifests".
+//    divergence: the input string differs; "not-a-step-or-profile" is neither a
+//             step nor a profile in the fixture. The error is a typed CLI error,
+//             not ValueError. The rejection outcome is the same.
+//
+// 3. upstream `test_resolve_task_names_fast_is_low_latency_subset`
+//    input:   resolve_task_names("fast")
+//    outcome: the 15-name FAST_LINT_ORDER [fmt, version, boundaries, manifests,
+//             daemon-signing-coupling, shear, silent-emit, runtime-stderr,
+//             function-length, legacy-mailbox-paths, nudge-taxonomy,
+//             capability-degradation, spell, hermes-adapter, pytests].
+//    here:    the `fast` profile is [fmt, version, manifests, spell, pytests]
+//             and excludes clippy.
+//    divergence: intentional subset. The fixture's `fast` profile is not
+//             upstream's 15 names. The `ci` profile ([spell, fmt]) has no
+//             upstream counterpart; on a Linux host its windows-probe step is
+//             not selected, so the expected value is fixture-derived.
+//
+// Not ported: upstream `test_resolve_task_names_accepts_sc_boundary_manual_target`
+// and `..._accepts_sc_portability_manual_target` (single-name selection of
+// `sc-boundary` and `sc-portability`). The fixture declares neither step.
 #[test]
 fn test_resolve_task_names_all_includes_new_targets() {
     let (_fixture, loaded) = load_named_membership();
