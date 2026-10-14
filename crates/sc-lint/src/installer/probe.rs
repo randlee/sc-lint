@@ -370,27 +370,40 @@ pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "linux")]
+    use std::fs;
+    #[cfg(target_os = "linux")]
+    use std::os::unix::fs::PermissionsExt;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
-    #[cfg(unix)]
-    use std::process::ChildStdout;
+    #[cfg(target_os = "linux")]
+    use tempfile::tempdir;
 
-    #[cfg(unix)]
-    struct ProbeChildGuard {
-        child: Child,
+    #[cfg(target_os = "linux")]
+    struct DetachedChildGuard {
+        process_id: u32,
     }
 
-    #[cfg(unix)]
-    impl ProbeChildGuard {
-        fn take_stdout(&mut self) -> ChildStdout {
-            self.child.stdout.take().expect("piped stdout")
+    #[cfg(target_os = "linux")]
+    impl Drop for DetachedChildGuard {
+        fn drop(&mut self) {
+            let process_id = self.process_id as libc::pid_t;
+            // SAFETY: the script writes this live detached child's PID before the test
+            // creates the guard; the child runs `sleep 60` until this direct signal.
+            unsafe { libc::kill(process_id, libc::SIGKILL) };
         }
     }
 
-    #[cfg(unix)]
-    impl Drop for ProbeChildGuard {
-        fn drop(&mut self) {
-            terminate_probe_processes(&mut self.child);
+    #[cfg(target_os = "linux")]
+    fn wait_for_probe_file(path: &Path) {
+        let deadline = Instant::now() + Duration::from_secs(1);
+        while !path.is_file() {
+            assert!(
+                Instant::now() < deadline,
+                "probe did not create {}",
+                path.display()
+            );
+            thread::sleep(Duration::from_millis(10));
         }
     }
 
@@ -465,35 +478,33 @@ mod tests {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     #[test]
     fn child_holding_probe_pipe_returns_typed_timeout() {
-        let mut pipe_holder = ProbeChildGuard {
-            child: Command::new("sleep")
-                .arg("60")
-                .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .process_group(0)
-                .spawn()
-                .expect("spawn child holding stdout open"),
-        };
-        let stdout = pipe_holder.take_stdout();
-        let (sender, reader) = mpsc::sync_channel(1);
-        thread::spawn(move || {
-            let _ = sender.send(read_probe_output(stdout));
-        });
+        let directory = tempdir().expect("temporary probe directory");
+        let script = directory.path().join("probe");
+        fs::write(
+            &script,
+            "#!/bin/sh\ndir=$(dirname \"$0\")\nsetsid sleep 60 &\nprintf '%s\\n' \"$!\" > \"$dir/pid\"\n: > \"$dir/ready\"\nexit 0\n",
+        )
+        .expect("write probe script");
+        let mut permissions = fs::metadata(&script).expect("probe metadata").permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script, permissions).expect("make probe executable");
 
-        let mut exited_group = Command::new("sh")
-            .args(["-c", "exit 0"])
-            .process_group(0)
-            .spawn()
-            .expect("spawn exited process group");
-        let exited_process_id = exited_group.id();
-        exited_group.wait().expect("reap exited process group");
+        let (mut child, reader) =
+            spawn_backend_probe(&script, "test", "--help").expect("spawn probe script");
+        wait_for_probe_file(&directory.path().join("ready"));
+        let process_id = fs::read_to_string(directory.path().join("pid"))
+            .expect("read detached child pid")
+            .trim()
+            .parse()
+            .expect("parse detached child pid");
+        let _detached_child = DetachedChildGuard { process_id };
+        let probe_process_id = child.id();
+        child.wait().expect("reap probe script");
 
-        // Use an already-exited group id to model a setsid descendant that
-        // escaped cleanup while retaining the original child's stdout pipe.
-        let error = finish_backend_output(reader, exited_process_id)
+        let error = finish_backend_output(reader, probe_process_id)
             .expect_err("child holding the pipe must time out instead of hanging");
 
         assert!(
