@@ -719,6 +719,82 @@ fn issue376_stale_active_gate() {
 }
 
 #[test]
+fn issue376_owner_unions_explicit_dev_permissions_before_stale_checking() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &(good_member_manifest("q", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(
+        &fixture,
+        "p/runtime.toml",
+        "Runtime",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    write_policy_record(
+        &fixture,
+        "p/development.toml",
+        "Development",
+        &["q"],
+        Some(&["q"]),
+        "active",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("owner policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+}
+
+#[test]
+fn issue376_mixed_active_owner_states_union_permissions() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &(good_member_manifest("q", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(
+        &fixture,
+        "p/active.toml",
+        "Active",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    write_policy_record(
+        &fixture,
+        "p/stub.toml",
+        "Stub",
+        &["q"],
+        Some(&["q"]),
+        "stub_landed",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("mixed-state owner policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+}
+
+#[test]
 fn issue377_semantic_mutations() {
     // Valid Rust raw identifiers, owner-local roots, and roots in an explicitly
     // allowed dependency are all accepted by the semantic inventory pass.

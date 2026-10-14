@@ -109,7 +109,10 @@ fn collect_policy_findings(
         .filter_map(|record| record.policy().map(|policy| (record, policy)))
         .collect::<Vec<_>>();
 
-    for (record, policy) in &policies {
+    for (record, policy) in policies
+        .iter()
+        .filter(|(record, _)| record.requires_workspace_package())
+    {
         for edge in runtime_edges
             .iter()
             .filter(|edge| edge.from == policy.owner)
@@ -164,6 +167,11 @@ fn collect_incoming_policy_findings(
     runtime_edges: &BTreeSet<PackageEdge>,
     dev_edges: &BTreeSet<PackageEdge>,
 ) -> Vec<Finding> {
+    let active_owners = policies
+        .iter()
+        .filter(|(record, _)| record.requires_workspace_package())
+        .map(|(_, policy)| policy.owner.clone())
+        .collect::<BTreeSet<_>>();
     let mut owners = BTreeMap::<
         WorkspacePackageName,
         (
@@ -192,6 +200,9 @@ fn collect_incoming_policy_findings(
     let mut findings = Vec::new();
     let mut stale_permissions = BTreeSet::new();
     for (owner, (record, runtime_allowed, dev_allowed)) in owners {
+        if !active_owners.contains(&owner) {
+            continue;
+        }
         for dependent in runtime_incoming.get(&owner).into_iter().flatten() {
             if !runtime_allowed.contains(dependent) {
                 findings.push(disallowed_dependent_finding(record, dependent, &owner));
@@ -202,35 +213,22 @@ fn collect_incoming_policy_findings(
                 findings.push(disallowed_dependent_finding(record, dependent, &owner));
             }
         }
-    }
-    for (record, policy) in policies {
-        let runtime_live = runtime_incoming.get(&policy.owner);
-        let dev_live = dev_incoming.get(&policy.owner);
-        for dependent in &policy.allowed_dependents {
-            let dev_permission = policy.allowed_dev_dependents.is_none();
-            let is_live = runtime_live.is_some_and(|edges| edges.contains(dependent))
-                || (dev_permission && dev_live.is_some_and(|edges| edges.contains(dependent)));
-            if !is_live && stale_permissions.insert((policy.owner.clone(), dependent.clone())) {
+        for dependent in runtime_allowed.union(&dev_allowed) {
+            let is_live = runtime_allowed.contains(dependent)
+                && runtime_incoming
+                    .get(&owner)
+                    .is_some_and(|edges| edges.contains(dependent))
+                || dev_allowed.contains(dependent)
+                    && dev_incoming
+                        .get(&owner)
+                        .is_some_and(|edges| edges.contains(dependent));
+            if !is_live && stale_permissions.insert((owner.clone(), dependent.clone())) {
                 findings.push(stale_allowed_dependent_finding(
                     record,
                     dependent,
-                    &policy.owner,
+                    &owner,
                     "dependencies.allowed_dependents",
                 ));
-            }
-        }
-        if let Some(dev_dependents) = &policy.allowed_dev_dependents {
-            for dependent in dev_dependents {
-                if !dev_live.is_some_and(|edges| edges.contains(dependent))
-                    && stale_permissions.insert((policy.owner.clone(), dependent.clone()))
-                {
-                    findings.push(stale_allowed_dependent_finding(
-                        record,
-                        dependent,
-                        &policy.owner,
-                        "dependencies.allowed_dev_dependents",
-                    ));
-                }
             }
         }
     }

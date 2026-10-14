@@ -208,6 +208,10 @@ impl ValidatedRecord {
     pub(crate) fn policy(&self) -> Option<&ValidatedDependencyPolicy> {
         self.policy.as_ref()
     }
+
+    pub(crate) fn requires_workspace_package(&self) -> bool {
+        self.record.status.state.requires_workspace_package()
+    }
 }
 
 #[derive(Debug, Clone)]
