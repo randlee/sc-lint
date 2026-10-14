@@ -13,6 +13,11 @@ its backend machine contract.
 - [../architecture.md](../architecture.md)
 - [../../crates/sc-lint-runtime/README.md](../../crates/sc-lint-runtime/README.md)
 
+## Governing ADRs
+
+- [ADR-007 — Analyzer-crate partition](../sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [ADR-013 — Analyzer shared support](../sc-lint/adr/ADR-013-analyzer-shared-support.md)
+
 ## Boundary Rules
 
 - the crate remains separate from `sc-lint-portability` and

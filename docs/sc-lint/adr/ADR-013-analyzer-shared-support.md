@@ -6,7 +6,7 @@
 | Status | Accepted |
 | Date | 2026-08-13 |
 | Deciders | team-lead, clint |
-| Relates to | ARCH-001 / RULE-005 |
+| Relates to | ADR-007, REQ-PRODUCT-003, REQ-PRODUCT-004D |
 
 ## Context
 
