@@ -33,8 +33,19 @@ current planning surface.
   - standard repo-tools adoption kit and rejection of Phase F's consumer-specific engine
 - [`ADR-016-python-wheel-runtime-and-no-rust-configuration.md`](./ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
   - version-matched Python wheel runtime and no-Rust configuration boundary
+- [`ADR-017-phase-k-consumer-contracts.md`](./ADR-017-phase-k-consumer-contracts.md)
+  - accepted Phase K consumer contracts
 
 ## Draft ADRs
+
+- [`ADR-018-shared-source-and-report-types.md`](./ADR-018-shared-source-and-report-types.md)
+  - proposed source-directive and analyzer-report crate ownership; pending Rand approval
+
+## Rejected ADRs
+
+- **ADR-014 — rejected; no ADR file was accepted or created.** ADR-015 records
+  the rejection of Phase F's consumer-specific engine; ADR-014 is intentionally
+  not a governing decision record.
 
 ## Index Rules
 

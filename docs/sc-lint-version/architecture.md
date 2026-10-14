@@ -22,6 +22,10 @@ It owns:
 - [../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
 - [../architecture.md](../architecture.md)
 
+## Governing ADRs
+
+- [ADR-011 — Interface versioning and shared report artifacts](../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+
 ## Boundary Rules
 
 - human-facing HTML/XHTML report rendering stays outside this crate

@@ -15,6 +15,16 @@ runtime/concurrency-correctness rules.
 - the crate must keep its machine contract stable through the top-level CLI
   normalization surface
 
+## Requirement Traceability
+
+- `REQ-PRODUCT-004B` assigns shared standard-library runtime and concurrency
+  correctness rules to this crate.
+- `REQ-PRODUCT-004C` reserves Tokio-specific rules for a separately justified
+  analyzer crate.
+- `SCB-RUNTIME-001` and `SCB-RUNTIME-002` are the current crate-owned rule
+  contracts, documented in the crate README.
+- `NFR-003` records the cross-cutting runtime scope.
+
 ## Related Docs
 
 - [architecture.md](./architecture.md)

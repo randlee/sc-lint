@@ -12,20 +12,20 @@ sc-lint uses sc-observability for structured JSON logging. The crate has both a 
 
 ## Decisions
 
-### ARCH-004 — sc-observability in [dependencies] (not binary-only)
+### ADR-008-D3 — sc-observability in [dependencies] (not binary-only)
 sc-observability lives in `[dependencies]` rather than being scoped to the binary only. This is an accepted trade-off: Cargo does not support binary-only dependencies in a mixed lib+bin crate. Enforcement is by convention and arch-qa, not the build system.
 
-### RULE-001 — sc-observability imports confined to binary modules
+### ADR-008-D1 — sc-observability imports confined to binary modules
 No lib crate module (anything other than `main.rs` and `logging.rs`) may import sc-observability. Library types must not hold or reference sc-observability types directly. Violations are tracked as `ARCH-010` findings.
 
-### RULE-002 — No custom emit_* wrapper functions
+### ADR-008-D2 — No custom emit_* wrapper functions
 Custom wrapper functions named `emit_*` are forbidden. The single approved dispatch helper is `dispatch_event` (formerly `emit_event`, renamed per `ARCH-006/011`). This prevents proliferation of logging indirection.
 
 ### CLI-LAYER-OWNS-LOGGER-INITIALIZATION
 The logger must be initialized in `main.rs` before any operation. Library code must not initialize or depend on a logger being present. Functions accessible from library code must not require or assume logging is initialized.
 
 ### ServiceName seam pattern
-The library defines its own `pub(crate)` `ServiceName` newtype in `contract.rs`. Conversion to `sc_observability::ServiceName` happens only at the `main.rs`/`logging.rs` binary boundary. This keeps `RULE-001` clean.
+The library defines its own `pub(crate)` `ServiceName` newtype in `contract.rs`. Conversion to `sc_observability::ServiceName` happens only at the `main.rs`/`logging.rs` binary boundary. This keeps `ADR-008-D1` clean.
 
 ### OnceLock metadata cells
 Lazy-initialized `OnceLock` metadata cells (service name, crate version, etc.) are held in the binary module tree. They are initialized once per process in `main.rs` and read by `dispatch_event` at each event emission.

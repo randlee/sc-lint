@@ -609,6 +609,28 @@ meaning and lint never installs tools. The managed-wheel helper owns
 inspection, installation and verification; absent declarations add no work.
 This is an amendment to those contracts, not a new product default.
 
+## Non-functional requirements
+
+- `NFR-001` Cross-platform support is a first-class product property. Shipped
+  analyzer behavior and consumer workflows must account for supported host
+  platforms rather than treating non-Unix platforms as best-effort.
+- `NFR-002` Shared portability rules must preserve equivalent intent across
+  supported platform classes. Platform-specific implementations need a
+  companion or an explicit portable fallback where the rule contract requires
+  parity. See `REQ-PRODUCT-004A` through `REQ-PRODUCT-004AC` and ADR-010.
+- `NFR-003` Runtime analysis stays scoped to portable standard-library
+  concurrency and liveness behavior. Framework-specific semantics, including
+  Tokio, remain outside `sc-lint-runtime` unless a dedicated analyzer is
+  approved (`REQ-PRODUCT-004B` and `REQ-PRODUCT-004C`).
+- `NFR-004` The top-level `--json` success and failure envelope is a stable
+  machine interface; backend-native schema changes must be normalized at the
+  CLI boundary (`REQ-PRODUCT-002A` through `REQ-PRODUCT-002DA`).
+- `NFR-005` Release artifacts and consumer setup must preserve verifiable
+  provenance, may cache only already-verified artifacts, and must support
+  offline documentation use after installation. See `REQ-PRODUCT-020`,
+  `REQ-PRODUCT-021`, `REQ-PRODUCT-024`, ADR-016, and GA-002/GA-005/GA-008 in
+  [the Action requirements](./sc-lint/github-action-requirements.md).
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
