@@ -30,6 +30,20 @@ The detailed requirement authorities for this crate are:
 - structured logging remains CLI-owned even when execution is delegated to a
   backend binary
 
+## Requirement Traceability
+
+The canonical requirement statements are owned by the product and CLI
+requirements. This crate-local index makes their application to this package
+explicit without defining duplicate requirements:
+
+- `REQ-PRODUCT-001` and `REQ-PRODUCT-002` define the stable CLI and its
+  parsing, configuration, output, and exit-code ownership.
+- `REQ-PRODUCT-002A` through `REQ-PRODUCT-002DA` define machine-mode and
+  envelope stability; `NFR-004` records the cross-cutting stability property.
+- `REQ-CLI-001` through `REQ-CLI-024` define command-specific CLI behavior.
+- `REQ-LOG-001` through `REQ-LOG-009` define the logging contract in
+  [logging.md](./logging.md).
+
 ## Related Docs
 
 - [architecture.md](./architecture.md)

@@ -387,6 +387,10 @@ Its authoritative sprint/dependency plan is in the `lint-phase-k` beads;
 and issue regressions; final k-10 reconciles shipped 0.7.* and Phase K user
 and offline documentation. Implementation remains gated by plan review.
 
+The shared source-directive and report-type ownership proposal is tracked in
+[draft ADR-018](./sc-lint/adr/ADR-018-shared-source-and-report-types.md) and
+remains pending Rand approval.
+
 ## Planning Conventions
 
 - This file tracks project-level phases and priorities.

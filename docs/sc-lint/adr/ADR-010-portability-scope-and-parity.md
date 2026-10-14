@@ -6,6 +6,7 @@
 | Status | Accepted |
 | Date | 2026-05-24 |
 | Deciders | team-lead, clint |
+| Relates to | ADR-007, REQ-PRODUCT-004A through REQ-PRODUCT-004AC, NFR-001, NFR-002 |
 
 ## Context
 

@@ -125,6 +125,10 @@ Contents:
   — installed-product consumer commands and generated Just integration
 - [`adr/ADR-013-analyzer-shared-support.md`](./adr/ADR-013-analyzer-shared-support.md)
   — shared rule-neutral AST support without analyzer-to-analyzer dependencies
+- [`adr/ADR-017-phase-k-consumer-contracts.md`](./adr/ADR-017-phase-k-consumer-contracts.md)
+  — accepted Phase K consumer contracts
+- [`adr/ADR-018-shared-source-and-report-types.md`](./adr/ADR-018-shared-source-and-report-types.md)
+  — draft source-directive and report-type ownership proposal; pending Rand approval
 - [`logging.md`](./logging.md) — structured logging design, rollout, and event
   schema for the top-level CLI
 - [`../../README.md`](../../README.md) — top-level CLI crate and workspace guide

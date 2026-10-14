@@ -14,6 +14,10 @@ its delegated backend calls without turning logging initialization into a
 backend-owned concern. The release-line design and queued maintenance
 direction satisfy `REQ-LOG-001` through `REQ-LOG-009`.
 
+`docs/requirements.md` is the canonical definition of `REQ-LOG-001` through
+`REQ-LOG-009`. References in this design document identify coverage only and
+do not define a second requirement set.
+
 This document defines both the logging design and the sprint-level
 implementation assignments for Phase `A`, plus the completed Phase `C.10`
 maintenance line. The A.1a bootstrap implementation is now present in

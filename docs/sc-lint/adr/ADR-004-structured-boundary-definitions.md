@@ -6,7 +6,7 @@
 | Status | **Accepted** |
 | Date | 2026-05-06 |
 | Deciders | arch-inj, team-lead, clint |
-| Relates to | REQ-SCB-001 through REQ-SCB-021 |
+| Relates to | REQ-SCB-001 through REQ-SCB-023 |
 
 ---
 
@@ -90,5 +90,14 @@ The tool needs one machine-authoritative source for:
 | Implement `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and `SCB-DEPENDENCY-003` against TOML-backed boundary dependency metadata. | sc-lint implementation owner | Before claiming package-edge dependency enforcement in normal lint runs or release docs |
 | Implement `SCB-INVENTORY-001`, `SCB-INVENTORY-002`, and `SCB-INVENTORY-003` against TOML-backed boundary data. | sc-lint implementation owner | Before inventory-parity enforcement enters CI |
 | Make `[planning].current_sprint` in `boundaries/planning.toml` the authoritative current-sprint source for warn/error escalation. | consumer repository owner | Before planned-gap warnings are permitted in normal lint runs |
+
+## Proposed clarification (pending Rand approval)
+
+The accepted decision above is clarified to match the current
+`REQ-SCB-013`: when `boundaries/` exists, `boundaries/planning.toml` must
+contain a valid `[planning].current_sprint`; if that value cannot be parsed,
+planned-but-missing items fail and must not be downgraded to warnings. When
+`boundaries/` is absent, the loader returns an empty inventory and requires no
+planning metadata. This text is a proposal until Rand approves the ADR edit.
 
 *ADR-004 | sc-lint | 2026-05-06*

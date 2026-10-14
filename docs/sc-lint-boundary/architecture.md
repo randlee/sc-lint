@@ -16,6 +16,14 @@ line, and the boundary-rule machine contract.
 - [graph-schema.md](./graph-schema.md)
 - [../architecture.md](../architecture.md)
 
+## Governing ADRs
+
+- [ADR-004 — Structured boundary definitions](../sc-lint/adr/ADR-004-structured-boundary-definitions.md)
+- [ADR-007 — Analyzer-crate partition](../sc-lint/adr/ADR-007-analyzer-crate-partition.md)
+- [ADR-009 — Observability boundary policy](../sc-lint/adr/ADR-009-observability-boundary-policy.md)
+- [ADR-013 — Analyzer shared support](../sc-lint/adr/ADR-013-analyzer-shared-support.md)
+- [ADR-017 — Phase K consumer contracts](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
+
 ## Boundary Rules
 
 - canonical boundary definitions live in TOML under `boundaries/`
