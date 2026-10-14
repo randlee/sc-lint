@@ -29,6 +29,27 @@ def installer_schema() -> dict[str, Any]:
     return runpy.run_path(str(KIT / "install.py"), run_name="sc_lint_adoption_install")["load_schema"]()
 
 
+def cargo_target_directory() -> Path:
+    metadata = run_subprocess(
+        ["cargo", "metadata", "--no-deps", "--format-version", "1"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
+    )
+    if metadata.returncode != 0:
+        pytest.fail(
+            "could not locate the Cargo target directory: `cargo metadata` "
+            f"exited {metadata.returncode}\n{metadata.stderr}"
+        )
+    try:
+        target_directory = json.loads(metadata.stdout)["target_directory"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        pytest.fail(f"cargo metadata did not report a target_directory: {exc}")
+    return Path(target_directory).resolve()
+
+
 def input_with_adapters(consumer: Path, adapters: object) -> Path:
     data = json.loads((FIXTURES / "install.json").read_text())
     data["analyzers"]["portability"]["platform_adapters"] = adapters
@@ -49,6 +70,7 @@ def tree_snapshot(root: Path) -> dict[str, tuple[str, int, bytes | None]]:
 
 
 def portability_binary() -> Path:
+    target_directory = cargo_target_directory()
     build = run_subprocess(
         ["cargo", "build", "--quiet", "-p", "sc-lint-portability", "--bin", "sc-lint-portability"],
         cwd=ROOT,
@@ -57,11 +79,25 @@ def portability_binary() -> Path:
         check=False,
         timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
     )
-    assert build.returncode == 0, build.stderr
+    if build.returncode != 0:
+        pytest.fail(
+            "could not build the sc-lint-portability analyzer "
+            f"(cargo build exited {build.returncode})\n{build.stderr}"
+        )
     suffix = ".exe" if os.name == "nt" else ""
-    binary = ROOT / "target" / "debug" / f"sc-lint-portability{suffix}"
-    assert binary.is_file(), f"built portability analyzer is missing: {binary}"
+    binary = target_directory / "debug" / f"sc-lint-portability{suffix}"
+    if not binary.is_file():
+        pytest.fail(
+            "cargo build succeeded but the sc-lint-portability analyzer was "
+            f"not found at its reported target path: {binary}"
+        )
     return binary
+
+
+def test_cargo_target_directory_respects_cargo_target_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    expected = tmp_path / "custom-target"
+    monkeypatch.setenv("CARGO_TARGET_DIR", str(expected))
+    assert cargo_target_directory() == expected.resolve()
 
 
 def test_issue372_installer_roundtrip() -> None:
