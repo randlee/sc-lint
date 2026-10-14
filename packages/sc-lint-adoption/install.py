@@ -85,10 +85,16 @@ class Desired:
 
 def _schema_value(value: object, schema: dict, label: str) -> None:
     kind = schema.get("type")
-    if kind == "object" and not isinstance(value, dict): raise ValueError(f"{label} must be an object")
-    if kind == "string" and not isinstance(value, str): raise ValueError(f"{label} must be a string")
-    if kind == "boolean" and type(value) is not bool: raise ValueError(f"{label} must be a boolean")
-    if kind == "array" and not isinstance(value, list): raise ValueError(f"{label} must be an array")
+    accepted_types = kind if isinstance(kind, list) else [kind]
+    matches_type = {
+        "object": lambda item: isinstance(item, dict),
+        "string": lambda item: isinstance(item, str),
+        "boolean": lambda item: type(item) is bool,
+        "array": lambda item: isinstance(item, list),
+    }
+    if kind is not None and not any(matches_type[name](value) for name in accepted_types):
+        expected = " or ".join(accepted_types)
+        raise ValueError(f"{label} must be {expected}")
     if "pattern" in schema and isinstance(value, str) and not re.fullmatch(schema["pattern"], value): raise ValueError(f"{label} does not match {schema['pattern']}")
     if "oneOf" in schema:
         errors = []

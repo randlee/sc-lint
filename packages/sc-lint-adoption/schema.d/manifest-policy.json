@@ -8,10 +8,19 @@
               "type": "array",
               "items": {
                 "type": "object",
+                "required": ["owner_manifest_path", "allowed_dependencies"],
                 "properties": {
-                  "owner_manifest_path": {"type": "string"},
-                  "allowed_dependencies": {"type": "array", "items": {"type": "string"}},
-                  "boundary_record_path": {"type": ["string", "array"], "items": {"type": "string"}}
+                  "owner_manifest_path": {"type": "string", "pattern": ".*\\S.*"},
+                  "allowed_dependencies": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": ".*\\S.*"}
+                  },
+                  "boundary_record_path": {
+                    "oneOf": [
+                      {"type": "string", "pattern": ".*\\S.*"},
+                      {"type": "array", "items": {"type": "string", "pattern": ".*\\S.*"}}
+                    ]
+                  }
                 }
               }
             },
@@ -19,12 +28,19 @@
               "type": "array",
               "items": {
                 "type": "object",
+                "required": ["dependency", "manifest_message", "source_message"],
                 "properties": {
-                  "dependency": {"type": "string"},
-                  "allowed_manifest_paths": {"type": "array", "items": {"type": "string"}},
-                  "allowed_source_roots": {"type": "array", "items": {"type": "string"}},
-                  "manifest_message": {"type": "string"},
-                  "source_message": {"type": "string"}
+                  "dependency": {"type": "string", "pattern": ".*\\S.*"},
+                  "allowed_manifest_paths": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": ".*\\S.*"}
+                  },
+                  "allowed_source_roots": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": ".*\\S.*"}
+                  },
+                  "manifest_message": {"type": "string", "pattern": ".*\\S.*"},
+                  "source_message": {"type": "string", "pattern": ".*\\S.*"}
                 }
               }
             },
@@ -32,11 +48,15 @@
               "type": "array",
               "items": {
                 "type": "object",
+                "required": ["owner_manifest_path", "dependency_package", "message"],
                 "properties": {
-                  "owner_manifest_path": {"type": "string"},
-                  "dependency_package": {"type": "string"},
-                  "allowed_sections": {"type": "array", "items": {"type": "string"}},
-                  "message": {"type": "string"}
+                  "owner_manifest_path": {"type": "string", "pattern": ".*\\S.*"},
+                  "dependency_package": {"type": "string", "pattern": ".*\\S.*"},
+                  "allowed_sections": {
+                    "type": "array",
+                    "items": {"type": "string", "pattern": ".*\\S.*"}
+                  },
+                  "message": {"type": "string", "pattern": ".*\\S.*"}
                 }
               }
             }
