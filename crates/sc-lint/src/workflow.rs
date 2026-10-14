@@ -250,7 +250,7 @@ pub fn run_lint_profile(
     clippy::result_large_err,
     reason = "Consumer lint profiles retain the shared top-level CliError contract."
 )]
-pub fn run_consumer_lint_profile(
+pub(crate) fn run_consumer_lint_profile(
     loaded_config: &LoadedConfig,
     selector: Option<&str>,
     scope: PlatformScope,

@@ -29,18 +29,14 @@ use std::path::Path;
 use serde_json::json;
 
 use crate::CliError;
+use crate::config::CONSUMER_SELECTOR_ALL;
+use crate::workflow::WINDOWS_XWIN_TARGET;
 
 /// Stable top-level code for every invalid consumer profile declaration.
 pub const PROFILE_PLAN_ERROR_CODE: &str = "CLI.SC_LINT_PROFILE_CONFIG_INVALID";
 
 /// Documentation reference attached to profile configuration errors.
 const PROFILE_DOCS_REFERENCE: &str = "sc-lint docs configuration";
-
-/// Selector value that means every declared step (the legacy meaning).
-pub(crate) const SELECTOR_ALL: &str = "all";
-
-/// The only cross-compilation target `cargo xwin` serves (ADR-017 change 4).
-pub const XWIN_MSVC_TARGET: &str = "x86_64-pc-windows-msvc";
 
 /// Machine-readable reason a structured profile error was raised.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -639,14 +635,14 @@ fn validate_profile_name(
     name: &ProfileName,
     declared: &BTreeSet<&str>,
 ) -> Result<(), ProfilePlanError> {
-    if name.as_str() == SELECTOR_ALL || declared.contains(name.as_str()) {
+    if name.as_str() == CONSUMER_SELECTOR_ALL || declared.contains(name.as_str()) {
         return Err(ProfilePlanError::new(
             ProfilePlanDetailCode::AmbiguousName,
             Some(name.as_str()),
             Some("lint_profiles"),
             format!(
                 "profile `{name}` collides with {}",
-                if name.as_str() == SELECTOR_ALL {
+                if name.as_str() == CONSUMER_SELECTOR_ALL {
                     "the reserved selector `all`"
                 } else {
                     "a lint step of the same name"
@@ -750,7 +746,7 @@ fn select_members<'a>(
             ));
         }
     }
-    let Some(name) = selector.filter(|name| name.as_str() != SELECTOR_ALL) else {
+    let Some(name) = selector.filter(|name| name.as_str() != CONSUMER_SELECTOR_ALL) else {
         return Ok(steps.iter().collect());
     };
     steps
@@ -763,7 +759,7 @@ fn select_members<'a>(
                 Some(name.as_str()),
                 Some("selector"),
                 format!("selector `{name}` names no declared lint step"),
-                format!("Select `{SELECTOR_ALL}` or one of the declared step names."),
+                format!("Select `{CONSUMER_SELECTOR_ALL}` or one of the declared step names."),
             )
         })
 }
@@ -804,7 +800,7 @@ fn decide(step: &ConsumerProfileStep, host: Platform) -> Result<PlanDecision, Pr
 fn uses_xwin(platform: Platform, target: &Target, host: Platform) -> bool {
     platform == Platform::Windows
         && matches!(host, Platform::Linux | Platform::MacOS)
-        && target.as_str() == XWIN_MSVC_TARGET
+        && target.as_str() == WINDOWS_XWIN_TARGET
 }
 
 fn planned(
