@@ -558,6 +558,34 @@ pub(crate) fn decode_lint_step_fields(
     Ok((platform, target))
 }
 
+/// Rejects profile-only fields on a consumer test row.
+///
+/// # Errors
+/// Returns `UNKNOWN_STEP_FIELD` because test rows support only `name` and
+/// `command`; platform profile selection applies exclusively to lint rows.
+pub(crate) fn reject_test_step_fields(
+    step: &str,
+    platform: Option<&toml::Value>,
+    target: Option<&toml::Value>,
+    extra_keys: &BTreeMap<String, toml::Value>,
+) -> Result<(), ProfilePlanError> {
+    let field = platform
+        .is_some()
+        .then_some("platform")
+        .or_else(|| target.is_some().then_some("target"))
+        .or_else(|| extra_keys.keys().next().map(String::as_str));
+    let Some(field) = field else {
+        return Ok(());
+    };
+    Err(ProfilePlanError::new(
+        ProfilePlanDetailCode::UnknownStepField,
+        Some(step),
+        Some(field),
+        format!("test step `{step}` has unsupported field `{field}`"),
+        "Test steps accept only `name` and `command`; move platform selection to a lint step.",
+    ))
+}
+
 /// Validated ordered lint profiles: a profile name maps to existing step names.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct LintProfiles(BTreeMap<ProfileName, Vec<String>>);

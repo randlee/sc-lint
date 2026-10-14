@@ -3396,6 +3396,23 @@ fn invalid_step_cases() -> Vec<(&'static str, String, &'static str)> {
     ]
 }
 
+fn invalid_test_step_cases() -> Vec<(&'static str, String, &'static str)> {
+    let test_row = |field: &str| {
+        format!(
+            "[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n{field}\n"
+        )
+    };
+    vec![
+        ("platform", test_row("platform = \"windows\""), "platform"),
+        (
+            "target",
+            test_row("target = \"x86_64-pc-windows-msvc\""),
+            "target",
+        ),
+        ("unknown", test_row("parallel = true"), "parallel"),
+    ]
+}
+
 #[test]
 fn test_profile_rejects_invalid_members_and_targets() {
     for (label, rows, detail_code) in invalid_profile_cases()
@@ -3470,6 +3487,23 @@ fn test_profile_rejects_invalid_members_and_targets() {
             "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
         ]
     );
+}
+
+#[test]
+fn test_profile_rejects_unsupported_test_row_fields() {
+    for (label, rows, field) in invalid_test_step_cases() {
+        let rows = format!("{}\n{rows}", lint_rows(&["fmt"]));
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
+        let error = loaded.expect_err(label);
+        assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE, "{label}");
+        assert_eq!(error.kind, CliErrorKind::Config, "{label}");
+        assert_eq!(
+            error.details["detail_code"], "PROFILE.UNKNOWN_STEP_FIELD",
+            "{label}"
+        );
+        assert_eq!(error.details["field"], field, "{label}");
+        assert_eq!(error.details["step"], "unit", "{label}");
+    }
 }
 
 fn load_named_membership() -> (TempDir, LoadedConfig) {
