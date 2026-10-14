@@ -47,6 +47,34 @@ fn issue136_added_and_stale() {
             ),
         ],
     );
+
+    let dev_fixture = Fixture::new();
+    dev_fixture.workspace();
+    dev_fixture.write(
+        "crates/app/Cargo.toml",
+        &package("app", "[dev-dependencies]\ndep = { path = \"../dep\" }\n"),
+    );
+    dev_fixture.write("crates/app/src/lib.rs", "pub struct App;\n");
+    dev_fixture.boundary_record(&[], &[]);
+    dev_fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = []
+        "#,
+    );
+    let added_dev_dependency = analyze(&dev_fixture, Some("SCB-MANIFEST-003,SCB-MANIFEST-006"))
+        .expect("allowlist policy analyzes development dependencies");
+    assert_failed_findings(
+        &added_dev_dependency,
+        &[(
+            RuleId::ScbManifest003,
+            "manifest_dependency_not_allowlisted",
+            "crates/app/Cargo.toml: remove dependency `dep` or review/add its permission",
+        )],
+    );
 }
 
 #[test]
@@ -119,6 +147,59 @@ fn issue136_record_locks() {
             RuleId::ScbManifest006,
             "manifest_policy_inconsistent",
             "crates/app/Cargo.toml: record lock `boundaries/app/app.toml` must align with the allowlist and dependency sections",
+        )],
+    );
+
+    let union_fixture = Fixture::new();
+    union_fixture.workspace();
+    union_fixture.boundary_record(&[], &[]);
+    union_fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = ["dep"]
+            boundary_record_path = "boundaries/app/app.toml"
+        "#,
+    );
+    let union_mismatch = analyze(&union_fixture, Some("SCB-MANIFEST-006"))
+        .expect("record lock compares the record union with the allowlist");
+    assert_failed_findings(
+        &union_mismatch,
+        &[(
+            RuleId::ScbManifest006,
+            "manifest_policy_inconsistent",
+            "crates/app/Cargo.toml: record lock `boundaries/app/app.toml` must align with the allowlist and dependency sections",
+        )],
+    );
+
+    let owner_fixture = Fixture::new();
+    owner_fixture.workspace();
+    owner_fixture.boundary_record(&["dep"], &[]);
+    owner_fixture.boundary_record_for("dep", "dep", "concrete_landed");
+    owner_fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = ["dep"]
+            boundary_record_path = "boundaries/dep/dep.toml"
+
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/dep/Cargo.toml"
+            allowed_dependencies = []
+        "#,
+    );
+    let other_owner = analyze(&owner_fixture, Some("SCB-MANIFEST-006"))
+        .expect("record lock rejects another owner's record");
+    assert_failed_findings(
+        &other_owner,
+        &[(
+            RuleId::ScbManifest006,
+            "manifest_policy_inconsistent",
+            "crates/app/Cargo.toml: record lock `boundaries/dep/dep.toml` belongs to a different owner",
         )],
     );
 }
