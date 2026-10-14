@@ -1819,7 +1819,7 @@ fn catalog_lists_every_rule_id() {
 }
 
 #[test]
-fn issue372_separate_adapter_pair_suppresses_only_the_enclosing_module() {
+fn issue372_retains_public_and_unrelated_parity() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -2110,7 +2110,7 @@ fn issue372_invalid_adapter_matrix_covers_every_row_and_stable_code() {
 }
 
 #[test]
-fn issue372_empty_adapter_list_preserves_prior_findings() {
+fn issue372_filter_precedence_and_empty() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
@@ -2129,6 +2129,23 @@ fn issue372_empty_adapter_list_preserves_prior_findings() {
     .unwrap();
 
     assert_eq!(absent.findings, empty.findings);
+
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\n\
+         exclude_paths = [\"crates/example/src/lib.rs\"]\n\
+         [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]\n\
+         \"PORT-010\" = [\"crates/example/src/lib.rs\"]\n",
+    );
+    let excluded = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+        },
+        None,
+        Some("PORT-010"),
+    )
+    .expect("filtering keeps optional adapter validation independent");
+    assert!(excluded.findings.is_empty());
 }
 
 struct WorkspaceFixture {
