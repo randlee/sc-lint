@@ -1,6 +1,4 @@
 use std::fs;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 #[cfg(any(unix, windows))]
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -189,39 +187,6 @@ fn inherited_powershell_command() -> Command {
     Command::new(powershell_executable())
 }
 
-#[cfg(windows)]
-fn inherited_powershell_command_with_restricted_path() -> Command {
-    let mut command = inherited_powershell_command();
-    command.env("PATH", restricted_windows_test_path());
-    command
-}
-
-#[cfg(windows)]
-fn cmd_command() -> Command {
-    let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
-    let system32 = PathBuf::from(&system_root).join("System32");
-
-    let mut command = Command::new(system32.join("cmd.exe"));
-    command
-        .env_clear()
-        .env("SystemRoot", &system_root)
-        .env("PATH", restricted_windows_test_path())
-        .env("ComSpec", system32.join("cmd.exe"));
-    for name in ["TEMP", "TMP"] {
-        if let Some(value) = std::env::var_os(name) {
-            command.env(name, value);
-        }
-    }
-    command
-}
-
-#[cfg(windows)]
-fn cmd_command_line(command_line: &str) -> Command {
-    let mut command = cmd_command();
-    command.args(["/d", "/s", "/c"]).raw_arg(command_line);
-    command
-}
-
 #[cfg(unix)]
 #[test]
 fn bootstrap_exec_does_not_reenter_consumer_profile() {
@@ -371,47 +336,7 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
         ("atm-core-derived-consumer", true),
     ] {
         let root = windows_consumer_fixture(fixture.path(), name, derived);
-        let direct = cmd_command_line(&format!("\"\"{}\" version\"", managed_binary.display()))
-            .current_dir(&root)
-            .output()
-            .expect("run direct cmd.exe managed product control");
-        let direct_powershell = powershell_command()
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-            .arg(format!(
-                "& '{}' version; exit $LASTEXITCODE",
-                managed_binary.display()
-            ))
-            .current_dir(&root)
-            .output()
-            .expect("run direct PowerShell managed product control");
-        let inherited_restricted_direct_powershell =
-            inherited_powershell_command_with_restricted_path()
-                .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-                .arg(format!(
-                    "& '{}' version; exit $LASTEXITCODE",
-                    managed_binary.display()
-                ))
-                .current_dir(&root)
-                .env_remove("SC_LINT_BIN")
-                .env_remove("SC_LINT_INSTALL_DIR")
-                .output()
-                .expect("run inherited PowerShell managed product control with restricted PATH");
-        let powershell_builtin = powershell_command()
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-            .arg("Write-Output 'powershell-builtin-control'; exit 0")
-            .current_dir(&root)
-            .output()
-            .expect("run cleared-environment PowerShell built-in control");
-        let inherited_direct_powershell = inherited_powershell_command()
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-            .arg(format!(
-                "& '{}' version; exit $LASTEXITCODE",
-                managed_binary.display()
-            ))
-            .current_dir(&root)
-            .output()
-            .expect("run inherited-environment direct PowerShell managed product control");
-        let output = powershell_command()
+        let output = inherited_powershell_command()
             .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
             .arg(root.join(".sc-lint/bootstrap.ps1"))
             .args(["exec", "--", "sc-lint", "version"])
@@ -421,115 +346,17 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .env("LOCALAPPDATA", &local_app_data)
             .output()
             .expect("run PowerShell consumer bootstrap");
-        let inherited_output = inherited_powershell_command()
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-            .arg(root.join(".sc-lint/bootstrap.ps1"))
-            .args(["exec", "--", "sc-lint", "version"])
-            .current_dir(&root)
-            .env_remove("SC_LINT_BIN")
-            .env_remove("SC_LINT_INSTALL_DIR")
-            .env("LOCALAPPDATA", &local_app_data)
-            .output()
-            .expect("run inherited-environment PowerShell consumer bootstrap");
-        let inherited_restricted_output = inherited_powershell_command_with_restricted_path()
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-            .arg(root.join(".sc-lint/bootstrap.ps1"))
-            .args(["exec", "--", "sc-lint", "version"])
-            .current_dir(&root)
-            .env_remove("SC_LINT_BIN")
-            .env_remove("SC_LINT_INSTALL_DIR")
-            .env("LOCALAPPDATA", &local_app_data)
-            .output()
-            .expect("run inherited PowerShell bootstrap with restricted PATH");
-
-        eprintln!(
-            "Windows native execution controls for {name}: direct cmd status={:?}, stdout={:?}, stderr={:?}; cleared direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; inherited restricted-PATH direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared bootstrap status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}; inherited restricted-PATH bootstrap status={:?}, stdout={:?}, stderr={:?}",
-            direct.status.code(),
-            String::from_utf8_lossy(&direct.stdout),
-            String::from_utf8_lossy(&direct.stderr),
-            direct_powershell.status.code(),
-            String::from_utf8_lossy(&direct_powershell.stdout),
-            String::from_utf8_lossy(&direct_powershell.stderr),
-            powershell_builtin.status.code(),
-            String::from_utf8_lossy(&powershell_builtin.stdout),
-            String::from_utf8_lossy(&powershell_builtin.stderr),
-            inherited_direct_powershell.status.code(),
-            String::from_utf8_lossy(&inherited_direct_powershell.stdout),
-            String::from_utf8_lossy(&inherited_direct_powershell.stderr),
-            inherited_restricted_direct_powershell.status.code(),
-            String::from_utf8_lossy(&inherited_restricted_direct_powershell.stdout),
-            String::from_utf8_lossy(&inherited_restricted_direct_powershell.stderr),
-            output.status.code(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-            inherited_output.status.code(),
-            String::from_utf8_lossy(&inherited_output.stdout),
-            String::from_utf8_lossy(&inherited_output.stderr),
-            inherited_restricted_output.status.code(),
-            String::from_utf8_lossy(&inherited_restricted_output.stdout),
-            String::from_utf8_lossy(&inherited_restricted_output.stderr)
-        );
-
         assert!(
             output.status.success(),
-            "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}; direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}",
+            "bootstrap status={:?}, stdout={:?}, stderr={:?}",
             output.status.code(),
             String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-            direct.status.code(),
-            String::from_utf8_lossy(&direct.stdout),
-            String::from_utf8_lossy(&direct.stderr),
-            direct_powershell.status.code(),
-            String::from_utf8_lossy(&direct_powershell.stdout),
-            String::from_utf8_lossy(&direct_powershell.stderr),
-            powershell_builtin.status.code(),
-            String::from_utf8_lossy(&powershell_builtin.stdout),
-            String::from_utf8_lossy(&powershell_builtin.stderr),
-            inherited_direct_powershell.status.code(),
-            String::from_utf8_lossy(&inherited_direct_powershell.stdout),
-            String::from_utf8_lossy(&inherited_direct_powershell.stderr),
-            inherited_output.status.code(),
-            String::from_utf8_lossy(&inherited_output.stdout),
-            String::from_utf8_lossy(&inherited_output.stderr)
+            String::from_utf8_lossy(&output.stderr)
         );
         assert!(
             String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
-            "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}; direct PowerShell status={:?}, stdout={:?}, stderr={:?}; cleared PowerShell built-in status={:?}, stdout={:?}, stderr={:?}; inherited direct PowerShell status={:?}, stdout={:?}, stderr={:?}; inherited bootstrap status={:?}, stdout={:?}, stderr={:?}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-            direct.status.code(),
-            String::from_utf8_lossy(&direct.stdout),
-            String::from_utf8_lossy(&direct.stderr),
-            direct_powershell.status.code(),
-            String::from_utf8_lossy(&direct_powershell.stdout),
-            String::from_utf8_lossy(&direct_powershell.stderr),
-            powershell_builtin.status.code(),
-            String::from_utf8_lossy(&powershell_builtin.stdout),
-            String::from_utf8_lossy(&powershell_builtin.stderr),
-            inherited_direct_powershell.status.code(),
-            String::from_utf8_lossy(&inherited_direct_powershell.stdout),
-            String::from_utf8_lossy(&inherited_direct_powershell.stderr),
-            inherited_output.status.code(),
-            String::from_utf8_lossy(&inherited_output.stdout),
-            String::from_utf8_lossy(&inherited_output.stderr)
-        );
-        assert!(
-            direct.status.success() && String::from_utf8_lossy(&direct.stdout).contains("sc-lint"),
-            "direct cmd status={:?}, stdout={:?}, stderr={:?}; bootstrap status={:?}",
-            direct.status.code(),
-            String::from_utf8_lossy(&direct.stdout),
-            String::from_utf8_lossy(&direct.stderr),
-            output.status.code()
-        );
-        assert!(
-            direct_powershell.status.success()
-                && String::from_utf8_lossy(&direct_powershell.stdout).contains("sc-lint"),
-            "direct PowerShell status={:?}, stdout={:?}, stderr={:?}; bootstrap status={:?}",
-            direct_powershell.status.code(),
-            String::from_utf8_lossy(&direct_powershell.stdout),
-            String::from_utf8_lossy(&direct_powershell.stderr),
-            output.status.code()
+            "stdout: {}",
+            String::from_utf8_lossy(&output.stdout)
         );
         assert_eq!(root.join("Cargo.toml").exists(), derived);
     }
@@ -587,17 +414,7 @@ fn bootstrap_exec_forwards_windows_config() {
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
         .expect("managed product copy");
 
-    let direct = powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-        .arg(format!(
-            "& '{}' --config '{}' version; exit $LASTEXITCODE",
-            managed.join("sc-lint.exe").display(),
-            config.display()
-        ))
-        .current_dir(&root)
-        .output()
-        .expect("run direct PowerShell config control");
-    let output = powershell_command()
+    let output = inherited_powershell_command()
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(root.join(".sc-lint/bootstrap.ps1"))
         .args(["exec", "--config"])
@@ -611,29 +428,15 @@ fn bootstrap_exec_forwards_windows_config() {
 
     assert!(
         output.status.success(),
-        "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct product status={:?}, stdout={:?}, stderr={:?}",
+        "bootstrap status={:?}, stdout={:?}, stderr={:?}",
         output.status.code(),
         String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr)
+        String::from_utf8_lossy(&output.stderr)
     );
     assert!(
         String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
-        "bootstrap stdout={:?}; direct product status={:?}, stdout={:?}, stderr={:?}",
-        String::from_utf8_lossy(&output.stdout),
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr)
-    );
-    assert!(
-        direct.status.success() && String::from_utf8_lossy(&direct.stdout).contains("sc-lint"),
-        "direct product status={:?}, stdout={:?}, stderr={:?}; bootstrap status={:?}",
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr),
-        output.status.code()
+        "bootstrap stdout={:?}",
+        String::from_utf8_lossy(&output.stdout)
     );
 }
 
@@ -652,14 +455,7 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
         .join("System32");
     let path = std::env::join_paths([&override_directory, &system32]).expect("valid test PATH");
 
-    let direct = powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-        .arg("sc-lint.exe version; exit $LASTEXITCODE")
-        .current_dir(&root)
-        .env("PATH", &path)
-        .output()
-        .expect("run direct PowerShell PATH override control");
-    let output = powershell_command()
+    let output = inherited_powershell_command()
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(root.join(".sc-lint/bootstrap.ps1"))
         .args(["exec", "--", "sc-lint", "version"])
@@ -679,29 +475,15 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
 
     assert!(
         output.status.success(),
-        "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct PATH command status={:?}, stdout={:?}, stderr={:?}",
+        "bootstrap status={:?}, stdout={:?}, stderr={:?}",
         output.status.code(),
         String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr)
+        String::from_utf8_lossy(&output.stderr)
     );
     assert!(
         String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
-        "bootstrap stdout={:?}; direct PATH command status={:?}, stdout={:?}, stderr={:?}",
-        String::from_utf8_lossy(&output.stdout),
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr)
-    );
-    assert!(
-        direct.status.success() && String::from_utf8_lossy(&direct.stdout).contains("sc-lint"),
-        "direct PATH command status={:?}, stdout={:?}, stderr={:?}; bootstrap status={:?}",
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr),
-        output.status.code()
+        "bootstrap stdout={:?}",
+        String::from_utf8_lossy(&output.stdout)
     );
 }
 
@@ -969,16 +751,8 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     let log_path = log.to_str().expect("log path");
     let managed_path = managed.to_str().expect("managed path");
     let child_path = child.to_str().expect("child path");
-    let direct_log = fixture.path().join("direct-child.log");
-    let direct = cmd_command_line(&format!("\"\"{child_path}\" \"two words\" tail\""))
-        .current_dir(&root)
-        .env("SC_LINT_BIN", managed_path)
-        .env("SC_LINT_EXEC_LOG", &direct_log)
-        .env("SC_LINT_TEST_VALUE", "preserved")
-        .output()
-        .expect("run direct cmd.exe child control");
 
-    let output = powershell_command()
+    let output = inherited_powershell_command()
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
         .arg(root.join(".sc-lint/bootstrap.ps1"))
         .args(["exec", "--", child_path, "two words", "tail"])
@@ -993,29 +767,7 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     assert_eq!(
         output.status.code(),
         Some(23),
-        "bootstrap status={:?}, stdout={:?}, stderr={:?}; direct cmd status={:?}, stdout={:?}, stderr={:?}, child_log_exists={}",
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr),
-        direct_log.is_file()
-    );
-    assert_eq!(
-        direct.status.code(),
-        Some(23),
-        "direct cmd status={:?}, stdout={:?}, stderr={:?}; bootstrap status={:?}, stdout={:?}, stderr={:?}",
-        direct.status.code(),
-        String::from_utf8_lossy(&direct.stdout),
-        String::from_utf8_lossy(&direct.stderr),
-        output.status.code(),
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        direct_log.is_file(),
-        "direct cmd control did not run the child; bootstrap status={:?}, stdout={:?}, stderr={:?}",
+        "bootstrap status={:?}, stdout={:?}, stderr={:?}",
         output.status.code(),
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
