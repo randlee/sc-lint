@@ -367,7 +367,9 @@ fn exclude_paths_drops_findings_from_matching_files() {
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
     fixture.write_lint_config(
-        "[tool.sc-lint.analyzers.portability]\nexclude_paths = [\"crates/example/src/**\"]\n",
+        r#"[tool.sc-lint.analyzers.portability]
+exclude_paths = ["crates\\example\\src\\**"]
+"#,
     );
     fixture.write_source(
         "example",
@@ -434,7 +436,7 @@ fn issue385_rule_path_exclusion_retains_other_rule() {
     fixture.write_lint_config(
         r#"
         [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
-        "PORT-007" = ["crates/example/src/lib.rs"]
+        "PORT-007" = ["crates\\example\\src\\lib.rs"]
         "#,
     );
     let report = analyze_workspace(&AnalyzeOptions {
@@ -2366,10 +2368,12 @@ fn issue372_filter_precedence_and_empty() {
     );
 
     fixture.write_lint_config(
-        "[tool.sc-lint.analyzers.portability]\n\
-         exclude_paths = [\"crates/example/src/lib.rs\"]\n\
-         [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]\n\
-         \"PORT-010\" = [\"crates/example/src/lib.rs\"]\n",
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        exclude_paths = ["crates\\example\\src\\lib.rs"]
+        [tool.sc-lint.analyzers.portability.exclude_paths_by_rule]
+        "PORT-010" = ["crates\\example\\src\\lib.rs"]
+        "#,
     );
     let excluded = analyze_workspace_configured(
         &AnalyzeOptions {

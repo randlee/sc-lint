@@ -99,5 +99,6 @@ Logging options can be set under the repository's existing logging settings;
 they do not change the compatibility contract. Use `--json` for machine
 consumers and keep the human diagnostics available for operators.
 
-See [using sc-lint](./using-sc-lint.md) and the package guides for analyzer
+See [profiles, platform scope, and declared tools](./using-sc-lint.md#profiles-platform-scope-and-declared-tools)
+for consumer lint-step syntax, and the package guides for analyzer
 configuration details.

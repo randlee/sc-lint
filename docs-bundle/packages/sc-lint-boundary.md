@@ -16,6 +16,21 @@ invocation is reserved for product development and release diagnostics.
 The analyzer reads the workspace Cargo metadata and canonical boundary TOML
 inventory. `sc-lint-attributes` and `sc-lint-directives` provide source policy;
 the package's boundary requirements describe inventory fields and exceptions.
+Optional manifest dependency policies are configured in the boundary analyzer
+table through `manifest_dependency_allowlists`,
+`global_dependency_ownership`, and `manifest_section_rules`; see
+[configuration](../configuration.md) for their syntax.
+
+## Recovering inventory and stale-policy findings
+
+For `SCB-BOUNDARY-004`, use the reported record and field to correct the
+inventory value or structure. For `SCB-DEPENDENCY-004`, remove a stale incoming
+permission or restore the intended direct workspace-package edge. For
+`SCB-MANIFEST-006`, use the owner and record path in the finding to remove a
+duplicate or inactive allowlist, repair its record lock, or align the
+allowlist with the owner's actual dependency sections. These are declaration
+and inventory corrections; do not suppress the finding by deleting unrelated
+metadata.
 
 ## Commands and output
 
@@ -90,7 +105,7 @@ preserved; only a resolved external crate-qualified root such as
 `sample_client::Api` participates in dependent-policy validation. An unresolved
 workspace package name also fails instead of being silently skipped.
 
-ADR-017 additions remain compatible with existing consumers: omitted
+Newer optional keys remain compatible with existing consumers: omitted
 `exclude_paths_by_rule` and `platform_adapters` retain prior behavior, and an
 absent optional manifest-policy family adds no manifest checks. Existing
 inventory permission fields keep their established semantics. When a policy
