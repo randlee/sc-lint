@@ -34,6 +34,7 @@ pub(crate) fn analyze(
         inventory.context("manifest dependency allowlists require validated boundary inventory")?;
     let packages = crate::workspace_packages(metadata);
     let manifests = manifest_packages(root, &packages)?;
+    let active_owners = active_owner_packages(inventory);
     let mut configured = BTreeSet::new();
     let mut findings = Vec::new();
 
@@ -42,14 +43,15 @@ pub(crate) fn analyze(
             root,
             inventory,
             &manifests,
+            &active_owners,
             &mut configured,
             allowlist,
         ));
     }
     findings.extend(missing_active_owner_allowlists(
         root,
-        inventory,
         &packages,
+        &active_owners,
         &configured,
     )?);
     Ok(findings)
@@ -74,21 +76,19 @@ fn analyze_allowlist(
     root: &Path,
     inventory: &ValidatedInventory,
     manifests: &BTreeMap<String, &Package>,
+    active_owners: &BTreeSet<String>,
     configured: &mut BTreeSet<String>,
     allowlist: &ManifestAllowlist,
 ) -> Vec<Finding> {
     let owner = allowlist.owner.display();
     if !configured.insert(owner.clone()) {
-        return vec![stale(&owner, "duplicate allowlist owner")];
+        return vec![stale(&owner, "duplicate allowlist owner entry")];
     }
     let Some(package) = manifests.get(&owner) else {
-        return vec![stale(&owner, "owner manifest is not a workspace member")];
+        return vec![stale(&owner, "non-workspace allowlist owner")];
     };
-    if !has_exactly_one_active_record(inventory, package) {
-        return vec![stale(
-            &owner,
-            "owner must have exactly one active boundary record",
-        )];
+    if !active_owners.contains(package.name.as_str()) {
+        return vec![stale(&owner, "inactive allowlist owner")];
     }
     let actual = ActualDependencies::from_package(package);
     let mut findings = compare_dependencies(&owner, &actual, allowlist);
@@ -98,13 +98,13 @@ fn analyze_allowlist(
     findings
 }
 
-fn has_exactly_one_active_record(inventory: &ValidatedInventory, package: &Package) -> bool {
+fn active_owner_packages(inventory: &ValidatedInventory) -> BTreeSet<String> {
     inventory
         .records()
-        .filter_map(|record| record.policy())
-        .filter(|policy| policy.owner.as_ref() == package.name.as_str())
-        .count()
-        == 1
+        .filter(|record| record.policy().is_some())
+        .filter_map(|record| record.owner())
+        .map(ToString::to_string)
+        .collect()
 }
 
 impl ActualDependencies {
@@ -228,21 +228,19 @@ fn validate_record_locks(
 
 fn missing_active_owner_allowlists(
     root: &Path,
-    inventory: &ValidatedInventory,
     packages: &[&Package],
+    active_owners: &BTreeSet<String>,
     configured: &BTreeSet<String>,
 ) -> Result<Vec<Finding>> {
     let mut findings = Vec::new();
-    for record in inventory.records().filter_map(|record| record.policy()) {
-        let Some(package) = packages
-            .iter()
-            .find(|package| package.name.as_str() == record.owner.as_ref())
-        else {
-            continue;
-        };
+    // Multiple active records may share one workspace owner; policy coverage is once per package.
+    for package in packages
+        .iter()
+        .filter(|package| active_owners.contains(package.name.as_str()))
+    {
         let path = relative(root, package.manifest_path.as_std_path())?;
         if !configured.contains(&path) {
-            findings.push(stale(&path, "missing active-owner allowlist entry"));
+            findings.push(stale(&path, "missing allowlist entry for active owner"));
         }
     }
     Ok(findings)

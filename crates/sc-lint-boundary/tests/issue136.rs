@@ -641,6 +641,146 @@ fn issue136_empty_ownership_paths_and_sections_remain_accepted() {
     .expect("empty strings remain accepted in ownership paths and sections");
 }
 
+#[test]
+fn issue136_names_inactive_allowlist_owners() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.boundary_record_with_owner("app", "app", "retired");
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = ["dep"]
+        "#,
+    );
+
+    let messages = analyze_messages(&fixture);
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("inactive allowlist owner"))
+    );
+}
+
+#[test]
+fn issue136_names_duplicate_allowlist_owners() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.boundary_record(&[], &[]);
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = ["dep"]
+
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = ["dep"]
+        "#,
+    );
+
+    let messages = analyze_messages(&fixture);
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("duplicate allowlist owner entry"))
+    );
+}
+
+#[test]
+fn issue136_names_non_workspace_allowlist_owners() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.boundary_record(&[], &[]);
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/missing/Cargo.toml"
+            allowed_dependencies = []
+        "#,
+    );
+
+    let messages = analyze_messages(&fixture);
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("non-workspace allowlist owner"))
+    );
+}
+
+#[test]
+fn issue136_reports_missing_allowlist_for_directory_alias_owner() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &package(
+            "application",
+            "[dependencies]\ndep = { path = \"../dep\" }\n",
+        ),
+    );
+    fixture.boundary_record_with_owner("app", "application", "concrete_landed");
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/dep/Cargo.toml"
+            allowed_dependencies = []
+        "#,
+    );
+
+    let messages = analyze_messages(&fixture);
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.contains("missing allowlist entry for active owner"))
+    );
+}
+
+#[test]
+fn issue136_one_allowlist_covers_multiple_active_records_for_an_owner() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.boundary_record(&[], &[]);
+    fixture.write_boundary_record(
+        "boundaries/app/extra.toml",
+        "BOUNDARY-App-Extra",
+        "app",
+        "app",
+        "App Extra",
+        "concrete_landed",
+        &[],
+        &[],
+    );
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = ["dep"]
+        "#,
+    );
+
+    let messages = analyze_messages(&fixture);
+    assert!(
+        !messages
+            .iter()
+            .any(|message| message.contains("inactive allowlist owner"))
+    );
+    assert!(!messages.iter().any(|message| {
+        message.contains("exactly one active boundary record")
+            || message.contains("multiple active boundary records")
+    }));
+}
+
 struct Fixture(TempDir);
 
 impl Fixture {
@@ -669,6 +809,40 @@ impl Fixture {
         );
     }
     fn boundary_record(&self, allowed_dependencies: &[&str], allowed_dev_dependencies: &[&str]) {
+        self.write_boundary_record(
+            "boundaries/app/app.toml",
+            "BOUNDARY-App",
+            "app",
+            "app",
+            "App",
+            "concrete_landed",
+            allowed_dependencies,
+            allowed_dev_dependencies,
+        );
+    }
+    fn boundary_record_with_owner(&self, owner_package: &str, owner_crate: &str, state: &str) {
+        self.write_boundary_record(
+            "boundaries/app/app.toml",
+            "BOUNDARY-App",
+            owner_package,
+            owner_crate,
+            "App",
+            state,
+            &[],
+            &[],
+        );
+    }
+    fn write_boundary_record(
+        &self,
+        relative: &str,
+        boundary_id: &str,
+        owner_package: &str,
+        owner_crate: &str,
+        name: &str,
+        state: &str,
+        allowed_dependencies: &[&str],
+        allowed_dev_dependencies: &[&str],
+    ) {
         let allowed_dependencies = toml_array(allowed_dependencies);
         let allowed_dev_dependencies = toml_array(allowed_dev_dependencies);
         self.write(
@@ -676,13 +850,13 @@ impl Fixture {
             "[planning]\ncurrent_sprint = \"K.4\"\n",
         );
         self.write(
-            "boundaries/app/app.toml",
+            relative,
             &format!(
                 r#"
-                boundary_id = "BOUNDARY-App"
-                owner_package = "app"
-                owner_crate_path = "app"
-                name = "App"
+                boundary_id = "{boundary_id}"
+                owner_package = "{owner_package}"
+                owner_crate_path = "{owner_crate}"
+                name = "{name}"
 
                 [public]
                 facade = "App"
@@ -715,8 +889,8 @@ impl Fixture {
                 review_gates = []
 
                 [status]
-                state = "concrete_landed"
-            "#,
+                state = "{state}"
+            "#
             ),
         );
     }
@@ -835,6 +1009,23 @@ fn policy(contents: &str) -> String {
             "[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists.",
         );
     format!("[tool.sc-lint.analyzers.boundary]\n{contents}")
+}
+
+fn analyze_messages(fixture: &Fixture) -> Vec<String> {
+    analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        Some("manifests"),
+    )
+    .expect("configured manifest policy analyzes")
+    .findings
+    .into_iter()
+    .map(|finding| finding.message)
+    .collect()
 }
 
 fn package(name: &str, tail: &str) -> String {
