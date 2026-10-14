@@ -1,6 +1,10 @@
 //! Backend and version probes for installed sc-lint binaries.
 
 use super::*;
+use std::sync::mpsc::{self, RecvTimeoutError};
+
+const BACKEND_OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(50);
+const BACKEND_OUTPUT_STOP_TIMEOUT: Duration = Duration::from_millis(250);
 
 /// Probe the supported CLI help contract and analyzer command surface.
 pub(super) fn backend_cli_failure(
@@ -61,7 +65,8 @@ pub(super) fn run_backend_probe(
     let (mut child, reader) = spawn_backend_probe(binary, expected_name, argument)?;
     let process_id = child.id();
     let status = wait_for_backend_probe(&mut child, binary, expected_name, argument, timeout)?;
-    let output = finish_backend_output(reader, process_id, binary, expected_name, argument)?;
+    let output = finish_backend_output(reader, process_id)
+        .map_err(|error| error.to_probe_message(binary, expected_name, argument))?;
     Ok((status, output))
 }
 
@@ -93,7 +98,10 @@ pub(super) fn spawn_backend_probe(
             binary.display(),
         ));
     };
-    let reader = thread::spawn(move || read_probe_output(stdout));
+    let (sender, reader) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let _ = sender.send(read_probe_output(stdout));
+    });
     Ok((child, reader))
 }
 
@@ -133,35 +141,60 @@ pub(super) fn wait_for_backend_probe(
 pub(super) fn finish_backend_output(
     reader: ProbeOutputReader,
     process_id: u32,
-    binary: &Path,
-    expected_name: &str,
-    argument: &str,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, BackendOutputError> {
     // A descendant can outlive the direct child while holding stdout open.
     // Give the reader a short chance to drain normal output, then stop the
     // process group instead of waiting indefinitely for EOF.
-    let drain_deadline = Instant::now() + Duration::from_millis(50);
-    while !reader.is_finished() && Instant::now() < drain_deadline {
-        thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
+    match reader.recv_timeout(BACKEND_OUTPUT_DRAIN_TIMEOUT) {
+        Ok(result) => return format_probe_output_result(result),
+        Err(RecvTimeoutError::Disconnected) => {
+            return Err(BackendOutputError::ReaderStopped);
+        }
+        Err(RecvTimeoutError::Timeout) => {}
     }
-    if !reader.is_finished()
-        && let Err(error) = terminate_probe_process_tree(process_id)
-    {
-        return Err(format!(
-            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited: {error}",
-            binary.display()
-        ));
+    terminate_probe_process_tree(process_id).map_err(BackendOutputError::ProcessTreeStop)?;
+    match reader.recv_timeout(BACKEND_OUTPUT_STOP_TIMEOUT) {
+        Ok(result) => format_probe_output_result(result),
+        Err(RecvTimeoutError::Timeout) => Err(BackendOutputError::Timeout {
+            wait: BACKEND_OUTPUT_STOP_TIMEOUT,
+        }),
+        Err(RecvTimeoutError::Disconnected) => Err(BackendOutputError::ReaderStopped),
     }
-    match reader.join() {
-        Ok(Ok(output)) => Ok(output),
-        Ok(Err(error)) => Err(format!(
-            "could not read `{argument}` output from backend companion `{expected_name}` at `{}`: {error}",
-            binary.display()
-        )),
-        Err(_) => Err(format!(
-            "`{argument}` output reader panicked for backend companion `{expected_name}` at `{}`",
-            binary.display()
-        )),
+}
+
+fn format_probe_output_result(result: io::Result<Vec<u8>>) -> Result<Vec<u8>, BackendOutputError> {
+    result.map_err(BackendOutputError::Read)
+}
+
+#[derive(Debug)]
+pub(super) enum BackendOutputError {
+    Read(io::Error),
+    ReaderStopped,
+    ProcessTreeStop(io::Error),
+    Timeout { wait: Duration },
+}
+
+impl BackendOutputError {
+    fn to_probe_message(&self, binary: &Path, expected_name: &str, argument: &str) -> String {
+        match self {
+            Self::Read(error) => format!(
+                "could not read `{argument}` output from backend companion `{expected_name}` at `{}`: {error}",
+                binary.display()
+            ),
+            Self::ReaderStopped => format!(
+                "`{argument}` output reader stopped without a result for backend companion `{expected_name}` at `{}`",
+                binary.display()
+            ),
+            Self::ProcessTreeStop(error) => format!(
+                "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited: {error}",
+                binary.display()
+            ),
+            Self::Timeout { wait } => format!(
+                "backend companion `{expected_name}` at `{}` timed out waiting for `{argument}` output to close after {} ms; a descendant may still hold the pipe",
+                binary.display(),
+                wait.as_millis()
+            ),
+        }
     }
 }
 
@@ -405,5 +438,49 @@ mod tests {
                 "exit {code:?} must stay an error"
             );
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn child_holding_probe_pipe_returns_typed_timeout() {
+        let mut pipe_holder = Command::new("sleep")
+            .arg("2")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .expect("spawn child holding stdout open");
+        let stdout = pipe_holder.stdout.take().expect("piped stdout");
+        let (sender, reader) = mpsc::sync_channel(1);
+        thread::spawn(move || {
+            let _ = sender.send(read_probe_output(stdout));
+        });
+
+        let mut exited_group = Command::new("sh")
+            .args(["-c", "exit 0"])
+            .process_group(0)
+            .spawn()
+            .expect("spawn exited process group");
+        let exited_process_id = exited_group.id();
+        exited_group.wait().expect("reap exited process group");
+
+        // Use an already-exited group id to model a setsid descendant that
+        // escaped cleanup while retaining the original child's stdout pipe.
+        let started = Instant::now();
+        let error = finish_backend_output(reader, exited_process_id)
+            .expect_err("child holding the pipe must time out instead of hanging");
+
+        terminate_probe_process_tree(pipe_holder.id()).expect("stop pipe holding child");
+        pipe_holder.wait().expect("reap pipe holding child");
+
+        assert!(
+            matches!(error, BackendOutputError::Timeout { .. }),
+            "expected typed timeout, got {error:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "bounded output wait took {:?}",
+            started.elapsed()
+        );
     }
 }

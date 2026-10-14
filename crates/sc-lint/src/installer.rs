@@ -415,7 +415,7 @@ struct PayloadEntry {
 }
 
 type PayloadChange = (PathBuf, PathBuf, bool, bool);
-type ProbeOutputReader = thread::JoinHandle<io::Result<Vec<u8>>>;
+type ProbeOutputReader = std::sync::mpsc::Receiver<io::Result<Vec<u8>>>;
 
 fn release_payload_candidates(binary: &Path, managed_binary: &Path) -> Vec<PayloadEntry> {
     let bin_dir = binary.parent().unwrap_or_else(|| Path::new("."));
@@ -2191,13 +2191,12 @@ mod tests {
             match wait_for_backend_probe(&mut child, binary, expected_name, "--help", timeout) {
                 Ok(status) => {
                     terminate_probe_processes(&mut child);
-                    let _ =
-                        finish_backend_output(reader, process_id, binary, expected_name, "--help");
+                    let _ = finish_backend_output(reader, process_id);
                     panic!("hanging backend unexpectedly exited with {status}");
                 }
                 Err(problem) => problem,
             };
-        let output = finish_backend_output(reader, process_id, binary, expected_name, "--help")
+        let output = finish_backend_output(reader, process_id)
             .expect("drain noisy output after process-tree cleanup");
         assert!(
             String::from_utf8_lossy(&output).contains("noisy-child"),
