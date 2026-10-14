@@ -135,9 +135,11 @@ fn rejects_nested_planning_metadata() {
         "{:#}",
         load_boundary_inventory(fixture.root()).expect_err("nested planning metadata fails")
     );
+    let planning_path = fixture.root().join("boundaries").join("planning.toml");
+    let nested_planning_path = fixture.root().join(nested_planning);
     assert!(error.contains("allows planning metadata only"));
-    assert!(error.contains("boundaries/planning.toml"));
-    assert!(error.contains(nested_planning));
+    assert!(error.contains(&planning_path.display().to_string()));
+    assert!(error.contains(&nested_planning_path.display().to_string()));
 }
 
 #[test]
