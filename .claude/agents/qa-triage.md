@@ -291,9 +291,9 @@ cat > /tmp/triage-record-vars.json <<'JSON'
   "found_in": "R-S1",
   "found_at": "2026-07-25T16:26:33Z",
   "occurrences": ["R17-1"],
-  "occurrence_files": ["crates/atm-daemon/src/tests.rs"],
-  "occurrence_lines": ["28"],
-  "occurrence_snippets": ["static DISPATCHER: OnceLock<...>"],
+  "occurrence_files": ["crates/sc-lint/tests/logging_integration.rs"],
+  "occurrence_lines": ["838"],
+  "occurrence_snippets": ["static ROOT: OnceLock<PathBuf>"],
   "occurrence_statuses": ["open"],
   "occurrence_closed": ["false"],
   "occurrence_branches": ["R.17"],
@@ -378,9 +378,9 @@ Return fenced JSON only.
       {
         "branch": "R.17",
         "head_sha": "9421e9f",
-        "file": "crates/atm-daemon/src/tests.rs",
-        "line": 28,
-        "snippet": "static DISPATCHER: OnceLock<...>",
+        "file": "crates/sc-lint/tests/logging_integration.rs",
+        "line": 838,
+        "snippet": "static ROOT: OnceLock<PathBuf>",
         "status": "open"
       }
     ],

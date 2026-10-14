@@ -478,3 +478,29 @@ class TemplateContractTests(unittest.TestCase):
             ("references", "\n- plan\n  "),
         ):
             self.assertEqual(legacy_root.findtext(field), expected)
+
+
+class AgentPromptProvenanceTests(unittest.TestCase):
+    PROMPTS = (
+        ".claude/agents/quality-mgr.md",
+        ".claude/agents/ruthless-boundary-qa.md",
+        ".claude/agents/rust-service-hardening-agent.md",
+        ".claude/agents/qa-triage.md",
+        ".claude/agents/flaky-test-qa.md",
+    )
+    ATM_CORE_ARTIFACTS = (
+        "atm-core",
+        "crates/atm/",
+        "crates/atm-",
+        "Legacy Daemon Exemption",
+        "atm-http-runtime",
+        "Phase-AM",
+        "AL.5–AL.7",
+    )
+
+    def test_agent_prompts_do_not_retain_atm_core_rules_or_examples(self) -> None:
+        for relative_path in self.PROMPTS:
+            text = (REPO / relative_path).read_text(encoding="utf-8")
+            for artifact in self.ATM_CORE_ARTIFACTS:
+                with self.subTest(path=relative_path, artifact=artifact):
+                    self.assertNotIn(artifact, text)

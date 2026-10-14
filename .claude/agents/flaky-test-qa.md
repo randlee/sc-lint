@@ -89,7 +89,7 @@ Return fenced JSON only.
       {
         "id": "FTQ-001",
         "severity": "critical | important | minor",
-        "file": "crates/atm/tests/send.rs",
+        "file": "crates/sc-lint/tests/logging_integration.rs",
         "line": 42,
         "test": "test_name",
         "mechanism": "fixed_sleep | timing_assertion | shared_state | parallel_race | spawn_without_readiness | missing_reap | fixed_runtime_path | env_leak | nondeterministic_order | unbounded_wait | masking_fix",
