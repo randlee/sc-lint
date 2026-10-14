@@ -46,13 +46,15 @@ def test_run_subprocess_stdin_is_closed(monkeypatch: pytest.MonkeyPatch) -> None
     assert observed_options["stdin"] is subprocess.DEVNULL
 
 
-def test_run_subprocess_timeout_reports_command_and_output() -> None:
-    command = [
-        "python3",
-        "-c",
-        "import sys, time; print('ready', flush=True); "
-        "print('warning', file=sys.stderr, flush=True); time.sleep(5)",
-    ]
+def test_run_subprocess_timeout_reports_command_and_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    command = ["python3", "-c", "print('ready')"]
+
+    def raise_timeout(*arguments: Any, **options: Any) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(
+            arguments[0], options["timeout"], output="ready\n", stderr="warning\n"
+        )
+
+    monkeypatch.setattr(subprocess, "run", raise_timeout)
     with pytest.raises(AssertionError) as error:
         run_subprocess(command, timeout=0.1, text=True, capture_output=True, check=False)
 
