@@ -1,10 +1,15 @@
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use tempfile::TempDir;
+
+const SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
 
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -44,12 +49,84 @@ fn copy_tree(source: &Path, destination: &Path) {
     }
 }
 
+fn run_bounded(command: &mut Command) -> Output {
+    run_bounded_for(command, SUBPROCESS_TIMEOUT)
+}
+
+fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
+    let label = format!(
+        "{:?} {:?}",
+        command.get_program(),
+        command.get_args().collect::<Vec<_>>()
+    );
+    let stdout = tempfile::tempfile().expect("create subprocess stdout capture");
+    let stderr = tempfile::tempfile().expect("create subprocess stderr capture");
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(
+            stdout.try_clone().expect("clone stdout capture"),
+        ))
+        .stderr(Stdio::from(
+            stderr.try_clone().expect("clone stderr capture"),
+        ));
+
+    let started = Instant::now();
+    let mut child = command
+        .spawn()
+        .unwrap_or_else(|error| panic!("failed to start {label}: {error}"));
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < timeout => {
+                thread::sleep(Duration::from_millis(20));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let status = child.wait().expect("reap timed out subprocess");
+                let stdout = captured(stdout, "timed out subprocess stdout");
+                let stderr = captured(stderr, "timed out subprocess stderr");
+                panic!(
+                    "subprocess exceeded {timeout:?}: {label}; status after kill: {status}\nstdout:\n{}\nstderr:\n{}",
+                    String::from_utf8_lossy(&stdout),
+                    String::from_utf8_lossy(&stderr)
+                );
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let stdout = captured(stdout, "failed subprocess stdout");
+                let stderr = captured(stderr, "failed subprocess stderr");
+                panic!(
+                    "failed waiting for subprocess {label}: {error}\nstdout:\n{}\nstderr:\n{}",
+                    String::from_utf8_lossy(&stdout),
+                    String::from_utf8_lossy(&stderr)
+                );
+            }
+        }
+    };
+
+    Output {
+        status,
+        stdout: captured(stdout, "subprocess stdout"),
+        stderr: captured(stderr, "subprocess stderr"),
+    }
+}
+
+fn captured(mut file: std::fs::File, description: &str) -> Vec<u8> {
+    let mut contents = Vec::new();
+    file.seek(SeekFrom::Start(0))
+        .unwrap_or_else(|error| panic!("rewind {description}: {error}"));
+    file.read_to_end(&mut contents)
+        .unwrap_or_else(|error| panic!("read {description}: {error}"));
+    contents
+}
+
+fn output_text(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
 fn assert_success(binary: &Path, args: &[&str], cwd: &Path) -> String {
-    let output = Command::new(binary)
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .unwrap_or_else(|error| panic!("failed to run {binary:?} {args:?}: {error}"));
+    let output = run_bounded(Command::new(binary).args(args).current_dir(cwd));
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -60,8 +137,120 @@ fn assert_success(binary: &Path, args: &[&str], cwd: &Path) -> String {
     stdout
 }
 
+fn host_tool(names: &[&str]) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .flat_map(|directory| names.iter().map(move |name| directory.join(name)))
+        .find(|candidate| candidate.is_file())
+}
+
+fn supported_cargo(cargo: &Path) -> bool {
+    let output = run_bounded(Command::new(cargo).arg("--version"));
+    if !output.status.success() {
+        eprintln!(
+            "skipping docs examples: cargo --version failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return false;
+    }
+    let version = output_text(&output);
+    let version = version.split_whitespace().nth(1).and_then(|version| {
+        version
+            .split('.')
+            .take(2)
+            .map(str::parse::<u32>)
+            .collect::<Result<Vec<_>, _>>()
+            .ok()
+    });
+    match version.as_deref() {
+        Some([major, minor]) if *major > 1 || (*major == 1 && *minor >= 85) => true,
+        _ => {
+            eprintln!(
+                "skipping docs examples: Rust 1.85+ is required for the edition-2024 fixture; cargo reported {version:?}"
+            );
+            false
+        }
+    }
+}
+
+#[test]
+fn bounded_runner_timeout_child() {
+    if std::env::var_os("SC_LINT_TIMEOUT_TEST_CHILD").is_some() {
+        println!("intentional timeout stdout");
+        eprintln!("intentional timeout stderr");
+        thread::sleep(Duration::from_secs(30));
+    }
+}
+
+#[test]
+fn bounded_runner_kills_and_reports_a_hung_child() {
+    let mut command = Command::new(std::env::current_exe().expect("test executable"));
+    command
+        .args(["--exact", "bounded_runner_timeout_child", "--nocapture"])
+        .env("SC_LINT_TIMEOUT_TEST_CHILD", "1");
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        run_bounded_for(&mut command, Duration::from_secs(2));
+    }))
+    .expect_err("hung subprocess should hit its deadline");
+    let panic = match panic.downcast::<String>() {
+        Ok(message) => *message,
+        Err(payload) => payload
+            .downcast::<&str>()
+            .map(|message| (*message).to_owned())
+            .expect("timeout panic has a string payload"),
+    };
+    assert!(panic.contains("bounded_runner_timeout_child"), "{panic}");
+    assert!(panic.contains("intentional timeout stdout"), "{panic}");
+    assert!(panic.contains("intentional timeout stderr"), "{panic}");
+}
+
 #[test]
 fn docs_examples_parse_and_run_with_the_staged_branch_binary() {
+    let cargo = match host_tool(if cfg!(windows) {
+        &["cargo.exe"]
+    } else {
+        &["cargo"]
+    }) {
+        Some(cargo) => cargo,
+        None => {
+            eprintln!("skipping docs examples: cargo is not available on PATH");
+            return;
+        }
+    };
+    let rustup = match host_tool(if cfg!(windows) {
+        &["rustup.exe"]
+    } else {
+        &["rustup"]
+    }) {
+        Some(rustup) => rustup,
+        None => {
+            eprintln!("skipping docs examples: rustup is not available on PATH");
+            return;
+        }
+    };
+    let python = match host_tool(if cfg!(windows) {
+        &["python.exe", "python3.exe"]
+    } else {
+        &["python3", "python"]
+    }) {
+        Some(python) => python,
+        None => {
+            eprintln!("skipping docs examples: Python is not available on PATH");
+            return;
+        }
+    };
+    if !supported_cargo(&cargo) {
+        return;
+    }
+    let rustup_version = run_bounded(Command::new(&rustup).arg("--version"));
+    if !rustup_version.status.success() {
+        eprintln!(
+            "skipping docs examples: rustup --version failed: {}",
+            String::from_utf8_lossy(&rustup_version.stderr)
+        );
+        return;
+    }
+
     let root = workspace_root();
     let guide = fs::read_to_string(root.join("docs-bundle/using-sc-lint.md"))
         .expect("read using-sc-lint guide");
@@ -164,12 +353,14 @@ fn docs_examples_parse_and_run_with_the_staged_branch_binary() {
             "sc-lint.toml",
         ],
     ] {
-        let output = Command::new(&staged_binary)
+        let mut command = Command::new(&staged_binary);
+        command
             .args(&args)
             .current_dir(fixture_root)
             .env("CARGO_TARGET_DIR", fixture_root.join("cargo-target"))
-            .output()
-            .expect("run documented lint profile");
+            .env("CARGO_HOME", fixture_root.join("cargo-home"))
+            .env("CARGO_NET_OFFLINE", "true");
+        let output = run_bounded(&mut command);
         assert!(
             output.status.success(),
             "lint config ordering failed: {args:?}\nstdout:\n{}\nstderr:\n{}",
@@ -180,23 +371,23 @@ fn docs_examples_parse_and_run_with_the_staged_branch_binary() {
 
     // The JSON snippet is consumed by the managed Python helper in inspect-
     // only mode so the test neither installs tools nor accesses real cargo state.
-    let python = if cfg!(windows) { "python" } else { "python3" };
     let cargo_home = fixture_root.join("cargo-home");
     let package_path = root.join("bindings/sc-lint-py/python");
     let python_path = std::env::join_paths([package_path]).expect("compose Python import path");
-    let output = Command::new(python)
-        .args([
-            "-m",
-            "sc_lint.setup_tools",
-            "--config",
-            "sc-lint.toml",
-            "--check",
-        ])
-        .current_dir(fixture_root)
-        .env("PYTHONPATH", python_path)
-        .env("CARGO_HOME", cargo_home)
-        .output()
-        .expect("run setup_tools against documented JSON");
+    let output = run_bounded(
+        Command::new(&python)
+            .args([
+                "-m",
+                "sc_lint.setup_tools",
+                "--config",
+                "sc-lint.toml",
+                "--check",
+            ])
+            .current_dir(fixture_root)
+            .env("PYTHONPATH", python_path)
+            .env("CARGO_HOME", cargo_home)
+            .env("CARGO_NET_OFFLINE", "true"),
+    );
     assert!(
         output.status.success(),
         "setup_tools rejected documented install.json example\nstdout:\n{}\nstderr:\n{}",
