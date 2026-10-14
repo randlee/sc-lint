@@ -165,7 +165,7 @@ def test_issue372_installer_renders_semantic_cases_for_rust_rejection(
     [{"unix_module": "", "windows_module": "b.rs", "reason": "reason"}],
     [{"unix_module": "a.rs", "windows_module": "b.rs", "reason": "reason", "extra": "x"}],
 ])
-def test_issue372_installer_rejects_structural_adapter_errors(adapters: object) -> None:
+def test_issue372_installer_rejects_legacy_structural_adapter_cases(adapters: object) -> None:
     consumer = copy_fixture("empty-workspace")
     result = run("--input", str(input_with_adapters(consumer, adapters)), str(consumer))
     assert result.returncode == 2
