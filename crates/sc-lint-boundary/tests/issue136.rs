@@ -538,24 +538,29 @@ fn issue136_optional_config_matrix() {
             .any(|finding| finding.message.contains("non-workspace allowlist owner"))
     );
 
-    for (shape, expected) in malformed_policy_shapes() {
+    for (shape, expected_key, expected_repair) in malformed_policy_shapes() {
         let malformed = Fixture::new();
         malformed.workspace();
         malformed.write("sc-lint.toml", &policy(&shape));
         let error =
             analyze(&malformed, Some("manifests")).expect_err("malformed policy shape is rejected");
-        assert!(
-            matches!(error, BoundaryError::ManifestPolicyAnalysis { .. }),
-            "{shape}: {error:?}"
-        );
-        assert_eq!(
-            error.to_string(),
-            format!(
-                "failed to analyze manifest policy for root `{}`: {expected}",
-                malformed.root().display()
-            ),
-            "{shape}"
-        );
+        let config_error = match error {
+            BoundaryError::AnalyzerConfig(error) => error,
+            other => panic!("{shape}: expected analyzer config error, got {other:?}"),
+        };
+        assert_eq!(config_error.code(), "ANALYZER_CONFIG.WRONG_TYPE", "{shape}");
+        match config_error {
+            sc_lint_analyzer_support::AnalyzerConfigError::WrongType {
+                analyzer,
+                key,
+                expected,
+            } => {
+                assert_eq!(analyzer, "boundary", "{shape}");
+                assert_eq!(key, expected_key, "{shape}");
+                assert_eq!(expected, expected_repair, "{shape}");
+            }
+            other => panic!("{shape}: expected wrong-type error, got {other:?}"),
+        }
     }
 
     let ignored_nested = Fixture::new();
@@ -1106,8 +1111,7 @@ impl Fixture {
 /// Every policy family's malformed shapes: wrong outer type, non-table entry,
 /// each missing required field and each wrongly typed field, with the exact
 /// error the parser reports.
-fn malformed_policy_shapes() -> Vec<(String, String)> {
-    const OUTER: &str = "in [tool.sc-lint.analyzers.boundary] must be";
+fn malformed_policy_shapes() -> Vec<(String, String, &'static str)> {
     let mut shapes = Vec::new();
     for key in [
         "manifest_dependency_allowlists",
@@ -1117,85 +1121,104 @@ fn malformed_policy_shapes() -> Vec<(String, String)> {
         for outer in ["\"invalid\"", "{ owner = \"app\" }", "3"] {
             shapes.push((
                 format!("{key} = {outer}"),
-                format!("boundary: `{key}` {OUTER} an array of tables"),
+                key.to_owned(),
+                "an array of tables (the policy field has the wrong TOML type; use array-of-table entries)",
             ));
         }
         shapes.push((
             format!("{key} = [\"invalid\"]"),
-            format!("boundary: `{key}[0]` {OUTER} a table"),
+            format!("{key}[0]"),
+            "a table (the indexed policy item has the wrong TOML type; replace it with a table entry)",
         ));
     }
     shapes.extend([
         (
             "[[manifest_dependency_allowlists]]\nallowed_dependencies = []",
-            "manifest_dependency_allowlists[0].owner_manifest_path must be a non-empty string",
+            "manifest_dependency_allowlists[0].owner_manifest_path",
+            "a non-empty string (the required field is missing; add a quoted string value)",
         ),
         (
             "[[manifest_dependency_allowlists]]\nowner_manifest_path = 1\nallowed_dependencies = []",
-            "manifest_dependency_allowlists[0].owner_manifest_path must be a non-empty string",
+            "manifest_dependency_allowlists[0].owner_manifest_path",
+            "a non-empty string (the value has the wrong TOML type; provide a quoted string)",
         ),
         (
             "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"",
-            "manifest_dependency_allowlists[0].allowed_dependencies must be an array of non-empty strings",
+            "manifest_dependency_allowlists[0].allowed_dependencies",
+            "an array of non-empty strings (the required field is missing; add quoted string values in an array)",
         ),
         (
             "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nallowed_dependencies = \"dep\"",
-            "manifest_dependency_allowlists[0].allowed_dependencies must be an array of strings",
+            "manifest_dependency_allowlists[0].allowed_dependencies",
+            "an array of strings (the value has the wrong TOML type; use an array of quoted strings)",
         ),
         (
             "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nallowed_dependencies = [1]",
-            "manifest_dependency_allowlists[0].allowed_dependencies[0] must be a string",
+            "manifest_dependency_allowlists[0].allowed_dependencies[0]",
+            "a string (the array item has the wrong TOML type; replace it with a quoted string)",
         ),
         (
             "[[manifest_dependency_allowlists]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nallowed_dependencies = []\nboundary_record_path = 1",
-            "manifest_dependency_allowlists[0].boundary_record_path must be a non-empty string or an array of non-empty strings",
+            "manifest_dependency_allowlists[0].boundary_record_path",
+            "a non-empty string or an array of non-empty strings (the value has the wrong TOML type; provide a repository-relative path or an array of paths)",
         ),
         (
             "[[global_dependency_ownership]]\nmanifest_message = \"m\"\nsource_message = \"s\"",
-            "global_dependency_ownership[0].dependency must be a non-empty string",
+            "global_dependency_ownership[0].dependency",
+            "a non-empty string (the required field is missing; add a quoted string value)",
         ),
         (
             "[[global_dependency_ownership]]\ndependency = 1\nmanifest_message = \"m\"\nsource_message = \"s\"",
-            "global_dependency_ownership[0].dependency must be a non-empty string",
+            "global_dependency_ownership[0].dependency",
+            "a non-empty string (the value has the wrong TOML type; provide a quoted string)",
         ),
         (
             "[[global_dependency_ownership]]\ndependency = \"dep\"\nsource_message = \"s\"",
-            "global_dependency_ownership[0].manifest_message must be a non-empty string",
+            "global_dependency_ownership[0].manifest_message",
+            "a non-empty string (the required field is missing; add a quoted string value)",
         ),
         (
             "[[global_dependency_ownership]]\ndependency = \"dep\"\nmanifest_message = \"m\"",
-            "global_dependency_ownership[0].source_message must be a non-empty string",
+            "global_dependency_ownership[0].source_message",
+            "a non-empty string (the required field is missing; add a quoted string value)",
         ),
         (
             "[[global_dependency_ownership]]\ndependency = \"dep\"\nallowed_manifest_paths = \"x\"\nmanifest_message = \"m\"\nsource_message = \"s\"",
-            "global_dependency_ownership[0].allowed_manifest_paths must be an array of strings",
+            "global_dependency_ownership[0].allowed_manifest_paths",
+            "an array of non-empty strings (the value has the wrong TOML type; use an array of repository-relative paths)",
         ),
         (
             "[[global_dependency_ownership]]\ndependency = \"dep\"\nallowed_source_roots = [1]\nmanifest_message = \"m\"\nsource_message = \"s\"",
-            "global_dependency_ownership[0].allowed_source_roots[0] must be a string",
+            "global_dependency_ownership[0].allowed_source_roots[0]",
+            "a string (the array item has the wrong TOML type; replace it with a quoted string)",
         ),
         (
             "[[manifest_section_rules]]\ndependency_package = \"dep\"\nmessage = \"m\"",
-            "manifest_section_rules[0].owner_manifest_path must be a non-empty string",
+            "manifest_section_rules[0].owner_manifest_path",
+            "a non-empty string (the required field is missing; add a quoted string value)",
         ),
         (
             "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\nmessage = \"m\"",
-            "manifest_section_rules[0].dependency_package must be a non-empty string",
+            "manifest_section_rules[0].dependency_package",
+            "a non-empty string (the required field is missing; add a quoted string value)",
         ),
         (
             "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\ndependency_package = \"dep\"",
-            "manifest_section_rules[0].message must be a non-empty string",
+            "manifest_section_rules[0].message",
+            "a non-empty string (the required field is missing; add a quoted string value)",
         ),
         (
             "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\ndependency_package = \"dep\"\nmessage = false",
-            "manifest_section_rules[0].message must be a non-empty string",
+            "manifest_section_rules[0].message",
+            "a non-empty string (the value has the wrong TOML type; provide a quoted string)",
         ),
         (
             "[[manifest_section_rules]]\nowner_manifest_path = \"crates/app/Cargo.toml\"\ndependency_package = \"dep\"\nallowed_sections = \"dependencies\"\nmessage = \"m\"",
-            "manifest_section_rules[0].allowed_sections must be an array of strings",
+            "manifest_section_rules[0].allowed_sections",
+            "an array of strings (the value has the wrong TOML type; use an array of quoted strings)",
         ),
     ]
-    .map(|(shape, expected)| (shape.to_owned(), expected.to_owned())));
+    .map(|(shape, key, expected)| (shape.to_owned(), key.to_owned(), expected)));
     shapes
 }
 
