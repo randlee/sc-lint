@@ -12,6 +12,7 @@ from sc_lint.lint_common import discover_repo_root
 
 
 RULE_ID = "SCB-BOUNDARY-004"
+RUST_REPORT_TIMEOUT_SECONDS = 60
 
 
 def delegation_argv(repo_root: Path) -> list[str]:
@@ -28,12 +29,19 @@ def delegation_argv(repo_root: Path) -> list[str]:
 
 
 def rust_report(repo_root: Path) -> tuple[int, dict]:
-    completed = subprocess.run(
-        delegation_argv(repo_root),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    argv = delegation_argv(repo_root)
+    try:
+        completed = subprocess.run(
+            argv,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=RUST_REPORT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(
+            f"sc-lint timed out after {RUST_REPORT_TIMEOUT_SECONDS}s for {RULE_ID}: {argv!r}"
+        ) from error
     payload = completed.stdout or completed.stderr
     try:
         return completed.returncode, json.loads(payload)
