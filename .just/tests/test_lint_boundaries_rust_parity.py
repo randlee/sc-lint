@@ -8,7 +8,6 @@ import tempfile
 import unittest
 
 from sc_lint.lint_boundaries import RULE_ID
-from sc_lint.lint_boundaries import RUST_REPORT_TIMEOUT_SECONDS
 from sc_lint.lint_boundaries import run
 from sc_lint.lint_boundaries import validate_inventory
 from sc_lint.tests.test_lint_boundaries import VALID_BOUNDARY
@@ -40,7 +39,7 @@ class LintBoundariesRustParityTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
                 text=True,
-                timeout=RUST_REPORT_TIMEOUT_SECONDS,
+                timeout=60,
             )
             self.assertEqual(direct.returncode, 10, direct.stderr)
             report = json.loads(direct.stdout)["data"]
