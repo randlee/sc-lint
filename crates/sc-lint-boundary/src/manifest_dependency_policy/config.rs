@@ -126,7 +126,7 @@ fn parse_allowlist(
             .into_iter()
             .map(DependencyPackageName)
             .collect(),
-        records: optional_paths(table, "boundary_record_path", &prefix, true)?,
+        records: optional_nonempty_paths(table, "boundary_record_path", &prefix, true)?,
     })
 }
 
@@ -156,7 +156,7 @@ fn parse_section_rule(
         dependency: DependencyPackageName(
             required_string(table, "dependency_package", &prefix)?.to_owned(),
         ),
-        sections: optional_strings(table, "allowed_sections", &prefix, false)?
+        sections: optional_strings(table, "allowed_sections", &prefix, false, false)?
             .into_iter()
             .map(ManifestSection)
             .collect(),
@@ -192,7 +192,7 @@ fn required_strings(
     key: &str,
     prefix: &str,
 ) -> std::result::Result<Vec<String>, AnalyzerConfigError> {
-    optional_strings(table, key, prefix, true)
+    optional_strings(table, key, prefix, true, true)
 }
 
 fn optional_strings(
@@ -200,6 +200,7 @@ fn optional_strings(
     key: &str,
     prefix: &str,
     required: bool,
+    nonempty_items: bool,
 ) -> std::result::Result<Vec<String>, AnalyzerConfigError> {
     let Some(value) = table.get(key) else {
         if required {
@@ -222,7 +223,9 @@ fn optional_strings(
         .map(|(index, value)| {
             let path = format!("{prefix}.{key}[{index}]");
             match value {
-                Value::String(value) if !value.trim().is_empty() => Ok(value.clone()),
+                Value::String(value) if !nonempty_items || !value.trim().is_empty() => {
+                    Ok(value.clone())
+                }
                 Value::String(_) => Err(wrong_type(
                     path,
                     "a non-empty string (the array item is blank; replace it with a non-empty quoted string)",
@@ -249,12 +252,14 @@ fn optional_paths(
         Value::String(value) if single_allowed && !value.trim().is_empty() => {
             Ok(vec![PolicyPath::parse(value)])
         }
-        Value::Array(_) => optional_strings(table, key, prefix, false).map(|values| {
-            values
-                .iter()
-                .map(|value| PolicyPath::parse(value))
-                .collect()
-        }),
+        Value::Array(_) => {
+            optional_strings(table, key, prefix, false, single_allowed).map(|values| {
+                values
+                    .iter()
+                    .map(|value| PolicyPath::parse(value))
+                    .collect()
+            })
+        }
         Value::String(_) if single_allowed => Err(wrong_type(
             format!("{prefix}.{key}"),
             "a non-empty string or an array of non-empty strings (the path is blank; provide a repository-relative path)",
@@ -276,4 +281,19 @@ fn wrong_type(key: String, expected: &'static str) -> AnalyzerConfigError {
         key,
         expected,
     }
+}
+
+fn optional_nonempty_paths(
+    table: &Table,
+    key: &str,
+    prefix: &str,
+    single_allowed: bool,
+) -> std::result::Result<Vec<PolicyPath>, AnalyzerConfigError> {
+    if matches!(table.get(key), Some(Value::Array(values)) if values.is_empty()) {
+        return Err(wrong_type(
+            format!("{prefix}.{key}"),
+            "a non-empty array of non-empty strings (the path array is empty; provide at least one repository-relative path)",
+        ));
+    }
+    optional_paths(table, key, prefix, single_allowed)
 }

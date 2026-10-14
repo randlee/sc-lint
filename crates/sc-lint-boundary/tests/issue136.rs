@@ -515,6 +515,132 @@ fn issue136_optional_config_matrix() {
     );
 }
 
+#[test]
+fn issue136_rejects_empty_allowlist_dependency_with_indexed_error() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = ["dep", "  "]
+        "#,
+    );
+
+    let error = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        Some("manifests"),
+    )
+    .expect_err("empty dependency names are invalid");
+    let message = error.to_string();
+    assert!(message.contains("manifest_dependency_allowlists[0].allowed_dependencies[1]"));
+    assert!(message.contains("non-empty string"));
+}
+
+#[test]
+fn issue136_rejects_empty_boundary_record_path_array() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = []
+            boundary_record_path = []
+        "#,
+    );
+
+    let error = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        Some("manifests"),
+    )
+    .expect_err("an explicitly empty boundary-record path list is invalid");
+    assert!(
+        error
+            .to_string()
+            .contains("manifest_dependency_allowlists[0].boundary_record_path")
+    );
+}
+
+#[test]
+fn issue136_rejects_empty_boundary_record_path_with_indexed_error() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            allowed_dependencies = []
+            boundary_record_path = ["boundaries/app.toml", "  "]
+        "#,
+    );
+
+    let error = analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        Some("manifests"),
+    )
+    .expect_err("empty boundary-record paths are invalid");
+    let message = error.to_string();
+    assert!(message.contains("manifest_dependency_allowlists[0].boundary_record_path[1]"));
+    assert!(message.contains("non-empty string"));
+}
+
+#[test]
+fn issue136_empty_ownership_paths_and_sections_remain_accepted() {
+    let fixture = Fixture::new();
+    fixture.workspace();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+            dependency = "dep"
+            allowed_manifest_paths = [""]
+            allowed_source_roots = [""]
+            manifest_message = "dep is not declared here"
+            source_message = "dep is not imported here"
+
+            [[tool.sc-lint.analyzers.boundary.manifest_section_rules]]
+            owner_manifest_path = "crates/app/Cargo.toml"
+            dependency_package = "dep"
+            allowed_sections = [""]
+            message = "dep is forbidden in every section"
+        "#,
+    );
+
+    analyze_workspace_configured(
+        &AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        },
+        None,
+        Some("manifests"),
+    )
+    .expect("empty strings remain accepted in ownership paths and sections");
+}
+
 struct Fixture(TempDir);
 
 impl Fixture {
