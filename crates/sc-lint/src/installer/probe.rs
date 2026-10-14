@@ -262,6 +262,10 @@ pub(super) fn terminate_probe_process_tree(process_id: u32) -> io::Result<ProbeT
     }
 }
 
+/// `taskkill` exit code for a PID that names no running process.
+#[cfg_attr(not(windows), allow(dead_code))]
+const TASKKILL_NOT_FOUND: i32 = 128;
+
 #[cfg(windows)]
 pub(super) fn terminate_probe_process_tree(process_id: u32) -> io::Result<ProbeTreeStop> {
     let status = Command::new("taskkill")
@@ -269,10 +273,23 @@ pub(super) fn terminate_probe_process_tree(process_id: u32) -> io::Result<ProbeT
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()?;
-    if status.success() {
-        Ok(ProbeTreeStop::Killed)
-    } else {
-        Err(io::Error::other(format!("taskkill exited with {status}")))
+    classify_taskkill_exit(status.code())
+}
+
+/// Maps a `taskkill` exit code to the probe stop outcome. A process that already exited is
+/// `AlreadyStopped`, matching the Unix `ESRCH` case; any other failure remains an error.
+/// Kept free of Windows APIs so the classification is tested on every platform.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn classify_taskkill_exit(code: Option<i32>) -> io::Result<ProbeTreeStop> {
+    match code {
+        Some(0) => Ok(ProbeTreeStop::Killed),
+        Some(TASKKILL_NOT_FOUND) => Ok(ProbeTreeStop::AlreadyStopped),
+        Some(code) => Err(io::Error::other(format!(
+            "taskkill exited with exit code: {code}"
+        ))),
+        None => Err(io::Error::other(
+            "taskkill was terminated before it reported an exit code",
+        )),
     }
 }
 
@@ -313,11 +330,13 @@ pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
     Version::parse(version).map_err(|error| error.to_string())
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
 
+    #[cfg(unix)]
     #[test]
     fn reaped_probe_group_counts_as_already_stopped() {
         let mut child = Command::new("sh")
@@ -335,6 +354,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn live_probe_group_is_killed_and_reported_as_stopped() {
         let mut child = Command::new("sleep")
@@ -352,10 +372,38 @@ mod tests {
         assert_eq!(status.signal(), Some(libc::SIGKILL));
     }
 
+    #[cfg(unix)]
     #[test]
     fn unrepresentable_probe_process_id_remains_an_error() {
         let error = terminate_probe_process_tree(u32::MAX)
             .expect_err("a process id that cannot name a group must stay an error");
         assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn taskkill_success_counts_as_killed() {
+        assert_eq!(
+            classify_taskkill_exit(Some(0)).expect("success is not an error"),
+            ProbeTreeStop::Killed
+        );
+    }
+
+    #[test]
+    fn taskkill_for_an_exited_process_counts_as_already_stopped() {
+        assert_eq!(
+            classify_taskkill_exit(Some(TASKKILL_NOT_FOUND))
+                .expect("an exited process is not an error"),
+            ProbeTreeStop::AlreadyStopped
+        );
+    }
+
+    #[test]
+    fn other_taskkill_failures_remain_errors() {
+        for code in [Some(1), Some(5), Some(129), None] {
+            assert!(
+                classify_taskkill_exit(code).is_err(),
+                "exit {code:?} must stay an error"
+            );
+        }
     }
 }
