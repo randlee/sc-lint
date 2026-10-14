@@ -13,8 +13,8 @@ All notable changes to sc-lint are documented here.
 - Previously accepted path-like cargo-shear
   `allowed_unused_dependencies` keys are rejected with
   `SC_LINT_CARGO_SHEAR_CONFIG_INVALID`. Use the canonical key
-  `{package}.{dependency_key}` (the dependency rename alias when present,
-  otherwise the package name), or `workspace.{dependency_key}` only for a
+  `"{package}.{dependency_key}"` (the dependency rename alias when present,
+  otherwise the package name), or `"workspace.{dependency_key}"` only for a
   virtual-root workspace dependency. See the cargo-shear migration guidance
   in [troubleshooting](docs-bundle/troubleshooting.md#cargo-shear-exception-migration).
 
