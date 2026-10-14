@@ -152,6 +152,39 @@ class FindingScriptTests(unittest.TestCase):
                 query._sprint_for_branch(root, "fix/s9", "SPX", "S9")
 
 
+class ReviewerPromptTests(unittest.TestCase):
+    def test_architecture_and_requirements_reviewers_use_document_conventions(self) -> None:
+        arch = (REPO / ".claude/agents/arch-qa.md").read_text(encoding="utf-8")
+        req = (REPO / ".claude/agents/req-qa.md").read_text(encoding="utf-8")
+        forbidden = (
+            "atm-core",
+            "atm-daemon",
+            "atm-observability",
+            "ATM-QA-",
+            "ATM_HOME",
+            "Phase-AM",
+            "docs/sc-lint/",
+            "crates/atm/",
+        )
+        for prompt in (arch, req):
+            for term in forbidden:
+                with self.subTest(term=term):
+                    self.assertNotIn(term.casefold(), prompt.casefold())
+
+        self.assertIn("docs/architecture.md", arch)
+        self.assertIn("docs/<crate>/architecture.md", arch)
+        self.assertIn("decision id and section", arch)
+        self.assertIn("ADR ids referenced by the plan", arch)
+        self.assertIn('"adr_verdicts": [', arch)
+        self.assertNotRegex(arch, r"(?m)^### RULE-\d+")
+        self.assertIn("docs/requirements.md", req)
+        self.assertIn("docs/<crate>/requirements.md", req)
+        self.assertIn("requirement id and section", req)
+        self.assertIn("REQ/NFR ids cited by the plan", req)
+        self.assertIn('"requirement_verdicts": [', req)
+        self.assertNotIn("ATM-QA-", req)
+
+
 class TemplateContractTests(unittest.TestCase):
     TEMPLATE_DIRS = (
         REPO / ".claude/skills/codex-orchestration",
