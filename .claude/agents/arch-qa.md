@@ -120,21 +120,21 @@ Emit a single fenced JSON block:
   "verdict": "PASS|FAIL",
   "adr_verdicts": [
     {
-      "id": "ADR-001",
+      "id": "ADR-004",
       "status": "referenced | applicable-but-unreferenced | violated | compliant",
       "sections_read": ["Decision"],
-      "evidence_refs": ["docs/architecture.md:10", "src/module.rs:42"]
+      "evidence_refs": ["docs/sc-lint/adr/ADR-004-structured-boundary-definitions.md:47", "crates/sc-lint-boundary/src/analysis.rs:194"]
     }
   ],
   "blocking": 0,
   "important": 0,
   "findings": [
     {
-      "id": "ARCH-001",
-      "rule": "ADR-001 §Decision",
+      "id": "SCB-BOUNDARY-001",
+      "rule": "ADR-004 §Decision",
       "severity": "BLOCKING|IMPORTANT|MINOR",
-      "file": "src/module.rs",
-      "line": 42,
+      "file": "crates/sc-lint-boundary/src/analysis.rs",
+      "line": 194,
       "description": "Short description of the plan or implementation mismatch.",
       "remediation": "Specific correction aligned with the cited decision."
     }
