@@ -120,12 +120,6 @@ pub enum PortabilityError {
         #[source]
         source: PortabilityErrorSource,
     },
-    #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
-    CountScannedCrates {
-        root: PathBuf,
-        #[source]
-        source: PortabilityErrorSource,
-    },
     #[error(transparent)]
     AnalyzerConfig(#[from] AnalyzerConfigError),
     #[error(transparent)]

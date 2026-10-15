@@ -1,0 +1,20 @@
+{
+  "tool": "sc-lint-runtime",
+  "version": "0.7.3",
+  "schema_version": "0.1.0",
+  "status": "fail",
+  "scanned_crates": 1,
+  "findings": [
+    {
+      "rule_id": "SCB-RUNTIME-001",
+      "kind": "condvar_wait_without_timeout",
+      "message": "<ROOT>/crates/example/src/lib.rs:5: SCB-RUNTIME-001 bare Condvar::wait(...) in non-test production code; use wait_timeout(...) or wait_timeout_while(...) and inspect the WaitTimeoutResult",
+      "owner_ids": [
+        "crate::example::example"
+      ],
+      "node_ids": [
+        "crate::example::example::bad_wait"
+      ]
+    }
+  ]
+}

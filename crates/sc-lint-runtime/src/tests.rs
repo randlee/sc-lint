@@ -166,6 +166,49 @@ fn loads_workspace_metadata_once_per_analyzer_run() {
 }
 
 #[test]
+fn metadata_once_preserves_text_and_json_output() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "use std::os::unix::net::UnixStream;\nuse std::sync::{Condvar, Mutex};\n\npub fn unix_stream() { let _ = UnixStream::pair(); }\npub fn bad_wait(c: &Condvar, m: &Mutex<bool>) { let g = m.lock().unwrap(); let _ = c.wait(g).unwrap(); }\n",
+    );
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let metadata_loads = std::cell::Cell::new(0);
+
+    let report = analyze_workspace_configured_with_metadata_loader(&options, None, None, |root| {
+        metadata_loads.set(metadata_loads.get() + 1);
+        sc_lint_analyzer_support::load_workspace_metadata(root)
+    })
+    .expect("runtime analysis succeeds");
+    assert_eq!(metadata_loads.get(), 1);
+
+    let root = std::fs::canonicalize(fixture.root()).unwrap();
+    let normalize_root =
+        |output: String| output.replace(&root.to_string_lossy().to_string(), "<ROOT>");
+    let mut text = normalize_root(render_findings_report(&report));
+    text.push('\n');
+    let mut json = normalize_root(serde_json::to_string_pretty(&report).unwrap());
+    json.push('\n');
+
+    assert_eq!(
+        text.as_bytes(),
+        include_bytes!("../tests/fixtures/metadata-once/text.txt"),
+        "metadata reuse must preserve the pre-optimization text output byte-for-byte"
+    );
+    assert_eq!(
+        json.as_bytes(),
+        include_bytes!("../tests/fixtures/metadata-once/report.json"),
+        "metadata reuse must preserve the pre-optimization JSON output byte-for-byte"
+    );
+}
+
+#[test]
 fn flags_bare_wait_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

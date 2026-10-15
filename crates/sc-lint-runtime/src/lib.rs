@@ -93,12 +93,6 @@ pub enum RuntimeError {
         #[source]
         source: RuntimeErrorSource,
     },
-    #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
-    CountScannedCrates {
-        root: PathBuf,
-        #[source]
-        source: RuntimeErrorSource,
-    },
     #[error(transparent)]
     AnalyzerConfig(#[from] AnalyzerConfigError),
 }
