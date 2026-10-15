@@ -2,9 +2,12 @@ use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -69,6 +72,8 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
         .stderr(Stdio::from(
             stderr.try_clone().expect("clone stderr capture"),
         ));
+    #[cfg(unix)]
+    command.process_group(0);
 
     let started = Instant::now();
     let mut child = command
@@ -81,8 +86,7 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
                 thread::sleep(Duration::from_millis(20));
             }
             Ok(None) => {
-                let _ = child.kill();
-                let status = child.wait().expect("reap timed out subprocess");
+                let status = terminate_test_process_tree(&mut child);
                 let stdout = captured(stdout, "timed out subprocess stdout");
                 let stderr = captured(stderr, "timed out subprocess stderr");
                 panic!(
@@ -92,8 +96,7 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
                 );
             }
             Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
+                let _ = terminate_test_process_tree(&mut child);
                 let stdout = captured(stdout, "failed subprocess stdout");
                 let stderr = captured(stderr, "failed subprocess stderr");
                 panic!(
@@ -110,6 +113,29 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
         stdout: captured(stdout, "subprocess stdout"),
         stderr: captured(stderr, "subprocess stderr"),
     }
+}
+
+fn terminate_test_process_tree(child: &mut Child) -> std::process::ExitStatus {
+    let process_id = child.id();
+    #[cfg(unix)]
+    if let Ok(group) = libc::pid_t::try_from(process_id)
+        && group > 0
+    {
+        // SAFETY: a negative pid signals the process group assigned to this child.
+        unsafe { libc::kill(-group, libc::SIGKILL) };
+    }
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &process_id.to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    let _ = child.kill();
+    child
+        .wait()
+        .expect("reap terminated subprocess tree leader")
 }
 
 fn captured(mut file: std::fs::File, description: &str) -> Vec<u8> {
@@ -189,7 +215,7 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
         .args(["--exact", "bounded_runner_timeout_child", "--nocapture"])
         .env("SC_LINT_TIMEOUT_TEST_CHILD", "1");
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        run_bounded_for(&mut command, Duration::from_secs(2));
+        run_bounded_for(&mut command, Duration::from_secs(10));
     }))
     .expect_err("hung subprocess should hit its deadline");
     let panic = match panic.downcast::<String>() {

@@ -10,6 +10,7 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_ADAPTER = REPO_ROOT / "bindings/sc-lint-py/python/sc_lint/lint_manifests.py"
+SUBPROCESS_TIMEOUT_SECONDS = 120
 
 
 class PhaseKAnalyzerDelegationTests(unittest.TestCase):
@@ -29,12 +30,14 @@ class PhaseKAnalyzerDelegationTests(unittest.TestCase):
             capture_output=True,
             check=False,
             text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
         wheel = subprocess.run(
             [sys.executable, "-c", "from sc_lint import run; raise SystemExit(run(__import__('sys').argv[1:]))", *argv],
             capture_output=True,
             check=False,
             text=True,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
 
         self.assertEqual(wheel.returncode, direct.returncode, wheel.stderr)

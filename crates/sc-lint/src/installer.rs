@@ -2175,8 +2175,8 @@ mod tests {
         child_pid_file: &Path,
         ready_fifo: &Path,
     ) -> Option<String> {
-        let (mut child, reader) =
-            spawn_backend_probe(binary, expected_name, "--help").expect("start backend probe");
+        let (mut child, reader) = spawn_backend_probe(binary, expected_name, &["--help"], "--help")
+            .expect("start backend probe");
         let process_id = child.id();
         fs::write(child_pid_file, process_id.to_string()).expect("record probe process group");
 

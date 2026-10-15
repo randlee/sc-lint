@@ -62,22 +62,33 @@ pub(super) fn run_backend_probe(
     argument: &str,
     timeout: Duration,
 ) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
-    let (mut child, reader) = spawn_backend_probe(binary, expected_name, argument)?;
+    run_backend_probe_with_arguments(binary, expected_name, &[argument], argument, timeout)
+}
+
+fn run_backend_probe_with_arguments(
+    binary: &Path,
+    expected_name: &str,
+    arguments: &[&str],
+    description: &str,
+    timeout: Duration,
+) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
+    let (mut child, reader) = spawn_backend_probe(binary, expected_name, arguments, description)?;
     let process_id = child.id();
-    let status = wait_for_backend_probe(&mut child, binary, expected_name, argument, timeout)?;
+    let status = wait_for_backend_probe(&mut child, binary, expected_name, description, timeout)?;
     let output = finish_backend_output(reader, process_id)
-        .map_err(|error| error.to_probe_message(binary, expected_name, argument))?;
+        .map_err(|error| error.to_probe_message(binary, expected_name, description))?;
     Ok((status, output))
 }
 
 pub(super) fn spawn_backend_probe(
     binary: &Path,
     expected_name: &str,
-    argument: &str,
+    arguments: &[&str],
+    description: &str,
 ) -> Result<(Child, ProbeOutputReader), String> {
     let mut command = Command::new(binary);
     command
-        .arg(argument)
+        .args(arguments)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     #[cfg(unix)]
@@ -94,7 +105,7 @@ pub(super) fn spawn_backend_probe(
     let Some(stdout) = child.stdout.take() else {
         terminate_probe_processes(&mut child);
         return Err(format!(
-            "backend companion `{expected_name}` at `{}` did not provide a readable `{argument}` stream",
+            "backend companion `{expected_name}` at `{}` did not provide a readable `{description}` stream",
             binary.display(),
         ));
     };
@@ -361,18 +372,24 @@ pub(super) fn terminate_probe_process_tree(_process_id: u32) -> io::Result<Probe
 }
 
 pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
+    probe_version_with_timeout(binary, BACKEND_PROBE_TIMEOUT)
+}
+
+fn probe_version_with_timeout(binary: &Path, timeout: Duration) -> Result<Version, String> {
     if !binary.is_file() {
         return Err("binary was not found".to_string());
     }
-    let output = Command::new(binary)
-        .args(["--json", "version"])
-        .output()
-        .map_err(|error| error.to_string())?;
-    if !output.status.success() {
-        return Err(format!("version probe exited with {}", output.status));
+    let (status, output) = run_backend_probe_with_arguments(
+        binary,
+        crate::consts::SERVICE_NAME,
+        &["--json", "version"],
+        "--json version",
+        timeout,
+    )?;
+    if !status.success() {
+        return Err(format!("version probe exited with {status}"));
     }
-    let envelope: Value =
-        serde_json::from_slice(&output.stdout).map_err(|error| error.to_string())?;
+    let envelope: Value = serde_json::from_slice(&output).map_err(|error| error.to_string())?;
     let data = envelope
         .get("data")
         .ok_or_else(|| "version probe did not include data".to_string())?;
@@ -557,8 +574,8 @@ mod tests {
         permissions.set_mode(0o755);
         fs::set_permissions(&script, permissions).expect("make probe executable");
 
-        let (mut child, reader) =
-            spawn_backend_probe(&script, "test", "--help").expect("spawn probe script");
+        let (mut child, reader) = spawn_backend_probe(&script, "test", &["--help"], "--help")
+            .expect("spawn probe script");
         wait_for_probe_file(&directory.path().join("ready"));
         let process_id = fs::read_to_string(directory.path().join("pid"))
             .expect("read detached child pid")
@@ -567,14 +584,38 @@ mod tests {
             .expect("parse detached child pid");
         let _detached_child = DetachedChildGuard { process_id };
         let probe_process_id = child.id();
-        child.wait().expect("reap probe script");
-
-        let error = finish_backend_output(reader, probe_process_id)
-            .expect_err("child holding the pipe must time out instead of hanging");
+        let output_result = finish_backend_output(reader, probe_process_id);
+        child
+            .wait()
+            .expect("reap probe script after stopping its group");
+        let error =
+            output_result.expect_err("child holding the pipe must time out instead of hanging");
 
         assert!(
             matches!(error, BackendOutputError::Timeout { .. }),
             "expected typed timeout, got {error:?}"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
+    #[test]
+    fn probe_version_hung_candidate_returns_a_bounded_timeout() {
+        let directory = tempdir().expect("temporary probe directory");
+        let script = directory.path().join("candidate");
+        fs::write(&script, "#!/bin/sh\nsleep 60\n").expect("write candidate script");
+        let mut permissions = fs::metadata(&script)
+            .expect("candidate metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script, permissions).expect("make candidate executable");
+
+        let error = probe_version_with_timeout(&script, Duration::from_millis(100))
+            .expect_err("hung version candidate must be bounded");
+
+        assert!(
+            error.contains("timed out after 100 ms during `--json version` probe"),
+            "expected timeout diagnostic, got {error}"
         );
     }
 }
