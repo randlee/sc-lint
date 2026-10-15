@@ -2281,15 +2281,20 @@ fn lint_profile_starts_cargo_lane_steps_in_plan_order() {
 }
 
 #[test]
-fn lint_profile_keeps_going_after_a_cargo_lane_failure() {
+fn lint_profile_keeps_going_and_reports_every_failed_step_by_plan_index() {
     let loaded = load_repo_lint_profile("full");
     let mut adapter = FakeSystemAdapter::new(false);
     adapter.failures.insert("clippy", "clippy failed");
     adapter.failures.insert("spell", "spell failed");
+    adapter.failures.insert("sc-boundary", "boundary failed");
 
     let error = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Full, &adapter)
         .expect_err("the profile fails");
-    assert_eq!(error.message, "clippy failed");
+    assert_eq!(
+        error.message,
+        "3 of 14 steps failed: [1] clippy, [6] spell, [8] sc-boundary"
+    );
+    assert_eq!(error.kind, CliErrorKind::BackendFailure);
     let ran = adapter
         .invocations
         .lock()
@@ -2328,7 +2333,10 @@ fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
 
     let error = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Fast, &adapter)
         .expect_err("the profile fails");
-    assert_eq!(error.message, "version failed first in plan");
+    assert_eq!(
+        error.message,
+        "2 of 5 steps failed: [1] version, [2] manifests"
+    );
 
     let completions = adapter
         .completions

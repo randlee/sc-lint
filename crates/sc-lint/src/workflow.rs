@@ -752,7 +752,7 @@ fn spawn_parallel_step<'scope, 'env>(
 
 /// Runs the built-in source lint plan with keep-going semantics: every step
 /// runs even when another fails, results are reported in plan order, and the
-/// first failure in plan order is the one returned.
+/// returned error names every failed step by plan index (REQ-CLI-023).
 ///
 /// `Lane::Parallel` steps each get their own worker. All other steps run on a
 /// single lane worker in plan order, so cargo steps never contend for the
@@ -793,22 +793,76 @@ fn run_steps_concurrent(
 
         let mut lane_results = lane_worker
             .join()
-            .map_err(|_| CliError::internal("the cargo execution lane panicked during execution"))?
+            .unwrap_or_else(|_| {
+                steps
+                    .iter()
+                    .filter(|step| step.lane != Lane::Parallel)
+                    .map(|_| {
+                        Err(CliError::internal(
+                            "the cargo execution lane panicked during execution",
+                        ))
+                    })
+                    .collect()
+            })
             .into_iter();
-        steps
+        let results = steps
             .iter()
             .zip(workers)
             .map(|(step, worker)| match worker {
                 None => lane_results
                     .next()
                     .expect("the lane worker reports every ordered step"),
-                Some(Ok(worker)) => worker.join().map_err(|_| {
-                    CliError::internal(format!("{} worker panicked during execution", step.name()))
-                })?,
+                Some(Ok(worker)) => worker.join().unwrap_or_else(|_| {
+                    Err(CliError::internal(format!(
+                        "{} worker panicked during execution",
+                        step.name()
+                    )))
+                }),
                 Some(Err(error)) => Err(error),
             })
-            .collect()
+            .collect::<Vec<_>>();
+        aggregate_step_results(steps, results)
     })
+}
+
+/// Returns every report in plan order, or one error naming every failed step
+/// with its zero-based plan index, in plan order.
+#[expect(
+    clippy::result_large_err,
+    reason = "Step execution stays within the top-level CliError contract."
+)]
+fn aggregate_step_results(
+    steps: &[StepPlan],
+    results: Vec<Result<StepReport, CliError>>,
+) -> Result<Vec<StepReport>, CliError> {
+    let mut reports = Vec::with_capacity(results.len());
+    let mut failures = Vec::new();
+    for (index, (step, result)) in steps.iter().zip(results).enumerate() {
+        match result {
+            Ok(report) => reports.push(report),
+            Err(error) => failures.push((index, step.name(), error)),
+        }
+    }
+    if failures.is_empty() {
+        return Ok(reports);
+    }
+    let listing = failures
+        .iter()
+        .map(|(index, name, _)| format!("[{index}] {name}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let details = failures
+        .iter()
+        .map(|(index, name, error)| {
+            json!({ "index": index, "step": name, "message": error.message })
+        })
+        .collect::<Vec<_>>();
+    Err(CliError::backend_failure(format!(
+        "{} of {} steps failed: {listing}",
+        failures.len(),
+        steps.len()
+    ))
+    .with_detail("failed_steps", Value::Array(details)))
 }
 
 fn cargo_step(
