@@ -114,7 +114,15 @@ impl std::fmt::Display for ResolvedReleaseVersion {
 
 impl ReleaseTarget {
     fn detect() -> Result<Self, CliError> {
-        let target = match (env::consts::OS, env::consts::ARCH) {
+        Self::detect_for(env::consts::OS, env::consts::ARCH)
+    }
+
+    /// Selects the published release target for one host `os`/`arch` pair.
+    ///
+    /// `detect` passes the compile-time host; tests pass unpublished pairs so
+    /// the real unsupported-platform failure runs on every CI host.
+    fn detect_for(os: &str, arch: &str) -> Result<Self, CliError> {
+        let target = match (os, arch) {
             ("linux", "x86_64") => Self {
                 triple: "x86_64-unknown-linux-gnu",
                 archive_extension: "tar.gz",
@@ -913,6 +921,104 @@ mod tests {
                 "x86_64-pc-windows-msvc",
             ]
             .contains(&target.triple)
+        );
+    }
+
+    #[test]
+    fn unsupported_host_platform_is_a_structured_installer_failure() {
+        for (os, arch) in [("freebsd", "x86_64"), ("linux", "aarch64")] {
+            let error = ReleaseTarget::detect_for(os, arch)
+                .expect_err("an unpublished platform must not select a release target");
+            assert_eq!(
+                error.code(),
+                "CLI.SC_LINT_INSTALL_UNSUPPORTED_PLATFORM",
+                "{os}/{arch}"
+            );
+            assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
+            assert!(
+                error.message.contains(&format!("`{os}/{arch}`")),
+                "{error:?}"
+            );
+            assert_eq!(error.details.get("host_os"), Some(&json!(os)));
+            assert_eq!(error.details.get("host_arch"), Some(&json!(arch)));
+            assert_installer_failure_is_recoverable(&error, "sc-lint setup");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[serial]
+    fn unwritable_managed_install_dir_is_a_permission_denied_installer_failure() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = TempDir::new().expect("fixture");
+        let config_path = fixture.path().join("sc-lint.toml");
+        write_consumer_config(&config_path, &Version::new(0, 4, 1));
+        let locked = fixture.path().join("locked");
+        fs::create_dir(&locked).expect("locked directory");
+        let install_dir = locked.join("managed");
+        // The release source is a local path holding no release, so a host that
+        // ignores directory permissions fails locally instead of reaching the
+        // network.
+        let release_base: OsString =
+            format!("file://{}", fixture.path().join("no-release").display()).into();
+        let _environment = InstallerEnvironment::set(&[
+            (INSTALL_DIR_ENV, install_dir.as_os_str()),
+            (RELEASE_BASE_URL_ENV, release_base.as_os_str()),
+        ]);
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).expect("read-only parent");
+
+        for command in ["setup", "upgrade"] {
+            let error = execute_command(&config_path, &[command]).expect_err(command);
+            assert_eq!(
+                error.code(),
+                "CLI.SC_LINT_INSTALL_PERMISSION_DENIED",
+                "{command}: {error:?}"
+            );
+            assert_eq!(
+                error.exit_code(),
+                crate::consts::EXIT_BACKEND_FAILURE,
+                "{command}"
+            );
+            assert_eq!(
+                error.details.get("managed_path"),
+                Some(&json!(install_dir.display().to_string())),
+                "{command}"
+            );
+            assert_eq!(
+                error.details.get("io_error_kind"),
+                Some(&json!("PermissionDenied")),
+                "{command}"
+            );
+            assert_installer_failure_is_recoverable(&error, "SC_LINT_INSTALL_DIR");
+            assert!(
+                !install_dir.exists(),
+                "{command} must not create the managed directory"
+            );
+        }
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).expect("restore parent");
+    }
+
+    /// REQ-CLI-020: every installer failure names a cause, a recovery action,
+    /// and the `sc-lint docs installation` reference.
+    fn assert_installer_failure_is_recoverable(error: &CliError, recovery_hint: &str) {
+        assert!(
+            error
+                .cause
+                .as_deref()
+                .is_some_and(|cause| !cause.is_empty()),
+            "{error:?}"
+        );
+        assert!(
+            error
+                .suggested_action
+                .as_deref()
+                .is_some_and(|action| action.contains(recovery_hint)),
+            "{error:?}"
+        );
+        assert_eq!(
+            error.documentation.as_deref(),
+            Some("sc-lint docs installation")
         );
     }
 
