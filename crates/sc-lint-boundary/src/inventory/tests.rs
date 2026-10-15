@@ -17,7 +17,7 @@ impl InventoryFixture {
         self.tempdir.path()
     }
 
-    fn write(&self, relative_path: &str, contents: &str) {
+    fn write(&self, relative_path: impl AsRef<Path>, contents: &str) {
         let path = self.root().join(relative_path);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).expect("create fixture parent");
@@ -111,14 +111,24 @@ fn assert_planning_metadata_error(fixture: &InventoryFixture, offending_path: &P
         "{error}"
     );
     assert!(!error.contains("found nested"), "{error}");
-    assert!(
-        error.contains(&planning_path.display().to_string()),
-        "{error}"
+    assert_reported_path_matches(&error, "allows planning metadata only at '", &planning_path);
+    assert_reported_path_matches(
+        &error,
+        "found disallowed planning entry at '",
+        offending_path,
     );
-    assert!(
-        error.contains(&offending_path.display().to_string()),
-        "{error}"
-    );
+}
+
+fn assert_reported_path_matches(error: &str, marker: &str, expected_path: &Path) {
+    let reported_path = error
+        .split_once(marker)
+        .and_then(|(_, remainder)| remainder.split_once('\'').map(|(path, _)| path))
+        .unwrap_or_else(|| panic!("missing reported path after {marker:?}: {error}"));
+    let reported_path = fs::canonicalize(reported_path)
+        .unwrap_or_else(|error| panic!("canonicalize reported path {reported_path:?}: {error}"));
+    let expected_path = fs::canonicalize(expected_path)
+        .unwrap_or_else(|error| panic!("canonicalize expected path {expected_path:?}: {error}"));
+    assert_eq!(reported_path, expected_path, "{error}");
 }
 
 use std::fs;
@@ -161,37 +171,22 @@ fn rejects_nested_planning_metadata() {
     let nested_planning = Path::new("boundaries")
         .join("sc-lint-boundary")
         .join("planning.toml");
-    fixture.write(
-        nested_planning
-            .to_str()
-            .expect("fixture relative path is valid UTF-8"),
-        "[planning]\ncurrent_sprint = \"A.6\"\n",
-    );
+    fixture.write(&nested_planning, "[planning]\ncurrent_sprint = \"A.6\"\n");
 
-    let error = format!(
-        "{:#}",
-        load_boundary_inventory(fixture.root()).expect_err("nested planning metadata fails")
-    );
-    let planning_path = fixture.root().join("boundaries").join("planning.toml");
-    let nested_planning_path = fixture.root().join(nested_planning);
-    assert!(error.contains("allows planning metadata only"));
-    assert!(error.contains(&planning_path.display().to_string()));
-    assert!(error.contains(&nested_planning_path.display().to_string()));
+    assert_planning_metadata_error(&fixture, &fixture.root().join(nested_planning));
 }
 
 #[test]
 fn rejects_deeply_nested_planning_metadata() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
-    let nested_planning = fixture
-        .root()
-        .join("boundaries/sc-lint-boundary/nested/planning.toml");
-    fixture.write(
-        "boundaries/sc-lint-boundary/nested/planning.toml",
-        "[planning]\ncurrent_sprint = \"A.6\"\n",
-    );
+    let nested_planning = Path::new("boundaries")
+        .join("sc-lint-boundary")
+        .join("nested")
+        .join("planning.toml");
+    fixture.write(&nested_planning, "[planning]\ncurrent_sprint = \"A.6\"\n");
 
-    assert_planning_metadata_error(&fixture, &nested_planning);
+    assert_planning_metadata_error(&fixture, &fixture.root().join(nested_planning));
 }
 
 #[test]
@@ -204,7 +199,9 @@ fn rejects_case_variant_nested_planning_metadata() {
         .join("sc-lint-boundary")
         .join("Planning.toml");
     fixture.write(
-        "boundaries/sc-lint-boundary/Planning.toml",
+        Path::new("boundaries")
+            .join("sc-lint-boundary")
+            .join("Planning.toml"),
         "[planning]\ncurrent_sprint = \"A.6\"\n",
     );
 
@@ -244,7 +241,7 @@ fn rejects_root_case_variant_planning_metadata() {
         .expect("remove canonical planning file");
     let case_variant = fixture.root().join("boundaries").join("Planning.toml");
     fixture.write(
-        "boundaries/Planning.toml",
+        Path::new("boundaries").join("Planning.toml"),
         "[planning]\ncurrent_sprint = \"A.6\"\n",
     );
 

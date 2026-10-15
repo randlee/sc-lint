@@ -4,7 +4,7 @@ $Operation = if ($InvocationArguments.Count -gt 0) { $InvocationArguments[0] } e
 $Rest = if ($InvocationArguments.Count -gt 1) { @($InvocationArguments | Select-Object -Skip 1) } else { @() }
 
 function Stop-Usage {
-    [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap.ps1 lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml; .sc-lint/bootstrap.ps1 exec [--config sc-lint.toml] -- <argv...>")
+    [Console]::Error.WriteLine("usage: .sc-lint/bootstrap.ps1 <setup|lint|test|upgrade|exec> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap.ps1 lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml; .sc-lint/bootstrap.ps1 exec [--config sc-lint.toml] -- <argv...>")
     exit 2
 }
 
@@ -26,7 +26,12 @@ if ($Operation -eq "exec") {
             $separatorFound = $true
             break
         } else {
-            Stop-Usage
+            # Some Windows pwsh -File invocations consume the literal `--`
+            # before populating $args. In that case, the first token that is
+            # not an exec option is the command, and the rest are its argv.
+            $execArguments = @($Rest[$index..($Rest.Count - 1)])
+            $separatorFound = $true
+            break
         }
     }
     if (-not $separatorFound -or $execArguments.Count -eq 0) { Stop-Usage }

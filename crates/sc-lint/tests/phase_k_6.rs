@@ -394,6 +394,11 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
                 "profile command did not execute the fixture's configured managed version check: {}",
                 String::from_utf8_lossy(&output.stdout)
             );
+            assert!(
+                String::from_utf8_lossy(&output.stdout).contains("\"version\""),
+                "profile exec did not preserve the sc-lint version command through pwsh -File: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
         }
     }
     assert!(managed_binary.is_file());
