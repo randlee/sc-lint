@@ -6,8 +6,8 @@ use std::path::PathBuf;
 #[cfg(any(unix, windows))]
 use std::process::Command as ProcessCommand;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::time::Duration;
-use std::time::Instant;
 
 use clap::Parser;
 use serde::Serialize;
@@ -508,6 +508,52 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
 }
 
 #[test]
+fn consumer_steps_run_in_declaration_order_and_stop_at_the_first_failure() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.test]]\nname = \"first\"\ncommand = [\"cargo\", \"test\"]\n\n[[tool.sc-lint.test]]\nname = \"second\"\ncommand = [\"cargo\", \"test\", \"--doc\"]\n\n[[tool.sc-lint.test]]\nname = \"third\"\ncommand = [\"cargo\", \"test\", \"--release\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n",
+    )
+    .expect("consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "test",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer test context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("consumer config");
+
+    let passing = FakeSystemAdapter::new(false);
+    workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &passing)
+        .expect("all layers pass");
+    assert_eq!(
+        passing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["first", "second", "third"]
+    );
+
+    let mut failing = FakeSystemAdapter::new(false);
+    failing.failures.insert("second", "second layer failed");
+    let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &failing)
+        .expect_err("the failing layer stops the run");
+    assert_eq!(error.message, "second layer failed");
+    assert_eq!(
+        failing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["first", "second"],
+        "the third layer must not run after the second fails"
+    );
+}
+
+#[test]
 fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
     let fixture = TempDir::new().expect("fixture");
     let config_path = fixture.path().join("sc-lint.toml");
@@ -542,11 +588,7 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
 
     let all_cli = Cli::parse_from(["sc-lint", "--config", config, "test", "all"]);
     let all_context = CommandContext::from_cli(&all_cli).expect("all layers context");
-    let mut adapter = FakeSystemAdapter::new(false);
-    adapter.delays.insert("unit", Duration::from_millis(40));
-    adapter
-        .delays
-        .insert("integrate", Duration::from_millis(40));
+    let adapter = FakeSystemAdapter::new(false);
     let run = workflow::run_consumer_profile_with(
         &loaded,
         ConsumerProfile::Test,
@@ -556,18 +598,13 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
     .expect("all layers run");
     let steps = run.data["steps"].as_array().expect("steps array");
     assert_eq!(step_names(steps), ["unit", "integrate"],);
-    let timings = adapter.timings.lock().expect("fake timing log lock");
-    let unit = timings
-        .iter()
-        .find(|timing| timing.name == "unit")
-        .expect("unit timing");
-    let integrate = timings
-        .iter()
-        .find(|timing| timing.name == "integrate")
-        .expect("integrate timing");
-    assert!(
-        unit.finished <= integrate.started || integrate.finished <= unit.started,
-        "consumer cargo steps must not overlap"
+    assert_eq!(
+        adapter
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["unit", "integrate"]
     );
 
     let profile_cli = Cli::parse_from([
@@ -2159,14 +2196,50 @@ fn load_repo_lint_profile(profile: &str) -> LoadedConfig {
     LoadedConfig::load(&cli, &context).expect("config loads")
 }
 
+/// Generous bound so a regression fails the test instead of hanging it.
+const RENDEZVOUS_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// A hook that announces `announce`, then blocks until `await_signal` arrives.
+fn rendezvous_hook(
+    announce: mpsc::Sender<()>,
+    await_signal: mpsc::Receiver<()>,
+    what: &'static str,
+) -> StepHook {
+    let await_signal = Mutex::new(await_signal);
+    Box::new(move || {
+        announce.send(()).expect("peer is listening");
+        await_signal
+            .lock()
+            .expect("rendezvous receiver lock")
+            .recv_timeout(RENDEZVOUS_TIMEOUT)
+            .unwrap_or_else(|_| panic!("{what}"));
+    })
+}
+
 #[test]
 fn lint_profile_runs_independent_steps_concurrently_in_plan_order() {
     let loaded = load_repo_lint_profile("fast");
     let mut adapter = FakeSystemAdapter::new(false);
-    adapter.delays.insert("version", Duration::from_millis(120));
-    adapter
-        .delays
-        .insert("manifests", Duration::from_millis(120));
+    let (version_started, manifests_waits) = mpsc::channel();
+    let (manifests_started, version_waits) = mpsc::channel();
+    // Each step blocks until the other has started: this can only finish when
+    // the two steps run at the same time.
+    adapter.on_start.insert(
+        "version",
+        rendezvous_hook(
+            version_started,
+            version_waits,
+            "manifests never started while version was running",
+        ),
+    );
+    adapter.on_start.insert(
+        "manifests",
+        rendezvous_hook(
+            manifests_started,
+            manifests_waits,
+            "version never started while manifests was running",
+        ),
+    );
 
     let success = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Fast, &adapter)
         .expect("fast profile succeeds");
@@ -2175,27 +2248,17 @@ fn lint_profile_runs_independent_steps_concurrently_in_plan_order() {
         step_names(steps),
         ["fmt", "version", "manifests", "spell", "pytests"]
     );
-
-    let timings = adapter.timings.lock().expect("fake timing log lock");
-    let version = timings
-        .iter()
-        .find(|timing| timing.name == "version")
-        .expect("version timing");
-    let manifests = timings
-        .iter()
-        .find(|timing| timing.name == "manifests")
-        .expect("manifests timing");
-    assert!(
-        version.started < manifests.finished && manifests.started < version.finished,
-        "independent steps must overlap"
-    );
 }
 
 #[test]
-fn lint_profile_serializes_every_cargo_lane_step() {
+fn lint_profile_starts_cargo_lane_steps_in_plan_order() {
     let loaded = load_repo_lint_profile("full");
-    let mut adapter = FakeSystemAdapter::new(true);
-    let cargo_steps = [
+    let adapter = FakeSystemAdapter::new(true);
+
+    workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Full, &adapter)
+        .expect("full profile succeeds");
+
+    let cargo_lane = [
         "fmt",
         "clippy",
         "deny",
@@ -2206,40 +2269,56 @@ fn lint_profile_serializes_every_cargo_lane_step() {
         "check.xwin",
         "clippy.xwin",
     ];
-    for name in cargo_steps {
-        adapter.delays.insert(name, Duration::from_millis(20));
-    }
+    let started = adapter
+        .invocations
+        .lock()
+        .expect("fake invocation log lock")
+        .iter()
+        .filter(|name| cargo_lane.contains(&name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(started, cargo_lane);
+}
 
-    workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Full, &adapter)
-        .expect("full profile succeeds");
+#[test]
+fn lint_profile_keeps_going_after_a_cargo_lane_failure() {
+    let loaded = load_repo_lint_profile("full");
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("clippy", "clippy failed");
+    adapter.failures.insert("spell", "spell failed");
 
-    let timings = adapter.timings.lock().expect("fake timing log lock");
-    for (index, first_name) in cargo_steps.iter().enumerate() {
-        let first = timings
-            .iter()
-            .find(|timing| timing.name == *first_name)
-            .expect("first cargo timing");
-        for second_name in &cargo_steps[index + 1..] {
-            let second = timings
-                .iter()
-                .find(|timing| timing.name == *second_name)
-                .expect("second cargo timing");
-            assert!(
-                first.finished <= second.started || second.finished <= first.started,
-                "cargo lane steps {first_name} and {second_name} overlapped"
-            );
-        }
-    }
+    let error = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Full, &adapter)
+        .expect_err("the profile fails");
+    assert_eq!(error.message, "clippy failed");
+    let ran = adapter
+        .invocations
+        .lock()
+        .expect("fake invocation log lock")
+        .len();
+    assert_eq!(ran, 14, "every step runs despite failures");
 }
 
 #[test]
 fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
     let loaded = load_repo_lint_profile("fast");
     let mut adapter = FakeSystemAdapter::new(false);
-    adapter.delays.insert("version", Duration::from_millis(120));
-    adapter
-        .delays
-        .insert("manifests", Duration::from_millis(20));
+    let (manifests_done, version_waits) = mpsc::channel();
+    // `version` (plan index 1) cannot finish until `manifests` (index 2) has.
+    let version_waits = Mutex::new(version_waits);
+    adapter.on_start.insert(
+        "version",
+        Box::new(move || {
+            version_waits
+                .lock()
+                .expect("version receiver lock")
+                .recv_timeout(RENDEZVOUS_TIMEOUT)
+                .expect("manifests never completed");
+        }),
+    );
+    adapter.on_finish.insert(
+        "manifests",
+        Box::new(move || manifests_done.send(()).expect("version is waiting")),
+    );
     adapter
         .failures
         .insert("version", "version failed first in plan");
@@ -2251,17 +2330,18 @@ fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
         .expect_err("the profile fails");
     assert_eq!(error.message, "version failed first in plan");
 
-    let timings = adapter.timings.lock().expect("fake timing log lock");
-    let version = timings
-        .iter()
-        .find(|timing| timing.name == "version")
-        .expect("version timing");
-    let manifests = timings
-        .iter()
-        .find(|timing| timing.name == "manifests")
-        .expect("manifests timing");
+    let completions = adapter
+        .completions
+        .lock()
+        .expect("fake completion log lock");
+    let position = |name: &str| {
+        completions
+            .iter()
+            .position(|done| done == name)
+            .expect("step completed")
+    };
     assert!(
-        manifests.finished < version.finished,
+        position("manifests") < position("version"),
         "completion order reversed"
     );
 }
@@ -2955,21 +3035,22 @@ fn step_names(steps: &[Value]) -> Vec<String> {
         .collect()
 }
 
-struct StepTiming {
-    name: String,
-    started: Instant,
-    finished: Instant,
-}
+/// Test hook run on the step's worker thread.
+type StepHook = Box<dyn Fn() + Send + Sync>;
 
 struct FakeSystemAdapter {
     xwin_available: bool,
     host: crate::profile_plan::Platform,
     failures: HashMap<&'static str, &'static str>,
-    delays: HashMap<&'static str, Duration>,
+    /// Runs after the step is logged as started, before it completes.
+    on_start: HashMap<&'static str, StepHook>,
+    /// Runs when the step completes, before its result is returned.
+    on_finish: HashMap<&'static str, StepHook>,
     invocations: Mutex<Vec<String>>,
     /// Program and argv of every planned (consumer lint) step, in run order.
     planned_argv: Mutex<Vec<Vec<String>>>,
-    timings: Mutex<Vec<StepTiming>>,
+    /// Step names in completion order.
+    completions: Mutex<Vec<String>>,
 }
 
 impl FakeSystemAdapter {
@@ -2978,10 +3059,11 @@ impl FakeSystemAdapter {
             xwin_available,
             host: crate::profile_plan::Platform::host(),
             failures: HashMap::new(),
-            delays: HashMap::new(),
+            on_start: HashMap::new(),
+            on_finish: HashMap::new(),
             planned_argv: Mutex::new(Vec::new()),
             invocations: Mutex::new(Vec::new()),
-            timings: Mutex::new(Vec::new()),
+            completions: Mutex::new(Vec::new()),
         }
     }
 }
@@ -2994,23 +3076,20 @@ impl FakeSystemAdapter {
     }
 
     fn record_step(&self, name: &str) -> Result<(), Box<CliError>> {
-        let started = Instant::now();
         self.invocations
             .lock()
             .expect("fake invocation log lock")
             .push(name.to_string());
-        if let Some(delay) = self.delays.get(name) {
-            std::thread::sleep(*delay);
+        if let Some(hook) = self.on_start.get(name) {
+            hook();
         }
-        let finished = Instant::now();
-        self.timings
+        self.completions
             .lock()
-            .expect("fake timing log lock")
-            .push(StepTiming {
-                name: name.to_string(),
-                started,
-                finished,
-            });
+            .expect("fake completion log lock")
+            .push(name.to_string());
+        if let Some(hook) = self.on_finish.get(name) {
+            hook();
+        }
         if let Some(message) = self.failures.get(name) {
             return Err(Box::new(CliError::backend_failure(*message)));
         }

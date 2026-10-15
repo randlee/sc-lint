@@ -1,7 +1,6 @@
 use std::ffi::OsString;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
-use std::sync::Mutex;
 use std::thread;
 
 use serde_json::Value;
@@ -25,10 +24,24 @@ use crate::profile_plan::plan_consumer_lint;
 
 pub const WINDOWS_XWIN_TARGET: &str = "x86_64-pc-windows-msvc";
 
+/// Execution lane of a planned step.
+///
+/// Built-in source lint steps declare `Cargo` (needs the shared cargo build
+/// lane) or `Parallel` (independent of it) where they are constructed.
+/// Consumer-configured steps are `Sequential`: they are only ever run by
+/// [`run_steps_sequential`], never classified into a concurrent lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Lane {
+    Cargo,
+    Parallel,
+    Sequential,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StepPlan {
     name: String,
     kind: String,
+    lane: Lane,
     command: OsString,
     args: Vec<OsString>,
     env: Vec<(OsString, OsString)>,
@@ -38,12 +51,14 @@ impl StepPlan {
     fn new(
         name: impl Into<String>,
         kind: impl Into<String>,
+        lane: Lane,
         command: impl Into<OsString>,
         args: impl IntoIterator<Item = impl Into<OsString>>,
     ) -> Self {
         Self {
             name: name.into(),
             kind: kind.into(),
+            lane,
             command: command.into(),
             args: args.into_iter().map(Into::into).collect(),
             env: Vec::new(),
@@ -60,6 +75,7 @@ impl StepPlan {
         Self::new(
             step.name(),
             ConsumerProfile::Lint.as_str(),
+            Lane::Sequential,
             step.command().clone(),
             step.args().iter().cloned(),
         )
@@ -318,7 +334,7 @@ pub(crate) fn run_lint_profile_with(
     let repo_root = loaded_config.require_repo_root()?;
     let xwin_available = adapter.cargo_xwin_available(repo_root);
     let plans = lint_profile_plan(repo_root, profile, xwin_available);
-    let steps = run_steps(repo_root, adapter, &plans)?;
+    let steps = run_steps_concurrent(repo_root, adapter, &plans)?;
 
     Ok(CommandSuccess::direct(json!({
         "status": "pass",
@@ -354,10 +370,16 @@ pub(crate) fn run_consumer_profile_with(
                 .command()
                 .split_first()
                 .expect("validated command argv");
-            StepPlan::new(step.name(), profile.as_str(), command, args)
+            StepPlan::new(
+                step.name(),
+                profile.as_str(),
+                Lane::Sequential,
+                command,
+                args,
+            )
         })
         .collect::<Vec<_>>();
-    let steps = run_steps(root, adapter, &plans)?;
+    let steps = run_steps_sequential(root, adapter, &plans)?;
     Ok(CommandSuccess::direct(json!({
         "status": "pass",
         "profile": profile.as_str(),
@@ -542,7 +564,7 @@ pub(crate) fn run_ci_with(
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
     let xwin_available = adapter.cargo_xwin_available(repo_root);
-    let mut steps = run_steps(
+    let mut steps = run_steps_concurrent(
         repo_root,
         adapter,
         &lint_profile_plan(repo_root, LintProfile::Ci, xwin_available),
@@ -572,79 +594,88 @@ fn lint_profile_plan(
     xwin_available: bool,
 ) -> Vec<StepPlan> {
     let mut plan = match profile {
-        LintProfile::Fast => vec![
-            cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
-            python_step(repo_root, "version", "lint", "sc_lint.check_version_sync"),
-            python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
-            python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
-            python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
-        ],
-        LintProfile::Full => vec![
-            cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
-            cargo_step(
-                "clippy",
-                "lint",
-                [
-                    "clippy",
-                    "--workspace",
-                    "--all-targets",
-                    "--",
-                    "-D",
-                    "warnings",
-                ],
-            ),
-            python_step(repo_root, "deny", "lint", "sc_lint.lint_cargo_deny"),
-            python_step(repo_root, "shear", "lint", "sc_lint.lint_cargo_shear"),
-            python_step(repo_root, "version", "lint", "sc_lint.check_version_sync"),
-            python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
-            python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
-            python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
-            product_step("sc-boundary", "lint", ["lint", "sc-boundary"]),
-            product_step("sc-portability", "lint", ["lint", "sc-portability"]),
-            product_step("sc-runtime", "lint", ["lint", "sc-runtime"]),
-            python_step(
-                repo_root,
-                "function-length",
-                "lint",
-                "sc_lint.lint_function_length",
-            ),
-            python_step(repo_root, "line-counts", "lint", "sc_lint.lint_line_counts"),
-            python_step(
-                repo_root,
-                "identity-literals",
-                "lint",
-                "sc_lint.lint_identity_literals",
-            ),
-        ],
-        LintProfile::Ci => vec![
-            cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
-            cargo_step(
-                "clippy",
-                "lint",
-                [
-                    "clippy",
-                    "--workspace",
-                    "--all-targets",
-                    "--",
-                    "-D",
-                    "warnings",
-                ],
-            ),
-            python_step(repo_root, "deny", "lint", "sc_lint.lint_cargo_deny"),
-            python_step(repo_root, "shear", "lint", "sc_lint.lint_cargo_shear"),
-            python_step(repo_root, "version", "lint", "sc_lint.check_version_sync"),
-            python_step(repo_root, "manifests", "lint", "sc_lint.lint_manifests"),
-            python_step(repo_root, "spell", "lint", "sc_lint.lint_codespell"),
-            python_step(repo_root, "pytests", "lint", "sc_lint.run_pytests"),
-            product_step("sc-boundary", "lint", ["lint", "sc-boundary"]),
-            product_step("sc-portability", "lint", ["lint", "sc-portability"]),
-            product_step("sc-runtime", "lint", ["lint", "sc-runtime"]),
-            // REQ-CLI-015: the CI profile never includes xwin-only steps.
-        ],
+        LintProfile::Fast => fast_lint_steps(repo_root),
+        LintProfile::Full => {
+            let mut steps = gate_lint_steps(repo_root);
+            steps.extend(repo_policy_lint_steps(repo_root));
+            steps
+        }
+        // REQ-CLI-015: the CI profile never includes xwin-only steps.
+        LintProfile::Ci => gate_lint_steps(repo_root),
     };
 
     plan.extend(xwin_lint_steps(profile, xwin_available));
     plan
+}
+
+fn fast_lint_steps(repo_root: &Path) -> Vec<StepPlan> {
+    let mut steps = vec![cargo_step("fmt", "lint", ["fmt", "--all", "--check"])];
+    steps.extend(source_check_steps(repo_root));
+    steps
+}
+
+/// Python source checks that never touch the cargo build directory.
+fn source_check_steps(repo_root: &Path) -> Vec<StepPlan> {
+    [
+        ("version", "sc_lint.check_version_sync"),
+        ("manifests", "sc_lint.lint_manifests"),
+        ("spell", "sc_lint.lint_codespell"),
+        ("pytests", "sc_lint.run_pytests"),
+    ]
+    .into_iter()
+    .map(|(name, module)| python_step(repo_root, name, "lint", Lane::Parallel, module))
+    .collect()
+}
+
+/// The steps shared by the Full and CI profiles, in plan order.
+fn gate_lint_steps(repo_root: &Path) -> Vec<StepPlan> {
+    let mut steps = vec![
+        cargo_step("fmt", "lint", ["fmt", "--all", "--check"]),
+        cargo_step(
+            "clippy",
+            "lint",
+            [
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+        ),
+        python_step(
+            repo_root,
+            "deny",
+            "lint",
+            Lane::Cargo,
+            "sc_lint.lint_cargo_deny",
+        ),
+        python_step(
+            repo_root,
+            "shear",
+            "lint",
+            Lane::Cargo,
+            "sc_lint.lint_cargo_shear",
+        ),
+    ];
+    steps.extend(source_check_steps(repo_root));
+    steps.extend(
+        ["sc-boundary", "sc-portability", "sc-runtime"]
+            .map(|name| product_step(name, "lint", Lane::Cargo, ["lint", name])),
+    );
+    steps
+}
+
+/// Repository-policy checks that only the Full profile adds.
+fn repo_policy_lint_steps(repo_root: &Path) -> Vec<StepPlan> {
+    [
+        ("function-length", "sc_lint.lint_function_length"),
+        ("line-counts", "sc_lint.lint_line_counts"),
+        ("identity-literals", "sc_lint.lint_identity_literals"),
+    ]
+    .into_iter()
+    .map(|(name, module)| python_step(repo_root, name, "lint", Lane::Parallel, module))
+    .collect()
 }
 
 fn xwin_lint_steps(profile: LintProfile, xwin_available: bool) -> Vec<StepPlan> {
@@ -682,76 +713,102 @@ fn xwin_lint_steps(profile: LintProfile, xwin_available: bool) -> Vec<StepPlan> 
     }
 }
 
+/// Runs consumer-configured steps strictly in declaration order and stops at
+/// the first failure, matching the documented consumer profile contract.
 #[expect(
     clippy::result_large_err,
     reason = "Step execution stays within the top-level CliError contract."
 )]
-fn run_steps(
+fn run_steps_sequential(
     repo_root: &Path,
     adapter: &dyn SystemAdapter,
     steps: &[StepPlan],
 ) -> Result<Vec<StepReport>, CliError> {
-    let cargo_lane = Mutex::new(());
+    steps
+        .iter()
+        .map(|step| adapter.run_step(repo_root, step))
+        .collect()
+}
+
+type StepWorker<'scope> = thread::ScopedJoinHandle<'scope, Result<StepReport, CliError>>;
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Worker start failures stay within the top-level CliError contract."
+)]
+fn spawn_parallel_step<'scope, 'env>(
+    scope: &'scope thread::Scope<'scope, 'env>,
+    repo_root: &'env Path,
+    adapter: &'env dyn SystemAdapter,
+    step: &'env StepPlan,
+) -> Result<StepWorker<'scope>, CliError> {
+    thread::Builder::new()
+        .name(format!("sc-lint-{}", step.name()))
+        .spawn_scoped(scope, move || adapter.run_step(repo_root, step))
+        .map_err(|error| {
+            CliError::internal(format!("{} worker failed to start", step.name())).with_source(error)
+        })
+}
+
+/// Runs the built-in source lint plan with keep-going semantics: every step
+/// runs even when another fails, results are reported in plan order, and the
+/// first failure in plan order is the one returned.
+///
+/// `Lane::Parallel` steps each get their own worker. All other steps run on a
+/// single lane worker in plan order, so cargo steps never contend for the
+/// build directory and start deterministically.
+#[expect(
+    clippy::result_large_err,
+    reason = "Step execution stays within the top-level CliError contract."
+)]
+fn run_steps_concurrent(
+    repo_root: &Path,
+    adapter: &dyn SystemAdapter,
+    steps: &[StepPlan],
+) -> Result<Vec<StepReport>, CliError> {
     thread::scope(|scope| {
+        let ordered = steps
+            .iter()
+            .filter(|step| step.lane != Lane::Parallel)
+            .collect::<Vec<_>>();
+        let lane_worker = thread::Builder::new()
+            .name("sc-lint-cargo-lane".to_string())
+            .spawn_scoped(scope, move || {
+                ordered
+                    .iter()
+                    .map(|step| adapter.run_step(repo_root, step))
+                    .collect::<Vec<_>>()
+            })
+            .map_err(|error| {
+                CliError::internal("the cargo execution lane failed to start").with_source(error)
+            })?;
+
         let workers = steps
             .iter()
             .map(|step| {
-                let step_name = step.name().to_string();
-                let worker_name = format!("sc-lint-{}", step.name());
-                let worker = thread::Builder::new()
-                    .name(worker_name)
-                    .spawn_scoped(scope, || {
-                        if step.requires_cargo_lane() {
-                            let _guard = cargo_lane.lock().map_err(|_| {
-                                CliError::internal("the cargo execution lane is unavailable")
-                            })?;
-                            adapter.run_step(repo_root, step)
-                        } else {
-                            adapter.run_step(repo_root, step)
-                        }
-                    })
-                    .map_err(|error| {
-                        CliError::internal(format!("{} worker failed to start", step.name()))
-                            .with_source(error)
-                    });
-                (step_name, worker)
+                (step.lane == Lane::Parallel)
+                    .then(|| spawn_parallel_step(scope, repo_root, adapter, step))
             })
             .collect::<Vec<_>>();
 
-        workers
-            .into_iter()
-            .map(|(step_name, worker)| match worker {
-                Ok(worker) => worker.join().map_err(|_| {
-                    CliError::internal(format!("{step_name} worker panicked during execution"))
+        let mut lane_results = lane_worker
+            .join()
+            .map_err(|_| CliError::internal("the cargo execution lane panicked during execution"))?
+            .into_iter();
+        steps
+            .iter()
+            .zip(workers)
+            .map(|(step, worker)| match worker {
+                None => lane_results
+                    .next()
+                    .expect("the lane worker reports every ordered step"),
+                Some(Ok(worker)) => worker.join().map_err(|_| {
+                    CliError::internal(format!("{} worker panicked during execution", step.name()))
                 })?,
-                Err(error) => Err(error),
+                Some(Err(error)) => Err(error),
             })
             .collect()
     })
-}
-
-impl StepPlan {
-    fn requires_cargo_lane(&self) -> bool {
-        let command_name = Path::new(&self.command)
-            .file_name()
-            .unwrap_or(self.command.as_os_str())
-            .to_string_lossy();
-        if command_name.eq_ignore_ascii_case("cargo")
-            || command_name.eq_ignore_ascii_case("cargo.exe")
-        {
-            return true;
-        }
-        !matches!(
-            self.name.as_str(),
-            "version"
-                | "manifests"
-                | "spell"
-                | "pytests"
-                | "function-length"
-                | "line-counts"
-                | "identity-literals"
-        )
-    }
 }
 
 fn cargo_step(
@@ -759,7 +816,7 @@ fn cargo_step(
     kind: &'static str,
     args: impl IntoIterator<Item = impl Into<OsString>>,
 ) -> StepPlan {
-    StepPlan::new(name, kind, "cargo", args)
+    StepPlan::new(name, kind, Lane::Cargo, "cargo", args)
 }
 
 /// A step that re-enters the running `sc-lint` executable so composite
@@ -768,14 +825,21 @@ fn cargo_step(
 fn product_step(
     name: &'static str,
     kind: &'static str,
+    lane: Lane,
     args: impl IntoIterator<Item = impl Into<OsString>>,
 ) -> StepPlan {
-    StepPlan::new(name, kind, crate::dispatch::product_binary(), args)
+    StepPlan::new(name, kind, lane, crate::dispatch::product_binary(), args)
 }
 
-fn python_step(repo_root: &Path, name: &'static str, kind: &'static str, module: &str) -> StepPlan {
+fn python_step(
+    repo_root: &Path,
+    name: &'static str,
+    kind: &'static str,
+    lane: Lane,
+    module: &str,
+) -> StepPlan {
     let interpreter = crate::python_adapter::PythonInterpreter::resolve(repo_root);
-    let step = StepPlan::new(name, kind, interpreter.program, ["-m", module])
+    let step = StepPlan::new(name, kind, lane, interpreter.program, ["-m", module])
         .with_env("SC_LINT_BIN", crate::dispatch::product_binary());
     match interpreter.python_path {
         Some(python_path) => step.with_env("PYTHONPATH", python_path),
@@ -809,7 +873,13 @@ mod tests {
 
     #[test]
     fn python_steps_delegate_to_the_running_product_binary() {
-        let step = python_step(Path::new("."), "pytests", "lint", "sc_lint.run_pytests");
+        let step = python_step(
+            Path::new("."),
+            "pytests",
+            "lint",
+            Lane::Parallel,
+            "sc_lint.run_pytests",
+        );
         let product_binary = crate::dispatch::product_binary().into_os_string();
 
         assert!(step.env.iter().any(|(key, value)| {
