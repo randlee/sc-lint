@@ -364,6 +364,11 @@ switch ($Operation) {
         if ($selector.Count -ge 1 -and $selector[0]) { $lintArguments += @("--profile", $selector[0]) }
         if ($selector.Count -eq 2) { $lintArguments += @("--platform-scope", $selector[1]) }
         & $productBinary @lintArguments
+        $lintSucceeded = $?
+        $lintExitCode = $LASTEXITCODE
+        if ($null -ne $lintExitCode) { exit $lintExitCode }
+        if (-not $lintSucceeded) { exit 1 }
+        exit 0
     }
     "test" {
         Ensure-Product

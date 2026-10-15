@@ -75,9 +75,20 @@ fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -
     if atm_core_derived {
         fs::write(
             root.join("Cargo.toml"),
-            "[package]\nname = \"consumer-derived-from-atm-core\"\nversion = \"0.1.0\"\n",
+            "[package]\nname = \"consumer-derived-from-atm-core\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[workspace]\n",
         )
         .expect("derived consumer manifest");
+        fs::write(
+            root.join("sc-lint.toml"),
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"pwsh\", \"-NoLogo\", \"-NoProfile\", \"-NonInteractive\", \"-File\", \".sc-lint/bootstrap.ps1\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n",
+        )
+        .expect("derived consumer profile configuration");
+    } else {
+        fs::write(
+            root.join("sc-lint.toml"),
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n",
+        )
+        .expect("consumer config");
     }
     root
 }
@@ -336,9 +347,9 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
     let managed_binary = managed.join("sc-lint.exe");
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), &managed_binary).expect("managed product copy");
 
-    for (name, derived) in [
-        ("neutral-consumer", false),
-        ("atm-core-derived-consumer", true),
+    for (name, derived, expected_manifest) in [
+        ("neutral-consumer", false, false),
+        ("atm-core-derived-consumer", true, true),
     ] {
         let root = windows_consumer_fixture(fixture.path(), name, derived);
         let output = inherited_powershell_command()
@@ -363,7 +374,7 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             "stdout: {}",
             String::from_utf8_lossy(&output.stdout)
         );
-        assert_eq!(root.join("Cargo.toml").exists(), derived);
+        assert_eq!(root.join("Cargo.toml").exists(), expected_manifest);
     }
     assert!(managed_binary.is_file());
 }

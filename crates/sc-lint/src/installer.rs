@@ -2111,14 +2111,10 @@ mod tests {
         }
         #[cfg(not(unix))]
         {
-            let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
             let executable = format!("{name}.exe");
             let destination = path.with_file_name(format!("{name}.exe"));
-            fs::copy(
-                workspace_root.join("target/debug").join(executable),
-                destination,
-            )
-            .expect("copy built backend executable");
+            fs::copy(built_artifact_directory().join(executable), destination)
+                .expect("copy built backend executable");
         }
     }
 

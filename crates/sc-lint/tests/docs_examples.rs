@@ -22,8 +22,9 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-fn fenced_block_after<'a>(markdown: &'a str, heading: &str, language: &str) -> &'a str {
-    let section = markdown
+fn fenced_block_after(markdown: &str, heading: &str, language: &str) -> String {
+    let normalized = markdown.replace("\r\n", "\n");
+    let section = normalized
         .split_once(heading)
         .map(|(_, section)| section)
         .unwrap_or_else(|| panic!("missing documentation heading `{heading}`"));
@@ -34,7 +35,7 @@ fn fenced_block_after<'a>(markdown: &'a str, heading: &str, language: &str) -> &
         .unwrap_or_else(|| panic!("missing `{language}` example after `{heading}`"));
     block
         .split_once("\n```")
-        .map(|(contents, _)| contents.trim_start_matches('\n'))
+        .map(|(contents, _)| contents.trim_start_matches('\n').to_owned())
         .unwrap_or_else(|| panic!("unterminated `{language}` example after `{heading}`"))
 }
 
@@ -231,6 +232,15 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
 }
 
 #[test]
+fn fenced_block_after_parses_crlf_toml() {
+    let document =
+        "## Example\r\n\r\n```toml\r\n[tool.sc-lint]\r\nminimum_version = \"0.7.0\"\r\n```\r\n";
+    let example = fenced_block_after(document, "## Example", "toml");
+    let parsed: toml::Value = toml::from_str(&example).expect("CRLF TOML parses");
+    assert_eq!(parsed["tool"]["sc-lint"]["minimum_version"], "0.7.0".into());
+}
+
+#[test]
 fn docs_examples_parse_and_run_with_the_staged_branch_binary() {
     let cargo = match host_tool(if cfg!(windows) {
         &["cargo.exe"]
@@ -287,9 +297,9 @@ fn docs_examples_parse_and_run_with_the_staged_branch_binary() {
     );
     let install_example = fenced_block_after(&guide, "The persisted JSON", "json");
 
-    let parsed_lint: toml::Value = toml::from_str(lint_example).expect("documented TOML parses");
+    let parsed_lint: toml::Value = toml::from_str(&lint_example).expect("documented TOML parses");
     let parsed_tools: Value =
-        serde_json::from_str(install_example).expect("documented JSON parses");
+        serde_json::from_str(&install_example).expect("documented JSON parses");
     assert_eq!(
         parsed_lint["tool"]["sc-lint"]["lint_profiles"]["ci"][2],
         "windows-check".into()
