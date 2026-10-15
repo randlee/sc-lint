@@ -62,6 +62,49 @@ fn installer_catalog_matches_rust() {
 }
 
 #[test]
+fn rule_ids_match_frozen_contract_baseline() {
+    let expected: serde_json::Value =
+        serde_json::from_str(include_str!("../tests/fixtures/contracts/rule-ids.json"))
+            .expect("rule-ID baseline is valid JSON");
+    let actual = serde_json::json!(
+        RUNTIME_CATALOG
+            .rules
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    assert_eq!(
+        actual, expected,
+        "update the frozen baseline explicitly for additions"
+    );
+}
+
+#[test]
+fn machine_report_matches_frozen_json_contract() {
+    let report = FindingsReport {
+        tool: "sc-lint-runtime",
+        version: "0.1.0",
+        schema_version: "0.1.0",
+        status: ReportStatus::Fail,
+        scanned_crates: 1,
+        findings: vec![Finding {
+            rule_id: RuleId::ScbRuntime001,
+            kind: "contract_fixture".into(),
+            message: "machine contract fixture".to_string(),
+            owner_ids: vec![OwnerId::new("crate::example::example")],
+            node_ids: vec![NodeId::new("crate::example::example::item")],
+        }],
+    };
+    let expected: serde_json::Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/contracts/machine-report.json"
+    ))
+    .expect("machine-report baseline is valid JSON");
+
+    assert_eq!(serde_json::to_value(report).unwrap(), expected);
+}
+
+#[test]
 fn findings_report_text_is_stable() {
     let report = FindingsReport {
         tool: "sc-lint-runtime",
