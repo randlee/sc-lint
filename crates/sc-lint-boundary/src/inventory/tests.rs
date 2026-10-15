@@ -105,6 +105,11 @@ fn assert_planning_metadata_error(fixture: &InventoryFixture, offending_path: &P
     let planning_path = fixture.root().join("boundaries/planning.toml");
     assert!(error.contains("allows planning metadata only"), "{error}");
     assert!(
+        error.contains("found disallowed planning entry at"),
+        "{error}"
+    );
+    assert!(!error.contains("found nested"), "{error}");
+    assert!(
         error.contains(&planning_path.display().to_string()),
         "{error}"
     );
@@ -212,6 +217,47 @@ fn rejects_directory_named_planning_toml() {
     fs::create_dir_all(&planning_directory).expect("create planning directory");
 
     assert_planning_metadata_error(&fixture, &planning_directory);
+}
+
+#[test]
+fn rejects_root_directory_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_directory = fixture.root().join("boundaries/planning.toml");
+    fs::remove_file(&planning_directory).expect("remove authoritative planning file");
+    fs::create_dir(&planning_directory).expect("create root planning directory");
+
+    assert_planning_metadata_error(&fixture, &planning_directory);
+}
+
+#[test]
+fn rejects_root_case_variant_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fs::remove_file(fixture.root().join("boundaries/planning.toml"))
+        .expect("remove canonical planning file");
+    let case_variant = fixture.root().join("boundaries/Planning.toml");
+    fixture.write(
+        "boundaries/Planning.toml",
+        "[planning]\ncurrent_sprint = \"A.6\"\n",
+    );
+
+    assert_planning_metadata_error(&fixture, &case_variant);
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_root_symlink_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_path = fixture.root().join("boundaries/planning.toml");
+    let target = fixture
+        .root()
+        .join("boundaries/sc-lint-boundary/boundary-analyzer.toml");
+    fs::remove_file(&planning_path).expect("remove authoritative planning file");
+    std::os::unix::fs::symlink(target, &planning_path).expect("create root planning symlink");
+
+    assert_planning_metadata_error(&fixture, &planning_path);
 }
 
 #[cfg(unix)]

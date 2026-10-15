@@ -145,8 +145,9 @@ family.
 
 - `REQ-SCB-012`
   `boundaries/planning.toml` is the sole authoritative planning-metadata
-  source for inventory parity; nested `boundaries/**/planning.toml` is an
-  explicit load error and is never silently ignored.
+  source for inventory parity and must be a regular file. Any other entry
+  named `planning.toml` is an error, including nested entries, directories,
+  symlinks, and case variants.
 
 - `REQ-SCB-013`
   When `boundaries/` exists, `boundaries/planning.toml` must define

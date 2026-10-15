@@ -219,11 +219,11 @@ fn collect_boundary_files(
             .and_then(|name| name.to_str())
             .is_some_and(|name| name.eq_ignore_ascii_case("planning.toml"))
         {
-            if path == boundaries_root.join("planning.toml") && !file_type.is_dir() {
+            if path == boundaries_root.join("planning.toml") && file_type.is_file() {
                 continue;
             }
             anyhow::bail!(
-                "boundary inventory allows planning metadata only at '{}'; found nested planning metadata at '{}'",
+                "boundary inventory allows planning metadata only at '{}'; found disallowed planning entry at '{}'",
                 boundaries_root.join("planning.toml").display(),
                 path.display(),
             );
