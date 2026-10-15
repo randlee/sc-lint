@@ -214,15 +214,12 @@ fn collect_boundary_files(
         let entry = entry?;
         let path = entry.path();
         let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            collect_boundary_files(boundaries_root, &path, seen, files)?;
-            continue;
-        }
-        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
-            continue;
-        }
-        if path.file_name().and_then(|name| name.to_str()) == Some("planning.toml") {
-            if path == boundaries_root.join("planning.toml") {
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("planning.toml"))
+        {
+            if path == boundaries_root.join("planning.toml") && !file_type.is_dir() {
                 continue;
             }
             anyhow::bail!(
@@ -230,6 +227,13 @@ fn collect_boundary_files(
                 boundaries_root.join("planning.toml").display(),
                 path.display(),
             );
+        }
+        if file_type.is_dir() {
+            collect_boundary_files(boundaries_root, &path, seen, files)?;
+            continue;
+        }
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            continue;
         }
         if seen.insert(path.clone()) {
             files.push(path);

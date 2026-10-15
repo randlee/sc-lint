@@ -96,6 +96,24 @@ expires_when = "sprint_before_current"
     }
 }
 
+fn assert_planning_metadata_error(fixture: &InventoryFixture, offending_path: &Path) {
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root())
+            .expect_err("non-authoritative planning entry fails")
+    );
+    let planning_path = fixture.root().join("boundaries/planning.toml");
+    assert!(error.contains("allows planning metadata only"), "{error}");
+    assert!(
+        error.contains(&planning_path.display().to_string()),
+        "{error}"
+    );
+    assert!(
+        error.contains(&offending_path.display().to_string()),
+        "{error}"
+    );
+}
+
 use std::fs;
 use std::path::Path;
 
@@ -152,6 +170,48 @@ fn rejects_nested_planning_metadata() {
     assert!(error.contains("allows planning metadata only"));
     assert!(error.contains(&planning_path.display().to_string()));
     assert!(error.contains(&nested_planning_path.display().to_string()));
+}
+
+#[test]
+fn rejects_case_variant_nested_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let case_variant = fixture
+        .root()
+        .join("boundaries/sc-lint-boundary/Planning.toml");
+    fixture.write(
+        "boundaries/sc-lint-boundary/Planning.toml",
+        "[planning]\ncurrent_sprint = \"A.6\"\n",
+    );
+
+    assert_planning_metadata_error(&fixture, &case_variant);
+}
+
+#[test]
+fn rejects_directory_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_directory = fixture
+        .root()
+        .join("boundaries/sc-lint-boundary/planning.toml");
+    fs::create_dir_all(&planning_directory).expect("create planning directory");
+
+    assert_planning_metadata_error(&fixture, &planning_directory);
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_symlink_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_symlink = fixture
+        .root()
+        .join("boundaries/sc-lint-boundary/planning.toml");
+    let authoritative_planning = fixture.root().join("boundaries/planning.toml");
+    std::os::unix::fs::symlink(authoritative_planning, &planning_symlink)
+        .expect("create nested planning symlink");
+
+    assert_planning_metadata_error(&fixture, &planning_symlink);
 }
 
 #[test]
