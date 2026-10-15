@@ -11,11 +11,14 @@ use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
-fn outside_source_path_has_no_repository_relative_path() {
+fn outside_source_path_reports_repository_relative_path_error() {
     let root = TempDir::new().unwrap();
     let outside_source = root.path().join("..\u{2f}outside.rs");
 
-    assert!(super::runtime::repo_relative_source_path(root.path(), &outside_source).is_none());
+    let error = super::runtime::repo_relative_source_path(root.path(), &outside_source)
+        .expect_err("outside paths must produce a diagnostic");
+    assert!(error.to_string().contains("outside.rs"));
+    assert!(error.to_string().contains("repository-relative"));
 }
 
 fn installer_catalog() -> serde_json::Value {
@@ -441,7 +444,7 @@ fn issue385_runtime_paths() {
         None,
     )
     .unwrap();
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![
             (
                 baseline.findings[0].clone(),

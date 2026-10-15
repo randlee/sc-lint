@@ -330,8 +330,8 @@ fn settings_apply_filtering_and_failure_policy() {
     let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
     let (findings, status) = settings.apply(
         vec![
-            config_finding(ConfigRule::One),
-            config_finding(ConfigRule::Two),
+            (config_finding(ConfigRule::One), None),
+            (config_finding(ConfigRule::Two), None),
         ],
         config_rule_id,
     );
@@ -344,8 +344,8 @@ fn settings_apply_filtering_and_failure_policy() {
         load_analyzer_settings(&CATALOG, directory.path(), None, Some("EXAMPLE-001")).unwrap();
     let (findings, status) = filtered.apply(
         vec![
-            config_finding(ConfigRule::One),
-            config_finding(ConfigRule::Two),
+            (config_finding(ConfigRule::One), None),
+            (config_finding(ConfigRule::Two), None),
         ],
         config_rule_id,
     );
@@ -361,7 +361,7 @@ fn per_rule_path_exclusions_require_exact_catalog_rule_ids() {
         "[tool.sc-lint.analyzers.example.exclude_paths_by_rule]\n\"EXAMPLE-002\" = [\"fixtures/**\"]\n",
     );
     let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![
             (
                 config_finding(ConfigRule::One),
@@ -489,7 +489,7 @@ fn issue385_config_matrix() {
     let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
     let fixture_path = Some(RepoRelativePath::parse("fixtures/config.toml").unwrap());
 
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![
             (config_finding(ConfigRule::One), fixture_path.clone()),
             (config_finding(ConfigRule::Two), fixture_path.clone()),
@@ -502,7 +502,7 @@ fn issue385_config_matrix() {
     assert_eq!(findings[1].rule_id, ConfigRule::One);
     assert_eq!(status, ReportStatus::Fail);
 
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![(config_finding(ConfigRule::One), fixture_path.clone())],
         config_rule_id,
     );
@@ -513,7 +513,7 @@ fn issue385_config_matrix() {
     let empty_map_settings =
         load_analyzer_settings(&CATALOG, empty_map.path(), None, None).unwrap();
     assert!(empty_map_settings.exclude_paths_by_rule.is_empty());
-    let (findings, status) = empty_map_settings.apply_with_paths(
+    let (findings, status) = empty_map_settings.apply(
         vec![(config_finding(ConfigRule::One), fixture_path.clone())],
         config_rule_id,
     );
@@ -522,7 +522,7 @@ fn issue385_config_matrix() {
 
     let no_map = TempDir::new().unwrap();
     let no_map_settings = load_analyzer_settings(&CATALOG, no_map.path(), None, None).unwrap();
-    let (no_map_findings, no_map_status) = no_map_settings.apply_with_paths(
+    let (no_map_findings, no_map_status) = no_map_settings.apply(
         vec![(config_finding(ConfigRule::One), fixture_path.clone())],
         config_rule_id,
     );
@@ -610,7 +610,7 @@ exclude_paths = ["crates/example/src/lib.rs", "docs\\guide\\index.md"]
 
     assert!(settings.path_excluded("crates\\example\\src\\lib.rs"));
     assert!(settings.path_excluded("docs\\guide\\index.md"));
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![
             (
                 config_finding(ConfigRule::One),
@@ -638,7 +638,7 @@ exclude_paths = ["crates/example/src/lib.rs", "docs\\guide\\index.md"]
 "#,
     );
     let settings = load_analyzer_settings(&CATALOG, per_rule.path(), None, None).unwrap();
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![
             (
                 config_finding(ConfigRule::One),

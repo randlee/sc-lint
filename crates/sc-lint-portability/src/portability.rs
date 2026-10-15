@@ -52,8 +52,15 @@ use self::findings::convert_findings;
 pub(super) fn repo_relative_source_path(
     root: &Path,
     source_path: &Path,
-) -> Option<RepoRelativePath> {
-    RepoRelativePath::parse(&relative_slash_path(root, source_path)).ok()
+) -> Result<RepoRelativePath> {
+    let relative = relative_slash_path(root, source_path);
+    RepoRelativePath::parse(&relative).with_context(|| {
+        format!(
+            "failed to build repository-relative source path for `{}` under `{}`",
+            source_path.display(),
+            root.display()
+        )
+    })
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -196,7 +203,7 @@ pub(crate) fn analyze_portability(
         ));
     }
 
-    Ok(convert_findings(root, findings))
+    convert_findings(root, findings)
 }
 
 pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {

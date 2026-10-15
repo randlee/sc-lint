@@ -131,7 +131,7 @@ pub fn analyze_workspace_configured(
         (Vec::new(), 0)
     };
     let (findings, status) =
-        settings.apply_with_paths(findings, |rule_id| CatalogRuleId::new(rule_id.as_str()));
+        settings.apply(findings, |rule_id| CatalogRuleId::new(rule_id.as_str()));
     Ok(FindingsReport {
         tool: SC_LINT_RUNTIME_TOOL,
         version: SC_LINT_RUNTIME_VERSION,

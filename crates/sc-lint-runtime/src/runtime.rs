@@ -36,8 +36,15 @@ use sc_lint_analyzer_support::span_start_line;
 pub(super) fn repo_relative_source_path(
     root: &Path,
     source_path: &Path,
-) -> Option<RepoRelativePath> {
-    RepoRelativePath::parse(&relative_slash_path(root, source_path)).ok()
+) -> Result<RepoRelativePath> {
+    let relative = relative_slash_path(root, source_path);
+    RepoRelativePath::parse(&relative).with_context(|| {
+        format!(
+            "failed to build repository-relative source path for `{}` under `{}`",
+            source_path.display(),
+            root.display()
+        )
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -89,11 +96,11 @@ pub(crate) fn analyze_runtime_liveness(
             .then_with(|| left.message.cmp(&right.message))
     });
 
-    Ok(findings
+    findings
         .into_iter()
         .map(|finding| {
-            let source_path = repo_relative_source_path(root, &finding.source_path);
-            (
+            let source_path = repo_relative_source_path(root, &finding.source_path)?;
+            Ok((
                 Finding {
                     rule_id: finding.rule_id,
                     kind: finding.kind.into(),
@@ -109,10 +116,10 @@ pub(crate) fn analyze_runtime_liveness(
                     ))],
                     node_ids: vec![NodeId::new(finding.node_label)],
                 },
-                source_path,
-            )
+                Some(source_path),
+            ))
         })
-        .collect())
+        .collect()
 }
 
 struct RuntimeCollector<'a> {

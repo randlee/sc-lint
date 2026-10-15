@@ -173,6 +173,21 @@ fn rejects_nested_planning_metadata() {
 }
 
 #[test]
+fn rejects_deeply_nested_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let nested_planning = fixture
+        .root()
+        .join("boundaries/sc-lint-boundary/nested/planning.toml");
+    fixture.write(
+        "boundaries/sc-lint-boundary/nested/planning.toml",
+        "[planning]\ncurrent_sprint = \"A.6\"\n",
+    );
+
+    assert_planning_metadata_error(&fixture, &nested_planning);
+}
+
+#[test]
 fn rejects_case_variant_nested_planning_metadata() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();

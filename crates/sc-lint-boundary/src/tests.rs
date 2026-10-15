@@ -5170,7 +5170,7 @@ fn issue385_boundary_manifest_paths() {
         Some("manifests"),
     )
     .unwrap();
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![
             (
                 baseline.findings[0].clone(),
