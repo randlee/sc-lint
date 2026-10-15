@@ -358,15 +358,10 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .arg(root.join(".sc-lint/bootstrap.ps1"))
             .current_dir(&root);
         if derived {
-            command.args([
-                "lint",
-                "ci",
-                "--consumer",
-                "--config",
-                "sc-lint.toml",
-                "--profile",
-                "ci",
-            ]);
+            // The bootstrap owns the consumer mode and translates its
+            // selector into `sc-lint lint --consumer --profile`; passing the
+            // product flags through makes them invalid bootstrap positionals.
+            command.args(["lint", "ci", "--config", "sc-lint.toml"]);
         } else {
             command.args(["exec", "--", "sc-lint", "version"]);
         }
