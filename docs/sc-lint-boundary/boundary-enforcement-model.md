@@ -423,11 +423,11 @@ During the Markdown + TOML transition, the parity model should operate on the
 shared internal boundary model, but the planning/enforcement feature itself
 should still be TOML-first.
 
-Default behavior should be:
+The planning-metadata source and default behavior are:
 
 - TOML planning metadata is authoritative
-- `boundaries/planning.toml` is the default authoritative planning-metadata
-  file
+- `boundaries/planning.toml` is the sole authoritative planning-metadata
+  source
 - when `boundaries/` exists, `boundaries/planning.toml` is required and must
   define `[planning].current_sprint`; when `boundaries/` is absent, loading
   returns an empty inventory and does not require planning metadata
