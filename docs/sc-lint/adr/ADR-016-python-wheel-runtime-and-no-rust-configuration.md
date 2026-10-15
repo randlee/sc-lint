@@ -136,5 +136,7 @@ engine or setup hooks are introduced. Dry-run never provisions the helper or
 tools. The existing Rust consumer executor gains ordered named lint profiles
 and separate platform scope, and bootstrap gains direct managed `exec` without
 profile recursion. ADR-017 specifies exact translation, failure, compatibility
-and dry-run behavior; it does not add generic test groups, parallel execution,
-keep-going or test argument forwarding.
+and dry-run behavior. Its 2026-10-14 amendment adds concurrent keep-going
+execution only to the built-in source-maintainer lint plan; consumer-configured
+lint and test profiles remain sequential, declaration-ordered, and fail-fast.
+Generic test groups and test argument forwarding are not added.

@@ -70,8 +70,14 @@ second consumer runner or copy atm-core policy values into product defaults.
    translated. Native targets use cargo; Linux/macOS to x86_64-pc-windows-msvc
    uses cargo xwin. Other cross combinations report explicit unsupported skips;
    missing tools or failures for supported combinations are failures.
-   Generic test groups, parallel execution, keep-going,
-   and test argument forwarding are outside this phase.
+   As amended 2026-10-14, the built-in source-maintainer lint plan may execute
+   independent steps concurrently and continues every planned step after
+   failures. Its report retains plan order and identifies every failed step by
+   plan index; any failure produces a non-zero exit. Steps requiring Cargo's
+   build lock are serialized. These semantics do not apply to
+   consumer-configured lint or test profiles: those remain sequential, in
+   declaration order, and fail-fast. Generic test groups and test argument
+   forwarding remain outside this phase.
 5. Add direct bootstrap `exec` using the existing managed installation and
    environment, preserving argv and child exit status without profile recursion
    (#388). No setup hooks or new interpreter-selection policy are introduced;
@@ -94,6 +100,10 @@ second consumer runner or copy atm-core policy values into product defaults.
    and installed environment.
 
 ## Compatibility and approval
+
+Change 4 amendment: Accepted — Rand, 2026-10-14. The ruling changes execution
+semantics only for the built-in source-maintainer lint plan; consumer-configured
+profiles retain their sequential, fail-fast contract.
 
 Optional manifests/configuration activate policy only when present. An empty
 manifest-policy family array adds no checks; a present allowlist record with

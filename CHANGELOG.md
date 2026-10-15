@@ -4,6 +4,13 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- The built-in source lint plan runs independent steps concurrently and
+  continues through all planned steps after failures, reporting every failure
+  by plan index in plan order. Consumer-configured lint and test profiles
+  remain sequential, declaration-ordered, and fail-fast.
+
 ### Compatibility
 
 - Tightened boundary inventory validation and stale-entry diagnostics can
