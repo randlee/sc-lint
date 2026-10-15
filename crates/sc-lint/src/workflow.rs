@@ -775,7 +775,8 @@ fn product_step(
 
 fn python_step(repo_root: &Path, name: &'static str, kind: &'static str, module: &str) -> StepPlan {
     let interpreter = crate::python_adapter::PythonInterpreter::resolve(repo_root);
-    let step = StepPlan::new(name, kind, interpreter.program, ["-m", module]);
+    let step = StepPlan::new(name, kind, interpreter.program, ["-m", module])
+        .with_env("SC_LINT_BIN", crate::dispatch::product_binary());
     match interpreter.python_path {
         Some(python_path) => step.with_env("PYTHONPATH", python_path),
         None => step,
@@ -800,4 +801,19 @@ fn ensure_xwin_available(command_id: &str, xwin_available: bool) -> Result<(), C
     .with_suggested_action(
         "Install `cargo-xwin` to enable Windows preflight or use the native check/clippy path instead.",
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn python_steps_delegate_to_the_running_product_binary() {
+        let step = python_step(Path::new("."), "pytests", "lint", "sc_lint.run_pytests");
+        let product_binary = crate::dispatch::product_binary().into_os_string();
+
+        assert!(step.env.iter().any(|(key, value)| {
+            key.to_string_lossy() == "SC_LINT_BIN" && value == &product_binary
+        }));
+    }
 }
