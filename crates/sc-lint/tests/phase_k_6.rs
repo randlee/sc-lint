@@ -53,7 +53,7 @@ fn consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBu
         .expect("derived consumer manifest");
         fs::write(
             root.join("sc-lint.toml"),
-            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\".sc-lint/bootstrap\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n",
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\".sc-lint/bootstrap\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
         )
         .expect("derived consumer profile configuration");
     } else {
@@ -80,7 +80,7 @@ fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -
         .expect("derived consumer manifest");
         fs::write(
             root.join("sc-lint.toml"),
-            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"pwsh\", \"-NoLogo\", \"-NoProfile\", \"-NonInteractive\", \"-File\", \".sc-lint/bootstrap.ps1\", \"exec\", \"--\", \"sc-lint\", \"version\"]\n",
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"pwsh\", \"-NoLogo\", \"-NoProfile\", \"-NonInteractive\", \"-File\", \".sc-lint/bootstrap.ps1\", \"exec\", \"--\", \"sc-lint\", \"version\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
         )
         .expect("derived consumer profile configuration");
     } else {
