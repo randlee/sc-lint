@@ -247,35 +247,82 @@ fn loads_workspace_metadata_once_per_analyzer_run() {
     assert_eq!(report.scanned_crates, 1);
 }
 
+const PARALLEL_FILE_COUNT: usize = 10;
+
+fn in_pool<T: Send>(threads: usize, work: impl FnOnce() -> T + Send) -> T {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .unwrap()
+        .install(work)
+}
+
+/// Extract `(file name, line)` from a finding message of the form
+/// `<path>:<line>: <detail>`.
+fn finding_location(message: &str) -> (String, usize) {
+    let head = message.split(": ").next().unwrap();
+    let (path, line) = head.rsplit_once(':').unwrap();
+    let file = path.rsplit(['/', '\\']).next().unwrap();
+    (file.to_string(), line.parse().unwrap())
+}
+
 #[test]
 fn parallel_file_analysis_renders_identically_for_multifile_workspaces() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
-    fixture.write_source("example", "lib.rs", "mod first; mod second;");
-    fixture.write_source(
-        "example",
-        "first.rs",
-        r#"pub fn first_path() { let _ = "/tmp/first"; }"#,
-    );
-    fixture.write_source(
-        "example",
-        "second.rs",
-        r#"pub fn second_path() { let _ = "/tmp/second"; }"#,
-    );
+    // Declare modules in reverse order so scheduling or declaration order
+    // cannot coincide with the expected sorted order by accident.
+    let mut lib = String::new();
+    for index in (0..PARALLEL_FILE_COUNT).rev() {
+        lib.push_str(&format!("mod file_{index:02};\n"));
+        fixture.write_source("example", &format!("file_{index:02}.rs"), &format!(
+                "pub fn a_{index:02}() {{ let _ = (\"/tmp/a\", \"/tmp/b\"); }}\npub fn b_{index:02}() {{ let _ = \"/tmp/c\"; }}\n"
+            ));
+    }
+    fixture.write_source("example", "lib.rs", &lib);
     let options = AnalyzeOptions {
         root: fixture.root().to_path_buf(),
         format: OutputFormat::Json,
     };
-    let expected = analyze_workspace(&options).unwrap();
-    let expected_text = render_findings_report(&expected);
-    let expected_json = serde_json::to_vec(&expected).unwrap();
-
-    assert!(!expected.findings.is_empty());
-    for _ in 0..8 {
+    let analyze = || {
         let report = analyze_workspace(&options).unwrap();
-        assert_eq!(render_findings_report(&report), expected_text);
-        assert_eq!(serde_json::to_vec(&report).unwrap(), expected_json);
+        (
+            render_findings_report(&report),
+            serde_json::to_vec(&report).unwrap(),
+            report,
+        )
+    };
+    // Oracle: a single-thread pool analyzes files strictly sequentially.
+    let (expected_text, expected_json, expected) = in_pool(1, analyze);
+
+    let locations: Vec<(String, usize)> = expected
+        .findings
+        .iter()
+        .map(|finding| finding_location(&finding.message))
+        .collect();
+    assert!(locations.len() >= PARALLEL_FILE_COUNT * 2, "{locations:#?}");
+    let mut sorted = locations.clone();
+    sorted.sort();
+    assert_eq!(locations, sorted, "findings ordered by (source_path, line)");
+    // Same-line findings appear for every file (two literals on line 1).
+    for index in 0..PARALLEL_FILE_COUNT {
+        let file = format!("file_{index:02}.rs");
+        let in_file: Vec<usize> = locations
+            .iter()
+            .filter(|(name, _)| *name == file)
+            .map(|(_, line)| *line)
+            .collect();
+        assert!(in_file.len() >= 2, "{file}: {in_file:?}");
+        assert_eq!(in_file.first(), Some(&1), "{file}: {in_file:?}");
+        assert_eq!(in_file.last(), Some(&2), "{file}: {in_file:?}");
+    }
+
+    for _ in 0..8 {
+        let (text, json, report) = in_pool(4, analyze);
+        assert_eq!(text, expected_text);
+        assert_eq!(json, expected_json);
+        assert_eq!(report.findings, expected.findings);
     }
 }
 

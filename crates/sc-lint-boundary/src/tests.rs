@@ -355,24 +355,100 @@ fn exports_graph_for_inline_and_file_modules_and_attributes() {
     }));
 }
 
-#[test]
-fn parallel_graph_file_parsing_is_deterministic_for_multifile_workspaces() {
+const PARALLEL_MODULE_COUNT: usize = 12;
+
+fn write_multifile_parallel_fixture() -> WorkspaceFixture {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
     fixture.write_package_manifest("example");
-    fixture.write_source("example", "lib.rs", "mod first; mod second;");
+    // Declare modules in reverse order so the merge order cannot coincide with
+    // declaration order by accident.
+    let mut lib = String::from("mod first; mod second;\n");
+    for index in (0..PARALLEL_MODULE_COUNT).rev() {
+        lib.push_str(&format!("mod gen_{index:02};\n"));
+        fixture.write_source(
+            "example",
+            &format!("gen_{index:02}.rs"),
+            &format!("pub struct Gen{index:02}; pub fn make_{index:02}() -> Gen{index:02} {{ Gen{index:02} }}"),
+        );
+    }
+    fixture.write_source("example", "lib.rs", &lib);
     fixture.write_source("example", "first.rs", "pub struct First; pub mod nested;");
     fixture.write_source("example", "first/nested.rs", "pub struct Nested;");
     fixture.write_source("example", "second.rs", "pub enum Second { A, B }");
+    fixture
+}
+
+fn in_pool<T: Send>(threads: usize, work: impl FnOnce() -> T + Send) -> T {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .unwrap()
+        .install(work)
+}
+
+#[test]
+fn parallel_graph_file_parsing_is_deterministic_for_multifile_workspaces() {
+    let fixture = write_multifile_parallel_fixture();
     let options = ExportGraphOptions {
         root: fixture.root().to_path_buf(),
     };
-    let expected = export_workspace_graph(&options).unwrap();
+    // Oracle: a single-thread pool processes every round strictly in order.
+    let expected = in_pool(1, || export_workspace_graph(&options).unwrap());
     let expected_json = render_graph_export_json(&expected);
 
+    let node_ids: Vec<&str> = expected.nodes.iter().map(|node| node.id.as_str()).collect();
+    for name in ["First", "Nested", "Second"] {
+        assert!(
+            node_ids.iter().any(|id| id.ends_with(&format!("::{name}"))),
+            "expected node {name} in {node_ids:#?}"
+        );
+    }
+    for index in 0..PARALLEL_MODULE_COUNT {
+        let suffix = format!("::Gen{index:02}");
+        assert!(node_ids.iter().any(|id| id.ends_with(&suffix)), "{suffix}");
+    }
+    let mut sorted_ids = node_ids.clone();
+    sorted_ids.sort();
+    assert_eq!(node_ids, sorted_ids, "nodes follow the sorted merge order");
+    let edge_keys: Vec<_> = expected
+        .edges
+        .iter()
+        .map(|edge| (edge.kind, edge.from.as_str(), edge.to.as_str()))
+        .collect();
+    let mut sorted_edge_keys = edge_keys.clone();
+    sorted_edge_keys.sort();
+    assert_eq!(edge_keys, sorted_edge_keys, "edges follow the sorted order");
+
     for _ in 0..8 {
-        let graph = export_workspace_graph(&options).unwrap();
+        let graph = in_pool(4, || export_workspace_graph(&options).unwrap());
+        assert_eq!(graph.nodes, expected.nodes);
+        assert_eq!(graph.edges, expected.edges);
         assert_eq!(render_graph_export_json(&graph), expected_json);
+    }
+}
+
+#[test]
+fn analyze_workspace_output_is_identical_across_thread_pools() {
+    let fixture = write_multifile_parallel_fixture();
+    let render = |format: OutputFormat| {
+        let options = AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format,
+            rule: None,
+        };
+        let report = analyze_workspace(&options).unwrap();
+        (
+            render_findings_report(&report),
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+    };
+    let expected = in_pool(1, || render(OutputFormat::Json));
+    assert!(expected.0.contains("scanned_crates=1"), "{}", expected.0);
+    for _ in 0..4 {
+        let actual = in_pool(4, || render(OutputFormat::Json));
+        assert_eq!(actual.0, expected.0, "text output differs");
+        assert_eq!(actual.1, expected.1, "json output differs");
     }
 }
 
