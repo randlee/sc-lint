@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
@@ -6,6 +5,9 @@ use std::path::Path;
 use std::path::PathBuf;
 #[cfg(any(unix, windows))]
 use std::process::Command as ProcessCommand;
+use std::sync::Mutex;
+use std::time::Duration;
+use std::time::Instant;
 
 use clap::Parser;
 use serde::Serialize;
@@ -472,8 +474,12 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
         vec!["lint-fmt", "lint-clippy"]
     );
     assert_eq!(
-        *passing.invocations.borrow(),
-        vec!["lint-fmt", "lint-clippy"]
+        passing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["lint-fmt", "lint-clippy"]
     );
 
     let test_cli = Cli::parse_from([
@@ -491,7 +497,14 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
     let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &failing)
         .expect_err("a required test member fails the aggregate");
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_eq!(*failing.invocations.borrow(), vec!["test-workspace"]);
+    assert_eq!(
+        failing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["test-workspace"]
+    );
 }
 
 #[test]
@@ -517,20 +530,45 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
         &adapter,
     )
     .expect("named layer runs");
-    assert_eq!(*adapter.invocations.borrow(), vec!["integrate"]);
+    assert_eq!(
+        adapter
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["integrate"]
+    );
     assert_eq!(run.data["selector"], "integrate");
 
     let all_cli = Cli::parse_from(["sc-lint", "--config", config, "test", "all"]);
     let all_context = CommandContext::from_cli(&all_cli).expect("all layers context");
-    let adapter = FakeSystemAdapter::new(false);
-    workflow::run_consumer_profile_with(
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.delays.insert("unit", Duration::from_millis(40));
+    adapter
+        .delays
+        .insert("integrate", Duration::from_millis(40));
+    let run = workflow::run_consumer_profile_with(
         &loaded,
         ConsumerProfile::Test,
         all_context.consumer_selector(),
         &adapter,
     )
     .expect("all layers run");
-    assert_eq!(*adapter.invocations.borrow(), vec!["unit", "integrate"]);
+    let steps = run.data["steps"].as_array().expect("steps array");
+    assert_eq!(step_names(steps), ["unit", "integrate"],);
+    let timings = adapter.timings.lock().expect("fake timing log lock");
+    let unit = timings
+        .iter()
+        .find(|timing| timing.name == "unit")
+        .expect("unit timing");
+    let integrate = timings
+        .iter()
+        .find(|timing| timing.name == "integrate")
+        .expect("integrate timing");
+    assert!(
+        unit.finished <= integrate.started || integrate.finished <= unit.started,
+        "consumer cargo steps must not overlap"
+    );
 
     let profile_cli = Cli::parse_from([
         "sc-lint",
@@ -551,7 +589,14 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
         &adapter,
     )
     .expect("named lint profile runs");
-    assert_eq!(*adapter.invocations.borrow(), vec!["fmt"]);
+    assert_eq!(
+        adapter
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["fmt"]
+    );
 
     let error = workflow::run_consumer_profile_with(
         &loaded,
@@ -2101,6 +2146,126 @@ fn lint_profiles_have_stable_membership() {
     );
 }
 
+fn load_repo_lint_profile(profile: &str) -> LoadedConfig {
+    let repo_root = repo_backed_workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        profile,
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("lint profile context");
+    LoadedConfig::load(&cli, &context).expect("config loads")
+}
+
+#[test]
+fn lint_profile_runs_independent_steps_concurrently_in_plan_order() {
+    let loaded = load_repo_lint_profile("fast");
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.delays.insert("version", Duration::from_millis(120));
+    adapter
+        .delays
+        .insert("manifests", Duration::from_millis(120));
+
+    let success = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Fast, &adapter)
+        .expect("fast profile succeeds");
+    let steps = success.data["steps"].as_array().expect("steps array");
+    assert_eq!(
+        step_names(steps),
+        ["fmt", "version", "manifests", "spell", "pytests"]
+    );
+
+    let timings = adapter.timings.lock().expect("fake timing log lock");
+    let version = timings
+        .iter()
+        .find(|timing| timing.name == "version")
+        .expect("version timing");
+    let manifests = timings
+        .iter()
+        .find(|timing| timing.name == "manifests")
+        .expect("manifests timing");
+    assert!(
+        version.started < manifests.finished && manifests.started < version.finished,
+        "independent steps must overlap"
+    );
+}
+
+#[test]
+fn lint_profile_serializes_every_cargo_lane_step() {
+    let loaded = load_repo_lint_profile("full");
+    let mut adapter = FakeSystemAdapter::new(true);
+    let cargo_steps = [
+        "fmt",
+        "clippy",
+        "deny",
+        "shear",
+        "sc-boundary",
+        "sc-portability",
+        "sc-runtime",
+        "check.xwin",
+        "clippy.xwin",
+    ];
+    for name in cargo_steps {
+        adapter.delays.insert(name, Duration::from_millis(20));
+    }
+
+    workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Full, &adapter)
+        .expect("full profile succeeds");
+
+    let timings = adapter.timings.lock().expect("fake timing log lock");
+    for (index, first_name) in cargo_steps.iter().enumerate() {
+        let first = timings
+            .iter()
+            .find(|timing| timing.name == *first_name)
+            .expect("first cargo timing");
+        for second_name in &cargo_steps[index + 1..] {
+            let second = timings
+                .iter()
+                .find(|timing| timing.name == *second_name)
+                .expect("second cargo timing");
+            assert!(
+                first.finished <= second.started || second.finished <= first.started,
+                "cargo lane steps {first_name} and {second_name} overlapped"
+            );
+        }
+    }
+}
+
+#[test]
+fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
+    let loaded = load_repo_lint_profile("fast");
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.delays.insert("version", Duration::from_millis(120));
+    adapter
+        .delays
+        .insert("manifests", Duration::from_millis(20));
+    adapter
+        .failures
+        .insert("version", "version failed first in plan");
+    adapter
+        .failures
+        .insert("manifests", "manifests failed first in time");
+
+    let error = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Fast, &adapter)
+        .expect_err("the profile fails");
+    assert_eq!(error.message, "version failed first in plan");
+
+    let timings = adapter.timings.lock().expect("fake timing log lock");
+    let version = timings
+        .iter()
+        .find(|timing| timing.name == "version")
+        .expect("version timing");
+    let manifests = timings
+        .iter()
+        .find(|timing| timing.name == "manifests")
+        .expect("manifests timing");
+    assert!(
+        manifests.finished < version.finished,
+        "completion order reversed"
+    );
+}
+
 #[test]
 fn full_profile_adds_xwin_only_when_available() {
     let repo_root = repo_backed_workspace_root();
@@ -2184,7 +2349,8 @@ fn ci_and_lint_ci_differ_only_by_test_execution() {
     assert_eq!(
         adapter
             .invocations
-            .borrow()
+            .lock()
+            .expect("fake invocation log lock")
             .iter()
             .filter(|step| step.as_str() == "sc-runtime")
             .count(),
@@ -2789,13 +2955,21 @@ fn step_names(steps: &[Value]) -> Vec<String> {
         .collect()
 }
 
+struct StepTiming {
+    name: String,
+    started: Instant,
+    finished: Instant,
+}
+
 struct FakeSystemAdapter {
     xwin_available: bool,
     host: crate::profile_plan::Platform,
     failures: HashMap<&'static str, &'static str>,
-    invocations: RefCell<Vec<String>>,
+    delays: HashMap<&'static str, Duration>,
+    invocations: Mutex<Vec<String>>,
     /// Program and argv of every planned (consumer lint) step, in run order.
-    planned_argv: RefCell<Vec<Vec<String>>>,
+    planned_argv: Mutex<Vec<Vec<String>>>,
+    timings: Mutex<Vec<StepTiming>>,
 }
 
 impl FakeSystemAdapter {
@@ -2804,10 +2978,10 @@ impl FakeSystemAdapter {
             xwin_available,
             host: crate::profile_plan::Platform::host(),
             failures: HashMap::new(),
-            planned_argv: RefCell::new(Vec::new()),
-            // Tests need to observe step order without requiring Sync, so
-            // RefCell is sufficient for this single-threaded fake.
-            invocations: RefCell::new(Vec::new()),
+            delays: HashMap::new(),
+            planned_argv: Mutex::new(Vec::new()),
+            invocations: Mutex::new(Vec::new()),
+            timings: Mutex::new(Vec::new()),
         }
     }
 }
@@ -2817,6 +2991,30 @@ impl FakeSystemAdapter {
     fn on_host(mut self, host: crate::profile_plan::Platform) -> Self {
         self.host = host;
         self
+    }
+
+    fn record_step(&self, name: &str) -> Result<(), Box<CliError>> {
+        let started = Instant::now();
+        self.invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .push(name.to_string());
+        if let Some(delay) = self.delays.get(name) {
+            std::thread::sleep(*delay);
+        }
+        let finished = Instant::now();
+        self.timings
+            .lock()
+            .expect("fake timing log lock")
+            .push(StepTiming {
+                name: name.to_string(),
+                started,
+                finished,
+            });
+        if let Some(message) = self.failures.get(name) {
+            return Err(Box::new(CliError::backend_failure(*message)));
+        }
+        Ok(())
     }
 }
 
@@ -2834,15 +3032,15 @@ impl workflow::SystemAdapter for FakeSystemAdapter {
         _repo_root: &Path,
         step: &crate::profile_plan::PlannedStep,
     ) -> Result<workflow::StepReport, CliError> {
-        self.invocations.borrow_mut().push(step.name().to_string());
+        self.record_step(step.name()).map_err(|error| *error)?;
         let argv = std::iter::once(step.command())
             .chain(step.args())
             .map(|part| part.to_string_lossy().into_owned())
             .collect();
-        self.planned_argv.borrow_mut().push(argv);
-        if let Some(message) = self.failures.get(step.name()) {
-            return Err(CliError::backend_failure(*message));
-        }
+        self.planned_argv
+            .lock()
+            .expect("fake planned argv log lock")
+            .push(argv);
         Ok(
             workflow::StepReport::success(&workflow::StepPlan::from_planned(step))
                 .for_planned(step),
@@ -2854,12 +3052,7 @@ impl workflow::SystemAdapter for FakeSystemAdapter {
         _repo_root: &Path,
         step: &workflow::StepPlan,
     ) -> Result<workflow::StepReport, CliError> {
-        self.invocations.borrow_mut().push(step.name().to_string());
-
-        if let Some(message) = self.failures.get(step.name()) {
-            return Err(CliError::backend_failure(*message));
-        }
-
+        self.record_step(step.name()).map_err(|error| *error)?;
         Ok(workflow::StepReport::success(step))
     }
 }
@@ -3702,7 +3895,11 @@ fn test_profile_emits_structured_skips_and_skip_only_success() {
         })
     );
     assert_eq!(
-        *linux.invocations.borrow(),
+        linux
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
         ["fmt"],
         "skipped steps never run"
     );
@@ -3714,7 +3911,13 @@ fn test_profile_emits_structured_skips_and_skip_only_success() {
     assert_eq!(skipped.len(), 1, "{skipped:?}");
     assert_eq!(skipped[0]["status"], "skipped");
     assert_eq!(skipped[0]["reason"], "unsupported_cross_command");
-    assert!(only.invocations.borrow().is_empty(), "nothing executed");
+    assert!(
+        only.invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .is_empty(),
+        "nothing executed"
+    );
 }
 
 #[test]
@@ -3730,7 +3933,15 @@ fn test_supported_execution_failure_is_nonzero() {
         .expect_err("failing step fails the run");
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
     assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
-    assert_eq!(*failing.invocations.borrow(), ["first"], "fail-fast");
+    assert_eq!(
+        failing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["first"],
+        "fail-fast"
+    );
 
     // A supported cross target without cargo-xwin is a capability failure, never a skip.
     let msvc = format!(
@@ -3743,7 +3954,13 @@ fn test_supported_execution_failure_is_nonzero() {
         .expect_err("missing xwin fails");
     assert_eq!(error.kind, CliErrorKind::Capability);
     assert_eq!(error.exit_code(), crate::consts::EXIT_CAPABILITY);
-    assert!(no_xwin.invocations.borrow().is_empty());
+    assert!(
+        no_xwin
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .is_empty()
+    );
 }
 
 #[test]

@@ -1,6 +1,8 @@
 use std::ffi::OsString;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
+use std::sync::Mutex;
+use std::thread;
 
 use serde_json::Value;
 use serde_json::json;
@@ -139,7 +141,7 @@ fn skipped_row(record: &SkipRecord) -> Value {
 }
 
 /// Seam for injecting step execution in tests and alternate runtimes.
-pub(crate) trait SystemAdapter {
+pub(crate) trait SystemAdapter: Send + Sync {
     fn cargo_xwin_available(&self, repo_root: &Path) -> bool;
     /// The platform planning treats as the local host.
     fn host_platform(&self) -> Platform;
@@ -365,8 +367,8 @@ pub(crate) fn run_consumer_profile_with(
     })))
 }
 
-/// Plans the selected consumer lint steps for this host, then runs them
-/// sequentially and fail-fast; skipped steps are reported in declaration order.
+/// Plans the selected consumer lint steps for this host; skipped steps are
+/// reported in declaration order.
 #[expect(
     clippy::result_large_err,
     reason = "Consumer lint execution retains the shared top-level CliError contract."
@@ -689,10 +691,67 @@ fn run_steps(
     adapter: &dyn SystemAdapter,
     steps: &[StepPlan],
 ) -> Result<Vec<StepReport>, CliError> {
-    steps
-        .iter()
-        .map(|step| adapter.run_step(repo_root, step))
-        .collect()
+    let cargo_lane = Mutex::new(());
+    thread::scope(|scope| {
+        let workers = steps
+            .iter()
+            .map(|step| {
+                let step_name = step.name().to_string();
+                let worker_name = format!("sc-lint-{}", step.name());
+                let worker = thread::Builder::new()
+                    .name(worker_name)
+                    .spawn_scoped(scope, || {
+                        if step.requires_cargo_lane() {
+                            let _guard = cargo_lane.lock().map_err(|_| {
+                                CliError::internal("the cargo execution lane is unavailable")
+                            })?;
+                            adapter.run_step(repo_root, step)
+                        } else {
+                            adapter.run_step(repo_root, step)
+                        }
+                    })
+                    .map_err(|error| {
+                        CliError::internal(format!("{} worker failed to start", step.name()))
+                            .with_source(error)
+                    });
+                (step_name, worker)
+            })
+            .collect::<Vec<_>>();
+
+        workers
+            .into_iter()
+            .map(|(step_name, worker)| match worker {
+                Ok(worker) => worker.join().map_err(|_| {
+                    CliError::internal(format!("{step_name} worker panicked during execution"))
+                })?,
+                Err(error) => Err(error),
+            })
+            .collect()
+    })
+}
+
+impl StepPlan {
+    fn requires_cargo_lane(&self) -> bool {
+        let command_name = Path::new(&self.command)
+            .file_name()
+            .unwrap_or(self.command.as_os_str())
+            .to_string_lossy();
+        if command_name.eq_ignore_ascii_case("cargo")
+            || command_name.eq_ignore_ascii_case("cargo.exe")
+        {
+            return true;
+        }
+        !matches!(
+            self.name.as_str(),
+            "version"
+                | "manifests"
+                | "spell"
+                | "pytests"
+                | "function-length"
+                | "line-counts"
+                | "identity-literals"
+        )
+    }
 }
 
 fn cargo_step(
