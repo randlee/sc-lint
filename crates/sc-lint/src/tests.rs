@@ -3862,10 +3862,7 @@ fn consumer_profile_steps_require_unique_names_and_non_empty_argv() {
         let error = loaded.expect_err(label);
         assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED", "{label}");
         assert_eq!(error.kind, CliErrorKind::Config, "{label}");
-        assert!(
-            error.message.contains(cause),
-            "{label}: {error:?}"
-        );
+        assert!(error.message.contains(cause), "{label}: {error:?}");
     }
 }
 
