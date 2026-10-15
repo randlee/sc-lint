@@ -270,6 +270,11 @@ fn metadata_once_preserves_text_and_json_output() {
     .expect("portability analysis succeeds");
     assert_eq!(metadata_loads.get(), 1);
 
+    // Windows cargo metadata can retain its 8.3 path alias while canonicalize
+    // returns the long path, so preserve the temp directory's spelling there.
+    #[cfg(windows)]
+    let root = fixture.root().to_path_buf();
+    #[cfg(not(windows))]
     let root = fs::canonicalize(fixture.root()).unwrap();
     let normalize_root =
         |output: String| output.replace(&root.to_string_lossy().to_string(), "<ROOT>");

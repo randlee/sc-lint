@@ -378,20 +378,16 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(
-            String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
-            "stdout: {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
         if derived {
             assert!(
-                String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
+                String::from_utf8_lossy(&output.stdout).contains("lint.ci.consumer: ok"),
                 "profile command did not execute the fixture's configured managed version check: {}",
                 String::from_utf8_lossy(&output.stdout)
             );
+        } else {
             assert!(
-                String::from_utf8_lossy(&output.stdout).contains("\"version\""),
-                "profile exec did not preserve the sc-lint version command through pwsh -File: {}",
+                String::from_utf8_lossy(&output.stdout).contains(env!("CARGO_PKG_VERSION")),
+                "managed version command did not report the product version: {}",
                 String::from_utf8_lossy(&output.stdout)
             );
         }
