@@ -124,11 +124,23 @@ fn assert_reported_path_matches(error: &str, marker: &str, expected_path: &Path)
         .split_once(marker)
         .and_then(|(_, remainder)| remainder.split_once('\'').map(|(path, _)| path))
         .unwrap_or_else(|| panic!("missing reported path after {marker:?}: {error}"));
-    let reported_path = fs::canonicalize(reported_path)
-        .unwrap_or_else(|error| panic!("canonicalize reported path {reported_path:?}: {error}"));
-    let expected_path = fs::canonicalize(expected_path)
-        .unwrap_or_else(|error| panic!("canonicalize expected path {expected_path:?}: {error}"));
-    assert_eq!(reported_path, expected_path, "{error}");
+    let reported_path = Path::new(reported_path);
+    // The authoritative lower-case path is deliberately absent in the
+    // root-case-variant fixture. Compare it lexically there; canonicalizing a
+    // missing path makes this otherwise portable rejection test Linux-only.
+    if expected_path.exists() {
+        assert_eq!(
+            fs::canonicalize(reported_path).unwrap_or_else(|error| panic!(
+                "canonicalize reported path {reported_path:?}: {error}"
+            )),
+            fs::canonicalize(expected_path).unwrap_or_else(|error| panic!(
+                "canonicalize expected path {expected_path:?}: {error}"
+            )),
+            "{error}"
+        );
+    } else {
+        assert_eq!(reported_path, expected_path, "{error}");
+    }
 }
 
 use std::fs;
