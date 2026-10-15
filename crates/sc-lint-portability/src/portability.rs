@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use anyhow::Result;
+use rayon::prelude::*;
 use serde::Deserialize;
 use syn::Block;
 use syn::Expr;
@@ -176,34 +177,37 @@ pub(crate) fn analyze_portability(
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let config = load_portability_config(document, analyzer_keys)?;
     let source_files = discover_source_files_with_metadata(workspace)?;
-    let mut findings = Vec::new();
-
-    for file_context in source_files {
-        let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
-            || {
+    let file_findings = source_files
+        .par_iter()
+        .map(|file_context| {
+            let source = fs::read_to_string(&file_context.source_path).with_context(|| {
                 format!(
                     "failed to read Rust source for portability analysis: {}",
                     file_context.source_path.display()
                 )
-            },
-        )?)
-        .with_context(|| {
-            format!(
-                "failed to parse Rust source for portability analysis: {}",
-                file_context.source_path.display()
-            )
-        })?;
+            })?;
+            let parsed = syn::parse_file(&source).with_context(|| {
+                format!(
+                    "failed to parse Rust source for portability analysis: {}",
+                    file_context.source_path.display()
+                )
+            })?;
 
-        let mut collector = PortabilityCollector::new(&file_context, &config);
-        collector.visit_file_items(&parsed);
-        findings.extend(collector.findings);
-        findings.extend(parity::collect_unix_portability_findings(
-            &parsed,
-            &file_context,
-            &config,
-            platform_adapters,
-        ));
-    }
+            let mut collector = PortabilityCollector::new(file_context, &config);
+            collector.visit_file_items(&parsed);
+            let mut findings = collector.findings;
+            findings.extend(parity::collect_unix_portability_findings(
+                &parsed,
+                file_context,
+                &config,
+                platform_adapters,
+            ));
+            Ok(findings)
+        })
+        .collect::<Vec<Result<Vec<_>>>>()
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
+    let findings = file_findings.into_iter().flatten().collect();
 
     convert_findings(root, findings)
 }

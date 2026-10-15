@@ -313,6 +313,27 @@ fn exports_graph_for_inline_and_file_modules_and_attributes() {
 }
 
 #[test]
+fn parallel_graph_file_parsing_is_deterministic_for_multifile_workspaces() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "mod first; mod second;");
+    fixture.write_source("example", "first.rs", "pub struct First; pub mod nested;");
+    fixture.write_source("example", "first/nested.rs", "pub struct Nested;");
+    fixture.write_source("example", "second.rs", "pub enum Second { A, B }");
+    let options = ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    };
+    let expected = export_workspace_graph(&options).unwrap();
+    let expected_json = render_graph_export_json(&expected);
+
+    for _ in 0..8 {
+        let graph = export_workspace_graph(&options).unwrap();
+        assert_eq!(render_graph_export_json(&graph), expected_json);
+    }
+}
+
+#[test]
 fn exports_field_and_variant_nodes_for_type_graph() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

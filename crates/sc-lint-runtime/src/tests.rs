@@ -156,6 +156,50 @@ fn flags_bare_wait_in_production_code() {
 }
 
 #[test]
+fn parallel_file_analysis_renders_identically_for_multifile_workspaces() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "mod first; mod second;");
+    fixture.write_source(
+        "example",
+        "first.rs",
+        r#"
+            use std::sync::{Condvar, Mutex};
+            pub fn first_wait(condvar: &Condvar, state: &Mutex<bool>) {
+                let state = state.lock().unwrap();
+                let _ = condvar.wait(state).unwrap();
+            }
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "second.rs",
+        r#"
+            use std::sync::{Condvar, Mutex};
+            pub fn second_wait(condvar: &Condvar, state: &Mutex<bool>) {
+                let state = state.lock().unwrap();
+                let _ = condvar.wait(state).unwrap();
+            }
+        "#,
+    );
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let expected = analyze_workspace(&options).unwrap();
+    let expected_text = render_findings_report(&expected);
+    let expected_json = serde_json::to_vec(&expected).unwrap();
+
+    assert!(!expected.findings.is_empty());
+    for _ in 0..8 {
+        let report = analyze_workspace(&options).unwrap();
+        assert_eq!(render_findings_report(&report), expected_text);
+        assert_eq!(serde_json::to_vec(&report).unwrap(), expected_json);
+    }
+}
+
+#[test]
 fn flags_discarded_wait_timeout_result_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

@@ -1,4 +1,5 @@
 use super::*;
+use rayon::prelude::*;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -40,79 +41,169 @@ pub(crate) fn build_workspace_graph(root: &Path) -> Result<GraphExport> {
 pub(crate) fn build_workspace_graph_from(
     metadata: &cargo_metadata::Metadata,
 ) -> Result<GraphExport> {
-    let workspace_packages = crate::workspace_packages(metadata);
     let mut builder = GraphBuilder::default();
-
-    for package in &workspace_packages {
-        let manifest_path = package.manifest_path.as_std_path().display().to_string();
-        for target in &package.targets {
-            if !is_supported_target(target) {
-                continue;
-            }
-
-            let source_path = target.src_path.as_std_path().to_path_buf();
-            let context = TargetContext {
-                package_name: package.name.to_string(),
-                target_name: target.name.clone(),
-                manifest_path: manifest_path.clone(),
-                crate_id: crate_id(&package.name, &target.name),
-                root_module_path: ModulePath::crate_root(),
-                workspace_dependency_roots: workspace_dependency_roots(
-                    &workspace_packages,
-                    package,
-                ),
-            };
-
-            builder.add_workspace_target(
-                &context.package_name,
-                &context.manifest_path,
-                &context.target_name,
-                &source_path,
-            );
-
-            let root_module_id = format!(
-                "{}::module::{}",
-                context.crate_id.as_str(),
-                context.root_module_path
-            );
-            builder.add_node(GraphNode {
-                id: NodeId::new(root_module_id.clone()),
-                kind: NodeKind::Module.as_str(),
-                label: "crate".to_string(),
-                visibility: None,
-                package: context.package_name.clone(),
-                target: Some(context.target_name.clone()),
-                manifest_path: context.manifest_path.clone(),
-                source_path: Some(source_path.display().to_string()),
-                module_path: Some(context.root_module_path.to_string()),
-                impl_kind: None,
-                impl_trait: None,
-                attributes: Vec::new(),
-            });
-            builder.add_edge(
-                EdgeKind::Contains,
-                context.crate_id.clone(),
-                root_module_id.clone(),
-            );
-
-            let root_dir = source_path
-                .parent()
-                .with_context(|| format!("missing parent dir for {}", source_path.display()))?
-                .to_path_buf();
-            ingest_module_items(
-                &mut builder,
-                &context,
-                &NodeId::new(root_module_id),
-                &context.root_module_path,
-                &root_dir,
-                &source_path,
-                parse_rust_file(&source_path)?,
-            )?;
-        }
-    }
-
+    let mut pending_files = queue_workspace_sources(metadata, &mut builder)?;
+    merge_source_file_partials(&mut builder, &mut pending_files)?;
     resolve_trait_method_edges(&mut builder);
     Ok(builder.finish())
+}
+
+fn queue_workspace_sources(
+    metadata: &cargo_metadata::Metadata,
+    builder: &mut GraphBuilder,
+) -> Result<Vec<SourceFileTask>> {
+    let workspace_packages = crate::workspace_packages(metadata);
+    let mut pending_files = Vec::new();
+    for package in &workspace_packages {
+        let manifest_path = package.manifest_path.as_std_path().display().to_string();
+        for target in package
+            .targets
+            .iter()
+            .filter(|target| is_supported_target(target))
+        {
+            pending_files.push(queue_target_source(
+                builder,
+                &workspace_packages,
+                package,
+                target,
+                &manifest_path,
+            )?);
+        }
+    }
+    Ok(pending_files)
+}
+
+fn queue_target_source(
+    builder: &mut GraphBuilder,
+    workspace_packages: &[&cargo_metadata::Package],
+    package: &cargo_metadata::Package,
+    target: &cargo_metadata::Target,
+    manifest_path: &str,
+) -> Result<SourceFileTask> {
+    let source_path = target.src_path.as_std_path().to_path_buf();
+    let context = TargetContext {
+        package_name: package.name.to_string(),
+        target_name: target.name.clone(),
+        manifest_path: manifest_path.to_string(),
+        crate_id: crate_id(&package.name, &target.name),
+        root_module_path: ModulePath::crate_root(),
+        workspace_dependency_roots: workspace_dependency_roots(workspace_packages, package),
+    };
+    builder.add_workspace_target(
+        &context.package_name,
+        &context.manifest_path,
+        &context.target_name,
+        &source_path,
+    );
+    let root_module_id = format!(
+        "{}::module::{}",
+        context.crate_id.as_str(),
+        context.root_module_path
+    );
+    builder.add_node(GraphNode {
+        id: NodeId::new(root_module_id.clone()),
+        kind: NodeKind::Module.as_str(),
+        label: "crate".to_string(),
+        visibility: None,
+        package: context.package_name.clone(),
+        target: Some(context.target_name.clone()),
+        manifest_path: context.manifest_path.clone(),
+        source_path: Some(source_path.display().to_string()),
+        module_path: Some(context.root_module_path.to_string()),
+        impl_kind: None,
+        impl_trait: None,
+        attributes: Vec::new(),
+    });
+    builder.add_edge(
+        EdgeKind::Contains,
+        context.crate_id.clone(),
+        root_module_id.clone(),
+    );
+    let root_dir = source_path
+        .parent()
+        .with_context(|| format!("missing parent dir for {}", source_path.display()))?
+        .to_path_buf();
+    Ok(SourceFileTask {
+        context,
+        parent_module_id: NodeId::new(root_module_id),
+        module_path: ModulePath::crate_root(),
+        module_dir: root_dir,
+        source_path,
+        resolution_context: None,
+    })
+}
+
+fn merge_source_file_partials(
+    builder: &mut GraphBuilder,
+    pending_files: &mut Vec<SourceFileTask>,
+) -> Result<()> {
+    while !pending_files.is_empty() {
+        pending_files.sort_by(|left, right| {
+            left.source_path
+                .cmp(&right.source_path)
+                .then_with(|| left.context.crate_id.cmp(&right.context.crate_id))
+                .then_with(|| left.module_path.as_str().cmp(right.module_path.as_str()))
+        });
+        let partials = pending_files
+            .par_iter()
+            .map(process_source_file)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut next_files = Vec::new();
+        for partial in partials {
+            builder.merge(partial.builder);
+            next_files.extend(partial.pending_files);
+        }
+        *pending_files = next_files;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct SourceFileTask {
+    context: TargetContext,
+    parent_module_id: NodeId,
+    module_path: ModulePath,
+    module_dir: PathBuf,
+    source_path: PathBuf,
+    resolution_context: Option<ModulePath>,
+}
+
+struct SourceFilePartial {
+    builder: GraphBuilder,
+    pending_files: Vec<SourceFileTask>,
+}
+
+fn process_source_file(task: &SourceFileTask) -> Result<SourceFilePartial> {
+    let file = if let Some(module_path) = &task.resolution_context {
+        parse_rust_file(&task.source_path)
+            .with_context(|| format!("while resolving module `{module_path}`"))?
+    } else {
+        parse_rust_file(&task.source_path)?
+    };
+    let mut builder = GraphBuilder::default();
+    let mut pending_files = Vec::new();
+    ingest_module_items(&mut builder, task, file, &mut pending_files)?;
+    Ok(SourceFilePartial {
+        builder,
+        pending_files,
+    })
+}
+
+impl GraphBuilder {
+    fn merge(&mut self, partial: Self) {
+        for node in partial.nodes {
+            self.add_node(node);
+        }
+        for edge in partial.edges {
+            if !self.edges.contains(&edge) {
+                self.edges.push(edge);
+            }
+        }
+        self.reference_impl_ids.extend(partial.reference_impl_ids);
+    }
 }
 
 fn resolve_trait_method_edges(builder: &mut GraphBuilder) {
@@ -209,13 +300,15 @@ fn visibility_label(visibility: &syn::Visibility) -> ItemVisibility {
 
 fn ingest_module_items(
     builder: &mut GraphBuilder,
-    context: &TargetContext,
-    parent_module_id: &NodeId,
-    module_path: &ModulePath,
-    module_dir: &Path,
-    source_path: &Path,
+    task: &SourceFileTask,
     file: File,
+    pending_files: &mut Vec<SourceFileTask>,
 ) -> Result<()> {
+    let context = &task.context;
+    let parent_module_id = &task.parent_module_id;
+    let module_path = &task.module_path;
+    let module_dir = &task.module_dir;
+    let source_path = task.source_path.as_path();
     let local_owner_names = collect_owner_names(&file.items);
 
     for item in file.items {
@@ -254,15 +347,15 @@ fn ingest_module_items(
                         attrs: Vec::new(),
                         items,
                     };
-                    ingest_module_items(
-                        builder,
-                        context,
-                        &NodeId::new(child_module_id.clone()),
-                        &child_module_path,
-                        &child_module_dir,
-                        source_path,
-                        inline_file,
-                    )?;
+                    let inline_task = SourceFileTask {
+                        context: context.clone(),
+                        parent_module_id: NodeId::new(child_module_id.clone()),
+                        module_path: child_module_path,
+                        module_dir: child_module_dir,
+                        source_path: task.source_path.clone(),
+                        resolution_context: None,
+                    };
+                    ingest_module_items(builder, &inline_task, inline_file, pending_files)?;
                 } else {
                     let child_source_path =
                         resolve_module_source(source_path, module_dir, &name, &item_mod.attrs)
@@ -288,16 +381,14 @@ fn ingest_module_items(
                     } else {
                         module_dir.join(&name)
                     };
-                    let child_file = parse_rust_file(&child_source_path)?;
-                    ingest_module_items(
-                        builder,
-                        context,
-                        &NodeId::new(child_module_id),
-                        &child_module_path,
-                        &child_module_dir,
-                        &child_source_path,
-                        child_file,
-                    )?;
+                    pending_files.push(SourceFileTask {
+                        context: context.clone(),
+                        parent_module_id: NodeId::new(child_module_id),
+                        module_path: child_module_path.clone(),
+                        module_dir: child_module_dir,
+                        source_path: child_source_path,
+                        resolution_context: Some(child_module_path),
+                    });
                 }
             }
             Item::Struct(item_struct) => {

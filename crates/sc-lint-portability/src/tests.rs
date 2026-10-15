@@ -205,6 +205,38 @@ fn loads_workspace_metadata_once_per_analyzer_run() {
 }
 
 #[test]
+fn parallel_file_analysis_renders_identically_for_multifile_workspaces() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "mod first; mod second;");
+    fixture.write_source(
+        "example",
+        "first.rs",
+        r#"pub fn first_path() { let _ = "/tmp/first"; }"#,
+    );
+    fixture.write_source(
+        "example",
+        "second.rs",
+        r#"pub fn second_path() { let _ = "/tmp/second"; }"#,
+    );
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let expected = analyze_workspace(&options).unwrap();
+    let expected_text = render_findings_report(&expected);
+    let expected_json = serde_json::to_vec(&expected).unwrap();
+
+    assert!(!expected.findings.is_empty());
+    for _ in 0..8 {
+        let report = analyze_workspace(&options).unwrap();
+        assert_eq!(render_findings_report(&report), expected_text);
+        assert_eq!(serde_json::to_vec(&report).unwrap(), expected_json);
+    }
+}
+
+#[test]
 fn analyzer_table_can_disable_portability() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

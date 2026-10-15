@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
+use rayon::prelude::*;
 use syn::Block;
 use syn::Expr;
 use syn::ExprMethodCall;
@@ -66,28 +67,30 @@ pub(crate) fn analyze_runtime_liveness(
     _settings: &AnalyzerSettings,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let source_files = discover_source_files_with_metadata(workspace)?;
-    let mut findings = Vec::new();
-
-    for file_context in source_files {
-        let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
-            || {
+    let file_findings = source_files
+        .par_iter()
+        .map(|file_context| {
+            let source = fs::read_to_string(&file_context.source_path).with_context(|| {
                 format!(
                     "failed to read Rust source for runtime liveness analysis: {}",
                     file_context.source_path.display()
                 )
-            },
-        )?)
-        .with_context(|| {
-            format!(
-                "failed to parse Rust source for runtime liveness analysis: {}",
-                file_context.source_path.display()
-            )
-        })?;
+            })?;
+            let parsed = syn::parse_file(&source).with_context(|| {
+                format!(
+                    "failed to parse Rust source for runtime liveness analysis: {}",
+                    file_context.source_path.display()
+                )
+            })?;
 
-        let mut collector = RuntimeCollector::new(&file_context);
-        collector.visit_file_items(&parsed);
-        findings.extend(collector.findings);
-    }
+            let mut collector = RuntimeCollector::new(file_context);
+            collector.visit_file_items(&parsed);
+            Ok(collector.findings)
+        })
+        .collect::<Vec<Result<Vec<_>>>>()
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
+    let mut findings = file_findings.into_iter().flatten().collect::<Vec<_>>();
 
     findings.sort_by(|left, right| {
         left.rule_id
@@ -96,6 +99,10 @@ pub(crate) fn analyze_runtime_liveness(
             .then_with(|| left.source_path.cmp(&right.source_path))
             .then_with(|| left.line.cmp(&right.line))
             .then_with(|| left.message.cmp(&right.message))
+            .then_with(|| left.kind.cmp(right.kind))
+            .then_with(|| left.package.cmp(&right.package))
+            .then_with(|| left.target.cmp(&right.target))
+            .then_with(|| left.node_label.cmp(&right.node_label))
     });
 
     findings
