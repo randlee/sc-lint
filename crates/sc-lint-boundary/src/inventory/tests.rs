@@ -84,13 +84,15 @@ expires_when = "sprint_before_current"
     fn rewrite_valid_boundary(&self, rewrite: impl FnOnce(String) -> String) {
         let path = self
             .root()
-            .join("boundaries/sc-lint-boundary/boundary-analyzer.toml");
+            .join("boundaries")
+            .join("sc-lint-boundary")
+            .join("boundary-analyzer.toml");
         let contents = fs::read_to_string(&path).expect("read valid boundary");
         fs::write(path, rewrite(contents)).expect("rewrite valid boundary");
     }
 
     fn rewrite_valid_planning(&self, rewrite: impl FnOnce(String) -> String) {
-        let path = self.root().join("boundaries/planning.toml");
+        let path = self.root().join("boundaries").join("planning.toml");
         let contents = fs::read_to_string(&path).expect("read valid planning");
         fs::write(path, rewrite(contents)).expect("rewrite valid planning");
     }
@@ -198,7 +200,9 @@ fn rejects_case_variant_nested_planning_metadata() {
     fixture.write_valid_inventory();
     let case_variant = fixture
         .root()
-        .join("boundaries/sc-lint-boundary/Planning.toml");
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("Planning.toml");
     fixture.write(
         "boundaries/sc-lint-boundary/Planning.toml",
         "[planning]\ncurrent_sprint = \"A.6\"\n",
@@ -213,7 +217,9 @@ fn rejects_directory_named_planning_toml() {
     fixture.write_valid_inventory();
     let planning_directory = fixture
         .root()
-        .join("boundaries/sc-lint-boundary/planning.toml");
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("planning.toml");
     fs::create_dir_all(&planning_directory).expect("create planning directory");
 
     assert_planning_metadata_error(&fixture, &planning_directory);
@@ -223,7 +229,7 @@ fn rejects_directory_named_planning_toml() {
 fn rejects_root_directory_named_planning_toml() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
-    let planning_directory = fixture.root().join("boundaries/planning.toml");
+    let planning_directory = fixture.root().join("boundaries").join("planning.toml");
     fs::remove_file(&planning_directory).expect("remove authoritative planning file");
     fs::create_dir(&planning_directory).expect("create root planning directory");
 
@@ -234,9 +240,9 @@ fn rejects_root_directory_named_planning_toml() {
 fn rejects_root_case_variant_planning_metadata() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
-    fs::remove_file(fixture.root().join("boundaries/planning.toml"))
+    fs::remove_file(fixture.root().join("boundaries").join("planning.toml"))
         .expect("remove canonical planning file");
-    let case_variant = fixture.root().join("boundaries/Planning.toml");
+    let case_variant = fixture.root().join("boundaries").join("Planning.toml");
     fixture.write(
         "boundaries/Planning.toml",
         "[planning]\ncurrent_sprint = \"A.6\"\n",
@@ -250,10 +256,12 @@ fn rejects_root_case_variant_planning_metadata() {
 fn rejects_root_symlink_named_planning_toml() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
-    let planning_path = fixture.root().join("boundaries/planning.toml");
+    let planning_path = fixture.root().join("boundaries").join("planning.toml");
     let target = fixture
         .root()
-        .join("boundaries/sc-lint-boundary/boundary-analyzer.toml");
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("boundary-analyzer.toml");
     fs::remove_file(&planning_path).expect("remove authoritative planning file");
     std::os::unix::fs::symlink(target, &planning_path).expect("create root planning symlink");
 
@@ -267,8 +275,10 @@ fn rejects_symlink_named_planning_toml() {
     fixture.write_valid_inventory();
     let planning_symlink = fixture
         .root()
-        .join("boundaries/sc-lint-boundary/planning.toml");
-    let authoritative_planning = fixture.root().join("boundaries/planning.toml");
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("planning.toml");
+    let authoritative_planning = fixture.root().join("boundaries").join("planning.toml");
     std::os::unix::fs::symlink(authoritative_planning, &planning_symlink)
         .expect("create nested planning symlink");
 
@@ -617,7 +627,8 @@ fn rejects_unknown_status_fields() {
 fn rejects_missing_planning_metadata_with_actionable_error() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
-    fs::remove_file(fixture.root().join("boundaries/planning.toml")).expect("remove planning");
+    fs::remove_file(fixture.root().join("boundaries").join("planning.toml"))
+        .expect("remove planning");
 
     let error = load_boundary_inventory(fixture.root())
         .expect_err("missing planning metadata fails")
