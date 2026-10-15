@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import yaml
 import shutil
 
@@ -124,6 +125,67 @@ class SourceSetupTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'fresh consumer'):
                 setup.install('example/unavailable', 'a'*40, root, root)
             self.assertEqual(list(root.glob('sc-lint-source-*')), [])
+
+    def test_source_install_record_contains_provenance_and_binary_digests(self):
+        revision = 'a' * 40
+        version = '0.7.3'
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / 'consumer'
+            workspace.mkdir()
+            (workspace / '.sc-lint').mkdir()
+
+            def fake_checkout(url, sha, destination):
+                self.assertEqual(url, 'https://github.com/example/sc-lint.git')
+                self.assertEqual(sha, revision)
+                destination.mkdir()
+
+            def fake_run(command, cwd, env=None, timeout=setup.SETUP_TIMEOUT_SECONDS):
+                command = [str(value) for value in command]
+                if command[:2] == ['cargo', 'metadata']:
+                    packages = [
+                        {'name': name, 'version': version}
+                        for name in (*setup.BINARIES, 'sc-lint-py')
+                    ]
+                    return json.dumps({'packages': packages})
+                if command[:2] == ['cargo', 'build']:
+                    target = Path(env['CARGO_TARGET_DIR']) / 'release'
+                    target.mkdir(parents=True)
+                    suffix = '.exe' if setup.os.name == 'nt' else ''
+                    for name in setup.BINARIES:
+                        (target / (name + suffix)).write_bytes(name.encode())
+                    return ''
+                if command[:3] == [sys.executable, '-m', 'venv']:
+                    python = setup.python_path(Path(command[3]))
+                    python.parent.mkdir(parents=True)
+                    python.write_text('', encoding='utf-8')
+                    return ''
+                if len(command) >= 3 and command[1:3] == ['-m', 'maturin']:
+                    output = Path(command[command.index('--out') + 1])
+                    output.mkdir()
+                    (output / 'sc_lint-0.7.3-py3-none-any.whl').write_bytes(b'wheel')
+                    return ''
+                if command[1:] == ['version', '--json']:
+                    return json.dumps({'ok': True, 'data': {'version': version, 'status': 'pass'}})
+                if command[1:3] == ['-I', '-c']:
+                    venv = workspace / '.sc-lint/venv'
+                    return json.dumps({'version': version, 'path': str(venv / 'lib/sc_lint/__init__.py')})
+                return ''
+
+            with mock.patch.object(setup, 'checkout', fake_checkout), \
+                 mock.patch.object(setup, 'verify_checkout'), \
+                 mock.patch.object(setup, 'run', fake_run):
+                record = setup.install('example/sc-lint', revision, workspace, root)
+
+            persisted = json.loads((workspace / '.sc-lint/source-install.json').read_text())
+            self.assertEqual(persisted, record)
+            self.assertEqual(record['source_revision'], revision)
+            self.assertEqual(record['version'], version)
+            self.assertEqual(record['wheel_sha256'], setup.digest(Path(record['wheel'])))
+            self.assertEqual(set(record['binaries']), set(setup.BINARIES))
+            for name, checksum in record['binaries'].items():
+                self.assertEqual(checksum, setup.digest(Path(record['binary_directory']) / name))
 
 
 if __name__ == '__main__':
