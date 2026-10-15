@@ -62,4 +62,6 @@ def test_ci_docs_match_every_declared_action_input_and_output() -> None:
         )
 
     normalized_docs = " ".join(docs.split())
-    assert "provide `artifact-url` and `checksums-url` together" in normalized_docs
+    assert "`artifact-url` and `checksums-url` are resolved independently" in normalized_docs
+    assert "{release-base-url}/v{version}/sc-lint_{version}_{target}.{extension}" in normalized_docs
+    assert "{release-base-url}/v{version}/checksums.txt" in normalized_docs

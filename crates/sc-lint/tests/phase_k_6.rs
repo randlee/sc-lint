@@ -80,7 +80,7 @@ fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -
         .expect("derived consumer manifest");
         fs::write(
             root.join("sc-lint.toml"),
-            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"pwsh\", \"-NoLogo\", \"-NoProfile\", \"-NonInteractive\", \"-File\", \".sc-lint/bootstrap.ps1\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n",
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"pwsh\", \"-NoLogo\", \"-NoProfile\", \"-NonInteractive\", \"-File\", \".sc-lint/bootstrap.ps1\", \"exec\", \"--\", \"sc-lint\", \"version\"]\n",
         )
         .expect("derived consumer profile configuration");
     } else {
@@ -347,16 +347,30 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
     let managed_binary = managed.join("sc-lint.exe");
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), &managed_binary).expect("managed product copy");
 
-    for (name, derived, expected_manifest) in [
-        ("neutral-consumer", false, false),
-        ("atm-core-derived-consumer", true, true),
+    for (name, derived) in [
+        ("neutral-consumer", false),
+        ("atm-core-derived-consumer", true),
     ] {
         let root = windows_consumer_fixture(fixture.path(), name, derived);
-        let output = inherited_powershell_command()
+        let mut command = inherited_powershell_command();
+        command
             .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
             .arg(root.join(".sc-lint/bootstrap.ps1"))
-            .args(["exec", "--", "sc-lint", "version"])
-            .current_dir(&root)
+            .current_dir(&root);
+        if derived {
+            command.args([
+                "lint",
+                "ci",
+                "--consumer",
+                "--config",
+                "sc-lint.toml",
+                "--profile",
+                "ci",
+            ]);
+        } else {
+            command.args(["exec", "--", "sc-lint", "version"]);
+        }
+        let output = command
             .env_remove("SC_LINT_BIN")
             .env_remove("SC_LINT_INSTALL_DIR")
             .env("LOCALAPPDATA", &local_app_data)
@@ -374,7 +388,13 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             "stdout: {}",
             String::from_utf8_lossy(&output.stdout)
         );
-        assert_eq!(root.join("Cargo.toml").exists(), expected_manifest);
+        if derived {
+            assert!(
+                String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
+                "profile command did not execute the fixture's configured managed version check: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+        }
     }
     assert!(managed_binary.is_file());
 }

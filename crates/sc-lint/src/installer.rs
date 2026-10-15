@@ -2189,21 +2189,21 @@ mod tests {
             match wait_for_backend_probe(&mut child, binary, expected_name, "--help", timeout) {
                 Ok(status) => {
                     terminate_probe_processes(&mut child);
-                    let _ = finish_backend_output_with_timeouts(
+                    let _ = finish_backend_output_after_stop(
                         reader,
-                        process_id,
                         BACKEND_OUTPUT_TEST_WAIT,
                         BACKEND_OUTPUT_TEST_WAIT,
+                        Some(|| terminate_probe_process_tree(process_id)),
                     );
                     panic!("hanging backend unexpectedly exited with {status}");
                 }
                 Err(problem) => problem,
             };
-        let output = finish_backend_output_with_timeouts(
+        let output = finish_backend_output_after_stop(
             reader,
-            process_id,
             BACKEND_OUTPUT_TEST_WAIT,
             BACKEND_OUTPUT_TEST_WAIT,
+            Some(|| terminate_probe_process_tree(process_id)),
         )
         .expect("drain noisy output after process-tree cleanup");
         assert!(

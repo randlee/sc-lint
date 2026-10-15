@@ -102,7 +102,7 @@ fn assert_planning_metadata_error(fixture: &InventoryFixture, offending_path: &P
         load_boundary_inventory(fixture.root())
             .expect_err("non-authoritative planning entry fails")
     );
-    let planning_path = fixture.root().join("boundaries/planning.toml");
+    let planning_path = fixture.root().join("boundaries").join("planning.toml");
     assert!(error.contains("allows planning metadata only"), "{error}");
     assert!(
         error.contains("found disallowed planning entry at"),

@@ -23,6 +23,9 @@ All notable changes to sc-lint are documented here.
 
 - The boundary inventory now rejects nested `planning.toml` files instead of
   silently ignoring planning metadata outside `boundaries/planning.toml`.
+- Portability and runtime analysis now report an error when a finding's source
+  path cannot be made repository-relative, including paths outside the
+  repository root, instead of silently skipping that finding.
 
 ## [0.7.3] — 2026-10-12
 

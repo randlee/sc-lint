@@ -44,15 +44,15 @@ artifact. Neither implies the other.
 | `operation` | No | `lint` | Selects `setup`, `lint`, or `test`. `setup` installs and preflights only. |
 | `version` | Yes | — | Exact released sc-lint SemVer without a leading `v`; selects the verified release artifact. |
 | `config-path` | No | `sc-lint.toml` | Consumer configuration path, relative to `working-directory`. |
-| `artifact-url` | No | Derived from `release-base-url` and `version` | Exact release archive URL, for a mirror or offline runner. |
-| `checksums-url` | No | Derived from `release-base-url` and `version` | URL of the matching `checksums.txt` manifest. |
+| `artifact-url` | No | `{release-base-url}/v{version}/sc-lint_{version}_{target}.{extension}` | Exact release archive URL, for a mirror or offline runner. |
+| `checksums-url` | No | `{release-base-url}/v{version}/checksums.txt` | URL of the matching `checksums.txt` manifest. |
 | `release-base-url` | No | `https://github.com/randlee/sc-lint/releases/download` | Trusted release download root used to derive the archive and checksum URLs. |
 | `working-directory` | No | `.` | Consumer working directory containing `sc-lint.toml`; relative `config-path` values resolve from here. |
 
-When overriding a mirror or offline location, provide `artifact-url` and
-`checksums-url` together. They must identify the exact archive selected by
-`version` and the matching checksum manifest. When neither is supplied,
-`release-base-url` is used to derive both URLs.
+`artifact-url` and `checksums-url` are resolved independently. Supplying one
+overrides only that URL; the other keeps its default derived from
+`release-base-url` and `version`. The archive URL selects the target-specific
+archive, while the checksum URL selects the release's `checksums.txt`.
 
 ### Action outputs
 

@@ -73,10 +73,16 @@ fn run_backend_probe_with_arguments(
     timeout: Duration,
 ) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
     let (mut child, reader) = spawn_backend_probe(binary, expected_name, arguments, description)?;
-    let process_id = child.id();
     let status = wait_for_backend_probe(&mut child, binary, expected_name, description, timeout)?;
-    let output = finish_backend_output(reader, process_id)
-        .map_err(|error| error.to_probe_message(binary, expected_name, description))?;
+    // `wait_for_backend_probe` reaps a successful leader. Its PID may then be
+    // reused, so the output-drain path must not signal the process group by
+    // that PID. A lingering descendant is reported as a bounded output timeout.
+    let output = finish_backend_output_after_leader_exit(
+        reader,
+        BACKEND_OUTPUT_DRAIN_TIMEOUT,
+        BACKEND_OUTPUT_STOP_TIMEOUT,
+    )
+    .map_err(|error| error.to_probe_message(binary, expected_name, description))?;
     Ok((status, output))
 }
 
@@ -153,34 +159,37 @@ pub(super) fn wait_for_backend_probe(
     }
 }
 
+#[cfg(all(test, target_os = "linux"))]
 pub(super) fn finish_backend_output(
     reader: ProbeOutputReader,
     process_id: u32,
 ) -> Result<Vec<u8>, BackendOutputError> {
-    finish_backend_output_with_timeouts(
+    finish_backend_output_after_stop(
         reader,
-        process_id,
         BACKEND_OUTPUT_DRAIN_TIMEOUT,
         BACKEND_OUTPUT_STOP_TIMEOUT,
+        Some(|| terminate_probe_process_tree(process_id)),
     )
 }
 
-pub(super) fn finish_backend_output_with_timeouts(
+fn finish_backend_output_after_leader_exit(
     reader: ProbeOutputReader,
-    process_id: u32,
     drain_timeout: Duration,
     stop_timeout: Duration,
 ) -> Result<Vec<u8>, BackendOutputError> {
-    finish_backend_output_after_stop(reader, drain_timeout, stop_timeout, || {
-        terminate_probe_process_tree(process_id)
-    })
+    finish_backend_output_after_stop(
+        reader,
+        drain_timeout,
+        stop_timeout,
+        None::<fn() -> io::Result<ProbeTreeStop>>,
+    )
 }
 
-fn finish_backend_output_after_stop(
+pub(super) fn finish_backend_output_after_stop(
     reader: ProbeOutputReader,
     drain_timeout: Duration,
     stop_timeout: Duration,
-    stop_process_tree: impl FnOnce() -> io::Result<ProbeTreeStop>,
+    stop_process_tree: Option<impl FnOnce() -> io::Result<ProbeTreeStop>>,
 ) -> Result<Vec<u8>, BackendOutputError> {
     // A descendant can outlive the direct child while holding stdout open.
     // Give the reader a short chance to drain normal output, then stop the
@@ -192,7 +201,9 @@ fn finish_backend_output_after_stop(
         }
         Err(RecvTimeoutError::Timeout) => {}
     }
-    stop_process_tree().map_err(BackendOutputError::ProcessTreeStop)?;
+    if let Some(stop_process_tree) = stop_process_tree {
+        stop_process_tree().map_err(BackendOutputError::ProcessTreeStop)?;
+    }
     match reader.recv_timeout(stop_timeout) {
         Ok(result) => format_probe_output_result(result),
         Err(RecvTimeoutError::Timeout) => Err(BackendOutputError::Timeout { wait: stop_timeout }),
@@ -449,20 +460,25 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn reaped_probe_group_counts_as_already_stopped() {
+    fn reaped_probe_leader_does_not_signal_its_reusable_group_id() {
         let mut child = Command::new("sh")
             .args(["-c", "exit 0"])
             .process_group(0)
             .spawn()
             .expect("spawn probe group leader");
-        let process_id = child.id();
         child.wait().expect("reap probe group leader");
 
-        assert_eq!(
-            terminate_probe_process_tree(process_id)
-                .expect("already-stopped group is not a failure"),
-            ProbeTreeStop::AlreadyStopped,
-        );
+        // Do not signal a process group by an identifier after its leader was
+        // reaped: the PID can be reused before the output pipe finishes draining.
+        let (_sender, reader) = mpsc::sync_channel(1);
+        assert!(matches!(
+            finish_backend_output_after_leader_exit(
+                reader,
+                Duration::ZERO,
+                Duration::ZERO,
+            ),
+            Err(BackendOutputError::Timeout { wait }) if wait.is_zero()
+        ));
     }
 
     #[cfg(unix)]
@@ -527,10 +543,10 @@ mod tests {
             reader,
             BACKEND_OUTPUT_DRAIN_TIMEOUT,
             BACKEND_OUTPUT_STOP_TIMEOUT,
-            || {
+            Some(|| {
                 stop_attempted = true;
                 Ok(ProbeTreeStop::AlreadyStopped)
-            },
+            }),
         )
         .expect_err("a connected reader that never sends must time out");
 
@@ -614,7 +630,9 @@ mod tests {
             .expect_err("hung version candidate must be bounded");
 
         assert!(
-            error.contains("timed out after 100 ms during `--json version` probe"),
+            error.contains(
+                "timed out after 100 ms during its `--json version` probe; process-tree cleanup was attempted"
+            ),
             "expected timeout diagnostic, got {error}"
         );
     }
