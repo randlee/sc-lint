@@ -2183,6 +2183,24 @@ fn lint_profiles_have_stable_membership() {
     );
 }
 
+#[test]
+fn fast_and_ci_profiles_exclude_xwin_when_available() {
+    for profile in [crate::cli::LintProfile::Fast, crate::cli::LintProfile::Ci] {
+        let loaded = load_repo_lint_profile(profile.command_suffix());
+        let adapter = FakeSystemAdapter::new(true);
+        let result = workflow::run_lint_profile_with(&loaded, profile, &adapter)
+            .expect("xwin-capable profile succeeds");
+        let steps = result.data["steps"].as_array().expect("steps array");
+        assert!(
+            !step_names(steps).iter().any(|step| step.contains("xwin")),
+            "{} must not plan xwin steps",
+            profile.command_suffix()
+        );
+        assert_eq!(result.data["xwin"]["available"], true);
+        assert_eq!(result.data["xwin"]["included"], false);
+    }
+}
+
 fn load_repo_lint_profile(profile: &str) -> LoadedConfig {
     let repo_root = repo_backed_workspace_root();
     let cli = Cli::parse_from([
@@ -3812,6 +3830,43 @@ fn test_profile_rejects_invalid_members_and_targets() {
             "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
         ]
     );
+}
+
+#[test]
+fn consumer_profile_steps_require_unique_names_and_non_empty_argv() {
+    let cases = [
+        (
+            "duplicate name",
+            "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"check\"]\n",
+            "repeats step name `fmt`",
+        ),
+        (
+            "missing name",
+            "[[tool.sc-lint.lint]]\ncommand = [\"cargo\", \"fmt\"]\n",
+            "missing a non-empty `name`",
+        ),
+        (
+            "empty argv",
+            "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = []\n",
+            "missing a command argv array",
+        ),
+        (
+            "empty argument",
+            "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"\"]\n",
+            "empty command argument",
+        ),
+    ];
+
+    for (label, rows, cause) in cases {
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(rows));
+        let error = loaded.expect_err(label);
+        assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED", "{label}");
+        assert_eq!(error.kind, CliErrorKind::Config, "{label}");
+        assert!(
+            error.message.contains(cause),
+            "{label}: {error:?}"
+        );
+    }
 }
 
 #[test]
