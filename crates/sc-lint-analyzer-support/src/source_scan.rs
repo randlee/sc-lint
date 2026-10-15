@@ -100,6 +100,11 @@ pub struct FileContext {
     pub is_test_file: bool,
 }
 
+/// Cargo workspace metadata shared by the source scanner and crate counter.
+pub struct WorkspaceMetadata {
+    metadata: cargo_metadata::Metadata,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {
     Test,
@@ -107,7 +112,14 @@ pub enum ScopeKind {
 }
 
 pub fn discover_source_files(root: &Path) -> Result<Vec<FileContext>> {
-    let metadata = load_metadata(root)?;
+    let metadata = load_workspace_metadata(root)?;
+    discover_source_files_with_metadata(&metadata)
+}
+
+pub fn discover_source_files_with_metadata(
+    workspace: &WorkspaceMetadata,
+) -> Result<Vec<FileContext>> {
+    let metadata = &workspace.metadata;
     let workspace_members = metadata.workspace_members.clone();
     let mut files = Vec::new();
     let mut seen_paths = BTreeSet::new();
@@ -152,13 +164,18 @@ pub fn discover_source_files(root: &Path) -> Result<Vec<FileContext>> {
 }
 
 pub fn count_scanned_crates(root: &Path) -> Result<usize> {
-    let metadata = load_metadata(root)?;
+    let metadata = load_workspace_metadata(root)?;
+    Ok(count_scanned_crates_with_metadata(&metadata))
+}
+
+pub fn count_scanned_crates_with_metadata(workspace: &WorkspaceMetadata) -> usize {
+    let metadata = &workspace.metadata;
     let workspace_members = metadata.workspace_members.clone();
-    Ok(metadata
+    metadata
         .packages
         .iter()
         .filter(|package| workspace_members.iter().any(|id| id == &package.id))
-        .count())
+        .count()
 }
 
 pub fn span_start_line(span: Span) -> usize {
@@ -281,9 +298,10 @@ fn is_supported_target(target: &cargo_metadata::Target) -> bool {
     })
 }
 
-fn load_metadata(root: &Path) -> Result<cargo_metadata::Metadata> {
-    MetadataCommand::new()
+pub fn load_workspace_metadata(root: &Path) -> Result<WorkspaceMetadata> {
+    let metadata = MetadataCommand::new()
         .current_dir(root)
         .exec()
-        .with_context(|| format!("failed to load cargo metadata for {}", root.display()))
+        .with_context(|| format!("failed to load cargo metadata for {}", root.display()))?;
+    Ok(WorkspaceMetadata { metadata })
 }

@@ -6,7 +6,9 @@ use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerName;
 use sc_lint_analyzer_support::CatalogRuleId;
 use sc_lint_analyzer_support::RuleCatalog;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::load_analyzer_settings;
+use sc_lint_analyzer_support::load_workspace_metadata;
 use sc_lint_schema::CrateId;
 use sc_lint_schema::Finding as SchemaFinding;
 use sc_lint_schema::FindingsReport as SchemaFindingsReport;
@@ -112,20 +114,34 @@ pub fn analyze_workspace_configured(
     config: Option<&Path>,
     rule_filter: Option<&str>,
 ) -> std::result::Result<FindingsReport, RuntimeError> {
+    analyze_workspace_configured_with_metadata_loader(
+        options,
+        config,
+        rule_filter,
+        load_workspace_metadata,
+    )
+}
+
+fn analyze_workspace_configured_with_metadata_loader(
+    options: &AnalyzeOptions,
+    config: Option<&Path>,
+    rule_filter: Option<&str>,
+    mut load_metadata: impl FnMut(&Path) -> anyhow_crate::Result<WorkspaceMetadata>,
+) -> std::result::Result<FindingsReport, RuntimeError> {
     let settings = load_analyzer_settings(&RUNTIME_CATALOG, &options.root, config, rule_filter)?;
     let (findings, scanned_crates) = if settings.enabled {
-        let findings =
-            runtime::analyze_runtime_liveness(&options.root, &settings).map_err(|source| {
-                RuntimeError::AnalyzeFindings {
-                    root: options.root.clone(),
-                    source: source.into(),
-                }
-            })?;
-        let scanned_crates = sc_lint_analyzer_support::count_scanned_crates(&options.root)
-            .map_err(|source| RuntimeError::CountScannedCrates {
+        let workspace =
+            load_metadata(&options.root).map_err(|source| RuntimeError::AnalyzeFindings {
                 root: options.root.clone(),
                 source: source.into(),
             })?;
+        let findings = runtime::analyze_runtime_liveness(&options.root, &workspace, &settings)
+            .map_err(|source| RuntimeError::AnalyzeFindings {
+                root: options.root.clone(),
+                source: source.into(),
+            })?;
+        let scanned_crates =
+            sc_lint_analyzer_support::count_scanned_crates_with_metadata(&workspace);
         (findings, scanned_crates)
     } else {
         (Vec::new(), 0)

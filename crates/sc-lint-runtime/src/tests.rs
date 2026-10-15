@@ -101,6 +101,28 @@ fn findings_report_text_renders_failure_status_and_count() {
 }
 
 #[test]
+fn loads_workspace_metadata_once_per_analyzer_run() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", "pub struct Example;");
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let metadata_loads = std::cell::Cell::new(0);
+
+    let report = analyze_workspace_configured_with_metadata_loader(&options, None, None, |root| {
+        metadata_loads.set(metadata_loads.get() + 1);
+        sc_lint_analyzer_support::load_workspace_metadata(root)
+    })
+    .expect("runtime analysis succeeds");
+
+    assert_eq!(metadata_loads.get(), 1);
+    assert_eq!(report.scanned_crates, 1);
+}
+
+#[test]
 fn flags_bare_wait_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

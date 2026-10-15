@@ -174,6 +174,37 @@ fn analyze_workspace_counts_crate_targets() {
 }
 
 #[test]
+fn loads_workspace_metadata_once_per_analyzer_run() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(unix)] mod unix_socket;\n#[cfg(windows)] mod named_pipe;\npub struct Example;",
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"crates/example/src/unix_socket.rs\"\nwindows_module = \"crates/example/src/named_pipe.rs\"\nreason = \"Private transport adapters\"\n",
+    );
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let metadata_loads = std::cell::Cell::new(0);
+
+    let report = analyze_workspace_configured_with_metadata_loader(&options, None, None, |root| {
+        metadata_loads.set(metadata_loads.get() + 1);
+        sc_lint_analyzer_support::load_workspace_metadata(root)
+    })
+    .expect("portability analysis succeeds");
+
+    assert_eq!(metadata_loads.get(), 1);
+    assert_eq!(report.scanned_crates, 1);
+}
+
+#[test]
 fn analyzer_table_can_disable_portability() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

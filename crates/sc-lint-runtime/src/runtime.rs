@@ -28,8 +28,9 @@ use sc_lint_analyzer_support::PackageName;
 use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
-use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
 
@@ -61,9 +62,10 @@ struct RuntimeFinding {
 
 pub(crate) fn analyze_runtime_liveness(
     root: &Path,
+    workspace: &WorkspaceMetadata,
     _settings: &AnalyzerSettings,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
-    let source_files = discover_source_files(root)?;
+    let source_files = discover_source_files_with_metadata(workspace)?;
     let mut findings = Vec::new();
 
     for file_context in source_files {

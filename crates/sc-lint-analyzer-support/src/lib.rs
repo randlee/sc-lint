@@ -20,14 +20,18 @@ pub use source_scan::FileContext;
 pub use source_scan::PackageName;
 pub use source_scan::ScopeKind;
 pub use source_scan::TargetName;
+pub use source_scan::WorkspaceMetadata;
 pub use source_scan::attr_is_cfg_test;
 pub use source_scan::attr_is_test;
 pub use source_scan::classify_scope;
 pub use source_scan::count_scanned_crates;
+pub use source_scan::count_scanned_crates_with_metadata;
 pub use source_scan::discover_source_files;
+pub use source_scan::discover_source_files_with_metadata;
 pub use source_scan::item_attrs;
 pub use source_scan::item_identifier;
 pub use source_scan::item_name_hint_is_tests;
+pub use source_scan::load_workspace_metadata;
 pub use source_scan::relative_slash_path;
 pub use source_scan::span_start_line;
 

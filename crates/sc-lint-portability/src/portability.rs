@@ -37,9 +37,10 @@ use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
-use sc_lint_analyzer_support::count_scanned_crates as count_crates;
-use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates;
+use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
 
@@ -167,13 +168,14 @@ impl AnalyzerPortabilityKeys {
 
 pub(crate) fn analyze_portability(
     root: &Path,
+    workspace: &WorkspaceMetadata,
     document: &toml::Table,
     _settings: &AnalyzerSettings,
     analyzer_keys: &AnalyzerPortabilityKeys,
     platform_adapters: &platform_adapters::PlatformAdapters,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let config = load_portability_config(document, analyzer_keys)?;
-    let source_files = discover_source_files(root)?;
+    let source_files = discover_source_files_with_metadata(workspace)?;
     let mut findings = Vec::new();
 
     for file_context in source_files {
@@ -206,8 +208,8 @@ pub(crate) fn analyze_portability(
     convert_findings(root, findings)
 }
 
-pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {
-    count_crates(root)
+pub(crate) fn count_scanned_crates(workspace: &WorkspaceMetadata) -> usize {
+    count_crates(workspace)
 }
 
 struct PortabilityCollector<'a> {
