@@ -25,6 +25,7 @@ Rule IDs include:
 - `SCB-DEPENDENCY-001`
 - `SCB-DEPENDENCY-002`
 - `SCB-DEPENDENCY-003`
+- `SCB-FEATURE-001`
 - `SCB-MANIFEST-001`
 - `SCB-MANIFEST-002`
 
@@ -208,6 +209,34 @@ kind. A dev-dependency is also permitted when its target appears in
 `allowed_dev_dependencies`; normal and build dependencies still require
 `allowed_dependencies`. If an edge is both a normal dependency and a
 dev-dependency, it is checked as a normal dependency.
+
+`allowed_dependencies`, `allowed_dev_dependencies` and
+`allowed_feature_dependencies` accept a single trailing `*` as a prefix
+pattern (for example `"codex-*"` matches every workspace package whose name
+starts with `codex-`). A `*` anywhere else, or a bare `*`, is a config error.
+A pattern that matches no workspace package is not an error. Patterns match
+canonical package names only, and `allowed_dependents` does not accept them.
+
+`SCB-FEATURE-001` (run under `--rule-filter dependencies`) keeps the owner's
+feature graph independent of other workspace packages:
+
+- The owner's normal and build dependencies on workspace packages must not
+  set `features` or `default-features = false`, and the owner's own
+  `[features]` must not forward to them (`"dep:x"`, `"x/feat"`, `"x?/feat"`;
+  a bare `"x"` is a local feature), unless the target package is listed in
+  the optional `allowed_feature_dependencies` (default empty, prefix patterns
+  allowed). Dev-dependencies are not checked, mirroring how
+  `SCB-DEPENDENCY-001` treats them separately.
+- Workspace dependencies are identified by path resolution, so a registry or
+  git dependency that shares a member's name is ignored.
+
+```toml
+[dependencies]
+allowed_dependents = ["codex-cli"]
+allowed_dependencies = ["codex-*"]
+allowed_feature_dependencies = ["codex-cli"]
+forbidden_edges = []
+```
 
 Boundary inventory records may use either structured or arrow-delimited
 forbidden edges:

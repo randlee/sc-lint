@@ -148,6 +148,9 @@ Operational rules:
   `allowed_dependents`
 - `SCB-DEPENDENCY-003` reports exact forbidden direct edges even when the same
   edge would otherwise pass owner/dependent allowlists
+- `SCB-FEATURE-001` reports owner dependency `features` /
+  `default-features = false` and owner `[features]` forwarding to workspace
+  packages not in `allowed_feature_dependencies` (REQ-SCB-024, REQ-SCB-025)
 
 Scope limits for the first rule family:
 

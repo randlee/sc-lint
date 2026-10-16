@@ -2,6 +2,24 @@
 
 All notable changes to sc-lint are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Boundary `allowed_dependencies` and `allowed_dev_dependencies` accept a
+  single trailing `*` prefix pattern (for example `"codex-*"`).
+- New `SCB-FEATURE-001` rule (in the `dependencies` family) enforces feature
+  independence, with a new optional `allowed_feature_dependencies` field.
+
+### Migration
+
+- Existing boundary records whose owner sets `features` or
+  `default-features = false` on (or forwards its `[features]` to) a workspace
+  dependency now fail `SCB-FEATURE-001` until that dependency is listed in
+  `allowed_feature_dependencies`.
+- Older binaries reject records that use `allowed_feature_dependencies`
+  (`deny_unknown_fields`).
+
 ## [0.7.3] — 2026-10-12
 
 Fixes found after publishing 0.7.2.

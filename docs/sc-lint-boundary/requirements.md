@@ -167,6 +167,22 @@ family.
   (Extended 2026-10-12, Accepted,
   [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
+- `REQ-SCB-024`
+  `allowed_dependencies`, `allowed_dev_dependencies` and
+  `allowed_feature_dependencies` may contain a prefix pattern: exactly one
+  trailing `*` after a non-empty prefix (for example `codex-*`). A bare `*`, a
+  `*` elsewhere, or any pattern in `allowed_dependents` fails inventory
+  loading. A pattern matching no workspace package is not an error. Patterns
+  match canonical package names only, not aliases.
+
+- `REQ-SCB-025`
+  `SCB-FEATURE-001` fails when the owner sets `features` or
+  `default-features = false` on a normal or build dependency that is a
+  workspace package, or forwards its own `[features]` to one (`dep:x`,
+  `x/feat`, `x?/feat`), unless the target is listed in the optional
+  `allowed_feature_dependencies`. Dev-dependencies are excluded. Workspace
+  dependencies are identified by path resolution, not by name alone.
+
 - `REQ-SCB-014`
   Sprint comparison for inventory parity must use parsed ordering, not lexical
   string comparison.
