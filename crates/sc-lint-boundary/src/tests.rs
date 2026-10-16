@@ -93,6 +93,11 @@ fn machine_report_matches_frozen_json_contract() {
     ))
     .expect("machine-report baseline is valid JSON");
 
+    assert_eq!(
+        expected["schema_version"].as_str(),
+        Some(SC_LINT_SCHEMA_VERSION),
+        "golden schema_version must match analyzer reports"
+    );
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
 }
 
