@@ -199,11 +199,9 @@ fn metadata_once_preserves_text_and_json_output() {
     let root = fixture.root().to_path_buf();
     #[cfg(not(windows))]
     let root = std::fs::canonicalize(fixture.root()).unwrap();
-    let normalize_root =
-        |output: String| output.replace(&root.to_string_lossy().to_string(), "<ROOT>");
-    let mut text = normalize_root(render_findings_report(&report));
+    let mut text = normalize_fixture_root(render_findings_report(&report), &root);
     text.push('\n');
-    let mut json = normalize_root(serde_json::to_string_pretty(&report).unwrap());
+    let mut json = normalize_fixture_root(serde_json::to_string_pretty(&report).unwrap(), &root);
     json.push('\n');
 
     assert_eq!(
@@ -216,6 +214,43 @@ fn metadata_once_preserves_text_and_json_output() {
         include_bytes!("../tests/fixtures/metadata-once/report.json"),
         "metadata reuse must preserve the pre-optimization JSON output byte-for-byte"
     );
+}
+
+fn normalize_fixture_root(output: String, root: &std::path::Path) -> String {
+    normalize_fixture_root_with_windows_alias(output, root, cfg!(windows))
+}
+
+fn normalize_fixture_root_with_windows_alias(
+    output: String,
+    root: &std::path::Path,
+    normalize_windows_alias: bool,
+) -> String {
+    let root = root.to_string_lossy().replace('\\', "/");
+    let mut output = output.replace('\\', "/");
+    output = output.replace(&root, "<ROOT>");
+    if normalize_windows_alias {
+        if let Some(message) = output.find("\"message\": \"") {
+            let path_start = message + "\"message\": \"".len();
+            if let Some(relative) = output[path_start..].find("/crates/") {
+                output.replace_range(path_start..path_start + relative, "<ROOT>");
+            }
+        } else if let Some(index) = output.find("/crates/") {
+            output.replace_range(..index, "<ROOT>");
+        }
+    }
+    output
+}
+
+#[test]
+fn metadata_golden_root_normalization_handles_windows_short_paths() {
+    let fixture = WorkspaceFixture::new();
+    let normalized = normalize_fixture_root_with_windows_alias(
+        "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\fixture\\crates\\example\\src\\lib.rs"
+            .to_string(),
+        fixture.root(),
+        true,
+    );
+    assert_eq!(normalized, "<ROOT>/crates/example/src/lib.rs");
 }
 
 #[test]
