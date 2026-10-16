@@ -308,7 +308,9 @@ fn normalize_fixture_root_with_windows_alias(
     normalize_windows_alias: bool,
 ) -> String {
     let root = root.to_string_lossy().replace('\\', "/");
-    let mut output = output.replace('\\', "/");
+    // JSON escapes every Windows separator, so normalize escaped pairs before
+    // individual separators. Reversing this order turns `\\\\` into `//`.
+    let mut output = output.replace("\\\\", "/").replace('\\', "/");
     output = output.replace(&root, "<ROOT>");
     // Cargo metadata can preserve an 8.3 alias (for example RUNNER~1)
     // while tempfile exposes the long root spelling. Both refer to the
@@ -327,15 +329,29 @@ fn normalize_fixture_root_with_windows_alias(
 }
 
 #[test]
-fn metadata_golden_root_normalization_handles_windows_short_paths() {
+fn metadata_golden_root_normalization_handles_raw_and_json_windows_short_paths() {
     let fixture = WorkspaceFixture::new();
-    let normalized = normalize_fixture_root_with_windows_alias(
-        "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\fixture\\crates\\example\\src\\lib.rs"
-            .to_string(),
-        fixture.root(),
-        true,
-    );
-    assert_eq!(normalized, "<ROOT>/crates/example/src/lib.rs");
+    let cases = [
+        (
+            "raw cargo metadata path",
+            r"C:\Users\RUNNER~1\AppData\Local\Temp\fixture\crates\example\src\lib.rs",
+            "<ROOT>/crates/example/src/lib.rs",
+        ),
+        (
+            "JSON-escaped cargo metadata path",
+            r#"{"message": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\fixture\\crates\\example\\src\\lib.rs"}"#,
+            r#"{"message": "<ROOT>/crates/example/src/lib.rs"}"#,
+        ),
+    ];
+
+    for (description, input, expected) in cases {
+        let normalized =
+            normalize_fixture_root_with_windows_alias(input.to_string(), fixture.root(), true);
+        assert_eq!(
+            normalized, expected,
+            "{description} must retain one separator per path component"
+        );
+    }
 }
 
 const PARALLEL_FILE_COUNT: usize = 10;
