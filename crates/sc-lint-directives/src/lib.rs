@@ -142,6 +142,95 @@ mod tests {
     }
 
     #[test]
+    fn parses_frozen_boundary_directive_grammar_corpus() {
+        let cases = [
+            (
+                quote!(boundary.allow("cycle.type_method_self_loop")),
+                vec![Directive::Allow(vec![
+                    "cycle.type_method_self_loop".to_string(),
+                ])],
+            ),
+            (
+                quote!(boundary.allow(
+                    "cycle.type_method_self_loop",
+                    "cycle.recursive_value_container"
+                )),
+                vec![Directive::Allow(vec![
+                    "cycle.type_method_self_loop".to_string(),
+                    "cycle.recursive_value_container".to_string(),
+                ])],
+            ),
+            (
+                quote!(boundary.internal_only),
+                vec![Directive::InternalOnly],
+            ),
+            (
+                quote!(boundary.forbid_external_impls),
+                vec![Directive::ForbidExternalImpls],
+            ),
+            (
+                quote!(
+                    boundary.internal_only,
+                    boundary.forbid_external_impls,
+                    boundary.allow("cycle.type_method_self_loop")
+                ),
+                vec![
+                    Directive::InternalOnly,
+                    Directive::ForbidExternalImpls,
+                    Directive::Allow(vec!["cycle.type_method_self_loop".to_string()]),
+                ],
+            ),
+            (
+                quote!(boundary.allow("cycle.type_method_self_loop",)),
+                vec![Directive::Allow(vec![
+                    "cycle.type_method_self_loop".to_string(),
+                ])],
+            ),
+            (
+                quote!(boundary.allow(
+                    "cycle.type_method_self_loop",
+                    "cycle.recursive_value_container",
+                )),
+                vec![Directive::Allow(vec![
+                    "cycle.type_method_self_loop".to_string(),
+                    "cycle.recursive_value_container".to_string(),
+                ])],
+            ),
+            (
+                quote!(boundary.internal_only,),
+                vec![Directive::InternalOnly],
+            ),
+            (
+                quote!(boundary.allow("cycle.type_method_self_loop"),),
+                vec![Directive::Allow(vec![
+                    "cycle.type_method_self_loop".to_string(),
+                ])],
+            ),
+            (
+                quote!(boundary.forbid_external_impls,),
+                vec![Directive::ForbidExternalImpls],
+            ),
+            (
+                quote!(
+                    boundary.internal_only,
+                    boundary.forbid_external_impls,
+                    boundary.allow("cycle.type_method_self_loop"),
+                ),
+                vec![
+                    Directive::InternalOnly,
+                    Directive::ForbidExternalImpls,
+                    Directive::Allow(vec!["cycle.type_method_self_loop".to_string()]),
+                ],
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let parsed: AttributeInput = syn::parse2(input.clone()).unwrap();
+            assert_eq!(parsed.directives, expected, "input: {input}");
+        }
+    }
+
+    #[test]
     fn rejects_unknown_boundary_directive() {
         let error = syn::parse2::<AttributeInput>(quote!(boundary.unknown)).unwrap_err();
         assert!(error.to_string().contains("unsupported boundary directive"));

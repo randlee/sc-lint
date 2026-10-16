@@ -9,8 +9,9 @@ use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::RelativePathError;
 use sc_lint_analyzer_support::RepoRelativePath;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::attr_is_cfg_test;
-use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::span_start_line;
 use syn::Item;
 use syn::ItemMod;
@@ -195,6 +196,8 @@ impl PlatformAdapters {
 pub(super) fn validate(
     root: &Path,
     records: &[PlatformAdapterRecord],
+    workspace: &mut Option<WorkspaceMetadata>,
+    mut load_metadata: impl FnMut(&Path) -> anyhow::Result<WorkspaceMetadata>,
 ) -> Result<PlatformAdapters, PortabilityError> {
     if records.is_empty() {
         return Ok(PlatformAdapters::default());
@@ -207,9 +210,17 @@ pub(super) fn validate(
     let canonical_root = root
         .canonicalize()
         .map_err(|source| scan_error(source.into()))?;
+    if workspace.is_none() {
+        *workspace = Some(load_metadata(root).map_err(scan_error)?);
+    }
+    let Some(workspace) = workspace.as_ref() else {
+        return Err(scan_error(anyhow::anyhow!(
+            "workspace metadata was not loaded for platform adapters"
+        )));
+    };
     // Discover declaring files from the same root the analyzer scans so their
     // source paths match its lookups; Windows canonical paths are verbatim.
-    let declarations = collect_declarations(root).map_err(scan_error)?;
+    let declarations = collect_declarations(workspace).map_err(scan_error)?;
     let root = canonical_root;
     let mut used_files = BTreeSet::new();
     let mut validate_pair = |root: &Path,
@@ -327,9 +338,11 @@ fn canonical_module_path(
     Ok(canonical)
 }
 
-fn collect_declarations(root: &Path) -> anyhow::Result<BTreeMap<PathBuf, ModuleDeclaration>> {
+fn collect_declarations(
+    workspace: &WorkspaceMetadata,
+) -> anyhow::Result<BTreeMap<PathBuf, ModuleDeclaration>> {
     let mut declarations = BTreeMap::new();
-    for context in discover_source_files(root)? {
+    for context in discover_source_files_with_metadata(workspace)? {
         if context.is_test_file {
             continue;
         }

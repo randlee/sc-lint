@@ -9,11 +9,14 @@ use sc_lint_schema::ReportStatus;
 use tempfile::TempDir;
 
 #[test]
-fn outside_source_path_has_no_repository_relative_path() {
+fn outside_source_path_reports_repository_relative_path_error() {
     let root = TempDir::new().unwrap();
     let outside_source = root.path().join("..\u{2f}outside.rs");
 
-    assert!(super::portability::repo_relative_source_path(root.path(), &outside_source).is_none());
+    let error = super::portability::repo_relative_source_path(root.path(), &outside_source)
+        .expect_err("outside paths must produce a diagnostic");
+    assert!(error.to_string().contains("outside.rs"));
+    assert!(error.to_string().contains("repository-relative"));
 }
 
 use super::*;
@@ -58,6 +61,54 @@ fn installer_catalog_matches_rust() {
     let actual: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
 
     assert_eq!(actual, installer_catalog());
+}
+
+#[test]
+fn rule_ids_match_frozen_contract_baseline() {
+    let expected: serde_json::Value =
+        serde_json::from_str(include_str!("../tests/fixtures/contracts/rule-ids.json"))
+            .expect("rule-ID baseline is valid JSON");
+    let actual = serde_json::json!(
+        PORTABILITY_CATALOG
+            .rules
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    assert_eq!(
+        actual, expected,
+        "update the frozen baseline explicitly for additions"
+    );
+}
+
+#[test]
+fn machine_report_matches_frozen_json_contract() {
+    let report = FindingsReport {
+        tool: "sc-lint-portability",
+        version: "0.1.0",
+        schema_version: "0.1.0",
+        status: ReportStatus::Fail,
+        scanned_crates: 1,
+        findings: vec![Finding {
+            rule_id: RuleId::Port001,
+            kind: "contract_fixture".into(),
+            message: "machine contract fixture".to_string(),
+            owner_ids: vec![OwnerId::new("crate::example::example")],
+            node_ids: vec![NodeId::new("crate::example::example::item")],
+        }],
+    };
+    let expected: serde_json::Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/contracts/machine-report.json"
+    ))
+    .expect("machine-report baseline is valid JSON");
+
+    assert_eq!(
+        expected["schema_version"].as_str(),
+        Some(SC_LINT_SCHEMA_VERSION),
+        "golden schema_version must match analyzer reports"
+    );
+    assert_eq!(serde_json::to_value(report).unwrap(), expected);
 }
 
 #[test]
@@ -168,6 +219,218 @@ fn analyze_workspace_counts_crate_targets() {
     assert_eq!(report.scanned_crates, 1);
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn loads_workspace_metadata_once_per_analyzer_run() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(unix)] mod unix_socket;\n#[cfg(windows)] mod named_pipe;\npub struct Example;",
+    );
+    fixture.write_source("example", "unix_socket.rs", "fn connect() {}");
+    fixture.write_source("example", "named_pipe.rs", "fn connect() {}");
+    fixture.write_lint_config(
+        "[tool.sc-lint.analyzers.portability]\n[[tool.sc-lint.analyzers.portability.platform_adapters]]\nunix_module = \"crates/example/src/unix_socket.rs\"\nwindows_module = \"crates/example/src/named_pipe.rs\"\nreason = \"Private transport adapters\"\n",
+    );
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let metadata_loads = std::cell::Cell::new(0);
+
+    let report = analyze_workspace_configured_with_metadata_loader(&options, None, None, |root| {
+        metadata_loads.set(metadata_loads.get() + 1);
+        sc_lint_analyzer_support::load_workspace_metadata(root)
+    })
+    .expect("portability analysis succeeds");
+
+    assert_eq!(metadata_loads.get(), 1);
+    assert_eq!(report.scanned_crates, 1);
+}
+
+#[test]
+fn metadata_once_preserves_text_and_json_output() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "use std::os::unix::net::UnixStream;\nuse std::sync::{Condvar, Mutex};\n\npub fn unix_stream() { let _ = UnixStream::pair(); }\npub fn bad_wait(c: &Condvar, m: &Mutex<bool>) { let g = m.lock().unwrap(); let _ = c.wait(g).unwrap(); }\n",
+    );
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let metadata_loads = std::cell::Cell::new(0);
+
+    let report = analyze_workspace_configured_with_metadata_loader(&options, None, None, |root| {
+        metadata_loads.set(metadata_loads.get() + 1);
+        sc_lint_analyzer_support::load_workspace_metadata(root)
+    })
+    .expect("portability analysis succeeds");
+    assert_eq!(metadata_loads.get(), 1);
+
+    // Windows cargo metadata can retain its 8.3 path alias while canonicalize
+    // returns the long path, so preserve the temp directory's spelling there.
+    #[cfg(windows)]
+    let root = fixture.root().to_path_buf();
+    #[cfg(not(windows))]
+    let root = fs::canonicalize(fixture.root()).unwrap();
+    let mut text = normalize_fixture_root(render_findings_report(&report), &root);
+    text.push('\n');
+    let mut json = normalize_fixture_root(serde_json::to_string_pretty(&report).unwrap(), &root);
+    json.push('\n');
+
+    assert_eq!(
+        text.as_bytes(),
+        include_bytes!("../tests/fixtures/metadata-once/text.txt"),
+        "metadata reuse must preserve the pre-optimization text output byte-for-byte"
+    );
+    assert_eq!(
+        json.as_bytes(),
+        include_bytes!("../tests/fixtures/metadata-once/report.json"),
+        "metadata reuse must preserve the pre-optimization JSON output byte-for-byte"
+    );
+}
+
+fn normalize_fixture_root(output: String, root: &Path) -> String {
+    normalize_fixture_root_with_windows_alias(output, root, cfg!(windows))
+}
+
+fn normalize_fixture_root_with_windows_alias(
+    output: String,
+    root: &Path,
+    normalize_windows_alias: bool,
+) -> String {
+    let root = root.to_string_lossy().replace('\\', "/");
+    // JSON escapes every Windows separator, so normalize escaped pairs before
+    // individual separators. Reversing this order turns `\\\\` into `//`.
+    let mut output = output.replace("\\\\", "/").replace('\\', "/");
+    output = output.replace(&root, "<ROOT>");
+    // Cargo metadata can preserve an 8.3 alias (for example RUNNER~1)
+    // while tempfile exposes the long root spelling. Both refer to the
+    // fixture root; retain the remainder byte-for-byte for the golden.
+    if normalize_windows_alias {
+        if let Some(message) = output.find("\"message\": \"") {
+            let path_start = message + "\"message\": \"".len();
+            if let Some(relative) = output[path_start..].find("/crates/") {
+                output.replace_range(path_start..path_start + relative, "<ROOT>");
+            }
+        } else if let Some(index) = output.find("/crates/") {
+            output.replace_range(..index, "<ROOT>");
+        }
+    }
+    output
+}
+
+#[test]
+fn metadata_golden_root_normalization_handles_raw_and_json_windows_short_paths() {
+    let fixture = WorkspaceFixture::new();
+    let cases = [
+        (
+            "raw cargo metadata path",
+            r"C:\Users\RUNNER~1\AppData\Local\Temp\fixture\crates\example\src\lib.rs",
+            "<ROOT>/crates/example/src/lib.rs",
+        ),
+        (
+            "JSON-escaped cargo metadata path",
+            r#"{"message": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\fixture\\crates\\example\\src\\lib.rs"}"#,
+            r#"{"message": "<ROOT>/crates/example/src/lib.rs"}"#,
+        ),
+    ];
+
+    for (description, input, expected) in cases {
+        let normalized =
+            normalize_fixture_root_with_windows_alias(input.to_string(), fixture.root(), true);
+        assert_eq!(
+            normalized, expected,
+            "{description} must retain one separator per path component"
+        );
+    }
+}
+
+const PARALLEL_FILE_COUNT: usize = 10;
+
+fn in_pool<T: Send>(threads: usize, work: impl FnOnce() -> T + Send) -> T {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .unwrap()
+        .install(work)
+}
+
+/// Extract `(file name, line)` from a finding message of the form
+/// `<path>:<line>: <detail>`.
+fn finding_location(message: &str) -> (String, usize) {
+    let head = message.split(": ").next().unwrap();
+    let (path, line) = head.rsplit_once(':').unwrap();
+    let file = path.rsplit(['/', '\\']).next().unwrap();
+    (file.to_string(), line.parse().unwrap())
+}
+
+#[test]
+fn parallel_file_analysis_renders_identically_for_multifile_workspaces() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    // Declare modules in reverse order so scheduling or declaration order
+    // cannot coincide with the expected sorted order by accident.
+    let mut lib = String::new();
+    for index in (0..PARALLEL_FILE_COUNT).rev() {
+        lib.push_str(&format!("mod file_{index:02};\n"));
+        fixture.write_source("example", &format!("file_{index:02}.rs"), &format!(
+                "pub fn a_{index:02}() {{ let _ = (\"/tmp/a\", \"/tmp/b\"); }}\npub fn b_{index:02}() {{ let _ = \"/tmp/c\"; }}\n"
+            ));
+    }
+    fixture.write_source("example", "lib.rs", &lib);
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    };
+    let analyze = || {
+        let report = analyze_workspace(&options).unwrap();
+        (
+            render_findings_report(&report),
+            serde_json::to_vec(&report).unwrap(),
+            report,
+        )
+    };
+    // Oracle: a single-thread pool analyzes files strictly sequentially.
+    let (expected_text, expected_json, expected) = in_pool(1, analyze);
+
+    let locations: Vec<(String, usize)> = expected
+        .findings
+        .iter()
+        .map(|finding| finding_location(&finding.message))
+        .collect();
+    assert!(locations.len() >= PARALLEL_FILE_COUNT * 2, "{locations:#?}");
+    let mut sorted = locations.clone();
+    sorted.sort();
+    assert_eq!(locations, sorted, "findings ordered by (source_path, line)");
+    // Same-line findings appear for every file (two literals on line 1).
+    for index in 0..PARALLEL_FILE_COUNT {
+        let file = format!("file_{index:02}.rs");
+        let in_file: Vec<usize> = locations
+            .iter()
+            .filter(|(name, _)| *name == file)
+            .map(|(_, line)| *line)
+            .collect();
+        assert!(in_file.len() >= 2, "{file}: {in_file:?}");
+        assert_eq!(in_file.first(), Some(&1), "{file}: {in_file:?}");
+        assert_eq!(in_file.last(), Some(&2), "{file}: {in_file:?}");
+    }
+
+    for _ in 0..8 {
+        let (text, json, report) = in_pool(4, analyze);
+        assert_eq!(text, expected_text);
+        assert_eq!(json, expected_json);
+        assert_eq!(report.findings, expected.findings);
+    }
 }
 
 #[test]

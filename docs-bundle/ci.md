@@ -37,17 +37,33 @@ The `v1` tag identifies the Action interface and is a movable tag, refreshed
 after each release is published. The `version` input identifies the release
 artifact. Neither implies the other.
 
-The Action publishes these outputs:
+### Action inputs
 
-- `binary-path`: the absolute path of the verified `sc-lint` binary.
-- `docs-path`: the absolute path of the shipped offline `sc-lint-docs`
-  directory. Documentation discovery never reaches the network.
-- `version`: the verified release version the Action selected.
+| Input | Required | Default | Description |
+| --- | --- | --- | --- |
+| `operation` | No | `lint` | Selects `setup`, `lint`, or `test`. `setup` installs and preflights only. |
+| `version` | Yes | — | Exact released sc-lint SemVer without a leading `v`; selects the verified release artifact. |
+| `config-path` | No | `sc-lint.toml` | Consumer configuration path, relative to `working-directory`. |
+| `artifact-url` | No | `{release-base-url}/v{version}/sc-lint_{version}_{target}.{extension}` | Exact release archive URL, for a mirror or offline runner. |
+| `checksums-url` | No | `{release-base-url}/v{version}/checksums.txt` | URL of the matching `checksums.txt` manifest. |
+| `release-base-url` | No | `https://github.com/randlee/sc-lint/releases/download` | Trusted release download root used to derive the archive and checksum URLs. |
+| `working-directory` | No | `.` | Consumer working directory containing `sc-lint.toml`; relative `config-path` values resolve from here. |
 
-Inputs `artifact-url` and `checksums-url` take an exact archive and checksum
-manifest URL for a release mirror or an offline runner. The Action does not
-fall back to a package manager, Cargo, a source checkout, or an analyzer package
-name. When an artifact cannot be reached, it reports
+`artifact-url` and `checksums-url` are resolved independently. Supplying one
+overrides only that URL; the other keeps its default derived from
+`release-base-url` and `version`. The archive URL selects the target-specific
+archive, while the checksum URL selects the release's `checksums.txt`.
+
+### Action outputs
+
+| Output | Description |
+| --- | --- |
+| `binary-path` | Absolute path of the verified `sc-lint` binary. |
+| `docs-path` | Absolute path of the shipped offline `sc-lint-docs` directory. Documentation discovery never reaches the network. |
+| `version` | Verified release version selected by the Action. |
+
+The Action does not fall back to a package manager, Cargo, a source checkout,
+or an analyzer package name. When an artifact cannot be reached, it reports
 `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`.
 
 Stable failure codes are `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`,

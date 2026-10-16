@@ -1,0 +1,7 @@
+{
+  "rule_id": "RULE-001",
+  "kind": "contract_fixture",
+  "message": "machine contract fixture",
+  "owner_ids": ["crate::example::example"],
+  "node_ids": ["crate::example::example::item"]
+}

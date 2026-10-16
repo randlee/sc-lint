@@ -53,7 +53,7 @@ fn consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBu
         .expect("derived consumer manifest");
         fs::write(
             root.join("sc-lint.toml"),
-            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\".sc-lint/bootstrap\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n",
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\".sc-lint/bootstrap\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
         )
         .expect("derived consumer profile configuration");
     } else {
@@ -75,9 +75,20 @@ fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -
     if atm_core_derived {
         fs::write(
             root.join("Cargo.toml"),
-            "[package]\nname = \"consumer-derived-from-atm-core\"\nversion = \"0.1.0\"\n",
+            "[package]\nname = \"consumer-derived-from-atm-core\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[workspace]\n",
         )
         .expect("derived consumer manifest");
+        fs::write(
+            root.join("sc-lint.toml"),
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"pwsh\", \"-NoLogo\", \"-NoProfile\", \"-NonInteractive\", \"-File\", \".sc-lint/bootstrap.ps1\", \"exec\", \"--\", \"sc-lint\", \"version\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
+        )
+        .expect("derived consumer profile configuration");
+    } else {
+        fs::write(
+            root.join("sc-lint.toml"),
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n",
+        )
+        .expect("consumer config");
     }
     root
 }
@@ -341,11 +352,20 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
         ("atm-core-derived-consumer", true),
     ] {
         let root = windows_consumer_fixture(fixture.path(), name, derived);
-        let output = inherited_powershell_command()
+        let mut command = inherited_powershell_command();
+        command
             .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
             .arg(root.join(".sc-lint/bootstrap.ps1"))
-            .args(["exec", "--", "sc-lint", "version"])
-            .current_dir(&root)
+            .current_dir(&root);
+        if derived {
+            // The bootstrap owns the consumer mode and translates its
+            // selector into `sc-lint lint --consumer --profile`; passing the
+            // product flags through makes them invalid bootstrap positionals.
+            command.args(["lint", "ci", "--config", "sc-lint.toml"]);
+        } else {
+            command.args(["exec", "--", "sc-lint", "version"]);
+        }
+        let output = command
             .env_remove("SC_LINT_BIN")
             .env_remove("SC_LINT_INSTALL_DIR")
             .env("LOCALAPPDATA", &local_app_data)
@@ -358,12 +378,19 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(
-            String::from_utf8_lossy(&output.stdout).contains("sc-lint"),
-            "stdout: {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
-        assert_eq!(root.join("Cargo.toml").exists(), derived);
+        if derived {
+            assert!(
+                String::from_utf8_lossy(&output.stdout).contains("lint.ci.consumer: ok"),
+                "profile command did not execute the fixture's configured managed version check: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+        } else {
+            assert!(
+                String::from_utf8_lossy(&output.stdout).contains(env!("CARGO_PKG_VERSION")),
+                "managed version command did not report the product version: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+        }
     }
     assert!(managed_binary.is_file());
 }

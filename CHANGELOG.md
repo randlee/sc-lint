@@ -4,6 +4,13 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- The built-in source lint plan runs independent steps concurrently and
+  continues through all planned steps after failures, reporting every failure
+  by plan index in plan order. Consumer-configured lint and test profiles
+  remain sequential, declaration-ordered, and fail-fast.
+
 ### Compatibility
 
 - Tightened boundary inventory validation and stale-entry diagnostics can
@@ -19,12 +26,22 @@ All notable changes to sc-lint are documented here.
   virtual-root workspace dependency. See the cargo-shear migration guidance
   in [troubleshooting](docs-bundle/troubleshooting.md#cargo-shear-exception-migration).
 
+### Fixed
+
+- The boundary inventory now rejects nested `planning.toml` files instead of
+  silently ignoring planning metadata outside `boundaries/planning.toml`.
+- Portability and runtime analysis now report an error when a finding's source
+  path cannot be made repository-relative, including paths outside the
+  repository root, instead of silently skipping that finding.
+
 ## [0.7.3] — 2026-10-12
 
 Fixes found after publishing 0.7.2.
 
 ### Fixed
 
+- The boundary inventory now rejects nested `planning.toml` files instead of
+  silently ignoring planning metadata outside `boundaries/planning.toml`.
 - A lone `sc-lint` now rejects a stale or foreign `sc-lint-*` backend found on
   `PATH` with `BACKEND_EXEC_FAILURE` and the `sc-lint setup` remedy instead of
   running it. The backends gain `--version` so the launcher can check them

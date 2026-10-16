@@ -856,7 +856,7 @@ fn apply_configured_rule_filter(
         })
         .collect();
     let (findings, status) =
-        settings.apply_with_paths(findings, |rule: &RuleId| CatalogRuleId::new(rule.as_str()));
+        settings.apply(findings, |rule: &RuleId| CatalogRuleId::new(rule.as_str()));
     report.findings = findings;
     report.status = status;
     report

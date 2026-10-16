@@ -467,15 +467,8 @@ impl AnalyzerSettings {
             .any(|pattern| glob_match(pattern, relative))
     }
 
+    /// Apply rule and path exclusions to findings with their optional source paths.
     pub fn apply<R: Serialize>(
-        &self,
-        findings: Vec<Finding<R>>,
-        id: impl Fn(&R) -> CatalogRuleId,
-    ) -> (Vec<Finding<R>>, ReportStatus) {
-        self.apply_with_paths(findings.into_iter().map(|finding| (finding, None)), id)
-    }
-
-    pub fn apply_with_paths<R: Serialize>(
         &self,
         findings: impl IntoIterator<Item = (Finding<R>, Option<RepoRelativePath>)>,
         id: impl Fn(&R) -> CatalogRuleId,

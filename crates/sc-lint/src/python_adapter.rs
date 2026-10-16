@@ -340,6 +340,10 @@ fn python_module_command(repo_root: &std::path::Path) -> ProcessCommand {
     if let Some(python_path) = interpreter.python_path {
         command.env("PYTHONPATH", python_path);
     }
+    // Parity with `workflow::python_step`: a delegated utility that resolves
+    // the product binary must reach this running executable, never a stale
+    // PATH or managed installation.
+    command.env("SC_LINT_BIN", crate::dispatch::product_binary());
     command.current_dir(repo_root).arg("-m");
     command
 }
@@ -488,5 +492,17 @@ mod tests {
 
         assert_eq!(success.data["adapter"], ADAPTER_SCHEMA);
         assert_eq!(success.data["status"], "pass");
+    }
+    #[test]
+    fn python_module_command_delegates_to_the_running_product_binary() {
+        let command = python_module_command(std::path::Path::new("."));
+        let product_binary = crate::dispatch::product_binary().into_os_string();
+
+        let exported = command
+            .get_envs()
+            .find(|(key, _)| *key == "SC_LINT_BIN")
+            .and_then(|(_, value)| value)
+            .expect("python_module_command exports SC_LINT_BIN");
+        assert_eq!(exported, product_binary.as_os_str());
     }
 }

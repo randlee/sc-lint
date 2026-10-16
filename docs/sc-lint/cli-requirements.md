@@ -357,9 +357,15 @@ specialized backend tools and mixed Rust/Python implementations.
   targets use cargo, while Linux/macOS to `x86_64-pc-windows-msvc` uses cargo
   xwin. Other cross combinations report explicit unsupported skips; missing
   tools or command failures in supported combinations are failures. Missing
-  optional declarations preserve existing behavior. Generic test groups,
-  parallel execution, keep-going and test argument forwarding are not added.
-  (Extended 2026-10-12, Accepted,
+  optional declarations preserve existing behavior. The built-in
+  source-maintainer lint plan may run independent steps concurrently and uses
+  keep-going behavior: every planned step runs even if another fails. Reports
+  retain plan order and identify every failed step by its plan index; the
+  command exits non-zero if any step fails. Steps that require Cargo's build
+  lock are serialized. Consumer-configured lint and test profiles remain
+  sequential, declaration-ordered, and fail-fast. Generic test groups and test
+  argument forwarding are not added.
+  (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-024`

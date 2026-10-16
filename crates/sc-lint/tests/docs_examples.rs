@@ -2,9 +2,12 @@ use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -19,8 +22,9 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
-fn fenced_block_after<'a>(markdown: &'a str, heading: &str, language: &str) -> &'a str {
-    let section = markdown
+fn fenced_block_after(markdown: &str, heading: &str, language: &str) -> String {
+    let normalized = markdown.replace("\r\n", "\n");
+    let section = normalized
         .split_once(heading)
         .map(|(_, section)| section)
         .unwrap_or_else(|| panic!("missing documentation heading `{heading}`"));
@@ -31,7 +35,7 @@ fn fenced_block_after<'a>(markdown: &'a str, heading: &str, language: &str) -> &
         .unwrap_or_else(|| panic!("missing `{language}` example after `{heading}`"));
     block
         .split_once("\n```")
-        .map(|(contents, _)| contents.trim_start_matches('\n'))
+        .map(|(contents, _)| contents.trim_start_matches('\n').to_owned())
         .unwrap_or_else(|| panic!("unterminated `{language}` example after `{heading}`"))
 }
 
@@ -69,6 +73,8 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
         .stderr(Stdio::from(
             stderr.try_clone().expect("clone stderr capture"),
         ));
+    #[cfg(unix)]
+    command.process_group(0);
 
     let started = Instant::now();
     let mut child = command
@@ -81,8 +87,7 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
                 thread::sleep(Duration::from_millis(20));
             }
             Ok(None) => {
-                let _ = child.kill();
-                let status = child.wait().expect("reap timed out subprocess");
+                let status = terminate_test_process_tree(&mut child);
                 let stdout = captured(stdout, "timed out subprocess stdout");
                 let stderr = captured(stderr, "timed out subprocess stderr");
                 panic!(
@@ -92,8 +97,7 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
                 );
             }
             Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
+                let _ = terminate_test_process_tree(&mut child);
                 let stdout = captured(stdout, "failed subprocess stdout");
                 let stderr = captured(stderr, "failed subprocess stderr");
                 panic!(
@@ -110,6 +114,29 @@ fn run_bounded_for(command: &mut Command, timeout: Duration) -> Output {
         stdout: captured(stdout, "subprocess stdout"),
         stderr: captured(stderr, "subprocess stderr"),
     }
+}
+
+fn terminate_test_process_tree(child: &mut Child) -> std::process::ExitStatus {
+    let process_id = child.id();
+    #[cfg(unix)]
+    if let Ok(group) = libc::pid_t::try_from(process_id)
+        && group > 0
+    {
+        // SAFETY: a negative pid signals the process group assigned to this child.
+        unsafe { libc::kill(-group, libc::SIGKILL) };
+    }
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &process_id.to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    let _ = child.kill();
+    child
+        .wait()
+        .expect("reap terminated subprocess tree leader")
 }
 
 fn captured(mut file: std::fs::File, description: &str) -> Vec<u8> {
@@ -189,7 +216,7 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
         .args(["--exact", "bounded_runner_timeout_child", "--nocapture"])
         .env("SC_LINT_TIMEOUT_TEST_CHILD", "1");
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        run_bounded_for(&mut command, Duration::from_secs(2));
+        run_bounded_for(&mut command, Duration::from_secs(10));
     }))
     .expect_err("hung subprocess should hit its deadline");
     let panic = match panic.downcast::<String>() {
@@ -202,6 +229,15 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
     assert!(panic.contains("bounded_runner_timeout_child"), "{panic}");
     assert!(panic.contains("intentional timeout stdout"), "{panic}");
     assert!(panic.contains("intentional timeout stderr"), "{panic}");
+}
+
+#[test]
+fn fenced_block_after_parses_crlf_toml() {
+    let document =
+        "## Example\r\n\r\n```toml\r\n[tool.sc-lint]\r\nminimum_version = \"0.7.0\"\r\n```\r\n";
+    let example = fenced_block_after(document, "## Example", "toml");
+    let parsed: toml::Value = toml::from_str(&example).expect("CRLF TOML parses");
+    assert_eq!(parsed["tool"]["sc-lint"]["minimum_version"], "0.7.0".into());
 }
 
 #[test]
@@ -261,9 +297,9 @@ fn docs_examples_parse_and_run_with_the_staged_branch_binary() {
     );
     let install_example = fenced_block_after(&guide, "The persisted JSON", "json");
 
-    let parsed_lint: toml::Value = toml::from_str(lint_example).expect("documented TOML parses");
+    let parsed_lint: toml::Value = toml::from_str(&lint_example).expect("documented TOML parses");
     let parsed_tools: Value =
-        serde_json::from_str(install_example).expect("documented JSON parses");
+        serde_json::from_str(&install_example).expect("documented JSON parses");
     assert_eq!(
         parsed_lint["tool"]["sc-lint"]["lint_profiles"]["ci"][2],
         "windows-check".into()

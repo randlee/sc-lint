@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use anyhow::Result;
+use rayon::prelude::*;
 use serde::Deserialize;
 use syn::Block;
 use syn::Expr;
@@ -37,9 +38,10 @@ use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
-use sc_lint_analyzer_support::count_scanned_crates as count_crates;
-use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates;
+use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
 
@@ -52,8 +54,15 @@ use self::findings::convert_findings;
 pub(super) fn repo_relative_source_path(
     root: &Path,
     source_path: &Path,
-) -> Option<RepoRelativePath> {
-    RepoRelativePath::parse(&relative_slash_path(root, source_path)).ok()
+) -> Result<RepoRelativePath> {
+    let relative = relative_slash_path(root, source_path);
+    RepoRelativePath::parse(&relative).with_context(|| {
+        format!(
+            "failed to build repository-relative source path for `{}` under `{}`",
+            source_path.display(),
+            root.display()
+        )
+    })
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -160,47 +169,51 @@ impl AnalyzerPortabilityKeys {
 
 pub(crate) fn analyze_portability(
     root: &Path,
+    workspace: &WorkspaceMetadata,
     document: &toml::Table,
     _settings: &AnalyzerSettings,
     analyzer_keys: &AnalyzerPortabilityKeys,
     platform_adapters: &platform_adapters::PlatformAdapters,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let config = load_portability_config(document, analyzer_keys)?;
-    let source_files = discover_source_files(root)?;
-    let mut findings = Vec::new();
-
-    for file_context in source_files {
-        let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
-            || {
+    let source_files = discover_source_files_with_metadata(workspace)?;
+    let file_findings = source_files
+        .par_iter()
+        .map(|file_context| {
+            let source = fs::read_to_string(&file_context.source_path).with_context(|| {
                 format!(
                     "failed to read Rust source for portability analysis: {}",
                     file_context.source_path.display()
                 )
-            },
-        )?)
-        .with_context(|| {
-            format!(
-                "failed to parse Rust source for portability analysis: {}",
-                file_context.source_path.display()
-            )
-        })?;
+            })?;
+            let parsed = syn::parse_file(&source).with_context(|| {
+                format!(
+                    "failed to parse Rust source for portability analysis: {}",
+                    file_context.source_path.display()
+                )
+            })?;
 
-        let mut collector = PortabilityCollector::new(&file_context, &config);
-        collector.visit_file_items(&parsed);
-        findings.extend(collector.findings);
-        findings.extend(parity::collect_unix_portability_findings(
-            &parsed,
-            &file_context,
-            &config,
-            platform_adapters,
-        ));
-    }
+            let mut collector = PortabilityCollector::new(file_context, &config);
+            collector.visit_file_items(&parsed);
+            let mut findings = collector.findings;
+            findings.extend(parity::collect_unix_portability_findings(
+                &parsed,
+                file_context,
+                &config,
+                platform_adapters,
+            ));
+            Ok(findings)
+        })
+        .collect::<Vec<Result<Vec<_>>>>()
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
+    let findings = file_findings.into_iter().flatten().collect();
 
-    Ok(convert_findings(root, findings))
+    convert_findings(root, findings)
 }
 
-pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {
-    count_crates(root)
+pub(crate) fn count_scanned_crates(workspace: &WorkspaceMetadata) -> usize {
+    count_crates(workspace)
 }
 
 struct PortabilityCollector<'a> {

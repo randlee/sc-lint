@@ -62,22 +62,39 @@ pub(super) fn run_backend_probe(
     argument: &str,
     timeout: Duration,
 ) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
-    let (mut child, reader) = spawn_backend_probe(binary, expected_name, argument)?;
-    let process_id = child.id();
-    let status = wait_for_backend_probe(&mut child, binary, expected_name, argument, timeout)?;
-    let output = finish_backend_output(reader, process_id)
-        .map_err(|error| error.to_probe_message(binary, expected_name, argument))?;
+    run_backend_probe_with_arguments(binary, expected_name, &[argument], argument, timeout)
+}
+
+fn run_backend_probe_with_arguments(
+    binary: &Path,
+    expected_name: &str,
+    arguments: &[&str],
+    description: &str,
+    timeout: Duration,
+) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
+    let (mut child, reader) = spawn_backend_probe(binary, expected_name, arguments, description)?;
+    let status = wait_for_backend_probe(&mut child, binary, expected_name, description, timeout)?;
+    // `wait_for_backend_probe` reaps a successful leader. Its PID may then be
+    // reused, so the output-drain path must not signal the process group by
+    // that PID. A lingering descendant is reported as a bounded output timeout.
+    let output = finish_backend_output_after_leader_exit(
+        reader,
+        BACKEND_OUTPUT_DRAIN_TIMEOUT,
+        BACKEND_OUTPUT_STOP_TIMEOUT,
+    )
+    .map_err(|error| error.to_probe_message(binary, expected_name, description))?;
     Ok((status, output))
 }
 
 pub(super) fn spawn_backend_probe(
     binary: &Path,
     expected_name: &str,
-    argument: &str,
+    arguments: &[&str],
+    description: &str,
 ) -> Result<(Child, ProbeOutputReader), String> {
     let mut command = Command::new(binary);
     command
-        .arg(argument)
+        .args(arguments)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
     #[cfg(unix)]
@@ -94,7 +111,7 @@ pub(super) fn spawn_backend_probe(
     let Some(stdout) = child.stdout.take() else {
         terminate_probe_processes(&mut child);
         return Err(format!(
-            "backend companion `{expected_name}` at `{}` did not provide a readable `{argument}` stream",
+            "backend companion `{expected_name}` at `{}` did not provide a readable `{description}` stream",
             binary.display(),
         ));
     };
@@ -142,34 +159,37 @@ pub(super) fn wait_for_backend_probe(
     }
 }
 
+#[cfg(all(test, target_os = "linux"))]
 pub(super) fn finish_backend_output(
     reader: ProbeOutputReader,
     process_id: u32,
 ) -> Result<Vec<u8>, BackendOutputError> {
-    finish_backend_output_with_timeouts(
+    finish_backend_output_after_stop(
         reader,
-        process_id,
         BACKEND_OUTPUT_DRAIN_TIMEOUT,
         BACKEND_OUTPUT_STOP_TIMEOUT,
+        Some(|| terminate_probe_process_tree(process_id)),
     )
 }
 
-pub(super) fn finish_backend_output_with_timeouts(
+fn finish_backend_output_after_leader_exit(
     reader: ProbeOutputReader,
-    process_id: u32,
     drain_timeout: Duration,
     stop_timeout: Duration,
 ) -> Result<Vec<u8>, BackendOutputError> {
-    finish_backend_output_after_stop(reader, drain_timeout, stop_timeout, || {
-        terminate_probe_process_tree(process_id)
-    })
+    finish_backend_output_after_stop(
+        reader,
+        drain_timeout,
+        stop_timeout,
+        None::<fn() -> io::Result<ProbeTreeStop>>,
+    )
 }
 
-fn finish_backend_output_after_stop(
+pub(super) fn finish_backend_output_after_stop(
     reader: ProbeOutputReader,
     drain_timeout: Duration,
     stop_timeout: Duration,
-    stop_process_tree: impl FnOnce() -> io::Result<ProbeTreeStop>,
+    stop_process_tree: Option<impl FnOnce() -> io::Result<ProbeTreeStop>>,
 ) -> Result<Vec<u8>, BackendOutputError> {
     // A descendant can outlive the direct child while holding stdout open.
     // Give the reader a short chance to drain normal output, then stop the
@@ -181,7 +201,9 @@ fn finish_backend_output_after_stop(
         }
         Err(RecvTimeoutError::Timeout) => {}
     }
-    stop_process_tree().map_err(BackendOutputError::ProcessTreeStop)?;
+    if let Some(stop_process_tree) = stop_process_tree {
+        stop_process_tree().map_err(BackendOutputError::ProcessTreeStop)?;
+    }
     match reader.recv_timeout(stop_timeout) {
         Ok(result) => format_probe_output_result(result),
         Err(RecvTimeoutError::Timeout) => Err(BackendOutputError::Timeout { wait: stop_timeout }),
@@ -361,18 +383,24 @@ pub(super) fn terminate_probe_process_tree(_process_id: u32) -> io::Result<Probe
 }
 
 pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
+    probe_version_with_timeout(binary, BACKEND_PROBE_TIMEOUT)
+}
+
+fn probe_version_with_timeout(binary: &Path, timeout: Duration) -> Result<Version, String> {
     if !binary.is_file() {
         return Err("binary was not found".to_string());
     }
-    let output = Command::new(binary)
-        .args(["--json", "version"])
-        .output()
-        .map_err(|error| error.to_string())?;
-    if !output.status.success() {
-        return Err(format!("version probe exited with {}", output.status));
+    let (status, output) = run_backend_probe_with_arguments(
+        binary,
+        crate::consts::SERVICE_NAME,
+        &["--json", "version"],
+        "--json version",
+        timeout,
+    )?;
+    if !status.success() {
+        return Err(format!("version probe exited with {status}"));
     }
-    let envelope: Value =
-        serde_json::from_slice(&output.stdout).map_err(|error| error.to_string())?;
+    let envelope: Value = serde_json::from_slice(&output).map_err(|error| error.to_string())?;
     let data = envelope
         .get("data")
         .ok_or_else(|| "version probe did not include data".to_string())?;
@@ -432,20 +460,25 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn reaped_probe_group_counts_as_already_stopped() {
+    fn reaped_probe_leader_does_not_signal_its_reusable_group_id() {
         let mut child = Command::new("sh")
             .args(["-c", "exit 0"])
             .process_group(0)
             .spawn()
             .expect("spawn probe group leader");
-        let process_id = child.id();
         child.wait().expect("reap probe group leader");
 
-        assert_eq!(
-            terminate_probe_process_tree(process_id)
-                .expect("already-stopped group is not a failure"),
-            ProbeTreeStop::AlreadyStopped,
-        );
+        // Do not signal a process group by an identifier after its leader was
+        // reaped: the PID can be reused before the output pipe finishes draining.
+        let (_sender, reader) = mpsc::sync_channel(1);
+        assert!(matches!(
+            finish_backend_output_after_leader_exit(
+                reader,
+                Duration::ZERO,
+                Duration::ZERO,
+            ),
+            Err(BackendOutputError::Timeout { wait }) if wait.is_zero()
+        ));
     }
 
     #[cfg(unix)]
@@ -510,10 +543,10 @@ mod tests {
             reader,
             BACKEND_OUTPUT_DRAIN_TIMEOUT,
             BACKEND_OUTPUT_STOP_TIMEOUT,
-            || {
+            Some(|| {
                 stop_attempted = true;
                 Ok(ProbeTreeStop::AlreadyStopped)
-            },
+            }),
         )
         .expect_err("a connected reader that never sends must time out");
 
@@ -557,8 +590,8 @@ mod tests {
         permissions.set_mode(0o755);
         fs::set_permissions(&script, permissions).expect("make probe executable");
 
-        let (mut child, reader) =
-            spawn_backend_probe(&script, "test", "--help").expect("spawn probe script");
+        let (mut child, reader) = spawn_backend_probe(&script, "test", &["--help"], "--help")
+            .expect("spawn probe script");
         wait_for_probe_file(&directory.path().join("ready"));
         let process_id = fs::read_to_string(directory.path().join("pid"))
             .expect("read detached child pid")
@@ -567,14 +600,40 @@ mod tests {
             .expect("parse detached child pid");
         let _detached_child = DetachedChildGuard { process_id };
         let probe_process_id = child.id();
-        child.wait().expect("reap probe script");
-
-        let error = finish_backend_output(reader, probe_process_id)
-            .expect_err("child holding the pipe must time out instead of hanging");
+        let output_result = finish_backend_output(reader, probe_process_id);
+        child
+            .wait()
+            .expect("reap probe script after stopping its group");
+        let error =
+            output_result.expect_err("child holding the pipe must time out instead of hanging");
 
         assert!(
             matches!(error, BackendOutputError::Timeout { .. }),
             "expected typed timeout, got {error:?}"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
+    #[test]
+    fn probe_version_hung_candidate_returns_a_bounded_timeout() {
+        let directory = tempdir().expect("temporary probe directory");
+        let script = directory.path().join("candidate");
+        fs::write(&script, "#!/bin/sh\nsleep 60\n").expect("write candidate script");
+        let mut permissions = fs::metadata(&script)
+            .expect("candidate metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script, permissions).expect("make candidate executable");
+
+        let error = probe_version_with_timeout(&script, Duration::from_millis(100))
+            .expect_err("hung version candidate must be bounded");
+
+        assert!(
+            error.contains(
+                "timed out after 100 ms during its `--json version` probe; process-tree cleanup was attempted"
+            ),
+            "expected timeout diagnostic, got {error}"
         );
     }
 }

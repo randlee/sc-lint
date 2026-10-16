@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use anyhow::Result;
 use sc_lint_analyzer_support::RepoRelativePath;
 
 use super::repo_relative_source_path;
@@ -25,7 +26,7 @@ pub(super) struct PortabilityFinding {
 pub(super) fn convert_findings(
     root: &Path,
     mut findings: Vec<PortabilityFinding>,
-) -> Vec<(Finding, Option<RepoRelativePath>)> {
+) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     findings.sort_by(|left, right| {
         left.rule_id
             .as_str()
@@ -33,13 +34,17 @@ pub(super) fn convert_findings(
             .then_with(|| left.source_path.cmp(&right.source_path))
             .then_with(|| left.line.cmp(&right.line))
             .then_with(|| left.message.cmp(&right.message))
+            .then_with(|| left.kind.cmp(right.kind))
+            .then_with(|| left.package.cmp(&right.package))
+            .then_with(|| left.target.cmp(&right.target))
+            .then_with(|| left.node_label.cmp(&right.node_label))
     });
 
     findings
         .into_iter()
         .map(|finding| {
-            let source_path = repo_relative_source_path(root, &finding.source_path);
-            (
+            let source_path = repo_relative_source_path(root, &finding.source_path)?;
+            Ok((
                 Finding {
                     rule_id: finding.rule_id,
                     kind: finding.kind.into(),
@@ -55,8 +60,8 @@ pub(super) fn convert_findings(
                     ))],
                     node_ids: vec![NodeId::new(finding.node_label)],
                 },
-                source_path,
-            )
+                Some(source_path),
+            ))
         })
         .collect()
 }

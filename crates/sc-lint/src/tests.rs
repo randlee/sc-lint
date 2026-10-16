@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
@@ -6,6 +5,9 @@ use std::path::Path;
 use std::path::PathBuf;
 #[cfg(any(unix, windows))]
 use std::process::Command as ProcessCommand;
+use std::sync::Mutex;
+use std::sync::mpsc;
+use std::time::Duration;
 
 use clap::Parser;
 use serde::Serialize;
@@ -472,8 +474,12 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
         vec!["lint-fmt", "lint-clippy"]
     );
     assert_eq!(
-        *passing.invocations.borrow(),
-        vec!["lint-fmt", "lint-clippy"]
+        passing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["lint-fmt", "lint-clippy"]
     );
 
     let test_cli = Cli::parse_from([
@@ -491,7 +497,60 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
     let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &failing)
         .expect_err("a required test member fails the aggregate");
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
-    assert_eq!(*failing.invocations.borrow(), vec!["test-workspace"]);
+    assert_eq!(
+        failing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["test-workspace"]
+    );
+}
+
+#[test]
+fn consumer_steps_run_in_declaration_order_and_stop_at_the_first_failure() {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.test]]\nname = \"first\"\ncommand = [\"cargo\", \"test\"]\n\n[[tool.sc-lint.test]]\nname = \"second\"\ncommand = [\"cargo\", \"test\", \"--doc\"]\n\n[[tool.sc-lint.test]]\nname = \"third\"\ncommand = [\"cargo\", \"test\", \"--release\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n",
+    )
+    .expect("consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "test",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer test context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("consumer config");
+
+    let passing = FakeSystemAdapter::new(false);
+    workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &passing)
+        .expect("all layers pass");
+    assert_eq!(
+        passing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["first", "second", "third"]
+    );
+
+    let mut failing = FakeSystemAdapter::new(false);
+    failing.failures.insert("second", "second layer failed");
+    let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &failing)
+        .expect_err("the failing layer stops the run");
+    assert_eq!(error.message, "second layer failed");
+    assert_eq!(
+        failing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["first", "second"],
+        "the third layer must not run after the second fails"
+    );
 }
 
 #[test]
@@ -517,20 +576,36 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
         &adapter,
     )
     .expect("named layer runs");
-    assert_eq!(*adapter.invocations.borrow(), vec!["integrate"]);
+    assert_eq!(
+        adapter
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["integrate"]
+    );
     assert_eq!(run.data["selector"], "integrate");
 
     let all_cli = Cli::parse_from(["sc-lint", "--config", config, "test", "all"]);
     let all_context = CommandContext::from_cli(&all_cli).expect("all layers context");
     let adapter = FakeSystemAdapter::new(false);
-    workflow::run_consumer_profile_with(
+    let run = workflow::run_consumer_profile_with(
         &loaded,
         ConsumerProfile::Test,
         all_context.consumer_selector(),
         &adapter,
     )
     .expect("all layers run");
-    assert_eq!(*adapter.invocations.borrow(), vec!["unit", "integrate"]);
+    let steps = run.data["steps"].as_array().expect("steps array");
+    assert_eq!(step_names(steps), ["unit", "integrate"],);
+    assert_eq!(
+        adapter
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["unit", "integrate"]
+    );
 
     let profile_cli = Cli::parse_from([
         "sc-lint",
@@ -551,7 +626,14 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
         &adapter,
     )
     .expect("named lint profile runs");
-    assert_eq!(*adapter.invocations.borrow(), vec!["fmt"]);
+    assert_eq!(
+        adapter
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["fmt"]
+    );
 
     let error = workflow::run_consumer_profile_with(
         &loaded,
@@ -2102,6 +2184,195 @@ fn lint_profiles_have_stable_membership() {
 }
 
 #[test]
+fn fast_and_ci_profiles_exclude_xwin_when_available() {
+    for profile in [crate::cli::LintProfile::Fast, crate::cli::LintProfile::Ci] {
+        let loaded = load_repo_lint_profile(profile.command_suffix());
+        let adapter = FakeSystemAdapter::new(true);
+        let result = workflow::run_lint_profile_with(&loaded, profile, &adapter)
+            .expect("xwin-capable profile succeeds");
+        let steps = result.data["steps"].as_array().expect("steps array");
+        assert!(
+            !step_names(steps).iter().any(|step| step.contains("xwin")),
+            "{} must not plan xwin steps",
+            profile.command_suffix()
+        );
+        assert_eq!(result.data["xwin"]["available"], true);
+        assert_eq!(result.data["xwin"]["included"], false);
+    }
+}
+
+fn load_repo_lint_profile(profile: &str) -> LoadedConfig {
+    let repo_root = repo_backed_workspace_root();
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        repo_root.to_str().expect("repo root"),
+        "lint",
+        profile,
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("lint profile context");
+    LoadedConfig::load(&cli, &context).expect("config loads")
+}
+
+/// Generous bound so a regression fails the test instead of hanging it.
+const RENDEZVOUS_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// A hook that announces `announce`, then blocks until `await_signal` arrives.
+fn rendezvous_hook(
+    announce: mpsc::Sender<()>,
+    await_signal: mpsc::Receiver<()>,
+    what: &'static str,
+) -> StepHook {
+    let await_signal = Mutex::new(await_signal);
+    Box::new(move || {
+        announce.send(()).expect("peer is listening");
+        await_signal
+            .lock()
+            .expect("rendezvous receiver lock")
+            .recv_timeout(RENDEZVOUS_TIMEOUT)
+            .unwrap_or_else(|_| panic!("{what}"));
+    })
+}
+
+#[test]
+fn lint_profile_runs_independent_steps_concurrently_in_plan_order() {
+    let loaded = load_repo_lint_profile("fast");
+    let mut adapter = FakeSystemAdapter::new(false);
+    let (version_started, manifests_waits) = mpsc::channel();
+    let (manifests_started, version_waits) = mpsc::channel();
+    // Each step blocks until the other has started: this can only finish when
+    // the two steps run at the same time.
+    adapter.on_start.insert(
+        "version",
+        rendezvous_hook(
+            version_started,
+            version_waits,
+            "manifests never started while version was running",
+        ),
+    );
+    adapter.on_start.insert(
+        "manifests",
+        rendezvous_hook(
+            manifests_started,
+            manifests_waits,
+            "version never started while manifests was running",
+        ),
+    );
+
+    let success = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Fast, &adapter)
+        .expect("fast profile succeeds");
+    let steps = success.data["steps"].as_array().expect("steps array");
+    assert_eq!(
+        step_names(steps),
+        ["fmt", "version", "manifests", "spell", "pytests"]
+    );
+}
+
+#[test]
+fn lint_profile_starts_cargo_lane_steps_in_plan_order() {
+    let loaded = load_repo_lint_profile("full");
+    let adapter = FakeSystemAdapter::new(true);
+
+    workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Full, &adapter)
+        .expect("full profile succeeds");
+
+    let cargo_lane = [
+        "fmt",
+        "clippy",
+        "deny",
+        "shear",
+        "sc-boundary",
+        "sc-portability",
+        "sc-runtime",
+        "check.xwin",
+        "clippy.xwin",
+    ];
+    let started = adapter
+        .invocations
+        .lock()
+        .expect("fake invocation log lock")
+        .iter()
+        .filter(|name| cargo_lane.contains(&name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(started, cargo_lane);
+}
+
+#[test]
+fn lint_profile_keeps_going_and_reports_every_failed_step_by_plan_index() {
+    let loaded = load_repo_lint_profile("full");
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("clippy", "clippy failed");
+    adapter.failures.insert("spell", "spell failed");
+    adapter.failures.insert("sc-boundary", "boundary failed");
+
+    let error = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Full, &adapter)
+        .expect_err("the profile fails");
+    assert_eq!(
+        error.message,
+        "3 of 14 steps failed: [1] clippy, [6] spell, [8] sc-boundary"
+    );
+    assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    let ran = adapter
+        .invocations
+        .lock()
+        .expect("fake invocation log lock")
+        .len();
+    assert_eq!(ran, 14, "every step runs despite failures");
+}
+
+#[test]
+fn lint_profile_reports_the_lowest_index_failure_after_reversed_completion() {
+    let loaded = load_repo_lint_profile("fast");
+    let mut adapter = FakeSystemAdapter::new(false);
+    let (manifests_done, version_waits) = mpsc::channel();
+    // `version` (plan index 1) cannot finish until `manifests` (index 2) has.
+    let version_waits = Mutex::new(version_waits);
+    adapter.on_start.insert(
+        "version",
+        Box::new(move || {
+            version_waits
+                .lock()
+                .expect("version receiver lock")
+                .recv_timeout(RENDEZVOUS_TIMEOUT)
+                .expect("manifests never completed");
+        }),
+    );
+    adapter.on_finish.insert(
+        "manifests",
+        Box::new(move || manifests_done.send(()).expect("version is waiting")),
+    );
+    adapter
+        .failures
+        .insert("version", "version failed first in plan");
+    adapter
+        .failures
+        .insert("manifests", "manifests failed first in time");
+
+    let error = workflow::run_lint_profile_with(&loaded, crate::cli::LintProfile::Fast, &adapter)
+        .expect_err("the profile fails");
+    assert_eq!(
+        error.message,
+        "2 of 5 steps failed: [1] version, [2] manifests"
+    );
+
+    let completions = adapter
+        .completions
+        .lock()
+        .expect("fake completion log lock");
+    let position = |name: &str| {
+        completions
+            .iter()
+            .position(|done| done == name)
+            .expect("step completed")
+    };
+    assert!(
+        position("manifests") < position("version"),
+        "completion order reversed"
+    );
+}
+
+#[test]
 fn full_profile_adds_xwin_only_when_available() {
     let repo_root = repo_backed_workspace_root();
     let cli = Cli::parse_from([
@@ -2184,7 +2455,8 @@ fn ci_and_lint_ci_differ_only_by_test_execution() {
     assert_eq!(
         adapter
             .invocations
-            .borrow()
+            .lock()
+            .expect("fake invocation log lock")
             .iter()
             .filter(|step| step.as_str() == "sc-runtime")
             .count(),
@@ -2789,13 +3061,22 @@ fn step_names(steps: &[Value]) -> Vec<String> {
         .collect()
 }
 
+/// Test hook run on the step's worker thread.
+type StepHook = Box<dyn Fn() + Send + Sync>;
+
 struct FakeSystemAdapter {
     xwin_available: bool,
     host: crate::profile_plan::Platform,
     failures: HashMap<&'static str, &'static str>,
-    invocations: RefCell<Vec<String>>,
+    /// Runs after the step is logged as started, before it completes.
+    on_start: HashMap<&'static str, StepHook>,
+    /// Runs when the step completes, before its result is returned.
+    on_finish: HashMap<&'static str, StepHook>,
+    invocations: Mutex<Vec<String>>,
     /// Program and argv of every planned (consumer lint) step, in run order.
-    planned_argv: RefCell<Vec<Vec<String>>>,
+    planned_argv: Mutex<Vec<Vec<String>>>,
+    /// Step names in completion order.
+    completions: Mutex<Vec<String>>,
 }
 
 impl FakeSystemAdapter {
@@ -2804,10 +3085,11 @@ impl FakeSystemAdapter {
             xwin_available,
             host: crate::profile_plan::Platform::host(),
             failures: HashMap::new(),
-            planned_argv: RefCell::new(Vec::new()),
-            // Tests need to observe step order without requiring Sync, so
-            // RefCell is sufficient for this single-threaded fake.
-            invocations: RefCell::new(Vec::new()),
+            on_start: HashMap::new(),
+            on_finish: HashMap::new(),
+            planned_argv: Mutex::new(Vec::new()),
+            invocations: Mutex::new(Vec::new()),
+            completions: Mutex::new(Vec::new()),
         }
     }
 }
@@ -2817,6 +3099,27 @@ impl FakeSystemAdapter {
     fn on_host(mut self, host: crate::profile_plan::Platform) -> Self {
         self.host = host;
         self
+    }
+
+    fn record_step(&self, name: &str) -> Result<(), Box<CliError>> {
+        self.invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .push(name.to_string());
+        if let Some(hook) = self.on_start.get(name) {
+            hook();
+        }
+        self.completions
+            .lock()
+            .expect("fake completion log lock")
+            .push(name.to_string());
+        if let Some(hook) = self.on_finish.get(name) {
+            hook();
+        }
+        if let Some(message) = self.failures.get(name) {
+            return Err(Box::new(CliError::backend_failure(*message)));
+        }
+        Ok(())
     }
 }
 
@@ -2834,15 +3137,15 @@ impl workflow::SystemAdapter for FakeSystemAdapter {
         _repo_root: &Path,
         step: &crate::profile_plan::PlannedStep,
     ) -> Result<workflow::StepReport, CliError> {
-        self.invocations.borrow_mut().push(step.name().to_string());
+        self.record_step(step.name()).map_err(|error| *error)?;
         let argv = std::iter::once(step.command())
             .chain(step.args())
             .map(|part| part.to_string_lossy().into_owned())
             .collect();
-        self.planned_argv.borrow_mut().push(argv);
-        if let Some(message) = self.failures.get(step.name()) {
-            return Err(CliError::backend_failure(*message));
-        }
+        self.planned_argv
+            .lock()
+            .expect("fake planned argv log lock")
+            .push(argv);
         Ok(
             workflow::StepReport::success(&workflow::StepPlan::from_planned(step))
                 .for_planned(step),
@@ -2854,12 +3157,7 @@ impl workflow::SystemAdapter for FakeSystemAdapter {
         _repo_root: &Path,
         step: &workflow::StepPlan,
     ) -> Result<workflow::StepReport, CliError> {
-        self.invocations.borrow_mut().push(step.name().to_string());
-
-        if let Some(message) = self.failures.get(step.name()) {
-            return Err(CliError::backend_failure(*message));
-        }
-
+        self.record_step(step.name()).map_err(|error| *error)?;
         Ok(workflow::StepReport::success(step))
     }
 }
@@ -3535,6 +3833,40 @@ fn test_profile_rejects_invalid_members_and_targets() {
 }
 
 #[test]
+fn consumer_profile_steps_require_unique_names_and_non_empty_argv() {
+    let cases = [
+        (
+            "duplicate name",
+            "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"check\"]\n",
+            "repeats step name `fmt`",
+        ),
+        (
+            "missing name",
+            "[[tool.sc-lint.lint]]\ncommand = [\"cargo\", \"fmt\"]\n",
+            "missing a non-empty `name`",
+        ),
+        (
+            "empty argv",
+            "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = []\n",
+            "missing a command argv array",
+        ),
+        (
+            "empty argument",
+            "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"\"]\n",
+            "empty command argument",
+        ),
+    ];
+
+    for (label, rows, cause) in cases {
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(rows));
+        let error = loaded.expect_err(label);
+        assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED", "{label}");
+        assert_eq!(error.kind, CliErrorKind::Config, "{label}");
+        assert!(error.message.contains(cause), "{label}: {error:?}");
+    }
+}
+
+#[test]
 fn test_profile_rejects_unsupported_test_row_fields() {
     for (label, rows, field) in invalid_test_step_cases() {
         let rows = format!("{}\n{rows}", lint_rows(&["fmt"]));
@@ -3702,7 +4034,11 @@ fn test_profile_emits_structured_skips_and_skip_only_success() {
         })
     );
     assert_eq!(
-        *linux.invocations.borrow(),
+        linux
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
         ["fmt"],
         "skipped steps never run"
     );
@@ -3714,7 +4050,13 @@ fn test_profile_emits_structured_skips_and_skip_only_success() {
     assert_eq!(skipped.len(), 1, "{skipped:?}");
     assert_eq!(skipped[0]["status"], "skipped");
     assert_eq!(skipped[0]["reason"], "unsupported_cross_command");
-    assert!(only.invocations.borrow().is_empty(), "nothing executed");
+    assert!(
+        only.invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .is_empty(),
+        "nothing executed"
+    );
 }
 
 #[test]
@@ -3730,7 +4072,15 @@ fn test_supported_execution_failure_is_nonzero() {
         .expect_err("failing step fails the run");
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
     assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
-    assert_eq!(*failing.invocations.borrow(), ["first"], "fail-fast");
+    assert_eq!(
+        failing
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .as_slice(),
+        ["first"],
+        "fail-fast"
+    );
 
     // A supported cross target without cargo-xwin is a capability failure, never a skip.
     let msvc = format!(
@@ -3743,7 +4093,13 @@ fn test_supported_execution_failure_is_nonzero() {
         .expect_err("missing xwin fails");
     assert_eq!(error.kind, CliErrorKind::Capability);
     assert_eq!(error.exit_code(), crate::consts::EXIT_CAPABILITY);
-    assert!(no_xwin.invocations.borrow().is_empty());
+    assert!(
+        no_xwin
+            .invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .is_empty()
+    );
 }
 
 #[test]

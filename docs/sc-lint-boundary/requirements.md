@@ -144,8 +144,10 @@ family.
   metadata, not prose, comments, or freeform allowlists.
 
 - `REQ-SCB-012`
-  The default planning metadata source for inventory parity is
-  `boundaries/planning.toml`.
+  `boundaries/planning.toml` is the sole authoritative planning-metadata
+  source for inventory parity and must be a regular file. Any other entry
+  named `planning.toml` is an error, including nested entries, directories,
+  symlinks, and case variants.
 
 - `REQ-SCB-013`
   When `boundaries/` exists, `boundaries/planning.toml` must define

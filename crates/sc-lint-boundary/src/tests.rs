@@ -53,6 +53,54 @@ fn installer_catalog_matches_rust() {
     assert_eq!(actual, installer_catalog());
 }
 
+#[test]
+fn rule_ids_match_frozen_contract_baseline() {
+    let expected: serde_json::Value =
+        serde_json::from_str(include_str!("../tests/fixtures/contracts/rule-ids.json"))
+            .expect("rule-ID baseline is valid JSON");
+    let actual = serde_json::json!(
+        BOUNDARY_CATALOG
+            .rules
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    assert_eq!(
+        actual, expected,
+        "update the frozen baseline explicitly for additions"
+    );
+}
+
+#[test]
+fn machine_report_matches_frozen_json_contract() {
+    let report = FindingsReport {
+        tool: "sc-lint-boundary",
+        version: "0.1.0",
+        schema_version: "0.2.0",
+        status: ReportStatus::Fail,
+        scanned_crates: 1,
+        findings: vec![Finding {
+            rule_id: RuleId::ScbBoundary001,
+            kind: "contract_fixture".into(),
+            message: "machine contract fixture".to_string(),
+            owner_ids: vec![OwnerId::new("crate::example::example")],
+            node_ids: vec![NodeId::new("crate::example::example::item")],
+        }],
+    };
+    let expected: serde_json::Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/contracts/machine-report.json"
+    ))
+    .expect("machine-report baseline is valid JSON");
+
+    assert_eq!(
+        expected["schema_version"].as_str(),
+        Some(SC_LINT_SCHEMA_VERSION),
+        "golden schema_version must match analyzer reports"
+    );
+    assert_eq!(serde_json::to_value(report).unwrap(), expected);
+}
+
 fn fixture_display_path(relative_path: &str) -> String {
     std::env::temp_dir()
         .join("sc-lint-boundary-tests")
@@ -310,6 +358,103 @@ fn exports_graph_for_inline_and_file_modules_and_attributes() {
         edge.from == "crate::example::example::module::crate::inline_mod::InlineType::helper"
             && edge.to == "crate::example::example::module::crate::inline_mod::self"
     }));
+}
+
+const PARALLEL_MODULE_COUNT: usize = 12;
+
+fn write_multifile_parallel_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    // Declare modules in reverse order so the merge order cannot coincide with
+    // declaration order by accident.
+    let mut lib = String::from("mod first; mod second;\n");
+    for index in (0..PARALLEL_MODULE_COUNT).rev() {
+        lib.push_str(&format!("mod gen_{index:02};\n"));
+        fixture.write_source(
+            "example",
+            &format!("gen_{index:02}.rs"),
+            &format!("pub struct Gen{index:02}; pub fn make_{index:02}() -> Gen{index:02} {{ Gen{index:02} }}"),
+        );
+    }
+    fixture.write_source("example", "lib.rs", &lib);
+    fixture.write_source("example", "first.rs", "pub struct First; pub mod nested;");
+    fixture.write_source("example", "first/nested.rs", "pub struct Nested;");
+    fixture.write_source("example", "second.rs", "pub enum Second { A, B }");
+    fixture
+}
+
+fn in_pool<T: Send>(threads: usize, work: impl FnOnce() -> T + Send) -> T {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .unwrap()
+        .install(work)
+}
+
+#[test]
+fn parallel_graph_file_parsing_is_deterministic_for_multifile_workspaces() {
+    let fixture = write_multifile_parallel_fixture();
+    let options = ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    };
+    // Oracle: a single-thread pool processes every round strictly in order.
+    let expected = in_pool(1, || export_workspace_graph(&options).unwrap());
+    let expected_json = render_graph_export_json(&expected);
+
+    let node_ids: Vec<&str> = expected.nodes.iter().map(|node| node.id.as_str()).collect();
+    for name in ["First", "Nested", "Second"] {
+        assert!(
+            node_ids.iter().any(|id| id.ends_with(&format!("::{name}"))),
+            "expected node {name} in {node_ids:#?}"
+        );
+    }
+    for index in 0..PARALLEL_MODULE_COUNT {
+        let suffix = format!("::Gen{index:02}");
+        assert!(node_ids.iter().any(|id| id.ends_with(&suffix)), "{suffix}");
+    }
+    let mut sorted_ids = node_ids.clone();
+    sorted_ids.sort();
+    assert_eq!(node_ids, sorted_ids, "nodes follow the sorted merge order");
+    let edge_keys: Vec<_> = expected
+        .edges
+        .iter()
+        .map(|edge| (edge.kind, edge.from.as_str(), edge.to.as_str()))
+        .collect();
+    let mut sorted_edge_keys = edge_keys.clone();
+    sorted_edge_keys.sort();
+    assert_eq!(edge_keys, sorted_edge_keys, "edges follow the sorted order");
+
+    for _ in 0..8 {
+        let graph = in_pool(4, || export_workspace_graph(&options).unwrap());
+        assert_eq!(graph.nodes, expected.nodes);
+        assert_eq!(graph.edges, expected.edges);
+        assert_eq!(render_graph_export_json(&graph), expected_json);
+    }
+}
+
+#[test]
+fn analyze_workspace_output_is_identical_across_thread_pools() {
+    let fixture = write_multifile_parallel_fixture();
+    let render = |format: OutputFormat| {
+        let options = AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format,
+            rule: None,
+        };
+        let report = analyze_workspace(&options).unwrap();
+        (
+            render_findings_report(&report),
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+    };
+    let expected = in_pool(1, || render(OutputFormat::Json));
+    assert!(expected.0.contains("scanned_crates=1"), "{}", expected.0);
+    for _ in 0..4 {
+        let actual = in_pool(4, || render(OutputFormat::Json));
+        assert_eq!(actual.0, expected.0, "text output differs");
+        assert_eq!(actual.1, expected.1, "json output differs");
+    }
 }
 
 #[test]
@@ -5170,7 +5315,7 @@ fn issue385_boundary_manifest_paths() {
         Some("manifests"),
     )
     .unwrap();
-    let (findings, status) = settings.apply_with_paths(
+    let (findings, status) = settings.apply(
         vec![
             (
                 baseline.findings[0].clone(),

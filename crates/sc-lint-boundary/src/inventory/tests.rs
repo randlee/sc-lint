@@ -17,7 +17,7 @@ impl InventoryFixture {
         self.tempdir.path()
     }
 
-    fn write(&self, relative_path: &str, contents: &str) {
+    fn write(&self, relative_path: impl AsRef<Path>, contents: &str) {
         let path = self.root().join(relative_path);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).expect("create fixture parent");
@@ -84,15 +84,62 @@ expires_when = "sprint_before_current"
     fn rewrite_valid_boundary(&self, rewrite: impl FnOnce(String) -> String) {
         let path = self
             .root()
-            .join("boundaries/sc-lint-boundary/boundary-analyzer.toml");
+            .join("boundaries")
+            .join("sc-lint-boundary")
+            .join("boundary-analyzer.toml");
         let contents = fs::read_to_string(&path).expect("read valid boundary");
         fs::write(path, rewrite(contents)).expect("rewrite valid boundary");
     }
 
     fn rewrite_valid_planning(&self, rewrite: impl FnOnce(String) -> String) {
-        let path = self.root().join("boundaries/planning.toml");
+        let path = self.root().join("boundaries").join("planning.toml");
         let contents = fs::read_to_string(&path).expect("read valid planning");
         fs::write(path, rewrite(contents)).expect("rewrite valid planning");
+    }
+}
+
+fn assert_planning_metadata_error(fixture: &InventoryFixture, offending_path: &Path) {
+    let error = format!(
+        "{:#}",
+        load_boundary_inventory(fixture.root())
+            .expect_err("non-authoritative planning entry fails")
+    );
+    let planning_path = fixture.root().join("boundaries").join("planning.toml");
+    assert!(error.contains("allows planning metadata only"), "{error}");
+    assert!(
+        error.contains("found disallowed planning entry at"),
+        "{error}"
+    );
+    assert!(!error.contains("found nested"), "{error}");
+    assert_reported_path_matches(&error, "allows planning metadata only at '", &planning_path);
+    assert_reported_path_matches(
+        &error,
+        "found disallowed planning entry at '",
+        offending_path,
+    );
+}
+
+fn assert_reported_path_matches(error: &str, marker: &str, expected_path: &Path) {
+    let reported_path = error
+        .split_once(marker)
+        .and_then(|(_, remainder)| remainder.split_once('\'').map(|(path, _)| path))
+        .unwrap_or_else(|| panic!("missing reported path after {marker:?}: {error}"));
+    let reported_path = Path::new(reported_path);
+    // The authoritative lower-case path is deliberately absent in the
+    // root-case-variant fixture. Compare it lexically there; canonicalizing a
+    // missing path makes this otherwise portable rejection test Linux-only.
+    if expected_path.exists() {
+        assert_eq!(
+            fs::canonicalize(reported_path).unwrap_or_else(|error| panic!(
+                "canonicalize reported path {reported_path:?}: {error}"
+            )),
+            fs::canonicalize(expected_path).unwrap_or_else(|error| panic!(
+                "canonicalize expected path {expected_path:?}: {error}"
+            )),
+            "{error}"
+        );
+    } else {
+        assert_eq!(reported_path, expected_path, "{error}");
     }
 }
 
@@ -122,6 +169,129 @@ fn loads_empty_inventory_without_boundaries_directory() {
 
     assert!(inventory.records.is_empty());
     assert!(inventory.planning.planned_items.is_empty());
+}
+
+#[test]
+fn rejects_nested_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+
+    let inventory = load_boundary_inventory(fixture.root())
+        .expect("root planning metadata alone loads before nested metadata is added");
+    assert_eq!(inventory.planning.planning.current_sprint, "A.6");
+
+    let nested_planning = Path::new("boundaries")
+        .join("sc-lint-boundary")
+        .join("planning.toml");
+    fixture.write(&nested_planning, "[planning]\ncurrent_sprint = \"A.6\"\n");
+
+    assert_planning_metadata_error(&fixture, &fixture.root().join(nested_planning));
+}
+
+#[test]
+fn rejects_deeply_nested_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let nested_planning = Path::new("boundaries")
+        .join("sc-lint-boundary")
+        .join("nested")
+        .join("planning.toml");
+    fixture.write(&nested_planning, "[planning]\ncurrent_sprint = \"A.6\"\n");
+
+    assert_planning_metadata_error(&fixture, &fixture.root().join(nested_planning));
+}
+
+#[test]
+fn rejects_case_variant_nested_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let case_variant = fixture
+        .root()
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("Planning.toml");
+    fixture.write(
+        Path::new("boundaries")
+            .join("sc-lint-boundary")
+            .join("Planning.toml"),
+        "[planning]\ncurrent_sprint = \"A.6\"\n",
+    );
+
+    assert_planning_metadata_error(&fixture, &case_variant);
+}
+
+#[test]
+fn rejects_directory_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_directory = fixture
+        .root()
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("planning.toml");
+    fs::create_dir_all(&planning_directory).expect("create planning directory");
+
+    assert_planning_metadata_error(&fixture, &planning_directory);
+}
+
+#[test]
+fn rejects_root_directory_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_directory = fixture.root().join("boundaries").join("planning.toml");
+    fs::remove_file(&planning_directory).expect("remove authoritative planning file");
+    fs::create_dir(&planning_directory).expect("create root planning directory");
+
+    assert_planning_metadata_error(&fixture, &planning_directory);
+}
+
+#[test]
+fn rejects_root_case_variant_planning_metadata() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    fs::remove_file(fixture.root().join("boundaries").join("planning.toml"))
+        .expect("remove canonical planning file");
+    let case_variant = fixture.root().join("boundaries").join("Planning.toml");
+    fixture.write(
+        Path::new("boundaries").join("Planning.toml"),
+        "[planning]\ncurrent_sprint = \"A.6\"\n",
+    );
+
+    assert_planning_metadata_error(&fixture, &case_variant);
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_root_symlink_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_path = fixture.root().join("boundaries").join("planning.toml");
+    let target = fixture
+        .root()
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("boundary-analyzer.toml");
+    fs::remove_file(&planning_path).expect("remove authoritative planning file");
+    std::os::unix::fs::symlink(target, &planning_path).expect("create root planning symlink");
+
+    assert_planning_metadata_error(&fixture, &planning_path);
+}
+
+#[cfg(unix)]
+#[test]
+fn rejects_symlink_named_planning_toml() {
+    let fixture = InventoryFixture::new();
+    fixture.write_valid_inventory();
+    let planning_symlink = fixture
+        .root()
+        .join("boundaries")
+        .join("sc-lint-boundary")
+        .join("planning.toml");
+    let authoritative_planning = fixture.root().join("boundaries").join("planning.toml");
+    std::os::unix::fs::symlink(authoritative_planning, &planning_symlink)
+        .expect("create nested planning symlink");
+
+    assert_planning_metadata_error(&fixture, &planning_symlink);
 }
 
 #[test]
@@ -466,7 +636,8 @@ fn rejects_unknown_status_fields() {
 fn rejects_missing_planning_metadata_with_actionable_error() {
     let fixture = InventoryFixture::new();
     fixture.write_valid_inventory();
-    fs::remove_file(fixture.root().join("boundaries/planning.toml")).expect("remove planning");
+    fs::remove_file(fixture.root().join("boundaries").join("planning.toml"))
+        .expect("remove planning");
 
     let error = load_boundary_inventory(fixture.root())
         .expect_err("missing planning metadata fails")

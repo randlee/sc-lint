@@ -1,10 +1,12 @@
 use std::fs;
 use std::io::Read;
-use std::process::Command;
-use std::process::Stdio;
+use std::process::{Child, Command, Output, Stdio};
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use sc_lint_boundary::ALL_BOUNDARY_IDS;
 use sc_lint_boundary::BOUNDARY_CATALOG;
@@ -21,6 +23,68 @@ fn drain<R: Read + Send + 'static>(mut pipe: R) -> thread::JoinHandle<Vec<u8>> {
         let _ = pipe.read_to_end(&mut bytes);
         bytes
     })
+}
+
+fn run_bounded(command: &mut Command, description: &str) -> Output {
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(unix)]
+    command.process_group(0);
+    let mut child = command
+        .spawn()
+        .unwrap_or_else(|error| panic!("failed to start {description}: {error}"));
+    let stdout = drain(child.stdout.take().expect("piped stdout"));
+    let stderr = drain(child.stderr.take().expect("piped stderr"));
+    let deadline = Instant::now() + CHILD_DEADLINE;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(20));
+            }
+            Ok(None) => {
+                let status = terminate_process_tree(&mut child);
+                let stderr = stderr.join().expect("stderr reader");
+                panic!(
+                    "{description} did not exit within {CHILD_DEADLINE:?}; status after kill: {status}\nstderr:\n{}",
+                    String::from_utf8_lossy(&stderr)
+                );
+            }
+            Err(error) => {
+                let _ = terminate_process_tree(&mut child);
+                let stderr = stderr.join().expect("stderr reader");
+                panic!(
+                    "failed waiting for {description}: {error}\nstderr:\n{}",
+                    String::from_utf8_lossy(&stderr)
+                );
+            }
+        }
+    };
+    Output {
+        status,
+        stdout: stdout.join().expect("stdout reader"),
+        stderr: stderr.join().expect("stderr reader"),
+    }
+}
+
+fn terminate_process_tree(child: &mut Child) -> std::process::ExitStatus {
+    let process_id = child.id();
+    #[cfg(unix)]
+    if let Ok(group) = libc::pid_t::try_from(process_id)
+        && group > 0
+    {
+        // SAFETY: a negative pid signals the process group assigned to this child.
+        unsafe { libc::kill(-group, libc::SIGKILL) };
+    }
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &process_id.to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    let _ = child.kill();
+    child.wait().expect("reap terminated process tree leader")
 }
 
 #[test]
@@ -74,8 +138,8 @@ fn issue377_rule_registration_and_dispatch() {
     fixture.write_boundary("not-valid");
     fixture.write_stale_consumer_boundary();
     let binary = env!("CARGO_BIN_EXE_sc-lint");
-    let mut child = Command::new(binary)
-        .args([
+    let output = run_bounded(
+        Command::new(binary).args([
             "--json",
             "--root",
             fixture.root().to_str().expect("utf-8 root"),
@@ -83,31 +147,12 @@ fn issue377_rule_registration_and_dispatch() {
             "sc-boundary",
             "--rule-filter",
             RuleId::ScbBoundary004.as_str(),
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("sc-lint starts");
-    let stdout = drain(child.stdout.take().expect("piped stdout"));
-    let stderr = drain(child.stderr.take().expect("piped stderr"));
-    let deadline = Instant::now() + CHILD_DEADLINE;
-    let status = loop {
-        if let Some(status) = child.try_wait().expect("poll sc-lint") {
-            break status;
-        }
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            panic!(
-                "sc-lint did not exit within {CHILD_DEADLINE:?} for {}: {}",
-                RuleId::ScbBoundary004.as_str(),
-                String::from_utf8_lossy(&stderr.join().expect("stderr reader"))
-            );
-        }
-        thread::sleep(Duration::from_millis(20));
-    };
-    let stdout = stdout.join().expect("stdout reader");
-    let stderr = stderr.join().expect("stderr reader");
+        ]),
+        "sc-lint sc-boundary boundaries probe",
+    );
+    let status = output.status;
+    let stdout = output.stdout;
+    let stderr = output.stderr;
     assert_eq!(
         status.code(),
         Some(10),
@@ -119,8 +164,8 @@ fn issue377_rule_registration_and_dispatch() {
     assert_eq!(output["data"]["findings"][0]["rule_id"], "SCB-BOUNDARY-004");
     assert_eq!(output["data"]["findings"][0]["kind"], "invalid_identifier");
 
-    let output = Command::new(binary)
-        .args([
+    let output = run_bounded(
+        Command::new(binary).args([
             "--json",
             "--root",
             fixture.root().to_str().expect("utf-8 root"),
@@ -128,9 +173,9 @@ fn issue377_rule_registration_and_dispatch() {
             "sc-boundary",
             "--rule-filter",
             "dependencies",
-        ])
-        .output()
-        .expect("sc-lint starts");
+        ]),
+        "sc-lint sc-boundary dependencies probe",
+    );
     assert_eq!(
         output.status.code(),
         Some(10),
