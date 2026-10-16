@@ -163,6 +163,7 @@ pub enum RuleId {
     ScbDependency001,
     ScbDependency002,
     ScbDependency003,
+    ScbFeature001,
     ScbManifest001,
     ScbManifest002,
 }
@@ -180,6 +181,7 @@ impl RuleId {
             Self::ScbDependency001 => "SCB-DEPENDENCY-001",
             Self::ScbDependency002 => "SCB-DEPENDENCY-002",
             Self::ScbDependency003 => "SCB-DEPENDENCY-003",
+            Self::ScbFeature001 => "SCB-FEATURE-001",
             Self::ScbManifest001 => "SCB-MANIFEST-001",
             Self::ScbManifest002 => "SCB-MANIFEST-002",
         }
@@ -283,6 +285,7 @@ pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbDependency001),
     rule(RuleId::ScbDependency002),
     rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbFeature001),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
 ];
@@ -297,6 +300,7 @@ pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbDependency001),
     rule(RuleId::ScbDependency002),
     rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbFeature001),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
 ];
@@ -335,6 +339,7 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
                 rule(RuleId::ScbDependency001),
                 rule(RuleId::ScbDependency002),
                 rule(RuleId::ScbDependency003),
+                rule(RuleId::ScbFeature001),
             ],
         ),
         (

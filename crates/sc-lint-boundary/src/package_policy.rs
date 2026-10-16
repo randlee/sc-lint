@@ -51,6 +51,7 @@ struct ResolvedDependencyPolicy {
     owner: WorkspacePackageName,
     allowed_dependencies: BTreeSet<WorkspacePackageName>,
     allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
+    allowed_feature_dependencies: BTreeSet<WorkspacePackageName>,
     allowed_dependents: BTreeSet<WorkspacePackageName>,
     forbidden_edges: BTreeSet<PackageEdge>,
 }
@@ -87,6 +88,7 @@ pub(crate) fn analyze_package_policy(
         &known_non_workspace_packages,
         &runtime_edges,
         &dev_edges,
+        &workspace_packages,
     )?;
 
     Ok(PackagePolicyReport {
@@ -129,6 +131,7 @@ fn collect_policy_findings(
     known_non_workspace_packages: &BTreeSet<String>,
     runtime_edges: &BTreeSet<PackageEdge>,
     dev_edges: &BTreeSet<PackageEdge>,
+    workspace_packages: &[&cargo_metadata::Package],
 ) -> Result<Vec<Finding>> {
     let direct_edges = runtime_edges
         .union(dev_edges)
@@ -137,6 +140,10 @@ fn collect_policy_findings(
     let mut findings = Vec::new();
     let mut forbidden_findings = BTreeSet::new();
     let incoming_edges = index_incoming_edges(&direct_edges);
+    let by_dir = workspace_packages
+        .iter()
+        .filter_map(|member| Some((member.manifest_path.parent()?, member.name.to_string())))
+        .collect::<BTreeMap<_, _>>();
 
     for record in &inventory.records {
         if !record.status.state.requires_workspace_package() {
@@ -177,6 +184,13 @@ fn collect_policy_findings(
                 ));
             }
         }
+
+        findings.extend(feature_findings(
+            record,
+            &policy,
+            workspace_packages,
+            &by_dir,
+        ));
 
         for edge in policy.forbidden_edges {
             if direct_edges.contains(&edge) && forbidden_findings.insert(edge.clone()) {
@@ -220,6 +234,13 @@ fn resolve_dependency_policy(
             record,
             "dependencies.allowed_dev_dependencies",
             &record.dependencies.allowed_dev_dependencies,
+        )?,
+        allowed_feature_dependencies: resolve_policy_references(
+            resolver,
+            known_non_workspace_packages,
+            record,
+            "dependencies.allowed_feature_dependencies",
+            &record.dependencies.allowed_feature_dependencies,
         )?,
         allowed_dependents: resolve_policy_references(
             resolver,
@@ -266,6 +287,11 @@ fn resolve_policy_references(
 ) -> Result<BTreeSet<WorkspacePackageName>> {
     let mut resolved = BTreeSet::new();
     for reference in references {
+        // Patterns match canonical package names only (not aliases).
+        if let Some(prefix) = reference.as_str().strip_suffix('*') {
+            resolved.extend(resolver.packages_with_prefix(prefix).cloned());
+            continue;
+        }
         if let Some(package) = resolve_policy_reference(
             resolver,
             known_non_workspace_packages,
@@ -291,6 +317,91 @@ fn resolve_policy_reference(
         Some(package) => Ok(Some(package)),
         None if known_non_workspace_packages.contains(reference) => Ok(None),
         None => resolver.resolve(reference, context).map(Some),
+    }
+}
+
+/// SCB-FEATURE-001: the owner may not set features on, or forward its own
+/// `[features]` to, a workspace dependency unless allow-listed. Dev
+/// dependencies are skipped. Workspace dependencies are identified by path
+/// resolution, so a same-named registry/git dependency is ignored.
+fn feature_findings(
+    record: &BoundaryRecord,
+    policy: &ResolvedDependencyPolicy,
+    workspace_packages: &[&cargo_metadata::Package],
+    by_dir: &BTreeMap<&cargo_metadata::camino::Utf8Path, String>,
+) -> Vec<Finding> {
+    let owner = policy.owner.as_str();
+    let Some(package) = workspace_packages
+        .iter()
+        .find(|package| *package.name == *owner)
+    else {
+        return Vec::new();
+    };
+    let mut findings = BTreeMap::new();
+    for dependency in &package.dependencies {
+        if dependency.kind == cargo_metadata::DependencyKind::Development {
+            continue;
+        }
+        let Some(target) = dependency
+            .path
+            .as_deref()
+            .and_then(|path| by_dir.get(path))
+            .map(|name| WorkspacePackageName::from_package_name(name.clone()))
+        else {
+            continue;
+        };
+        if policy.allowed_feature_dependencies.contains(&target) {
+            continue;
+        }
+        let key = dependency.rename.as_deref().unwrap_or(&dependency.name);
+        let sets_features = !dependency.uses_default_features || !dependency.features.is_empty();
+        let forwards = package
+            .features
+            .values()
+            .flatten()
+            .any(|value| references_dependency(value, key));
+        for (kind, hit) in [
+            ("package_dependency_sets_features", sets_features),
+            ("package_feature_forwards_dependency", forwards),
+        ] {
+            if hit {
+                findings
+                    .entry((target.to_string(), kind))
+                    .or_insert_with(|| {
+                        feature_finding(
+                            kind,
+                            format!(
+                                "workspace package `{owner}` uses features of `{target}` ({kind}) but `{target}` is not listed in `{}` allowed_feature_dependencies",
+                                record.boundary_id
+                            ),
+                            owner,
+                            target.as_str(),
+                        )
+                    });
+            }
+        }
+    }
+    findings.into_values().collect()
+}
+
+/// True for `dep:key`, `key/feat` and `key?/feat`; a bare `key` is a local
+/// feature, not a dependency reference.
+pub(crate) fn references_dependency(value: &str, key: &str) -> bool {
+    match value.strip_prefix("dep:") {
+        Some(name) => name == key,
+        None => value
+            .split_once('/')
+            .is_some_and(|(name, _)| name.strip_suffix('?').unwrap_or(name) == key),
+    }
+}
+
+fn feature_finding(kind: &str, message: String, from: &str, to: &str) -> Finding {
+    Finding {
+        rule_id: RuleId::ScbFeature001,
+        kind: kind.into(),
+        message,
+        owner_ids: vec![OwnerId::new(from), OwnerId::new(to)],
+        node_ids: Vec::new(),
     }
 }
 

@@ -423,6 +423,7 @@ pub(crate) fn finding_is_failure(finding: &Finding) -> bool {
             | RuleId::ScbDependency001
             | RuleId::ScbDependency002
             | RuleId::ScbDependency003
+            | RuleId::ScbFeature001
             | RuleId::ScbManifest001
             | RuleId::ScbManifest002
     )

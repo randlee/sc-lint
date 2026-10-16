@@ -1,6 +1,7 @@
 #![cfg(test)]
 
 use super::*;
+use crate::package_policy::references_dependency;
 use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
@@ -468,6 +469,139 @@ fn dependency_policy_allows_direct_workspace_dependency() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+fn feature_fixture(app_dep: &str, app_features: &str) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/api"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &(good_member_manifest("app", "") + &format!("[dependencies]\n{app_dep}\n{app_features}")),
+    );
+    fixture.write(
+        "crates/api/Cargo.toml",
+        &(good_member_manifest("api", "") + "[features]\nfast = []\n"),
+    );
+    fixture.write_member_boundary_record("app", &["ap*"], &[], &[]);
+    fixture.write_member_boundary_record("api", &[], &["app"], &[]);
+    fixture.write_source("app", "lib.rs", "pub struct App;");
+    fixture.write_source("api", "lib.rs", "pub struct Api;");
+    fixture
+}
+
+fn dependencies_report(
+    fixture: &WorkspaceFixture,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+}
+
+const API_DEP: &str = "api = { path = \"../api\", version = \"0.1.0\" }";
+
+#[test]
+fn dependency_prefix_pattern_matches_workspace_packages() {
+    let fixture = feature_fixture(API_DEP, "");
+    assert_eq!(
+        dependencies_report(&fixture).unwrap().status,
+        ReportStatus::Pass
+    );
+}
+
+#[test]
+fn dependency_pattern_validation_rejects_misplaced_stars() {
+    let fixture = feature_fixture(API_DEP, "");
+    for (allowed, dependents, expected) in [
+        (vec!["*"], vec![], "trailing `*`"),
+        (vec!["a*p"], vec![], "trailing `*`"),
+        (vec!["ap*"], vec!["a*"], "patterns are only supported"),
+    ] {
+        fixture.write_member_boundary_record("app", &allowed, &dependents, &[]);
+        let error = dependencies_report(&fixture).unwrap_err();
+        assert!(error.to_string().contains(expected), "{error}");
+    }
+    fixture.write_member_boundary_record("app", &["codex-*"], &[], &[]);
+    assert!(dependencies_report(&fixture).is_ok());
+}
+
+#[test]
+fn feature_reference_matching_is_exact_and_rename_aware() {
+    for hit in ["dep:api", "api?/f", "api/f"] {
+        assert!(references_dependency(hit, "api"), "{hit}");
+    }
+    for miss in ["api", "api-extra/f", "dep:api-extra", "other/api"] {
+        assert!(!references_dependency(miss, "api"), "{miss}");
+    }
+    assert!(references_dependency("dep:alias", "alias"));
+}
+
+#[test]
+fn feature_rule_flags_owner_forwarding_unless_opted_in() {
+    let fixture = feature_fixture(API_DEP, "[features]\nfast = [\"api/fast\"]\n");
+    let report = dependencies_report(&fixture).unwrap();
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id == RuleId::ScbFeature001),
+        "{:?}",
+        report.findings
+    );
+    assert!(!report.findings.is_empty());
+    let fixture = feature_fixture(
+        "api = { path = \"../api\", version = \"0.1.0\", default-features = false }",
+        "",
+    );
+    let report = dependencies_report(&fixture).unwrap();
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::ScbFeature001
+                && finding.kind == "package_dependency_sets_features"),
+        "{:?}",
+        report.findings
+    );
+    let fixture = feature_fixture(API_DEP, "[features]\nfast = [\"api/fast\"]\n");
+    let boundary = fixture.root().join("boundaries/app/boundary.toml");
+    let contents = fs::read_to_string(&boundary).unwrap().replace(
+        "forbidden_edges = []",
+        "allowed_feature_dependencies = [\"api\"]\nforbidden_edges = []",
+    );
+    fs::write(boundary, contents).unwrap();
+    assert_eq!(
+        dependencies_report(&fixture).unwrap().status,
+        ReportStatus::Pass
+    );
+}
+
+#[test]
+fn feature_rule_ignores_same_name_external_dependency() {
+    let external = TempDir::new().unwrap();
+    fs::create_dir_all(external.path().join("src")).unwrap();
+    fs::write(
+        external.path().join("Cargo.toml"),
+        "[package]\nname = \"api\"\nversion = \"9.9.9\"\nedition = \"2021\"\n[features]\nfast = []\n",
+    )
+    .unwrap();
+    fs::write(external.path().join("src/lib.rs"), "").unwrap();
+    let dep = format!(
+        "api = {{ path = {:?}, default-features = false }}",
+        external.path()
+    );
+    let fixture = feature_fixture(&dep, "[features]\nfast = [\"api/fast\"]\n");
+    let report = dependencies_report(&fixture).unwrap();
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id != RuleId::ScbFeature001),
+        "{:?}",
+        report.findings
+    );
 }
 
 #[test]
