@@ -17,6 +17,17 @@ Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
 - [docs/sc-lint-version/requirements.md](./sc-lint-version/requirements.md)
 
+Crate-local requirement and architecture traceability:
+- [`sc-lint`](./sc-lint/requirements.md) ([architecture](./sc-lint/architecture.md))
+- [`sc-lint-analyzer-support`](./sc-lint-analyzer-support/requirements.md) ([architecture](./sc-lint-analyzer-support/architecture.md))
+- [`sc-lint-attributes`](./sc-lint-attributes/requirements.md) ([architecture](./sc-lint-attributes/architecture.md))
+- [`sc-lint-boundary`](./sc-lint-boundary/requirements.md) ([architecture](./sc-lint-boundary/architecture.md))
+- [`sc-lint-directives`](./sc-lint-directives/requirements.md) ([architecture](./sc-lint-directives/architecture.md))
+- [`sc-lint-portability`](./sc-lint-portability/requirements.md) ([architecture](./sc-lint-portability/architecture.md))
+- [`sc-lint-runtime`](./sc-lint-runtime/requirements.md) ([architecture](./sc-lint-runtime/architecture.md))
+- [`sc-lint-schema`](./sc-lint-schema/requirements.md) ([architecture](./sc-lint-schema/architecture.md))
+- [`sc-lint-py`](./sc-lint-py/requirements.md) ([architecture](./sc-lint-py/architecture.md))
+
 For release `0.2.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
 
