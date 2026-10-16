@@ -187,8 +187,40 @@ mod tests {
                 ])],
             ),
             (
+                quote!(boundary.allow(
+                    "cycle.type_method_self_loop",
+                    "cycle.recursive_value_container",
+                )),
+                vec![Directive::Allow(vec![
+                    "cycle.type_method_self_loop".to_string(),
+                    "cycle.recursive_value_container".to_string(),
+                ])],
+            ),
+            (
                 quote!(boundary.internal_only,),
                 vec![Directive::InternalOnly],
+            ),
+            (
+                quote!(boundary.allow("cycle.type_method_self_loop"),),
+                vec![Directive::Allow(vec![
+                    "cycle.type_method_self_loop".to_string(),
+                ])],
+            ),
+            (
+                quote!(boundary.forbid_external_impls,),
+                vec![Directive::ForbidExternalImpls],
+            ),
+            (
+                quote!(
+                    boundary.internal_only,
+                    boundary.forbid_external_impls,
+                    boundary.allow("cycle.type_method_self_loop"),
+                ),
+                vec![
+                    Directive::InternalOnly,
+                    Directive::ForbidExternalImpls,
+                    Directive::Allow(vec!["cycle.type_method_self_loop".to_string()]),
+                ],
             ),
         ];
 
