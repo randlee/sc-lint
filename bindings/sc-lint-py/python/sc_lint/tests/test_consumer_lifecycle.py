@@ -159,14 +159,18 @@ class ConsumerLifecycleTests(unittest.TestCase):
         server = http.server.ThreadingHTTPServer(
             ("127.0.0.1", 0), partial(QuietHandler, directory=str(root))
         )
+        server.daemon_threads = True
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
             yield f"http://127.0.0.1:{server.server_port}"
         finally:
             server.shutdown()
-            thread.join()
-            server.server_close()
+            thread.join(timeout=10)
+            try:
+                assert not thread.is_alive(), "release server thread did not stop after shutdown"
+            finally:
+                server.server_close()
 
     def initialize_rust_consumer(self, release: Path, consumer: Path) -> dict[str, str]:
         environment = self.fixture_environment(release)
