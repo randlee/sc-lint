@@ -75,6 +75,50 @@ fn rule_ids_match_frozen_contract_baseline() {
 }
 
 #[test]
+fn catalog_lists_every_rule_id() {
+    use RuleId::*;
+
+    let every = [
+        ScbCycle001,
+        ScbCycle002,
+        ScbCycle003,
+        ScbBoundary001,
+        ScbBoundary002,
+        ScbBoundary003,
+        ScbBoundary004,
+        ScbCaller001,
+        ScbDependency001,
+        ScbDependency002,
+        ScbDependency003,
+        ScbDependency004,
+        ScbFeature001,
+        ScbManifest001,
+        ScbManifest002,
+        ScbManifest003,
+        ScbManifest004,
+        ScbManifest005,
+        ScbManifest006,
+    ];
+    for id in every {
+        match id {
+            ScbCycle001 | ScbCycle002 | ScbCycle003 | ScbBoundary001 | ScbBoundary002
+            | ScbBoundary003 | ScbBoundary004 | ScbCaller001 | ScbDependency001
+            | ScbDependency002 | ScbDependency003 | ScbDependency004 | ScbFeature001
+            | ScbManifest001 | ScbManifest002 | ScbManifest003 | ScbManifest004
+            | ScbManifest005 | ScbManifest006 => {}
+        }
+    }
+    assert_eq!(
+        BOUNDARY_CATALOG
+            .rules
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>(),
+        every.map(RuleId::as_str).to_vec()
+    );
+}
+
+#[test]
 fn machine_report_matches_frozen_json_contract() {
     let report = FindingsReport {
         tool: "sc-lint-boundary",
