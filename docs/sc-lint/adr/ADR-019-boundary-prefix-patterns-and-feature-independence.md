@@ -1,7 +1,6 @@
 # ADR-019 — Boundary prefix patterns and opt-in feature independence
 
-Status: Proposed — direction from Rand, 2026-10-17: “I think making it opt-in
-would be the cleanest.” Acceptance pending Rand's approval of this record.
+Status: Proposed
 
 Related: ADR-004, ADR-011, ADR-017.
 Motivating contribution: PR #603 (external), for a fork that keeps its own
@@ -69,12 +68,5 @@ another workspace package through Cargo features: setting `features` or
 
 REQ-SCB-024 (prefix patterns) and REQ-SCB-025 (`SCB-FEATURE-001`) in
 [`docs/sc-lint-boundary/requirements.md`](../../sc-lint-boundary/requirements.md).
-
-## Action Items
-
-| Action | Owner | Gate |
-|---|---|---|
-| Accept or amend this record. | Rand | Before any implementation merges |
-| Rework PR #603 to this record (opt-in, bare optional-dependency forwarding, distinct pattern type, tests for build, target-specific and inherited dependencies, ADR-004 and CLI rule lists) and rebase it onto `develop` after phase-k lands. | PR author | Before #603 merges |
 
 *ADR-019 | sc-lint | 2026-10-17*
