@@ -220,15 +220,7 @@ fn feature_findings(
             continue;
         }
         let key = dependency.rename.as_deref().unwrap_or(&dependency.name);
-        let explicit_dep = values.iter().any(|v| v.strip_prefix("dep:") == Some(key));
-        let use_ = if dependency.optional {
-            DependencyUse::Optional
-        } else {
-            DependencyUse::Required
-        };
-        let forwards = values
-            .iter()
-            .any(|value| references_dependency(value, key, use_, explicit_dep));
+        let forwards = forwards_dependency(&values, key, dependency);
         for (kind, hit) in [
             (
                 "package_dependency_sets_features",
@@ -254,6 +246,22 @@ fn feature_findings(
 pub(crate) enum DependencyUse {
     Optional,
     Required,
+}
+
+fn forwards_dependency(
+    values: &[&str],
+    key: &str,
+    dependency: &cargo_metadata::Dependency,
+) -> bool {
+    let explicit_dep = values.iter().any(|v| v.strip_prefix("dep:") == Some(key));
+    let use_ = if dependency.optional {
+        DependencyUse::Optional
+    } else {
+        DependencyUse::Required
+    };
+    values
+        .iter()
+        .any(|value| references_dependency(value, key, use_, explicit_dep))
 }
 
 pub(crate) fn references_dependency(
