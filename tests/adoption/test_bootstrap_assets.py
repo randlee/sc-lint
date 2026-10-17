@@ -12,6 +12,12 @@ from conftest import ProductArtifacts
 from install_helpers import FIXTURES, ROOT, copy_fixture, run, run_subprocess
 
 ASSET = ROOT / "crates/sc-lint/assets/bootstrap.py"
+# AC5 (ADR-012 d1): every just asset that ships a windows-shell sets it to exactly this line.
+WINDOWS_SHELL_SETTING = 'set windows-shell := ["cmd.exe", "/c"]'
+# The root-level assets ship the setting; the included `.sc-lint/justfile` and `test.just`
+# inherit it from the consumer's root Justfile and must not set one of their own.
+WINDOWS_SHELL_ASSETS = ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-lint-adoption/templates/Justfile.default",
+    "Justfile")
 
 # The usage grammar of the POSIX `.sc-lint/bootstrap` at cc1d496, which printed:
 #   usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run];
@@ -42,15 +48,16 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
         elif isinstance(node, ast.ImportFrom) and node.module:
             modules.add(node.module.split(".")[0])
     assert modules <= sys.stdlib_module_names
-    for path in (ROOT / "crates/sc-lint/assets/consumer-Justfile",
-                 ROOT / "packages/sc-lint-adoption/.sc-lint/justfile",
-                 ROOT / "packages/sc-lint-adoption/templates/Justfile.default",
-                 ROOT / "packages/sc-lint-adoption/templates/test.just", ROOT / "Justfile"):
-        text = path.read_text(encoding="utf-8")
-        assert "pw" + "sh" not in text
-        for line in text.splitlines():
-            if line.startswith("set windows-shell"):
-                assert line == 'set windows-shell := ["cmd.exe", "/c"]'
+    for relative in ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-lint-adoption/.sc-lint/justfile",
+                     "packages/sc-lint-adoption/templates/Justfile.default",
+                     "packages/sc-lint-adoption/templates/test.just", "Justfile"):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "pw" + "sh" not in text, relative
+        shell_lines = [line for line in text.splitlines() if line.startswith("set windows-shell")]
+        if relative in WINDOWS_SHELL_ASSETS:
+            assert shell_lines == [WINDOWS_SHELL_SETTING], relative
+        else:
+            assert shell_lines == [], relative
 
 
 @pytest.mark.parametrize("arguments", [[], ["unknown"], ["setup"], ["setup", "--config"],
