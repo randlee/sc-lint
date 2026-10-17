@@ -325,12 +325,20 @@ class BootstrapSelectorScopeGrammarTests(unittest.TestCase):
             minimum = re.search(r'^minimum_version = "([^"]+)"', config.read_text(encoding="utf-8"), re.M)
             self.assertIsNotNone(minimum)
             venv_python = state / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-            purelib = subprocess.run(
-                [str(venv_python), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
-                text=True,
-                capture_output=True,
-                check=True,
-            ).stdout.strip()
+            try:
+                purelib_result = subprocess.run(
+                    [str(venv_python), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as error:
+                self.fail(
+                    f"venv purelib lookup timed out after {error.timeout}s; "
+                    f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+                )
+            purelib = purelib_result.stdout.strip()
             stub = Path(purelib) / "sc_lint"
             stub.mkdir()
             (stub / "__init__.py").write_text(f"__version__ = {minimum.group(1)!r}\n", encoding="utf-8")
