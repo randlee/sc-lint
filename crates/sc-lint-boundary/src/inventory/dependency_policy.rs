@@ -74,6 +74,8 @@ pub(crate) struct RawDependenciesSection {
     pub(crate) allowed_dependencies: Vec<String>,
     #[serde(default)]
     pub(crate) allowed_dev_dependencies: Vec<String>,
+    #[serde(default)]
+    pub(crate) allowed_feature_dependencies: Option<Vec<String>>,
     pub(crate) forbidden_edges: Vec<RawForbiddenPackageEdge>,
 }
 
@@ -102,6 +104,22 @@ impl fmt::Display for WorkspacePackageName {
     }
 }
 
+/// A validated package prefix, distinct from an exact Cargo package name.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct PackagePrefix(String);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum PackageRef {
+    Exact(WorkspacePackageName),
+    Prefix(PackagePrefix),
+}
+
+impl PackagePrefix {
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct ForbiddenPackageEdge {
     pub(crate) from: WorkspacePackageName,
@@ -112,8 +130,9 @@ pub(crate) struct ForbiddenPackageEdge {
 pub(crate) struct PackageDependencyPolicy {
     pub(crate) allowed_dependents: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dev_dependents: Option<BTreeSet<WorkspacePackageName>>,
-    pub(crate) allowed_dependencies: BTreeSet<WorkspacePackageName>,
-    pub(crate) allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
+    pub(crate) allowed_dependencies: BTreeSet<PackageRef>,
+    pub(crate) allowed_dev_dependencies: BTreeSet<PackageRef>,
+    pub(crate) allowed_feature_dependencies: Option<BTreeSet<PackageRef>>,
     pub(crate) forbidden_edges: Vec<ForbiddenPackageEdge>,
 }
 
@@ -123,6 +142,22 @@ pub(crate) enum DependencyPolicyError {
         "invalid workspace package name {value:?} in `{field}` for boundary `{boundary_id}`: package names must not be empty or contain whitespace"
     )]
     InvalidFormat {
+        boundary_id: BoundaryId,
+        field: &'static str,
+        value: String,
+    },
+    #[error(
+        "invalid package pattern {value:?} in `{field}` for boundary `{boundary_id}`: only a single trailing `*` (for example `codex-*`) is supported, and the prefix must not be empty"
+    )]
+    InvalidPattern {
+        boundary_id: BoundaryId,
+        field: &'static str,
+        value: String,
+    },
+    #[error(
+        "package pattern {value:?} is not accepted in `{field}` for boundary `{boundary_id}`: patterns are only supported in `allowed_dependencies`, `allowed_dev_dependencies`, and `allowed_feature_dependencies`"
+    )]
+    PatternNotAccepted {
         boundary_id: BoundaryId,
         field: &'static str,
         value: String,
@@ -137,7 +172,7 @@ pub(crate) enum DependencyPolicyError {
     DuplicatePackage {
         boundary_id: BoundaryId,
         field: &'static str,
-        package: WorkspacePackageName,
+        package: String,
     },
     #[error(
         "invalid `dependencies.forbidden_edges[]` value {value:?} in boundary `{boundary_id}`: expected `from -> to`; {reason}"
@@ -160,16 +195,22 @@ impl RawDependenciesSection {
             .allowed_dev_dependents
             .map(|packages| validate_package_list(boundary_id, "allowed_dev_dependents", packages))
             .transpose()?;
-        let allowed_dependencies = validate_package_list(
+        let allowed_dependencies = validate_package_patterns(
             boundary_id,
             "allowed_dependencies",
             self.allowed_dependencies,
         )?;
-        let allowed_dev_dependencies = validate_package_list(
+        let allowed_dev_dependencies = validate_package_patterns(
             boundary_id,
             "allowed_dev_dependencies",
             self.allowed_dev_dependencies,
         )?;
+        let allowed_feature_dependencies = self
+            .allowed_feature_dependencies
+            .map(|packages| {
+                validate_package_patterns(boundary_id, "allowed_feature_dependencies", packages)
+            })
+            .transpose()?;
 
         let mut forbidden_edges = Vec::with_capacity(self.forbidden_edges.len());
         let mut seen_edges = BTreeSet::new();
@@ -204,6 +245,7 @@ impl RawDependenciesSection {
             allowed_dev_dependents,
             allowed_dependencies,
             allowed_dev_dependencies,
+            allowed_feature_dependencies,
             forbidden_edges,
         })
     }
@@ -260,12 +302,55 @@ fn validate_package_list(
 ) -> std::result::Result<BTreeSet<WorkspacePackageName>, DependencyPolicyError> {
     let mut validated = BTreeSet::new();
     for package in packages {
+        if package.contains('*') {
+            return Err(DependencyPolicyError::PatternNotAccepted {
+                boundary_id: boundary_id.clone(),
+                field,
+                value: package,
+            });
+        }
         let package = parse_workspace_package_name(package, boundary_id, field)?;
         if !validated.insert(package.clone()) {
             return Err(DependencyPolicyError::DuplicatePackage {
                 boundary_id: boundary_id.clone(),
                 field,
-                package,
+                package: package.to_string(),
+            });
+        }
+    }
+    Ok(validated)
+}
+
+fn validate_package_patterns(
+    boundary_id: &BoundaryId,
+    field: &'static str,
+    packages: Vec<String>,
+) -> std::result::Result<BTreeSet<PackageRef>, DependencyPolicyError> {
+    let mut validated = BTreeSet::new();
+    for value in packages {
+        let trimmed = value.trim();
+        let package = if trimmed.contains('*') {
+            let prefix = trimmed
+                .strip_suffix('*')
+                .filter(|p| !p.is_empty() && !p.contains('*') && !p.contains(char::is_whitespace))
+                .ok_or_else(|| DependencyPolicyError::InvalidPattern {
+                    boundary_id: boundary_id.clone(),
+                    field,
+                    value: value.clone(),
+                })?;
+            PackageRef::Prefix(PackagePrefix(prefix.to_owned()))
+        } else {
+            PackageRef::Exact(parse_workspace_package_name(value, boundary_id, field)?)
+        };
+        if !validated.insert(package.clone()) {
+            let name = match package {
+                PackageRef::Exact(name) => name.to_string(),
+                PackageRef::Prefix(prefix) => format!("{}*", prefix.as_str()),
+            };
+            return Err(DependencyPolicyError::DuplicatePackage {
+                boundary_id: boundary_id.clone(),
+                field,
+                package: name,
             });
         }
     }
