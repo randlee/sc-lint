@@ -114,6 +114,72 @@ pub(crate) enum PackageRef {
     Prefix(PackagePrefix),
 }
 
+impl PackageRef {
+    pub(crate) fn matches(&self, name: &WorkspacePackageName) -> bool {
+        match self {
+            Self::Exact(exact) => exact == name,
+            Self::Prefix(prefix) => name.as_str().starts_with(prefix.as_str()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod package_ref_tests {
+    use super::{BoundaryId, WorkspacePackageName};
+    use super::{FeatureIndependence, PackagePrefix, PackageRef, RawDependenciesSection};
+
+    #[test]
+    fn exact_and_prefix_matching_uses_canonical_case_sensitive_names() {
+        let exact = PackageRef::Exact(WorkspacePackageName::from_package_name("codex-api"));
+        let prefix = PackageRef::Prefix(PackagePrefix("codex-".to_owned()));
+        for (name, exact_match, prefix_match) in [
+            ("codex-api", true, true),
+            ("codex-other", false, true),
+            ("codex", false, false),
+            ("Codex-api", false, false),
+            ("alias", false, false),
+        ] {
+            let name = WorkspacePackageName::from_package_name(name);
+            assert_eq!(exact.matches(&name), exact_match, "exact: {name}");
+            assert_eq!(prefix.matches(&name), prefix_match, "prefix: {name}");
+        }
+    }
+
+    #[test]
+    fn feature_independence_distinguishes_absent_empty_and_configured() {
+        let base = "allowed_dependents = []\nallowed_dependencies = []\nforbidden_edges = []\n";
+        let boundary = BoundaryId::try_from("BOUNDARY-example".to_owned()).unwrap();
+        for (suffix, expected) in [
+            ("", FeatureIndependence::NotChecked),
+            (
+                "allowed_feature_dependencies = []\n",
+                FeatureIndependence::Checked(vec![]),
+            ),
+            (
+                "allowed_feature_dependencies = [\"codex-*\"]\n",
+                FeatureIndependence::Checked(vec![PackageRef::Prefix(PackagePrefix(
+                    "codex-".to_owned(),
+                ))]),
+            ),
+        ] {
+            let raw: RawDependenciesSection = toml::from_str(&format!("{base}{suffix}")).unwrap();
+            assert_eq!(
+                raw.validate(&boundary)
+                    .unwrap()
+                    .allowed_feature_dependencies,
+                expected
+            );
+        }
+    }
+}
+
+/// An absent feature allowlist disables the check; an empty one enables it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FeatureIndependence<T = Vec<PackageRef>> {
+    NotChecked,
+    Checked(T),
+}
+
 impl PackagePrefix {
     pub(crate) fn as_str(&self) -> &str {
         &self.0
@@ -130,9 +196,9 @@ pub(crate) struct ForbiddenPackageEdge {
 pub(crate) struct PackageDependencyPolicy {
     pub(crate) allowed_dependents: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dev_dependents: Option<BTreeSet<WorkspacePackageName>>,
-    pub(crate) allowed_dependencies: BTreeSet<PackageRef>,
-    pub(crate) allowed_dev_dependencies: BTreeSet<PackageRef>,
-    pub(crate) allowed_feature_dependencies: Option<BTreeSet<PackageRef>>,
+    pub(crate) allowed_dependencies: Vec<PackageRef>,
+    pub(crate) allowed_dev_dependencies: Vec<PackageRef>,
+    pub(crate) allowed_feature_dependencies: FeatureIndependence,
     pub(crate) forbidden_edges: Vec<ForbiddenPackageEdge>,
 }
 
@@ -205,12 +271,14 @@ impl RawDependenciesSection {
             "allowed_dev_dependencies",
             self.allowed_dev_dependencies,
         )?;
-        let allowed_feature_dependencies = self
-            .allowed_feature_dependencies
-            .map(|packages| {
-                validate_package_patterns(boundary_id, "allowed_feature_dependencies", packages)
-            })
-            .transpose()?;
+        let allowed_feature_dependencies = match self.allowed_feature_dependencies {
+            Some(packages) => FeatureIndependence::Checked(validate_package_patterns(
+                boundary_id,
+                "allowed_feature_dependencies",
+                packages,
+            )?),
+            None => FeatureIndependence::NotChecked,
+        };
 
         let mut forbidden_edges = Vec::with_capacity(self.forbidden_edges.len());
         let mut seen_edges = BTreeSet::new();
@@ -325,7 +393,7 @@ fn validate_package_patterns(
     boundary_id: &BoundaryId,
     field: &'static str,
     packages: Vec<String>,
-) -> std::result::Result<BTreeSet<PackageRef>, DependencyPolicyError> {
+) -> std::result::Result<Vec<PackageRef>, DependencyPolicyError> {
     let mut validated = BTreeSet::new();
     for value in packages {
         let trimmed = value.trim();
@@ -354,7 +422,7 @@ fn validate_package_patterns(
             });
         }
     }
-    Ok(validated)
+    Ok(validated.into_iter().collect())
 }
 
 fn parse_workspace_package_name(
