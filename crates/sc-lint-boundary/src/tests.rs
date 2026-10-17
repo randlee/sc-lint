@@ -882,6 +882,24 @@ fn feature_independence_is_opt_in_and_supports_prefix_exemptions() {
 }
 
 #[test]
+fn dependency_and_feature_findings_are_independent() {
+    let fixture = feature_fixture("api = { path = \"../api\", features = [\"fast\"] }", "");
+    let boundary = fixture.root().join("boundaries/app/boundary.toml");
+    let contents = fs::read_to_string(&boundary).unwrap().replace(
+        "allowed_dependencies = [\"ap*\"]",
+        "allowed_dependencies = []",
+    );
+    fs::write(boundary, contents).unwrap();
+    let findings = dependencies_report(&fixture).unwrap().findings;
+    for rule in [RuleId::ScbDependency001, RuleId::ScbFeature001] {
+        assert!(
+            findings.iter().any(|finding| finding.rule_id == rule),
+            "{rule:?}: {findings:?}"
+        );
+    }
+}
+
+#[test]
 fn feature_independence_covers_dependency_sections_and_forwarding() {
     for (dependency, features) in [
         ("api = { path = \"../api\", features = [\"fast\"] }", ""),
