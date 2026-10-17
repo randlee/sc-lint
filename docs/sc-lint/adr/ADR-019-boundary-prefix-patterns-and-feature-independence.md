@@ -69,4 +69,4 @@ another workspace package through Cargo features: setting `features` or
 REQ-SCB-024 (prefix patterns) and REQ-SCB-025 (`SCB-FEATURE-001`) in
 [`docs/sc-lint-boundary/requirements.md`](../../sc-lint-boundary/requirements.md).
 
-*ADR-019 | sc-lint | 2026-10-17*
+*ADR-019 | sc-lint | 2026-10-16*
