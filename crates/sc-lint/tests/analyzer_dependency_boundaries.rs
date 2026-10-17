@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::io::{self, Read};
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -10,6 +11,7 @@ use serde_json::Value;
 const ANALYZERS: [&str; 3] = ["sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"];
 const ANALYZER_SUPPORT: &str = "sc-lint-analyzer-support";
 const CLI: &str = "sc-lint";
+const POST_KILL_PIPE_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 
 #[test]
 fn analyzer_manifests_remain_dependency_independent() {
@@ -59,8 +61,14 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
     let mut child = command.spawn()?;
     let stdout = child.stdout.take().expect("stdout is piped");
     let stderr = child.stderr.take().expect("stderr is piped");
-    let stdout_reader = thread::spawn(move || read_pipe(stdout));
-    let stderr_reader = thread::spawn(move || read_pipe(stderr));
+    let (stdout_sender, stdout_reader) = mpsc::channel();
+    let (stderr_sender, stderr_reader) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = stdout_sender.send(read_pipe(stdout));
+    });
+    thread::spawn(move || {
+        let _ = stderr_sender.send(read_pipe(stderr));
+    });
     let started = Instant::now();
 
     loop {
@@ -68,19 +76,26 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
             Ok(Some(status)) => {
                 return Ok(Output {
                     status,
-                    stdout: join_pipe_reader(stdout_reader)?,
-                    stderr: join_pipe_reader(stderr_reader)?,
+                    stdout: receive_pipe_reader(stdout_reader)?,
+                    stderr: receive_pipe_reader(stderr_reader)?,
                 });
             }
             Ok(None) if started.elapsed() >= timeout => {
                 let _ = child.kill();
                 child.wait()?;
-                let _ = join_pipe_reader(stdout_reader)?;
-                let _ = join_pipe_reader(stderr_reader)?;
+                let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
+                let drain_error = drain_pipe_reader(stdout_reader, drain_deadline)
+                    .err()
+                    .or_else(|| drain_pipe_reader(stderr_reader, drain_deadline).err());
+                let drain_context = drain_error
+                    .map(|error| {
+                        format!("; output pipes did not drain after child termination: {error}")
+                    })
+                    .unwrap_or_default();
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
                     format!(
-                        "{description} timed out after {timeout:?}; child was killed and reaped"
+                        "{description} timed out after {timeout:?}; child was killed and reaped{drain_context}"
                     ),
                 ));
             }
@@ -88,9 +103,19 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                let _ = join_pipe_reader(stdout_reader);
-                let _ = join_pipe_reader(stderr_reader);
-                return Err(error);
+                let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
+                let drain_error = drain_pipe_reader(stdout_reader, drain_deadline)
+                    .err()
+                    .or_else(|| drain_pipe_reader(stderr_reader, drain_deadline).err());
+                return Err(match drain_error {
+                    Some(drain_error) => io::Error::new(
+                        error.kind(),
+                        format!(
+                            "{error}; output pipes did not drain after child termination: {drain_error}"
+                        ),
+                    ),
+                    None => error,
+                });
             }
         }
     }
@@ -102,15 +127,53 @@ fn read_pipe(mut pipe: impl Read) -> io::Result<Vec<u8>> {
     Ok(output)
 }
 
-fn join_pipe_reader(reader: thread::JoinHandle<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
+fn receive_pipe_reader(reader: Receiver<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
     reader
-        .join()
-        .map_err(|_| io::Error::other("child output reader panicked"))?
+        .recv()
+        .map_err(|_| io::Error::other("child output reader stopped without returning output"))?
+}
+
+fn drain_pipe_reader(
+    reader: Receiver<io::Result<Vec<u8>>>,
+    deadline: Instant,
+) -> io::Result<Vec<u8>> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    match reader.recv_timeout(remaining) {
+        Ok(output) => output,
+        Err(RecvTimeoutError::Timeout) => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("pipe reader exceeded {POST_KILL_PIPE_DRAIN_TIMEOUT:?} drain limit"),
+        )),
+        Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(
+            "child output reader stopped without returning output",
+        )),
+    }
 }
 
 #[test]
 fn timeout_child_sleeps_when_requested() {
     if std::env::var_os("SC_LINT_TEST_CHILD_SLEEP").is_some() {
+        thread::sleep(Duration::from_secs(10));
+    }
+}
+
+#[test]
+fn timeout_grandchild_keeps_inherited_pipes_open() {
+    if std::env::var_os("SC_LINT_TEST_GRANDCHILD_SLEEP").is_some() {
+        thread::sleep(Duration::from_secs(5));
+    }
+}
+
+#[test]
+fn timeout_parent_spawns_pipe_inheriting_grandchild() {
+    if std::env::var_os("SC_LINT_TEST_SPAWN_GRANDCHILD").is_some() {
+        let mut grandchild = Command::new(std::env::current_exe().expect("test executable path"))
+            .args(["--exact", "timeout_grandchild_keeps_inherited_pipes_open"])
+            .env("SC_LINT_TEST_GRANDCHILD_SLEEP", "1")
+            .spawn()
+            .expect("spawn pipe-inheriting grandchild");
+        println!("grandchild spawned");
+        let _ = grandchild.wait();
         thread::sleep(Duration::from_secs(10));
     }
 }
@@ -132,6 +195,24 @@ fn command_output_deadline_kills_and_reaps_child() {
     );
     assert!(error.to_string().contains("250ms"));
     assert!(error.to_string().contains("killed and reaped"));
+}
+
+#[test]
+fn command_output_timeout_does_not_wait_for_pipe_inheriting_grandchild() {
+    let mut command = Command::new(std::env::current_exe().expect("test executable path"));
+    command
+        .args([
+            "--exact",
+            "timeout_parent_spawns_pipe_inheriting_grandchild",
+        ])
+        .env("SC_LINT_TEST_SPAWN_GRANDCHILD", "1");
+
+    let started = Instant::now();
+    let error = command_output_with_timeout(command, Duration::from_secs(1))
+        .expect_err("the sleeping test child exceeds the deadline");
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    assert!(error.to_string().contains("output pipes did not drain"));
+    assert!(started.elapsed() < Duration::from_secs(4));
 }
 
 fn direct_dependencies(metadata: &Value, package_name: &str) -> BTreeSet<String> {
