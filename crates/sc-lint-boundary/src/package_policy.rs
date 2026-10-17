@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use crate::Finding;
 use crate::OwnerId;
 use crate::RuleId;
+use crate::inventory::FeatureIndependence;
 use crate::inventory::ValidatedDependencyPolicy;
 use crate::inventory::ValidatedInventory;
 use crate::inventory::ValidatedRecord;
@@ -172,7 +173,7 @@ fn feature_findings(
     policy: &ValidatedDependencyPolicy,
     packages: &[&cargo_metadata::Package],
 ) -> Result<Vec<Finding>> {
-    let Some(allowed) = &policy.allowed_feature_dependencies else {
+    let FeatureIndependence::Checked(allowed) = &policy.allowed_feature_dependencies else {
         return Ok(Vec::new());
     };
     let Some(owner) = packages
@@ -220,9 +221,14 @@ fn feature_findings(
         }
         let key = dependency.rename.as_deref().unwrap_or(&dependency.name);
         let explicit_dep = values.iter().any(|v| v.strip_prefix("dep:") == Some(key));
-        let forwards = values.iter().any(|value| {
-            references_dependency_with_implicit(value, key, dependency.optional, explicit_dep)
-        });
+        let use_ = if dependency.optional {
+            DependencyUse::Optional
+        } else {
+            DependencyUse::Required
+        };
+        let forwards = values
+            .iter()
+            .any(|value| references_dependency(value, key, use_, explicit_dep));
         for (kind, hit) in [
             (
                 "package_dependency_sets_features",
@@ -244,22 +250,27 @@ fn feature_findings(
     Ok(findings.into_values().collect())
 }
 
-pub(crate) fn references_dependency(value: &str, key: &str) -> bool {
-    match value.strip_prefix("dep:") {
-        Some(name) => name == key,
-        None => value
-            .split_once('/')
-            .is_some_and(|(name, _)| name.strip_suffix('?').unwrap_or(name) == key),
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DependencyUse {
+    Optional,
+    Required,
 }
 
-pub(crate) fn references_dependency_with_implicit(
+pub(crate) fn references_dependency(
     value: &str,
     key: &str,
-    optional: bool,
-    explicit_dep: bool,
+    use_: DependencyUse,
+    has_dep_prefixed_key: bool,
 ) -> bool {
-    references_dependency(value, key) || (optional && !explicit_dep && value == key)
+    match value.strip_prefix("dep:") {
+        Some(name) => name == key,
+        None => {
+            value
+                .split_once('/')
+                .is_some_and(|(name, _)| name.strip_suffix('?').unwrap_or(name) == key)
+                || (use_ == DependencyUse::Optional && !has_dep_prefixed_key && value == key)
+        }
+    }
 }
 
 fn collect_incoming_policy_findings(
