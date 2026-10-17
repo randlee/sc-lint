@@ -2,6 +2,41 @@
 
 All notable changes to sc-lint are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- The built-in source lint plan runs independent steps concurrently and
+  continues through all planned steps after failures, reporting every failure
+  by plan index in plan order. Consumer-configured lint and test profiles
+  remain sequential, declaration-ordered, and fail-fast.
+
+### Compatibility
+
+- Tightened boundary inventory validation and stale-entry diagnostics can
+  reject previously accepted invalid declarations, including
+  `SCB-DEPENDENCY-004`, `SCB-BOUNDARY-004`, and `SCB-MANIFEST-006`. Review the
+  [boundary inventory and stale-policy recovery steps](docs-bundle/packages/sc-lint-boundary.md#recovering-inventory-and-stale-policy-findings)
+  before upgrading.
+- Previously accepted path-like cargo-shear
+  `allowed_unused_dependencies` keys are rejected with
+  `SC_LINT_CARGO_SHEAR_CONFIG_INVALID`. Use the canonical key
+  `"{package}.{dependency_key}"` (the dependency rename alias when present,
+  otherwise the package name), or `"workspace.{dependency_key}"` only for a
+  virtual-root workspace dependency. See the cargo-shear migration guidance
+  in [troubleshooting](docs-bundle/troubleshooting.md#cargo-shear-exception-migration).
+- The never-constructed public `CountScannedCrates` variants were removed from
+  `sc_lint_portability::PortabilityError` and `sc_lint_runtime::RuntimeError`
+  in `2a53e91`.
+
+### Fixed
+
+- The boundary inventory now rejects nested `planning.toml` files instead of
+  silently ignoring planning metadata outside `boundaries/planning.toml`.
+- Portability and runtime analysis now report an error when a finding's source
+  path cannot be made repository-relative, including paths outside the
+  repository root, instead of silently skipping that finding.
+
 ## [0.7.3] — 2026-10-12
 
 Fixes found after publishing 0.7.2.

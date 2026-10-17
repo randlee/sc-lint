@@ -76,12 +76,19 @@ fn bundle_root_from_candidates(candidates: &[PathBuf]) -> Result<PathBuf, CliErr
         }
     }
     let searched = candidates
+        .iter()
+        .map(|candidate| candidate.display().to_string())
+        .collect::<Vec<_>>();
+    let path = searched
         .first()
-        .cloned()
+        .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("docs-bundle"));
     Err(unavailable(
-        &searched,
-        "the bundle manifest or overview file was not found in any supported install layout",
+        &path,
+        format!(
+            "the bundle manifest or overview file was not found; searched: {}",
+            searched.join(", ")
+        ),
     ))
 }
 
@@ -373,6 +380,26 @@ mod tests {
             installed_bundle_root_for_executable(&executable),
             Some(dunce::canonicalize(published_docs).expect("published docs path"))
         );
+    }
+
+    #[test]
+    fn missing_bundle_reports_every_searched_candidate() {
+        let temporary = tempfile::TempDir::new().expect("temporary installation");
+        let candidates = [
+            temporary.path().join("first-docs"),
+            temporary.path().join("second-docs"),
+        ];
+
+        let error = bundle_root_from_candidates(&candidates).expect_err("bundle is absent");
+        assert_eq!(error.code(), DOCS_UNAVAILABLE_CODE);
+        assert_eq!(
+            error.details["bundle_path"],
+            json!(candidates[0].display().to_string())
+        );
+        let cause = error.cause.expect("searched paths cause");
+        for candidate in &candidates {
+            assert!(cause.contains(&candidate.display().to_string()), "{cause}");
+        }
     }
 
     #[test]

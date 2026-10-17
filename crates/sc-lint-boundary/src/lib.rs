@@ -12,6 +12,7 @@ use anyhow::Result;
 use quote::ToTokens;
 use sc_lint_analyzer_support::AnalyzerName;
 use sc_lint_analyzer_support::CatalogRuleId;
+use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::RuleCatalog;
 use sc_lint_analyzer_support::load_analyzer_settings;
 use sc_lint_directives::AttributeInput;
@@ -37,6 +38,7 @@ use thiserror::Error;
 mod analysis;
 mod graph;
 mod inventory;
+mod manifest_dependency_policy;
 mod manifest_policy;
 mod package_policy;
 mod render;
@@ -159,12 +161,18 @@ pub enum RuleId {
     ScbBoundary001,
     ScbBoundary002,
     ScbBoundary003,
+    ScbBoundary004,
     ScbCaller001,
     ScbDependency001,
     ScbDependency002,
     ScbDependency003,
+    ScbDependency004,
     ScbManifest001,
     ScbManifest002,
+    ScbManifest003,
+    ScbManifest004,
+    ScbManifest005,
+    ScbManifest006,
 }
 
 impl RuleId {
@@ -176,12 +184,18 @@ impl RuleId {
             Self::ScbBoundary001 => "SCB-BOUNDARY-001",
             Self::ScbBoundary002 => "SCB-BOUNDARY-002",
             Self::ScbBoundary003 => "SCB-BOUNDARY-003",
+            Self::ScbBoundary004 => "SCB-BOUNDARY-004",
             Self::ScbCaller001 => "SCB-CALLER-001",
             Self::ScbDependency001 => "SCB-DEPENDENCY-001",
             Self::ScbDependency002 => "SCB-DEPENDENCY-002",
             Self::ScbDependency003 => "SCB-DEPENDENCY-003",
+            Self::ScbDependency004 => "SCB-DEPENDENCY-004",
             Self::ScbManifest001 => "SCB-MANIFEST-001",
             Self::ScbManifest002 => "SCB-MANIFEST-002",
+            Self::ScbManifest003 => "SCB-MANIFEST-003",
+            Self::ScbManifest004 => "SCB-MANIFEST-004",
+            Self::ScbManifest005 => "SCB-MANIFEST-005",
+            Self::ScbManifest006 => "SCB-MANIFEST-006",
         }
     }
 }
@@ -279,12 +293,18 @@ pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbBoundary001),
     rule(RuleId::ScbBoundary002),
     rule(RuleId::ScbBoundary003),
+    rule(RuleId::ScbBoundary004),
     rule(RuleId::ScbCaller001),
     rule(RuleId::ScbDependency001),
     rule(RuleId::ScbDependency002),
     rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbDependency004),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
+    rule(RuleId::ScbManifest003),
+    rule(RuleId::ScbManifest004),
+    rule(RuleId::ScbManifest005),
+    rule(RuleId::ScbManifest006),
 ];
 
 /// Every id except SCB-CYCLE-002/003: the set `analysis::finding_is_failure` fails on.
@@ -293,12 +313,18 @@ pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbBoundary001),
     rule(RuleId::ScbBoundary002),
     rule(RuleId::ScbBoundary003),
+    rule(RuleId::ScbBoundary004),
     rule(RuleId::ScbCaller001),
     rule(RuleId::ScbDependency001),
     rule(RuleId::ScbDependency002),
     rule(RuleId::ScbDependency003),
+    rule(RuleId::ScbDependency004),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
+    rule(RuleId::ScbManifest003),
+    rule(RuleId::ScbManifest004),
+    rule(RuleId::ScbManifest005),
+    rule(RuleId::ScbManifest006),
 ];
 
 /// Families keep today's CLI spellings (kebab-case, as clap rendered the old
@@ -321,6 +347,7 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
                 rule(RuleId::ScbBoundary001),
                 rule(RuleId::ScbBoundary002),
                 rule(RuleId::ScbBoundary003),
+                rule(RuleId::ScbBoundary004),
                 rule(RuleId::ScbCaller001),
             ],
         ),
@@ -332,18 +359,31 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
         (
             "dependencies",
             &[
+                rule(RuleId::ScbBoundary004),
                 rule(RuleId::ScbDependency001),
                 rule(RuleId::ScbDependency002),
                 rule(RuleId::ScbDependency003),
+                rule(RuleId::ScbDependency004),
             ],
         ),
         (
             "manifests",
-            &[rule(RuleId::ScbManifest001), rule(RuleId::ScbManifest002)],
+            &[
+                rule(RuleId::ScbManifest001),
+                rule(RuleId::ScbManifest002),
+                rule(RuleId::ScbManifest003),
+                rule(RuleId::ScbManifest004),
+                rule(RuleId::ScbManifest005),
+                rule(RuleId::ScbManifest006),
+            ],
         ),
     ],
     default_fail: DEFAULT_FAIL_IDS,
-    own_keys: &[],
+    own_keys: &[
+        "manifest_dependency_allowlists",
+        "global_dependency_ownership",
+        "manifest_section_rules",
+    ],
 };
 
 fn disabled_report() -> FindingsReport {
@@ -624,17 +664,35 @@ pub fn analyze_workspace(
         graph::load_metadata(root).map_err(|e| BoundaryError::inventory_load(root, e))?;
     inventory::validate_owner_crate_paths(&inventory, &metadata)
         .map_err(|e| BoundaryError::inventory_load(root, e))?;
+    let workspace_packages = workspace_packages(&metadata);
+    let resolver =
+        inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
+    let known_non_workspace_packages =
+        known_non_workspace_packages(&metadata, &inventory, &workspace_packages);
+    let validate_package_policy =
+        options.rule.is_none() || options.rule == Some(RuleFilter::Dependencies);
+    let (inventory, semantic_diagnostics) = inventory::validate_inventory(
+        inventory,
+        &resolver,
+        &known_non_workspace_packages,
+        validate_package_policy,
+    )
+    .map_err(|error| BoundaryError::package_policy(root, error))?;
+    let semantic_findings = semantic_diagnostics
+        .iter()
+        .map(inventory::InventoryDiagnostic::finding)
+        .collect::<Vec<_>>();
     if options.rule == Some(RuleFilter::Dependencies) {
-        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
-            .map_err(|e| BoundaryError::package_policy(root, e))?;
-        return Ok(findings_report(
-            dependency_report.scanned_crates,
-            dependency_report.findings,
-        ));
+        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory);
+        let mut findings = semantic_findings;
+        findings.extend(dependency_report.findings);
+        return Ok(findings_report(dependency_report.scanned_crates, findings));
     }
     let graph = graph::build_workspace_graph_from(&metadata)
         .map_err(|e| BoundaryError::graph_build(root, e))?;
-    let mut findings = Vec::with_capacity(inventory.summary().recommended_finding_capacity());
+    let raw_inventory = inventory.as_raw_inventory();
+    let mut findings = semantic_findings;
+    findings.reserve(inventory.summary().recommended_finding_capacity());
     let filter = options.rule;
     use RuleFilter::{Boundaries, Cycles, ForbidExternalImpls, InternalOnly};
     if rule_selected(filter, &[Cycles]) {
@@ -647,11 +705,10 @@ pub fn analyze_workspace(
         findings.extend(analysis::analyze_forbid_external_impls(&graph));
     }
     if rule_selected(filter, &[Boundaries]) {
-        findings.extend(analysis::analyze_named_callers(&graph, &inventory));
+        findings.extend(analysis::analyze_named_callers(&graph, &raw_inventory));
     }
     if filter.is_none() {
-        let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
-            .map_err(|e| BoundaryError::package_policy(root, e))?;
+        let package_report = package_policy::analyze_package_policy(&metadata, &inventory);
         findings.extend(package_report.findings);
         let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
             .map_err(|e| BoundaryError::manifest_policy(root, e))?;
@@ -718,27 +775,202 @@ pub fn analyze_workspace_configured(
     if !settings.enabled {
         return Ok(disabled_report());
     }
+    if settings.rule_filter.as_ref().is_some_and(|selected| {
+        selected.len() == 1 && selected.contains(&rule(RuleId::ScbBoundary004))
+    }) {
+        return analyze_inventory_semantics(&options.root);
+    }
+    let policy_config = if manifest_policy_selected(&settings) {
+        manifest_dependency_policy::parse_policy(&settings, settings.rule_filter.as_ref())?
+    } else {
+        manifest_dependency_policy::ManifestPolicyConfig::default()
+    };
     let mut options = options.clone();
     options.rule = legacy_family_rule_filter(settings.rule_filter.as_ref());
+    if inventory_free_manifest_policy_selected(&settings) {
+        return analyze_inventory_free_manifest_policy(&options, &settings, &policy_config);
+    }
     let mut report = analyze_workspace(&options)?;
-    let findings: Vec<Finding> = std::mem::take(&mut report.findings)
+    if manifest_policy_selected(&settings) && !policy_config.is_empty() {
+        let metadata = graph::load_metadata(&options.root)
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
+        let inventory = if policy_config.requires_inventory() {
+            Some(load_validated_inventory(&options.root, &metadata)?)
+        } else {
+            None
+        };
+        report.findings.extend(
+            manifest_dependency_policy::analyze_policy(
+                &options.root,
+                &metadata,
+                inventory.as_ref(),
+                &policy_config,
+            )
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
+        );
+        report.findings.sort_by(|left, right| {
+            analysis::finding_sort_key(left)
+                .cmp(&analysis::finding_sort_key(right))
+                .then_with(|| left.message.cmp(&right.message))
+        });
+        report.status = if report.findings.iter().any(analysis::finding_is_failure) {
+            ReportStatus::Fail
+        } else {
+            ReportStatus::Pass
+        };
+    }
+    Ok(apply_configured_rule_filter(report, &settings))
+}
+
+fn analyze_inventory_free_manifest_policy(
+    options: &AnalyzeOptions,
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+    policy_config: &manifest_dependency_policy::ManifestPolicyConfig,
+) -> std::result::Result<FindingsReport, BoundaryError> {
+    let mut report = analyze_manifests_only(options)?;
+    if !policy_config.is_empty() {
+        let metadata = graph::load_metadata(&options.root)
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
+        report.findings.extend(
+            manifest_dependency_policy::analyze_policy(
+                &options.root,
+                &metadata,
+                None,
+                policy_config,
+            )
+            .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
+        );
+    }
+    Ok(apply_configured_rule_filter(report, settings))
+}
+
+fn apply_configured_rule_filter(
+    mut report: FindingsReport,
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+) -> FindingsReport {
+    let findings: Vec<_> = std::mem::take(&mut report.findings)
         .into_iter()
-        .filter(|finding| {
-            // Only manifest findings carry a path: their first owner id is the
-            // repo-relative manifest path.
-            !(matches!(
-                finding.rule_id,
-                RuleId::ScbManifest001 | RuleId::ScbManifest002
-            ) && finding
-                .owner_ids
-                .first()
-                .is_some_and(|owner| settings.path_excluded(owner.as_str())))
+        .map(|finding| {
+            let path = manifest_finding_path(&finding);
+            (finding, path)
         })
         .collect();
-    let (findings, status) = settings.apply(findings, |rule| rule.as_str());
+    let (findings, status) =
+        settings.apply(findings, |rule: &RuleId| CatalogRuleId::new(rule.as_str()));
     report.findings = findings;
     report.status = status;
-    Ok(report)
+    report
+}
+
+fn manifest_policy_selected(settings: &sc_lint_analyzer_support::AnalyzerSettings) -> bool {
+    let manifest_policy_ids = [
+        rule(RuleId::ScbManifest003),
+        rule(RuleId::ScbManifest004),
+        rule(RuleId::ScbManifest005),
+        rule(RuleId::ScbManifest006),
+    ];
+    settings.rule_filter.as_ref().is_none_or(|selected| {
+        manifest_policy_ids
+            .iter()
+            .any(|rule| selected.contains(rule))
+    })
+}
+
+fn inventory_free_manifest_policy_selected(
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+) -> bool {
+    let inventory_free_rules = [
+        rule(RuleId::ScbManifest001),
+        rule(RuleId::ScbManifest002),
+        rule(RuleId::ScbManifest004),
+        rule(RuleId::ScbManifest005),
+    ];
+    settings.rule_filter.as_ref().is_some_and(|selected| {
+        !selected.is_empty()
+            && selected
+                .iter()
+                .all(|selected_rule| inventory_free_rules.contains(selected_rule))
+    })
+}
+
+fn load_validated_inventory(
+    root: &Path,
+    metadata: &cargo_metadata::Metadata,
+) -> std::result::Result<inventory::ValidatedInventory, BoundaryError> {
+    let raw = inventory::load_boundary_inventory(root)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    inventory::validate_owner_crate_paths(&raw, metadata)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    let packages = workspace_packages(metadata);
+    let resolver = inventory::WorkspacePackageResolver::from_workspace_packages(&packages);
+    let known_non_workspace_packages = known_non_workspace_packages(metadata, &raw, &packages);
+    let (inventory, _) =
+        inventory::validate_inventory(raw, &resolver, &known_non_workspace_packages, true)
+            .map_err(|error| BoundaryError::package_policy(root, error))?;
+    Ok(inventory)
+}
+
+fn manifest_finding_path(finding: &Finding) -> Option<RepoRelativePath> {
+    matches!(
+        finding.rule_id,
+        RuleId::ScbManifest001
+            | RuleId::ScbManifest002
+            | RuleId::ScbManifest003
+            | RuleId::ScbManifest004
+            | RuleId::ScbManifest005
+            | RuleId::ScbManifest006
+    )
+    .then(|| finding.owner_ids.first())
+    .flatten()
+    .and_then(|owner| RepoRelativePath::parse(owner.as_str()).ok())
+}
+
+fn analyze_inventory_semantics(root: &Path) -> std::result::Result<FindingsReport, BoundaryError> {
+    let inventory = inventory::load_boundary_inventory(root)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    let metadata =
+        graph::load_metadata(root).map_err(|error| BoundaryError::inventory_load(root, error))?;
+    inventory::validate_owner_crate_paths(&inventory, &metadata)
+        .map_err(|error| BoundaryError::inventory_load(root, error))?;
+    let workspace_packages = workspace_packages(&metadata);
+    let resolver =
+        inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
+    let known_non_workspace_packages =
+        known_non_workspace_packages(&metadata, &inventory, &workspace_packages);
+    let (_, diagnostics) =
+        inventory::validate_inventory(inventory, &resolver, &known_non_workspace_packages, false)
+            .map_err(|error| BoundaryError::package_policy(root, error))?;
+    Ok(findings_report(
+        workspace_packages.len(),
+        diagnostics
+            .iter()
+            .map(inventory::InventoryDiagnostic::finding)
+            .collect(),
+    ))
+}
+
+fn known_non_workspace_packages(
+    metadata: &cargo_metadata::Metadata,
+    inventory: &inventory::BoundaryInventory,
+    workspace_packages: &[&cargo_metadata::Package],
+) -> BTreeSet<String> {
+    let workspace_package_names = workspace_packages
+        .iter()
+        .map(|package| package.name.to_string())
+        .collect::<BTreeSet<_>>();
+    metadata
+        .packages
+        .iter()
+        .map(|package| package.name.to_string())
+        .filter(|package| !workspace_package_names.contains(package))
+        .chain(
+            inventory
+                .records
+                .iter()
+                .filter(|record| !record.status.state.requires_workspace_package())
+                .map(|record| record.owner_package.to_string()),
+        )
+        .collect()
 }
 
 fn legacy_family_rule_filter(selected: Option<&BTreeSet<CatalogRuleId>>) -> Option<RuleFilter> {

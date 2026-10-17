@@ -1,64 +1,32 @@
 """Integration tests for the vendorable adoption kit."""
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
 import re
+import runpy
 import shutil
 import subprocess
+import sys
 import tempfile
+from textwrap import dedent
 from pathlib import Path
 from typing import Any
 
 import pytest
 from conftest import ProductArtifacts
-
-ROOT = Path(__file__).resolve().parents[2]
-KIT = ROOT / "packages" / "sc-lint-adoption"
-INSTALL = KIT / "install.py"
-FIXTURES = ROOT / "tests" / "fixtures" / "adoption"
-SUBPROCESS_TIMEOUT_SECONDS = 60
-WORKED_EXAMPLE_TIMEOUT_SECONDS = 300
-
-
-def copy_fixture(name: str) -> Path:
-    temporary = Path(tempfile.mkdtemp())
-    destination = temporary / "consumer"
-    shutil.copytree(FIXTURES / name, destination)
-    return destination
-
-
-def run_subprocess(
-    arguments: list[str],
-    *,
-    timeout: float = SUBPROCESS_TIMEOUT_SECONDS,
-    **options: Any,
-) -> subprocess.CompletedProcess[str]:
-    try:
-        return subprocess.run(
-            arguments, stdin=subprocess.DEVNULL, timeout=timeout, **options
-        )
-    except subprocess.TimeoutExpired as error:
-        raise AssertionError(
-            f"subprocess timed out after {timeout}s: {arguments!r}\n"
-            f"stdout: {error.stdout!r}\nstderr: {error.stderr!r}"
-        ) from error
-
-
-def run(
-    *arguments: str,
-    cwd: Path | None = None,
-    timeout: float = SUBPROCESS_TIMEOUT_SECONDS,
-) -> subprocess.CompletedProcess[str]:
-    return run_subprocess(
-        ["python3", str(INSTALL), *arguments],
-        cwd=cwd,
-        timeout=timeout,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+from install_helpers import FIXTURES
+from install_helpers import INSTALL
+from install_helpers import KIT
+from install_helpers import ROOT
+from install_helpers import SUBPROCESS_TIMEOUT_SECONDS
+from install_helpers import WORKED_EXAMPLE_TIMEOUT_SECONDS
+from install_helpers import copy_fixture
+from install_helpers import run
+from install_helpers import run_subprocess
+from install_helpers import write_input
 
 
 def test_run_subprocess_stdin_is_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,13 +46,15 @@ def test_run_subprocess_stdin_is_closed(monkeypatch: pytest.MonkeyPatch) -> None
     assert observed_options["stdin"] is subprocess.DEVNULL
 
 
-def test_run_subprocess_timeout_reports_command_and_output() -> None:
-    command = [
-        "python3",
-        "-c",
-        "import sys, time; print('ready', flush=True); "
-        "print('warning', file=sys.stderr, flush=True); time.sleep(5)",
-    ]
+def test_run_subprocess_timeout_reports_command_and_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    command = ["python3", "-c", "print('ready')"]
+
+    def raise_timeout(*arguments: Any, **options: Any) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(
+            arguments[0], options["timeout"], output="ready\n", stderr="warning\n"
+        )
+
+    monkeypatch.setattr(subprocess, "run", raise_timeout)
     with pytest.raises(AssertionError) as error:
         run_subprocess(command, timeout=0.1, text=True, capture_output=True, check=False)
 
@@ -93,14 +63,6 @@ def test_run_subprocess_timeout_reports_command_and_output() -> None:
     assert repr(command) in message
     assert "ready" in message
     assert "warning" in message
-
-
-def write_input(consumer: Path, **overrides: object) -> Path:
-    data = json.loads((FIXTURES / "install.json").read_text())
-    data.update(overrides)
-    path = consumer.parent / "install.json"
-    path.write_text(json.dumps(data))
-    return path
 
 
 def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> None:
@@ -455,10 +417,240 @@ def test_portability_keys_render_into_own_table(tmp_path: Path) -> None:
     ).read_text()
 
 
+def test_issue385_installer_roundtrip(tmp_path: Path) -> None:
+    data = json.loads((FIXTURES / "install.json").read_text())
+    data["analyzers"]["portability"] = {
+        "exclude_paths_by_rule": {"PORT-007": ["src/lib.rs"]}
+    }
+    input_path = tmp_path / "in.json"
+    input_path.write_text(json.dumps(data))
+    consumer = copy_fixture("empty-workspace")
+
+    result = run("--input", str(input_path), str(consumer))
+
+    assert result.returncode == 0, result.stderr
+    assert 'exclude_paths_by_rule = { "PORT-007" = ["src/lib.rs"] }' in (
+        consumer / "sc-lint.toml"
+    ).read_text()
+    (consumer / "src" / "lib.rs").write_text(
+        (ROOT / "crates" / "sc-lint-portability" / "tests" / "fixtures" / "issue385.rs").read_text()
+    )
+
+    build = run_subprocess(
+        [
+            "cargo",
+            "build",
+            "--quiet",
+            "--message-format=json-render-diagnostics",
+            "-p",
+            "sc-lint-portability",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
+    )
+    assert build.returncode == 0, build.stderr
+
+    artifacts = []
+    for line in build.stdout.splitlines():
+        message = json.loads(line)
+        target = message.get("target", {})
+        if (
+            message.get("reason") == "compiler-artifact"
+            and target.get("name") == "sc-lint-portability"
+            and "bin" in target.get("kind", [])
+            and message.get("executable")
+        ):
+            artifacts.append(message)
+    assert len(artifacts) == 1, build.stdout
+    analyzer_path = artifacts[0]["executable"]
+
+    analyzer = run_subprocess(
+        [
+            analyzer_path,
+            "analyze",
+            "--root",
+            str(consumer),
+            "--config",
+            str(consumer / "sc-lint.toml"),
+            "--format",
+            "json",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=SUBPROCESS_TIMEOUT_SECONDS,
+    )
+    assert analyzer.returncode == 0, analyzer.stderr
+    report = json.loads(analyzer.stdout)
+    assert [finding["rule_id"] for finding in report["findings"]] == ["PORT-006"]
+
+    data["analyzers"]["portability"] = {
+        "exclude_paths_by_rule": {"PORT-007": "src/lib.rs"}
+    }
+    input_path.write_text(json.dumps(data))
+    result = run("--input", str(input_path), str(copy_fixture("empty-workspace")))
+    assert result.returncode == 2
+    assert "exclude_paths_by_rule" in result.stderr
+
+    data["analyzers"]["portability"] = {
+        "exclude_paths_by_rule": {"portability": ["src/lib.rs"]}
+    }
+    input_path.write_text(json.dumps(data))
+    result = run("--input", str(input_path), str(copy_fixture("empty-workspace")))
+    assert result.returncode == 2
+    assert "unknown exact rules" in result.stderr
+
+
+def test_generated_catalogs_are_current_and_vendored_only() -> None:
+    result = run_subprocess(
+        ["python3", str(ROOT / "tools" / "generate_installer_catalog.py"), "--check"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=WORKED_EXAMPLE_TIMEOUT_SECONDS,
+    )
+    assert result.returncode == 0, result.stderr
+
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    assert not (consumer / "analyzer-catalog").exists()
+    assert not (consumer / "schema.d").exists()
+    plugin = consumer / "plugins" / "sc-lint"
+    assert (plugin / "analyzer-catalog" / "portability.json").is_file()
+    assert (plugin / "schema.d" / "tools.json").is_file()
+    assert (plugin / "install.schema.json").is_file()
+
+
+def test_install_omits_internal_schema_and_catalog(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    fragment = kit / "schema.d" / "phase-k.json"
+    fragment.parent.mkdir(exist_ok=True)
+    fragment.write_text(json.dumps({"properties": {"phase_k_fixture": {"type": "string"}}}))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not (consumer / "analyzer-catalog").exists()
+    assert not (consumer / "schema.d").exists()
+    plugin = consumer / "plugins" / "sc-lint"
+    assert (plugin / "analyzer-catalog" / "portability.json").is_file()
+    assert (plugin / "schema.d" / "phase-k.json").is_file()
+
+
+def test_schema_merge_conflict_names_fragment_and_property(tmp_path: Path) -> None:
+    kit = tmp_path / "kit"
+    shutil.copytree(KIT, kit)
+    overlay = kit / "schema.d" / "zzz-conflict.json"
+    overlay.parent.mkdir(exist_ok=True)
+    overlay.write_text(json.dumps({"properties": {"minimum_version": {"type": "integer"}}}))
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+
+    result = run_subprocess(
+        ["python3", str(kit / "install.py"), "--input", str(FIXTURES / "install.json"), str(consumer)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "zzz-conflict.json" in result.stderr
+    assert "properties.minimum_version.type" in result.stderr
+
+
+def test_schema_fragments_merge_in_sorted_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    earlier = tmp_path / "aaa-conflict.json"
+    later = tmp_path / "zzz-conflict.json"
+    earlier.write_text(json.dumps({"properties": {"minimum_version": {"type": "integer"}}}))
+    later.write_text(json.dumps({"properties": {"minimum_version": {"type": "boolean"}}}))
+
+    module_name = "sc_lint_adoption_installer_under_test"
+    module_spec = importlib.util.spec_from_file_location(module_name, INSTALL)
+    assert module_spec is not None
+    assert module_spec.loader is not None
+    installer = importlib.util.module_from_spec(module_spec)
+    monkeypatch.setitem(sys.modules, module_name, installer)
+    module_spec.loader.exec_module(installer)
+
+    class ReverseSchemaDirectory:
+        def exists(self) -> bool:
+            return True
+
+        def glob(self, _pattern: str) -> list[Path]:
+            return [later, earlier]
+
+    monkeypatch.setattr(installer, "SCHEMA_DIRECTORY", ReverseSchemaDirectory())
+    with pytest.raises(ValueError, match=r"aaa-conflict\.json at properties\.minimum_version\.type"):
+        installer.load_schema()
+
+
+def test_baseline_sc_lint_config_rendering_is_unchanged() -> None:
+    consumer = copy_fixture("empty-workspace")
+    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 0, result.stderr
+
+    expected = dedent(
+        '''\
+        [tool.sc-lint]
+        minimum_version = "0.5.0"
+
+        [tool.sc-lint.analyzers.runtime]
+        enabled = false
+        reason = "non-tokio"
+
+        [tool.sc-lint.analyzers.portability]
+        enabled = true
+        targets = ["linux"]
+
+        [[tool.sc-lint.lint]]
+        name = "ci"
+        command = ["cargo", "check"]
+
+        [[tool.sc-lint.test]]
+        name = "unit"
+        command = ["cargo", "test"]
+        '''
+    )
+    assert (consumer / "sc-lint.toml").read_text() == expected
+
+
+def test_installer_has_no_rule_constants() -> None:
+    catalog_ids = {
+        rule_id
+        for catalog_path in (KIT / "analyzer-catalog").glob("*.json")
+        for catalog in [json.loads(catalog_path.read_text())]
+        for rule_id in catalog["rules"]
+    }
+    source_constants = {
+        node.value
+        for node in ast.walk(ast.parse(INSTALL.read_text()))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+    assert catalog_ids
+    assert not (catalog_ids & source_constants), (
+        "executable install.py contains analyzer catalog IDs; generated catalog data "
+        "and test fixtures are intentionally not scanned"
+    )
+
+
 def test_schema_analyzer_keys_match_rust_catalogs() -> None:
-    schema = json.loads((KIT / "install.schema.json").read_text())
+    schema = runpy.run_path(str(INSTALL), run_name="sc_lint_adoption_install")["load_schema"]()
     tables = schema["properties"]["analyzers"]["properties"]
-    common = {"enabled", "reason", "exclude_rules", "fail_rules", "exclude_paths"}
+    common = {"enabled", "reason", "exclude_rules", "fail_rules", "exclude_paths", "exclude_paths_by_rule"}
     for name, crate in [
         ("boundary", "sc-lint-boundary"),
         ("portability", "sc-lint-portability"),

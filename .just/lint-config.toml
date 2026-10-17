@@ -4,6 +4,7 @@ config_home_env = "SC_LINT_CONFIG_HOME"
 [cargo_shear.allowed_empty_files]
 
 [cargo_shear.allowed_unlinked_files]
+"tests/fixtures/issue385.rs" = "Shared lint input included by crates/sc-lint-portability/src/tests.rs and read by tests/adoption/test_install.py; removed its standalone Cargo test target after cargo metadata confirmed it was registered and cargo-shear reported it unlinked."
 
 # Reviewed entries use "<crate>.<dependency>" = "reason"; reasons must be nonblank.
 [cargo_shear.allowed_unused_dependencies]

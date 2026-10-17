@@ -20,31 +20,38 @@ documentation remains local and offline.
 
 ## Release archive
 
-> Release-archive and Homebrew documentation packaging are delivered by Sprint
-> E.5. Until that release lands, use the source bundle or the package path
-> documented by the installed release.
-
 Download the archive matching the host triple from the project release page,
-verify its published checksum, and put `sc-lint` on `PATH`. The archive's
-`sc-lint-docs/` directory must stay beside the executable. The Homebrew layout
-instead places it in the formula-owned `pkgshare` path shown above.
+verify its published checksum, and put `sc-lint` on `PATH`. Keep the launcher
+and three analyzer companions together, and preserve the archive's declared
+`share/sc-lint/sc-lint-docs/` path for the offline manual. Managed setup
+installs and checks the launcher, companions, and documentation bundle as one
+complete unit before activation.
+The [upgrade guide](./upgrade.md) explains health probes and rollback behavior.
 
 ```sh
 tar -xzf sc-lint_0.7.3_x86_64-unknown-linux-gnu.tar.gz
-install -m 0755 sc-lint /usr/local/bin/sc-lint
+cd sc-lint_0.7.3_x86_64-unknown-linux-gnu
+install -d /usr/local/bin /usr/local/share/sc-lint
+install -m 0755 bin/sc-lint bin/sc-lint-boundary bin/sc-lint-portability bin/sc-lint-runtime /usr/local/bin/
+cp -R share/sc-lint/sc-lint-docs /usr/local/share/sc-lint/
 sc-lint docs --path
 ```
 
 Never replace a working installation with an unverified archive. The
 product-owned `sc-lint setup` and `sc-lint upgrade` paths perform checksum and
 post-install verification for consumer repositories.
+The bootstrap's explicit, managed, and `PATH` binary selection is described in
+[the best-practices guide](./best-practices.md#binary-resolution-and-path-fallback).
 
-## CI and GitHub Action
+## CI
 
 CI should install one pinned release, run `sc-lint --json version`, and then
-use the same commands as local development. A workflow may use the reusable
-project Action once E.6 publishes it, or install the release archive directly.
-Do not run `cargo run -p sc-lint` in a consumer CI job.
+use the same commands as local development. Consumer workflows can use the
+shipped reusable Action, `randlee/sc-lint@v1`, with an explicit `version` input
+(see [CI](./ci.md#reusable-github-action)); install a verified release archive;
+or use the generated Just integration. The repository's `.github/actions/*`
+composites are repository-only and are not consumer actions. Do not run
+`cargo run -p sc-lint` in a consumer CI job.
 
 ## Verify an installation
 

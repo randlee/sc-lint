@@ -9,9 +9,15 @@ use anyhow::Result;
 use serde::Deserialize;
 
 mod dependency_policy;
+mod semantic;
 mod types;
 
 pub(crate) use dependency_policy::WorkspacePackageName;
+pub(crate) use semantic::InventoryDiagnostic;
+pub(crate) use semantic::ValidatedDependencyPolicy;
+pub(crate) use semantic::ValidatedInventory;
+pub(crate) use semantic::ValidatedRecord;
+pub(crate) use semantic::validate_inventory;
 pub(crate) use types::BoundaryInventory;
 pub(crate) use types::BoundaryRecord;
 pub(crate) use types::CallersSection;
@@ -154,12 +160,13 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
 
     for path in boundary_paths {
         let raw_record: types::RawBoundaryRecord = parse_toml_file(&path)?;
-        let record = types::BoundaryRecord::try_from(raw_record).with_context(|| {
+        let mut record = types::BoundaryRecord::try_from(raw_record).with_context(|| {
             format!(
                 "failed to validate dependency policy in `{}`",
                 path.display()
             )
         })?;
+        record.record_path = path.clone();
         validate_boundary_schema(&record, &path)?;
         validate_boundary_path(&record, &path, &boundaries_root)?;
         if let Some(previous_path) =
@@ -190,12 +197,13 @@ pub(crate) fn load_boundary_inventory(root: &Path) -> Result<BoundaryInventory> 
 fn discover_boundary_files(boundaries_root: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     let mut seen = BTreeSet::new();
-    collect_boundary_files(boundaries_root, &mut seen, &mut files)?;
+    collect_boundary_files(boundaries_root, boundaries_root, &mut seen, &mut files)?;
     files.sort();
     Ok(files)
 }
 
 fn collect_boundary_files(
+    boundaries_root: &Path,
     dir: &Path,
     seen: &mut BTreeSet<PathBuf>,
     files: &mut Vec<PathBuf>,
@@ -206,14 +214,25 @@ fn collect_boundary_files(
         let entry = entry?;
         let path = entry.path();
         let file_type = entry.file_type()?;
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("planning.toml"))
+        {
+            if path == boundaries_root.join("planning.toml") && file_type.is_file() {
+                continue;
+            }
+            anyhow::bail!(
+                "boundary inventory allows planning metadata only at '{}'; found disallowed planning entry at '{}'",
+                boundaries_root.join("planning.toml").display(),
+                path.display(),
+            );
+        }
         if file_type.is_dir() {
-            collect_boundary_files(&path, seen, files)?;
+            collect_boundary_files(boundaries_root, &path, seen, files)?;
             continue;
         }
         if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
-            continue;
-        }
-        if path.file_name().and_then(|name| name.to_str()) == Some("planning.toml") {
             continue;
         }
         if seen.insert(path.clone()) {

@@ -11,6 +11,7 @@ use crate::consts;
 use crate::contract::ServiceName;
 use crate::dispatch;
 use crate::installer;
+use crate::profile_plan::PlatformScope;
 use crate::python_adapter;
 use crate::workflow;
 
@@ -116,8 +117,13 @@ enum CommandRequest {
     },
     Init(ConsumerInitRequest),
     Docs(DocsRequest),
-    /// Optional lint profile step or test layer selector for consumer profile commands.
+    /// Optional test layer selector for the consumer test command.
     ConsumerSelector(Option<String>),
+    /// Consumer lint selector (step or named profile) and platform scope.
+    ConsumerLint {
+        selector: Option<String>,
+        scope: PlatformScope,
+    },
     /// `--rule-filter` value forwarded unchanged to an analyzer backend.
     RuleFilter(String),
 }
@@ -440,7 +446,16 @@ impl CommandContext {
     pub(crate) fn consumer_selector(&self) -> Option<&str> {
         match &self.request {
             Some(CommandRequest::ConsumerSelector(selector)) => selector.as_deref(),
+            Some(CommandRequest::ConsumerLint { selector, .. }) => selector.as_deref(),
             _ => None,
+        }
+    }
+
+    /// Platform scope for `lint --consumer`; the default is the host scope.
+    pub(crate) fn platform_scope(&self) -> PlatformScope {
+        match &self.request {
+            Some(CommandRequest::ConsumerLint { scope, .. }) => *scope,
+            _ => PlatformScope::Host,
         }
     }
 
@@ -552,8 +567,12 @@ fn command_request(command: &Command) -> Option<CommandRequest> {
         Command::Lint {
             consumer: true,
             profile,
+            platform_scope,
             ..
-        } => Some(CommandRequest::ConsumerSelector(profile.clone())),
+        } => Some(CommandRequest::ConsumerLint {
+            selector: profile.clone(),
+            scope: platform_scope.map_or(PlatformScope::Host, PlatformScope::from),
+        }),
         Command::Lint {
             rule_filter: Some(filter),
             ..
@@ -591,9 +610,11 @@ pub(crate) fn execute(
         CommandId::Init => Ok(CommandSuccess::direct(crate::config::run_consumer_init(
             context.consumer_init_request(),
         )?)),
-        CommandId::ConsumerLintCi => {
-            workflow::run_consumer_lint_profile(loaded_config, context.consumer_selector())
-        }
+        CommandId::ConsumerLintCi => workflow::run_consumer_lint_profile(
+            loaded_config,
+            context.consumer_selector(),
+            context.platform_scope(),
+        ),
         CommandId::ConsumerTest => {
             workflow::run_consumer_test_profile(loaded_config, context.consumer_selector())
         }

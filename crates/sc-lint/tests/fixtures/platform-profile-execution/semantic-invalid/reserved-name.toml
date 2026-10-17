@@ -1,0 +1,6 @@
+[tool.sc-lint.lint_profiles]
+all = ["format"]
+
+[[tool.sc-lint.lint]]
+name = "format"
+command = ["cargo", "fmt", "--check"]

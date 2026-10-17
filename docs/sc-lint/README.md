@@ -8,6 +8,10 @@ offline with `sc-lint docs`. It includes the canonical
 [`just-setup.md`](../../docs-bundle/just-setup.md) guide and one guide for each
 published package.
 
+The current analyzer, consumer-profile, setup, and release-recovery contracts
+are documented in that offline bundle; accepted planning decisions remain in
+the ADRs and sprint records below.
+
 Contents:
 
 - [`requirements.md`](./requirements.md) — top-level `sc-lint` crate

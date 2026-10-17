@@ -3,17 +3,81 @@
 set -eu
 
 usage() {
-    printf '%s\n' 'usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]' >&2
+    printf '%s\n' 'usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run]; .sc-lint/bootstrap lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml; .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>' >&2
     exit 2
 }
 
 operation="${1:-}"
 [ -n "$operation" ] || usage
 shift
+
+# Directly execute a managed product command or an arbitrary consumer command.
+# This path intentionally does not run setup or profile dispatch.
+if [ "$operation" = exec ]; then
+    exec_config=""
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --config)
+                [ "$#" -ge 2 ] || usage
+                exec_config="$2"
+                shift 2
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *) usage ;;
+        esac
+    done
+    [ "$#" -gt 0 ] || usage
+
+    if [ -n "${SC_LINT_BIN:-}" ]; then
+        # Resolve the override as a command, like resolve_product_binary and
+        # bootstrap.ps1: a bare name is a PATH lookup, a path is used as given.
+        # An unresolved override fails here; it never falls back.
+        exec_binary="$(command -v "$SC_LINT_BIN" 2>/dev/null || :)"
+        case "$exec_binary" in
+            */*) ;;
+            *)
+                printf '%s\n' "sc-lint binary is unavailable at $SC_LINT_BIN; run just setup" >&2
+                exit 1
+                ;;
+        esac
+    else
+        exec_install_dir="${SC_LINT_INSTALL_DIR:-${XDG_DATA_HOME:-${HOME:-}/.local/share}/sc-lint/bin}"
+        exec_binary="$exec_install_dir/sc-lint"
+    fi
+    if [ ! -f "$exec_binary" ] || [ ! -x "$exec_binary" ]; then
+        printf '%s\n' "sc-lint binary is unavailable at $exec_binary; run just setup" >&2
+        exit 1
+    fi
+
+    export SC_LINT_BIN="$exec_binary"
+    case "$exec_binary" in
+        */*) exec_binary_dir="${exec_binary%/*}"; [ -n "$exec_binary_dir" ] || exec_binary_dir="/" ;;
+        *) exec_binary_dir="." ;;
+    esac
+    PATH="$exec_binary_dir:${PATH:-}"
+    export PATH
+    if [ "$1" = sc-lint ]; then
+        shift
+        if [ -n "$exec_config" ]; then
+            exec "$exec_binary" --config "$exec_config" "$@"
+        fi
+        exec "$exec_binary" "$@"
+    fi
+    exec "$@"
+fi
+
 config=""
 selector=""
+scope=""
+positional=0
 flags=""
 
+# `lint [selector] [scope]`: one positional is always the selector (a step,
+# named profile or `all`; `lint windows` selects a step named windows), two are
+# selector then platform scope, and no other count is valid.
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --config)
@@ -22,7 +86,15 @@ while [ "$#" -gt 0 ]; do
             shift 2
             ;;
         --check|--dry-run) flags="$flags $1"; shift ;;
-        *) [ -z "$selector" ] || usage; selector="$1"; shift ;;
+        *)
+            case "$positional" in
+                0) selector="$1" ;;
+                1) scope="$1" ;;
+                *) usage ;;
+            esac
+            positional=$((positional + 1))
+            shift
+            ;;
     esac
 done
 # Re-expose the mode flags as "$@" for the setup/upgrade paths below.
@@ -31,7 +103,13 @@ set -- $flags
 
 [ -n "$config" ] || usage
 case "$operation" in setup|lint|test|upgrade) ;; *) usage ;; esac
-case "$operation" in lint|test) ;; *) [ -z "$selector" ] || usage ;; esac
+case "$operation" in
+    lint) ;;
+    test) [ "$positional" -le 1 ] || usage ;;
+    *) [ "$positional" -eq 0 ] || usage ;;
+esac
+# A scope needs a selector in front of it; scope-only input is a usage error.
+if [ "$positional" -eq 2 ] && { [ -z "$selector" ] || [ -z "$scope" ]; }; then usage; fi
 
 minimum_version() {
     sed -n 's/^[[:space:]]*minimum_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$config" | head -n 1
@@ -45,6 +123,24 @@ product_binary_override="false"
 # Python helper package (sc_lint wheel) provisioned next to the config file.
 venv_dir="$(cd "$(dirname "$config")" && pwd)/.sc-lint/venv"
 venv_python="$venv_dir/bin/python3"
+# Consumer-declared tools (ADR-017 change 6) persist in the installer input next
+# to the config file; the managed wheel helper sc_lint.setup_tools owns them.
+install_input="$(cd "$(dirname "$config")" && pwd)/.sc-lint/install.json"
+# Seed-interpreter probe (stdlib JSON only): exit 0 when the tools object is
+# absent or every collection is empty, 3 when the managed helper must run.
+tools_probe=$(cat <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as handle:
+        data = json.load(handle)
+except (OSError, ValueError):
+    sys.exit(3)
+tools = data.get('tools', {}) if isinstance(data, dict) else None
+empty = {'cargo': {}, 'rustup_targets': []}
+declared = not isinstance(tools, dict) or any(key not in empty or tools[key] != empty[key] for key in tools)
+sys.exit(3 if declared else 0)
+PY
+)
 
 host_python() {
     command -v python3 2>/dev/null || command -v python 2>/dev/null
@@ -96,6 +192,42 @@ provision_venv() {
     if ! "$venv_python" -m pip install --quiet --disable-pip-version-check "$@" "sc-lint==$version"; then
         printf '%s\n' "setup: could not install sc-lint==$version into $venv_dir (CLI.SC_LINT_PYTHON_UNAVAILABLE)" >&2
         return 4
+    fi
+}
+
+# provision_tools <install|check|dry-run>: run the managed sc_lint.setup_tools
+# helper only when the persisted installer input declares tools. Dry-run and
+# check forward --check and never provision the helper or any tool.
+provision_tools() {
+    [ -f "$install_input" ] || return 0
+    probe_python="$(host_python || true)"
+    if [ -z "$probe_python" ] && [ -x "$venv_python" ]; then probe_python="$venv_python"; fi
+    if [ -z "$probe_python" ]; then
+        printf '%s\n' "setup: no Python is available to read the tools declaration in $install_input (SETUP_TOOLS.INSPECTION_UNAVAILABLE); install Python 3, then run just setup" >&2
+        return 4
+    fi
+    tools_status=0
+    "$probe_python" -c "$tools_probe" "$install_input" || tools_status=$?
+    case "$tools_status" in
+        0) return 0 ;;
+        3) ;;
+        *)
+            printf '%s\n' "setup: could not read the tools declaration in $install_input (SETUP_TOOLS.INSPECTION_UNAVAILABLE); run just setup" >&2
+            return 4
+            ;;
+    esac
+    if [ ! -x "$venv_python" ] || ! "$venv_python" -c 'import sc_lint.setup_tools' >/dev/null 2>&1; then
+        if [ "$1" = install ]; then
+            printf '%s\n' "setup: $install_input declares tools, but the sc-lint wheel in $venv_dir does not provide sc_lint.setup_tools (SETUP_TOOLS.INSPECTION_UNAVAILABLE); raise minimum_version, then run just setup" >&2
+        else
+            printf '%s\n' "setup: $install_input declares tools that cannot be inspected because sc_lint.setup_tools is unavailable in $venv_dir (SETUP_TOOLS.INSPECTION_UNAVAILABLE); run just setup" >&2
+        fi
+        return 4
+    fi
+    if [ "$1" = install ]; then
+        "$venv_python" -m sc_lint.setup_tools --config "$config"
+    else
+        "$venv_python" -m sc_lint.setup_tools --config "$config" --check
     fi
 }
 
@@ -214,15 +346,19 @@ case "$operation" in
     setup)
         ensure_product "$@"
         "$product_binary" --config "$config" setup "$@" || exit $?
-        provision_venv "$(venv_mode "$@")"
+        setup_mode="$(venv_mode "$@")"
+        provision_venv "$setup_mode" || exit $?
+        provision_tools "$setup_mode"
         exit $?
         ;;
     lint)
         ensure_product "$@"
         activate_product_env
         provision_venv install || exit $?
-        if [ -n "$selector" ]; then exec "$product_binary" lint --consumer --config "$config" ci --profile "$selector"; fi
-        exec "$product_binary" lint --consumer --config "$config" ci
+        set -- lint --consumer --config "$config" ci
+        if [ -n "$selector" ]; then set -- "$@" --profile "$selector"; fi
+        if [ -n "$scope" ]; then set -- "$@" --platform-scope "$scope"; fi
+        exec "$product_binary" "$@"
         ;;
     test)
         ensure_product "$@"

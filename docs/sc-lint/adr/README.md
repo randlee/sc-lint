@@ -24,8 +24,8 @@ current planning surface.
   - accepted `sc-lint-version` form-factor, interface-family configuration
     surface, and shared HTML/XHTML/JSON interface-report artifact policy
 - [`ADR-012-consumer-adoption-and-just-contract.md`](./ADR-012-consumer-adoption-and-just-contract.md)
-  - installed-product consumer orchestration, generated Just integration, and
-    explicit source-maintainer versus consumer ownership
+  - consumer Just integration and the single cross-platform
+    `.sc-lint/bootstrap.py` (revision Proposed 2026-10-16)
 - [`ADR-013-analyzer-shared-support.md`](./ADR-013-analyzer-shared-support.md)
   - rule-neutral shared AST scanning/rendering support without analyzer-to-
     analyzer dependencies
@@ -33,6 +33,7 @@ current planning surface.
   - standard repo-tools adoption kit and rejection of Phase F's consumer-specific engine
 - [`ADR-016-python-wheel-runtime-and-no-rust-configuration.md`](./ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
   - version-matched Python wheel runtime and no-Rust configuration boundary
+    (revision Proposed 2026-10-16)
 
 ## Draft ADRs
 

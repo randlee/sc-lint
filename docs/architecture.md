@@ -107,6 +107,15 @@ planned.
   (`crates/sc-lint/assets/bootstrap{,.ps1}`, included by `installer.rs`),
   byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap{,.ps1}`.
 
+ADR-017's accepted Phase K changes are delivered within these existing
+owners: Rust analyzer crates validate and evaluate analyzer/inventory policy;
+the top-level Rust CLI selects and sequentially executes consumer lint steps;
+the bootstrap delegates `exec` and installation to the existing managed
+product and wheel; and the setup helper provisions only consumer-declared
+tools/targets. The installer remains configuration/rendering glue, not a
+second Rust policy evaluator. The canonical operator-facing account is in the
+offline product guides linked from [configuration](../docs-bundle/configuration.md).
+
 ## Planned Interface Versioning Layer
 
 The product capability planned for Phase `C` is `sc-lint-version`, which

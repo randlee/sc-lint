@@ -4,6 +4,8 @@ use super::*;
 use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
 use sc_lint_schema::ReportStatus;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -11,12 +13,113 @@ use std::process::Command;
 
 use tempfile::TempDir;
 
+fn installer_catalog() -> serde_json::Value {
+    let families = BOUNDARY_CATALOG
+        .families
+        .iter()
+        .map(|(name, rules)| {
+            (
+                *name,
+                rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    serde_json::json!({
+        "analyzer": BOUNDARY_CATALOG.analyzer.as_str(),
+        "rules": BOUNDARY_CATALOG.rules.iter().map(|rule| rule.as_str()).collect::<Vec<_>>(),
+        "families": families,
+        "own_keys": BOUNDARY_CATALOG.own_keys,
+    })
+}
+
+#[test]
+#[ignore]
+fn emit_installer_catalog() {
+    let output = std::env::var("SC_LINT_INSTALLER_CATALOG_OUTPUT")
+        .expect("catalog output path must be provided");
+    fs::write(
+        output,
+        serde_json::to_vec_pretty(&installer_catalog()).unwrap(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn installer_catalog_matches_rust() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/sc-lint-adoption/analyzer-catalog/boundary.json");
+    let actual: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+
+    assert_eq!(actual, installer_catalog());
+}
+
+#[test]
+fn rule_ids_match_frozen_contract_baseline() {
+    let expected: serde_json::Value =
+        serde_json::from_str(include_str!("../tests/fixtures/contracts/rule-ids.json"))
+            .expect("rule-ID baseline is valid JSON");
+    let actual = serde_json::json!(
+        BOUNDARY_CATALOG
+            .rules
+            .iter()
+            .map(|rule| rule.as_str())
+            .collect::<Vec<_>>()
+    );
+
+    assert_eq!(
+        actual, expected,
+        "update the frozen baseline explicitly for additions"
+    );
+}
+
+#[test]
+fn machine_report_matches_frozen_json_contract() {
+    let report = FindingsReport {
+        tool: "sc-lint-boundary",
+        version: "0.1.0",
+        schema_version: "0.2.0",
+        status: ReportStatus::Fail,
+        scanned_crates: 1,
+        findings: vec![Finding {
+            rule_id: RuleId::ScbBoundary001,
+            kind: "contract_fixture".into(),
+            message: "machine contract fixture".to_string(),
+            owner_ids: vec![OwnerId::new("crate::example::example")],
+            node_ids: vec![NodeId::new("crate::example::example::item")],
+        }],
+    };
+    let expected: serde_json::Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/contracts/machine-report.json"
+    ))
+    .expect("machine-report baseline is valid JSON");
+
+    assert_eq!(
+        expected["schema_version"].as_str(),
+        Some(SC_LINT_SCHEMA_VERSION),
+        "golden schema_version must match analyzer reports"
+    );
+    assert_eq!(serde_json::to_value(report).unwrap(), expected);
+}
+
 fn fixture_display_path(relative_path: &str) -> String {
     std::env::temp_dir()
         .join("sc-lint-boundary-tests")
         .join(relative_path)
         .display()
         .to_string()
+}
+
+#[test]
+fn malformed_manifest_owner_has_no_repository_relative_path() {
+    let finding = Finding {
+        rule_id: RuleId::ScbManifest001,
+        kind: "manifest_error".into(),
+        message: "invalid manifest path".to_string(),
+        owner_ids: vec![OwnerId::new("/outside/Cargo.toml")],
+        node_ids: Vec::new(),
+    };
+
+    assert!(manifest_finding_path(&finding).is_none());
 }
 
 #[test]
@@ -257,6 +360,103 @@ fn exports_graph_for_inline_and_file_modules_and_attributes() {
     }));
 }
 
+const PARALLEL_MODULE_COUNT: usize = 12;
+
+fn write_multifile_parallel_fixture() -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    // Declare modules in reverse order so the merge order cannot coincide with
+    // declaration order by accident.
+    let mut lib = String::from("mod first; mod second;\n");
+    for index in (0..PARALLEL_MODULE_COUNT).rev() {
+        lib.push_str(&format!("mod gen_{index:02};\n"));
+        fixture.write_source(
+            "example",
+            &format!("gen_{index:02}.rs"),
+            &format!("pub struct Gen{index:02}; pub fn make_{index:02}() -> Gen{index:02} {{ Gen{index:02} }}"),
+        );
+    }
+    fixture.write_source("example", "lib.rs", &lib);
+    fixture.write_source("example", "first.rs", "pub struct First; pub mod nested;");
+    fixture.write_source("example", "first/nested.rs", "pub struct Nested;");
+    fixture.write_source("example", "second.rs", "pub enum Second { A, B }");
+    fixture
+}
+
+fn in_pool<T: Send>(threads: usize, work: impl FnOnce() -> T + Send) -> T {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build()
+        .unwrap()
+        .install(work)
+}
+
+#[test]
+fn parallel_graph_file_parsing_is_deterministic_for_multifile_workspaces() {
+    let fixture = write_multifile_parallel_fixture();
+    let options = ExportGraphOptions {
+        root: fixture.root().to_path_buf(),
+    };
+    // Oracle: a single-thread pool processes every round strictly in order.
+    let expected = in_pool(1, || export_workspace_graph(&options).unwrap());
+    let expected_json = render_graph_export_json(&expected);
+
+    let node_ids: Vec<&str> = expected.nodes.iter().map(|node| node.id.as_str()).collect();
+    for name in ["First", "Nested", "Second"] {
+        assert!(
+            node_ids.iter().any(|id| id.ends_with(&format!("::{name}"))),
+            "expected node {name} in {node_ids:#?}"
+        );
+    }
+    for index in 0..PARALLEL_MODULE_COUNT {
+        let suffix = format!("::Gen{index:02}");
+        assert!(node_ids.iter().any(|id| id.ends_with(&suffix)), "{suffix}");
+    }
+    let mut sorted_ids = node_ids.clone();
+    sorted_ids.sort();
+    assert_eq!(node_ids, sorted_ids, "nodes follow the sorted merge order");
+    let edge_keys: Vec<_> = expected
+        .edges
+        .iter()
+        .map(|edge| (edge.kind, edge.from.as_str(), edge.to.as_str()))
+        .collect();
+    let mut sorted_edge_keys = edge_keys.clone();
+    sorted_edge_keys.sort();
+    assert_eq!(edge_keys, sorted_edge_keys, "edges follow the sorted order");
+
+    for _ in 0..8 {
+        let graph = in_pool(4, || export_workspace_graph(&options).unwrap());
+        assert_eq!(graph.nodes, expected.nodes);
+        assert_eq!(graph.edges, expected.edges);
+        assert_eq!(render_graph_export_json(&graph), expected_json);
+    }
+}
+
+#[test]
+fn analyze_workspace_output_is_identical_across_thread_pools() {
+    let fixture = write_multifile_parallel_fixture();
+    let render = |format: OutputFormat| {
+        let options = AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format,
+            rule: None,
+        };
+        let report = analyze_workspace(&options).unwrap();
+        (
+            render_findings_report(&report),
+            serde_json::to_string_pretty(&report).unwrap(),
+        )
+    };
+    let expected = in_pool(1, || render(OutputFormat::Json));
+    assert!(expected.0.contains("scanned_crates=1"), "{}", expected.0);
+    for _ in 0..4 {
+        let actual = in_pool(4, || render(OutputFormat::Json));
+        assert_eq!(actual.0, expected.0, "text output differs");
+        assert_eq!(actual.1, expected.1, "json output differs");
+    }
+}
+
 #[test]
 fn exports_field_and_variant_nodes_for_type_graph() {
     let fixture = WorkspaceFixture::new();
@@ -471,6 +671,780 @@ fn dependency_policy_allows_direct_workspace_dependency() {
 }
 
 #[test]
+fn issue376_union_matrix() {
+    let (fallback_fixture, fallback_options) = issue376_fixture(false);
+    assert_issue376_union_row(
+        &fallback_fixture,
+        &fallback_options,
+        &["q"],
+        None,
+        &["r_lib"],
+        None,
+    );
+    assert_issue376_union_row(
+        &fallback_fixture,
+        &fallback_options,
+        &["q"],
+        Some(&[]),
+        &["r_lib"],
+        None,
+    );
+
+    let (fixture, options) = issue376_fixture(true);
+    assert_issue376_union_row(
+        &fixture,
+        &options,
+        &["q"],
+        Some(&["s_lib"]),
+        &["r-pkg"],
+        None,
+    );
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], Some(&[]), "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], Some(&[]), "active");
+    let report = analyze_workspace(&options).expect("missing dev grants analyze");
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::ScbDependency002)
+            .count(),
+        2,
+        "only dev-only r and s edges should be rejected: {:#?}",
+        report.findings
+    );
+
+    assert_issue376_union_row(
+        &fixture,
+        &options,
+        &["q"],
+        Some(&["s_lib"]),
+        &["r-pkg"],
+        None,
+    );
+    let record = fixture.root().join("boundaries/p/a.toml");
+    let contents = fs::read_to_string(&record).expect("read policy record");
+    fs::write(
+        record,
+        contents.replace(
+            "forbidden_edges = []",
+            "forbidden_edges = [{ from = \"q\", to = \"p\" }]",
+        ),
+    )
+    .expect("write forbidden policy");
+    let report = analyze_workspace(&options).expect("forbidden edge analyzes");
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::ScbDependency002)
+            .count(),
+        0,
+        "the incoming permissions remain valid: {:#?}",
+        report.findings
+    );
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::ScbDependency003)
+            .count(),
+        1,
+        "forbidden edges take precedence over allowlists: {:#?}",
+        report.findings
+    );
+}
+
+fn issue376_fixture(with_explicit_dev: bool) -> (WorkspaceFixture, AnalyzeOptions) {
+    let fixture = WorkspaceFixture::new();
+    let mut members = vec!["crates/p", "crates/q", "crates/r"];
+    if with_explicit_dev {
+        members.push("crates/s");
+    }
+    fixture.write_workspace_root_with_members(&members);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &identity_member_manifest(
+            "q-pkg",
+            "q_lib",
+            "[dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }\n\n[dev-dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }",
+        ),
+    );
+    fixture.write(
+        "crates/r/Cargo.toml",
+        &identity_member_manifest(
+            "r-pkg",
+            "r_lib",
+            "[dev-dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }",
+        ),
+    );
+    if with_explicit_dev {
+        fixture.write(
+            "crates/s/Cargo.toml",
+            &identity_member_manifest(
+                "s-pkg",
+                "s_lib",
+                "[dev-dependencies]\np_alias = { package = \"p\", path = \"../p\", version = \"0.1.0\" }",
+            ),
+        );
+    }
+    for package in members
+        .iter()
+        .map(|member| member.trim_start_matches("crates/"))
+    {
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    (fixture, options)
+}
+
+fn assert_issue376_union_row(
+    fixture: &WorkspaceFixture,
+    options: &AnalyzeOptions,
+    first_runtime: &[&str],
+    first_dev: Option<&[&str]>,
+    second_runtime: &[&str],
+    second_dev: Option<&[&str]>,
+) {
+    write_policy_record(fixture, "p/a.toml", "A", first_runtime, first_dev, "active");
+    write_policy_record(
+        fixture,
+        "p/b.toml",
+        "B",
+        second_runtime,
+        second_dev,
+        "active",
+    );
+    let report = analyze_workspace(options).expect("union policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+}
+
+#[test]
+fn issue376_stale_active_gate() {
+    for (state, expects_stale) in [
+        ("active", true),
+        ("stub_landed", true),
+        ("concrete_landed", true),
+        ("unix_implemented_windows_pending", true),
+        ("planned", false),
+        ("retired", false),
+        ("reserved_future", false),
+    ] {
+        let fixture = WorkspaceFixture::new();
+        fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+        fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+        fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+        fixture.write_source("p", "lib.rs", "pub struct P;");
+        fixture.write_source("q", "lib.rs", "pub struct Q;");
+        write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, state);
+        write_policy_record(&fixture, "p/b.toml", "B", &["q"], None, state);
+
+        let report = analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Dependencies),
+        })
+        .expect("stale policy analyzes");
+        assert_eq!(
+            report
+                .findings
+                .iter()
+                .filter(|finding| finding.rule_id == RuleId::ScbDependency004)
+                .count(),
+            usize::from(expects_stale),
+            "state={state}: {:#?}",
+            report.findings
+        );
+    }
+}
+
+#[test]
+fn issue376_stale_dependent_diagnostic_has_record_cause_category_and_recovery() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r"]);
+    for package in ["p", "q", "r"] {
+        fixture.write(
+            &format!("crates/{package}/Cargo.toml"),
+            &good_member_manifest(package, ""),
+        );
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], Some(&["r"]), "active");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("stale policy analyzes");
+    let stale = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbDependency004)
+        .collect::<Vec<_>>();
+    assert_eq!(stale.len(), 2);
+
+    let runtime_and_fallback_dev = stale
+        .iter()
+        .find(|finding| finding.message.contains("`q`"))
+        .expect("runtime allowlist permission is reported");
+    let dev_only = stale
+        .iter()
+        .find(|finding| finding.message.contains("`r`"))
+        .expect("dev allowlist permission is reported");
+    for (finding, path, field, categories) in [
+        (
+            runtime_and_fallback_dev,
+            Path::new("boundaries").join("p").join("a.toml"),
+            "dependencies.allowed_dependents",
+            "runtime and fallback dev",
+        ),
+        (
+            dev_only,
+            Path::new("boundaries").join("p").join("b.toml"),
+            "dependencies.allowed_dev_dependents",
+            "dev",
+        ),
+    ] {
+        assert!(finding.message.contains(&path.display().to_string()));
+        assert!(finding.message.contains(field));
+        assert!(finding.message.contains(categories));
+        assert!(
+            finding
+                .message
+                .contains("no live direct workspace edge exists in any granted category")
+        );
+        assert!(finding.message.contains(
+            "remove the obsolete permission or restore the intended direct workspace edge"
+        ));
+    }
+}
+
+#[test]
+fn issue376_owner_unions_explicit_dev_permissions_before_stale_checking() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &(good_member_manifest("q", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(
+        &fixture,
+        "p/runtime.toml",
+        "Runtime",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    write_policy_record(
+        &fixture,
+        "p/development.toml",
+        "Development",
+        &["q"],
+        Some(&["q"]),
+        "active",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("owner policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+}
+
+#[test]
+fn issue376_owner_level_active_gate_retains_planned_record_permissions() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &(good_member_manifest("q", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(
+        &fixture,
+        "p/active.toml",
+        "Active",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    write_policy_record(
+        &fixture,
+        "p/planned.toml",
+        "Planned",
+        &["q"],
+        Some(&["q"]),
+        "planned",
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("mixed-state owner policy analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+}
+
+#[test]
+fn issue377_semantic_mutations() {
+    // Valid Rust raw identifiers, owner-local roots, and roots in an explicitly
+    // allowed dependency are all accepted by the semantic inventory pass.
+    let valid_fixture = WorkspaceFixture::new();
+    valid_fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    valid_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    valid_fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    valid_fixture.write_source("p", "lib.rs", "pub struct P;");
+    valid_fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&valid_fixture, "p/a.toml", "A", &[], None, "active");
+    let valid_record = valid_fixture.root().join("boundaries/p/a.toml");
+    let valid_contents = fs::read_to_string(&valid_record).expect("read valid record");
+    fs::write(
+        &valid_record,
+        valid_contents
+            .replace(
+                "roots = [\"run\"]",
+                "roots = [\"r#type\", \"p::LocalRoot\", \"q::ExternalRoot\"]",
+            )
+            .replace(
+                "allowed_dependencies = []",
+                "allowed_dependencies = [\"q\"]",
+            ),
+    )
+    .expect("write valid roots");
+    let valid_report = analyze_workspace(&AnalyzeOptions {
+        root: valid_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("valid roots analyze");
+    assert_eq!(
+        valid_report.status,
+        ReportStatus::Pass,
+        "{:#?}",
+        valid_report.findings
+    );
+    assert!(
+        valid_report.findings.is_empty(),
+        "{:#?}",
+        valid_report.findings
+    );
+
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&fixture, "p/a.toml", "A", &[], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], None, "active");
+    let first = fixture.root().join("boundaries/p/a.toml");
+    let first_contents = fs::read_to_string(&first).expect("read first record");
+    fs::write(
+        &first,
+        first_contents
+            .replace("facade = \"run\"", "facade = \"not-valid\"")
+            .replace(
+                "type = \"Runner\"\nmodule = \"p\"\nvisibility = \"public\"\nconstructor = \"none\"",
+                "visibility = \"trait_only\"\nconstructor = \"public\"",
+            )
+            .replace("roots = [\"run\"]", "roots = [\"api::\", \"q::Root\"]")
+            .replace("forbidden_edges = []", "forbidden_edges = [\"p -> p\"]"),
+    )
+    .expect("write first record");
+    let second = fixture.root().join("boundaries/p/b.toml");
+    let second_contents = fs::read_to_string(&second).expect("read second record");
+    fs::write(
+        &second,
+        second_contents.replace("name = \"B\"", "name = \"A\""),
+    )
+    .expect("write second record");
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("semantic defects are findings");
+    let kinds = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbBoundary004)
+        .map(|finding| finding.kind.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        kinds,
+        BTreeSet::from([
+            "duplicate_owner_name",
+            "invalid_identifier",
+            "invalid_public_path",
+            "self_forbidden_edge",
+            "trait_only_constructor",
+            "unapproved_composition_root",
+        ])
+    );
+    assert_eq!(report.status, ReportStatus::Fail);
+
+    let diagnostic_contexts = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::ScbBoundary004)
+        .map(|finding| {
+            let field = finding
+                .message
+                .split(" field `")
+                .nth(1)
+                .and_then(|tail| tail.split('`').next())
+                .expect("diagnostic includes field context");
+            (finding.kind.as_str(), field.to_string())
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        diagnostic_contexts,
+        vec![
+            ("invalid_public_path", "composition.roots[0]".into()),
+            ("unapproved_composition_root", "composition.roots[1]".into()),
+            ("self_forbidden_edge", "dependencies.forbidden_edges".into()),
+            (
+                "trait_only_constructor",
+                "implementation.constructor".into()
+            ),
+            ("invalid_identifier", "public".into()),
+            ("duplicate_owner_name", "name".into()),
+        ],
+        "diagnostics retain deterministic record/field context: {:#?}",
+        report.findings
+    );
+    assert!(report.findings.iter().all(|finding| {
+        finding.message.contains("boundary `BOUNDARY-PA`")
+            || finding.message.contains("boundary `BOUNDARY-PB`")
+    }));
+
+    let duplicate_fixture = WorkspaceFixture::new();
+    duplicate_fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    duplicate_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    duplicate_fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    duplicate_fixture.write_source("p", "lib.rs", "pub struct P;");
+    duplicate_fixture.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&duplicate_fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&duplicate_fixture, "p/b.toml", "B", &["q"], None, "active");
+    let duplicate_record = duplicate_fixture.root().join("boundaries/p/b.toml");
+    let duplicate_contents = fs::read_to_string(&duplicate_record).expect("read duplicate record");
+    fs::write(
+        &duplicate_record,
+        duplicate_contents.replace("name = \"B\"", "name = \"A\""),
+    )
+    .expect("write duplicate owner name");
+    let duplicate_report = analyze_workspace(&AnalyzeOptions {
+        root: duplicate_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("duplicate names are semantic findings");
+    assert_eq!(duplicate_report.status, ReportStatus::Fail);
+    assert_eq!(
+        duplicate_report
+            .findings
+            .iter()
+            .map(|finding| finding.kind.as_str())
+            .collect::<Vec<_>>(),
+        vec!["duplicate_owner_name", "duplicate_owner_name"],
+        "both distinct boundary IDs are excluded from downstream analysis: {:#?}",
+        duplicate_report.findings
+    );
+    assert!(duplicate_report.findings.iter().all(|finding| {
+        finding.message.contains("field `name`:") && finding.kind == "duplicate_owner_name"
+    }));
+    assert!(
+        duplicate_report.findings[0]
+            .message
+            .contains("boundary `BOUNDARY-PA`")
+    );
+    assert!(
+        duplicate_report.findings[1]
+            .message
+            .contains("boundary `BOUNDARY-PB`")
+    );
+}
+
+#[test]
+fn issue377_aggregates_and_keeps_fatal_errors() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&fixture, "p/a.toml", "A", &[], None, "active");
+    let record = fixture.root().join("boundaries/p/a.toml");
+    let contents = fs::read_to_string(&record).expect("read record");
+    fs::write(
+        &record,
+        contents.replace("facade = \"run\"", "facade = \"bad name\""),
+    )
+    .expect("write semantic record");
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("semantic defect is not fatal");
+    assert_eq!(report.findings[0].kind, "invalid_identifier");
+    assert!(report.findings[0].message.contains("field `public`:"));
+    assert_eq!(report.status, ReportStatus::Fail);
+
+    fs::write(&record, "not valid = [toml").expect("write malformed record");
+    let malformed = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("malformed TOML remains fatal")
+    .to_string();
+    assert!(
+        malformed.contains("failed to parse TOML file"),
+        "{malformed}"
+    );
+
+    let schema_fixture = WorkspaceFixture::new();
+    schema_fixture.write_workspace_root_with_members(&["crates/p"]);
+    schema_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    schema_fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&schema_fixture, "p/a.toml", "A", &[], None, "active");
+    let schema_record = schema_fixture.root().join("boundaries/p/a.toml");
+    let schema_contents = fs::read_to_string(&schema_record).expect("read schema record");
+    fs::write(
+        &schema_record,
+        format!("{schema_contents}\nunknown_root_field = true\n"),
+    )
+    .expect("write unknown schema field");
+    let schema_error = analyze_workspace(&AnalyzeOptions {
+        root: schema_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("schema violation remains fatal")
+    .to_string();
+    assert!(
+        schema_error.contains("failed to parse TOML file"),
+        "{schema_error}"
+    );
+
+    let layout_fixture = WorkspaceFixture::new();
+    layout_fixture.write_workspace_root_with_members(&["crates/p"]);
+    layout_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    layout_fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&layout_fixture, "p/nested/a.toml", "A", &[], None, "active");
+    let layout_record = layout_fixture.root().join("boundaries/p/nested/a.toml");
+    let layout_contents = fs::read_to_string(&layout_record).expect("read layout record");
+    fs::write(
+        &layout_record,
+        layout_contents.replace("owner_package = \"p\"", "owner_package = \"nested\""),
+    )
+    .expect("write nested-layout record");
+    let layout_error = analyze_workspace(&AnalyzeOptions {
+        root: layout_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("invalid inventory layout remains fatal")
+    .to_string();
+    assert!(
+        layout_error.contains("must use boundaries/<owner-package>/<boundary>.toml layout"),
+        "{layout_error}"
+    );
+
+    let duplicate_id_fixture = WorkspaceFixture::new();
+    duplicate_id_fixture.write_workspace_root_with_members(&["crates/p"]);
+    duplicate_id_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    duplicate_id_fixture.write_source("p", "lib.rs", "pub struct P;");
+    write_policy_record(&duplicate_id_fixture, "p/a.toml", "A", &[], None, "active");
+    write_policy_record(&duplicate_id_fixture, "p/b.toml", "B", &[], None, "active");
+    let duplicate_a = duplicate_id_fixture.root().join("boundaries/p/a.toml");
+    let duplicate_b = duplicate_id_fixture.root().join("boundaries/p/b.toml");
+    let duplicate_a_contents = fs::read_to_string(&duplicate_a).expect("read first duplicate id");
+    let duplicate_b_contents = fs::read_to_string(&duplicate_b).expect("read second duplicate id");
+    fs::write(
+        &duplicate_b,
+        duplicate_b_contents.replace("BOUNDARY-PB", "BOUNDARY-PA"),
+    )
+    .expect("write duplicate id");
+    let duplicate_id_error = analyze_workspace(&AnalyzeOptions {
+        root: duplicate_id_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("duplicate boundary ids remain fatal")
+    .to_string();
+    assert!(
+        duplicate_id_error.contains("duplicate boundary_id"),
+        "{duplicate_id_error}"
+    );
+    assert!(duplicate_a_contents.contains("BOUNDARY-PA"));
+
+    let io_fixture = WorkspaceFixture::new();
+    io_fixture.write_workspace_root_with_members(&["crates/p"]);
+    io_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    io_fixture.write_source("p", "lib.rs", "pub struct P;");
+    io_fixture.write("boundaries", "not a directory");
+    let io_error = analyze_workspace(&AnalyzeOptions {
+        root: io_fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect_err("inventory I/O failure remains fatal")
+    .to_string();
+    assert!(
+        io_error.contains("failed to read boundary directory"),
+        "{io_error}"
+    );
+}
+
+/// Issue #376 reporter's reproducer: package `p` owns two records; `q`
+/// depends on `p` at runtime and `r` dev-depends on `p`. Record A lists `q`,
+/// record B lists nothing and no list names `r`. The consumer saw findings on
+/// record B for `q` and on both records for `r`, and never a stale entry.
+#[test]
+fn issue_376_reported_consumer_reproducer() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r", "crates/s"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write(
+        "crates/q/Cargo.toml",
+        &path_dependency_manifest("q", "p", "../p", "0.1.0"),
+    );
+    fixture.write(
+        "crates/r/Cargo.toml",
+        &(good_member_manifest("r", "")
+            + "[dev-dependencies]\np = { path = \"../p\", version = \"0.1.0\" }\n"),
+    );
+    fixture.write("crates/s/Cargo.toml", &good_member_manifest("s", ""));
+    for package in ["p", "q", "r", "s"] {
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &[], None, "active");
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    let mentions =
+        |finding: &Finding, package: &str| finding.message.contains(&format!("`{package}`"));
+
+    // Expected: one dev-edge finding for `r`, none for record B's runtime `q`.
+    let report = analyze_workspace(&options).expect("reproducer analyzes");
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert!(mentions(&report.findings[0], "r"), "{:#?}", report.findings);
+    assert!(!report.findings.iter().any(|finding| mentions(finding, "q")));
+
+    // Listing `r` in `allowed_dev_dependents` clears the dev edge.
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], Some(&["r"]), "active");
+    let report = analyze_workspace(&options).expect("dev allowlist analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+
+    // A listed dependent with no live edge to `p` is reported as stale.
+    write_policy_record(
+        &fixture,
+        "p/a.toml",
+        "A",
+        &["q", "s"],
+        Some(&["r"]),
+        "active",
+    );
+    let report = analyze_workspace(&options).expect("stale entry analyzes");
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id.as_str(), "SCB-DEPENDENCY-004");
+    assert!(mentions(&report.findings[0], "s"), "{:#?}", report.findings);
+}
+
+/// Issue #377 reporter's reproducer: each defect is a one-line change to a
+/// valid record. The consumer saw every mutated inventory pass; each must be
+/// a validation finding instead.
+#[test]
+fn issue_377_reported_consumer_reproducer() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    fixture.write_source("p", "lib.rs", "pub struct P;");
+    fixture.write_source("q", "lib.rs", "pub struct Q;");
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    let record = fixture.root().join("boundaries/p/a.toml");
+    let reset = || {
+        write_policy_record(&fixture, "p/a.toml", "A", &[], None, "active");
+        write_policy_record(&fixture, "p/b.toml", "B", &[], None, "active");
+    };
+    reset();
+    let report = analyze_workspace(&options).expect("valid records analyze");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+
+    let valid = fs::read_to_string(&record).expect("read valid record");
+    for (defect, from, to) in [
+        ("identifier", "facade = \"run\"", "facade = \"not-valid\""),
+        ("module path", "module = \"p\"", "module = \"p::\""),
+        (
+            "implementation type",
+            "type = \"Runner\"",
+            "type = \"not-valid\"",
+        ),
+        (
+            "composition root path",
+            "roots = [\"run\"]",
+            "roots = [\"api::\"]",
+        ),
+        (
+            "trait_only constructor",
+            "type = \"Runner\"\nmodule = \"p\"\nvisibility = \"public\"\nconstructor = \"none\"",
+            "visibility = \"trait_only\"\nconstructor = \"public\"",
+        ),
+        (
+            "self edge",
+            "forbidden_edges = []",
+            "forbidden_edges = [\"p -> p\"]",
+        ),
+        ("duplicate name", "name = \"A\"", "name = \"B\""),
+        (
+            "composition root",
+            "roots = [\"run\"]",
+            "roots = [\"q::Root\"]",
+        ),
+    ] {
+        reset();
+        assert!(
+            valid.contains(from),
+            "{defect}: fixture line `{from}` not found"
+        );
+        fs::write(&record, valid.replace(from, to)).expect("write mutated record");
+        let report = analyze_workspace(&options).expect("defect is a finding, not a load error");
+        assert_eq!(
+            report.status,
+            ReportStatus::Fail,
+            "{defect}: {:#?}",
+            report.findings
+        );
+    }
+}
+
+#[test]
 fn dependency_policy_resolves_owner_and_policy_aliases_to_canonical_packages() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root_with_members(&["crates/app-dir", "crates/api-dir"]);
@@ -515,6 +1489,51 @@ fn dependency_policy_resolves_owner_and_policy_aliases_to_canonical_packages() {
     assert_eq!(
         report.findings[0].message,
         "forbidden workspace dependency edge `app-pkg -> api-pkg` is present"
+    );
+}
+
+#[test]
+fn validated_inventory_exposes_canonical_package_policy_fields() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app-dir", "crates/api-dir"]);
+    fixture.write(
+        "crates/app-dir/Cargo.toml",
+        &identity_member_manifest("app-pkg", "app_lib", ""),
+    );
+    fixture.write(
+        "crates/api-dir/Cargo.toml",
+        &identity_member_manifest("api-pkg", "api_lib", ""),
+    );
+    fixture.write_boundary_record("app-dir", "app-dir", "app_lib", &["api_lib"], &[], &[]);
+    fixture.write_source("app-dir", "lib.rs", "pub struct App;");
+    fixture.write_source("api-dir", "lib.rs", "pub struct Api;");
+
+    let raw = inventory::load_boundary_inventory(fixture.root()).expect("load inventory");
+    let metadata = graph::load_metadata(fixture.root()).expect("load workspace metadata");
+    let workspace_packages = workspace_packages(&metadata);
+    let resolver =
+        inventory::WorkspacePackageResolver::from_workspace_packages(&workspace_packages);
+    let known_non_workspace_packages =
+        known_non_workspace_packages(&metadata, &raw, &workspace_packages);
+    let (validated, diagnostics) =
+        inventory::validate_inventory(raw, &resolver, &known_non_workspace_packages, true)
+            .expect("validate inventory");
+
+    assert!(diagnostics.is_empty());
+    let policy = validated
+        .records()
+        .next()
+        .and_then(inventory::ValidatedRecord::policy)
+        .expect("active record has canonical policy");
+    assert_eq!(
+        policy.owner,
+        inventory::WorkspacePackageName::from_package_name("app-pkg")
+    );
+    assert_eq!(
+        policy.allowed_dependencies,
+        BTreeSet::from([inventory::WorkspacePackageName::from_package_name(
+            "api-pkg"
+        )])
     );
 }
 
@@ -2944,6 +3963,77 @@ fn write_named_caller_boundary_record(fixture: &WorkspaceFixture, approved_entri
     );
 }
 
+fn write_policy_record(
+    fixture: &WorkspaceFixture,
+    path: &str,
+    name: &str,
+    allowed_dependents: &[&str],
+    allowed_dev_dependents: Option<&[&str]>,
+    state: &str,
+) {
+    let allowed_dependents = allowed_dependents
+        .iter()
+        .map(|package| format!("\"{package}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let allowed_dev_dependents = allowed_dev_dependents.map(|packages| {
+        let packages = packages
+            .iter()
+            .map(|package| format!("\"{package}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("                allowed_dev_dependents = [{packages}]\n                ")
+    });
+    fixture.write(
+        "boundaries/planning.toml",
+        "[planning]\ncurrent_sprint = \"K.3\"\n",
+    );
+    fixture.write(
+        &format!("boundaries/{path}"),
+        &format!(
+            r#"
+                boundary_id = "BOUNDARY-P{name}"
+                owner_package = "p"
+                owner_crate_path = "p"
+                name = "{name}"
+
+                [public]
+                facade = "run"
+
+                [implementation]
+                type = "Runner"
+                module = "p"
+                visibility = "public"
+                constructor = "none"
+
+                [composition]
+                roots = ["run"]
+
+                [dependencies]
+                allowed_dependents = [{allowed_dependents}]
+                {allowed_dev_dependents}allowed_dependencies = []
+                forbidden_edges = []
+
+                [references]
+                scope = "outside_owner_crate"
+                forbidden = []
+
+                [testing]
+                allowed_test_double_paths = []
+                forbidden_test_bypasses = []
+
+                [enforcement]
+                lint_rules = []
+                review_gates = []
+
+                [status]
+                state = "{state}"
+            "#,
+            allowed_dev_dependents = allowed_dev_dependents.unwrap_or_default(),
+        ),
+    );
+}
+
 struct ManifestPolicyFixture {
     workspace: WorkspaceFixture,
     members: Vec<String>,
@@ -3845,6 +4935,42 @@ fn unknown_rule_filter_is_selector_error() {
 }
 
 #[test]
+fn manifest_policy_shape_errors_are_indexed_analyzer_config_errors() {
+    for (config, expected_key, explanation) in [
+        (
+            "manifest_dependency_allowlists = \"wrong\"",
+            "manifest_dependency_allowlists",
+            "use array-of-table entries",
+        ),
+        (
+            "manifest_dependency_allowlists = [\"wrong\"]",
+            "manifest_dependency_allowlists[0]",
+            "replace it with a table entry",
+        ),
+        (
+            "[[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]\nowner_manifest_path = 42",
+            "manifest_dependency_allowlists[0].owner_manifest_path",
+            "provide a quoted string",
+        ),
+    ] {
+        let fixture = undeclared_dependency_fixture();
+        fixture.write(
+            "sc-lint.toml",
+            &format!("[tool.sc-lint.analyzers.boundary]\n{config}\n"),
+        );
+
+        match configured(fixture.root(), None) {
+            Err(BoundaryError::AnalyzerConfig(error)) => {
+                assert_eq!(error.code(), "ANALYZER_CONFIG.WRONG_TYPE");
+                assert!(error.to_string().contains(expected_key));
+                assert!(error.to_string().contains(explanation));
+            }
+            other => panic!("expected indexed analyzer config error, got {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn rule_filter_selects_exactly_the_rule() {
     let fixture = undeclared_dependency_fixture();
 
@@ -3863,6 +4989,88 @@ fn rule_filter_selects_exactly_the_rule() {
     assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(report.findings.len(), 1);
     assert_eq!(report.findings[0].rule_id, RuleId::ScbDependency001);
+}
+
+#[test]
+fn inventory_free_manifest_policy_runs_with_missing_or_invalid_boundaries() {
+    for invalid_boundaries in [false, true] {
+        for with_policy in [false, true] {
+            let fixture = inventory_free_policy_fixture(invalid_boundaries, with_policy);
+            let ownership = configured(fixture.root(), Some("SCB-MANIFEST-004"))
+                .expect("ownership policy does not require boundary inventory");
+            let sections = configured(fixture.root(), Some("SCB-MANIFEST-005"))
+                .expect("section policy does not require boundary inventory");
+
+            if with_policy {
+                assert_eq!(ownership.status, ReportStatus::Fail);
+                assert!(ownership.findings.iter().any(|finding| {
+                    finding.rule_id == RuleId::ScbManifest004
+                        && finding.message.contains("not permitted")
+                }));
+                assert_eq!(sections.status, ReportStatus::Fail);
+                assert_eq!(sections.findings.len(), 1);
+                assert_eq!(sections.findings[0].rule_id, RuleId::ScbManifest005);
+            } else {
+                assert_eq!(ownership.status, ReportStatus::Pass);
+                assert!(ownership.findings.is_empty());
+                assert_eq!(sections.status, ReportStatus::Pass);
+                assert!(sections.findings.is_empty());
+            }
+        }
+    }
+}
+
+#[test]
+fn boundary_semantics_only_does_not_parse_unselected_manifest_policy() {
+    let fixture = undeclared_dependency_fixture();
+    fixture.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary]
+            global_dependency_ownership = "not an array of tables"
+        "#,
+    );
+
+    configured(fixture.root(), Some("SCB-BOUNDARY-004"))
+        .expect("boundary semantic selection ignores unselected manifest policy");
+}
+
+fn inventory_free_policy_fixture(invalid_boundaries: bool, with_policy: bool) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root_with_members(&["crates/app", "crates/dep"]);
+    fixture.write(
+        "crates/app/Cargo.toml",
+        &path_dependency_manifest("app", "dep", "../dep", "0.1.0"),
+    );
+    fixture.write("crates/dep/Cargo.toml", &good_member_manifest("dep", ""));
+    fixture.write_source("app", "lib.rs", "use dep::Thing;\npub struct App;");
+    fixture.write_source("dep", "lib.rs", "pub struct Thing;");
+    if invalid_boundaries {
+        fixture.write("boundaries/planning.toml", "not_planning = true\n");
+    }
+    if with_policy {
+        fixture.write(
+            "sc-lint.toml",
+            r#"
+                [tool.sc-lint.analyzers.boundary]
+                manifest_dependency_allowlists = "not selected by ownership or section rules"
+
+                [[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+                dependency = "dep"
+                allowed_manifest_paths = []
+                allowed_source_roots = []
+                manifest_message = "not permitted"
+                source_message = "not permitted"
+
+                [[tool.sc-lint.analyzers.boundary.manifest_section_rules]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                dependency_package = "dep"
+                allowed_sections = ["dev-dependencies"]
+                message = "dependency belongs in dev-dependencies"
+            "#,
+        );
+    }
+    fixture
 }
 
 #[test]
@@ -4023,4 +5231,112 @@ fn exclude_paths_drops_manifest_findings() {
 
     assert_eq!(report.status, ReportStatus::Pass);
     assert!(report.findings.is_empty());
+}
+
+#[test]
+fn per_rule_path_exclusion_drops_only_matching_manifest_rule() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+            [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+            "SCB-MANIFEST-001" = ["crates/example/Cargo.toml"]
+        "#,
+    );
+
+    let report = configured(fixture.root(), Some("manifests")).expect("manifest analysis succeeds");
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn issue385_boundary_manifest_paths() {
+    let fixture = ManifestPolicyFixture::new(&["crates/example"]);
+    fixture.write_workspace_package_defaults("1.1.2");
+    fixture.write_member_manifest(
+        "example",
+        &good_member_manifest("example", "").replace("homepage.workspace = true\n", ""),
+    );
+    fixture.write_member_source("example", "pub struct Example;");
+    let baseline = configured(fixture.root(), Some("manifests")).unwrap();
+    let baseline_json = serde_json::to_vec(&baseline).unwrap();
+
+    fixture
+        .workspace
+        .write("sc-lint.toml", "[tool.sc-lint.analyzers.boundary]\n");
+    assert_eq!(
+        serde_json::to_vec(&configured(fixture.root(), Some("manifests")).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        "[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n",
+    );
+    assert_eq!(
+        serde_json::to_vec(&configured(fixture.root(), Some("manifests")).unwrap()).unwrap(),
+        baseline_json
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+        [tool.sc-lint.analyzers.boundary]
+        exclude_paths = ["crates/example/Cargo.toml"]
+        [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+        "SCB-MANIFEST-001" = ["crates/other/Cargo.toml"]
+        "#,
+    );
+    assert!(
+        configured(fixture.root(), Some("manifests"))
+            .unwrap()
+            .findings
+            .is_empty()
+    );
+
+    fixture.workspace.write(
+        "sc-lint.toml",
+        r#"
+        [tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+        "SCB-MANIFEST-001" = ["crates/example/Cargo.toml"]
+        "#,
+    );
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.root(),
+        None,
+        Some("manifests"),
+    )
+    .unwrap();
+    let (findings, status) = settings.apply(
+        vec![
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse(
+                        "crates\\example\\Cargo.toml",
+                    )
+                    .unwrap(),
+                ),
+            ),
+            (baseline.findings[0].clone(), None),
+            (
+                baseline.findings[0].clone(),
+                Some(
+                    sc_lint_analyzer_support::RepoRelativePath::parse("crates/example/other.toml")
+                        .unwrap(),
+                ),
+            ),
+        ],
+        |rule| sc_lint_analyzer_support::CatalogRuleId::new(rule.as_str()),
+    );
+    assert_eq!(findings.len(), 2);
+    assert_eq!(status, ReportStatus::Fail);
 }
