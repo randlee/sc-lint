@@ -6,8 +6,9 @@ All notable changes to sc-lint are documented here.
 
 ### Added
 
-- Boundary `allowed_dependencies` and `allowed_dev_dependencies` accept a
-  single trailing `*` prefix pattern (for example `"codex-*"`).
+- Boundary `allowed_dependencies`, `allowed_dev_dependencies`, and
+  `allowed_feature_dependencies` accept a single trailing `*` prefix pattern
+  (for example `"codex-*"`).
 - New `SCB-FEATURE-001` rule (in the `dependencies` family) enforces feature
   independence, with a new optional `allowed_feature_dependencies` field.
 
