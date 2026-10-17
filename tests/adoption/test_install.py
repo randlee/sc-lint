@@ -726,12 +726,13 @@ def test_new_repository_gets_the_default_justfile() -> None:
     assert text.count("set windows-shell") == 1
 
 
-def test_generated_windows_lint_recipe_uses_file_invocation_for_typed_exits() -> None:
+def test_generated_windows_lint_recipe_propagates_typed_exits() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
-    text = (consumer / "Justfile").read_text()
-    assert "pwsh -NoLogo -NoProfile -NonInteractive -File .\\\\.sc-lint\\\\bootstrap.ps1" in text
-    assert '"& .\\\\.sc-lint\\\\bootstrap.ps1"' not in text
+    text = (consumer / ".sc-lint" / "justfile").read_text()
+    assert '& .\\\\.sc-lint\\\\bootstrap.ps1' in text
+    assert 'bootstrap_exit := if os_family() == "windows" { "; exit $LASTEXITCODE" }' in text
+    assert "{{bootstrap_command}} lint --config sc-lint.toml {{profile}}{{bootstrap_exit}}" in text
 
 
 def test_existing_justfile_without_test_gets_the_recommended_recipe() -> None:

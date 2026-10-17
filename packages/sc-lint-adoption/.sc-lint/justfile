@@ -1,10 +1,11 @@
 bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
+bootstrap_exit := if os_family() == "windows" { "; exit $LASTEXITCODE" } else { "" }
 
 setup:
-    {{bootstrap_command}} setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml{{bootstrap_exit}}
 
 lint *profile:
-    {{bootstrap_command}} lint --config sc-lint.toml {{profile}}
+    {{bootstrap_command}} lint --config sc-lint.toml {{profile}}{{bootstrap_exit}}
 
 upgrade:
-    {{bootstrap_command}} upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml{{bootstrap_exit}}

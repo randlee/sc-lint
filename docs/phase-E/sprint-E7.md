@@ -75,22 +75,23 @@ set windows-shell := ["pwsh", "-NoLogo", "-Command"]
 
 default: lint
 
-# Invoke the Windows bootstrap in a child PowerShell process. Calling the
-# script from Just's PowerShell command wrapper collapses typed CLI exits
-# (notably usage=2 and config=3) into a generic recipe failure (1).
-bootstrap_command := if os_family() == "windows" { "pwsh -NoLogo -NoProfile -NonInteractive -File .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
+# Invoke the Windows bootstrap from Just's PowerShell command wrapper and
+# explicitly return its native exit code, preserving typed CLI exits such as
+# usage=2 and config=3 instead of collapsing them into recipe failure (1).
+bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
+bootstrap_exit := if os_family() == "windows" { "; exit $LASTEXITCODE" } else { "" }
 
 setup:
-    {{bootstrap_command}} setup --config sc-lint.toml
+    {{bootstrap_command}} setup --config sc-lint.toml{{bootstrap_exit}}
 
 lint *profile:
-    {{bootstrap_command}} lint --config sc-lint.toml {{profile}}
+    {{bootstrap_command}} lint --config sc-lint.toml {{profile}}{{bootstrap_exit}}
 
 test *layer:
-    {{bootstrap_command}} test --config sc-lint.toml {{layer}}
+    {{bootstrap_command}} test --config sc-lint.toml {{layer}}{{bootstrap_exit}}
 
 upgrade:
-    {{bootstrap_command}} upgrade --config sc-lint.toml
+    {{bootstrap_command}} upgrade --config sc-lint.toml{{bootstrap_exit}}
 ```
 
 ## Acceptance Criteria
