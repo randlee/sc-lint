@@ -8,3 +8,4 @@
 {"sprint": "k-9", "depends_on": ["k-7"]}
 {"sprint": "k-10", "depends_on": ["k-2", "k-4", "k-8", "k-9"]}
 {"sprint": "k-11", "depends_on": ["k-10"]}
+{"sprint": "k-12", "depends_on": ["k-11"]}
