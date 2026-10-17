@@ -1,6 +1,7 @@
 #![cfg(test)]
 
 use super::*;
+use crate::package_policy::DependencyUse;
 use crate::package_policy::references_dependency;
 use crate::render::hex_encode;
 use sc_lint_schema::OutputFormat;
@@ -735,12 +736,23 @@ fn dependency_pattern_validation_rejects_misplaced_stars() {
 #[test]
 fn feature_reference_matching_is_exact_and_rename_aware() {
     for hit in ["dep:api", "api?/f", "api/f"] {
-        assert!(references_dependency(hit, "api"), "{hit}");
+        assert!(
+            references_dependency(hit, "api", DependencyUse::Required, false),
+            "{hit}"
+        );
     }
     for miss in ["api", "api-extra/f", "dep:api-extra", "other/api"] {
-        assert!(!references_dependency(miss, "api"), "{miss}");
+        assert!(
+            !references_dependency(miss, "api", DependencyUse::Required, false),
+            "{miss}"
+        );
     }
-    assert!(references_dependency("dep:alias", "alias"));
+    assert!(references_dependency(
+        "dep:alias",
+        "alias",
+        DependencyUse::Required,
+        false
+    ));
 }
 
 #[test]
@@ -1117,18 +1129,29 @@ fn dev_dependency_prefix_matches_but_does_not_allow_normal_dependency() {
 
 #[test]
 fn feature_independence_honors_explicit_dep_suppression_of_implicit_feature() {
-    use crate::package_policy::references_dependency_with_implicit;
-    assert!(references_dependency_with_implicit(
-        "api", "api", true, false
+    assert!(references_dependency(
+        "api",
+        "api",
+        DependencyUse::Optional,
+        false
     ));
-    assert!(!references_dependency_with_implicit(
-        "api", "api", false, false
+    assert!(!references_dependency(
+        "api",
+        "api",
+        DependencyUse::Required,
+        false
     ));
-    assert!(!references_dependency_with_implicit(
-        "api", "api", true, true
+    assert!(!references_dependency(
+        "api",
+        "api",
+        DependencyUse::Optional,
+        true
     ));
-    assert!(references_dependency_with_implicit(
-        "dep:api", "api", true, true
+    assert!(references_dependency(
+        "dep:api",
+        "api",
+        DependencyUse::Optional,
+        true
     ));
     let fixture = feature_fixture(
         "api = { path = \"../api\", optional = true }",

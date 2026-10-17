@@ -12,6 +12,7 @@ use crate::RuleId;
 
 use super::BoundaryInventory;
 use super::BoundaryRecord;
+use super::FeatureIndependence;
 use super::WorkspacePackageResolver;
 use super::dependency_policy::PackageRef;
 use super::dependency_policy::WorkspacePackageName;
@@ -168,7 +169,7 @@ pub(crate) struct ValidatedDependencyPolicy {
     pub(crate) owner: WorkspacePackageName,
     pub(crate) allowed_dependencies: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
-    pub(crate) allowed_feature_dependencies: Option<BTreeSet<WorkspacePackageName>>,
+    pub(crate) allowed_feature_dependencies: FeatureIndependence<BTreeSet<WorkspacePackageName>>,
     pub(crate) allowed_dependents: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dev_dependents: Option<BTreeSet<WorkspacePackageName>>,
     pub(crate) forbidden_edges: BTreeSet<ValidatedForbiddenPackageEdge>,
@@ -425,37 +426,32 @@ fn validate_dependency_policy(
 fn resolve_feature_patterns(
     context: &ValidationContext<'_>,
     record: &BoundaryRecord,
-) -> Result<Option<BTreeSet<WorkspacePackageName>>> {
-    record
-        .dependencies
-        .allowed_feature_dependencies
-        .as_ref()
-        .map(|references| {
-            resolve_policy_patterns(
+) -> Result<FeatureIndependence<BTreeSet<WorkspacePackageName>>> {
+    match &record.dependencies.allowed_feature_dependencies {
+        FeatureIndependence::NotChecked => Ok(FeatureIndependence::NotChecked),
+        FeatureIndependence::Checked(references) => {
+            Ok(FeatureIndependence::Checked(resolve_policy_patterns(
                 context,
                 record,
                 "dependencies.allowed_feature_dependencies",
                 references,
-            )
-        })
-        .transpose()
+            )?))
+        }
+    }
 }
 
 fn resolve_policy_patterns(
     context: &ValidationContext<'_>,
     record: &BoundaryRecord,
     field: &str,
-    references: &BTreeSet<PackageRef>,
+    references: &[PackageRef],
 ) -> Result<BTreeSet<WorkspacePackageName>> {
     let mut resolved = BTreeSet::new();
     for reference in references {
         match reference {
-            PackageRef::Prefix(prefix) => resolved.extend(
-                context
-                    .resolver
-                    .packages_with_prefix(prefix.as_str())
-                    .cloned(),
-            ),
+            PackageRef::Prefix(_) => {
+                resolved.extend(context.resolver.packages_matching(reference).cloned())
+            }
             PackageRef::Exact(package) => {
                 if let Some(package) =
                     resolve_policy_reference(context, record, field, package.as_ref())?
@@ -730,10 +726,7 @@ fn validate_external_root(
             .dependencies
             .allowed_dependencies
             .iter()
-            .any(|reference| match reference {
-                PackageRef::Exact(name) => name == &root_package,
-                PackageRef::Prefix(prefix) => root_package.as_str().starts_with(prefix.as_str()),
-            })
+            .any(|reference| reference.matches(&root_package))
     {
         return;
     }

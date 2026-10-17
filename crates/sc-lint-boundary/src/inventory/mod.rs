@@ -12,6 +12,8 @@ mod dependency_policy;
 mod semantic;
 mod types;
 
+pub(crate) use dependency_policy::FeatureIndependence;
+use dependency_policy::PackageRef;
 pub(crate) use dependency_policy::WorkspacePackageName;
 pub(crate) use semantic::InventoryDiagnostic;
 pub(crate) use semantic::ValidatedDependencyPolicy;
@@ -76,15 +78,14 @@ impl WorkspacePackageResolver {
         resolver
     }
 
-    /// Workspace packages whose exact name starts with `prefix`.
-    pub(crate) fn packages_with_prefix<'a>(
+    /// Workspace packages matching a validated reference by canonical name.
+    pub(crate) fn packages_matching<'a>(
         &'a self,
-        prefix: &'a str,
+        reference: &'a PackageRef,
     ) -> impl Iterator<Item = &'a WorkspacePackageName> + 'a {
         self.packages
-            .iter()
-            .filter(move |(name, _)| name.starts_with(prefix))
-            .map(|(_, package)| package)
+            .values()
+            .filter(move |package| reference.matches(package))
     }
 
     pub(crate) fn resolve(
