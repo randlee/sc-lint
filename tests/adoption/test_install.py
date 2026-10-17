@@ -707,8 +707,13 @@ def test_schema_analyzer_keys_match_rust_catalogs() -> None:
         ("portability", "sc-lint-portability"),
         ("runtime", "sc-lint-runtime"),
     ]:
-        source = (ROOT / "crates" / crate / "src" / "lib.rs").read_text()
-        own = set(re.findall(r'"([a-z_]+)"', re.search(r"own_keys: &\[([^\]]*)\]", source).group(1)))
+        source = "\n".join(
+            path.read_text()
+            for path in sorted((ROOT / "crates" / crate / "src").rglob("*.rs"))
+        )
+        match = re.search(r"own_keys: &\[([^\]]*)\]", source)
+        assert match is not None, name
+        own = set(re.findall(r'"([a-z_]+)"', match.group(1)))
         assert set(tables[name]["properties"]) == common | own, name
 
 
