@@ -1,0 +1,1112 @@
+{
+ "schema": "plan-anchor/tune-oracle/1",
+ "correlation_id": "lint-8fyq-tune-2",
+ "gate": "planning",
+ "intent": {
+  "id": "phase-j-intent",
+  "version": "1",
+  "sha256": "1099f4ac301151edd2eb6f4376ff1e3958636197c594eb6fbec5e225ad520522"
+ },
+ "anchors_sha256": "6631d3b3609d8c92bf6280504f6faee775fcb247c7b144af1f7e5f6f220d6999",
+ "anchor_record_sha256": {
+  "ANC-001": "d4ac166d9c303c742a551b6cde1b872756d92861bba0ba4a8f322d11703e00e3",
+  "ANC-002": "039d304c01ce53faec5cbaa26b0459d12318189b9de9aad21bb0b8e3b036d01a",
+  "ANC-008": "498e99b71f51fae0c10cdb1fdd2b7394edb2fa71644f1002224d59b81965ef2f",
+  "ANC-012": "eccd6b0713eada457327c101efc4289f6c968b32cc625bc289f1e5bca0fe9e19",
+  "ANC-013": "193ae337b44bf762d89b299bffa3cc186561eaeef54353b123235b81e861e0c3",
+  "ANC-014": "7e6f7e87c611817ea16afb56aa9e4795ad3f774e1e329d5427148392594275b1"
+ },
+ "verdict_rule": "jev_judge.decide(answers, roles, 0.0, kind); prohibition anchors gate on relevant+contradicted only",
+ "repeat_count": 2,
+ "cases": [
+  {
+   "case_id": "ANC-001:fixture_pass",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "fixture_pass",
+   "item": {
+    "id": "item-34d692baf4",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Every step of the formula is dispatched to an agent role (dev, qa, lead, publisher); decisions and stops are sent to omega-prime@hermes and no step waits for a reply from Rand."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Approved pass fixture: no step waits on Rand."
+  },
+  {
+   "case_id": "ANC-001:fixture_fail",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "fixture_fail",
+   "item": {
+    "id": "item-05aa6a990f",
+    "title": "upgrade-sc-compose formula step",
+    "text": "The release step pauses and asks Rand to confirm whether to cut a patch release before it continues."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Approved fail fixture: release step waits for Rand's confirmation, which ANC-001 forbids."
+  },
+  {
+   "case_id": "ANC-001:compliant_paraphrase",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "compliant_paraphrase",
+   "item": {
+    "id": "item-a5c4d9a4d3",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Release step: the publisher agent cuts the patch release on its own once the PRs are merged. Any question it has is sent to omega-prime@hermes and the step continues on the documented default without waiting for a reply from Rand."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Explicitly does not wait on Rand; questions go to omega-prime without blocking."
+  },
+  {
+   "case_id": "ANC-001:silent",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "silent",
+   "item": {
+    "id": "item-11b438f4a4",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Release step: the publisher agent tags the release candidate and publishes the patch release to crates.io after the PR to main is merged."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "A run step (in scope) that never waits on input from Rand; waiting on the merge is the stated exception. Silence is compliance for a prohibition."
+  },
+  {
+   "case_id": "ANC-001:conflict",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "conflict",
+   "item": {
+    "id": "item-dd676253c7",
+    "title": "upgrade-sc-compose formula step",
+    "text": "If CI fails twice on the upgrade branch, the lead stops the run and waits for Rand to say whether to continue or abandon the upgrade."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "A step that waits for Rand's decision, not a merge."
+  },
+  {
+   "case_id": "ANC-001:exception_boundary",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "exception_boundary",
+   "item": {
+    "id": "item-e6bdd4503c",
+    "title": "upgrade-sc-compose formula step",
+    "text": "When CI on the PR to main is green, the lead sends `atm send omega-prime@hermes` asking Rand to merge it; the publish step starts after Rand merges the PR."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Waiting for Rand's merge of the PR to main is the explicit exception in ANC-001."
+  },
+  {
+   "case_id": "ANC-001:relay_wait_boundary",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "relay_wait_boundary",
+   "item": {
+    "id": "item-dc4503198d",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Before tagging, the lead sends `atm send omega-prime@hermes` asking Rand which version number to use, and waits for his answer before continuing."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Routing through omega-prime does not remove the wait for Rand's input (not a merge); still forbidden."
+  },
+  {
+   "case_id": "ANC-001:irrelevant",
+   "anchor_id": "ANC-001",
+   "anchor_version": 3,
+   "kind": "prohibition",
+   "probe": "irrelevant",
+   "item": {
+    "id": "item-e8936f6f89",
+    "title": "sc-lint-boundary change",
+    "text": "Add a rule to the sc-lint-boundary crate that reports wildcard imports (`use foo::*`) in library crates, with unit tests and a documentation entry. No dependency, CI or release tooling changes."
+   },
+   "expected_roles": {
+    "relevant": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "contradicted"
+   ],
+   "expected_verdict": "not_applicable",
+   "rationale": "Not part of an sc-compose upgrade run."
+  },
+  {
+   "case_id": "ANC-002:fixture_pass",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_pass",
+   "item": {
+    "id": "item-0f588b4066",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Deliverable 1 bumps SC_COMPOSE_PIN in .claude/lib/sc_compose_dependency.py; deliverable 2 edits only the repo-owned files the changelog requires; owned_paths lists only these."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Approved pass fixture."
+  },
+  {
+   "case_id": "ANC-002:fixture_fail",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_fail",
+   "item": {
+    "id": "item-e48175b169",
+    "title": "upgrade-sc-compose formula step",
+    "text": "The upgrade step also refactors the bead templates, rewrites the README and reorganises .claude/lib while bumping the pin."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Approved fail fixture: refactors and rewrites unrelated files during the upgrade."
+  },
+  {
+   "case_id": "ANC-002:compliant_paraphrase",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "compliant_paraphrase",
+   "item": {
+    "id": "item-621c123963",
+    "title": "upgrade-sc-compose formula step",
+    "text": "The upgrade edits two or three files: the pin constant in .claude/lib/sc_compose_dependency.py and whichever repository files the new sc-compose changelog says must change. No other file is edited."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "States the exact file restriction."
+  },
+  {
+   "case_id": "ANC-002:silent",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "silent",
+   "item": {
+    "id": "item-a18245d9f8",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Upgrade step: the dev agent updates the sc-compose dependency to the target version and runs the full test suite before pushing the branch."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Changes files for the upgrade but states no file restriction; nothing conflicting."
+  },
+  {
+   "case_id": "ANC-002:topical_only",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "topical_only",
+   "item": {
+    "id": "item-cbe8c68bc2",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Deliverable 2: the dev agent reads the sc-compose changelog for the new version and summarises it in the bead notes."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Mentions the changelog but not the only-these-files constraint."
+  },
+  {
+   "case_id": "ANC-002:conflict",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "conflict",
+   "item": {
+    "id": "item-c548f1c854",
+    "title": "upgrade-sc-compose formula step",
+    "text": "While bumping the sc-compose pin, the dev agent also upgrades every other Python dependency in the repository to its latest version."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Changes files that neither reference sc-compose nor are required by its changelog."
+  },
+  {
+   "case_id": "ANC-002:exception_boundary",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "exception_boundary",
+   "item": {
+    "id": "item-fd88130132",
+    "title": "upgrade-sc-compose formula step",
+    "text": "The new sc-compose changelog renames the `--check-render` flag, so deliverable 2 updates the two repository scripts that pass that flag; together with the pin bump these are the only files changed."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Changelog-required edits are explicitly allowed by ANC-002."
+  },
+  {
+   "case_id": "ANC-002:irrelevant",
+   "anchor_id": "ANC-002",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "irrelevant",
+   "item": {
+    "id": "item-e8936f6f89",
+    "title": "sc-lint-boundary change",
+    "text": "Add a rule to the sc-lint-boundary crate that reports wildcard imports (`use foo::*`) in library crates, with unit tests and a documentation entry. No dependency, CI or release tooling changes."
+   },
+   "expected_roles": {
+    "relevant": "no",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_applicable",
+   "rationale": "Not an sc-compose upgrade."
+  },
+  {
+   "case_id": "ANC-008:fixture_pass",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_pass",
+   "item": {
+    "id": "item-66b93aac49",
+    "title": "upgrade-sc-compose formula step",
+    "text": "On a BREAKING verdict the pr_develop step leaves the develop PR ready to merge, closes the release bead as not planned and opens no PR to main."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Approved pass fixture."
+  },
+  {
+   "case_id": "ANC-008:fixture_fail",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_fail",
+   "item": {
+    "id": "item-1dcb9ece4b",
+    "title": "upgrade-sc-compose formula step",
+    "text": "On a BREAKING verdict the run abandons the branch without opening a PR to develop."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Approved fail fixture: BREAKING path ends without a develop PR."
+  },
+  {
+   "case_id": "ANC-008:compliant_paraphrase",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "compliant_paraphrase",
+   "item": {
+    "id": "item-b315efa322",
+    "title": "upgrade-sc-compose formula step",
+    "text": "If the impact assessment says BREAKING, the run finishes the work, leaves the PR to develop open, green and ready to merge with the impact assessment attached, and stops; no release PR to main is created."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Both required outcomes on the breaking path."
+  },
+  {
+   "case_id": "ANC-008:silent",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "silent",
+   "item": {
+    "id": "item-eda8e3cce2",
+    "title": "upgrade-sc-compose formula step",
+    "text": "pr_develop step: the lead opens the PR from the upgrade branch to develop and waits for CI to finish."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Touches the develop PR but says nothing about the breaking-change path."
+  },
+  {
+   "case_id": "ANC-008:topical_only",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "topical_only",
+   "item": {
+    "id": "item-bf6be49236",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Decision point 1: the lead reads the impact assessment and classifies the upgrade as BREAKING or non-breaking."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Names the breaking verdict but not what the run must do on it."
+  },
+  {
+   "case_id": "ANC-008:conflict",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "conflict",
+   "item": {
+    "id": "item-e29215cc37",
+    "title": "upgrade-sc-compose formula step",
+    "text": "On a BREAKING verdict the run still opens the release PR to main after the PR to develop, with a warning in the PR description."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Opens a release PR to main on a breaking change."
+  },
+  {
+   "case_id": "ANC-008:condition_boundary",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "condition_boundary",
+   "item": {
+    "id": "item-e7ab931d09",
+    "title": "upgrade-sc-compose formula step",
+    "text": "On a non-breaking verdict the run opens the release PR to main after the develop PR merges; on a BREAKING verdict it stops with the PR to develop ready to merge and opens no PR to main."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Release PR to main only on the non-breaking branch; the breaking branch complies."
+  },
+  {
+   "case_id": "ANC-008:irrelevant",
+   "anchor_id": "ANC-008",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "irrelevant",
+   "item": {
+    "id": "item-e8936f6f89",
+    "title": "sc-lint-boundary change",
+    "text": "Add a rule to the sc-lint-boundary crate that reports wildcard imports (`use foo::*`) in library crates, with unit tests and a documentation entry. No dependency, CI or release tooling changes."
+   },
+   "expected_roles": {
+    "relevant": "no",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_applicable",
+   "rationale": "Not an sc-compose upgrade."
+  },
+  {
+   "case_id": "ANC-012:fixture_pass",
+   "anchor_id": "ANC-012",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_pass",
+   "item": {
+    "id": "item-913a252bf4",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Decision point 1 sends `atm send omega-prime@hermes` with the BREAKING or CI-green message; decision point 2 sends `atm send omega-prime@hermes` when the release is deferred."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Approved pass fixture."
+  },
+  {
+   "case_id": "ANC-012:fixture_fail",
+   "anchor_id": "ANC-012",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_fail",
+   "item": {
+    "id": "item-9ddd43eb79",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Decision point 2 checks for other work in progress and silently closes the release bead when release is deferred."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Approved fail fixture: a decision point closes 'silently', i.e. explicitly without the required message."
+  },
+  {
+   "case_id": "ANC-012:compliant_paraphrase",
+   "anchor_id": "ANC-012",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "compliant_paraphrase",
+   "item": {
+    "id": "item-33f0506054",
+    "title": "upgrade-sc-compose formula step",
+    "text": "At decision point 1 the lead runs `atm send omega-prime@hermes` with the verdict; at decision point 2 the lead runs `atm send omega-prime@hermes` with the release decision."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Explicit instruction at every decision point."
+  },
+  {
+   "case_id": "ANC-012:silent",
+   "anchor_id": "ANC-012",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "silent",
+   "item": {
+    "id": "item-5aee2291f6",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Decision point 1: if the impact assessment is BREAKING, take the stop path; otherwise continue to the release path."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "A decision point with no messaging instruction; nothing says no message is sent."
+  },
+  {
+   "case_id": "ANC-012:topical_only",
+   "anchor_id": "ANC-012",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "topical_only",
+   "item": {
+    "id": "item-447fce4e14",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Each decision point records its outcome in the bead notes so the run can be audited later."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "About decision points but lacks the omega-prime instruction; recording notes does not exclude messaging."
+  },
+  {
+   "case_id": "ANC-012:conflict",
+   "anchor_id": "ANC-012",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "conflict",
+   "item": {
+    "id": "item-a8cb333088",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Decision points send no messages; the lead records the chosen branch in the bead notes and continues."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Explicitly rules out the required message."
+  },
+  {
+   "case_id": "ANC-012:irrelevant",
+   "anchor_id": "ANC-012",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "irrelevant",
+   "item": {
+    "id": "item-e8936f6f89",
+    "title": "sc-lint-boundary change",
+    "text": "Add a rule to the sc-lint-boundary crate that reports wildcard imports (`use foo::*`) in library crates, with unit tests and a documentation entry. No dependency, CI or release tooling changes."
+   },
+   "expected_roles": {
+    "relevant": "no",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_applicable",
+   "rationale": "Not an sc-compose upgrade."
+  },
+  {
+   "case_id": "ANC-013:fixture_pass",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_pass",
+   "item": {
+    "id": "item-e1472a580d",
+    "title": "upgrade-sc-compose formula step",
+    "text": "If an environment will not install, the dev records the refusal and sends the reason with `atm send omega-prime@hermes`."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Approved pass fixture."
+  },
+  {
+   "case_id": "ANC-013:fixture_fail",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_fail",
+   "item": {
+    "id": "item-3864a039eb",
+    "title": "upgrade-sc-compose formula step",
+    "text": "If an environment will not install, the dev messages the team-lead and waits."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Approved fail fixture: escalation routed to team-lead instead of omega-prime."
+  },
+  {
+   "case_id": "ANC-013:compliant_paraphrase",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "compliant_paraphrase",
+   "item": {
+    "id": "item-bc67038315",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Any step that cannot proceed (a failed install, CI still red after two fixes, missing credentials) escalates with `atm send omega-prime@hermes` stating the blocker."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "All escalations to omega-prime via atm send."
+  },
+  {
+   "case_id": "ANC-013:silent",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "silent",
+   "item": {
+    "id": "item-f3bff20bdb",
+    "title": "upgrade-sc-compose formula step",
+    "text": "If the environment will not install, the dev records the refusal in the bead notes."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Escalation situation with no destination stated; no conflicting recipient."
+  },
+  {
+   "case_id": "ANC-013:topical_only",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "topical_only",
+   "item": {
+    "id": "item-e4ba582918",
+    "title": "upgrade-sc-compose formula step",
+    "text": "The dev escalates install failures."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Mentions escalation without the required channel or recipient."
+  },
+  {
+   "case_id": "ANC-013:conflict",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "conflict",
+   "item": {
+    "id": "item-a410c45920",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Escalations from the run go to team-lead@sc-lint with `atm send team-lead@sc-lint`; omega-prime@hermes is not contacted."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Different recipient, omega-prime explicitly excluded."
+  },
+  {
+   "case_id": "ANC-013:second_paraphrase",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "second_paraphrase",
+   "item": {
+    "id": "item-ffc9f0a665",
+    "title": "upgrade-sc-compose formula step",
+    "text": "When CI stays red after two fix attempts, the lead escalates with `atm send omega-prime@hermes` and stops the run."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Escalation by the required command and recipient."
+  },
+  {
+   "case_id": "ANC-013:irrelevant",
+   "anchor_id": "ANC-013",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "irrelevant",
+   "item": {
+    "id": "item-e8936f6f89",
+    "title": "sc-lint-boundary change",
+    "text": "Add a rule to the sc-lint-boundary crate that reports wildcard imports (`use foo::*`) in library crates, with unit tests and a documentation entry. No dependency, CI or release tooling changes."
+   },
+   "expected_roles": {
+    "relevant": "no",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_applicable",
+   "rationale": "Not an sc-compose upgrade."
+  },
+  {
+   "case_id": "ANC-014:fixture_pass",
+   "anchor_id": "ANC-014",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_pass",
+   "item": {
+    "id": "item-f1746a079f",
+    "title": "upgrade-sc-compose formula step",
+    "text": "When CI on the develop PR is green, the lead sends omega-prime@hermes \"CI green. Rand, please complete <PR link>.\""
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Approved pass fixture."
+  },
+  {
+   "case_id": "ANC-014:fixture_fail",
+   "anchor_id": "ANC-014",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "fixture_fail",
+   "item": {
+    "id": "item-ddc3131abf",
+    "title": "upgrade-sc-compose formula step",
+    "text": "When CI on the develop PR is green, the lead merges the PR to develop itself."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Approved fail fixture: the agent merges instead of asking Rand."
+  },
+  {
+   "case_id": "ANC-014:compliant_paraphrase",
+   "anchor_id": "ANC-014",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "compliant_paraphrase",
+   "item": {
+    "id": "item-8781a7c621",
+    "title": "upgrade-sc-compose formula step",
+    "text": "Once CI is green on the PR to main, the lead runs `atm send omega-prime@hermes \"CI green on <main PR link>. Rand, please complete the PR.\"` and does not merge it."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "yes",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "satisfied",
+   "rationale": "Required notification on green CI for the main PR."
+  },
+  {
+   "case_id": "ANC-014:silent",
+   "anchor_id": "ANC-014",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "silent",
+   "item": {
+    "id": "item-d78ef6c930",
+    "title": "upgrade-sc-compose formula step",
+    "text": "pr_main step: the lead opens the release PR from develop to main and waits for CI."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Protected-branch PR step with no green-CI notification; nothing conflicting."
+  },
+  {
+   "case_id": "ANC-014:topical_only",
+   "anchor_id": "ANC-014",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "topical_only",
+   "item": {
+    "id": "item-fb78263bd0",
+    "title": "upgrade-sc-compose formula step",
+    "text": "When CI is green on the PR to develop, the lead marks the step complete in the bead."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_addressed",
+   "rationale": "Names the green-CI moment but not the required message."
+  },
+  {
+   "case_id": "ANC-014:conflict",
+   "anchor_id": "ANC-014",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "conflict",
+   "item": {
+    "id": "item-40a8346a61",
+    "title": "upgrade-sc-compose formula step",
+    "text": "When CI on the PR to main is green, the publisher enables auto-merge so the PR merges without Rand."
+   },
+   "expected_roles": {
+    "relevant": "yes",
+    "addressed": "no",
+    "contradicted": "yes"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "contradicted",
+   "rationale": "Completes the PR without asking Rand."
+  },
+  {
+   "case_id": "ANC-014:irrelevant",
+   "anchor_id": "ANC-014",
+   "anchor_version": 2,
+   "kind": "directive",
+   "probe": "irrelevant",
+   "item": {
+    "id": "item-e8936f6f89",
+    "title": "sc-lint-boundary change",
+    "text": "Add a rule to the sc-lint-boundary crate that reports wildcard imports (`use foo::*`) in library crates, with unit tests and a documentation entry. No dependency, CI or release tooling changes."
+   },
+   "expected_roles": {
+    "relevant": "no",
+    "addressed": "no",
+    "contradicted": "no"
+   },
+   "scored_roles": [
+    "relevant",
+    "addressed",
+    "contradicted"
+   ],
+   "expected_verdict": "not_applicable",
+   "rationale": "Not an sc-compose upgrade."
+  }
+ ],
+ "sha256": "f3b4bd117203fa882c7fdfd8affc71bb408f2bdda064ec4fe6d002c9d6f58749"
+}

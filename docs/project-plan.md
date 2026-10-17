@@ -387,6 +387,16 @@ Its authoritative sprint/dependency plan is in the `lint-phase-k` beads;
 and issue regressions; final k-10 reconciles shipped 0.7.* and Phase K user
 and offline documentation. Implementation remains gated by plan review.
 
+Phase `J` delivers the repo formula for unattended sc-compose upgrades,
+`.atm-bd/formula/upgrade-sc-compose.formula.toml.j2`, under
+REQ-PRODUCT-025..031 and the [approved intent](./plans/phase-j/intent.md)
+with its locked anchors. Its one sprint, j-1, pours the formula into a scratch
+phase and rehearses it (1.6.1 to 1.7.0) without a pin edit or PR;
+`docs/plans/phase-j.jsonl` is the phase index and `lint-phase-j` its beads.
+The first production run (1.7.0 to 1.7.1, floors raised to 1.7.1, #342) is
+not a Phase J sprint: it is poured from the formula as its own phase once
+sc-compose v1.7.1 is released.
+
 ## Planning Conventions
 
 - This file tracks project-level phases and priorities.
