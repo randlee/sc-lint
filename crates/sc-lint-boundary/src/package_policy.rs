@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use anyhow::{Context, Result};
+
 use crate::Finding;
 use crate::OwnerId;
 use crate::RuleId;
@@ -48,7 +50,7 @@ pub(crate) struct PackagePolicyReport {
 pub(crate) fn analyze_package_policy(
     metadata: &cargo_metadata::Metadata,
     inventory: &ValidatedInventory,
-) -> PackagePolicyReport {
+) -> Result<PackagePolicyReport> {
     let workspace_packages = crate::workspace_packages(metadata);
     let workspace_package_names = workspace_packages
         .iter()
@@ -57,12 +59,13 @@ pub(crate) fn analyze_package_policy(
     let (runtime_edges, dev_edges) =
         collect_direct_workspace_edges(&workspace_packages, &workspace_package_names);
 
-    let findings = collect_policy_findings(inventory, &runtime_edges, &dev_edges);
+    let findings =
+        collect_policy_findings(inventory, &runtime_edges, &dev_edges, &workspace_packages)?;
 
-    PackagePolicyReport {
+    Ok(PackagePolicyReport {
         findings,
         scanned_crates: workspace_packages.len(),
-    }
+    })
 }
 
 fn collect_direct_workspace_edges(
@@ -97,7 +100,8 @@ fn collect_policy_findings(
     inventory: &ValidatedInventory,
     runtime_edges: &BTreeSet<PackageEdge>,
     dev_edges: &BTreeSet<PackageEdge>,
-) -> Vec<Finding> {
+    workspace_packages: &[&cargo_metadata::Package],
+) -> Result<Vec<Finding>> {
     let direct_edges = runtime_edges
         .union(dev_edges)
         .cloned()
@@ -113,6 +117,7 @@ fn collect_policy_findings(
         .iter()
         .filter(|(record, _)| record.requires_workspace_package())
     {
+        findings.extend(feature_findings(record, policy, workspace_packages)?);
         for edge in runtime_edges
             .iter()
             .filter(|edge| edge.from == policy.owner)
@@ -159,7 +164,93 @@ fn collect_policy_findings(
             .cmp(&right.rule_id)
             .then_with(|| left.message.cmp(&right.message))
     });
-    findings
+    Ok(findings)
+}
+
+fn feature_findings(
+    record: &ValidatedRecord,
+    policy: &ValidatedDependencyPolicy,
+    packages: &[&cargo_metadata::Package],
+) -> Result<Vec<Finding>> {
+    let Some(allowed) = &policy.allowed_feature_dependencies else {
+        return Ok(Vec::new());
+    };
+    let Some(owner) = packages
+        .iter()
+        .find(|p| p.name.as_str() == policy.owner.as_str())
+    else {
+        return Ok(Vec::new());
+    };
+    let text = std::fs::read_to_string(&owner.manifest_path).with_context(|| {
+        format!(
+            "reading feature declarations from `{}`",
+            owner.manifest_path
+        )
+    })?;
+    let manifest: toml::Value = toml::from_str(&text).with_context(|| {
+        format!(
+            "parsing feature declarations from `{}`",
+            owner.manifest_path
+        )
+    })?;
+    let values = manifest
+        .get("features")
+        .and_then(toml::Value::as_table)
+        .into_iter()
+        .flat_map(|table| table.values())
+        .filter_map(toml::Value::as_array)
+        .flatten()
+        .filter_map(toml::Value::as_str)
+        .collect::<Vec<_>>();
+    let mut findings = BTreeMap::new();
+    for dependency in &owner.dependencies {
+        if dependency.kind == cargo_metadata::DependencyKind::Development {
+            continue;
+        }
+        let Some(target) = dependency.path.as_deref().and_then(|path| {
+            packages
+                .iter()
+                .find(|p| p.manifest_path.parent() == Some(path))
+        }) else {
+            continue;
+        };
+        let target_name = WorkspacePackageName::from_package_name(target.name.to_string());
+        if allowed.contains(&target_name) {
+            continue;
+        }
+        let key = dependency.rename.as_deref().unwrap_or(&dependency.name);
+        let implicit = dependency.optional && !values.iter().any(|v| *v == format!("dep:{key}"));
+        let forwards = values
+            .iter()
+            .any(|value| references_dependency(value, key) || (implicit && *value == key));
+        for (kind, hit) in [
+            (
+                "package_dependency_sets_features",
+                !dependency.uses_default_features || !dependency.features.is_empty(),
+            ),
+            ("package_feature_forwards_dependency", forwards),
+        ] {
+            if hit {
+                findings.entry((target.name.to_string(), kind)).or_insert_with(|| Finding {
+                    rule_id: RuleId::ScbFeature001,
+                    kind: kind.into(),
+                    message: format!("workspace package `{}` uses features of `{}` ({kind}) but `{}` is not listed in `{}` allowed_feature_dependencies", owner.name, target.name, target.name, record.boundary_id()),
+                    owner_ids: vec![OwnerId::new(owner.name.to_string()), OwnerId::new(target.name.to_string())],
+                    node_ids: Vec::new(),
+                });
+            }
+        }
+    }
+    Ok(findings.into_values().collect())
+}
+
+pub(crate) fn references_dependency(value: &str, key: &str) -> bool {
+    match value.strip_prefix("dep:") {
+        Some(name) => name == key,
+        None => value
+            .split_once('/')
+            .is_some_and(|(name, _)| name.strip_suffix('?').unwrap_or(name) == key),
+    }
 }
 
 fn collect_incoming_policy_findings(

@@ -4,6 +4,13 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Boundary `allowed_dependencies` and `allowed_dev_dependencies` accept a
+  single trailing `*` prefix pattern (for example `"codex-*"`).
+- New `SCB-FEATURE-001` rule (in the `dependencies` family) enforces feature
+  independence, with a new optional `allowed_feature_dependencies` field.
+
 ### Changed
 
 - The built-in source lint plan runs independent steps concurrently and
@@ -13,6 +20,9 @@ All notable changes to sc-lint are documented here.
 
 ### Compatibility
 
+- Existing boundary records retain their results; feature independence is opt-in.
+  Older binaries reject records declaring `allowed_feature_dependencies`, so
+  consumers adopting it must pin a release that supports the field.
 - Tightened boundary inventory validation and stale-entry diagnostics can
   reject previously accepted invalid declarations, including
   `SCB-DEPENDENCY-004`, `SCB-BOUNDARY-004`, and `SCB-MANIFEST-006`. Review the

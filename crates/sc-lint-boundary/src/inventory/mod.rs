@@ -76,6 +76,17 @@ impl WorkspacePackageResolver {
         resolver
     }
 
+    /// Workspace packages whose exact name starts with `prefix`.
+    pub(crate) fn packages_with_prefix<'a>(
+        &'a self,
+        prefix: &'a str,
+    ) -> impl Iterator<Item = &'a WorkspacePackageName> + 'a {
+        self.packages
+            .iter()
+            .filter(move |(name, _)| name.starts_with(prefix))
+            .map(|(_, package)| package)
+    }
+
     pub(crate) fn resolve(
         &self,
         reference: &str,

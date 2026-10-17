@@ -167,6 +167,7 @@ pub enum RuleId {
     ScbDependency002,
     ScbDependency003,
     ScbDependency004,
+    ScbFeature001,
     ScbManifest001,
     ScbManifest002,
     ScbManifest003,
@@ -190,6 +191,7 @@ impl RuleId {
             Self::ScbDependency002 => "SCB-DEPENDENCY-002",
             Self::ScbDependency003 => "SCB-DEPENDENCY-003",
             Self::ScbDependency004 => "SCB-DEPENDENCY-004",
+            Self::ScbFeature001 => "SCB-FEATURE-001",
             Self::ScbManifest001 => "SCB-MANIFEST-001",
             Self::ScbManifest002 => "SCB-MANIFEST-002",
             Self::ScbManifest003 => "SCB-MANIFEST-003",
@@ -299,6 +301,7 @@ pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbDependency002),
     rule(RuleId::ScbDependency003),
     rule(RuleId::ScbDependency004),
+    rule(RuleId::ScbFeature001),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
     rule(RuleId::ScbManifest003),
@@ -319,6 +322,7 @@ pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbDependency002),
     rule(RuleId::ScbDependency003),
     rule(RuleId::ScbDependency004),
+    rule(RuleId::ScbFeature001),
     rule(RuleId::ScbManifest001),
     rule(RuleId::ScbManifest002),
     rule(RuleId::ScbManifest003),
@@ -364,6 +368,7 @@ pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
                 rule(RuleId::ScbDependency002),
                 rule(RuleId::ScbDependency003),
                 rule(RuleId::ScbDependency004),
+                rule(RuleId::ScbFeature001),
             ],
         ),
         (
@@ -683,7 +688,8 @@ pub fn analyze_workspace(
         .map(inventory::InventoryDiagnostic::finding)
         .collect::<Vec<_>>();
     if options.rule == Some(RuleFilter::Dependencies) {
-        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory);
+        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
         let mut findings = semantic_findings;
         findings.extend(dependency_report.findings);
         return Ok(findings_report(dependency_report.scanned_crates, findings));
@@ -708,7 +714,8 @@ pub fn analyze_workspace(
         findings.extend(analysis::analyze_named_callers(&graph, &raw_inventory));
     }
     if filter.is_none() {
-        let package_report = package_policy::analyze_package_policy(&metadata, &inventory);
+        let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
         findings.extend(package_report.findings);
         let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
             .map_err(|e| BoundaryError::manifest_policy(root, e))?;
