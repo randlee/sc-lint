@@ -1,0 +1,12 @@
+[workspace]
+members = ["app", "api"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+authors = ["sc-lint contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid/sc-lint"
+homepage = "https://example.invalid/sc-lint"

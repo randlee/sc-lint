@@ -155,7 +155,7 @@ pub(crate) enum DependencyPolicyError {
         value: String,
     },
     #[error(
-        "package pattern {value:?} is not accepted in `{field}` for boundary `{boundary_id}`: patterns are only supported in `allowed_dependencies`"
+        "package pattern {value:?} is not accepted in `{field}` for boundary `{boundary_id}`: patterns are only supported in `allowed_dependencies`, `allowed_dev_dependencies`, and `allowed_feature_dependencies`"
     )]
     PatternNotAccepted {
         boundary_id: BoundaryId,
@@ -172,7 +172,7 @@ pub(crate) enum DependencyPolicyError {
     DuplicatePackage {
         boundary_id: BoundaryId,
         field: &'static str,
-        package: WorkspacePackageName,
+        package: String,
     },
     #[error(
         "invalid `dependencies.forbidden_edges[]` value {value:?} in boundary `{boundary_id}`: expected `from -> to`; {reason}"
@@ -314,7 +314,7 @@ fn validate_package_list(
             return Err(DependencyPolicyError::DuplicatePackage {
                 boundary_id: boundary_id.clone(),
                 field,
-                package,
+                package: package.to_string(),
             });
         }
     }
@@ -344,10 +344,8 @@ fn validate_package_patterns(
         };
         if !validated.insert(package.clone()) {
             let name = match package {
-                PackageRef::Exact(name) => name,
-                PackageRef::Prefix(prefix) => {
-                    WorkspacePackageName::from_package_name(format!("{}*", prefix.as_str()))
-                }
+                PackageRef::Exact(name) => name.to_string(),
+                PackageRef::Prefix(prefix) => format!("{}*", prefix.as_str()),
             };
             return Err(DependencyPolicyError::DuplicatePackage {
                 boundary_id: boundary_id.clone(),

@@ -373,19 +373,7 @@ fn validate_dependency_policy(
             "dependencies.allowed_dev_dependencies",
             &record.dependencies.allowed_dev_dependencies,
         )?,
-        allowed_feature_dependencies: record
-            .dependencies
-            .allowed_feature_dependencies
-            .as_ref()
-            .map(|references| {
-                resolve_policy_patterns(
-                    context,
-                    record,
-                    "dependencies.allowed_feature_dependencies",
-                    references,
-                )
-            })
-            .transpose()?,
+        allowed_feature_dependencies: resolve_feature_patterns(context, record)?,
         allowed_dependents: resolve_policy_references(
             context,
             record,
@@ -432,6 +420,25 @@ fn validate_dependency_policy(
             })
             .collect::<Result<BTreeSet<_>>>()?,
     })
+}
+
+fn resolve_feature_patterns(
+    context: &ValidationContext<'_>,
+    record: &BoundaryRecord,
+) -> Result<Option<BTreeSet<WorkspacePackageName>>> {
+    record
+        .dependencies
+        .allowed_feature_dependencies
+        .as_ref()
+        .map(|references| {
+            resolve_policy_patterns(
+                context,
+                record,
+                "dependencies.allowed_feature_dependencies",
+                references,
+            )
+        })
+        .transpose()
 }
 
 fn resolve_policy_patterns(

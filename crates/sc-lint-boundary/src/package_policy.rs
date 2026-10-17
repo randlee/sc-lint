@@ -219,10 +219,10 @@ fn feature_findings(
             continue;
         }
         let key = dependency.rename.as_deref().unwrap_or(&dependency.name);
-        let implicit = dependency.optional && !values.iter().any(|v| *v == format!("dep:{key}"));
-        let forwards = values
-            .iter()
-            .any(|value| references_dependency(value, key) || (implicit && *value == key));
+        let explicit_dep = values.iter().any(|v| v.strip_prefix("dep:") == Some(key));
+        let forwards = values.iter().any(|value| {
+            references_dependency_with_implicit(value, key, dependency.optional, explicit_dep)
+        });
         for (kind, hit) in [
             (
                 "package_dependency_sets_features",
@@ -251,6 +251,15 @@ pub(crate) fn references_dependency(value: &str, key: &str) -> bool {
             .split_once('/')
             .is_some_and(|(name, _)| name.strip_suffix('?').unwrap_or(name) == key),
     }
+}
+
+pub(crate) fn references_dependency_with_implicit(
+    value: &str,
+    key: &str,
+    optional: bool,
+    explicit_dep: bool,
+) -> bool {
+    references_dependency(value, key) || (optional && !explicit_dep && value == key)
 }
 
 fn collect_incoming_policy_findings(
