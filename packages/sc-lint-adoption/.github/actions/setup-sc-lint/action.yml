@@ -10,52 +10,25 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install verified sc-lint release (POSIX)
-      if: runner.os != 'Windows'
-      shell: bash
+    - name: Install verified sc-lint release
+      shell: python
+      env:
+        SC_LINT_ACTION_CONFIG: ${{ inputs.config }}
       run: |
-        set -euo pipefail
-        config='${{ inputs.config }}'
-        version="$(sed -n 's/^[[:space:]]*minimum_version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$config" | head -n 1)"
-        test -n "$version"
-        case "${RUNNER_OS}/${RUNNER_ARCH}" in
-          Linux/X64) target=x86_64-unknown-linux-gnu ;;
-          macOS/X64) target=x86_64-apple-darwin ;;
-          macOS/ARM64) target=aarch64-apple-darwin ;;
-          *) echo "unsupported platform ${RUNNER_OS}/${RUNNER_ARCH}" >&2; exit 1 ;;
-        esac
-        archive="sc-lint_${version}_${target}.tar.gz"
-        base="https://github.com/randlee/sc-lint/releases/download/v${version}"
-        curl --fail --location --retry 3 --output "$RUNNER_TEMP/checksums.txt" "$base/checksums.txt"
-        curl --fail --location --retry 3 --output "$RUNNER_TEMP/$archive" "$base/$archive"
-        expected="$(awk -v name="$archive" '$2 == name || $2 == "*" name { print $1; exit }' "$RUNNER_TEMP/checksums.txt")"
-        test -n "$expected"
-        actual="$(shasum -a 256 "$RUNNER_TEMP/$archive" | awk '{print $1}')"
-        test "$actual" = "$expected"
-        mkdir -p "$RUNNER_TEMP/sc-lint"
-        tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/sc-lint"
-        echo "$RUNNER_TEMP/sc-lint" >> "$GITHUB_PATH"
-        "$RUNNER_TEMP/sc-lint/sc-lint" version --json
-    - name: Install verified sc-lint release (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: |
-        $config = '${{ inputs.config }}'
-        $line = Select-String -Path $config -Pattern '^\s*minimum_version\s*=\s*"([^"]+)"' | Select-Object -First 1
-        if (-not $line) { throw "minimum_version missing from $config" }
-        $version = $line.Matches[0].Groups[1].Value
-        $archive = "sc-lint_${version}_x86_64-pc-windows-msvc.zip"
-        $base = "https://github.com/randlee/sc-lint/releases/download/v$version"
-        $checksums = Join-Path $env:RUNNER_TEMP "checksums.txt"
-        $archivePath = Join-Path $env:RUNNER_TEMP $archive
-        Invoke-WebRequest -UseBasicParsing -Uri "$base/checksums.txt" -OutFile $checksums
-        Invoke-WebRequest -UseBasicParsing -Uri "$base/$archive" -OutFile $archivePath
-        $expectedLine = Get-Content $checksums | Where-Object { $_ -match ("\s\*?" + [regex]::Escape($archive) + "$") } | Select-Object -First 1
-        if (-not $expectedLine) { throw "checksum missing $archive" }
-        $expected = ($expectedLine -split '\s+')[0]
-        $actual = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash
-        if ($actual -ne $expected) { throw "checksum mismatch" }
-        $destination = Join-Path $env:RUNNER_TEMP "sc-lint"
-        Expand-Archive -Path $archivePath -DestinationPath $destination -Force
-        Add-Content -Path $env:GITHUB_PATH -Value $destination
-        & (Join-Path $destination "sc-lint.exe") version --json
+        import os
+        from pathlib import Path
+        import shutil
+        import subprocess
+        import sys
+
+        install_dir = Path(os.environ['RUNNER_TEMP']) / 'sc-lint' / 'bin'
+        env = dict(os.environ, SC_LINT_INSTALL_DIR=str(install_dir))
+        env.pop('SC_LINT_BIN', None)
+        subprocess.run([sys.executable, '.sc-lint/bootstrap.py', 'setup', '--config',
+                        env['SC_LINT_ACTION_CONFIG']], env=env, check=True)
+        binary = install_dir / ('sc-lint.exe' if os.name == 'nt' else 'sc-lint')
+        resolved = str(binary) if binary.is_file() else shutil.which('sc-lint', path=env.get('PATH'))
+        if not resolved:
+            raise SystemExit('setup succeeded but no sc-lint executable was found')
+        with open(env['GITHUB_PATH'], 'a', encoding='utf-8') as path_file:
+            path_file.write(str(Path(resolved).parent) + '\n')

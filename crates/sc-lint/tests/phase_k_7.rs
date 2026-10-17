@@ -14,10 +14,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
-#[cfg(unix)]
-const BOOTSTRAP: &str = include_str!("../assets/bootstrap");
-#[cfg(windows)]
-const BOOTSTRAP_POWERSHELL: &str = include_str!("../assets/bootstrap.ps1");
+const BOOTSTRAP: &str = include_str!("../assets/bootstrap.py");
 
 const DECLARED_TOOLS: &str = r#"{"minimum_version":"0.7.0","profiles":{"ci":["cargo","check"]},"ci":{"os":["linux"],"enabled":false},"analyzers":{},"tools":{"cargo":{"cargo-xwin":"0.18.4"},"rustup_targets":["x86_64-pc-windows-msvc"]}}"#;
 const WITHOUT_TOOLS: &str = r#"{"minimum_version":"0.7.0","profiles":{"ci":["cargo","check"]},"ci":{"os":["linux"],"enabled":false},"analyzers":{}}"#;
@@ -203,11 +200,7 @@ fn consumer(parent: &Path, name: &str, install_input: Option<&str>) -> PathBuf {
         "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n",
     )
     .expect("consumer config");
-    #[cfg(unix)]
-    write_executable(&root.join(".sc-lint/bootstrap"), BOOTSTRAP);
-    #[cfg(windows)]
-    fs::write(root.join(".sc-lint/bootstrap.ps1"), BOOTSTRAP_POWERSHELL)
-        .expect("consumer PowerShell bootstrap");
+    fs::write(root.join(".sc-lint/bootstrap.py"), BOOTSTRAP).expect("consumer Python bootstrap");
     if let Some(input) = install_input {
         fs::write(root.join(".sc-lint/install.json"), input).expect("persisted install input");
     }
@@ -264,9 +257,9 @@ fn bootstrap(fixture: &Path, root: &Path, arguments: &[&str], extra: &[(&str, &s
         write_executable(&managed.join("sc-lint"), "#!/bin/sh\nexit 0\n");
     }
     let path = format!("{}:/usr/bin:/bin", host_python_directory().display());
-    let mut command = Command::new("/bin/sh");
+    let mut command = Command::new(host_python());
     command
-        .arg(root.join(".sc-lint/bootstrap"))
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(arguments)
         .current_dir(root)
         .env_clear()
@@ -290,21 +283,11 @@ fn bootstrap(fixture: &Path, root: &Path, arguments: &[&str], extra: &[(&str, &s
     }
     let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
     let system32 = PathBuf::from(&system_root).join("System32");
-    let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
-    let pwsh = std::env::split_paths(&inherited_path)
-        .map(|directory| directory.join("pwsh.exe"))
-        .find(|candidate| candidate.is_file())
-        .expect("pwsh.exe on Windows PATH");
-    let path = std::env::join_paths([
-        pwsh.parent().expect("pwsh parent").to_path_buf(),
-        host_python_directory(),
-        system32.clone(),
-    ])
-    .expect("valid Windows PATH");
-    let mut command = Command::new(&pwsh);
+    let path = std::env::join_paths([host_python_directory(), system32.clone()])
+        .expect("valid Windows PATH");
+    let mut command = Command::new(host_python());
     command
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-        .arg(root.join(".sc-lint/bootstrap.ps1"))
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(arguments)
         .current_dir(root)
         .env_clear()

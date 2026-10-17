@@ -14,8 +14,7 @@ sc-lint init --just
 just setup
 ```
 
-This creates only `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and the
-Windows companion `.sc-lint/bootstrap.ps1`.
+This creates only `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py`.
 
 On every later clean checkout, including a machine with no `sc-lint` binary on
 `PATH`, run `just setup`. The bootstrap helper downloads the release selected

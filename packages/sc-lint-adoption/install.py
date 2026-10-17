@@ -19,7 +19,8 @@ MARKER_END = "# <<< sc-lint managed integration <<<"
 MANIFEST = Path(".sc-lint/installed.json")
 INSTALL_INPUT = Path(".sc-lint/install.json")
 RENAMED = {Path("README.md"): Path("README.sc-lint.md")}
-WINDOWS_SHELL = 'set windows-shell := ["pwsh", "-NoLogo", "-Command"]\n'
+WINDOWS_SHELL = 'set windows-shell := ["cmd.exe", "/c"]\n'
+PYTHON_BINDING = 'python := if os_family() == "windows" { "python" } else { "python3" }\n'
 RECIPE = r"^([A-Za-z_][\w-]*)[^:\n]*:(?!=)"
 JUST_COLLISION = re.compile(r"(?:recipe|setting) `([^`]+)`", re.I)
 TEMPLATES = {
@@ -29,7 +30,7 @@ TEMPLATES = {
 }
 TEMPLATE_PLACEHOLDERS = {
     "sc-lint.toml.j2": {"minimum_version", "analyzers", "profiles", "test_layers"},
-    "Justfile.import.j2": {"windows_shell"},
+    "Justfile.import.j2": {"windows_shell", "python_binding"},
     "sc-lint-workflow.yml.j2": {"ci_os", "lint_steps"},
 }
 TEMPLATE_VARIABLE = re.compile(r"{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}")
@@ -207,7 +208,7 @@ def render(template: Path, data: dict) -> str:
         "ci_os": json.dumps(runners),
         "lint_steps": lint_workflow_steps(data),
     }
-    deferred = {"windows_shell"} if template.name == "Justfile.import.j2" else set()
+    deferred = {"windows_shell", "python_binding"} if template.name == "Justfile.import.j2" else set()
     if observed - replacements.keys() != deferred:
         raise ValueError(f"{template.name}: unresolved template variables after rendering")
     return substitute_template_variables(source, replacements)
@@ -234,7 +235,7 @@ def package_files() -> dict[Path, bytes]:
     return {
         Path("plugins/sc-lint") / source.relative_to(ROOT): source.read_bytes()
         for source in ROOT.rglob("*")
-        if source.is_file()
+        if source.is_file() and "__pycache__" not in source.parts and source.suffix != ".pyc"
     }
 
 
@@ -243,7 +244,7 @@ def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     if not data["ci"]["enabled"]:
         result = {path: content for path, content in result.items() if path.parts[2] != ".github"}
     for source in ROOT.rglob("*"):
-        if not source.is_file() or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"templates", ".claude-plugin", ".github", "schema.d", "analyzer-catalog"}: continue
+        if not source.is_file() or "__pycache__" in source.parts or source.suffix == ".pyc" or source.relative_to(ROOT) in TEMPLATES or source.name in {"install.py", "install.schema.json"} or source.relative_to(ROOT).parts[0] in {"templates", ".claude-plugin", ".github", "schema.d", "analyzer-catalog"}: continue
         result[RENAMED.get(source.relative_to(ROOT), source.relative_to(ROOT))] = source.read_bytes()
     for source, target in TEMPLATES.items():
         if source.name == "sc-lint-workflow.yml.j2" and not data["ci"]["enabled"]: continue
@@ -253,9 +254,10 @@ def desired(data: dict, repo: Path, input_path: Path) -> Desired:
     if not re.search(r"^test(?![\w-])[^:\n]*:(?!=)", unmanaged(original), re.M): original = (original.rstrip() + "\n\n" + (ROOT / "templates/test.just").read_text()).lstrip("\n")
     if original.count(MARKER_START) != original.count(MARKER_END) or original.count(MARKER_START) > 1: raise RuntimeError(f"{justfile}: marker conflict")
     shell = data.get("justfile", {}).get("windows_shell", True) and not re.search(r"^set\s+windows-shell\b", unmanaged(original), re.M)
+    python_binding = not re.search(r"^(?:export\s+)?python\s*:?=", unmanaged(original), re.M)
     block = substitute_template_variables(
         render(ROOT / Path("templates/Justfile.import.j2"), data),
-        {"windows_shell": WINDOWS_SHELL if shell else ""},
+        {"windows_shell": WINDOWS_SHELL if shell else "", "python_binding": PYTHON_BINDING if python_binding else ""},
     ).strip()
     result[Path("Justfile")] = (re.sub(re.escape(MARKER_START) + r".*?" + re.escape(MARKER_END), block, original, flags=re.S) if MARKER_START in original else (original.rstrip() + "\n\n" + block).lstrip("\n")).encode()
     persisted = frozenset({INSTALL_INPUT}) if input_path.resolve() == (repo / INSTALL_INPUT).resolve() else frozenset()
@@ -298,6 +300,21 @@ def main() -> int:
         )
         return 2
     changes = []
+    retired = []
+    for name, recorded_digest in previously_managed.items():
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            print(f"conflict: invalid managed path {name}", file=sys.stderr); return 2
+        if relative in targets.files:
+            continue
+        path = args.repo / relative
+        if not path.resolve().is_relative_to(args.repo.resolve()) or path.is_symlink():
+            print(f"conflict: invalid managed path {name}", file=sys.stderr); return 2
+        if not path.exists():
+            continue
+        if not path.is_file() or digest(path.read_bytes()) != recorded_digest:
+            print(f"conflict: {relative.as_posix()} was modified outside sc-lint", file=sys.stderr); return 2
+        retired.append((path, path.read_bytes()))
     for relative, expected in targets.files.items():
         path = args.repo / relative; current = path.read_bytes() if path.exists() else b""
         if current != expected:
@@ -308,12 +325,14 @@ def main() -> int:
         except OSError as error: print(f"conflict: --dry-run needs `just` on PATH to check Justfile collisions: {error}", file=sys.stderr); return 2
         if collisions: print(f"conflict: Justfile collisions: {', '.join(collisions)}", file=sys.stderr); return 2
         for path, old, new in changes: print("".join(difflib.unified_diff(old.decode(errors="replace").splitlines(True), new.decode(errors="replace").splitlines(True), fromfile=str(path), tofile=str(path))))
-        return 1 if changes else 0
+        for path, old in retired: print("".join(difflib.unified_diff(old.decode(errors="replace").splitlines(True), [], fromfile=str(path), tofile="/dev/null")))
+        return 1 if changes or retired else 0
     manifest = {relative.as_posix(): digest(content) for relative, content in targets.files.items()}
     changes.append((args.repo / MANIFEST, (args.repo / MANIFEST).read_bytes() if (args.repo / MANIFEST).exists() else b"", json.dumps({"managed": manifest}, indent=2, sort_keys=True).encode() + b"\n"))
+    for path, _ in retired:
+        path.unlink()
     for path, _, content in changes:
         path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(content)
-        if path.relative_to(args.repo) == Path(".sc-lint/bootstrap"): path.chmod(0o755)
     return 0
 
 

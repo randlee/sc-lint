@@ -34,8 +34,7 @@ The installer writes or merges these consumer surfaces:
 
 ```text
 sc-lint.toml
-.sc-lint/bootstrap
-.sc-lint/bootstrap.ps1
+.sc-lint/bootstrap.py
 .sc-lint/justfile
 .sc-lint/install.json
 .sc-lint/installed.json
@@ -58,7 +57,7 @@ block:
 
 ```just
 # >>> sc-lint managed integration >>>
-set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+set windows-shell := ["cmd.exe", "/c"]
 import '.sc-lint/justfile'
 # <<< sc-lint managed integration <<<
 ```

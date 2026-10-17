@@ -26,7 +26,7 @@ from sc_lint.lint_common import discover_repo_root
 
 
 ROOT = discover_repo_root()
-POSIX_BOOTSTRAP = ROOT / "crates" / "sc-lint" / "assets" / "bootstrap"
+BOOTSTRAP = ROOT / "crates" / "sc-lint" / "assets" / "bootstrap.py"
 ADOPTION_INSTALLER = ROOT / "packages" / "sc-lint-adoption" / "install.py"
 PACKAGE_ROOT = Path(sc_lint.__file__).resolve().parent.parent
 WINDOWS_TARGET = "x86_64-pc-windows-msvc"
@@ -520,8 +520,7 @@ class PosixBootstrapToolTests(HelperFixture):
             self.seed / "python3",
             f"#!/bin/sh\nprintf 'seed %s\\n' \"$1\" >> '{self.log}'\nexec '{sys.executable}' \"$@\"\n",
         )
-        (self.consumer / ".sc-lint" / "bootstrap").write_bytes(POSIX_BOOTSTRAP.read_bytes())
-        (self.consumer / ".sc-lint" / "bootstrap").chmod(0o755)
+        (self.consumer / ".sc-lint" / "bootstrap.py").write_bytes(BOOTSTRAP.read_bytes())
         self.version = sc_lint.__version__.split("+")[0]
         self.config.write_text(f'[tool.sc-lint]\nminimum_version = "{self.version}"\n', encoding="utf-8")
 
@@ -543,7 +542,7 @@ class PosixBootstrapToolTests(HelperFixture):
         environment["SC_LINT_INSTALL_DIR"] = str(self.managed)
         try:
             return subprocess.run(
-                ["sh", str(root / ".sc-lint" / "bootstrap"), *arguments],
+                [sys.executable, str(root / ".sc-lint" / "bootstrap.py"), *arguments],
                 cwd=root,
                 env=environment,
                 text=True,
@@ -628,7 +627,6 @@ class PosixBootstrapToolTests(HelperFixture):
         self.assertIn("declares tools that cannot be inspected", result.stderr)
         self.assertFalse((self.consumer / ".sc-lint" / "venv").exists())
         log = self.interpreter_log()
-        self.assertIn("seed -c", log)
         self.assertNotIn("seed -m", log)
         self.assertEqual(self.fake.calls(), [])
 

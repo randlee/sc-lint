@@ -130,7 +130,6 @@ jobs:
           toolchain: "1.94.1"
 
       - name: Run adoption kit integration tests
-        if: ${{ github.event_name == 'push' || github.base_ref == 'develop' || github.base_ref == 'main' }}
         run: just test-adoption-integration
 
   wheel-runtime:

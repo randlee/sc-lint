@@ -320,15 +320,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment["SC_LINT_INSTALL_DIR"] = str(Path(temporary.name) / "clean-install")
             # Keep only OS command directories: this fixture intentionally leaves
             # every directory containing a preinstalled sc-lint off PATH.
-            command_dirs = [Path("/usr/bin"), Path("/bin")]
-            if os.name == "nt":
-                for command in ("pwsh", "curl"):
-                    resolved = shutil.which(command)
-                    if resolved:
-                        command_dirs.append(Path(resolved).parent)
-                # Windows has no /usr/bin: the bootstrap needs a host python
-                # on PATH to create the consumer venv.
-                command_dirs.append(Path(sys.executable).parent)
+            command_dirs = [Path(sys.executable).parent, Path("/usr/bin"), Path("/bin")]
             environment["PATH"] = os.pathsep.join(
                 str(path) for path in command_dirs if path.is_dir()
             )
@@ -367,7 +359,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment = os.environ.copy()
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
-            command_dirs = [old_bin, Path(just).parent, Path("/usr/bin"), Path("/bin")]
+            command_dirs = [old_bin, Path(just).parent, Path(sys.executable).parent, Path("/usr/bin"), Path("/bin")]
             environment["PATH"] = os.pathsep.join(
                 str(path) for path in command_dirs if path.is_dir()
             )
@@ -411,7 +403,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             )
 
             result = self.run_command(
-                ["sh", str(consumer / ".sc-lint/bootstrap"), "setup", "--config", "sc-lint.toml", "--dry-run"],
+                [sys.executable, str(consumer / ".sc-lint/bootstrap.py"), "setup", "--config", "sc-lint.toml", "--dry-run"],
                 cwd=consumer,
                 environment=environment,
             )
@@ -448,10 +440,10 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 for path in (old_bin, Path("/usr/bin"), Path("/bin"))
                 if path.is_dir()
             )
-            bootstrap = str(consumer / ".sc-lint/bootstrap")
+            bootstrap = str(consumer / ".sc-lint/bootstrap.py")
             config = str(consumer / "sc-lint.toml")
             path_result = self.run_command(
-                ["sh", bootstrap, "setup", "--config", config, "--dry-run"],
+                [sys.executable, bootstrap, "setup", "--config", config, "--dry-run"],
                 cwd=consumer,
                 environment=environment,
             )
@@ -471,7 +463,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             calls.unlink()
             environment["SC_LINT_BIN"] = str(old_binary)
             override_result = self.run_command(
-                ["sh", str(consumer / ".sc-lint/bootstrap"), "setup", "--config", str(consumer / "sc-lint.toml"), "--dry-run"],
+                [sys.executable, str(consumer / ".sc-lint/bootstrap.py"), "setup", "--config", str(consumer / "sc-lint.toml"), "--dry-run"],
                 cwd=consumer,
                 environment=environment,
             )
@@ -562,7 +554,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment = os.environ.copy()
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
-            command_dirs = [Path("/usr/bin"), Path("/bin"), Path(just).parent]
+            command_dirs = [Path(sys.executable).parent, Path("/usr/bin"), Path("/bin"), Path(just).parent]
             environment["PATH"] = os.pathsep.join(
                 str(path) for path in command_dirs if path.is_dir()
             )
@@ -625,7 +617,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
             command_dirs = []
-            for command in ("just", "pwsh", "curl"):
+            for command in ("just",):
                 resolved = shutil.which(command)
                 self.assertIsNotNone(resolved, f"{command} is required for this fixture")
                 command_dirs.append(str(Path(resolved).parent))
@@ -682,10 +674,6 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
             command_dirs = []
-            for command in ("pwsh", "curl"):
-                resolved = shutil.which(command)
-                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
-                command_dirs.append(str(Path(resolved).parent))
             command_dirs.append(str(Path(sys.executable).parent))
             environment["PATH"] = os.pathsep.join(command_dirs)
 
@@ -693,11 +681,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
                 result = self.run_command(
                     [
-                        "pwsh",
-                        "-NoLogo",
-                        "-NonInteractive",
-                        "-File",
-                        str(consumer / ".sc-lint/bootstrap.ps1"),
+                        sys.executable,
+                        str(consumer / ".sc-lint/bootstrap.py"),
                         "setup",
                         "--config",
                         "sc-lint.toml",
@@ -725,10 +710,6 @@ class ConsumerLifecycleTests(unittest.TestCase):
             just = shutil.which("just")
             self.assertIsNotNone(just, "just is required for the consumer fixture")
             command_dirs = []
-            for command in ("pwsh", "curl"):
-                resolved = shutil.which(command)
-                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
-                command_dirs.append(str(Path(resolved).parent))
             command_dirs.append(str(Path(sys.executable).parent))
             environment = os.environ.copy()
             environment.pop("SC_LINT_BIN", None)
@@ -766,7 +747,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
             command_dirs = []
-            for command in ("just", "pwsh"):
+            for command in ("just",):
                 resolved = shutil.which(command)
                 self.assertIsNotNone(resolved, f"{command} is required for this fixture")
                 command_dirs.append(str(Path(resolved).parent))
@@ -777,11 +758,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
 
             result = self.run_command(
                 [
-                    "pwsh",
-                    "-NoLogo",
-                    "-NonInteractive",
-                    "-File",
-                    str(consumer / ".sc-lint/bootstrap.ps1"),
+                    sys.executable,
+                    str(consumer / ".sc-lint/bootstrap.py"),
                     "upgrade",
                     "--config",
                     "sc-lint.toml",
@@ -796,10 +774,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertEqual(before, hashlib.sha256(managed_binary.read_bytes()).hexdigest())
 
     def bootstrap_setup(self, consumer: Path, environment: dict[str, str], *flags: str) -> subprocess.CompletedProcess[str]:
-        if os.name == "nt":
-            command = ["pwsh", "-NoLogo", "-NonInteractive", "-File", str(consumer / ".sc-lint/bootstrap.ps1")]
-        else:
-            command = ["sh", str(consumer / ".sc-lint/bootstrap")]
+        command = [sys.executable, str(consumer / ".sc-lint/bootstrap.py")]
         return self.run_command(
             [*command, "setup", "--config", "sc-lint.toml", *flags], cwd=consumer, environment=environment
         )

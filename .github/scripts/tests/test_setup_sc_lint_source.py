@@ -94,29 +94,25 @@ class SourceSetupTests(unittest.TestCase):
             self.assertIn('cannot reuse', result.stderr)
             self.assertFalse((root/'env').exists())
 
-    def test_default_action_resolution_needs_no_python_on_unix_or_windows(self):
+    def test_default_action_resolution_does_not_invoke_source_helper(self):
         action = SCRIPT.parents[1] / 'actions/setup-sc-lint/action.yml'
         steps = yaml.safe_load(action.read_text())['runs']['steps']
-        for label, shell in (('Unix', 'bash'), ('Windows', 'pwsh')):
+        for label, shell in (('Unix', 'bash'), ('Windows', sys.executable)):
             if not shutil.which(shell):
                 continue
             with self.subTest(platform=label), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root/'release').mkdir()
                 (root/'release/publish-artifacts.toml').write_text('[project]\nname="old-consumer"\n')
-                # Any helper invocation fails: default mode must not reach Python.
+                # Any source helper invocation fails in default release mode.
                 helper = root/'.github/scripts/setup_sc_lint_source.py'
                 helper.parent.mkdir(parents=True)
                 helper.write_text('raise RuntimeError("default release must not invoke source helper")')
                 step = next(x for x in steps if x['name'] == f'Resolve immutable sc-lint source ({label})')
-                script = root / ('resolve.ps1' if label == 'Windows' else 'resolve.sh')
+                script = root / ('resolve.py' if label == 'Windows' else 'resolve.sh')
                 script.write_text(step['run'])
                 env = dict(os.environ, GITHUB_ENV=str(root/'env'), SC_LINT_SOURCE_REVISION_INPUT='')
-                cmd = (
-                    [shell, '-NoProfile', '-NonInteractive', '-File', str(script)]
-                    if label == 'Windows'
-                    else [shell, str(script)]
-                )
+                cmd = [shell, str(script)]
                 result = subprocess.run(
                     cmd,
                     cwd=root,

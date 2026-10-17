@@ -22,8 +22,8 @@ boundary record is `boundaries/sc-lint-py/python-bindings.toml`.
 
 ## How consumers get it
 
-`.sc-lint/bootstrap setup --config sc-lint.toml` (POSIX) or
-`bootstrap.ps1` (Windows) provisions `.sc-lint/venv` next to the config file
+`python .sc-lint/bootstrap.py setup --config sc-lint.toml` provisions
+`.sc-lint/venv` next to the config file
 and installs `sc-lint==<minimum_version>` into it:
 
 - `setup --check` exits 4 (`CLI.SC_LINT_PYTHON_UNAVAILABLE`) when the venv is
