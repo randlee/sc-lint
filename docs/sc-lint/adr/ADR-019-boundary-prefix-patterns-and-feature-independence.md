@@ -52,9 +52,9 @@ another workspace package through Cargo features: setting `features` or
    family and runs under `--rule-filter dependencies`.
 
 3. **Compatibility.** Both additions are additive: existing records keep their
-   results. A record that uses a pattern or `allowed_feature_dependencies` is
-   rejected by older binaries (`deny_unknown_fields` / unknown package), so a
-   consumer adopting either pins a release that supports it. The release notes
+   results. Older binaries reject a record that declares
+   `allowed_feature_dependencies` (`deny_unknown_fields`), so a consumer
+   adopting it pins a release that supports it. The release notes
    state this under Compatibility.
 
 ## Consequences
