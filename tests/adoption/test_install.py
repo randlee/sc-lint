@@ -112,7 +112,15 @@ def test_retired_managed_bootstraps_are_removed_only_if_unmodified() -> None:
     assert modified.read_text() == "consumer modification\n"
     assert (consumer / ".sc-lint/bootstrap.ps1").is_file()
 
-    modified.write_text("retired .sc-lint/bootstrap\n")
+    # A newline conversion changes the bytes and must remain a conflict on
+    # every host; restore the recorded bytes without text-mode translation.
+    recorded = before[".sc-lint/bootstrap"]
+    modified.write_bytes(recorded.replace(b"\n", b"\r\n"))
+    newline_conflict = run(*args)
+    assert newline_conflict.returncode == 2
+    assert "conflict: .sc-lint/bootstrap was modified outside sc-lint" in newline_conflict.stderr
+    modified.write_bytes(recorded)
+    assert hashlib.sha256(modified.read_bytes()).hexdigest() == manifest["managed"][".sc-lint/bootstrap"]
     installed = run(*args)
     assert installed.returncode == 0, installed.stderr
     assert not modified.exists()
