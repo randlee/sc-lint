@@ -949,7 +949,10 @@ fn feature_independence_checks_workspace_inherited_features() {
 fn invalid_patterns_name_the_field_and_value() {
     let fixture = feature_fixture(API_DEP, "");
     let boundary = fixture.root().join("boundaries/app/boundary.toml");
-    let valid = fs::read_to_string(&boundary).unwrap();
+    let valid = fs::read_to_string(&boundary).unwrap().replace(
+        "allowed_dependencies = [\"ap*\"]",
+        "allowed_dependencies = [\"ap*\"]\nallowed_dev_dependencies = []",
+    );
     for (field, old, value) in [
         (
             "allowed_dependencies",
@@ -967,6 +970,11 @@ fn invalid_patterns_name_the_field_and_value() {
             "codex-**",
         ),
         ("allowed_dependents", "allowed_dependents = []", "ap*"),
+        (
+            "allowed_dev_dependencies",
+            "allowed_dev_dependencies = []",
+            "a**",
+        ),
         (
             "allowed_feature_dependencies",
             "allowed_feature_dependencies = []",
@@ -1002,6 +1010,15 @@ fn prefixes_match_canonical_package_names_and_forbidden_edges_still_win() {
             .findings
             .iter()
             .any(|f| f.rule_id == RuleId::ScbDependency001)
+    );
+    fs::write(&boundary, valid.replace("[\"ap*\"]", "[\"Ap*\"]")).unwrap();
+    assert!(
+        dependencies_report(&fixture)
+            .unwrap()
+            .findings
+            .iter()
+            .any(|f| f.rule_id == RuleId::ScbDependency001),
+        "prefixes are case-sensitive"
     );
     fs::write(&boundary, valid.replace("[\"ap*\"]", "[\"alias\"]")).unwrap();
     assert!(
