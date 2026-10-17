@@ -148,9 +148,16 @@ Operational rules:
   `allowed_dependents`
 - `SCB-DEPENDENCY-003` reports exact forbidden direct edges even when the same
   edge would otherwise pass owner/dependent allowlists
-- `SCB-FEATURE-001` reports owner dependency `features` /
-  `default-features = false` and owner `[features]` forwarding to workspace
-  packages not in `allowed_feature_dependencies` (REQ-SCB-024, REQ-SCB-025)
+- `allowed_dependencies`, `allowed_dev_dependencies`, and
+  `allowed_feature_dependencies` accept a nonempty canonical-package prefix
+  followed by one `*`; unmatched patterns are valid. `allowed_dependents`
+  remains exact-only. Forbidden edges remain enforced after a prefix match.
+- `SCB-FEATURE-001` is opt-in: omitting `allowed_feature_dependencies` leaves
+  the record unchecked, while `[]` checks without exemptions. It reports
+  normal and build workspace-path dependency features, including inherited and
+  target-specific declarations, and Cargo feature forwarding (`dep:x`,
+  `x/feat`, `x?/feat`, and implicit optional dependency feature `x`). Dev and
+  non-workspace dependencies are excluded (REQ-SCB-024, REQ-SCB-025).
 
 Scope limits for the first rule family:
 
