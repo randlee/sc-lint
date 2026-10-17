@@ -54,11 +54,8 @@ const MANAGED_BACKENDS: &[&str] = &[
 /// The only executable helper E.3 may place in a consumer repository.
 ///
 /// It delegates behavior to the installed product instead of copying source
-/// checkout scripts; E.3 owns rendering it into `.sc-lint/bootstrap`.
-pub(crate) const CONSUMER_BOOTSTRAP_ASSET: &str = include_str!("../assets/bootstrap");
-/// Windows companion for the product-owned consumer bootstrap.
-pub(crate) const CONSUMER_BOOTSTRAP_POWERSHELL_ASSET: &str =
-    include_str!("../assets/bootstrap.ps1");
+/// checkout scripts; E.3 owns rendering it into `.sc-lint/bootstrap.py`.
+pub(crate) const CONSUMER_BOOTSTRAP_ASSET: &str = include_str!("../assets/bootstrap.py");
 
 #[derive(Debug, Clone, Copy)]
 enum InstallerErrorCode {
@@ -1154,21 +1151,11 @@ mod tests {
                 "bootstrap does not expose {operation}"
             );
         }
-        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(r#"[ "$operation" = exec ]"#));
-        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(".sc-lint/bootstrap exec"));
-        assert!(CONSUMER_BOOTSTRAP_ASSET.contains("compatibility check"));
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(".sc-lint/bootstrap.py exec"));
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains("compatibility"));
         assert!(CONSUMER_BOOTSTRAP_ASSET.contains("--config"));
         assert!(!CONSUMER_BOOTSTRAP_ASSET.contains("cargo run"));
-        for operation in ["setup", "lint", "test", "upgrade"] {
-            assert!(
-                CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(operation),
-                "Windows bootstrap does not expose {operation}"
-            );
-        }
-        assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(r#"$Operation -eq "exec""#));
-        assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(".sc-lint/bootstrap.ps1 exec"));
-        assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("CLI.SC_LINT_RELEASE_UNAVAILABLE"));
-        assert!(!CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("cargo run"));
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains("CLI.SC_LINT_RELEASE_UNAVAILABLE"));
     }
 
     #[cfg(unix)]

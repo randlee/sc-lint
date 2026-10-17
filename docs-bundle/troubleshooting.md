@@ -32,8 +32,7 @@ machine-readable error. The human form includes the same recovery guidance.
 
 `sc-lint init --just` reports
 `CLI.SC_LINT_INTEGRATION_CONFLICT` rather than overwriting a differing
-user-owned `Justfile`, `sc-lint.toml`, `.sc-lint/bootstrap`, or
-`.sc-lint/bootstrap.ps1`. Missing managed
+user-owned `Justfile`, `sc-lint.toml`, or `.sc-lint/bootstrap.py`. Missing managed
 files produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
 conflicting file or reconcile it with [the canonical guide](./just-setup.md),
 then rerun initialization.

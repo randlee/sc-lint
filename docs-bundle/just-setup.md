@@ -12,8 +12,7 @@ sc-lint init --just --dry-run # show managed paths without writing
 sc-lint init --just           # create or update managed files
 ```
 
-The command manages `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and the
-Windows companion `.sc-lint/bootstrap.ps1` only.
+The command manages `sc-lint.toml`, `Justfile`, and `.sc-lint/bootstrap.py` only.
 Conflicting user-owned files produce a structured error instead of an
 overwrite.
 The installer also rejects unresolved template variables before writing;
@@ -24,27 +23,26 @@ details are in [Best practices](./best-practices.md#template-rendering).
 The generated file has exactly these public entry points:
 
 ```just
-set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+set windows-shell := ["cmd.exe", "/c"]
+
+python := if os_family() == "windows" { "python" } else { "python3" }
 
 default: lint
 
-bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
-
 setup:
-    {{bootstrap_command}} setup --config sc-lint.toml
+    {{python}} .sc-lint/bootstrap.py setup --config sc-lint.toml
 
 lint *profile:
-    {{bootstrap_command}} lint --config sc-lint.toml {{profile}}
+    {{python}} .sc-lint/bootstrap.py lint --config sc-lint.toml {{profile}}
 
 test *layer:
-    {{bootstrap_command}} test --config sc-lint.toml {{layer}}
+    {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}
 
 upgrade:
-    {{bootstrap_command}} upgrade --config sc-lint.toml
+    {{python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml
 ```
 
-The `bootstrap_command` expression dispatches to the product-owned PowerShell
-companion on Windows and to the POSIX helper elsewhere.
+Every platform runs the same Python bootstrap; Python 3.11 or newer is required.
 
 ## Select lint steps and run managed commands
 
@@ -55,18 +53,18 @@ scopes are `host` (the default), `all`, `linux`, `macos`, and `windows`; a scope
 needs a selector before it. The equivalent direct helper form is:
 
 ```sh
-.sc-lint/bootstrap lint ci windows --config sc-lint.toml
+python .sc-lint/bootstrap.py lint ci windows --config sc-lint.toml
 ```
 
 Use `exec` to run a command with the managed product environment while
 preserving its arguments and exit status:
 
 ```sh
-.sc-lint/bootstrap exec -- cargo --version
+python .sc-lint/bootstrap.py exec -- cargo --version
 ```
 
 An alternate configuration can be named before the `--` separator, as in
-`.sc-lint/bootstrap exec --config config/sc-lint.toml -- cargo --version`.
+`python .sc-lint/bootstrap.py exec --config config/sc-lint.toml -- cargo --version`.
 `exec` does not run setup or select a lint profile. See
 [profiles, platform scope, and declared tools](./using-sc-lint.md#profiles-platform-scope-and-declared-tools)
 for step, target, profile, and tool declaration syntax.

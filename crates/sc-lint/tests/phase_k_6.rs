@@ -6,10 +6,7 @@ use std::process::Command;
 use std::process::Output;
 use tempfile::TempDir;
 
-#[cfg(unix)]
-const BOOTSTRAP: &str = include_str!("../assets/bootstrap");
-#[cfg(windows)]
-const BOOTSTRAP_POWERSHELL: &str = include_str!("../assets/bootstrap.ps1");
+const BOOTSTRAP: &str = include_str!("../assets/bootstrap.py");
 
 #[cfg(unix)]
 fn write_executable(path: &Path, contents: &str) {
@@ -43,7 +40,7 @@ fn write_executable(path: &Path, contents: &str) {
 fn consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBuf {
     let root = parent.join(name);
     fs::create_dir_all(root.join(".sc-lint")).expect("consumer bootstrap directory");
-    let bootstrap = root.join(".sc-lint/bootstrap");
+    let bootstrap = root.join(".sc-lint/bootstrap.py");
     write_executable(&bootstrap, BOOTSTRAP);
     if atm_core_derived {
         fs::write(
@@ -53,7 +50,7 @@ fn consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBu
         .expect("derived consumer manifest");
         fs::write(
             root.join("sc-lint.toml"),
-            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\".sc-lint/bootstrap\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\".sc-lint/bootstrap.py\", \"exec\", \"--\", \"sc-lint\", \"profile-marker\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
         )
         .expect("derived consumer profile configuration");
     } else {
@@ -70,8 +67,7 @@ fn consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBu
 fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -> PathBuf {
     let root = parent.join(name);
     fs::create_dir_all(root.join(".sc-lint")).expect("consumer bootstrap directory");
-    fs::write(root.join(".sc-lint/bootstrap.ps1"), BOOTSTRAP_POWERSHELL)
-        .expect("consumer PowerShell bootstrap");
+    fs::write(root.join(".sc-lint/bootstrap.py"), BOOTSTRAP).expect("consumer Python bootstrap");
     if atm_core_derived {
         fs::write(
             root.join("Cargo.toml"),
@@ -80,7 +76,7 @@ fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -
         .expect("derived consumer manifest");
         fs::write(
             root.join("sc-lint.toml"),
-            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"pwsh\", \"-NoLogo\", \"-NoProfile\", \"-NonInteractive\", \"-File\", \".sc-lint/bootstrap.ps1\", \"exec\", \"--\", \"sc-lint\", \"version\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
+            "[tool.sc-lint]\nminimum_version = \"0.7.0\"\n\n[[tool.sc-lint.lint]]\nname = \"ci\"\ncommand = [\"python\", \".sc-lint/bootstrap.py\", \"exec\", \"--\", \"sc-lint\", \"version\"]\n\n[[tool.sc-lint.test]]\nname = \"test\"\ncommand = [\"cargo\", \"metadata\", \"--no-deps\"]\n",
         )
         .expect("derived consumer profile configuration");
     } else {
@@ -95,11 +91,7 @@ fn windows_consumer_fixture(parent: &Path, name: &str, atm_core_derived: bool) -
 
 #[cfg(windows)]
 fn write_windows_stale_status_bootstrap(path: &Path) {
-    fs::write(
-        path,
-        format!("$global:LASTEXITCODE = 37\n{BOOTSTRAP_POWERSHELL}"),
-    )
-    .expect("PowerShell bootstrap with stale status");
+    fs::write(path, BOOTSTRAP).expect("Python bootstrap");
 }
 
 #[cfg(windows)]
@@ -142,9 +134,14 @@ fn capture_script() -> &'static str {
 
 #[cfg(unix)]
 fn run_bootstrap(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) -> Output {
-    let mut command = Command::new("/bin/sh");
+    let inherited = std::env::var_os("PATH").expect("host PATH");
+    let python = std::env::split_paths(&inherited)
+        .map(|directory| directory.join("python3"))
+        .find(|path| path.is_file())
+        .expect("Python 3 on PATH");
+    let mut command = Command::new(python);
     command
-        .arg(root.join(".sc-lint/bootstrap"))
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(arguments)
         .current_dir(root)
         .env_clear()
@@ -156,35 +153,35 @@ fn run_bootstrap(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) 
 }
 
 #[cfg(windows)]
-fn powershell_executable() -> PathBuf {
+fn python_executable() -> PathBuf {
     let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
     let search_path = std::env::split_paths(&inherited_path).collect::<Vec<_>>();
     search_path
         .iter()
-        .map(|directory| directory.join("pwsh.exe"))
+        .map(|directory| directory.join("python.exe"))
         .find(|candidate| candidate.is_file())
-        .expect("pwsh.exe on Windows PATH")
+        .expect("python.exe on Windows PATH")
 }
 
 #[cfg(windows)]
 fn restricted_windows_test_path() -> std::ffi::OsString {
-    let pwsh = powershell_executable();
+    let python = python_executable();
     let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
     let system32 = PathBuf::from(system_root).join("System32");
     let inherited_path = std::env::var_os("PATH").expect("Windows PATH");
     let mut path = std::env::split_paths(&inherited_path)
-        .filter(|directory| directory == pwsh.parent().expect("pwsh parent"))
+        .filter(|directory| directory == python.parent().expect("python parent"))
         .collect::<Vec<_>>();
     path.push(system32);
     std::env::join_paths(path).expect("valid Windows PATH")
 }
 
 #[cfg(windows)]
-fn powershell_command() -> Command {
-    let pwsh = powershell_executable();
+fn python_command() -> Command {
+    let python = python_executable();
     let system_root = std::env::var_os("SystemRoot").expect("Windows SystemRoot");
     let system32 = PathBuf::from(&system_root).join("System32");
-    let mut command = Command::new(&pwsh);
+    let mut command = Command::new(&python);
     command
         .env_clear()
         .env("SystemRoot", &system_root)
@@ -199,8 +196,8 @@ fn powershell_command() -> Command {
 }
 
 #[cfg(windows)]
-fn inherited_powershell_command() -> Command {
-    Command::new(powershell_executable())
+fn inherited_python_command() -> Command {
+    Command::new(python_executable())
 }
 
 #[cfg(unix)]
@@ -261,9 +258,13 @@ fn bootstrap_exec_does_not_reenter_consumer_profile() {
             String::from_utf8_lossy(&output.stderr)
         );
         let captured = fs::read_to_string(&log).expect("managed process log");
-        assert!(
-            captured.contains(&format!("cwd={root_path}\n")),
-            "{captured}"
+        let cwd = captured
+            .lines()
+            .find_map(|line| line.strip_prefix("cwd="))
+            .expect("child cwd");
+        assert_eq!(
+            Path::new(cwd).canonicalize().unwrap(),
+            Path::new(root_path).canonicalize().unwrap()
         );
         assert!(
             captured.contains(&format!("bin={}\n", managed_binary.display())),
@@ -352,10 +353,9 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
         ("atm-core-derived-consumer", true),
     ] {
         let root = windows_consumer_fixture(fixture.path(), name, derived);
-        let mut command = inherited_powershell_command();
+        let mut command = inherited_python_command();
         command
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-            .arg(root.join(".sc-lint/bootstrap.ps1"))
+            .arg(root.join(".sc-lint/bootstrap.py"))
             .current_dir(&root);
         if derived {
             // The bootstrap owns the consumer mode and translates its
@@ -370,7 +370,7 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
             .env_remove("SC_LINT_INSTALL_DIR")
             .env("LOCALAPPDATA", &local_app_data)
             .output()
-            .expect("run PowerShell consumer bootstrap");
+            .expect("run Python consumer bootstrap");
         assert!(
             output.status.success(),
             "bootstrap status={:?}, stdout={:?}, stderr={:?}",
@@ -411,16 +411,15 @@ fn bootstrap_exec_reports_missing_windows_managed_product_without_path_fallback(
         std::env::var("PATH").expect("host PATH")
     );
 
-    let output = powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-        .arg(root.join(".sc-lint/bootstrap.ps1"))
+    let output = python_command()
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(["exec", "--", "sc-lint", "version"])
         .current_dir(&root)
         .env_remove("SC_LINT_BIN")
         .env("SC_LINT_INSTALL_DIR", &missing)
         .env("PATH", path)
         .output()
-        .expect("run PowerShell consumer bootstrap");
+        .expect("run Python consumer bootstrap");
 
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty(), "stdout: {:?}", output.stdout);
@@ -446,9 +445,8 @@ fn bootstrap_exec_forwards_windows_config() {
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
         .expect("managed product copy");
 
-    let output = inherited_powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-        .arg(root.join(".sc-lint/bootstrap.ps1"))
+    let output = inherited_python_command()
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(["exec", "--config"])
         .arg(&config)
         .args(["--", "sc-lint", "version"])
@@ -456,7 +454,7 @@ fn bootstrap_exec_forwards_windows_config() {
         .env_remove("SC_LINT_BIN")
         .env("SC_LINT_INSTALL_DIR", &managed)
         .output()
-        .expect("run PowerShell consumer bootstrap");
+        .expect("run Python consumer bootstrap");
 
     assert!(
         output.status.success(),
@@ -487,9 +485,8 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
         .join("System32");
     let path = std::env::join_paths([&override_directory, &system32]).expect("valid test PATH");
 
-    let output = inherited_powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-        .arg(root.join(".sc-lint/bootstrap.ps1"))
+    let output = inherited_python_command()
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(["exec", "--", "sc-lint", "version"])
         .current_dir(&root)
         .env(
@@ -503,7 +500,7 @@ fn bootstrap_exec_honors_windows_sc_lint_bin_override() {
         .env("PATH", path)
         .env("SC_LINT_BIN", "sc-lint.exe")
         .output()
-        .expect("run PowerShell consumer bootstrap");
+        .expect("run Python consumer bootstrap");
 
     assert!(
         output.status.success(),
@@ -530,15 +527,14 @@ fn bootstrap_exec_does_not_fall_back_when_windows_sc_lint_bin_override_is_missin
         .expect("managed product copy");
     let missing_override = fixture.path().join("missing-override.exe");
 
-    let output = powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-        .arg(root.join(".sc-lint/bootstrap.ps1"))
+    let output = python_command()
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(["exec", "--", "sc-lint", "version"])
         .current_dir(&root)
         .env("SC_LINT_INSTALL_DIR", &managed)
         .env("SC_LINT_BIN", &missing_override)
         .output()
-        .expect("run PowerShell consumer bootstrap");
+        .expect("run Python consumer bootstrap");
 
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty(), "stdout: {:?}", output.stdout);
@@ -561,20 +557,19 @@ fn bootstrap_exec_returns_zero_for_non_native_command_after_stale_status() {
     fs::create_dir_all(&managed).expect("managed directory");
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
         .expect("managed product copy");
-    let child = fixture.path().join("consumer-command.ps1");
-    fs::write(&child, "Write-Output 'non-native command ran'\n").expect("PowerShell child");
-    let bootstrap = fixture.path().join("bootstrap-with-stale-status.ps1");
+    let child = fixture.path().join("consumer-command.cmd");
+    fs::write(&child, "@echo non-native command ran\r\n").expect("command child");
+    let bootstrap = fixture.path().join("bootstrap.py");
     write_windows_stale_status_bootstrap(&bootstrap);
 
-    let output = powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+    let output = python_command()
         .arg(bootstrap)
         .args(["exec", "--"])
         .arg(child)
         .current_dir(&root)
         .env("SC_LINT_INSTALL_DIR", managed)
         .output()
-        .expect("run PowerShell consumer bootstrap");
+        .expect("run Python consumer bootstrap");
 
     assert_eq!(
         output.status.code(),
@@ -599,18 +594,17 @@ fn bootstrap_exec_returns_127_for_launch_failure_after_stale_status() {
     fs::copy(env!("CARGO_BIN_EXE_sc-lint"), managed.join("sc-lint.exe"))
         .expect("managed product copy");
     let missing = fixture.path().join("missing-command.exe");
-    let bootstrap = fixture.path().join("bootstrap-with-stale-status.ps1");
+    let bootstrap = fixture.path().join("bootstrap.py");
     write_windows_stale_status_bootstrap(&bootstrap);
 
-    let output = powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
+    let output = python_command()
         .arg(bootstrap)
         .args(["exec", "--"])
         .arg(missing)
         .current_dir(&root)
         .env("SC_LINT_INSTALL_DIR", managed)
         .output()
-        .expect("run PowerShell consumer bootstrap");
+        .expect("run Python consumer bootstrap");
 
     assert_eq!(
         output.status.code(),
@@ -660,9 +654,13 @@ fn bootstrap_exec_preserves_argv_and_exit_status() {
         String::from_utf8_lossy(&output.stderr)
     );
     let captured = fs::read_to_string(log).expect("child process log");
-    assert!(
-        captured.contains(&format!("cwd={root_path}\n")),
-        "{captured}"
+    let cwd = captured
+        .lines()
+        .find_map(|line| line.strip_prefix("cwd="))
+        .expect("child cwd");
+    assert_eq!(
+        Path::new(cwd).canonicalize().unwrap(),
+        Path::new(root_path).canonicalize().unwrap()
     );
     assert!(
         captured.contains(&format!("bin={}\n", managed.join("sc-lint").display())),
@@ -784,9 +782,8 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
     let managed_path = managed.to_str().expect("managed path");
     let child_path = child.to_str().expect("child path");
 
-    let output = inherited_powershell_command()
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-        .arg(root.join(".sc-lint/bootstrap.ps1"))
+    let output = inherited_python_command()
+        .arg(root.join(".sc-lint/bootstrap.py"))
         .args(["exec", "--", child_path, "two words", "tail"])
         .current_dir(&root)
         .env_remove("SC_LINT_BIN")
@@ -794,7 +791,7 @@ fn bootstrap_exec_preserves_windows_child_argv_cwd_environment_and_status() {
         .env("SC_LINT_EXEC_LOG", log_path)
         .env("SC_LINT_TEST_VALUE", "preserved")
         .output()
-        .expect("run PowerShell consumer bootstrap");
+        .expect("run Python consumer bootstrap");
 
     assert_eq!(
         output.status.code(),

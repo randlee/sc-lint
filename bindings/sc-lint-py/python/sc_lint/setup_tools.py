@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Provision consumer-declared cargo tools and rustup targets during setup.
 
-ADR-017 change 6: ordinary `.sc-lint/bootstrap setup --config PATH` runs this
+ADR-017 change 6: ordinary `.sc-lint/bootstrap.py setup --config PATH` runs this
 managed-wheel helper after it has ensured the product and the wheel. The helper
 reads only the optional `tools` object of the persisted installer input,
 `PATH.parent/.sc-lint/install.json`. An absent object, or empty collections,
