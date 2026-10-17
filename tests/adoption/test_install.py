@@ -87,6 +87,8 @@ def test_retired_managed_bootstraps_are_removed_only_if_unmodified() -> None:
     assert run(*args).returncode == 0
     manifest_path = consumer / ".sc-lint" / "installed.json"
     manifest = json.loads(manifest_path.read_text())
+    # Synthetic equivalent of the cc1d496 pre-upgrade state: its manifest
+    # records both retired paths as managed, unmodified files.
     for name in (".sc-lint/bootstrap", ".sc-lint/bootstrap.ps1"):
         path = consumer / name
         payload = ("retired " + name + "\n").encode()
@@ -98,7 +100,8 @@ def test_retired_managed_bootstraps_are_removed_only_if_unmodified() -> None:
 
     dry_run = run("--dry-run", *args)
     assert dry_run.returncode == 1, dry_run.stderr
-    assert ".sc-lint/bootstrap" in dry_run.stdout
+    for name in (".sc-lint/bootstrap", ".sc-lint/bootstrap.ps1"):
+        assert f"--- {consumer / name}\n+++ /dev/null\n" in dry_run.stdout
     assert (consumer / ".sc-lint/bootstrap").is_file()
     assert (consumer / ".sc-lint/bootstrap.ps1").is_file()
     assert manifest_path.read_bytes() == manifest_before
