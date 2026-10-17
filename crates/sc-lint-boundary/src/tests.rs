@@ -1022,6 +1022,34 @@ fn invalid_patterns_name_the_field_and_value() {
 }
 
 #[test]
+fn invalid_patterns_stop_at_the_first_error() {
+    let fixture = feature_fixture(API_DEP, "");
+    let boundary = fixture.root().join("boundaries/app/boundary.toml");
+    let valid = fs::read_to_string(&boundary).unwrap();
+    fs::write(
+        &boundary,
+        valid.replace(
+            "allowed_dependencies = [\"ap*\"]",
+            "allowed_dependencies = [\"co*dex-*\", \"codex-**\"]",
+        ),
+    )
+    .unwrap();
+
+    let error = dependencies_report(&fixture).unwrap_err().to_string();
+    assert!(
+        error.contains("invalid package pattern \"co*dex-*\""),
+        "{error}"
+    );
+    assert!(error.contains("`allowed_dependencies`"), "{error}");
+    assert!(!error.contains("codex-**"), "{error}");
+    assert_eq!(
+        error.matches("invalid package pattern").count(),
+        1,
+        "{error}"
+    );
+}
+
+#[test]
 fn prefixes_match_canonical_package_names_and_forbidden_edges_still_win() {
     let fixture = feature_fixture("alias = { package = \"api\", path = \"../api\" }", "");
     let boundary = fixture.root().join("boundaries/app/boundary.toml");
@@ -1051,9 +1079,11 @@ fn prefixes_match_canonical_package_names_and_forbidden_edges_still_win() {
         "prefixes are case-sensitive"
     );
     fs::write(&boundary, valid.replace("[\"ap*\"]", "[\"alias\"]")).unwrap();
+    let error = dependencies_report(&fixture).unwrap_err().to_string();
     assert!(
-        dependencies_report(&fixture).is_err(),
-        "manifest dependency keys are not package references"
+        error.contains("unknown workspace package reference `alias`")
+            && error.contains("`dependencies.allowed_dependencies`"),
+        "manifest dependency keys are not package references: {error}"
     );
     fs::write(
         &boundary,
