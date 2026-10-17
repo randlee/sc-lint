@@ -73,22 +73,31 @@ class ConsumerLifecycleTests(unittest.TestCase):
             ),
         ]
         if any(not binary.is_file() for binary in cls.release_binaries):
-            subprocess.run(
-                [
-                    "cargo",
-                    "build",
-                    "-p",
-                    "sc-lint",
-                    "-p",
-                    "sc-lint-boundary",
-                    "-p",
-                    "sc-lint-portability",
-                    "-p",
-                    "sc-lint-runtime",
-                ],
-                cwd=ROOT,
-                check=True,
-            )
+            command = [
+                "cargo",
+                "build",
+                "-p",
+                "sc-lint",
+                "-p",
+                "sc-lint-boundary",
+                "-p",
+                "sc-lint-portability",
+                "-p",
+                "sc-lint-runtime",
+            ]
+            try:
+                subprocess.run(
+                    command,
+                    cwd=ROOT,
+                    check=True,
+                    stdin=subprocess.DEVNULL,
+                    timeout=300,
+                )
+            except subprocess.TimeoutExpired as error:
+                raise AssertionError(
+                    f"{command!r} timed out after {error.timeout}s; "
+                    f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+                ) from error
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -116,16 +125,29 @@ class ConsumerLifecycleTests(unittest.TestCase):
         environment["PATH"] = str(release) + os.pathsep + environment.get("PATH", "")
         return environment
 
-    @staticmethod
-    def run_command(command: list[str], *, cwd: Path, environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            command,
-            cwd=cwd,
-            env=environment,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+    def run_command(
+        self,
+        command: list[str],
+        *,
+        cwd: Path,
+        environment: dict[str, str],
+    ) -> subprocess.CompletedProcess[str]:
+        try:
+            return subprocess.run(
+                command,
+                cwd=cwd,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=180,
+            )
+        except subprocess.TimeoutExpired as error:
+            self.fail(
+                f"{command!r} timed out after {error.timeout}s; "
+                f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+            )
 
     @staticmethod
     @contextmanager
