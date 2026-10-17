@@ -321,9 +321,9 @@ specialized backend tools and mixed Rust/Python implementations.
   promise that the previous managed installation was restored.
 
 - `REQ-CLI-021`
-  The original E.3 product bootstrap contract exposed `ensure`, `setup`, and
-  `upgrade`, required explicit `--config sc-lint.toml`, and delegated to the
-  installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
+  The product bootstrap `.sc-lint/bootstrap.py` exposes `setup`, `lint`,
+  `test`, `upgrade` and `exec`, requires explicit `--config sc-lint.toml`, and
+  delegates to the installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
   as amended. ADR-017 adds bootstrap `exec` through the existing managed
   installation/environment, preserving argv and child exit status without
   re-entering consumer profile dispatch. Lint accepts a selector followed by
@@ -334,8 +334,7 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-022`
   `sc-lint init --just [--check|--dry-run]` must materialize only the
-  product-owned `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and Windows
-  `.sc-lint/bootstrap.ps1` files.
+  product-owned `sc-lint.toml`, `Justfile` and `.sc-lint/bootstrap.py` files.
   A current integration is idempotent; `--check` and `--dry-run` do not mutate
   it. A differing existing managed-path file is a structured conflict, never
   an overwrite, and a consumer README is outside the command's write set.

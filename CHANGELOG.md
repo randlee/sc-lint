@@ -25,6 +25,9 @@ All notable changes to sc-lint are documented here.
   otherwise the package name), or `"workspace.{dependency_key}"` only for a
   virtual-root workspace dependency. See the cargo-shear migration guidance
   in [troubleshooting](docs-bundle/troubleshooting.md#cargo-shear-exception-migration).
+- The never-constructed public `CountScannedCrates` variants were removed from
+  `sc_lint_portability::PortabilityError` and `sc_lint_runtime::RuntimeError`
+  in `2a53e91`.
 
 ### Fixed
 
@@ -40,8 +43,6 @@ Fixes found after publishing 0.7.2.
 
 ### Fixed
 
-- The boundary inventory now rejects nested `planning.toml` files instead of
-  silently ignoring planning metadata outside `boundaries/planning.toml`.
 - A lone `sc-lint` now rejects a stale or foreign `sc-lint-*` backend found on
   `PATH` with `BACKEND_EXEC_FAILURE` and the `sc-lint setup` remedy instead of
   running it. The backends gain `--version` so the launcher can check them

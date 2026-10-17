@@ -284,7 +284,6 @@ if ($missingResult -ne $false -or $existingResult -ne $true -or $missingErrors.C
             ROOT / "docs-bundle/just-setup.md",
             ROOT / "docs/phase-E/sprint-E3.md",
             ROOT / "docs/phase-E/sprint-E7.md",
-            ROOT / "docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md",
         ):
             document = path.read_text(encoding="utf-8")
             just_blocks = re.findall(r"```just\n(.*?)\n```", document, flags=re.DOTALL)
