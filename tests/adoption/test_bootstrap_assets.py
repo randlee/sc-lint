@@ -13,6 +13,19 @@ from install_helpers import FIXTURES, ROOT, copy_fixture, run, run_subprocess
 
 ASSET = ROOT / "crates/sc-lint/assets/bootstrap.py"
 
+# The usage grammar of the POSIX `.sc-lint/bootstrap` at cc1d496, which printed:
+#   usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run];
+#   .sc-lint/bootstrap lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml;
+#   .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>
+# bootstrap.py must list the same operations and arguments under its own name (AC3).
+CC1D496_USAGE_GRAMMAR = (
+    "usage: .sc-lint/bootstrap.py <setup|lint|test|upgrade|exec> --config sc-lint.toml [--check] [--dry-run]",
+    ".sc-lint/bootstrap.py lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
+    ".sc-lint/bootstrap.py exec [--config sc-lint.toml] -- <argv...>",
+)
+CC1D496_USAGE_TOKENS = ("setup", "lint", "test", "upgrade", "exec", "--config sc-lint.toml", "[--check]", "[--dry-run]",
+    "[selector]", "[host|all|linux|macos|windows]", "-- <argv...>")
+
 
 def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
     paths = [ASSET, ROOT / "packages/sc-lint-adoption/.sc-lint/bootstrap.py", ROOT / ".sc-lint/bootstrap.py"]
@@ -47,9 +60,12 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
 def test_usage_errors_report_one_shared_grammar(arguments: list[str]) -> None:
     result = run_subprocess([sys.executable, str(ASSET), *arguments], text=True, capture_output=True, check=False)
     assert result.returncode == 2
-    assert "usage: .sc-lint/bootstrap.py" in result.stderr
-    for operation in ("setup", "lint", "test", "upgrade", "exec"):
-        assert operation in result.stderr
+    usage_lines = [line for line in result.stderr.splitlines() if line.startswith("usage: .sc-lint/bootstrap.py")]
+    assert len(usage_lines) == 1, result.stderr
+    assert usage_lines[0].split("; ") == list(CC1D496_USAGE_GRAMMAR)
+    for token in CC1D496_USAGE_TOKENS:
+        assert token in usage_lines[0], token
+    assert ".sc-lint/bootstrap " not in usage_lines[0]
 
 
 def test_old_python_fails_before_importing_the_bootstrap() -> None:
