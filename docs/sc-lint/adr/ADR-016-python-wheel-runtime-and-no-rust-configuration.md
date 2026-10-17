@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-016 |
-| Status | Proposed revision (2026-10-16), pending Rand's approval; the Accepted text is in git history |
+| Status | Proposed |
 | Date | 2026-08-29, revised 2026-10-16 |
 | Deciders | Rand |
 | Related | ADR-012, ADR-015, ADR-017 |
@@ -52,20 +52,9 @@ silently from their pinned binary. `sc-publish` solves the same problem for
    declaration order, fail-fast. ADR-017 specifies translation, failure and
    compatibility behavior.
 
-Resolution performed by `.sc-lint/bootstrap.py <operation>` (the same
-program on every platform, ADR-012):
-
-```text
-setup
-  ├─ read sc-lint.toml [tool.sc-lint].minimum_version
-  ├─ ensure .sc-lint/venv (python -m venv, idempotent)
-  ├─ pip install "sc-lint==<minimum_version>"   # maturin wheel from PyPI
-  ├─ python -m sc_lint.setup_tools              # declared tools, if any
-  ├─ resolve the verified managed binary
-  └─ export SC_LINT_BIN, PATH for this invocation
-lint | test | upgrade | exec
-  └─ same resolution, then run the product; its exit code is returned unchanged
-```
+The bootstrap (`.sc-lint/bootstrap.py`, ADR-012) provisions `.sc-lint/venv`
+with the pinned wheel, runs declared-tool setup and resolves the managed
+binary before running the product.
 
 ## How To Extend
 

@@ -384,8 +384,10 @@ Phase `K` plans general-purpose closure of reported consumer gaps under the
 [Accepted ADR-017](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md).
 Its authoritative sprint/dependency plan is in the `lint-phase-k` beads;
 `docs/plans/phase-k.jsonl` is the phase index. k-1 through k-9 own behavior
-and issue regressions; final k-10 reconciles shipped 0.7.* and Phase K user
-and offline documentation. Implementation remains gated by plan review.
+and issue regressions; k-10 reconciles shipped 0.7.* and Phase K user and
+offline documentation; k-11 replaces the per-platform bootstrap scripts with
+one `.sc-lint/bootstrap.py` and fixes the Windows adoption failure on #541.
+Implementation remains gated by plan review.
 
 ## Planning Conventions
 
