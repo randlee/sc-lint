@@ -513,8 +513,9 @@ The product should support both:
   without choosing a Cargo package or copying source-repository
   orchestration. The product-owned
   installation must create an idempotent `sc-lint.toml`, thin Just
-  integration, `.sc-lint/bootstrap`, and Windows `.sc-lint/bootstrap.ps1`
-  helpers with non-mutating `--check`/`--dry-run` modes; it must never
+  integration, and one `.sc-lint/bootstrap.py` helper that runs identically
+  on every platform and returns exit codes unchanged, with non-mutating
+  `--check`/`--dry-run` modes (Proposed 2026-10-16, ADR-012 revision); it must never
   overwrite a consumer README or user-owned integration file. Consumer `just
   setup`, `just lint`, `just test`, and `just upgrade` all depend on the same
   compatibility preflight; lint and test execute complete configured profiles.
@@ -544,7 +545,7 @@ The product should support both:
   product location. The selected immutable release artifact is reported
   separately from that floor, which remains the installed-version comparison
   policy. Consumer repositories use the product-owned
-  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` assets; they delegate
+  `.sc-lint/bootstrap.py` asset (Proposed 2026-10-16, ADR-012 revision); it delegates
   `ensure`, `setup`, and `upgrade` to
   installed `sc-lint` and never copies source-checkout scripts or overwrites a
   consumer README.
