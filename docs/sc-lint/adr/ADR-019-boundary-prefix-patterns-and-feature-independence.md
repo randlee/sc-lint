@@ -1,6 +1,6 @@
 # ADR-019 — Boundary prefix patterns and opt-in feature independence
 
-Status: Proposed
+Status: Accepted (Rand, 2026-10-16)
 
 Related: ADR-004, ADR-011, ADR-017.
 Motivating contribution: PR #603 (external), for a fork that keeps its own
