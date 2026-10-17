@@ -82,6 +82,16 @@ def test_old_python_fails_before_importing_the_bootstrap() -> None:
     assert "CLI.SC_LINT_PYTHON_UNAVAILABLE" in result.stderr
 
 
+def build_fake_product(tmp_path: Path) -> Path:
+    """A stand-in binary: compatible with any config, exits SC_LINT_TEST_EXIT on `lint`."""
+    source = tmp_path / "fake.rs"
+    source.write_text('fn main() { if std::env::args().any(|a| a == "lint") { std::process::exit(std::env::var("SC_LINT_TEST_EXIT").unwrap().parse().unwrap()); } }')
+    binary = tmp_path / ("fake.exe" if os.name == "nt" else "fake")
+    build = run_subprocess(["rustc", str(source), "-o", str(binary)], text=True, capture_output=True, check=False)
+    assert build.returncode == 0, build.stderr
+    return binary
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize("exit_code", [0, 1, 2, 3, 4, 7])
 def test_just_passes_through_product_exit_codes(exit_code: int, product_artifacts: ProductArtifacts, tmp_path: Path) -> None:
@@ -89,14 +99,41 @@ def test_just_passes_through_product_exit_codes(exit_code: int, product_artifact
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     config = consumer / "sc-lint.toml"
     config.write_text(config.read_text().replace('minimum_version = "0.5.0"', f'minimum_version = "{product_artifacts.version}"'))
-    source = tmp_path / "fake.rs"
-    source.write_text('fn main() { if std::env::args().any(|a| a == "lint") { std::process::exit(std::env::var("SC_LINT_TEST_EXIT").unwrap().parse().unwrap()); } }')
-    binary = tmp_path / ("fake.exe" if os.name == "nt" else "fake")
-    build = run_subprocess(["rustc", str(source), "-o", str(binary)], text=True, capture_output=True, check=False)
-    assert build.returncode == 0, build.stderr
+    binary = build_fake_product(tmp_path)
     environment = {**os.environ, "SC_LINT_BIN": str(binary), "SC_LINT_WHEEL_DIR": str(product_artifacts.wheel_dir), "SC_LINT_TEST_EXIT": str(exit_code)}
     result = run_subprocess(["just", "lint"], cwd=consumer, env=environment, text=True, capture_output=True, check=False, timeout=300)
     assert result.returncode == exit_code, result.stdout + result.stderr
+
+
+@pytest.mark.integration
+def test_just_reports_bootstrap_unreadable_minimum_version(product_artifacts: ProductArtifacts, tmp_path: Path) -> None:
+    # Bootstrap's own exit 3 (not a child's): the compatible fake binary gets the
+    # bootstrap past `ensure`, then `provision_venv` cannot read minimum_version.
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    config = consumer / "sc-lint.toml"
+    lines = [line for line in config.read_text().splitlines() if not line.startswith("minimum_version")]
+    assert len(lines) == len(config.read_text().splitlines()) - 1
+    config.write_text("\n".join(lines) + "\n")
+    binary = build_fake_product(tmp_path)
+    environment = {**os.environ, "SC_LINT_BIN": str(binary), "SC_LINT_WHEEL_DIR": str(product_artifacts.wheel_dir), "SC_LINT_TEST_EXIT": "0"}
+    result = run_subprocess(["just", "lint"], cwd=consumer, env=environment, text=True, capture_output=True, check=False, timeout=300)
+    assert result.returncode == 3, result.stdout + result.stderr
+    assert "CLI.SC_LINT_CONFIG_MALFORMED" in result.stderr, result.stderr
+    assert "minimum_version" in result.stderr, result.stderr
+
+
+@pytest.mark.parametrize("arguments", [["lint", "a", "b", "c"], ["test", "a", "b"]])
+def test_just_reports_bootstrap_usage_errors(arguments: list[str]) -> None:
+    # Bootstrap's own exit 2 through a recipe: the installed Justfile forwards the
+    # extra positionals, and the bootstrap rejects them before touching any binary.
+    consumer = copy_fixture("empty-workspace")
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    result = run_subprocess(["just", *arguments], cwd=consumer, text=True, capture_output=True, check=False, timeout=300)
+    assert result.returncode == 2, result.stdout + result.stderr
+    usage_lines = [line for line in result.stderr.splitlines() if line.startswith("usage: .sc-lint/bootstrap.py")]
+    assert len(usage_lines) == 1, result.stderr
+    assert usage_lines[0].split("; ") == list(CC1D496_USAGE_GRAMMAR)
 
 
 @pytest.mark.integration
