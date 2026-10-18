@@ -99,7 +99,7 @@ fn cli_contract_documents_current_business_verdict_exit_codes() {
 #[test]
 fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
     let canonical = CANONICAL_CONSUMER_JUSTFILE.replace("\r\n", "\n");
-    assert!(canonical.starts_with("set windows-shell := [\"pwsh\", \"-NoLogo\", \"-Command\"]\n"));
+    assert!(canonical.starts_with("set windows-shell := [\"cmd.exe\", \"/c\"]\n"));
     for (recipe, selector) in [
         ("setup", None),
         ("lint", Some("profile")),
@@ -108,10 +108,12 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
     ] {
         let expected = match selector {
             Some(selector) => format!(
-                "{recipe} *{selector}:\n    {{{{bootstrap_command}}}} {recipe} --config sc-lint.toml {{{{{selector}}}}}"
+                "{recipe} *{selector}:\n    {{{{python}}}} .sc-lint/bootstrap.py {recipe} --config sc-lint.toml {{{{{selector}}}}}"
             ),
             None => {
-                format!("{recipe}:\n    {{{{bootstrap_command}}}} {recipe} --config sc-lint.toml")
+                format!(
+                    "{recipe}:\n    {{{{python}}}} .sc-lint/bootstrap.py {recipe} --config sc-lint.toml"
+                )
             }
         };
         assert!(
@@ -119,7 +121,7 @@ fn canonical_consumer_justfile_is_thin_and_has_exactly_four_public_recipes() {
             "consumer template does not delegate `{recipe}` to the product bootstrap"
         );
     }
-    assert!(canonical.contains("bootstrap_command := if os_family() == \"windows\""));
+    assert!(canonical.contains("python := if os_family() == \"windows\""));
     assert!(!canonical.contains("compatibility"));
     assert!(!canonical.contains("_ensure-sc-lint"));
     for forbidden in ["cargo run", "sc-lint-boundary", ".just/"] {
@@ -415,13 +417,12 @@ fn consumer_init_is_idempotent_non_mutating_when_checked_and_preserves_user_file
     assert_eq!(created["status"], "created");
     assert!(root.join("sc-lint.toml").is_file());
     assert!(root.join("Justfile").is_file());
-    assert!(root.join(".sc-lint/bootstrap").is_file());
-    assert!(root.join(".sc-lint/bootstrap.ps1").is_file());
+    assert!(root.join(".sc-lint/bootstrap.py").is_file());
     assert_eq!(
-        fs::read(root.join(".sc-lint/bootstrap"))
+        fs::read(root.join(".sc-lint/bootstrap.py"))
             .expect("bootstrap")
-            .get(..9),
-        Some(&b"#!/bin/sh"[..])
+            .get(..22),
+        Some(&b"#!/usr/bin/env python3"[..])
     );
     assert_eq!(
         fs::read_to_string(&readme).expect("README"),
@@ -861,15 +862,12 @@ fn generated_windows_bootstrap_accepts_gnu_style_flags_without_positional_errors
         );
         return;
     }
-    let bootstrap = fixture.path().join(".sc-lint/bootstrap.ps1");
+    let bootstrap = fixture.path().join(".sc-lint/bootstrap.py");
     let record = fixture.path().join("calls.txt");
     let binary = fixture.path().join("sc-lint.cmd");
     fs::write(&binary, "@echo off\r\necho %*>> \"%SC_LINT_RECORD%\"\r\n").expect("fake sc-lint");
-    let output = ProcessCommand::new("pwsh")
+    let output = ProcessCommand::new("python")
         .args([
-            "-NoLogo",
-            "-NonInteractive",
-            "-File",
             bootstrap.to_str().expect("UTF-8 bootstrap path"),
             "setup",
             "--config",

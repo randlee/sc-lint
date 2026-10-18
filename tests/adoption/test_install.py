@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import json
 import os
@@ -71,13 +72,63 @@ def test_empty_workspace_installs_converges_and_exposes_consumer_recipes() -> No
     assert install.returncode == 0, install.stderr
     clean = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
     assert clean.returncode == 0, clean.stdout
-    assert os.access(consumer / ".sc-lint" / "bootstrap", os.X_OK)
+    assert (consumer / ".sc-lint" / "bootstrap.py").is_file()
     recipes = run_subprocess(
         ["just", "--list"], cwd=consumer, text=True, capture_output=True, check=False
     )
     assert recipes.returncode == 0, recipes.stderr
     for recipe in ("default", "setup", "lint", "test", "upgrade"):
         assert f"    {recipe}" in recipes.stdout
+
+
+def test_retired_managed_bootstraps_are_removed_only_if_unmodified() -> None:
+    consumer = copy_fixture("empty-workspace")
+    args = ("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert run(*args).returncode == 0
+    manifest_path = consumer / ".sc-lint" / "installed.json"
+    manifest = json.loads(manifest_path.read_text())
+    # Synthetic equivalent of the cc1d496 pre-upgrade state: its manifest
+    # records both retired paths as managed, unmodified files.
+    for name in (".sc-lint/bootstrap", ".sc-lint/bootstrap.ps1"):
+        path = consumer / name
+        payload = ("retired " + name + "\n").encode()
+        path.write_bytes(payload)
+        manifest["managed"][name] = hashlib.sha256(payload).hexdigest()
+    manifest_path.write_text(json.dumps(manifest))
+    before = {name: (consumer / name).read_bytes() for name in manifest["managed"] if (consumer / name).is_file()}
+    manifest_before = manifest_path.read_bytes()
+
+    dry_run = run("--dry-run", *args)
+    assert dry_run.returncode == 1, dry_run.stderr
+    for name in (".sc-lint/bootstrap", ".sc-lint/bootstrap.ps1"):
+        assert f"--- {consumer / name}\n+++ /dev/null\n" in dry_run.stdout
+    assert (consumer / ".sc-lint/bootstrap").is_file()
+    assert (consumer / ".sc-lint/bootstrap.ps1").is_file()
+    assert manifest_path.read_bytes() == manifest_before
+    assert all((consumer / name).read_bytes() == content for name, content in before.items())
+
+    modified = consumer / ".sc-lint/bootstrap"
+    modified.write_text("consumer modification\n")
+    conflict = run(*args)
+    assert conflict.returncode == 2
+    assert "conflict: .sc-lint/bootstrap was modified outside sc-lint" in conflict.stderr
+    assert modified.read_text() == "consumer modification\n"
+    assert (consumer / ".sc-lint/bootstrap.ps1").is_file()
+
+    # A newline conversion changes the bytes and must remain a conflict on
+    # every host; restore the recorded bytes without text-mode translation.
+    recorded = before[".sc-lint/bootstrap"]
+    modified.write_bytes(recorded.replace(b"\n", b"\r\n"))
+    newline_conflict = run(*args)
+    assert newline_conflict.returncode == 2
+    assert "conflict: .sc-lint/bootstrap was modified outside sc-lint" in newline_conflict.stderr
+    modified.write_bytes(recorded)
+    assert hashlib.sha256(modified.read_bytes()).hexdigest() == manifest["managed"][".sc-lint/bootstrap"]
+    installed = run(*args)
+    assert installed.returncode == 0, installed.stderr
+    assert not modified.exists()
+    assert not (consumer / ".sc-lint/bootstrap.ps1").exists()
+    assert (consumer / ".sc-lint/bootstrap.py").is_file()
 
 
 def test_established_justfile_preserves_unmanaged_recipe() -> None:
@@ -656,8 +707,13 @@ def test_schema_analyzer_keys_match_rust_catalogs() -> None:
         ("portability", "sc-lint-portability"),
         ("runtime", "sc-lint-runtime"),
     ]:
-        source = (ROOT / "crates" / crate / "src" / "lib.rs").read_text()
-        own = set(re.findall(r'"([a-z_]+)"', re.search(r"own_keys: &\[([^\]]*)\]", source).group(1)))
+        source = "\n".join(
+            path.read_text()
+            for path in sorted((ROOT / "crates" / crate / "src").rglob("*.rs"))
+        )
+        match = re.search(r"own_keys: &\[([^\]]*)\]", source)
+        assert match is not None, name
+        own = set(re.findall(r'"([a-z_]+)"', match.group(1)))
         assert set(tables[name]["properties"]) == common | own, name
 
 

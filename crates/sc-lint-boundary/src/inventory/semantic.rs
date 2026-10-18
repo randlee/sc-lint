@@ -12,7 +12,9 @@ use crate::RuleId;
 
 use super::BoundaryInventory;
 use super::BoundaryRecord;
+use super::FeatureIndependence;
 use super::WorkspacePackageResolver;
+use super::dependency_policy::PackageRef;
 use super::dependency_policy::WorkspacePackageName;
 use super::types::Constructor;
 use super::types::Visibility;
@@ -167,6 +169,7 @@ pub(crate) struct ValidatedDependencyPolicy {
     pub(crate) owner: WorkspacePackageName,
     pub(crate) allowed_dependencies: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dev_dependencies: BTreeSet<WorkspacePackageName>,
+    pub(crate) allowed_feature_dependencies: FeatureIndependence<BTreeSet<WorkspacePackageName>>,
     pub(crate) allowed_dependents: BTreeSet<WorkspacePackageName>,
     pub(crate) allowed_dev_dependents: Option<BTreeSet<WorkspacePackageName>>,
     pub(crate) forbidden_edges: BTreeSet<ValidatedForbiddenPackageEdge>,
@@ -359,18 +362,19 @@ fn validate_dependency_policy(
             record.owner_package.as_ref(),
         )?
         .expect("enforceable boundary owners must resolve to workspace packages"),
-        allowed_dependencies: resolve_policy_references(
+        allowed_dependencies: resolve_policy_patterns(
             context,
             record,
             "dependencies.allowed_dependencies",
             &record.dependencies.allowed_dependencies,
         )?,
-        allowed_dev_dependencies: resolve_policy_references(
+        allowed_dev_dependencies: resolve_policy_patterns(
             context,
             record,
             "dependencies.allowed_dev_dependencies",
             &record.dependencies.allowed_dev_dependencies,
         )?,
+        allowed_feature_dependencies: resolve_feature_patterns(context, record)?,
         allowed_dependents: resolve_policy_references(
             context,
             record,
@@ -417,6 +421,47 @@ fn validate_dependency_policy(
             })
             .collect::<Result<BTreeSet<_>>>()?,
     })
+}
+
+fn resolve_feature_patterns(
+    context: &ValidationContext<'_>,
+    record: &BoundaryRecord,
+) -> Result<FeatureIndependence<BTreeSet<WorkspacePackageName>>> {
+    match &record.dependencies.allowed_feature_dependencies {
+        FeatureIndependence::NotChecked => Ok(FeatureIndependence::NotChecked),
+        FeatureIndependence::Checked(references) => {
+            Ok(FeatureIndependence::Checked(resolve_policy_patterns(
+                context,
+                record,
+                "dependencies.allowed_feature_dependencies",
+                references,
+            )?))
+        }
+    }
+}
+
+fn resolve_policy_patterns(
+    context: &ValidationContext<'_>,
+    record: &BoundaryRecord,
+    field: &str,
+    references: &[PackageRef],
+) -> Result<BTreeSet<WorkspacePackageName>> {
+    let mut resolved = BTreeSet::new();
+    for reference in references {
+        match reference {
+            PackageRef::Prefix(_) => {
+                resolved.extend(context.resolver.packages_matching(reference).cloned())
+            }
+            PackageRef::Exact(package) => {
+                if let Some(package) =
+                    resolve_policy_reference(context, record, field, package.as_ref())?
+                {
+                    resolved.insert(package);
+                }
+            }
+        }
+    }
+    Ok(resolved)
 }
 
 fn resolve_policy_references(
@@ -680,7 +725,8 @@ fn validate_external_root(
         || record
             .dependencies
             .allowed_dependencies
-            .contains(&root_package)
+            .iter()
+            .any(|reference| reference.matches(&root_package))
     {
         return;
     }

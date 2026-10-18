@@ -169,6 +169,30 @@ family.
   (Extended 2026-10-12, Accepted,
   [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
+- `REQ-SCB-024`
+  `allowed_dependencies`, `allowed_dev_dependencies` and
+  `allowed_feature_dependencies` may contain a prefix pattern: a non-empty
+  prefix followed by exactly one trailing `*` (for example `codex-*`), matching
+  canonical workspace package names, not aliases. A pattern matching no
+  package is not an error. A bare `*`, a `*` elsewhere, more than one `*`, or
+  any pattern in `allowed_dependents` fails inventory loading.
+  (Proposed 2026-10-17,
+  [ADR-019, decision 1](../sc-lint/adr/ADR-019-boundary-prefix-patterns-and-feature-independence.md#decision).)
+
+- `REQ-SCB-025`
+  `SCB-FEATURE-001` runs for an owner only when its boundary record declares
+  `[dependencies].allowed_feature_dependencies`; an empty list opts in with no
+  exemptions, and a record without the field is not checked. For an opted-in
+  owner it fails when a normal or build dependency (including target-specific
+  ones) that resolves by path to a workspace package not matched by
+  `allowed_feature_dependencies` sets `features` or `default-features = false`
+  (including values inherited through `workspace = true`), or when the owner's
+  `[features]` forward to it through `dep:x`, `x/feat`, `x?/feat`, or a bare
+  `x` enabling optional dependency `x`. Dev-dependencies and same-named
+  registry or git dependencies are not checked.
+  (Proposed 2026-10-17,
+  [ADR-019, decision 2](../sc-lint/adr/ADR-019-boundary-prefix-patterns-and-feature-independence.md#decision).)
+
 - `REQ-SCB-014`
   Sprint comparison for inventory parity must use parsed ordering, not lexical
   string comparison.

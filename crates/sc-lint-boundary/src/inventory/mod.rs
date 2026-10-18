@@ -12,6 +12,8 @@ mod dependency_policy;
 mod semantic;
 mod types;
 
+pub(crate) use dependency_policy::FeatureIndependence;
+use dependency_policy::PackageRef;
 pub(crate) use dependency_policy::WorkspacePackageName;
 pub(crate) use semantic::InventoryDiagnostic;
 pub(crate) use semantic::ValidatedDependencyPolicy;
@@ -74,6 +76,16 @@ impl WorkspacePackageResolver {
         }
 
         resolver
+    }
+
+    /// Workspace packages matching a validated reference by canonical name.
+    pub(crate) fn packages_matching<'a>(
+        &'a self,
+        reference: &'a PackageRef,
+    ) -> impl Iterator<Item = &'a WorkspacePackageName> + 'a {
+        self.packages
+            .values()
+            .filter(move |package| reference.matches(package))
     }
 
     pub(crate) fn resolve(

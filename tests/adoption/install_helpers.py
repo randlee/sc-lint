@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -46,7 +47,7 @@ def run(
     timeout: float = SUBPROCESS_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
     return run_subprocess(
-        ["python3", str(INSTALL), *arguments],
+        [sys.executable, str(INSTALL), *arguments],
         cwd=cwd,
         timeout=timeout,
         text=True,

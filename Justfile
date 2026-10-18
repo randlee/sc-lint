@@ -1,4 +1,4 @@
-set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+set windows-shell := ["cmd.exe", "/c"]
 
 host_python := if os_family() == "windows" { "python" } else { "python3" }
 # Source recipes run the sc_lint helper package from the repo-local venv (G.3a).
@@ -110,15 +110,15 @@ _source-lint target='full':
 
 # Verify the root model's compatible product binary and report setup state.
 setup: _source-build _source-venv
-    .sc-lint/bootstrap setup --config sc-lint.toml --dry-run
+    {{host_python}} .sc-lint/bootstrap.py setup --config sc-lint.toml --dry-run
 
 # Run every required source lint gate through the consumer contract.
-lint: _source-build _source-venv
-    .sc-lint/bootstrap lint --config sc-lint.toml
+lint *args: _source-build _source-venv
+    {{host_python}} .sc-lint/bootstrap.py lint --config sc-lint.toml {{if args == "ci" { "all" } else { args }}}
 
 # Run every required source test gate through the consumer contract.
 test: _source-build _source-venv
-    .sc-lint/bootstrap test --config sc-lint.toml
+    {{host_python}} .sc-lint/bootstrap.py test --config sc-lint.toml
 
 # Run the vendorable consumer-adoption kit integration suite. Requires pytest
 # in the host Python: `python3 -m pip install 'pytest>=8,<9'` (POSIX) or
@@ -136,4 +136,4 @@ test-adoption-integration:
 
 # Inspect the managed upgrade path without changing the source checkout.
 upgrade: _source-build _source-venv
-    .sc-lint/bootstrap upgrade --config sc-lint.toml --check --dry-run
+    {{host_python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml --check --dry-run

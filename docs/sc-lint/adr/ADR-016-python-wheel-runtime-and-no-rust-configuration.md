@@ -3,7 +3,8 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-016 |
-| Status | Proposed |
+| Status | Accepted |
+| Approved by | Rand, 2026-10-16 |
 | Date | 2026-08-29, revised 2026-10-16 |
 | Deciders | Rand |
 | Related | ADR-012, ADR-015, ADR-017 |

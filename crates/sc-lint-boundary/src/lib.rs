@@ -10,10 +10,8 @@ use anyhow as anyhow_crate;
 use anyhow::Context;
 use anyhow::Result;
 use quote::ToTokens;
-use sc_lint_analyzer_support::AnalyzerName;
 use sc_lint_analyzer_support::CatalogRuleId;
 use sc_lint_analyzer_support::RepoRelativePath;
-use sc_lint_analyzer_support::RuleCatalog;
 use sc_lint_analyzer_support::load_analyzer_settings;
 use sc_lint_directives::AttributeInput;
 use sc_lint_directives::Directive;
@@ -24,7 +22,6 @@ use sc_lint_schema::OwnerId;
 use sc_lint_schema::ReportStatus;
 use serde::Deserialize;
 use serde::Serialize;
-use serde::Serializer;
 use syn::Attribute;
 use syn::File;
 use syn::Ident;
@@ -42,8 +39,11 @@ mod manifest_dependency_policy;
 mod manifest_policy;
 mod package_policy;
 mod render;
+mod rule_catalog;
 #[cfg(test)]
 mod tests;
+
+use rule_catalog::rule;
 
 const SC_LINT_SCHEMA_VERSION: &str = "0.2.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
@@ -152,238 +152,8 @@ pub enum GraphOutputFormat {
 pub type FindingsReport = sc_lint_schema::FindingsReport<RuleId>;
 pub type Finding = sc_lint_schema::Finding<RuleId>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[non_exhaustive]
-pub enum RuleId {
-    ScbCycle001,
-    ScbCycle002,
-    ScbCycle003,
-    ScbBoundary001,
-    ScbBoundary002,
-    ScbBoundary003,
-    ScbBoundary004,
-    ScbCaller001,
-    ScbDependency001,
-    ScbDependency002,
-    ScbDependency003,
-    ScbDependency004,
-    ScbManifest001,
-    ScbManifest002,
-    ScbManifest003,
-    ScbManifest004,
-    ScbManifest005,
-    ScbManifest006,
-}
-
-impl RuleId {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::ScbCycle001 => "SCB-CYCLE-001",
-            Self::ScbCycle002 => "SCB-CYCLE-002",
-            Self::ScbCycle003 => "SCB-CYCLE-003",
-            Self::ScbBoundary001 => "SCB-BOUNDARY-001",
-            Self::ScbBoundary002 => "SCB-BOUNDARY-002",
-            Self::ScbBoundary003 => "SCB-BOUNDARY-003",
-            Self::ScbBoundary004 => "SCB-BOUNDARY-004",
-            Self::ScbCaller001 => "SCB-CALLER-001",
-            Self::ScbDependency001 => "SCB-DEPENDENCY-001",
-            Self::ScbDependency002 => "SCB-DEPENDENCY-002",
-            Self::ScbDependency003 => "SCB-DEPENDENCY-003",
-            Self::ScbDependency004 => "SCB-DEPENDENCY-004",
-            Self::ScbManifest001 => "SCB-MANIFEST-001",
-            Self::ScbManifest002 => "SCB-MANIFEST-002",
-            Self::ScbManifest003 => "SCB-MANIFEST-003",
-            Self::ScbManifest004 => "SCB-MANIFEST-004",
-            Self::ScbManifest005 => "SCB-MANIFEST-005",
-            Self::ScbManifest006 => "SCB-MANIFEST-006",
-        }
-    }
-}
-
-impl Serialize for RuleId {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.as_str())
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RuleFilter {
-    Cycles,
-    // SCB-CALLER-001 is enforced as part of boundary policy, so it routes
-    // through the existing boundaries filter instead of a separate callers
-    // variant.
-    Boundaries,
-    InternalOnly,
-    ForbidExternalImpls,
-    Dependencies,
-    Manifests,
-}
-
-impl RuleFilter {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Cycles => "cycles",
-            Self::Boundaries => "boundaries",
-            Self::InternalOnly => "internal_only",
-            Self::ForbidExternalImpls => "forbid_external_impls",
-            Self::Dependencies => "dependencies",
-            Self::Manifests => "manifests",
-        }
-    }
-}
-
-impl fmt::Display for RuleFilter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuleFilterParseError {
-    invalid_value: String,
-}
-
-impl RuleFilterParseError {
-    fn new(invalid_value: impl Into<String>) -> Self {
-        Self {
-            invalid_value: invalid_value.into(),
-        }
-    }
-}
-
-impl fmt::Display for RuleFilterParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "unsupported rule filter `{}`; supported: cycles, boundaries, internal_only, forbid_external_impls, dependencies, manifests",
-            self.invalid_value
-        )
-    }
-}
-
-impl std::error::Error for RuleFilterParseError {}
-
-impl TryFrom<&str> for RuleFilter {
-    type Error = RuleFilterParseError;
-
-    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
-        match value {
-            "cycles" => Ok(Self::Cycles),
-            "boundaries" => Ok(Self::Boundaries),
-            "internal_only" => Ok(Self::InternalOnly),
-            "forbid_external_impls" => Ok(Self::ForbidExternalImpls),
-            "dependencies" => Ok(Self::Dependencies),
-            "manifests" => Ok(Self::Manifests),
-            other => Err(RuleFilterParseError::new(other)),
-        }
-    }
-}
-
-const fn rule(id: RuleId) -> CatalogRuleId {
-    CatalogRuleId::new(id.as_str())
-}
-
-pub const ALL_BOUNDARY_IDS: &[CatalogRuleId] = &[
-    rule(RuleId::ScbCycle001),
-    rule(RuleId::ScbCycle002),
-    rule(RuleId::ScbCycle003),
-    rule(RuleId::ScbBoundary001),
-    rule(RuleId::ScbBoundary002),
-    rule(RuleId::ScbBoundary003),
-    rule(RuleId::ScbBoundary004),
-    rule(RuleId::ScbCaller001),
-    rule(RuleId::ScbDependency001),
-    rule(RuleId::ScbDependency002),
-    rule(RuleId::ScbDependency003),
-    rule(RuleId::ScbDependency004),
-    rule(RuleId::ScbManifest001),
-    rule(RuleId::ScbManifest002),
-    rule(RuleId::ScbManifest003),
-    rule(RuleId::ScbManifest004),
-    rule(RuleId::ScbManifest005),
-    rule(RuleId::ScbManifest006),
-];
-
-/// Every id except SCB-CYCLE-002/003: the set `analysis::finding_is_failure` fails on.
-pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
-    rule(RuleId::ScbCycle001),
-    rule(RuleId::ScbBoundary001),
-    rule(RuleId::ScbBoundary002),
-    rule(RuleId::ScbBoundary003),
-    rule(RuleId::ScbBoundary004),
-    rule(RuleId::ScbCaller001),
-    rule(RuleId::ScbDependency001),
-    rule(RuleId::ScbDependency002),
-    rule(RuleId::ScbDependency003),
-    rule(RuleId::ScbDependency004),
-    rule(RuleId::ScbManifest001),
-    rule(RuleId::ScbManifest002),
-    rule(RuleId::ScbManifest003),
-    rule(RuleId::ScbManifest004),
-    rule(RuleId::ScbManifest005),
-    rule(RuleId::ScbManifest006),
-];
-
-/// Families keep today's CLI spellings (kebab-case, as clap rendered the old
-/// `RuleFilterArg`); members are what each `RuleFilter` arm runs.
-pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
-    analyzer: AnalyzerName::new("boundary"),
-    rules: ALL_BOUNDARY_IDS,
-    families: &[
-        (
-            "cycles",
-            &[
-                rule(RuleId::ScbCycle001),
-                rule(RuleId::ScbCycle002),
-                rule(RuleId::ScbCycle003),
-            ],
-        ),
-        (
-            "boundaries",
-            &[
-                rule(RuleId::ScbBoundary001),
-                rule(RuleId::ScbBoundary002),
-                rule(RuleId::ScbBoundary003),
-                rule(RuleId::ScbBoundary004),
-                rule(RuleId::ScbCaller001),
-            ],
-        ),
-        (
-            "internal-only",
-            &[rule(RuleId::ScbBoundary001), rule(RuleId::ScbBoundary002)],
-        ),
-        ("forbid-external-impls", &[rule(RuleId::ScbBoundary003)]),
-        (
-            "dependencies",
-            &[
-                rule(RuleId::ScbBoundary004),
-                rule(RuleId::ScbDependency001),
-                rule(RuleId::ScbDependency002),
-                rule(RuleId::ScbDependency003),
-                rule(RuleId::ScbDependency004),
-            ],
-        ),
-        (
-            "manifests",
-            &[
-                rule(RuleId::ScbManifest001),
-                rule(RuleId::ScbManifest002),
-                rule(RuleId::ScbManifest003),
-                rule(RuleId::ScbManifest004),
-                rule(RuleId::ScbManifest005),
-                rule(RuleId::ScbManifest006),
-            ],
-        ),
-    ],
-    default_fail: DEFAULT_FAIL_IDS,
-    own_keys: &[
-        "manifest_dependency_allowlists",
-        "global_dependency_ownership",
-        "manifest_section_rules",
-    ],
+pub use rule_catalog::{
+    ALL_BOUNDARY_IDS, BOUNDARY_CATALOG, DEFAULT_FAIL_IDS, RuleFilter, RuleFilterParseError, RuleId,
 };
 
 fn disabled_report() -> FindingsReport {
@@ -683,7 +453,8 @@ pub fn analyze_workspace(
         .map(inventory::InventoryDiagnostic::finding)
         .collect::<Vec<_>>();
     if options.rule == Some(RuleFilter::Dependencies) {
-        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory);
+        let dependency_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
         let mut findings = semantic_findings;
         findings.extend(dependency_report.findings);
         return Ok(findings_report(dependency_report.scanned_crates, findings));
@@ -708,7 +479,8 @@ pub fn analyze_workspace(
         findings.extend(analysis::analyze_named_callers(&graph, &raw_inventory));
     }
     if filter.is_none() {
-        let package_report = package_policy::analyze_package_policy(&metadata, &inventory);
+        let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
         findings.extend(package_report.findings);
         let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
             .map_err(|e| BoundaryError::manifest_policy(root, e))?;
