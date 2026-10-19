@@ -158,27 +158,6 @@ fn timeout_child_sleeps_when_requested() {
 }
 
 #[test]
-fn timeout_grandchild_keeps_inherited_pipes_open() {
-    if std::env::var_os("SC_LINT_TEST_GRANDCHILD_SLEEP").is_some() {
-        thread::sleep(Duration::from_secs(5));
-    }
-}
-
-#[test]
-fn timeout_parent_spawns_pipe_inheriting_grandchild() {
-    if std::env::var_os("SC_LINT_TEST_SPAWN_GRANDCHILD").is_some() {
-        let mut grandchild = Command::new(std::env::current_exe().expect("test executable path"))
-            .args(["--exact", "timeout_grandchild_keeps_inherited_pipes_open"])
-            .env("SC_LINT_TEST_GRANDCHILD_SLEEP", "1")
-            .spawn()
-            .expect("spawn pipe-inheriting grandchild");
-        println!("grandchild spawned");
-        let _ = grandchild.wait();
-        thread::sleep(Duration::from_secs(10));
-    }
-}
-
-#[test]
 fn command_output_deadline_kills_and_reaps_child() {
     let mut command = Command::new(std::env::current_exe().expect("test executable path"));
     command
@@ -198,21 +177,39 @@ fn command_output_deadline_kills_and_reaps_child() {
 }
 
 #[test]
-fn command_output_timeout_does_not_wait_for_pipe_inheriting_grandchild() {
-    let mut command = Command::new(std::env::current_exe().expect("test executable path"));
-    command
-        .args([
-            "--exact",
-            "timeout_parent_spawns_pipe_inheriting_grandchild",
-        ])
-        .env("SC_LINT_TEST_SPAWN_GRANDCHILD", "1");
+fn pipe_drain_times_out_while_a_reader_still_holds_the_pipe() {
+    let (_held_sender, reader) = mpsc::channel::<io::Result<Vec<u8>>>();
 
-    let started = Instant::now();
-    let error = command_output_with_timeout(command, Duration::from_secs(1))
-        .expect_err("the sleeping test child exceeds the deadline");
+    let error = drain_pipe_reader(reader, Instant::now())
+        .expect_err("a reader that never returns exceeds the drain deadline");
     assert_eq!(error.kind(), io::ErrorKind::TimedOut);
-    assert!(error.to_string().contains("output pipes did not drain"));
-    assert!(started.elapsed() < Duration::from_secs(4));
+    assert!(error.to_string().contains("drain limit"), "{error}");
+}
+
+#[test]
+fn pipe_drain_returns_output_the_reader_already_sent() {
+    let (sender, reader) = mpsc::channel();
+    sender
+        .send(Ok(b"drained".to_vec()))
+        .expect("send reader output");
+
+    let output = drain_pipe_reader(reader, Instant::now()).expect("output already sent");
+    assert_eq!(output, b"drained");
+}
+
+#[test]
+fn pipe_drain_reports_a_reader_that_stopped_without_output() {
+    let (sender, reader) = mpsc::channel::<io::Result<Vec<u8>>>();
+    drop(sender);
+
+    let error =
+        drain_pipe_reader(reader, Instant::now()).expect_err("a stopped reader returns no output");
+    assert!(
+        error
+            .to_string()
+            .contains("stopped without returning output"),
+        "{error}"
+    );
 }
 
 fn direct_dependencies(metadata: &Value, package_name: &str) -> BTreeSet<String> {
