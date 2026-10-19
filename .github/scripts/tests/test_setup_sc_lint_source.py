@@ -19,7 +19,41 @@ setup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(setup)
 
 
+def minimal_environment(home: Path, **variables: str) -> dict[str, str]:
+    """Build child environments without host configuration or sc-lint overrides."""
+    env = {'PATH': os.defpath, 'HOME': str(home)}
+    if os.name == 'nt':
+        for name in ('SYSTEMROOT', 'WINDIR', 'PATHEXT'):
+            if name in os.environ:
+                env[name] = os.environ[name]
+    env.update(variables)
+    return env
+
+
 class SourceSetupTests(unittest.TestCase):
+    def test_minimal_environment_excludes_ambient_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    'SC_LINT_UNEXPECTED': 'ambient',
+                    'GIT_CONFIG_GLOBAL': '/tmp/host-gitconfig',
+                    'HTTP_PROXY': 'http://host-proxy.invalid',
+                },
+            ):
+                env = minimal_environment(
+                    Path(directory),
+                    GITHUB_ENV=str(Path(directory) / 'env'),
+                    SC_LINT_SOURCE_REVISION_INPUT='',
+                )
+
+        self.assertEqual(env['PATH'], os.defpath)
+        self.assertEqual(env['HOME'], directory)
+        self.assertEqual(env['SC_LINT_SOURCE_REVISION_INPUT'], '')
+        self.assertNotIn('SC_LINT_UNEXPECTED', env)
+        self.assertNotIn('GIT_CONFIG_GLOBAL', env)
+        self.assertNotIn('HTTP_PROXY', env)
+
     def test_refs_are_full_immutable_sha_only(self):
         for ref in ('main', 'v0.6.0', 'HEAD', 'abc123', 'a'*39, 'z'*40, 'a'*40+'\n', '--help', None):
             with self.subTest(ref=ref), self.assertRaises(ValueError):
@@ -81,7 +115,12 @@ class SourceSetupTests(unittest.TestCase):
             root = Path(directory)
             (root/'.sc-lint').mkdir()
             (root/'.sc-lint/source-install.json').write_text('{}')
-            env = dict(os.environ, GITHUB_WORKSPACE=str(root), GITHUB_ENV=str(root/'env'), SC_LINT_SOURCE_REVISION_INPUT='')
+            env = minimal_environment(
+                root,
+                GITHUB_WORKSPACE=str(root),
+                GITHUB_ENV=str(root/'env'),
+                SC_LINT_SOURCE_REVISION_INPUT='',
+            )
             result = subprocess.run(
                 [sys.executable, SCRIPT, 'resolve'],
                 env=env,
@@ -111,7 +150,11 @@ class SourceSetupTests(unittest.TestCase):
                 step = next(x for x in steps if x['name'] == f'Resolve immutable sc-lint source ({label})')
                 script = root / ('resolve.py' if label == 'Windows' else 'resolve.sh')
                 script.write_text(step['run'])
-                env = dict(os.environ, GITHUB_ENV=str(root/'env'), SC_LINT_SOURCE_REVISION_INPUT='')
+                env = minimal_environment(
+                    root,
+                    GITHUB_ENV=str(root/'env'),
+                    SC_LINT_SOURCE_REVISION_INPUT='',
+                )
                 cmd = [shell, str(script)]
                 result = subprocess.run(
                     cmd,
