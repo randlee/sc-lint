@@ -1,17 +1,17 @@
-set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+set windows-shell := ["cmd.exe", "/c"]
+
+python := if os_family() == "windows" { "python" } else { "python3" }
 
 default: lint
 
-bootstrap_command := if os_family() == "windows" { "& .\\.sc-lint\\bootstrap.ps1" } else { ".sc-lint/bootstrap" }
-
 setup:
-    {{bootstrap_command}} setup --config sc-lint.toml
+    {{python}} .sc-lint/bootstrap.py setup --config sc-lint.toml
 
 lint *profile:
-    {{bootstrap_command}} lint --config sc-lint.toml {{profile}}
+    {{python}} .sc-lint/bootstrap.py lint --config sc-lint.toml {{profile}}
 
 test *layer:
-    {{bootstrap_command}} test --config sc-lint.toml {{layer}}
+    {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}
 
 upgrade:
-    {{bootstrap_command}} upgrade --config sc-lint.toml
+    {{python}} .sc-lint/bootstrap.py upgrade --config sc-lint.toml

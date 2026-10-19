@@ -321,9 +321,9 @@ specialized backend tools and mixed Rust/Python implementations.
   promise that the previous managed installation was restored.
 
 - `REQ-CLI-021`
-  The original E.3 product bootstrap contract exposed `ensure`, `setup`, and
-  `upgrade`, required explicit `--config sc-lint.toml`, and delegated to the
-  installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
+  The product bootstrap `.sc-lint/bootstrap.py` exposes `setup`, `lint`,
+  `test`, `upgrade` and `exec`, requires explicit `--config sc-lint.toml`, and
+  delegates to the installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
   as amended. ADR-017 adds bootstrap `exec` through the existing managed
   installation/environment, preserving argv and child exit status without
   re-entering consumer profile dispatch. Lint accepts a selector followed by
@@ -334,8 +334,7 @@ specialized backend tools and mixed Rust/Python implementations.
 
 - `REQ-CLI-022`
   `sc-lint init --just [--check|--dry-run]` must materialize only the
-  product-owned `sc-lint.toml`, `Justfile`, `.sc-lint/bootstrap`, and Windows
-  `.sc-lint/bootstrap.ps1` files.
+  product-owned `sc-lint.toml`, `Justfile` and `.sc-lint/bootstrap.py` files.
   A current integration is idempotent; `--check` and `--dry-run` do not mutate
   it. A differing existing managed-path file is a structured conflict, never
   an overwrite, and a consumer README is outside the command's write set.
@@ -357,9 +356,15 @@ specialized backend tools and mixed Rust/Python implementations.
   targets use cargo, while Linux/macOS to `x86_64-pc-windows-msvc` uses cargo
   xwin. Other cross combinations report explicit unsupported skips; missing
   tools or command failures in supported combinations are failures. Missing
-  optional declarations preserve existing behavior. Generic test groups,
-  parallel execution, keep-going and test argument forwarding are not added.
-  (Extended 2026-10-12, Accepted,
+  optional declarations preserve existing behavior. The built-in
+  source-maintainer lint plan may run independent steps concurrently and uses
+  keep-going behavior: every planned step runs even if another fails. Reports
+  retain plan order and identify every failed step by its plan index; the
+  command exits non-zero if any step fails. Steps that require Cargo's build
+  lock are serialized. Consumer-configured lint and test profiles remain
+  sequential, declaration-ordered, and fail-fast. Generic test groups and test
+  argument forwarding are not added.
+  (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-CLI-024`

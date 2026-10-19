@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
+use rayon::prelude::*;
 use syn::Block;
 use syn::Expr;
 use syn::ExprMethodCall;
@@ -25,12 +26,28 @@ use crate::RuleId;
 use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::PackageName;
+use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
-use sc_lint_analyzer_support::discover_source_files;
+use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
+
+pub(super) fn repo_relative_source_path(
+    root: &Path,
+    source_path: &Path,
+) -> Result<RepoRelativePath> {
+    let relative = relative_slash_path(root, source_path);
+    RepoRelativePath::parse(&relative).with_context(|| {
+        format!(
+            "failed to build repository-relative source path for `{}` under `{}`",
+            source_path.display(),
+            root.display()
+        )
+    })
+}
 
 #[derive(Debug, Clone)]
 struct RuntimeFinding {
@@ -46,34 +63,34 @@ struct RuntimeFinding {
 
 pub(crate) fn analyze_runtime_liveness(
     root: &Path,
-    settings: &AnalyzerSettings,
-) -> Result<Vec<Finding>> {
-    let source_files = discover_source_files(root)?;
-    let mut findings = Vec::new();
-
-    for file_context in source_files {
-        if settings.path_excluded(&relative_slash_path(root, &file_context.source_path)) {
-            continue;
-        }
-        let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
-            || {
+    workspace: &WorkspaceMetadata,
+    _settings: &AnalyzerSettings,
+) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
+    let source_files = discover_source_files_with_metadata(workspace)?;
+    let file_findings = source_files
+        .par_iter()
+        .map(|file_context| {
+            let source = fs::read_to_string(&file_context.source_path).with_context(|| {
                 format!(
                     "failed to read Rust source for runtime liveness analysis: {}",
                     file_context.source_path.display()
                 )
-            },
-        )?)
-        .with_context(|| {
-            format!(
-                "failed to parse Rust source for runtime liveness analysis: {}",
-                file_context.source_path.display()
-            )
-        })?;
+            })?;
+            let parsed = syn::parse_file(&source).with_context(|| {
+                format!(
+                    "failed to parse Rust source for runtime liveness analysis: {}",
+                    file_context.source_path.display()
+                )
+            })?;
 
-        let mut collector = RuntimeCollector::new(&file_context);
-        collector.visit_file_items(&parsed);
-        findings.extend(collector.findings);
-    }
+            let mut collector = RuntimeCollector::new(file_context);
+            collector.visit_file_items(&parsed);
+            Ok(collector.findings)
+        })
+        .collect::<Vec<Result<Vec<_>>>>()
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
+    let mut findings = file_findings.into_iter().flatten().collect::<Vec<_>>();
 
     findings.sort_by(|left, right| {
         left.rule_id
@@ -82,26 +99,36 @@ pub(crate) fn analyze_runtime_liveness(
             .then_with(|| left.source_path.cmp(&right.source_path))
             .then_with(|| left.line.cmp(&right.line))
             .then_with(|| left.message.cmp(&right.message))
+            .then_with(|| left.kind.cmp(right.kind))
+            .then_with(|| left.package.cmp(&right.package))
+            .then_with(|| left.target.cmp(&right.target))
+            .then_with(|| left.node_label.cmp(&right.node_label))
     });
 
-    Ok(findings
+    findings
         .into_iter()
-        .map(|finding| Finding {
-            rule_id: finding.rule_id,
-            kind: finding.kind.into(),
-            message: format!(
-                "{}:{}: {}",
-                finding.source_path.display(),
-                finding.line,
-                finding.message
-            ),
-            owner_ids: vec![OwnerId::new(CrateId::from_parts(
-                finding.package.as_str(),
-                finding.target.as_str(),
-            ))],
-            node_ids: vec![NodeId::new(finding.node_label)],
+        .map(|finding| {
+            let source_path = repo_relative_source_path(root, &finding.source_path)?;
+            Ok((
+                Finding {
+                    rule_id: finding.rule_id,
+                    kind: finding.kind.into(),
+                    message: format!(
+                        "{}:{}: {}",
+                        finding.source_path.display(),
+                        finding.line,
+                        finding.message
+                    ),
+                    owner_ids: vec![OwnerId::new(CrateId::from_parts(
+                        finding.package.as_str(),
+                        finding.target.as_str(),
+                    ))],
+                    node_ids: vec![NodeId::new(finding.node_label)],
+                },
+                Some(source_path),
+            ))
         })
-        .collect())
+        .collect()
 }
 
 struct RuntimeCollector<'a> {

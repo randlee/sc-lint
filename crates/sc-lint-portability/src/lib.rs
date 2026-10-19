@@ -6,7 +6,9 @@ use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerName;
 use sc_lint_analyzer_support::CatalogRuleId;
 use sc_lint_analyzer_support::RuleCatalog;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::analyzer_settings_from;
+use sc_lint_analyzer_support::load_workspace_metadata;
 use sc_lint_analyzer_support::read_config_document;
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
@@ -16,6 +18,7 @@ use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
 
+mod platform_adapters;
 mod portability;
 mod predicates;
 #[cfg(test)]
@@ -41,7 +44,12 @@ pub const PORTABILITY_CATALOG: RuleCatalog = RuleCatalog {
     rules: ALL_PORT_IDS,
     families: &[],
     default_fail: ALL_PORT_IDS,
-    own_keys: &["config_home_env", "unix_path_prefixes", "targets"],
+    own_keys: &[
+        "config_home_env",
+        "unix_path_prefixes",
+        "targets",
+        "platform_adapters",
+    ],
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,14 +120,16 @@ pub enum PortabilityError {
         #[source]
         source: PortabilityErrorSource,
     },
-    #[error("failed to count scanned crates for root `{}`: {source:#}", root.display())]
-    CountScannedCrates {
+    #[error(transparent)]
+    AnalyzerConfig(#[from] AnalyzerConfigError),
+    #[error(transparent)]
+    AdapterConfig(#[from] platform_adapters::AdapterConfigError),
+    #[error("failed to scan platform adapter declarations under root `{}`: {source:#}", root.display())]
+    AdapterScan {
         root: PathBuf,
         #[source]
         source: PortabilityErrorSource,
     },
-    #[error(transparent)]
-    AnalyzerConfig(#[from] AnalyzerConfigError),
 }
 
 pub fn analyze_workspace(
@@ -133,30 +143,66 @@ pub fn analyze_workspace_configured(
     config: Option<&Path>,
     rule_filter: Option<&str>,
 ) -> std::result::Result<FindingsReport, PortabilityError> {
+    analyze_workspace_configured_with_metadata_loader(
+        options,
+        config,
+        rule_filter,
+        load_workspace_metadata,
+    )
+}
+
+fn analyze_workspace_configured_with_metadata_loader(
+    options: &AnalyzeOptions,
+    config: Option<&Path>,
+    rule_filter: Option<&str>,
+    mut load_metadata: impl FnMut(&Path) -> anyhow_crate::Result<WorkspaceMetadata>,
+) -> std::result::Result<FindingsReport, PortabilityError> {
     let document =
         read_config_document(PORTABILITY_CATALOG.analyzer.as_str(), &options.root, config)?;
     let settings = analyzer_settings_from(&PORTABILITY_CATALOG, &document, rule_filter)?;
     let analyzer_keys = portability::AnalyzerPortabilityKeys::from_settings(&settings)?;
     portability::validate_legacy_portability_config(&document)?;
+    let mut workspace = None;
+    let platform_adapters = platform_adapters::validate(
+        &options.root,
+        analyzer_keys.platform_adapter_records(),
+        &mut workspace,
+        &mut load_metadata,
+    )?;
     let (findings, scanned_crates) = if settings.enabled {
-        let findings =
-            portability::analyze_portability(&options.root, &document, &settings, &analyzer_keys)
-                .map_err(|source| PortabilityError::AnalyzeFindings {
-                root: options.root.clone(),
-                source: source.into(),
-            })?;
-        let scanned_crates =
-            portability::count_scanned_crates(&options.root).map_err(|source| {
-                PortabilityError::CountScannedCrates {
+        if workspace.is_none() {
+            workspace = Some(load_metadata(&options.root).map_err(|source| {
+                PortabilityError::AnalyzeFindings {
                     root: options.root.clone(),
                     source: source.into(),
                 }
-            })?;
+            })?);
+        }
+        let Some(workspace) = workspace.as_ref() else {
+            return Err(PortabilityError::AnalyzeFindings {
+                root: options.root.clone(),
+                source: anyhow_crate::anyhow!("workspace metadata was not loaded").into(),
+            });
+        };
+        let findings = portability::analyze_portability(
+            &options.root,
+            workspace,
+            &document,
+            &settings,
+            &analyzer_keys,
+            &platform_adapters,
+        )
+        .map_err(|source| PortabilityError::AnalyzeFindings {
+            root: options.root.clone(),
+            source: source.into(),
+        })?;
+        let scanned_crates = portability::count_scanned_crates(workspace);
         (findings, scanned_crates)
     } else {
         (Vec::new(), 0)
     };
-    let (findings, status) = settings.apply(findings, |rule_id| rule_id.as_str());
+    let (findings, status) =
+        settings.apply(findings, |rule_id| CatalogRuleId::new(rule_id.as_str()));
     Ok(FindingsReport {
         tool: "sc-lint-portability",
         version: env!("CARGO_PKG_VERSION"),

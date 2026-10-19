@@ -1,0 +1,4 @@
+[[tool.sc-lint.lint]]
+name = "mac"
+command = ["cargo", "check"]
+platform = "beos"

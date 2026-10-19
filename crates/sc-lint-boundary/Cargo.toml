@@ -29,6 +29,7 @@ sc-lint-schema.workspace = true
 clap = { version = "4", features = ["derive"] }
 syn = { version = "2", features = ["full", "parsing", "visit"] }
 quote = "1"
+rayon.workspace = true
 toml = "0.8"
 thiserror = "1"
 

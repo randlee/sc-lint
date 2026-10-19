@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import yaml
 import shutil
 
@@ -81,31 +82,46 @@ class SourceSetupTests(unittest.TestCase):
             (root/'.sc-lint').mkdir()
             (root/'.sc-lint/source-install.json').write_text('{}')
             env = dict(os.environ, GITHUB_WORKSPACE=str(root), GITHUB_ENV=str(root/'env'), SC_LINT_SOURCE_REVISION_INPUT='')
-            result = subprocess.run([sys.executable, SCRIPT, 'resolve'], env=env, capture_output=True, text=True)
+            result = subprocess.run(
+                [sys.executable, SCRIPT, 'resolve'],
+                env=env,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('cannot reuse', result.stderr)
             self.assertFalse((root/'env').exists())
 
-    def test_default_action_resolution_needs_no_python_on_unix_or_windows(self):
+    def test_default_action_resolution_does_not_invoke_source_helper(self):
         action = SCRIPT.parents[1] / 'actions/setup-sc-lint/action.yml'
         steps = yaml.safe_load(action.read_text())['runs']['steps']
-        for label, shell in (('Unix', 'bash'), ('Windows', 'pwsh')):
+        for label, shell in (('Unix', 'bash'), ('Windows', sys.executable)):
             if not shutil.which(shell):
                 continue
             with self.subTest(platform=label), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root/'release').mkdir()
                 (root/'release/publish-artifacts.toml').write_text('[project]\nname="old-consumer"\n')
-                # Any helper invocation fails: default mode must not reach Python.
+                # Any source helper invocation fails in default release mode.
                 helper = root/'.github/scripts/setup_sc_lint_source.py'
                 helper.parent.mkdir(parents=True)
                 helper.write_text('raise RuntimeError("default release must not invoke source helper")')
                 step = next(x for x in steps if x['name'] == f'Resolve immutable sc-lint source ({label})')
-                script = root / ('resolve.ps1' if label == 'Windows' else 'resolve.sh')
+                script = root / ('resolve.py' if label == 'Windows' else 'resolve.sh')
                 script.write_text(step['run'])
                 env = dict(os.environ, GITHUB_ENV=str(root/'env'), SC_LINT_SOURCE_REVISION_INPUT='')
-                cmd = [shell, '-NoProfile', '-File', str(script)] if label == 'Windows' else [shell, str(script)]
-                result = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True)
+                cmd = [shell, str(script)]
+                result = subprocess.run(
+                    cmd,
+                    cwd=root,
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual((root/'env').read_text().strip(), 'SC_LINT_SOURCE_REVISION=')
 
@@ -124,6 +140,67 @@ class SourceSetupTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'fresh consumer'):
                 setup.install('example/unavailable', 'a'*40, root, root)
             self.assertEqual(list(root.glob('sc-lint-source-*')), [])
+
+    def test_source_install_record_contains_provenance_and_binary_digests(self):
+        revision = 'a' * 40
+        version = '0.7.3'
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / 'consumer'
+            workspace.mkdir()
+            (workspace / '.sc-lint').mkdir()
+
+            def fake_checkout(url, sha, destination):
+                self.assertEqual(url, 'https://github.com/example/sc-lint.git')
+                self.assertEqual(sha, revision)
+                destination.mkdir()
+
+            def fake_run(command, cwd, env=None, timeout=setup.SETUP_TIMEOUT_SECONDS):
+                command = [str(value) for value in command]
+                if command[:2] == ['cargo', 'metadata']:
+                    packages = [
+                        {'name': name, 'version': version}
+                        for name in (*setup.BINARIES, 'sc-lint-py')
+                    ]
+                    return json.dumps({'packages': packages})
+                if command[:2] == ['cargo', 'build']:
+                    target = Path(env['CARGO_TARGET_DIR']) / 'release'
+                    target.mkdir(parents=True)
+                    suffix = '.exe' if setup.os.name == 'nt' else ''
+                    for name in setup.BINARIES:
+                        (target / (name + suffix)).write_bytes(name.encode())
+                    return ''
+                if command[:3] == [sys.executable, '-m', 'venv']:
+                    python = setup.python_path(Path(command[3]))
+                    python.parent.mkdir(parents=True)
+                    python.write_text('', encoding='utf-8')
+                    return ''
+                if len(command) >= 3 and command[1:3] == ['-m', 'maturin']:
+                    output = Path(command[command.index('--out') + 1])
+                    output.mkdir()
+                    (output / 'sc_lint-0.7.3-py3-none-any.whl').write_bytes(b'wheel')
+                    return ''
+                if command[1:] == ['version', '--json']:
+                    return json.dumps({'ok': True, 'data': {'version': version, 'status': 'pass'}})
+                if command[1:3] == ['-I', '-c']:
+                    venv = workspace / '.sc-lint/venv'
+                    return json.dumps({'version': version, 'path': str(venv / 'lib/sc_lint/__init__.py')})
+                return ''
+
+            with mock.patch.object(setup, 'checkout', fake_checkout), \
+                 mock.patch.object(setup, 'verify_checkout'), \
+                 mock.patch.object(setup, 'run', fake_run):
+                record = setup.install('example/sc-lint', revision, workspace, root)
+
+            persisted = json.loads((workspace / '.sc-lint/source-install.json').read_text())
+            self.assertEqual(persisted, record)
+            self.assertEqual(record['source_revision'], revision)
+            self.assertEqual(record['version'], version)
+            self.assertEqual(record['wheel_sha256'], setup.digest(Path(record['wheel'])))
+            self.assertEqual(set(record['binaries']), set(setup.BINARIES))
+            for name, checksum in record['binaries'].items():
+                self.assertEqual(checksum, setup.digest(Path(record['binary_directory']) / name))
 
 
 if __name__ == '__main__':

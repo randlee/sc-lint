@@ -1,0 +1,8 @@
+{
+  "unknown-member": "PROFILE.UNKNOWN_MEMBER",
+  "target-without-platform": "PROFILE.TARGET_REQUIRES_PLATFORM",
+  "reserved-name": "PROFILE.AMBIGUOUS_NAME",
+  "bad-platform": "PROFILE.UNKNOWN_STEP_FIELD",
+  "wrapped-command": "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
+  "embedded-target": "PROFILE.UNSUPPORTED_COMMAND_SHAPE"
+}

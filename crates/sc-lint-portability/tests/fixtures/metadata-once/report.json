@@ -1,0 +1,20 @@
+{
+  "tool": "sc-lint-portability",
+  "version": "0.7.3",
+  "schema_version": "0.1.0",
+  "status": "fail",
+  "scanned_crates": 1,
+  "findings": [
+    {
+      "rule_id": "PORT-004",
+      "kind": "ungated_std_os_unix_import",
+      "message": "<ROOT>/crates/example/src/lib.rs:1: PORT-004 ungated std::os::unix import in production code; wrap the item with #[cfg(unix)] or move the import behind a Unix-only boundary",
+      "owner_ids": [
+        "crate::example::example"
+      ],
+      "node_ids": [
+        "crate::example::example::portability"
+      ]
+    }
+  ]
+}

@@ -160,10 +160,8 @@ def assert_self_contained(binary: Path, workspace: Path, env: dict[str, str]) ->
         raise SystemExit(f"release-smoke: archive binary is not self-contained: {result.stdout}")
 
 
-def bootstrap_command(workspace: Path) -> list[str]:
-    if WINDOWS:
-        return ["pwsh", "-NoLogo", "-File", str(workspace / ".sc-lint" / "bootstrap.ps1")]
-    return [str(workspace / ".sc-lint" / "bootstrap")]
+def bootstrap_invocation(workspace: Path) -> list[str]:
+    return [sys.executable, str(workspace / ".sc-lint" / "bootstrap.py")]
 
 
 def main() -> int:
@@ -208,7 +206,7 @@ def main() -> int:
                 run(recipe, ["just", recipe], workspace, env)
             run(
                 "upgrade",
-                [*bootstrap_command(workspace), "upgrade", "--config", "sc-lint.toml", "--check", "--dry-run"],
+                [*bootstrap_invocation(workspace), "upgrade", "--config", "sc-lint.toml", "--check", "--dry-run"],
                 workspace,
                 env,
             )

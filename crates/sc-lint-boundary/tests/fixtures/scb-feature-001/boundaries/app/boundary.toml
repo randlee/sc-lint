@@ -1,0 +1,37 @@
+boundary_id = "BOUNDARY-App"
+owner_package = "app"
+owner_crate_path = "app"
+name = "app"
+
+[public]
+facade = "run"
+
+[implementation]
+type = "run"
+module = "app"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = ["run"]
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = ["api"]
+allowed_feature_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "concrete_landed"

@@ -104,8 +104,17 @@ planned.
   sc-lint's recommended `test` recipe outside the managed block only when the
   consumer `Justfile` has none, after which the consumer owns it.
 - (c) embeds a copy of the (d) bootstrap assets
-  (`crates/sc-lint/assets/bootstrap{,.ps1}`, included by `installer.rs`),
-  byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap{,.ps1}`.
+  (`crates/sc-lint/assets/bootstrap.py`, included by `installer.rs`),
+  byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap.py`.
+
+ADR-017's accepted Phase K changes are delivered within these existing
+owners: Rust analyzer crates validate and evaluate analyzer/inventory policy;
+the top-level Rust CLI selects and sequentially executes consumer lint steps;
+the bootstrap delegates `exec` and installation to the existing managed
+product and wheel; and the setup helper provisions only consumer-declared
+tools/targets. The installer remains configuration/rendering glue, not a
+second Rust policy evaluator. The canonical operator-facing account is in the
+offline product guides linked from [configuration](../docs-bundle/configuration.md).
 
 ## Planned Interface Versioning Layer
 
@@ -579,7 +588,7 @@ enforcement scope unless later modeled as explicit boundary records.
 
 Consumer repositories do not copy these Python utilities. Their generated
 integration delegates exclusively to installed `sc-lint` and the product-owned
-`.sc-lint/bootstrap` asset as defined by ADR-012.
+`.sc-lint/bootstrap.py` asset as defined by ADR-012.
 
 Phase G extends this consumer-adoption boundary through
 [ADR-015](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md): the

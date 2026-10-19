@@ -1,0 +1,1 @@
+{"profiles":{"format":["cargo","fmt","--check"]},"lint_profiles":{"fast":["format","missing"]}}

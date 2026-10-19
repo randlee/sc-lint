@@ -1,3 +1,5 @@
-crates/sc-lint/assets/bootstrap text eol=lf
-packages/sc-lint-adoption/.sc-lint/bootstrap text eol=lf
-.sc-lint/bootstrap text eol=lf
+crates/sc-lint/assets/bootstrap.py text eol=lf
+packages/sc-lint-adoption/.sc-lint/bootstrap.py text eol=lf
+.sc-lint/bootstrap.py text eol=lf
+crates/sc-lint-portability/tests/fixtures/metadata-once/** text eol=lf
+crates/sc-lint-runtime/tests/fixtures/metadata-once/** text eol=lf

@@ -502,6 +502,34 @@ mod tests {
     }
 
     #[test]
+    fn manifest_policy_wrong_type_maps_to_config_exit_three_with_code() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let root = temp_dir.path();
+        let config_path = root.join("sc-lint.toml");
+        fs::write(
+            &config_path,
+            "[tool.sc-lint.analyzers.boundary]\nmanifest_dependency_allowlists = \"wrong\"\n",
+        )
+        .expect("config");
+        let options = AnalyzeOptions {
+            root: root.to_path_buf(),
+            format: OutputFormat::Json,
+            rule: None,
+        };
+        let error = analyze_workspace_configured(&options, Some(&config_path), None)
+            .expect_err("malformed manifest policy is rejected");
+        let cli_error = BoundaryDispatchError::Analysis(Box::new(error))
+            .into_cli_error(consts::TOOL_BOUNDARY, None);
+
+        assert_eq!(cli_error.kind, CliErrorKind::Config);
+        assert_eq!(cli_error.exit_code(), 3);
+        assert_eq!(
+            cli_error.details.get("analyzer_config_code"),
+            Some(&serde_json::json!("ANALYZER_CONFIG.WRONG_TYPE"))
+        );
+    }
+
+    #[test]
     fn backend_args_forward_config_and_rule_filter() {
         let args = backend_args(
             Path::new("/r"),

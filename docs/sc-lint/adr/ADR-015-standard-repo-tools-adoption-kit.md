@@ -28,7 +28,8 @@ now defines how shared tooling is vendored into consumers.
    by `install.json`, byte-for-byte copied assets, renamed README
    (`README.sc-lint.md`), templates rendered only for `sc-lint.toml` and the
    `Justfile` import block, `--dry-run` drift as unified diff with exit 1,
-   conflict with a user-owned file as exit 2, and no delete operation.
+   conflict with a user-owned file as exit 2, and no delete operation other
+   than retiring an unmodified managed file (ADR-012).
 2. The kit is the **only** adoption path. `sc-publish` delegates sc-lint
    setup to the kit (its `setup-sc-lint` action and version pin are removed);
    `sc-lint.toml` `[tool.sc-lint].minimum_version` is the sole version pin in
@@ -37,9 +38,9 @@ now defines how shared tooling is vendored into consumers.
    **any** Rust repository. Nothing in this repository names or fingerprints
    a specific consumer. Anything that would exist in two consumers belongs in
    a kit.
-4. The consumer interface is ADR-012 unchanged: `just setup | lint | test |
-   upgrade`, delegating to `.sc-lint/bootstrap`. The kit vendors the
-   product-owned bootstrap assets verbatim.
+4. The consumer interface is ADR-012's: `just setup | lint | test |
+   upgrade`, delegating to `.sc-lint/bootstrap.py`. The kit vendors the
+   product-owned bootstrap verbatim.
 5. Greenfield and adoption produce an identical end state: the new-repository
    template is the kits applied to an empty Cargo workspace.
 6. ADR-014 is rejected. No Phase F code is merged; salvageable text (the
