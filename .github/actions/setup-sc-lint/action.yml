@@ -34,18 +34,22 @@ runs:
         fi
     - name: Resolve immutable sc-lint source (Windows)
       if: runner.os == 'Windows'
-      shell: pwsh
+      shell: python
       env:
         SC_LINT_SOURCE_REVISION_INPUT: ${{ inputs.source-revision }}
         SC_LINT_REPOSITORY: ${{ inputs.repository }}
       run: |
-        $manifest = 'release/publish-artifacts.toml'
-        $declared = (Test-Path $manifest) -and (Select-String -Quiet -Pattern sc_lint_source_revision -Path $manifest)
-        if ($env:SC_LINT_SOURCE_REVISION_INPUT -or $declared -or (Test-Path '.sc-lint/source-install.json')) {
-          python .github/scripts/setup_sc_lint_source.py resolve
-        } else {
-          Add-Content -Path $env:GITHUB_ENV -Value 'SC_LINT_SOURCE_REVISION='
-        }
+        import os
+        from pathlib import Path
+        import subprocess
+        import sys
+        manifest = Path('release/publish-artifacts.toml')
+        declared = manifest.is_file() and 'sc_lint_source_revision' in manifest.read_text(encoding='utf-8')
+        if os.environ.get('SC_LINT_SOURCE_REVISION_INPUT') or declared or Path('.sc-lint/source-install.json').exists():
+            subprocess.run([sys.executable, '.github/scripts/setup_sc_lint_source.py', 'resolve'], check=True)
+        else:
+            with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+                output.write('SC_LINT_SOURCE_REVISION=\n')
     - name: Install immutable sc-lint source (Unix)
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION != ''
       shell: bash
@@ -55,7 +59,7 @@ runs:
       run: python3 .github/scripts/setup_sc_lint_source.py install
     - name: Install immutable sc-lint source (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION != ''
-      shell: pwsh
+      shell: cmd
       env:
         SC_LINT_SOURCE_REVISION_INPUT: ${{ inputs.source-revision }}
         SC_LINT_REPOSITORY: ${{ inputs.repository }}
@@ -100,33 +104,43 @@ runs:
         echo "${install_dir}" >> "${GITHUB_PATH}"
     - name: Install sc-lint release (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
-      shell: pwsh
+      shell: python
       env:
         SC_LINT_VERSION: ${{ inputs.version }}
         SC_LINT_REPOSITORY: ${{ inputs.repository }}
       run: |
-        $ErrorActionPreference = 'Stop'
-        if ($env:RUNNER_ARCH -ne 'X64') {
-          throw "sc-lint setup: unsupported Windows architecture $env:RUNNER_ARCH"
-        }
-        $target = 'x86_64-pc-windows-msvc'
-        $archive = "sc-lint_$env:SC_LINT_VERSION`_$target.zip"
-        $url = "https://github.com/$env:SC_LINT_REPOSITORY/releases/download/v$env:SC_LINT_VERSION/$archive"
-        $installDir = Join-Path $env:RUNNER_TEMP "sc-lint-$env:SC_LINT_VERSION\$target"
-        New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-        $archivePath = Join-Path $env:RUNNER_TEMP $archive
-        try {
-          Invoke-WebRequest -Uri $url -OutFile $archivePath
-        } catch {
-          throw "sc-lint setup: could not download $url; verify that release v$env:SC_LINT_VERSION publishes this runner asset. $($_.Exception.Message)"
-        }
-        Expand-Archive -Path $archivePath -DestinationPath $installDir -Force
-        foreach ($binary in @('sc-lint.exe', 'sc-lint-boundary.exe', 'sc-lint-portability.exe', 'sc-lint-runtime.exe')) {
-          if (-not (Test-Path (Join-Path $installDir $binary))) {
-            throw "sc-lint setup: release archive is missing sibling backend $binary"
-          }
-        }
-        Add-Content -Path $env:GITHUB_PATH -Value $installDir
+        import hashlib
+        import os
+        from pathlib import Path
+        import urllib.request
+        import zipfile
+        if os.environ['RUNNER_ARCH'] != 'X64':
+            raise RuntimeError('sc-lint setup: unsupported Windows architecture')
+        version, repository = os.environ['SC_LINT_VERSION'], os.environ['SC_LINT_REPOSITORY']
+        target = 'x86_64-pc-windows-msvc'
+        archive = f'sc-lint_{version}_{target}.zip'
+        base = f'https://github.com/{repository}/releases/download/v{version}'
+        with urllib.request.urlopen(f'{base}/checksums.txt') as response:
+            checksums = response.read().decode('utf-8')
+        expected = next((parts[0] for line in checksums.splitlines() if len(parts := line.split()) >= 2 and parts[1].lstrip('*') == archive), None)
+        with urllib.request.urlopen(f'{base}/{archive}') as response:
+            contents = response.read()
+        if not expected or hashlib.sha256(contents).hexdigest().lower() != expected.lower():
+            raise RuntimeError(f'sc-lint setup: checksum failed for {archive}')
+        destination = Path(os.environ['RUNNER_TEMP']) / f'sc-lint-{version}' / target
+        destination.mkdir(parents=True, exist_ok=True)
+        archive_path = Path(os.environ['RUNNER_TEMP']) / archive
+        archive_path.write_bytes(contents)
+        with zipfile.ZipFile(archive_path) as package:
+            for member in package.infolist():
+                if not (destination / member.filename).resolve().is_relative_to(destination.resolve()):
+                    raise RuntimeError('sc-lint setup: unsafe archive path')
+            package.extractall(destination)
+        for binary in ('sc-lint.exe', 'sc-lint-boundary.exe', 'sc-lint-portability.exe', 'sc-lint-runtime.exe'):
+            if not (destination / binary).is_file():
+                raise RuntimeError(f'sc-lint setup: release archive is missing sibling backend {binary}')
+        with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as output:
+            output.write(str(destination) + '\n')
     - name: Verify sc-lint version contract
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: bash
@@ -144,15 +158,17 @@ runs:
         }
     - name: Verify sc-lint version contract (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
-      shell: pwsh
+      shell: python
       env:
         SC_LINT_VERSION: ${{ inputs.version }}
         SC_LINT_REPOSITORY: ${{ inputs.repository }}
       run: |
-        $value = sc-lint version --json | ConvertFrom-Json
-        if (-not $value.ok -or $value.data.crate_version -ne $env:SC_LINT_VERSION) {
-          throw "sc-lint setup: expected version $env:SC_LINT_VERSION, got $($value.data.crate_version)"
-        }
+        import json
+        import os
+        import subprocess
+        value = json.loads(subprocess.check_output(['sc-lint', 'version', '--json'], text=True))
+        if not value.get('ok') or value.get('data', {}).get('crate_version') != os.environ['SC_LINT_VERSION']:
+            raise RuntimeError(f"sc-lint setup: expected version {os.environ['SC_LINT_VERSION']}")
     - name: Materialize pinned sc-lint Python utilities (Unix)
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: bash
@@ -174,24 +190,29 @@ runs:
         test -f "${GITHUB_WORKSPACE}/.just/run_lint.py"
     - name: Materialize pinned sc-lint Python utilities (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
-      shell: pwsh
+      shell: python
       env:
         SC_LINT_VERSION: ${{ inputs.version }}
         SC_LINT_REPOSITORY: ${{ inputs.repository }}
       run: |
-        $ErrorActionPreference = 'Stop'
-        $archive = Join-Path $env:RUNNER_TEMP "sc-lint-source-$env:SC_LINT_VERSION.zip"
-        $sourceRoot = Join-Path $env:RUNNER_TEMP "sc-lint-source-$env:SC_LINT_VERSION"
-        Invoke-WebRequest -Uri "https://github.com/$env:SC_LINT_REPOSITORY/archive/refs/tags/v$env:SC_LINT_VERSION.zip" -OutFile $archive
-        Expand-Archive -Path $archive -DestinationPath $sourceRoot -Force
-        $extracted = Get-ChildItem -Directory $sourceRoot | Select-Object -First 1
-        $justRoot = Join-Path $env:GITHUB_WORKSPACE '.just'
-        New-Item -ItemType Directory -Force -Path $justRoot | Out-Null
-        Copy-Item (Join-Path $extracted.FullName '.just\*.py') $justRoot -Force
-        Set-Content -Path (Join-Path $justRoot '.sc-lint-runtime-version') -Value $env:SC_LINT_VERSION -NoNewline
-        if (-not (Test-Path (Join-Path $justRoot 'run_lint.py'))) {
-          throw 'sc-lint setup: source archive is missing .just/run_lint.py'
-        }
+        import io
+        import os
+        from pathlib import Path
+        import urllib.request
+        import zipfile
+        version, repository = os.environ['SC_LINT_VERSION'], os.environ['SC_LINT_REPOSITORY']
+        with urllib.request.urlopen(f'https://github.com/{repository}/archive/refs/tags/v{version}.zip') as response:
+            contents = response.read()
+        just_root = Path(os.environ['GITHUB_WORKSPACE']) / '.just'
+        just_root.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(io.BytesIO(contents)) as package:
+            for name in package.namelist():
+                parts = Path(name).parts
+                if len(parts) == 3 and parts[1] == '.just' and parts[2].endswith('.py'):
+                    (just_root / parts[2]).write_bytes(package.read(name))
+        (just_root / '.sc-lint-runtime-version').write_text(version, encoding='utf-8')
+        if not (just_root / 'run_lint.py').is_file():
+            raise RuntimeError('sc-lint setup: source archive is missing .just/run_lint.py')
     - name: Smoke-test repository root discovery (Unix)
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
       shell: bash
@@ -206,13 +227,15 @@ runs:
         }
     - name: Smoke-test repository root discovery (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION == ''
-      shell: pwsh
+      shell: python
       run: |
-        $root = if ($env:GITHUB_WORKSPACE) { $env:GITHUB_WORKSPACE } else { (Get-Location).Path }
-        $value = sc-lint --json --root $root lint sc-boundary | ConvertFrom-Json
-        if (-not $value.ok -or $value.error.code -eq 'CLI.CONFIG_ERROR') {
-          throw "sc-lint root discovery failed: $($value | ConvertTo-Json -Compress)"
-        }
+        import json
+        import os
+        import subprocess
+        root = os.environ.get('GITHUB_WORKSPACE', os.getcwd())
+        value = json.loads(subprocess.check_output(['sc-lint', '--json', '--root', root, 'lint', 'sc-boundary'], text=True))
+        if not value.get('ok') or value.get('error', {}).get('code') == 'CLI.CONFIG_ERROR':
+            raise RuntimeError(f'sc-lint root discovery failed: {value}')
     - name: Verify source sc-lint consumer semantics (Unix)
       if: runner.os != 'Windows' && env.SC_LINT_SOURCE_REVISION != ''
       shell: bash
@@ -221,7 +244,7 @@ runs:
       run: python3 .github/scripts/setup_sc_lint_source.py smoke
     - name: Verify source sc-lint consumer semantics (Windows)
       if: runner.os == 'Windows' && env.SC_LINT_SOURCE_REVISION != ''
-      shell: pwsh
+      shell: cmd
       env:
         SC_LINT_SOURCE_REVISION_INPUT: ${{ inputs.source-revision }}
       run: python .github/scripts/setup_sc_lint_source.py smoke

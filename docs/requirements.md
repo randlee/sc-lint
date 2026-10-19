@@ -39,6 +39,17 @@ with no Rust configuration logic. `REQ-PRODUCT-019` obligations on the
 installed end state are unchanged; see the supersession note under that
 requirement.
 
+Phase K's accepted ADR-017 amendments describe delivered contracts, not new
+product defaults: analyzer `exclude_paths_by_rule`, explicit portability
+adapter pairs, optional boundary inventory policies, consumer named lint
+profiles and platform scopes, direct managed `exec`, and consumer-declared
+cargo tools/rustup targets provisioned by setup. Optional declarations remain
+inactive when absent. Consumer tools and policy values are never chosen from
+repository identity. User-facing syntax and recovery are maintained in the
+offline [configuration](../docs-bundle/configuration.md),
+[usage](../docs-bundle/using-sc-lint.md), and
+[troubleshooting](../docs-bundle/troubleshooting.md) guides.
+
 ## Product Purpose
 
 `sc-lint` is a standalone lint tool family for Rust repositories. It provides:
@@ -502,8 +513,9 @@ The product should support both:
   without choosing a Cargo package or copying source-repository
   orchestration. The product-owned
   installation must create an idempotent `sc-lint.toml`, thin Just
-  integration, `.sc-lint/bootstrap`, and Windows `.sc-lint/bootstrap.ps1`
-  helpers with non-mutating `--check`/`--dry-run` modes; it must never
+  integration, and one `.sc-lint/bootstrap.py` helper that runs identically
+  on every platform and returns exit codes unchanged, with non-mutating
+  `--check`/`--dry-run` modes; it must never
   overwrite a consumer README or user-owned integration file. Consumer `just
   setup`, `just lint`, `just test`, and `just upgrade` all depend on the same
   compatibility preflight; lint and test execute complete configured profiles.
@@ -519,7 +531,8 @@ The product should support both:
   and which product sprints use for fresh-workspace acceptance. The
   idempotence and never-overwrite obligations above bind the kit: `--dry-run`
   drift reports a unified diff and exits 1, a conflict with a user-owned file
-  exits 2, and the kit has no delete operation. Runtime delivery of the
+  exits 2, and the kit deletes nothing except an unmodified managed file a
+  release retires (ADR-012). Runtime delivery of the
   helpers is governed by ADR-016.
 
 - `REQ-PRODUCT-020`
@@ -533,8 +546,7 @@ The product should support both:
   product location. The selected immutable release artifact is reported
   separately from that floor, which remains the installed-version comparison
   policy. Consumer repositories use the product-owned
-  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` assets; they delegate
-  `ensure`, `setup`, and `upgrade` to
+  `.sc-lint/bootstrap.py` asset; it delegates `setup` and `upgrade` to
   installed `sc-lint` and never copies source-checkout scripts or overwrites a
   consumer README.
 

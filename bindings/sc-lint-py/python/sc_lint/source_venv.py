@@ -3,7 +3,7 @@
 
 Self-contained on purpose: it runs with the host interpreter before `sc_lint`
 is importable. Consumers never use this file; they get the wheel from PyPI via
-`.sc-lint/bootstrap setup`.
+`.sc-lint/bootstrap.py setup`.
 """
 from __future__ import annotations
 

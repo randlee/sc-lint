@@ -3,6 +3,8 @@ use crate::render::hex_encode;
 use cargo_metadata::MetadataCommand;
 
 mod build;
+mod ingest;
+mod merge;
 mod reference_collector;
 
 pub(crate) use build::build_workspace_graph;

@@ -1,9 +1,9 @@
 use std::fs;
 use std::path::Path;
-use std::path::PathBuf;
 
 use anyhow::Context;
 use anyhow::Result;
+use rayon::prelude::*;
 use serde::Deserialize;
 use syn::Block;
 use syn::Expr;
@@ -21,21 +21,11 @@ use syn::Stmt;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
-use crate::CrateId;
 use crate::Finding;
-use crate::NodeId;
-use crate::OwnerId;
 use crate::RuleId;
-use crate::predicates::attr_is_cfg_attr_not_unix_allow_dead_code;
-use crate::predicates::attr_is_cfg_unix;
+use crate::platform_adapters;
 use crate::predicates::attr_is_platform_cfg;
 use crate::predicates::extract_env_var_lookup;
-use crate::predicates::has_portable_fallback;
-use crate::predicates::has_windows_companion;
-use crate::predicates::impl_method_has_portable_fallback;
-use crate::predicates::impl_method_has_windows_companion;
-use crate::predicates::impl_method_is_cfg_unix_production_item;
-use crate::predicates::is_cfg_unix_production_item;
 use crate::predicates::is_dirs_home_dir_call;
 use crate::predicates::is_path_like_constructor;
 use crate::predicates::is_set_var_call;
@@ -43,20 +33,37 @@ use crate::predicates::is_shell_command_call;
 use crate::predicates::is_unix_shell_path_literal;
 use crate::predicates::production_env_portability_variable;
 use crate::predicates::production_path_rule_id;
-use crate::predicates::use_tree_contains_std_os_unix;
 use sc_lint_analyzer_support::AnalyzerConfigError;
 use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
-use sc_lint_analyzer_support::PackageName;
+use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
-use sc_lint_analyzer_support::TargetName;
+use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::classify_scope;
-use sc_lint_analyzer_support::count_scanned_crates as count_crates;
-use sc_lint_analyzer_support::discover_source_files;
-use sc_lint_analyzer_support::item_attrs;
-use sc_lint_analyzer_support::item_identifier;
-use sc_lint_analyzer_support::item_name_hint_is_tests;
+use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates;
+use sc_lint_analyzer_support::discover_source_files_with_metadata;
+use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
+
+mod findings;
+mod parity;
+
+use self::findings::PortabilityFinding;
+use self::findings::convert_findings;
+
+pub(super) fn repo_relative_source_path(
+    root: &Path,
+    source_path: &Path,
+) -> Result<RepoRelativePath> {
+    let relative = relative_slash_path(root, source_path);
+    RepoRelativePath::parse(&relative).with_context(|| {
+        format!(
+            "failed to build repository-relative source path for `{}` under `{}`",
+            source_path.display(),
+            root.display()
+        )
+    })
+}
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 struct RepoPortabilityConfig {
@@ -121,6 +128,7 @@ impl PortabilityConfig {
 pub(crate) struct AnalyzerPortabilityKeys {
     config_home_env: Option<String>,
     unix_path_prefixes: Vec<String>,
+    platform_adapters: Vec<platform_adapters::PlatformAdapterRecord>,
 }
 
 impl AnalyzerPortabilityKeys {
@@ -146,227 +154,72 @@ impl AnalyzerPortabilityKeys {
                 "an array of non-empty strings starting with `/`",
             ));
         }
+        let platform_adapters = platform_adapters::parse_records(settings)?;
         Ok(Self {
             config_home_env,
             unix_path_prefixes,
+            platform_adapters,
         })
     }
-}
 
-#[derive(Debug, Clone)]
-struct PortabilityFinding {
-    rule_id: RuleId,
-    kind: &'static str,
-    message: String,
-    source_path: PathBuf,
-    line: usize,
-    package: PackageName,
-    target: TargetName,
-    node_label: String,
+    pub(crate) fn platform_adapter_records(&self) -> &[platform_adapters::PlatformAdapterRecord] {
+        &self.platform_adapters
+    }
 }
 
 pub(crate) fn analyze_portability(
     root: &Path,
+    workspace: &WorkspaceMetadata,
     document: &toml::Table,
-    settings: &AnalyzerSettings,
+    _settings: &AnalyzerSettings,
     analyzer_keys: &AnalyzerPortabilityKeys,
-) -> Result<Vec<Finding>> {
+    platform_adapters: &platform_adapters::PlatformAdapters,
+) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let config = load_portability_config(document, analyzer_keys)?;
-    let source_files = discover_source_files(root)?;
-    let mut findings = Vec::new();
-
-    for file_context in source_files.into_iter().filter(|file| {
-        !settings.path_excluded(&sc_lint_analyzer_support::relative_slash_path(
-            root,
-            &file.source_path,
-        ))
-    }) {
-        let parsed = syn::parse_file(&fs::read_to_string(&file_context.source_path).with_context(
-            || {
+    let source_files = discover_source_files_with_metadata(workspace)?;
+    let file_findings = source_files
+        .par_iter()
+        .map(|file_context| {
+            let source = fs::read_to_string(&file_context.source_path).with_context(|| {
                 format!(
                     "failed to read Rust source for portability analysis: {}",
                     file_context.source_path.display()
                 )
-            },
-        )?)
-        .with_context(|| {
-            format!(
-                "failed to parse Rust source for portability analysis: {}",
-                file_context.source_path.display()
-            )
-        })?;
+            })?;
+            let parsed = syn::parse_file(&source).with_context(|| {
+                format!(
+                    "failed to parse Rust source for portability analysis: {}",
+                    file_context.source_path.display()
+                )
+            })?;
 
-        let mut collector = PortabilityCollector::new(&file_context, &config);
-        collector.visit_file_items(&parsed);
-        findings.extend(collector.findings);
-        findings.extend(collect_unix_portability_findings(
-            &parsed,
-            &file_context,
-            &config,
-        ));
-    }
-
-    findings.sort_by(|left, right| {
-        left.rule_id
-            .as_str()
-            .cmp(right.rule_id.as_str())
-            .then_with(|| left.source_path.cmp(&right.source_path))
-            .then_with(|| left.line.cmp(&right.line))
-            .then_with(|| left.message.cmp(&right.message))
-    });
-
-    Ok(findings
-        .into_iter()
-        .map(|finding| Finding {
-            rule_id: finding.rule_id,
-            kind: finding.kind.into(),
-            message: format!(
-                "{}:{}: {}",
-                finding.source_path.display(),
-                finding.line,
-                finding.message
-            ),
-            owner_ids: vec![OwnerId::new(CrateId::from_parts(
-                finding.package.as_str(),
-                finding.target.as_str(),
-            ))],
-            node_ids: vec![NodeId::new(finding.node_label)],
+            let mut collector = PortabilityCollector::new(file_context, &config);
+            collector.visit_file_items(&parsed);
+            let mut findings = collector.findings;
+            findings.extend(parity::collect_unix_portability_findings(
+                &parsed,
+                file_context,
+                &config,
+                platform_adapters,
+            ));
+            Ok(findings)
         })
-        .collect())
+        .collect::<Vec<Result<Vec<_>>>>()
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
+    let findings = file_findings.into_iter().flatten().collect();
+
+    convert_findings(root, findings)
 }
 
-pub(crate) fn count_scanned_crates(root: &Path) -> Result<usize> {
-    count_crates(root)
+pub(crate) fn count_scanned_crates(workspace: &WorkspaceMetadata) -> usize {
+    count_crates(workspace)
 }
 
 struct PortabilityCollector<'a> {
     file_context: &'a FileContext,
     config: &'a PortabilityConfig,
     findings: Vec<PortabilityFinding>,
-}
-
-fn collect_unix_portability_findings(
-    file: &File,
-    file_context: &FileContext,
-    config: &PortabilityConfig,
-) -> Vec<PortabilityFinding> {
-    let mut findings = Vec::new();
-    let initial_scope = if file_context.is_test_file {
-        ScopeKind::Test
-    } else {
-        ScopeKind::NonTest
-    };
-    visit_items_for_unix_portability(
-        &file.items,
-        initial_scope,
-        false,
-        false,
-        file_context,
-        &mut findings,
-        config,
-    );
-    findings
-}
-
-fn visit_items_for_unix_portability(
-    items: &[Item],
-    inherited_scope: ScopeKind,
-    inherited_unix_gated: bool,
-    inherited_platform_gated: bool,
-    file_context: &FileContext,
-    findings: &mut Vec<PortabilityFinding>,
-    config: &PortabilityConfig,
-) {
-    collect_parity_findings(
-        items,
-        inherited_scope,
-        inherited_unix_gated,
-        file_context,
-        findings,
-    );
-    for item in items {
-        visit_item_for_unix_portability(
-            item,
-            inherited_scope,
-            inherited_unix_gated,
-            inherited_platform_gated,
-            file_context,
-            findings,
-            config,
-        );
-    }
-}
-
-fn visit_item_for_unix_portability(
-    item: &Item,
-    inherited_scope: ScopeKind,
-    inherited_unix_gated: bool,
-    inherited_platform_gated: bool,
-    file_context: &FileContext,
-    findings: &mut Vec<PortabilityFinding>,
-    config: &PortabilityConfig,
-) {
-    let attrs = item_attrs(item);
-    let scope = classify_scope(attrs, inherited_scope, item_name_hint_is_tests(item));
-    let unix_gated = inherited_unix_gated || attrs.iter().any(attr_is_cfg_unix);
-    let platform_gated = inherited_platform_gated || attrs.iter().any(attr_is_platform_cfg);
-
-    if scope == ScopeKind::NonTest && !platform_gated {
-        collect_production_path_literal_findings(item, file_context, findings, config);
-    }
-
-    if scope == ScopeKind::NonTest {
-        for attr in attrs {
-            if attr_is_cfg_attr_not_unix_allow_dead_code(attr) {
-                findings.push(PortabilityFinding {
-                    rule_id: RuleId::Port005,
-                    kind: "cfg_attr_not_unix_allow_dead_code",
-                    message: "PORT-005 #[cfg_attr(not(unix), allow(dead_code))] is not an approved portability suppressor in production code; gate the item with #[cfg(unix)] or provide a real cross-platform implementation".to_string(),
-                    source_path: file_context.source_path.clone(),
-                    line: span_start_line(attr.span()),
-                    package: file_context.package.clone(),
-                    target: file_context.target.clone(),
-                    node_label: format!(
-                        "crate::{}::{}::portability",
-                        file_context.package, file_context.target
-                    ),
-                });
-            }
-        }
-
-        if let Item::Use(item_use) = item
-            && use_tree_contains_std_os_unix(&item_use.tree)
-            && !unix_gated
-        {
-            findings.push(PortabilityFinding {
-                rule_id: RuleId::Port004,
-                kind: "ungated_std_os_unix_import",
-                message: "PORT-004 ungated std::os::unix import in production code; wrap the item with #[cfg(unix)] or move the import behind a Unix-only boundary".to_string(),
-                source_path: file_context.source_path.clone(),
-                line: span_start_line(item_use.span()),
-                package: file_context.package.clone(),
-                target: file_context.target.clone(),
-                node_label: format!(
-                    "crate::{}::{}::portability",
-                    file_context.package, file_context.target
-                ),
-            });
-        }
-    }
-
-    if let Item::Mod(item_mod) = item
-        && let Some((_, items)) = &item_mod.content
-    {
-        visit_items_for_unix_portability(
-            items,
-            scope,
-            unix_gated,
-            platform_gated,
-            file_context,
-            findings,
-            config,
-        );
-    }
 }
 
 fn collect_production_path_literal_findings(
@@ -404,7 +257,7 @@ fn collect_production_path_literal_findings(
             config,
         ),
         Item::Impl(item_impl) => {
-            collect_impl_method_parity_findings(
+            parity::collect_impl_method_parity_findings(
                 item_impl,
                 ScopeKind::NonTest,
                 file_context,
@@ -443,14 +296,14 @@ fn visit_block_for_unix_portability(
 ) {
     for stmt in &block.stmts {
         match stmt {
-            Stmt::Item(item) => visit_item_for_unix_portability(
+            Stmt::Item(item) => parity::visit_item_for_unix_portability(
                 item,
                 inherited_scope,
                 inherited_unix_gated,
                 inherited_platform_gated,
                 file_context,
                 findings,
-                config,
+                parity::ParityContext::without_adapters(config),
             ),
             Stmt::Local(local) => {
                 if let Some(init) = &local.init {
@@ -847,84 +700,6 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
                 self.file_context.package, self.file_context.target
             ),
         });
-    }
-}
-
-fn push_cfg_parity_finding(
-    findings: &mut Vec<PortabilityFinding>,
-    file_context: &FileContext,
-    line: usize,
-    detail: &str,
-) {
-    findings.push(PortabilityFinding {
-        rule_id: RuleId::Port010,
-        kind: "cfg_unix_parity_missing",
-        message: format!(
-            "PORT-010 production #[cfg(unix)] item `{detail}` has no #[cfg(windows)] companion or explicit portable fallback in the same scope; consider adding a cfg(windows) sibling or an unguarded portable fallback"
-        ),
-        source_path: file_context.source_path.clone(),
-        line,
-        package: file_context.package.clone(),
-        target: file_context.target.clone(),
-        node_label: format!(
-            "crate::{}::{}::portability",
-            file_context.package, file_context.target
-        ),
-    });
-}
-
-fn collect_parity_findings(
-    items: &[Item],
-    inherited_scope: ScopeKind,
-    inherited_unix_gated: bool,
-    file_context: &FileContext,
-    findings: &mut Vec<PortabilityFinding>,
-) {
-    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
-        return;
-    }
-    for item in items {
-        if is_cfg_unix_production_item(item, inherited_scope)
-            && !has_windows_companion(item, items)
-            && !has_portable_fallback(item, items, inherited_scope)
-        {
-            let detail = item_identifier(item)
-                .map(ToString::to_string)
-                .unwrap_or_else(|| "cfg(unix) item".to_string());
-            push_cfg_parity_finding(
-                findings,
-                file_context,
-                span_start_line(item.span()),
-                &detail,
-            );
-        }
-    }
-}
-
-fn collect_impl_method_parity_findings(
-    item_impl: &ItemImpl,
-    inherited_scope: ScopeKind,
-    file_context: &FileContext,
-    findings: &mut Vec<PortabilityFinding>,
-) {
-    if inherited_scope != ScopeKind::NonTest {
-        return;
-    }
-    for impl_item in &item_impl.items {
-        let ImplItem::Fn(unix_method) = impl_item else {
-            continue;
-        };
-        if impl_method_is_cfg_unix_production_item(unix_method, inherited_scope)
-            && !impl_method_has_windows_companion(unix_method, &item_impl.items)
-            && !impl_method_has_portable_fallback(unix_method, &item_impl.items, inherited_scope)
-        {
-            push_cfg_parity_finding(
-                findings,
-                file_context,
-                span_start_line(unix_method.span()),
-                &unix_method.sig.ident.to_string(),
-            );
-        }
     }
 }
 

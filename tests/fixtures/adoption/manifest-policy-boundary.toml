@@ -1,0 +1,36 @@
+boundary_id = "BOUNDARY-EmptyWorkspace"
+owner_package = "empty-workspace"
+owner_crate_path = "empty_workspace"
+name = "EmptyWorkspace"
+
+[public]
+facade = "name"
+
+[implementation]
+type = "name"
+module = "empty_workspace"
+visibility = "public"
+constructor = "none"
+
+[composition]
+roots = []
+
+[dependencies]
+allowed_dependents = []
+allowed_dependencies = []
+forbidden_edges = []
+
+[references]
+scope = "outside_owner_crate"
+forbidden = []
+
+[testing]
+allowed_test_double_paths = []
+forbidden_test_bypasses = []
+
+[enforcement]
+lint_rules = []
+review_gates = []
+
+[status]
+state = "concrete_landed"

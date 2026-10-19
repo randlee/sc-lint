@@ -2,10 +2,10 @@
 # columns: path, name, code_lines. A name may repeat; each row is one allowance.
 # regenerate: python -m sc_lint.lint_function_length --write-baseline
 crates/sc-lint-boundary/src/analysis.rs	analyze_named_callers	86
-crates/sc-lint-boundary/src/graph/build.rs	ingest_module_items	484
+crates/sc-lint-boundary/src/graph/ingest.rs	ingest_module_items	484
 crates/sc-lint-boundary/src/inventory/mod.rs	validate_boundary_schema	120
 crates/sc-lint-boundary/src/render.rs	render_graph_export_turtle	88
 crates/sc-lint/src/config.rs	evaluate_compatibility	97
-crates/sc-lint/src/consumer_integration.rs	run_consumer_init_at	99
+crates/sc-lint/src/consumer_integration.rs	run_consumer_init_at	98
 crates/sc-lint/src/python_adapter.rs	parse_adapter_output	87
 crates/sc-lint/src/render.rs	render_success_human	93

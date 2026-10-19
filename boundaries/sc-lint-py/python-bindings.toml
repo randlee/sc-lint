@@ -36,7 +36,7 @@ forbidden_test_bypasses = []
 
 [enforcement]
 lint_rules = []
-review_gates = ["native_exports_version_json_and_run_only"]
+review_gates = ["native_exports_version_json_and_run_only", "generated_catalog_matches_rust", "installer_has_no_rule_constants"]
 
 [status]
 state = "concrete_landed"

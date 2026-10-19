@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+from collections.abc import Callable
 
 from sc_lint.lint_common import discover_repo_root
 from sc_lint.lint_common import write_console_output
@@ -18,6 +20,9 @@ DEPRECATED_CONFIG_LINES = (
     "vulnerability = ",
     "unlicensed = ",
 )
+DNS_RETRY_ATTEMPTS = 3
+DNS_RETRY_DELAY_SECONDS = 2
+DNS_RESOLUTION_FAILURE_MARKER = "could not resolve hostname"
 
 
 def build_command(config_path: Path, version: tuple[int, int]) -> list[str]:
@@ -43,6 +48,40 @@ def detect_version() -> tuple[int, int]:
     if match is None:
         raise RuntimeError(f"unrecognized cargo-deny version output: {completed.stdout.strip()}")
     return int(match.group(1)), int(match.group(2))
+
+
+def is_dns_resolution_failure(completed: subprocess.CompletedProcess[str]) -> bool:
+    output = "\n".join((completed.stdout or "", completed.stderr or "")).lower()
+    return completed.returncode != 0 and DNS_RESOLUTION_FAILURE_MARKER in output
+
+
+def run_cargo_deny(
+    command: list[str],
+    repo_root: Path,
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+    sleeper: Callable[[float], None] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    run = runner or subprocess.run
+    sleep = sleeper or time.sleep
+    for attempt in range(1, DNS_RETRY_ATTEMPTS + 1):
+        completed = run(
+            command,
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        if not is_dns_resolution_failure(completed) or attempt == DNS_RETRY_ATTEMPTS:
+            return completed
+
+        write_console_output(
+            sys.stderr,
+            f"cargo-deny DNS failure (attempt {attempt}/{DNS_RETRY_ATTEMPTS}); retrying in {DNS_RETRY_DELAY_SECONDS}s\n",
+        )
+        sleep(DNS_RETRY_DELAY_SECONDS)
+
+    raise AssertionError("cargo-deny retry loop must return")
 
 
 def build_runtime_config(repo_root: Path) -> Path:
@@ -80,13 +119,7 @@ def main(argv: list[str]) -> int:
     except RuntimeError as error:
         write_console_output(sys.stderr, f"{error}\n")
         return 2
-    completed = subprocess.run(
-        build_command(runtime_config, version),
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
+    completed = run_cargo_deny(build_command(runtime_config, version), repo_root)
     if completed.stdout:
         write_console_output(sys.stdout, completed.stdout)
     if completed.stderr:

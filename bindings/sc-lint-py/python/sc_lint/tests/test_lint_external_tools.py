@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-import os
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -17,15 +17,20 @@ from sc_lint import lint_codespell
 from sc_lint.lint_common import WorkspaceCrate
 from sc_lint.lint_cargo_deny import build_command as build_cargo_deny_command
 from sc_lint.lint_cargo_deny import build_runtime_config
+from sc_lint.lint_cargo_deny import run_cargo_deny
 from sc_lint.lint_cargo_shear import annotate_sections
 from sc_lint.lint_cargo_shear import build_command as build_cargo_shear_command
+from sc_lint.lint_cargo_shear import CargoShearWorkspaceMetadata
 from sc_lint.lint_cargo_shear import evaluate_policy
 from sc_lint.lint_cargo_shear import evaluate_unused_dependency_policy
+from sc_lint.lint_cargo_shear import load_cargo_shear_workspace_metadata
 from sc_lint.lint_cargo_shear import load_policy_config
+from sc_lint.lint_cargo_shear import manifest_to_package_name
 from sc_lint.lint_cargo_shear import main as cargo_shear_main
 from sc_lint.lint_cargo_shear import parse_sections
+from sc_lint.lint_cargo_shear import PATH_KEY_MIGRATION_DIAGNOSTIC
+from sc_lint.lint_cargo_shear import validate_unused_dependency_allowlist
 from sc_lint.lint_codespell import build_command as build_codespell_command
-from sc_lint.lint_common import WorkspaceCrate
 from sc_lint.lint_common import write_console_output
 from sc_lint.lint_common import workspace_crate_section_lines
 
@@ -97,7 +102,10 @@ class ExternalLintToolTests(unittest.TestCase):
             )
 
     def test_build_runtime_config_strips_deprecated_keys(self) -> None:
-        with tempfile.TemporaryDirectory() as tempdir:
+        with (
+            tempfile.TemporaryDirectory() as tempdir,
+            tempfile.TemporaryDirectory(prefix="atm-lint-deny-") as runtime_dir,
+        ):
             repo_root = Path(tempdir)
             (repo_root / "deny.toml").write_text(
                 """\
@@ -112,13 +120,162 @@ allow = ["MIT"]
                 encoding="utf-8",
             )
 
-            runtime_path = build_runtime_config(repo_root)
+            with patch(
+                "sc_lint.lint_cargo_deny.tempfile.mkdtemp",
+                return_value=runtime_dir,
+            ):
+                runtime_path = build_runtime_config(repo_root)
             text = runtime_path.read_text(encoding="utf-8")
 
             self.assertNotIn('vulnerability = "deny"', text)
             self.assertNotIn('unlicensed = "deny"', text)
             self.assertIn('yanked = "deny"', text)
             self.assertIn('allow = ["MIT"]', text)
+
+    def test_cargo_deny_retries_dns_resolution_failure(self) -> None:
+        failure = subprocess.CompletedProcess(
+            ["cargo-deny"], 1, stdout="Could NOT resolve hostname", stderr=""
+        )
+        success = subprocess.CompletedProcess(["cargo-deny"], 0, stdout="ok", stderr="")
+        runner = mock.Mock(side_effect=[failure, success])
+        sleeper = mock.Mock()
+        with patch("sc_lint.lint_cargo_deny.sys.stderr", new_callable=io.StringIO):
+            completed = run_cargo_deny(
+                ["cargo-deny", "check"], Path("/repo"), runner=runner, sleeper=sleeper
+            )
+
+        self.assertEqual(completed.returncode, 0)
+        self.assertEqual(runner.call_count, 2)
+        sleeper.assert_called_once_with(2)
+
+    def test_cargo_deny_does_not_retry_policy_failure(self) -> None:
+        failure = subprocess.CompletedProcess(
+            ["cargo-deny"], 1, stdout="", stderr="error: failed license policy"
+        )
+        runner = mock.Mock(return_value=failure)
+        sleeper = mock.Mock()
+
+        completed = run_cargo_deny(
+            ["cargo-deny", "check"], Path("/repo"), runner=runner, sleeper=sleeper
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        runner.assert_called_once()
+        sleeper.assert_not_called()
+
+    def test_cargo_deny_reports_each_retry_and_preserves_final_output(self) -> None:
+        dns_failures = [
+            subprocess.CompletedProcess(
+                ["cargo-deny"], 1, stdout="Could not resolve hostname", stderr=""
+            ),
+            subprocess.CompletedProcess(
+                ["cargo-deny"], 1, stdout="", stderr="could not resolve HOSTNAME"
+            ),
+        ]
+        success = subprocess.CompletedProcess(
+            ["cargo-deny"], 0, stdout="final stdout\n", stderr="final stderr\n"
+        )
+        runner = mock.Mock(side_effect=[*dns_failures, success])
+        sleeper = mock.Mock()
+        stderr = io.StringIO()
+
+        with patch("sc_lint.lint_cargo_deny.sys.stderr", stderr):
+            completed = run_cargo_deny(
+                ["cargo-deny", "check"], Path("/repo"), runner=runner, sleeper=sleeper
+            )
+
+        self.assertEqual(completed.returncode, 0)
+        self.assertEqual(completed.stdout, "final stdout\n")
+        self.assertEqual(completed.stderr, "final stderr\n")
+        self.assertEqual(
+            stderr.getvalue(),
+            "cargo-deny DNS failure (attempt 1/3); retrying in 2s\n"
+            "cargo-deny DNS failure (attempt 2/3); retrying in 2s\n",
+        )
+        self.assertEqual(runner.call_count, 3)
+        self.assertEqual([call.args for call in sleeper.call_args_list], [(2,), (2,)])
+
+    def test_cargo_deny_main_retries_dns_failure_and_forwards_only_final_result(self) -> None:
+        dns_failure = subprocess.CompletedProcess(
+            ["cargo-deny"], 1, "intermediate DNS output\ncould not resolve hostname\n", ""
+        )
+        final = subprocess.CompletedProcess(
+            ["cargo-deny"], 7, "final stdout\n", "final stderr\n"
+        )
+        version = subprocess.CompletedProcess(
+            ["cargo-deny", "--version"], 0, "cargo-deny 0.20.0\n", ""
+        )
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with (
+            patch("sc_lint.lint_cargo_deny.discover_repo_root", return_value=Path("/repo")),
+            patch("sc_lint.lint_cargo_deny.shutil.which", return_value="cargo-deny"),
+            patch("sc_lint.lint_cargo_deny.workspace_crate_section_lines", return_value=["workspace crates:"]),
+            patch("sc_lint.lint_cargo_deny.build_runtime_config", return_value=Path("/repo/deny.toml")),
+            patch("sc_lint.lint_cargo_deny.subprocess.run", side_effect=[version, dns_failure, final]) as run_mock,
+            patch("sc_lint.lint_cargo_deny.time.sleep") as sleep_mock,
+            patch("sc_lint.lint_cargo_deny.sys.stdout", stdout),
+            patch("sc_lint.lint_cargo_deny.sys.stderr", stderr),
+        ):
+            result = lint_cargo_deny.main(["lint-cargo-deny", "--root", "/repo"])
+
+        self.assertEqual(result, 7)
+        self.assertEqual(stdout.getvalue(), "workspace crates:\nfinal stdout\n")
+        self.assertEqual(
+            stderr.getvalue(),
+            "cargo-deny DNS failure (attempt 1/3); retrying in 2s\nfinal stderr\n",
+        )
+        self.assertEqual(run_mock.call_count, 3)
+        sleep_mock.assert_called_once_with(2)
+
+    def test_cargo_deny_stops_after_three_dns_failures(self) -> None:
+        failure = subprocess.CompletedProcess(
+            ["cargo-deny"], 9, "", "could not resolve hostname\n"
+        )
+        runner = mock.Mock(side_effect=[failure, failure, failure])
+        sleeper = mock.Mock()
+        stderr = io.StringIO()
+
+        with patch("sc_lint.lint_cargo_deny.sys.stderr", stderr):
+            completed = run_cargo_deny(
+                ["cargo-deny", "check"], Path("/repo"), runner=runner, sleeper=sleeper
+            )
+
+        self.assertEqual(completed.returncode, 9)
+        self.assertEqual(runner.call_count, 3)
+        self.assertEqual(sleeper.call_count, 2)
+        self.assertEqual(
+            stderr.getvalue(),
+            "cargo-deny DNS failure (attempt 1/3); retrying in 2s\n"
+            "cargo-deny DNS failure (attempt 2/3); retrying in 2s\n",
+        )
+
+    def test_cargo_deny_mixed_dns_then_policy_stops(self) -> None:
+        dns_failure = subprocess.CompletedProcess(
+            ["cargo-deny"], 1, stdout="could not resolve hostname", stderr=""
+        )
+        policy_failure = subprocess.CompletedProcess(
+            ["cargo-deny"], 7, stdout="final policy failure\n", stderr="denied\n"
+        )
+        runner = mock.Mock(side_effect=[dns_failure, policy_failure])
+        sleeper = mock.Mock()
+        stderr = io.StringIO()
+
+        with patch("sc_lint.lint_cargo_deny.sys.stderr", stderr):
+            completed = run_cargo_deny(
+                ["cargo-deny", "check"], Path("/repo"), runner=runner, sleeper=sleeper
+            )
+
+        self.assertEqual(completed.returncode, 7)
+        self.assertEqual(completed.stdout, "final policy failure\n")
+        self.assertEqual(completed.stderr, "denied\n")
+        self.assertEqual(runner.call_count, 2)
+        sleeper.assert_called_once_with(2)
+        self.assertEqual(
+            stderr.getvalue(),
+            "cargo-deny DNS failure (attempt 1/3); retrying in 2s\n",
+        )
 
     def test_build_cargo_shear_command_targets_workspace_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -127,6 +284,464 @@ allow = ["MIT"]
                 build_cargo_shear_command(repo_root),
                 ["cargo-shear"],
             )
+
+    def test_cargo_shear_metadata_loads_one_offline_no_deps_query_and_dependency_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                '[workspace]\nmembers = ["crates/app"]\n'
+                '[workspace.dependencies]\nworkspace_alias = { package = "real-workspace", version = "1" }\n'
+                'workspace_direct = "1"\n',
+                encoding="utf-8",
+            )
+            app_manifest = repo_root / "crates" / "app" / "Cargo.toml"
+            app_manifest.parent.mkdir(parents=True)
+            app_manifest.write_text("[package]\nname = \"fixture-app\"\n", encoding="utf-8")
+            metadata_json = {
+                "packages": [
+                    {
+                        "name": "fixture-app",
+                        "manifest_path": str(app_manifest),
+                        "dependencies": [
+                            {"name": "normal-dep", "rename": None, "kind": None},
+                            {"name": "real-package", "rename": "dependency_alias", "kind": None},
+                            {"name": "dev-dep", "rename": None, "kind": "dev"},
+                            {"name": "build-dep", "rename": None, "kind": "build"},
+                            {
+                                "name": "target-dep",
+                                "rename": "target_alias",
+                                "kind": None,
+                                "target": "cfg(windows)",
+                            },
+                        ],
+                    }
+                ]
+            }
+            metadata_result = subprocess.CompletedProcess(
+                ["cargo", "metadata"], 0, json.dumps(metadata_json), ""
+            )
+            with patch(
+                "sc_lint.lint_cargo_shear.subprocess.run", return_value=metadata_result
+            ) as run_mock:
+                metadata = load_cargo_shear_workspace_metadata(repo_root)
+
+        run_mock.assert_called_once_with(
+            ["cargo", "metadata", "--offline", "--format-version", "1", "--no-deps"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        self.assertEqual(
+            metadata.allowed_unused_dependency_keys,
+            frozenset(
+                {
+                    "fixture-app.normal-dep",
+                    "fixture-app.dependency_alias",
+                    "fixture-app.dev-dep",
+                    "fixture-app.build-dep",
+                    "fixture-app.target_alias",
+                    "workspace.workspace_alias",
+                    "workspace.workspace_direct",
+                }
+            ),
+        )
+        self.assertEqual(
+            metadata.manifest_packages["crates/app/Cargo.toml"], "fixture-app"
+        )
+        self.assertEqual(metadata.manifest_packages["Cargo.toml"], "workspace")
+
+    def test_cargo_shear_package_named_workspace_does_not_get_virtual_root_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                '[package]\nname = "workspace"\nversion = "0.1.0"\n'
+                '[workspace]\nmembers = []\n'
+                '[workspace.dependencies]\nvirtual_only = "1"\n',
+                encoding="utf-8",
+            )
+            manifest = str(repo_root / "Cargo.toml")
+            metadata_json = {
+                "packages": [
+                    {
+                        "name": "workspace",
+                        "manifest_path": manifest,
+                        "dependencies": [{"name": "serde", "rename": None}],
+                    }
+                ]
+            }
+            completed = subprocess.CompletedProcess(
+                ["cargo", "metadata"], 0, json.dumps(metadata_json), ""
+            )
+            with patch(
+                "sc_lint.lint_cargo_shear.subprocess.run", return_value=completed
+            ):
+                metadata = load_cargo_shear_workspace_metadata(repo_root)
+
+        self.assertIn("workspace.serde", metadata.allowed_unused_dependency_keys)
+        self.assertNotIn("workspace.virtual_only", metadata.allowed_unused_dependency_keys)
+        self.assertEqual(metadata.manifest_packages["Cargo.toml"], "workspace")
+
+    def test_cargo_shear_metadata_collects_dependencies_for_out_of_root_members(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir, tempfile.TemporaryDirectory() as member_tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                "[workspace]\nmembers = []\nresolver = \"2\"\n",
+                encoding="utf-8",
+            )
+            member_manifest = Path(member_tempdir) / "member" / "Cargo.toml"
+            completed = subprocess.CompletedProcess(
+                ["cargo", "metadata"],
+                0,
+                json.dumps(
+                    {
+                        "packages": [
+                            {
+                                "name": "external-member",
+                                "manifest_path": str(member_manifest),
+                                "dependencies": [
+                                    {"name": "serde", "rename": None, "kind": None}
+                                ],
+                            }
+                        ]
+                    }
+                ),
+                "",
+            )
+            with patch(
+                "sc_lint.lint_cargo_shear.subprocess.run", return_value=completed
+            ):
+                metadata = load_cargo_shear_workspace_metadata(repo_root)
+
+        self.assertIn("external-member.serde", metadata.allowed_unused_dependency_keys)
+        self.assertNotIn(member_manifest.as_posix(), metadata.manifest_packages)
+
+    def test_cargo_shear_virtual_root_workspace_member_collision_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                '[workspace]\nmembers = ["crates/workspace"]\n'
+                '[workspace.dependencies]\nshared = "1"\nroot_only = "1"\n',
+                encoding="utf-8",
+            )
+            member_manifest = repo_root / "crates" / "workspace" / "Cargo.toml"
+            member_manifest.parent.mkdir(parents=True)
+            member_manifest.write_text(
+                '[package]\nname = "workspace"\nversion = "0.1.0"\n',
+                encoding="utf-8",
+            )
+            metadata_json = {
+                "packages": [
+                    {
+                        "name": "workspace",
+                        "manifest_path": str(member_manifest),
+                        "dependencies": [
+                            {"name": "shared", "rename": None},
+                            {"name": "member_only", "rename": None},
+                        ],
+                    }
+                ]
+            }
+            completed = subprocess.CompletedProcess(
+                ["cargo", "metadata"], 0, json.dumps(metadata_json), ""
+            )
+            with patch(
+                "sc_lint.lint_cargo_shear.subprocess.run", return_value=completed
+            ):
+                metadata = load_cargo_shear_workspace_metadata(repo_root)
+
+        self.assertEqual(
+            metadata.ambiguous_unused_dependency_keys,
+            frozenset({"workspace.shared"}),
+        )
+        self.assertIn("workspace.root_only", metadata.allowed_unused_dependency_keys)
+        self.assertIn("workspace.member_only", metadata.allowed_unused_dependency_keys)
+        diagnostics = validate_unused_dependency_allowlist(
+            {"workspace.shared": "either package or virtual-root dependency"}, metadata
+        )
+        self.assertEqual(len(diagnostics), 1)
+        self.assertIn("cause=ambiguous-dependency-key", diagnostics[0])
+        self.assertIn("virtual workspace root", diagnostics[0])
+        self.assertIn("package named workspace", diagnostics[0])
+
+    def test_cargo_shear_validation_reports_exact_path_key_migration(self) -> None:
+        metadata = CargoShearWorkspaceMetadata(
+            {"crates/app/Cargo.toml": APP_PACKAGE},
+            frozenset({f"{APP_PACKAGE}.serde"}),
+        )
+        key = "crates/app/Cargo.toml.serde"
+
+        diagnostics = validate_unused_dependency_allowlist({key: "old path form"}, metadata)
+
+        self.assertEqual(len(diagnostics), 2)
+        self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", diagnostics[0])
+        self.assertIn("field=cargo_shear.allowed_unused_dependencies", diagnostics[0])
+        self.assertIn("key=", diagnostics[0])
+        self.assertIn("cause=path-like-key", diagnostics[0])
+        self.assertNotIn("action=", diagnostics[0])
+        self.assertEqual(diagnostics[1], PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key))
+
+    def test_cargo_shear_validation_rejects_stale_keys_with_correction(self) -> None:
+        metadata = CargoShearWorkspaceMetadata({}, frozenset({f"{APP_PACKAGE}.serde"}))
+
+        diagnostics = validate_unused_dependency_allowlist(
+            {f"{APP_PACKAGE}.missing": "stale"}, metadata
+        )
+
+        self.assertEqual(len(diagnostics), 1)
+        self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", diagnostics[0])
+        self.assertIn("cause=dependency-key-not-found", diagnostics[0])
+        self.assertIn("action=", diagnostics[0])
+
+    def test_cargo_shear_validation_rejects_blank_and_non_string_reasons(self) -> None:
+        metadata = CargoShearWorkspaceMetadata(
+            {}, frozenset({f"{APP_PACKAGE}.serde", f"{APP_PACKAGE}.regex"})
+        )
+
+        diagnostics = validate_unused_dependency_allowlist(
+            {f"{APP_PACKAGE}.serde": "   ", f"{APP_PACKAGE}.regex": 3}, metadata
+        )
+
+        self.assertEqual(len(diagnostics), 2)
+        self.assertIn("key='synthetic-app.serde' cause=blank-reason", diagnostics[0])
+        self.assertIn("key='synthetic-app.regex' cause=non-string-reason", diagnostics[1])
+        self.assertTrue(
+            all('action="supply a nonblank string reason"' in diagnostic for diagnostic in diagnostics)
+        )
+
+    def test_cargo_shear_validation_accepts_only_declared_canonical_keys(self) -> None:
+        metadata = CargoShearWorkspaceMetadata(
+            {}, frozenset({f"{APP_PACKAGE}.serde", "workspace.shared"})
+        )
+
+        self.assertEqual(
+            validate_unused_dependency_allowlist(
+                {f"{APP_PACKAGE}.serde": "normal", "workspace.shared": "root"}, metadata
+            ),
+            [],
+        )
+
+    def test_cargo_shear_absent_allowlist_preserves_child_status_without_metadata(self) -> None:
+        child = subprocess.CompletedProcess(
+            ["cargo-shear"], 7, "cargo-shear failed\n", "tool failure\n"
+        )
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text(
+                "[cargo_shear.allowed_empty_files]\n", encoding="utf-8"
+            )
+            with (
+                patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
+                patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[]),
+                patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
+                patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=child) as run_mock,
+                patch(
+                    "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
+                    side_effect=AssertionError("absent optional table must not query metadata"),
+                ) as metadata_mock,
+                patch("sc_lint.lint_cargo_shear.sys.stdout", stdout),
+                patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
+            ):
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
+
+        self.assertEqual(result, 7)
+        run_mock.assert_called_once()
+        metadata_mock.assert_not_called()
+        self.assertEqual(stdout.getvalue(), "cargo-shear failed\n")
+        self.assertEqual(stderr.getvalue(), "tool failure\n")
+
+    def test_cargo_shear_path_key_is_rejected_before_successful_tool_run(self) -> None:
+        keys = (
+            "crates/old/Cargo.toml.serde",
+            r"crates\old\Cargo.toml.serde",
+            "./crates/old/Cargo.toml.serde",
+            "~/.cache/Cargo.toml.serde",
+            r"C:\crates\old\Cargo.toml.serde",
+        )
+        for key in keys:
+            with self.subTest(key=key):
+                metadata = CargoShearWorkspaceMetadata(
+                    {}, frozenset({f"{APP_PACKAGE}.serde"})
+                )
+                stderr = io.StringIO()
+                with tempfile.TemporaryDirectory() as tempdir:
+                    repo_root = Path(tempdir)
+                    (repo_root / ".just").mkdir()
+                    (repo_root / ".just" / "lint-config.toml").write_text(
+                        f"[cargo_shear.allowed_unused_dependencies]\n'{key}' = \"old path\"\n",
+                        encoding="utf-8",
+                    )
+                    with (
+                        patch(
+                            "sc_lint.lint_cargo_shear.discover_repo_root",
+                            return_value=repo_root,
+                        ),
+                        patch(
+                            "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
+                            return_value=metadata,
+                        ),
+                        patch(
+                            "sc_lint.lint_cargo_shear.workspace_crate_section_lines",
+                            return_value=[],
+                        ),
+                        patch("sc_lint.lint_cargo_shear.shutil.which") as which_mock,
+                        patch("sc_lint.lint_cargo_shear.subprocess.run") as child_mock,
+                        patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
+                    ):
+                        result = cargo_shear_main(
+                            ["lint_cargo_shear.py", "--root", str(repo_root)]
+                        )
+
+                diagnostics = stderr.getvalue().splitlines()
+                self.assertEqual(result, 2)
+                self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", diagnostics[0])
+                self.assertIn("cause=path-like-key", diagnostics[0])
+                self.assertNotIn("action=", diagnostics[0])
+                self.assertEqual(
+                    diagnostics[1], PATH_KEY_MIGRATION_DIAGNOSTIC.format(key=key)
+                )
+                which_mock.assert_not_called()
+                child_mock.assert_not_called()
+
+    def test_cargo_shear_stale_key_is_rejected_before_successful_tool_run(self) -> None:
+        stale_key = f"{APP_PACKAGE}.not_declared"
+        metadata = CargoShearWorkspaceMetadata({}, frozenset({f"{APP_PACKAGE}.serde"}))
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text(
+                f'[cargo_shear.allowed_unused_dependencies]\n"{stale_key}" = "stale"\n',
+                encoding="utf-8",
+            )
+            with (
+                patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
+                patch(
+                    "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
+                    return_value=metadata,
+                ),
+                patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[]),
+                patch("sc_lint.lint_cargo_shear.shutil.which") as which_mock,
+                patch("sc_lint.lint_cargo_shear.subprocess.run") as child_mock,
+                patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
+            ):
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
+
+        self.assertEqual(result, 2)
+        self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", stderr.getvalue())
+        self.assertIn(stale_key, stderr.getvalue())
+        self.assertIn("cause=dependency-key-not-found", stderr.getvalue())
+        self.assertIn("action=", stderr.getvalue())
+        which_mock.assert_not_called()
+        child_mock.assert_not_called()
+
+    def test_cargo_shear_metadata_failure_is_actionable_config_error(self) -> None:
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text(
+                f'[cargo_shear.allowed_unused_dependencies]\n"{APP_PACKAGE}.serde" = "needed"\n',
+                encoding="utf-8",
+            )
+            failure = subprocess.CompletedProcess(
+                ["cargo", "metadata"], 101, "", "offline metadata unavailable\n"
+            )
+            with (
+                patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
+                patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[]),
+                patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=failure) as run_mock,
+                patch("sc_lint.lint_cargo_shear.shutil.which") as which_mock,
+                patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
+            ):
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
+
+        self.assertEqual(result, 2)
+        self.assertIn("SC_LINT_CARGO_SHEAR_CONFIG_INVALID", stderr.getvalue())
+        self.assertIn("offline metadata unavailable", stderr.getvalue())
+        self.assertIn("cargo metadata --offline --format-version 1 --no-deps", stderr.getvalue())
+        run_mock.assert_called_once_with(
+            ["cargo", "metadata", "--offline", "--format-version", "1", "--no-deps"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        which_mock.assert_not_called()
+
+    def test_cargo_shear_reuses_metadata_mapping_for_renamed_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = Path(tempdir)
+            (repo_root / "Cargo.toml").write_text(
+                '[workspace]\nmembers = ["crates/app"]\nresolver = "2"\n',
+                encoding="utf-8",
+            )
+            app_manifest = repo_root / "crates" / "app" / "Cargo.toml"
+            app_manifest.parent.mkdir(parents=True)
+            app_manifest.write_text(
+                '[package]\nname = "fixture-app"\nversion = "0.1.0"\n'
+                '[dependencies]\nserde_alias = { package = "serde", version = "1" }\n',
+                encoding="utf-8",
+            )
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text(
+                '[cargo_shear.allowed_unused_dependencies]\n'
+                '"fixture-app.serde_alias" = "used by generated code"\n',
+                encoding="utf-8",
+            )
+            metadata = subprocess.CompletedProcess(
+                ["cargo", "metadata"],
+                0,
+                json.dumps(
+                    {
+                        "packages": [
+                            {
+                                "name": "fixture-app",
+                                "manifest_path": str(app_manifest),
+                                "dependencies": [
+                                    {"name": "serde", "rename": "serde_alias", "kind": None}
+                                ],
+                            }
+                        ]
+                    }
+                ),
+                "",
+            )
+            shear = subprocess.CompletedProcess(
+                ["cargo-shear"],
+                1,
+                "shear/unused_dependency\n\n  × unused dependency `serde_alias`\n"
+                "    ╭─[crates/app/Cargo.toml:5:1]\n\n"
+                "shear/summary\n\n  × 1 error\n",
+                "",
+            )
+            stdout = io.StringIO()
+            with (
+                patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
+                patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=[]),
+                patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
+                patch(
+                    "sc_lint.lint_cargo_shear.subprocess.run", side_effect=[metadata, shear]
+                ) as run_mock,
+                patch("sc_lint.lint_cargo_shear.sys.stdout", stdout),
+            ):
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(run_mock.call_count, 2)
+        self.assertEqual(
+            run_mock.call_args_list[0].args[0],
+            ["cargo", "metadata", "--offline", "--format-version", "1", "--no-deps"],
+        )
+        self.assertEqual(run_mock.call_args_list[1].args[0], ["cargo-shear"])
+        self.assertIn(
+            "unused_dependency: downgraded fixture-app.serde_alias", stdout.getvalue()
+        )
 
     def test_parse_sections_extracts_warning_files(self) -> None:
         stdout = f"""\
@@ -340,6 +955,13 @@ shear/summary
             with (
                 mock.patch("sc_lint.lint_cargo_shear.sys.stdout", restrictive_stdout),
                 mock.patch("sc_lint.lint_cargo_shear.sys.stderr", restrictive_stderr),
+                mock.patch(
+                    "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
+                    return_value=CargoShearWorkspaceMetadata(
+                        {manifest_relative: APP_PACKAGE},
+                        frozenset({f"{APP_PACKAGE}.serde"}),
+                    ),
+                ),
             ):
                 result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
 
@@ -397,6 +1019,12 @@ shear/summary
             with (
                 mock.patch("sc_lint.lint_cargo_shear.sys.stdout", restrictive_stdout),
                 mock.patch("sc_lint.lint_cargo_shear.sys.stderr", restrictive_stderr),
+                mock.patch(
+                    "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
+                    return_value=CargoShearWorkspaceMetadata(
+                        {manifest_relative: APP_PACKAGE}, frozenset()
+                    ),
+                ),
             ):
                 result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
 
@@ -429,7 +1057,7 @@ shear/summary
   × 1 error
 """
         completed = mock.Mock(returncode=1, stdout=stdout, stderr="")
-        with tempfile.TemporaryDirectory() as repo_dir, tempfile.TemporaryDirectory() as foreign_cwd:
+        with tempfile.TemporaryDirectory() as repo_dir:
             repo_root = Path(repo_dir)
             (repo_root / "Cargo.toml").write_text(
                 '[workspace]\nmembers = ["crates/*"]\n', encoding="utf-8"
@@ -442,18 +1070,27 @@ shear/summary
             )
             (repo_root / ".just").mkdir()
             (repo_root / ".just" / "lint-config.toml").write_text(allowlist, encoding="utf-8")
+            self.assertNotEqual(repo_root.resolve(), Path.cwd().resolve())
+            self.assertEqual(
+                manifest_to_package_name(repo_root),
+                {f"crates/{APP_CRATE}/Cargo.toml": APP_PACKAGE},
+            )
             with (
                 patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
                 patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=completed),
+                patch(
+                    "sc_lint.lint_cargo_shear.load_cargo_shear_workspace_metadata",
+                    return_value=CargoShearWorkspaceMetadata(
+                        {f"crates/{APP_CRATE}/Cargo.toml": APP_PACKAGE},
+                        frozenset(
+                            {f"{APP_PACKAGE}.serde", f"{APP_PACKAGE}.regex"}
+                        ),
+                    ),
+                ),
                 patch("sys.stdout", new_callable=io.StringIO) as stdout_mock,
                 patch("sys.stderr", new_callable=io.StringIO),
             ):
-                previous_cwd = os.getcwd()
-                os.chdir(foreign_cwd)
-                try:
-                    result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
-                finally:
-                    os.chdir(previous_cwd)
+                result = cargo_shear_main(["lint_cargo_shear.py", "--root", str(repo_root)])
         return result, stdout_mock.getvalue()
 
     def test_main_from_foreign_cwd_downgrades_allowlisted_unused_dependency(self) -> None:
@@ -820,7 +1457,10 @@ shear/unlinked_files
             stderr="deny failure: \u03bb\n",
         )
 
-        with tempfile.TemporaryDirectory() as tempdir:
+        with (
+            tempfile.TemporaryDirectory() as tempdir,
+            tempfile.TemporaryDirectory(prefix="atm-lint-deny-") as runtime_dir,
+        ):
             repo_root = Path(tempdir)
             create_non_ascii_workspace(repo_root)
             (repo_root / "deny.toml").write_text("[advisories]\n", encoding="utf-8")
@@ -834,6 +1474,10 @@ shear/unlinked_files
                 patch("sc_lint.lint_cargo_deny.subprocess.run", return_value=completed),
                 patch("sc_lint.lint_cargo_deny.sys.stdout", stdout),
                 patch("sc_lint.lint_cargo_deny.sys.stderr", stderr),
+                patch(
+                    "sc_lint.lint_cargo_deny.tempfile.mkdtemp",
+                    return_value=runtime_dir,
+                ),
             ):
                 result = lint_cargo_deny.main(["lint-cargo-deny", "--root", str(repo_root)])
 

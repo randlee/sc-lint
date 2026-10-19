@@ -23,17 +23,24 @@ logging controls. Consumer profiles require explicit `--config sc-lint.toml`.
 ```sh
 sc-lint init --just
 sc-lint setup
-sc-lint lint --consumer --config sc-lint.toml ci
+sc-lint lint ci --consumer --config sc-lint.toml --profile ci
 sc-lint test --config sc-lint.toml
 sc-lint upgrade --check --config sc-lint.toml
 sc-lint docs
 ```
 
+The consumer lint selector, named profiles, and platform scope are described
+in [using sc-lint](../using-sc-lint.md). The `ci` and `full` source-maintainer
+profiles include the runtime analyzer. Consumer test steps remain consumer
+declared; `sc-lint test` executes the configured complete test profile or one
+named layer, sequentially and fail-fast.
+
 ## Output and CI
 
 Human output is operator-oriented. `--json` emits the stable success/error
 envelope with a command identifier, status, details, recovery action, and docs
-reference. CI should run the same `just lint` and `just test` contract.
+reference. A lint-fail verdict exits 10 while retaining the report. CI should
+run the same `just lint` and `just test` contract.
 
 ## Common failures
 

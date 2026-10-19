@@ -144,8 +144,10 @@ family.
   metadata, not prose, comments, or freeform allowlists.
 
 - `REQ-SCB-012`
-  The default planning metadata source for inventory parity is
-  `boundaries/planning.toml`.
+  `boundaries/planning.toml` is the sole authoritative planning-metadata
+  source for inventory parity and must be a regular file. Any other entry
+  named `planning.toml` is an error, including nested entries, directories,
+  symlinks, and case variants.
 
 - `REQ-SCB-013`
   When `boundaries/` exists, `boundaries/planning.toml` must define
@@ -174,7 +176,7 @@ family.
   canonical workspace package names, not aliases. A pattern matching no
   package is not an error. A bare `*`, a `*` elsewhere, more than one `*`, or
   any pattern in `allowed_dependents` fails inventory loading.
-  (Proposed 2026-10-17,
+  (Accepted 2026-10-16,
   [ADR-019, decision 1](../sc-lint/adr/ADR-019-boundary-prefix-patterns-and-feature-independence.md#decision).)
 
 - `REQ-SCB-025`
@@ -188,7 +190,7 @@ family.
   `[features]` forward to it through `dep:x`, `x/feat`, `x?/feat`, or a bare
   `x` enabling optional dependency `x`. Dev-dependencies and same-named
   registry or git dependencies are not checked.
-  (Proposed 2026-10-17,
+  (Accepted 2026-10-16,
   [ADR-019, decision 2](../sc-lint/adr/ADR-019-boundary-prefix-patterns-and-feature-independence.md#decision).)
 
 - `REQ-SCB-014`

@@ -25,6 +25,7 @@ sc-lint-schema.workspace = true
 sc-lint-analyzer-support.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+rayon.workspace = true
 toml.workspace = true
 syn = { version = "2", features = ["full", "parsing", "visit"] }
 thiserror = "1"
