@@ -4,6 +4,8 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-19
+
 ### Added
 
 - Boundary `allowed_dependencies`, `allowed_dev_dependencies`, and
@@ -11,9 +13,41 @@ All notable changes to sc-lint are documented here.
   (for example `"codex-*"`).
 - New `SCB-FEATURE-001` rule (in the `dependencies` family) enforces feature
   independence, with a new optional `allowed_feature_dependencies` field.
+- Analyzer `exclude_paths_by_rule` maps exact rule IDs to workspace-relative
+  globs and drops only that rule's findings at matching paths; optional and
+  inactive when not declared
+  ([configuration](docs-bundle/configuration.md)).
+- Portability `platform_adapters` declares explicit Unix/Windows module pairs,
+  with a review reason, for equivalent implementations whose names differ;
+  optional and inactive when not declared
+  ([sc-lint-portability](docs-bundle/packages/sc-lint-portability.md)).
+- Boundary accepts the optional manifest dependency policy families
+  `manifest_dependency_allowlists`, `global_dependency_ownership` and
+  `manifest_section_rules`, validates inventory policy semantically, and
+  reports stale dependent permissions; inactive when not declared
+  ([sc-lint-boundary](docs-bundle/packages/sc-lint-boundary.md#dependency-and-manifest-policies)).
+- Consumer named lint profiles (`[tool.sc-lint.lint_profiles]`) and
+  `--platform-scope` (`host` by default, or `all`, `linux`, `macos`,
+  `windows`) select which declared lint steps run; the adoption kit renders
+  platform-aware profiles and CI resolution
+  ([using sc-lint](docs-bundle/using-sc-lint.md#profiles-platform-scope-and-declared-tools)).
+- `.sc-lint/bootstrap.py exec -- <command>` runs a command in the managed
+  product environment, preserving its arguments and exit status; it does not
+  run setup or select a profile
+  ([Just setup](docs-bundle/just-setup.md#select-lint-steps-and-run-managed-commands)).
+- `just setup` provisions only the cargo tools (exact versions) and rustup
+  targets a consumer declares under `tools` in `.sc-lint/install.json`; no
+  product default chooses tools, and lint never installs them
+  ([using sc-lint](docs-bundle/using-sc-lint.md#profiles-platform-scope-and-declared-tools)).
 
 ### Changed
 
+- Adoption uses one Python bootstrap, `.sc-lint/bootstrap.py`, identical on
+  Linux, macOS and Windows. Recipes run
+  `<python> .sc-lint/bootstrap.py <operation> --config sc-lint.toml`
+  (`python` on Windows, `python3` elsewhere); on Windows `just` runs recipes
+  with `cmd.exe /c`. pwsh is no longer used by recipes, actions or tests
+  (ADR-012, ADR-016).
 - The built-in source lint plan runs independent steps concurrently and
   continues through all planned steps after failures, reporting every failure
   by plan index in plan order. Consumer-configured lint and test profiles
@@ -21,6 +55,11 @@ All notable changes to sc-lint are documented here.
 
 ### Compatibility
 
+- `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` are no longer shipped.
+  Upgrading the adoption kit removes them when they are unmodified (their
+  digest matches the kit's install manifest); a modified copy is reported as
+  a conflict (exit 2) and left in place. The bootstrap requires Python 3.11 or
+  newer.
 - Existing boundary records retain their results; feature independence is opt-in.
   Older binaries reject records declaring `allowed_feature_dependencies`, so
   consumers adopting it must pin a release that supports the field.
@@ -42,6 +81,8 @@ All notable changes to sc-lint are documented here.
 
 ### Fixed
 
+- The cargo-deny lint step retries a DNS resolution failure up to three times
+  before reporting it.
 - The boundary inventory now rejects nested `planning.toml` files instead of
   silently ignoring planning metadata outside `boundaries/planning.toml`.
 - Portability and runtime analysis now report an error when a finding's source
