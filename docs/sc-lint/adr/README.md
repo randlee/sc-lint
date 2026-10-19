@@ -38,7 +38,7 @@ current planning surface.
 
 - [`ADR-019-boundary-prefix-patterns-and-feature-independence.md`](./ADR-019-boundary-prefix-patterns-and-feature-independence.md)
   - prefix patterns in boundary dependency allow-lists and opt-in
-    `SCB-FEATURE-001` feature independence (Proposed)
+    `SCB-FEATURE-001` feature independence (Accepted)
 
 ## Index Rules
 
