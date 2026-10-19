@@ -4,6 +4,8 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-19
+
 ### Added
 
 - Boundary `allowed_dependencies`, `allowed_dev_dependencies`, and
@@ -14,6 +16,12 @@ All notable changes to sc-lint are documented here.
 
 ### Changed
 
+- Adoption uses one Python bootstrap, `.sc-lint/bootstrap.py`, identical on
+  Linux, macOS and Windows. Recipes run
+  `<python> .sc-lint/bootstrap.py <operation> --config sc-lint.toml`
+  (`python` on Windows, `python3` elsewhere); on Windows `just` runs recipes
+  with `cmd.exe /c`. pwsh is no longer used by recipes, actions or tests
+  (ADR-012, ADR-016).
 - The built-in source lint plan runs independent steps concurrently and
   continues through all planned steps after failures, reporting every failure
   by plan index in plan order. Consumer-configured lint and test profiles
@@ -21,6 +29,11 @@ All notable changes to sc-lint are documented here.
 
 ### Compatibility
 
+- `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` are no longer shipped.
+  Upgrading the adoption kit removes them when they are unmodified (their
+  digest matches the kit's install manifest); a modified copy is reported as
+  a conflict (exit 2) and left in place. The bootstrap requires Python 3.11 or
+  newer.
 - Existing boundary records retain their results; feature independence is opt-in.
   Older binaries reject records declaring `allowed_feature_dependencies`, so
   consumers adopting it must pin a release that supports the field.
