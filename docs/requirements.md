@@ -621,6 +621,59 @@ meaning and lint never installs tools. The managed-wheel helper owns
 inspection, installation and verification; absent declarations add no work.
 This is an amendment to those contracts, not a new product default.
 
+### Dependency upgrades (Rand 2026-10-12)
+
+- `REQ-PRODUCT-025`
+  A dependency upgrade runs from a repo formula
+  (`.atm-bd/formula/upgrade-<dependency>.formula.toml.j2`) attached with
+  sc-compose `bead attach` under a new phase root, and runs to its end with no
+  input from Rand. The formula's steps are the plan; a run adds no other work.
+
+- `REQ-PRODUCT-026`
+  The upgrade changes only the repo's own version constants in
+  `.claude/lib/sc_compose_dependency.py` for sc-compose: the wheel pin
+  (`SC_COMPOSE_WHEEL_PIN`) and the minimum floors and install specs
+  (`MIN_SC_COMPOSE`, `MIN_SC_COMPOSE_TEXT`, `MIN_SC_COMPOSE_BINDING`,
+  `MIN_SC_COMPOSE_BINDING_TEXT`, `SC_COMPOSE_INSTALL`,
+  `SC_COMPOSE_BINDING_INSTALL`), which all require the new version
+  (ANC-016), plus repo-owned files a changelog item requires. It edits no other
+  skill's or kit's pin or files; those keep their own minimum versions.
+
+- `REQ-PRODUCT-027`
+  Before testing, the run reads the dependency's CHANGELOG and migration docs
+  between the two versions. Each breaking change, deprecation or recommended
+  change is applied to repo-owned uses, recorded as not used, or filed as an
+  issue against the owning repository.
+
+- `REQ-PRODUCT-028`
+  The run tests the old and new versions side by side, with recorded installed
+  versions: the old version on the base commit, the new on the upgrade head.
+  It compares the rendering tests and the rendered output of every formula the
+  team pours, from committed sample requests. The upgrade is breaking when a
+  test passing on the old version fails on the new one or a rendered formula
+  differs. The verdict is one of NOT_BREAKING; BREAKING_FIXED, a minor break
+  fixed in repo-owned files with no public interface, kit-file or architecture
+  change and listed in the PR (ANC-017); or BREAKING, any other break.
+  quality-mgr re-runs the comparison independently.
+
+- `REQ-PRODUCT-029`
+  When BREAKING, the run stops with a ready PR to `develop` whose description
+  carries the failing tests, diffs and an impact assessment. When
+  BREAKING_FIXED, it stops with a green PR to `develop` whose description
+  announces each fixed break and the fix. When NOT_BREAKING and no other work is
+  in progress, it continues to a patch bump, publish-preflight GO and a PR to
+  `main`; with other work in progress it stops after `develop`.
+
+- `REQ-PRODUCT-030`
+  No agent merges to `develop` or `main`. Every PR to either requests review
+  from GitHub user `rand-lee`.
+
+- `REQ-PRODUCT-031`
+  Every decision point, stop and escalation (QA or sanity failure, a refused
+  run, an issue filed on another repository, a blocked release) sends an
+  explicit `atm send omega-prime@hermes` message with the link, including when
+  a PR to `develop` or `main` has green CI.
+
 ## Current Detailed Requirement Areas
 
 - Boundary definition and enforcement requirements
