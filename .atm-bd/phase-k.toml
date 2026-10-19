@@ -1,0 +1,3 @@
+plan = "docs/plans/phase-k.jsonl"
+root = "lint-phase-k"
+integration_branch = "integrate/phase-k"

@@ -30,6 +30,13 @@ use crate::MinimumVersion;
 use crate::config::{LoadedConfig, VERSION_PROBE_SCHEMA};
 use crate::error::ErrorCode;
 
+mod activation;
+mod probe;
+
+use activation::*;
+use probe::*;
+pub(crate) use probe::{probe_backend_version, probe_version};
+
 const DEFAULT_RELEASE_BASE_URL: &str = "https://github.com/randlee/sc-lint/releases/download";
 const RELEASE_BASE_URL_ENV: &str = "SC_LINT_RELEASE_BASE_URL";
 const INSTALL_DIR_ENV: &str = "SC_LINT_INSTALL_DIR";
@@ -47,11 +54,8 @@ const MANAGED_BACKENDS: &[&str] = &[
 /// The only executable helper E.3 may place in a consumer repository.
 ///
 /// It delegates behavior to the installed product instead of copying source
-/// checkout scripts; E.3 owns rendering it into `.sc-lint/bootstrap`.
-pub(crate) const CONSUMER_BOOTSTRAP_ASSET: &str = include_str!("../assets/bootstrap");
-/// Windows companion for the product-owned consumer bootstrap.
-pub(crate) const CONSUMER_BOOTSTRAP_POWERSHELL_ASSET: &str =
-    include_str!("../assets/bootstrap.ps1");
+/// checkout scripts; E.3 owns rendering it into `.sc-lint/bootstrap.py`.
+pub(crate) const CONSUMER_BOOTSTRAP_ASSET: &str = include_str!("../assets/bootstrap.py");
 
 #[derive(Debug, Clone, Copy)]
 enum InstallerErrorCode {
@@ -107,7 +111,15 @@ impl std::fmt::Display for ResolvedReleaseVersion {
 
 impl ReleaseTarget {
     fn detect() -> Result<Self, CliError> {
-        let target = match (env::consts::OS, env::consts::ARCH) {
+        Self::detect_for(env::consts::OS, env::consts::ARCH)
+    }
+
+    /// Selects the published release target for one host `os`/`arch` pair.
+    ///
+    /// `detect` passes the compile-time host; tests pass unpublished pairs so
+    /// the real unsupported-platform failure runs on every CI host.
+    fn detect_for(os: &str, arch: &str) -> Result<Self, CliError> {
+        let target = match (os, arch) {
             ("linux", "x86_64") => Self {
                 triple: "x86_64-unknown-linux-gnu",
                 archive_extension: "tar.gz",
@@ -408,7 +420,7 @@ struct PayloadEntry {
 }
 
 type PayloadChange = (PathBuf, PathBuf, bool, bool);
-type ProbeOutputReader = thread::JoinHandle<io::Result<Vec<u8>>>;
+type ProbeOutputReader = std::sync::mpsc::Receiver<io::Result<Vec<u8>>>;
 
 fn release_payload_candidates(binary: &Path, managed_binary: &Path) -> Vec<PayloadEntry> {
     let bin_dir = binary.parent().unwrap_or_else(|| Path::new("."));
@@ -496,6 +508,14 @@ fn payload_validation_issue_with_timeout(
     entries: &[PayloadEntry],
     probe_timeout: Duration,
 ) -> Option<String> {
+    payload_validation_issue_with_probe(entries, probe_timeout, backend_cli_failure)
+}
+
+fn payload_validation_issue_with_probe(
+    entries: &[PayloadEntry],
+    probe_timeout: Duration,
+    mut probe: impl FnMut(&Path, &str, Duration) -> Option<String>,
+) -> Option<String> {
     for entry in entries {
         if entry.source.is_dir() {
             if !docs_bundle_complete(&entry.source) {
@@ -518,7 +538,7 @@ fn payload_validation_issue_with_timeout(
                 })
             })
         {
-            if let Some(problem) = backend_cli_failure(&entry.source, backend, probe_timeout) {
+            if let Some(problem) = probe(&entry.source, backend, probe_timeout) {
                 return Some(problem);
             }
         } else if !entry.source.is_file() {
@@ -543,6 +563,14 @@ fn managed_payload_validation_issue_with_timeout(
     binary: &Path,
     probe_timeout: Duration,
 ) -> Option<String> {
+    managed_payload_validation_issue_with_probe(binary, probe_timeout, backend_cli_failure)
+}
+
+fn managed_payload_validation_issue_with_probe(
+    binary: &Path,
+    probe_timeout: Duration,
+    mut probe: impl FnMut(&Path, &str, Duration) -> Option<String>,
+) -> Option<String> {
     let parent = binary.parent().unwrap_or_else(|| Path::new("."));
     for backend in MANAGED_BACKENDS {
         let name = if cfg!(windows) {
@@ -551,7 +579,7 @@ fn managed_payload_validation_issue_with_timeout(
             (*backend).to_string()
         };
         let path = parent.join(name);
-        if let Some(problem) = backend_cli_failure(&path, backend, probe_timeout) {
+        if let Some(problem) = probe(&path, backend, probe_timeout) {
             return Some(problem);
         }
     }
@@ -568,249 +596,6 @@ fn managed_payload_validation_issue_with_timeout(
             binary.display()
         ))
     }
-}
-
-/// Probe the supported CLI help contract and analyzer command surface.
-fn backend_cli_failure(binary: &Path, expected_name: &str, timeout: Duration) -> Option<String> {
-    let Some(expected_about) = backend_about(expected_name) else {
-        return Some(format!("unknown backend companion `{expected_name}`"));
-    };
-    let (status, output) = match run_backend_probe(binary, expected_name, "--help", timeout) {
-        Ok(result) => result,
-        Err(problem) => return Some(problem),
-    };
-    backend_help_contract_failure(
-        &output,
-        status.success(),
-        binary,
-        expected_name,
-        expected_about,
-    )
-}
-
-pub(crate) fn probe_backend_version(binary: &Path, expected_name: &str) -> Result<Version, String> {
-    let (status, output) =
-        run_backend_probe(binary, expected_name, "--version", BACKEND_PROBE_TIMEOUT)?;
-    if !status.success() {
-        return Err(format!("`--version` probe exited with {status}"));
-    }
-    let output = String::from_utf8(output)
-        .map_err(|error| format!("`--version` probe output was not UTF-8: {error}"))?;
-    let mut fields = output.split_whitespace();
-    let reported_name = fields
-        .next()
-        .ok_or_else(|| "`--version` probe returned no identity or version".to_string())?;
-    let reported_version = fields
-        .next()
-        .ok_or_else(|| "`--version` probe returned no version".to_string())?;
-    if reported_name != expected_name {
-        return Err(format!(
-            "`--version` probe reported backend `{reported_name}`, expected `{expected_name}`"
-        ));
-    }
-    if fields.next().is_some() {
-        return Err("`--version` probe returned unexpected trailing output".to_string());
-    }
-    Version::parse(reported_version).map_err(|error| {
-        format!("`--version` probe reported invalid version `{reported_version}`: {error}")
-    })
-}
-
-fn run_backend_probe(
-    binary: &Path,
-    expected_name: &str,
-    argument: &str,
-    timeout: Duration,
-) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
-    let (mut child, reader) = spawn_backend_probe(binary, expected_name, argument)?;
-    let process_id = child.id();
-    let status = wait_for_backend_probe(&mut child, binary, expected_name, argument, timeout)?;
-    let output = finish_backend_output(reader, process_id, binary, expected_name, argument)?;
-    Ok((status, output))
-}
-
-fn spawn_backend_probe(
-    binary: &Path,
-    expected_name: &str,
-    argument: &str,
-) -> Result<(Child, ProbeOutputReader), String> {
-    let mut command = Command::new(binary);
-    command
-        .arg(argument)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
-    #[cfg(unix)]
-    command.process_group(0);
-    let mut child = match command.spawn() {
-        Ok(child) => child,
-        Err(error) => {
-            return Err(format!(
-                "could not start backend companion `{expected_name}` at `{}`: {error}",
-                binary.display()
-            ));
-        }
-    };
-    let Some(stdout) = child.stdout.take() else {
-        terminate_probe_processes(&mut child);
-        return Err(format!(
-            "backend companion `{expected_name}` at `{}` did not provide a readable `{argument}` stream",
-            binary.display(),
-        ));
-    };
-    let reader = thread::spawn(move || read_probe_output(stdout));
-    Ok((child, reader))
-}
-
-fn wait_for_backend_probe(
-    child: &mut Child,
-    binary: &Path,
-    expected_name: &str,
-    argument: &str,
-    timeout: Duration,
-) -> Result<std::process::ExitStatus, String> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status),
-            Ok(None) if Instant::now() < deadline => {
-                thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
-            }
-            Ok(None) => {
-                terminate_probe_processes(child);
-                return Err(format!(
-                    "backend companion `{expected_name}` at `{}` timed out after {} ms during its `{argument}` probe; process-tree cleanup was attempted",
-                    binary.display(),
-                    timeout.as_millis()
-                ));
-            }
-            Err(error) => {
-                terminate_probe_processes(child);
-                return Err(format!(
-                    "could not wait for backend companion `{expected_name}` at `{}`: {error}",
-                    binary.display()
-                ));
-            }
-        }
-    }
-}
-
-fn finish_backend_output(
-    reader: ProbeOutputReader,
-    process_id: u32,
-    binary: &Path,
-    expected_name: &str,
-    argument: &str,
-) -> Result<Vec<u8>, String> {
-    // A descendant can outlive the direct child while holding stdout open.
-    // Give the reader a short chance to drain normal output, then stop the
-    // process group instead of waiting indefinitely for EOF.
-    let drain_deadline = Instant::now() + Duration::from_millis(50);
-    while !reader.is_finished() && Instant::now() < drain_deadline {
-        thread::sleep(BACKEND_PROBE_POLL_INTERVAL);
-    }
-    if !reader.is_finished() && !terminate_probe_process_tree(process_id) {
-        return Err(format!(
-            "could not stop the process tree for backend companion `{expected_name}` at `{}` after its `{argument}` process exited",
-            binary.display()
-        ));
-    }
-    match reader.join() {
-        Ok(Ok(output)) => Ok(output),
-        Ok(Err(error)) => Err(format!(
-            "could not read `{argument}` output from backend companion `{expected_name}` at `{}`: {error}",
-            binary.display()
-        )),
-        Err(_) => Err(format!(
-            "`{argument}` output reader panicked for backend companion `{expected_name}` at `{}`",
-            binary.display()
-        )),
-    }
-}
-
-fn backend_help_contract_failure(
-    output: &[u8],
-    successful_exit: bool,
-    binary: &Path,
-    expected_name: &str,
-    expected_about: &str,
-) -> Option<String> {
-    if !successful_exit {
-        return Some(format!(
-            "backend companion `{expected_name}` at `{}` exited unsuccessfully",
-            binary.display()
-        ));
-    }
-    let help = String::from_utf8_lossy(output);
-    let healthy = help.contains(expected_about)
-        && help
-            .lines()
-            .any(|line| line.trim_start().starts_with("Usage:") && line.contains("<COMMAND>"))
-        && help
-            .lines()
-            .any(|line| line.trim_start().starts_with("analyze "));
-    if healthy {
-        None
-    } else {
-        Some(format!(
-            "backend companion `{expected_name}` at `{}` did not satisfy the documented `--help` contract",
-            binary.display()
-        ))
-    }
-}
-
-fn backend_about(name: &str) -> Option<&'static str> {
-    match name {
-        crate::consts::TOOL_BOUNDARY => Some("AST-sensitive Rust boundary analyzer"),
-        crate::consts::TOOL_PORTABILITY => Some("AST-sensitive Rust portability analyzer"),
-        crate::consts::TOOL_RUNTIME => Some("AST-sensitive Rust runtime analyzer"),
-        _ => None,
-    }
-}
-
-fn read_probe_output(mut stdout: impl Read) -> io::Result<Vec<u8>> {
-    let mut output = Vec::with_capacity(BACKEND_PROBE_OUTPUT_LIMIT.min(4096));
-    let mut buffer = [0u8; 4096];
-    loop {
-        let count = stdout.read(&mut buffer)?;
-        if count == 0 {
-            return Ok(output);
-        }
-        let remaining = BACKEND_PROBE_OUTPUT_LIMIT.saturating_sub(output.len());
-        output.extend_from_slice(&buffer[..count.min(remaining)]);
-    }
-}
-
-fn terminate_probe_processes(child: &mut Child) {
-    let process_id = child.id();
-    let _ = terminate_probe_process_tree(process_id);
-    let _ = child.kill();
-    let _ = child.wait();
-}
-
-#[cfg(unix)]
-fn terminate_probe_process_tree(process_id: u32) -> bool {
-    let process_group = format!("-{process_id}");
-    Command::new("/bin/kill")
-        .args(["-KILL", "--", &process_group])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-#[cfg(windows)]
-fn terminate_probe_process_tree(process_id: u32) -> bool {
-    Command::new("taskkill")
-        .args(["/PID", &process_id.to_string(), "/T", "/F"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-#[cfg(not(any(unix, windows)))]
-fn terminate_probe_process_tree(_process_id: u32) -> bool {
-    false
 }
 
 fn release_binary_candidate(
@@ -1033,233 +818,6 @@ fn extract_archive(archive: &Path, destination: &Path) -> Result<(), CliError> {
     }
 }
 
-trait InstallerFileOps {
-    fn remove_file(&self, path: &Path) -> io::Result<()>;
-    fn rename(&self, source: &Path, destination: &Path) -> io::Result<()>;
-
-    fn remove_path(&self, path: &Path) -> io::Result<()> {
-        if path.is_dir() {
-            fs::remove_dir_all(path)
-        } else {
-            self.remove_file(path)
-        }
-    }
-}
-
-struct SystemFileOps;
-
-impl InstallerFileOps for SystemFileOps {
-    fn remove_file(&self, path: &Path) -> io::Result<()> {
-        fs::remove_file(path)
-    }
-
-    fn rename(&self, source: &Path, destination: &Path) -> io::Result<()> {
-        fs::rename(source, destination)
-    }
-
-    fn remove_path(&self, path: &Path) -> io::Result<()> {
-        if path.is_dir() {
-            fs::remove_dir_all(path)
-        } else {
-            fs::remove_file(path)
-        }
-    }
-}
-
-fn activate_payload(
-    entries: &[PayloadEntry],
-    managed_binary: &Path,
-    minimum: &MinimumVersion,
-) -> Result<Version, CliError> {
-    activate_payload_with(entries, managed_binary, minimum, &SystemFileOps)
-}
-
-fn activate_payload_with<F: InstallerFileOps>(
-    entries: &[PayloadEntry],
-    managed_binary: &Path,
-    minimum: &MinimumVersion,
-    file_ops: &F,
-) -> Result<Version, CliError> {
-    reject_running_managed_binary(managed_binary)?;
-    let backups = prepare_payload_activation(entries, managed_binary)?;
-    let changes = activate_payload_entries(entries, &backups, managed_binary, file_ops)?;
-    match verify_activated_payload(managed_binary, minimum) {
-        Ok(version) => {
-            remove_payload_backups(&changes, file_ops);
-            Ok(version)
-        }
-        Err(cause) => {
-            if let Err(rollback_error) = rollback_payload(&changes, file_ops) {
-                let backup = changes
-                    .first()
-                    .map(|(_, backup, _, _)| backup.as_path())
-                    .unwrap_or(managed_binary);
-                return Err(
-                    rollback_failure_error(managed_binary, backup, rollback_error, None)
-                        .with_detail("post_install_verification_cause", json!(cause)),
-                );
-            }
-            Err(install_error(
-                InstallerErrorCode::PostInstallVersionFailed,
-                format!("activated sc-lint bundle `{}` failed post-install verification", managed_binary.display()),
-                cause,
-                "The previous managed bundle was restored. Repair the release source and rerun `sc-lint setup`.",
-            )
-            .with_detail("managed_binary", json!(managed_binary.display().to_string()))
-            .with_detail("minimum_version", json!(minimum.to_string())))
-        }
-    }
-}
-
-fn prepare_payload_activation(
-    entries: &[PayloadEntry],
-    managed_binary: &Path,
-) -> Result<Vec<PathBuf>, CliError> {
-    let mut backups = Vec::with_capacity(entries.len());
-    for entry in entries {
-        let parent = entry.target.parent().ok_or_else(|| {
-            activation_error(
-                &entry.target,
-                io::Error::other("target has no parent directory"),
-            )
-        })?;
-        fs::create_dir_all(parent).map_err(|error| permission_error(parent, error))?;
-        let file_name = entry
-            .target
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy();
-        let backup = parent.join(format!(".{file_name}-sc-lint-backup"));
-        if backup.exists() {
-            return Err(install_error(
-                InstallerErrorCode::RollbackFailed,
-                format!("managed payload backup `{}` already exists", backup.display()),
-                "A prior activation left a backup that may contain the previous managed payload.",
-                "Inspect the backup and managed installation, restore the known-good payload if needed, then rerun `sc-lint setup`.",
-            )
-            .with_detail("managed_binary", json!(managed_binary.display().to_string()))
-            .with_detail("backup_path", json!(backup.display().to_string())));
-        }
-        backups.push(backup);
-    }
-    Ok(backups)
-}
-
-fn activate_payload_entries<F: InstallerFileOps>(
-    entries: &[PayloadEntry],
-    backups: &[PathBuf],
-    managed_binary: &Path,
-    file_ops: &F,
-) -> Result<Vec<PayloadChange>, CliError> {
-    let mut changes = Vec::with_capacity(entries.len());
-    for (entry, backup) in entries.iter().zip(backups) {
-        let had_previous = entry.target.exists();
-        if had_previous && let Err(error) = file_ops.rename(&entry.target, backup) {
-            let error_message = error.to_string();
-            rollback_payload(&changes, file_ops).map_err(|rollback_error| {
-                rollback_failure_error(
-                    managed_binary,
-                    backup,
-                    rollback_error,
-                    Some(io::Error::other(error_message.clone())),
-                )
-            })?;
-            return Err(activation_error(
-                &entry.target,
-                io::Error::other(error_message),
-            ));
-        }
-        changes.push((entry.target.clone(), backup.clone(), had_previous, false));
-        if let Err(error) = file_ops.rename(&entry.source, &entry.target) {
-            if let Err(rollback_error) = rollback_payload(&changes, file_ops) {
-                return Err(rollback_failure_error(
-                    managed_binary,
-                    backup,
-                    rollback_error,
-                    Some(error),
-                ));
-            }
-            return Err(activation_error(&entry.target, error));
-        }
-        if let Some(last) = changes.last_mut() {
-            last.3 = true;
-        }
-    }
-    Ok(changes)
-}
-
-fn verify_activated_payload(
-    managed_binary: &Path,
-    minimum: &MinimumVersion,
-) -> Result<Version, String> {
-    let version = probe_version(managed_binary)?;
-    if version < *minimum.as_semver() {
-        return Err(format!(
-            "activated version `{version}` is below required `{minimum}`"
-        ));
-    }
-    if let Some(problem) = managed_payload_validation_issue(managed_binary) {
-        return Err(format!(
-            "activated release payload failed validation: {problem}"
-        ));
-    }
-    Ok(version)
-}
-
-fn remove_payload_backups<F: InstallerFileOps>(changes: &[PayloadChange], file_ops: &F) {
-    for (_, backup, had_previous, _) in changes {
-        if *had_previous {
-            let _ = file_ops.remove_path(backup);
-        }
-    }
-}
-
-fn rollback_payload<F: InstallerFileOps>(
-    changes: &[PayloadChange],
-    file_ops: &F,
-) -> io::Result<()> {
-    for (target, backup, had_previous, activated) in changes.iter().rev() {
-        if *activated && target.exists() {
-            file_ops.remove_path(target)?;
-        }
-        if *had_previous && backup.exists() {
-            file_ops.rename(backup, target)?;
-        }
-    }
-    Ok(())
-}
-
-fn rollback_failure_error(
-    target: &Path,
-    backup: &Path,
-    rollback_error: io::Error,
-    activation_error: Option<io::Error>,
-) -> CliError {
-    let mut error = install_error(
-        InstallerErrorCode::RollbackFailed,
-        format!(
-            "could not verify rollback of managed sc-lint binary `{}`",
-            target.display()
-        ),
-        rollback_error.to_string(),
-        format!(
-            "Inspect `{}` and `{}`; recover the known-good backup manually, then rerun `sc-lint setup`.",
-            target.display(),
-            backup.display()
-        ),
-    )
-    .with_detail("managed_binary", json!(target.display().to_string()))
-    .with_detail("backup_path", json!(backup.display().to_string()))
-    .with_detail(
-        "rollback_error_kind",
-        json!(format!("{:?}", rollback_error.kind())),
-    );
-    if let Some(activation_error) = activation_error {
-        error = error.with_detail("activation_error", json!(activation_error.to_string()));
-    }
-    error
-}
-
 fn reject_running_managed_binary(target: &Path) -> Result<(), CliError> {
     #[cfg(not(windows))]
     let _ = target;
@@ -1281,36 +839,6 @@ fn reject_running_managed_binary(target: &Path) -> Result<(), CliError> {
         }
     }
     Ok(())
-}
-
-pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
-    if !binary.is_file() {
-        return Err("binary was not found".to_string());
-    }
-    let output = Command::new(binary)
-        .args(["--json", "version"])
-        .output()
-        .map_err(|error| error.to_string())?;
-    if !output.status.success() {
-        return Err(format!("version probe exited with {}", output.status));
-    }
-    let envelope: Value =
-        serde_json::from_slice(&output.stdout).map_err(|error| error.to_string())?;
-    let data = envelope
-        .get("data")
-        .ok_or_else(|| "version probe did not include data".to_string())?;
-    if envelope.get("ok").and_then(Value::as_bool) != Some(true)
-        || envelope.get("command").and_then(Value::as_str) != Some("version")
-        || data.get("tool").and_then(Value::as_str) != Some(crate::consts::SERVICE_NAME)
-        || data.get("contract_schema").and_then(Value::as_str) != Some(VERSION_PROBE_SCHEMA)
-    {
-        return Err("version probe did not implement sc-lint-version-v1".to_string());
-    }
-    let version = data
-        .get("version")
-        .and_then(Value::as_str)
-        .ok_or_else(|| "version probe did not include a version".to_string())?;
-    Version::parse(version).map_err(|error| error.to_string())
 }
 
 fn permission_error(path: &Path, error: io::Error) -> CliError {
@@ -1376,6 +904,8 @@ mod tests {
     const MINIMAL_DOCS_MANIFEST: &str = "schema_version = 1\n\n[[guides]]\npath = \"README.md\"\n";
     #[cfg(unix)]
     const BACKEND_PROBE_TEST_WATCHDOG: Duration = Duration::from_secs(30);
+    #[cfg(unix)]
+    const BACKEND_OUTPUT_TEST_WAIT: Duration = Duration::from_secs(5);
 
     #[test]
     fn release_target_matches_the_published_release_matrix() {
@@ -1388,6 +918,104 @@ mod tests {
                 "x86_64-pc-windows-msvc",
             ]
             .contains(&target.triple)
+        );
+    }
+
+    #[test]
+    fn unsupported_host_platform_is_a_structured_installer_failure() {
+        for (os, arch) in [("freebsd", "x86_64"), ("linux", "aarch64")] {
+            let error = ReleaseTarget::detect_for(os, arch)
+                .expect_err("an unpublished platform must not select a release target");
+            assert_eq!(
+                error.code(),
+                "CLI.SC_LINT_INSTALL_UNSUPPORTED_PLATFORM",
+                "{os}/{arch}"
+            );
+            assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
+            assert!(
+                error.message.contains(&format!("`{os}/{arch}`")),
+                "{error:?}"
+            );
+            assert_eq!(error.details.get("host_os"), Some(&json!(os)));
+            assert_eq!(error.details.get("host_arch"), Some(&json!(arch)));
+            assert_installer_failure_is_recoverable(&error, "sc-lint setup");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[serial]
+    fn unwritable_managed_install_dir_is_a_permission_denied_installer_failure() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = TempDir::new().expect("fixture");
+        let config_path = fixture.path().join("sc-lint.toml");
+        write_consumer_config(&config_path, &Version::new(0, 4, 1));
+        let locked = fixture.path().join("locked");
+        fs::create_dir(&locked).expect("locked directory");
+        let install_dir = locked.join("managed");
+        // The release source is a local path holding no release, so a host that
+        // ignores directory permissions fails locally instead of reaching the
+        // network.
+        let release_base: OsString =
+            format!("file://{}", fixture.path().join("no-release").display()).into();
+        let _environment = InstallerEnvironment::set(&[
+            (INSTALL_DIR_ENV, install_dir.as_os_str()),
+            (RELEASE_BASE_URL_ENV, release_base.as_os_str()),
+        ]);
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).expect("read-only parent");
+
+        for command in ["setup", "upgrade"] {
+            let error = execute_command(&config_path, &[command]).expect_err(command);
+            assert_eq!(
+                error.code(),
+                "CLI.SC_LINT_INSTALL_PERMISSION_DENIED",
+                "{command}: {error:?}"
+            );
+            assert_eq!(
+                error.exit_code(),
+                crate::consts::EXIT_BACKEND_FAILURE,
+                "{command}"
+            );
+            assert_eq!(
+                error.details.get("managed_path"),
+                Some(&json!(install_dir.display().to_string())),
+                "{command}"
+            );
+            assert_eq!(
+                error.details.get("io_error_kind"),
+                Some(&json!("PermissionDenied")),
+                "{command}"
+            );
+            assert_installer_failure_is_recoverable(&error, "SC_LINT_INSTALL_DIR");
+            assert!(
+                !install_dir.exists(),
+                "{command} must not create the managed directory"
+            );
+        }
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).expect("restore parent");
+    }
+
+    /// REQ-CLI-020: every installer failure names a cause, a recovery action,
+    /// and the `sc-lint docs installation` reference.
+    fn assert_installer_failure_is_recoverable(error: &CliError, recovery_hint: &str) {
+        assert!(
+            error
+                .cause
+                .as_deref()
+                .is_some_and(|cause| !cause.is_empty()),
+            "{error:?}"
+        );
+        assert!(
+            error
+                .suggested_action
+                .as_deref()
+                .is_some_and(|action| action.contains(recovery_hint)),
+            "{error:?}"
+        );
+        assert_eq!(
+            error.documentation.as_deref(),
+            Some("sc-lint docs installation")
         );
     }
 
@@ -1523,17 +1151,11 @@ mod tests {
                 "bootstrap does not expose {operation}"
             );
         }
-        assert!(CONSUMER_BOOTSTRAP_ASSET.contains("compatibility check"));
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains(".sc-lint/bootstrap.py exec"));
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains("compatibility"));
         assert!(CONSUMER_BOOTSTRAP_ASSET.contains("--config"));
         assert!(!CONSUMER_BOOTSTRAP_ASSET.contains("cargo run"));
-        for operation in ["setup", "lint", "test", "upgrade"] {
-            assert!(
-                CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains(operation),
-                "Windows bootstrap does not expose {operation}"
-            );
-        }
-        assert!(CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("CLI.SC_LINT_RELEASE_UNAVAILABLE"));
-        assert!(!CONSUMER_BOOTSTRAP_POWERSHELL_ASSET.contains("cargo run"));
+        assert!(CONSUMER_BOOTSTRAP_ASSET.contains("CLI.SC_LINT_RELEASE_UNAVAILABLE"));
     }
 
     #[cfg(unix)]
@@ -1817,6 +1439,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn swapped_real_backend_is_rejected_from_staged_and_installed_bundles() {
+        build_release_binaries();
         let fixture = TempDir::new().expect("fixture");
         let staged_root = fixture.path().join("staged");
         let staged_bin = staged_root.join("bin");
@@ -1895,8 +1518,10 @@ mod tests {
         let staged_bin = staged_root.join("bin");
         let staged_docs = staged_root.join("share/sc-lint/sc-lint-docs");
         let staged_pid_file = fixture.path().join("staged-child-pids");
+        let staged_ready_fifo = fixture.path().join("staged-probe-ready");
         fs::create_dir_all(&staged_bin).expect("staged bin");
         fs::create_dir_all(&staged_docs).expect("staged docs");
+        create_probe_ready_fifo(&staged_ready_fifo);
         fs::write(staged_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("staged launcher");
         for backend in [
@@ -1907,7 +1532,7 @@ mod tests {
         }
         write_hanging_noisy_stub(
             &staged_bin.join(crate::consts::TOOL_RUNTIME),
-            &staged_pid_file,
+            &staged_ready_fifo,
         );
         fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("staged docs manifest");
@@ -1915,9 +1540,27 @@ mod tests {
         let staged_launcher = staged_bin.join(ReleaseTarget::binary_name());
         let staged_managed = fixture.path().join("managed/bin/sc-lint");
         let probe_timeout = Duration::from_secs(5);
+        let staged_pid_file_for_probe = staged_pid_file.clone();
+        let staged_ready_fifo_for_probe = staged_ready_fifo.clone();
         let staged_is_complete = run_probe_with_watchdog(&staged_pid_file, move || {
             let entries = release_payload_candidates(&staged_launcher, &staged_managed);
-            payload_validation_issue_with_timeout(&entries, probe_timeout)
+            payload_validation_issue_with_probe(
+                &entries,
+                probe_timeout,
+                |path, backend, timeout| {
+                    if backend == crate::consts::TOOL_RUNTIME {
+                        hanging_backend_cli_failure_after_startup(
+                            path,
+                            backend,
+                            timeout,
+                            &staged_pid_file_for_probe,
+                            &staged_ready_fifo_for_probe,
+                        )
+                    } else {
+                        backend_cli_failure(path, backend, timeout)
+                    }
+                },
+            )
         });
         let staged_problem = staged_is_complete.expect("hanging staged companion is rejected");
         assert!(
@@ -1934,8 +1577,10 @@ mod tests {
         let installed_bin = installed_root.join("bin");
         let installed_docs = installed_root.join("share/sc-lint/sc-lint-docs");
         let installed_pid_file = fixture.path().join("installed-child-pids");
+        let installed_ready_fifo = fixture.path().join("installed-probe-ready");
         fs::create_dir_all(&installed_bin).expect("installed bin");
         fs::create_dir_all(&installed_docs).expect("installed docs");
+        create_probe_ready_fifo(&installed_ready_fifo);
         fs::write(installed_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("installed launcher");
         for backend in [
@@ -1946,14 +1591,32 @@ mod tests {
         }
         write_hanging_noisy_stub(
             &installed_bin.join(crate::consts::TOOL_RUNTIME),
-            &installed_pid_file,
+            &installed_ready_fifo,
         );
         fs::write(installed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("installed docs manifest");
         fs::write(installed_docs.join("README.md"), "# docs\n").expect("installed docs README");
         let installed_launcher = installed_bin.join(ReleaseTarget::binary_name());
+        let installed_pid_file_for_probe = installed_pid_file.clone();
+        let installed_ready_fifo_for_probe = installed_ready_fifo.clone();
         let installed_is_complete = run_probe_with_watchdog(&installed_pid_file, move || {
-            managed_payload_validation_issue_with_timeout(&installed_launcher, probe_timeout)
+            managed_payload_validation_issue_with_probe(
+                &installed_launcher,
+                probe_timeout,
+                |path, backend, timeout| {
+                    if backend == crate::consts::TOOL_RUNTIME {
+                        hanging_backend_cli_failure_after_startup(
+                            path,
+                            backend,
+                            timeout,
+                            &installed_pid_file_for_probe,
+                            &installed_ready_fifo_for_probe,
+                        )
+                    } else {
+                        backend_cli_failure(path, backend, timeout)
+                    }
+                },
+            )
         });
         let installed_problem =
             installed_is_complete.expect("hanging installed companion is rejected");
@@ -2161,24 +1824,7 @@ mod tests {
         let payload_dir = fixture.path().join("payload");
         let archive_root = payload_dir.join(format!("sc-lint_{version}_{}", target.triple));
         let bin_dir = archive_root.join("bin");
-        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let build_status = Command::new("cargo")
-            .args([
-                "build",
-                "--quiet",
-                "-p",
-                "sc-lint",
-                "-p",
-                "sc-lint-boundary",
-                "-p",
-                "sc-lint-portability",
-                "-p",
-                "sc-lint-runtime",
-            ])
-            .current_dir(&workspace_root)
-            .status()
-            .expect("build release backend binaries");
-        assert!(build_status.success(), "backend binaries build");
+        build_release_binaries();
         fs::create_dir_all(&release_dir).expect("release directory");
         fs::create_dir_all(&bin_dir).expect("archive bin directory");
         let debug_dir = built_cli_binary()
@@ -2394,27 +2040,56 @@ mod tests {
     }
 
     fn built_cli_binary() -> PathBuf {
-        let test_binary = env::current_exe().expect("test executable");
-        let debug_dir = test_binary
-            .parent()
-            .and_then(Path::parent)
-            .expect("target debug directory");
-        debug_dir.join(ReleaseTarget::binary_name())
+        built_artifact_directory().join(ReleaseTarget::binary_name())
     }
 
     #[cfg(unix)]
     fn built_backend_binary(name: &str) -> PathBuf {
-        let test_binary = env::current_exe().expect("test executable");
-        let debug_dir = test_binary
-            .parent()
-            .and_then(Path::parent)
-            .expect("target debug directory");
         let name = if cfg!(windows) {
             format!("{name}.exe")
         } else {
             name.to_string()
         };
-        debug_dir.join(name)
+        built_artifact_directory().join(name)
+    }
+
+    fn built_artifact_directory() -> PathBuf {
+        env::current_exe()
+            .expect("test executable")
+            .parent()
+            .and_then(Path::parent)
+            .expect("target debug directory")
+            .to_path_buf()
+    }
+
+    #[cfg(unix)]
+    fn build_release_binaries() {
+        // `cargo test -p sc-lint --lib` builds the test executable but not the
+        // companion backend executables this fixture copies from target/debug.
+        // Derive Cargo's target directory from the test executable so an
+        // explicit `cargo test --target-dir` is honored by this nested build.
+        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let artifact_directory = built_artifact_directory();
+        let target_dir = artifact_directory.parent().expect("Cargo target directory");
+        let build_status = Command::new("cargo")
+            .arg("build")
+            .arg("--quiet")
+            .arg("--target-dir")
+            .arg(target_dir)
+            .args([
+                "-p",
+                "sc-lint",
+                "-p",
+                "sc-lint-boundary",
+                "-p",
+                "sc-lint-portability",
+                "-p",
+                "sc-lint-runtime",
+            ])
+            .current_dir(&workspace_root)
+            .status()
+            .expect("build release backend binaries");
+        assert!(build_status.success(), "backend binaries build");
     }
 
     #[cfg(unix)]
@@ -2529,14 +2204,10 @@ mod tests {
         }
         #[cfg(not(unix))]
         {
-            let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
             let executable = format!("{name}.exe");
             let destination = path.with_file_name(format!("{name}.exe"));
-            fs::copy(
-                workspace_root.join("target/debug").join(executable),
-                destination,
-            )
-            .expect("copy built backend executable");
+            fs::copy(built_artifact_directory().join(executable), destination)
+                .expect("copy built backend executable");
         }
     }
 
@@ -2558,14 +2229,14 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn write_hanging_noisy_stub(path: &Path, child_pid_file: &Path) {
+    fn write_hanging_noisy_stub(path: &Path, ready_fifo: &Path) {
         use std::os::unix::fs::PermissionsExt;
 
-        let child_pid_file = child_pid_file.to_string_lossy().replace('\'', "'\\''");
+        let ready_fifo = ready_fifo.to_string_lossy().replace('\'', "'\\''");
         fs::write(
             path,
             format!(
-                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{child_pid_file}'\nwait\n"
+                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
             ),
         )
         .expect("write hanging noisy backend");
@@ -2574,6 +2245,65 @@ mod tests {
             .permissions();
         permissions.set_mode(0o755);
         fs::set_permissions(path, permissions).expect("make hanging backend executable");
+    }
+
+    #[cfg(unix)]
+    fn create_probe_ready_fifo(path: &Path) {
+        let status = Command::new("mkfifo")
+            .arg(path)
+            .status()
+            .expect("start mkfifo for backend startup handshake");
+        assert!(status.success(), "mkfifo creates startup handshake");
+    }
+
+    #[cfg(unix)]
+    fn hanging_backend_cli_failure_after_startup(
+        binary: &Path,
+        expected_name: &str,
+        timeout: Duration,
+        child_pid_file: &Path,
+        ready_fifo: &Path,
+    ) -> Option<String> {
+        let (mut child, reader) = spawn_backend_probe(binary, expected_name, &["--help"], "--help")
+            .expect("start backend probe");
+        let process_id = child.id();
+        fs::write(child_pid_file, process_id.to_string()).expect("record probe process group");
+
+        // The stub writes its parent and child pids to this FIFO only after
+        // both descendants exist. Opening it blocks until that point, so the
+        // production timeout starts after startup is established without
+        // adding time to the timeout being tested.
+        let ready_pids = fs::read_to_string(ready_fifo).expect("read backend startup handshake");
+        fs::write(child_pid_file, &ready_pids).expect("record backend process tree");
+        let pid_count = ready_pids.split_whitespace().count();
+        assert_eq!(pid_count, 3, "startup handshake includes both children");
+
+        let problem =
+            match wait_for_backend_probe(&mut child, binary, expected_name, "--help", timeout) {
+                Ok(status) => {
+                    terminate_probe_processes(&mut child);
+                    let _ = finish_backend_output_after_stop(
+                        reader,
+                        BACKEND_OUTPUT_TEST_WAIT,
+                        BACKEND_OUTPUT_TEST_WAIT,
+                        Some(|| terminate_probe_process_tree(process_id)),
+                    );
+                    panic!("hanging backend unexpectedly exited with {status}");
+                }
+                Err(problem) => problem,
+            };
+        let output = finish_backend_output_after_stop(
+            reader,
+            BACKEND_OUTPUT_TEST_WAIT,
+            BACKEND_OUTPUT_TEST_WAIT,
+            Some(|| terminate_probe_process_tree(process_id)),
+        )
+        .expect("drain noisy output after process-tree cleanup");
+        assert!(
+            String::from_utf8_lossy(&output).contains("noisy-child"),
+            "the backend emitted noisy output before timeout"
+        );
+        Some(problem)
     }
 
     #[cfg(unix)]
@@ -2598,6 +2328,7 @@ mod tests {
                 );
             }
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                terminate_test_probe_processes(child_pid_file);
                 let _ = worker.join();
                 panic!("probe worker exited without returning a result");
             }

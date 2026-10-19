@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from sc_lint.lint_common import discover_repo_root
+from sc_lint.tests.test_setup_tools import FakeToolchain
+from sc_lint.tests.test_setup_tools import WINDOWS_TARGET
+from sc_lint.tests.test_setup_tools import XWIN_TOOLS
+from sc_lint.tests.test_setup_tools import install_input
 
 import os
 from pathlib import Path
@@ -22,7 +26,7 @@ from functools import partial
 
 
 ROOT = discover_repo_root()
-VERSION = "0.7.3"
+VERSION = "0.8.0"
 GUIDES = (
     "README.md",
     "installation",
@@ -69,22 +73,31 @@ class ConsumerLifecycleTests(unittest.TestCase):
             ),
         ]
         if any(not binary.is_file() for binary in cls.release_binaries):
-            subprocess.run(
-                [
-                    "cargo",
-                    "build",
-                    "-p",
-                    "sc-lint",
-                    "-p",
-                    "sc-lint-boundary",
-                    "-p",
-                    "sc-lint-portability",
-                    "-p",
-                    "sc-lint-runtime",
-                ],
-                cwd=ROOT,
-                check=True,
-            )
+            command = [
+                "cargo",
+                "build",
+                "-p",
+                "sc-lint",
+                "-p",
+                "sc-lint-boundary",
+                "-p",
+                "sc-lint-portability",
+                "-p",
+                "sc-lint-runtime",
+            ]
+            try:
+                subprocess.run(
+                    command,
+                    cwd=ROOT,
+                    check=True,
+                    stdin=subprocess.DEVNULL,
+                    timeout=300,
+                )
+            except subprocess.TimeoutExpired as error:
+                raise AssertionError(
+                    f"{command!r} timed out after {error.timeout}s; "
+                    f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+                ) from error
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -112,16 +125,29 @@ class ConsumerLifecycleTests(unittest.TestCase):
         environment["PATH"] = str(release) + os.pathsep + environment.get("PATH", "")
         return environment
 
-    @staticmethod
-    def run_command(command: list[str], *, cwd: Path, environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            command,
-            cwd=cwd,
-            env=environment,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+    def run_command(
+        self,
+        command: list[str],
+        *,
+        cwd: Path,
+        environment: dict[str, str],
+    ) -> subprocess.CompletedProcess[str]:
+        try:
+            return subprocess.run(
+                command,
+                cwd=cwd,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=180,
+            )
+        except subprocess.TimeoutExpired as error:
+            self.fail(
+                f"{command!r} timed out after {error.timeout}s; "
+                f"stdout={error.stdout!r}; stderr={error.stderr!r}"
+            )
 
     @staticmethod
     @contextmanager
@@ -133,14 +159,18 @@ class ConsumerLifecycleTests(unittest.TestCase):
         server = http.server.ThreadingHTTPServer(
             ("127.0.0.1", 0), partial(QuietHandler, directory=str(root))
         )
+        server.daemon_threads = True
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
             yield f"http://127.0.0.1:{server.server_port}"
         finally:
             server.shutdown()
-            thread.join()
-            server.server_close()
+            thread.join(timeout=10)
+            try:
+                assert not thread.is_alive(), "release server thread did not stop after shutdown"
+            finally:
+                server.server_close()
 
     def initialize_rust_consumer(self, release: Path, consumer: Path) -> dict[str, str]:
         environment = self.fixture_environment(release)
@@ -316,15 +346,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment["SC_LINT_INSTALL_DIR"] = str(Path(temporary.name) / "clean-install")
             # Keep only OS command directories: this fixture intentionally leaves
             # every directory containing a preinstalled sc-lint off PATH.
-            command_dirs = [Path("/usr/bin"), Path("/bin")]
-            if os.name == "nt":
-                for command in ("pwsh", "curl"):
-                    resolved = shutil.which(command)
-                    if resolved:
-                        command_dirs.append(Path(resolved).parent)
-                # Windows has no /usr/bin: the bootstrap needs a host python
-                # on PATH to create the consumer venv.
-                command_dirs.append(Path(sys.executable).parent)
+            command_dirs = [Path(sys.executable).parent, Path("/usr/bin"), Path("/bin")]
             environment["PATH"] = os.pathsep.join(
                 str(path) for path in command_dirs if path.is_dir()
             )
@@ -363,7 +385,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment = os.environ.copy()
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
-            command_dirs = [old_bin, Path(just).parent, Path("/usr/bin"), Path("/bin")]
+            command_dirs = [old_bin, Path(just).parent, Path(sys.executable).parent, Path("/usr/bin"), Path("/bin")]
             environment["PATH"] = os.pathsep.join(
                 str(path) for path in command_dirs if path.is_dir()
             )
@@ -407,7 +429,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             )
 
             result = self.run_command(
-                ["sh", str(consumer / ".sc-lint/bootstrap"), "setup", "--config", "sc-lint.toml", "--dry-run"],
+                [sys.executable, str(consumer / ".sc-lint/bootstrap.py"), "setup", "--config", "sc-lint.toml", "--dry-run"],
                 cwd=consumer,
                 environment=environment,
             )
@@ -444,10 +466,10 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 for path in (old_bin, Path("/usr/bin"), Path("/bin"))
                 if path.is_dir()
             )
-            bootstrap = str(consumer / ".sc-lint/bootstrap")
+            bootstrap = str(consumer / ".sc-lint/bootstrap.py")
             config = str(consumer / "sc-lint.toml")
             path_result = self.run_command(
-                ["sh", bootstrap, "setup", "--config", config, "--dry-run"],
+                [sys.executable, bootstrap, "setup", "--config", config, "--dry-run"],
                 cwd=consumer,
                 environment=environment,
             )
@@ -467,7 +489,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             calls.unlink()
             environment["SC_LINT_BIN"] = str(old_binary)
             override_result = self.run_command(
-                ["sh", str(consumer / ".sc-lint/bootstrap"), "setup", "--config", str(consumer / "sc-lint.toml"), "--dry-run"],
+                [sys.executable, str(consumer / ".sc-lint/bootstrap.py"), "setup", "--config", str(consumer / "sc-lint.toml"), "--dry-run"],
                 cwd=consumer,
                 environment=environment,
             )
@@ -558,7 +580,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment = os.environ.copy()
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
-            command_dirs = [Path("/usr/bin"), Path("/bin"), Path(just).parent]
+            command_dirs = [Path(sys.executable).parent, Path("/usr/bin"), Path("/bin"), Path(just).parent]
             environment["PATH"] = os.pathsep.join(
                 str(path) for path in command_dirs if path.is_dir()
             )
@@ -621,7 +643,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
             command_dirs = []
-            for command in ("just", "pwsh", "curl"):
+            for command in ("just",):
                 resolved = shutil.which(command)
                 self.assertIsNotNone(resolved, f"{command} is required for this fixture")
                 command_dirs.append(str(Path(resolved).parent))
@@ -678,10 +700,6 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
             command_dirs = []
-            for command in ("pwsh", "curl"):
-                resolved = shutil.which(command)
-                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
-                command_dirs.append(str(Path(resolved).parent))
             command_dirs.append(str(Path(sys.executable).parent))
             environment["PATH"] = os.pathsep.join(command_dirs)
 
@@ -689,11 +707,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
                 environment["SC_LINT_RELEASE_BASE_URL"] = f"{release_base}/published"
                 result = self.run_command(
                     [
-                        "pwsh",
-                        "-NoLogo",
-                        "-NonInteractive",
-                        "-File",
-                        str(consumer / ".sc-lint/bootstrap.ps1"),
+                        sys.executable,
+                        str(consumer / ".sc-lint/bootstrap.py"),
                         "setup",
                         "--config",
                         "sc-lint.toml",
@@ -721,10 +736,6 @@ class ConsumerLifecycleTests(unittest.TestCase):
             just = shutil.which("just")
             self.assertIsNotNone(just, "just is required for the consumer fixture")
             command_dirs = []
-            for command in ("pwsh", "curl"):
-                resolved = shutil.which(command)
-                self.assertIsNotNone(resolved, f"{command} is required for this fixture")
-                command_dirs.append(str(Path(resolved).parent))
             command_dirs.append(str(Path(sys.executable).parent))
             environment = os.environ.copy()
             environment.pop("SC_LINT_BIN", None)
@@ -762,7 +773,7 @@ class ConsumerLifecycleTests(unittest.TestCase):
             environment.pop("SC_LINT_BIN", None)
             environment["SC_LINT_INSTALL_DIR"] = str(managed)
             command_dirs = []
-            for command in ("just", "pwsh"):
+            for command in ("just",):
                 resolved = shutil.which(command)
                 self.assertIsNotNone(resolved, f"{command} is required for this fixture")
                 command_dirs.append(str(Path(resolved).parent))
@@ -773,11 +784,8 @@ class ConsumerLifecycleTests(unittest.TestCase):
 
             result = self.run_command(
                 [
-                    "pwsh",
-                    "-NoLogo",
-                    "-NonInteractive",
-                    "-File",
-                    str(consumer / ".sc-lint/bootstrap.ps1"),
+                    sys.executable,
+                    str(consumer / ".sc-lint/bootstrap.py"),
                     "upgrade",
                     "--config",
                     "sc-lint.toml",
@@ -790,6 +798,88 @@ class ConsumerLifecycleTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("CLI.SC_LINT_RELEASE_UNAVAILABLE", result.stdout + result.stderr)
             self.assertEqual(before, hashlib.sha256(managed_binary.read_bytes()).hexdigest())
+
+    def bootstrap_setup(self, consumer: Path, environment: dict[str, str], *flags: str) -> subprocess.CompletedProcess[str]:
+        command = [sys.executable, str(consumer / ".sc-lint/bootstrap.py")]
+        return self.run_command(
+            [*command, "setup", "--config", "sc-lint.toml", *flags], cwd=consumer, environment=environment
+        )
+
+    def tool_environment(self, release: Path, root: Path) -> tuple[dict[str, str], FakeToolchain, Path]:
+        """Stub cargo/rustup first on PATH and a private CARGO_HOME; the real ~/.cargo is never used."""
+        fake = FakeToolchain(root / "fake-toolchain")
+        cargo_home = root / "cargo-home"
+        environment = self.fixture_environment(release)
+        environment["PATH"] = str(fake.bin) + os.pathsep + environment["PATH"]
+        environment["CARGO_HOME"] = str(cargo_home)
+        return environment, fake, cargo_home
+
+    def test_just_setup_provisions_declared_tools_from_the_persisted_install_input(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            environment, fake, cargo_home = self.tool_environment(release, Path(temporary.name))
+            data = install_input(XWIN_TOOLS)
+            data["minimum_version"] = VERSION
+            persisted = consumer / ".sc-lint" / "install.json"
+            persisted.write_text(json.dumps(data), encoding="utf-8")
+            just = shutil.which("just")
+            self.assertIsNotNone(just, "just is required for the consumer fixture")
+
+            # Dry-run before the managed wheel exists reports, never bootstraps.
+            unavailable = self.bootstrap_setup(consumer, environment, "--dry-run")
+            self.assertEqual(unavailable.returncode, 4, unavailable.stdout + unavailable.stderr)
+            self.assertIn("SETUP_TOOLS.INSPECTION_UNAVAILABLE", unavailable.stderr)
+            self.assertFalse((consumer / ".sc-lint" / "venv").exists())
+            self.assertEqual(fake.calls(), [])
+
+            setup = self.run_command([just, "setup"], cwd=consumer, environment=environment)
+            self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
+            self.assertIn("+ cargo install --locked --version =0.18.4 cargo-xwin", setup.stdout)
+            self.assertIn(f"+ rustup target add {WINDOWS_TARGET}", setup.stdout)
+            self.assertEqual(
+                fake.argvs("cargo"),
+                [["install", "--list"], ["install", "--locked", "--version", "=0.18.4", "cargo-xwin"], ["install", "--list"]],
+            )
+            self.assertEqual(
+                fake.argvs("rustup"),
+                [["target", "list", "--installed"], ["target", "add", WINDOWS_TARGET], ["target", "list", "--installed"]],
+            )
+            for record in fake.calls():
+                self.assertEqual(record["cargo_home"], str(cargo_home))
+                self.assertEqual(Path(record["cwd"]).resolve(), consumer.resolve())
+            self.assertEqual(FakeToolchain.installs(cargo_home)["cargo-xwin"]["version"], "0.18.4")
+            self.assertTrue(
+                (cargo_home / "bin" / ("cargo-xwin.exe" if os.name == "nt" else "cargo-xwin")).is_file()
+            )
+            self.assertEqual(fake.targets(), [WINDOWS_TARGET])
+            self.assertEqual(json.loads(persisted.read_text(encoding="utf-8")), data)
+
+            again = self.run_command([just, "setup"], cwd=consumer, environment=environment)
+            self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+            self.assertNotIn("+ ", again.stdout)
+            check = self.bootstrap_setup(consumer, environment, "--dry-run")
+            self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+            installs = [argv for argv in fake.argvs("cargo") if argv[:2] == ["install", "--locked"]]
+            self.assertEqual(len(installs), 1)
+
+    def test_just_setup_without_declared_tools_does_no_tool_work(self) -> None:
+        temporary, release, consumer = self.make_release_fixture()
+        with temporary:
+            self.initialize_rust_consumer(release, consumer)
+            environment, fake, cargo_home = self.tool_environment(release, Path(temporary.name))
+            just = shutil.which("just")
+            self.assertIsNotNone(just, "just is required for the consumer fixture")
+            persisted = consumer / ".sc-lint" / "install.json"
+            for label, data in (("no installer input", None), ("empty tools", install_input({}))):
+                with self.subTest(label):
+                    if data is not None:
+                        persisted.write_text(json.dumps(data), encoding="utf-8")
+                    setup = self.run_command([just, "setup"], cwd=consumer, environment=environment)
+                    self.assertEqual(setup.returncode, 0, setup.stdout + setup.stderr)
+                    self.assertNotIn("SETUP_TOOLS", setup.stdout + setup.stderr)
+            self.assertEqual(fake.calls(), [])
+            self.assertFalse(cargo_home.exists())
 
     def test_fixture_matrix_declares_each_supported_release_platform(self) -> None:
         mappings = {

@@ -1,0 +1,83 @@
+{
+  "success": true,
+  "canceled": false,
+  "aborted_by": null,
+  "data": {
+    "acceptance_table": [],
+    "authority_citations": [
+      "ANC-001@3",
+      "phase-k-intent@3"
+    ],
+    "authority_recommendations": [],
+    "candidate_rankings": [],
+    "disposition": "plan_violation",
+    "evidence": {
+      "controlling_cases": [
+        "no-applicable-source",
+        "scope-no-source",
+        "scope-path-silent"
+      ],
+      "frozen_oracle_path": "/tmp/phase-k-plan/direct-tuning/runs/ANC-001-plan/scope-v2/oracle.json",
+      "plan_excerpt": "atm-core supplies the failing literal fixture and whole-file workaround, but no per-rule exclusion implementation to port. Reuse that fixture; implement the new per-rule filtering in sc-lint.",
+      "plan_location": "Deliverable 5 and acceptance criterion 1",
+      "raw_choices": {
+        "addressed": "no",
+        "contradicted": "no",
+        "relevant": "yes"
+      },
+      "raw_request_path": "/tmp/phase-k-parallel/k1-user-rerun-raw/001-request.json",
+      "raw_response_path": "/tmp/phase-k-parallel/k1-user-rerun-raw/001-response.json",
+      "request_path": "/tmp/phase-k-parallel/anchor-triage-user-rerun/request.json"
+    },
+    "explanation": "ANC-001 distinguishes adaptable implementation logic from consumer reproducer input. The frozen no-source probes explicitly exclude adaptable source for the reported behavior, while silence is not_addressed. This item describes the reported failure as intentional named-pipe literals rejected by PORT-007 with PORT-006 hidden by whole-file exclusion, but its exception statement excludes only a per-rule exclusion implementation. It neither establishes the broader absence of adaptable source for that reported behavior nor carries forward conditional reuse of such source. Copying the literal fixture addresses test reuse, not implementation-logic reuse. The raw yes/no/no answer and low confidence expose that unresolved plan distinction; they do not independently demonstrate defective sealed questions. This is missing/ambiguous conditional commitment, not evidence of an explicit forbidden rewrite or proof that upstream implementation exists.",
+    "gate": "planning",
+    "operation": "triage",
+    "oracle_sha256": "29ff80cc66fb0bbdd6b858e0950602903b8b2c4bb2ff72c1f6c8ec0a5dae6ecd",
+    "planner_action": "Replace only the two middle sentences of Deliverable 5 with: For #385, use any adaptable atm-core implementation logic for the reported failure as the sc-lint implementation starting point; the cited named_pipe_name and whole-file workaround supply regression input, not an exclusion implementation. Reuse the fixture and implement filtering in sc-lint where no applicable upstream implementation exists. This states ANC-001 conditional duty without inventing upstream availability. Alternatively, if independently verified, state explicitly that no adaptable atm-core source implements the reported #385 failure behavior. Do not claim that absence solely from the narrower per-rule statement. No passing verdict is promised by this correction.",
+    "question_action": "unchanged",
+    "sealed_question_set": {
+      "digest": "475bb26df181b5121f4752de188d754090dae0648e302ab063fee37ebc2fbd3d",
+      "questions": {
+        "addressed": {
+          "criteria": {
+            "no": "It only studies or mentions atm-core, omits source reuse, or proposes a fresh implementation.",
+            "unclear": "It proposes a related implementation but leaves whether source logic is reused uncertain.",
+            "yes": "It says to port, copy, fork, or otherwise reuse the existing source logic as the implementation starting point."
+          },
+          "instructions": "Does `item.text` plan to reuse applicable atm-core source logic for the reported behavior, adapted to a reusable sc-lint interface? Judge the plan stated, not conflict.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "It does not reject applicable source reuse, including when the item is silent or no applicable source exists.",
+            "unclear": "Its approach may bypass suitable source, but the text does not settle that.",
+            "yes": "It rejects, replaces, or rewrites from scratch adaptable existing atm-core source."
+          },
+          "instructions": "Does `item.text` explicitly choose a fresh implementation rather than reuse applicable atm-core source for the reported behavior? Silence is not conflict.",
+          "type": "choice"
+        },
+        "relevant": {
+          "criteria": {
+            "no": "The item is unrelated, or expressly establishes that no atm-core source for this behavior can fit sc-lint.",
+            "unclear": "The item is too vague to identify whether it concerns a reported failure behavior.",
+            "yes": "The item implements, investigates, or changes a reported failure behavior and does not rule out applicable atm-core source."
+          },
+          "instructions": "Does `item.text` work on a reported failure whose behavior could fall under the anchor\u2019s conditional reuse duty? An item stays relevant when silent about where source comes from. The conditional duty is not triggered when the item explicitly establishes that no adaptable atm-core implementation exists. Judge applicability only, never whether reuse is planned.",
+          "type": "choice"
+        }
+      }
+    },
+    "sealed_question_set_digest_after": "475bb26df181b5121f4752de188d754090dae0648e302ab063fee37ebc2fbd3d",
+    "sealed_question_set_digest_before": "475bb26df181b5121f4752de188d754090dae0648e302ab063fee37ebc2fbd3d"
+  },
+  "error": null,
+  "metadata": {
+    "authoritative_sources_unchanged": true,
+    "correlation_id": "phase-k-k1-user-rerun-ANC001-20261013T161625Z",
+    "duration_ms": 0,
+    "jev_run_ids": [],
+    "planner_observation_trust": "untrusted",
+    "retry_count": 0,
+    "tool_calls": 2
+  }
+}

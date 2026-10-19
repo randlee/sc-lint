@@ -1,6 +1,6 @@
 """Locate the installed sc-lint product binary.
 
-Resolution order mirrors `.sc-lint/bootstrap`: `SC_LINT_BIN`, the managed
+Resolution order mirrors `.sc-lint/bootstrap.py`: `SC_LINT_BIN`, the managed
 install directory (`SC_LINT_INSTALL_DIR`, else `$XDG_DATA_HOME/sc-lint/bin`,
 else `~/.local/share/sc-lint/bin`), then `PATH`.
 """
@@ -34,5 +34,5 @@ def binary_path() -> str:
     if found:
         return found
     raise FileNotFoundError(
-        "sc-lint binary not found: set SC_LINT_BIN, run `.sc-lint/bootstrap setup`, or add sc-lint to PATH"
+        "sc-lint binary not found: set SC_LINT_BIN, run `.sc-lint/bootstrap.py setup`, or add sc-lint to PATH"
     )

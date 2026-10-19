@@ -34,8 +34,7 @@ The installer writes or merges these consumer surfaces:
 
 ```text
 sc-lint.toml
-.sc-lint/bootstrap
-.sc-lint/bootstrap.ps1
+.sc-lint/bootstrap.py
 .sc-lint/justfile
 .sc-lint/install.json
 .sc-lint/installed.json
@@ -58,7 +57,7 @@ block:
 
 ```just
 # >>> sc-lint managed integration >>>
-set windows-shell := ["pwsh", "-NoLogo", "-Command"]
+set windows-shell := ["cmd.exe", "/c"]
 import '.sc-lint/justfile'
 # <<< sc-lint managed integration <<<
 ```
@@ -160,12 +159,20 @@ checkout for this product-owned bundle.
 
 ## How to extend
 
+This guide describes the separate adoption-kit installer. For the installed
+product's `sc-lint.toml`, analyzer filters, consumer lint profiles, platform
+scope, `exec`, and release recovery contracts, use the canonical offline
+[configuration](../../docs-bundle/configuration.md),
+[usage](../../docs-bundle/using-sc-lint.md), and
+[troubleshooting](../../docs-bundle/troubleshooting.md) guides. The kit does
+not add generic test groups or test-argument forwarding.
+
 - **Analyzers:** set `analyzers.<name>` in `install.json`; the kit renders it as
   `[tool.sc-lint.analyzers.<name>]`. The keys are listed in `configuration.md`,
   "Analyzer tables"; any other key fails the install.
-- **Test layers:** add ordered `[tool.sc-lint.test.<layer>]` lists. `unit` is
-  default; `just test <layer> *args` passes through and `just test all` follows
-  declared order.
+- **Test layers:** add ordered `[tool.sc-lint.test.<layer>]` lists. The
+  generated test recipe accepts one layer name, or `all` to run every declared
+  layer in order; it does not forward arbitrary extra test arguments.
 - **Lint profiles:** add ordered `[tool.sc-lint.lint.<profile>]` step lists.
 - **Consumer-owned recipes:** add normal root `Justfile` recipes outside the
   managed import block.

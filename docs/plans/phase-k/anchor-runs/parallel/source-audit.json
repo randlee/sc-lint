@@ -1,0 +1,66 @@
+[
+  {
+    "bead": "lint-k-1",
+    "description_sha256": "fe36418e999056e9369278323e9c35d28fd96b6dd52667fff1740f165b6f1a2e",
+    "source_equal_after_trailing_whitespace_normalization": true,
+    "source_available": true,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T162229Z-lint-k-1.json"
+  },
+  {
+    "bead": "lint-k-2",
+    "description_sha256": "bdf0d37804dc9695650784eea933da0deddba6046a7586bed8c2bee1b9ba0c23",
+    "source_equal_after_trailing_whitespace_normalization": true,
+    "source_available": true,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151443Z-lint-k-2.json"
+  },
+  {
+    "bead": "lint-k-4",
+    "description_sha256": "7ac46541ad9128077f9f5be13f0e2c28db88fdc7c33fbed0e082ec5f0a383400",
+    "source_equal_after_trailing_whitespace_normalization": true,
+    "source_available": true,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151527Z-lint-k-4.json"
+  },
+  {
+    "bead": "lint-k-7",
+    "description_sha256": "4df199d720af42653f3c338ceb8539e53991b9e74334ffa7568d46c073c6c6d7",
+    "source_equal_after_trailing_whitespace_normalization": true,
+    "source_available": true,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151604Z-lint-k-7.json"
+  },
+  {
+    "bead": "lint-k-6",
+    "description_sha256": "b9bb4446cef4cab8a2911b1c56c720919ec9e7eb4347da14d2447af7325e153e",
+    "source_equal_after_trailing_whitespace_normalization": null,
+    "source_available": false,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151622Z-lint-k-6.json"
+  },
+  {
+    "bead": "lint-k-9",
+    "description_sha256": "d50f3239455378c73f784f78ee3a1f5022983a0f35af2d30a486a1591a4d0e17",
+    "source_equal_after_trailing_whitespace_normalization": true,
+    "source_available": true,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151651Z-lint-k-9.json"
+  },
+  {
+    "bead": "lint-k-10",
+    "description_sha256": "08049e0c2141de43ee0c2b4322491e371f385ba4d41ab5b85f049ecfdd37f897",
+    "source_equal_after_trailing_whitespace_normalization": null,
+    "source_available": false,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-20261013T151708Z-lint-k-10.json"
+  },
+  {
+    "bead": "lint-k-3",
+    "description_sha256": "cc22212ecdb97e03e5cc7ac0e818e91f9b03a325cff097f7d4b872f6ab425435",
+    "source_equal_after_trailing_whitespace_normalization": true,
+    "source_available": true,
+    "pass": true,
+    "run": "docs/plans/phase-k/anchor-runs/parallel/plan-lint-k-3.json"
+  }
+]

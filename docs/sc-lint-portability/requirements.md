@@ -17,6 +17,11 @@ platform and OS portability rules.
 - structural `cfg` parity checks stay crate-owned here
 - consumer-specific portability wrappers must not be imported unchanged
 
+## Stable consumer interfaces
+
+Rule IDs and this analyzer's JSON output are stable consumer contracts
+(`REQ-PRODUCT-002`, [ADR-011](../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)).
+
 ## Related Docs
 
 - [architecture.md](./architecture.md)

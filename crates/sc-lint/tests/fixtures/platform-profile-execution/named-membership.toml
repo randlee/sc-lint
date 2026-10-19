@@ -1,0 +1,44 @@
+# Issue #199 inputs adapted from atm-core's lint task names (c1f3ee7a
+# .just/run_lint.py). Every command is a harmless version probe so the real host
+# adapter can execute it anywhere. The upstream-to-fixture case mapping, including
+# intentional divergence, is recorded above `test_resolve_task_names_all_includes_new_targets`
+# in crates/sc-lint/src/tests.rs.
+[tool.sc-lint]
+minimum_version = "0.4.0"
+
+[tool.sc-lint.lint_profiles]
+fast = ["fmt", "version", "manifests", "spell", "pytests"]
+ci = ["spell", "fmt", "windows-probe"]
+
+[[tool.sc-lint.lint]]
+name = "fmt"
+command = ["cargo", "--version"]
+
+[[tool.sc-lint.lint]]
+name = "clippy"
+command = ["cargo", "--version", "--verbose"]
+
+[[tool.sc-lint.lint]]
+name = "version"
+command = ["rustc", "--version"]
+
+[[tool.sc-lint.lint]]
+name = "manifests"
+command = ["rustc", "--print", "sysroot"]
+
+[[tool.sc-lint.lint]]
+name = "spell"
+command = ["rustc", "--version", "--verbose"]
+
+[[tool.sc-lint.lint]]
+name = "pytests"
+command = ["rustc", "--print", "cfg"]
+
+[[tool.sc-lint.lint]]
+name = "windows-probe"
+command = ["rustc", "--version"]
+platform = "windows"
+
+[[tool.sc-lint.test]]
+name = "test"
+command = ["cargo", "--version"]

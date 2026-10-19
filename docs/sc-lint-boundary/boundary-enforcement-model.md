@@ -148,6 +148,16 @@ Operational rules:
   `allowed_dependents`
 - `SCB-DEPENDENCY-003` reports exact forbidden direct edges even when the same
   edge would otherwise pass owner/dependent allowlists
+- `allowed_dependencies`, `allowed_dev_dependencies`, and
+  `allowed_feature_dependencies` accept a nonempty canonical-package prefix
+  followed by one `*`; unmatched patterns are valid. `allowed_dependents`
+  remains exact-only. Forbidden edges remain enforced after a prefix match.
+- `SCB-FEATURE-001` is opt-in: omitting `allowed_feature_dependencies` leaves
+  the record unchecked, while `[]` checks without exemptions. It reports
+  normal and build workspace-path dependency features, including inherited and
+  target-specific declarations, and Cargo feature forwarding (`dep:x`,
+  `x/feat`, `x?/feat`, and implicit optional dependency feature `x`). Dev and
+  non-workspace dependencies are excluded (REQ-SCB-024, REQ-SCB-025).
 
 Scope limits for the first rule family:
 
@@ -423,11 +433,11 @@ During the Markdown + TOML transition, the parity model should operate on the
 shared internal boundary model, but the planning/enforcement feature itself
 should still be TOML-first.
 
-Default behavior should be:
+The planning-metadata source and default behavior are:
 
 - TOML planning metadata is authoritative
-- `boundaries/planning.toml` is the default authoritative planning-metadata
-  file
+- `boundaries/planning.toml` is the sole authoritative planning-metadata
+  source
 - when `boundaries/` exists, `boundaries/planning.toml` is required and must
   define `[planning].current_sprint`; when `boundaries/` is absent, loading
   returns an empty inventory and does not require planning metadata

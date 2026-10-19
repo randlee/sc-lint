@@ -9,7 +9,6 @@ use crate::CliError;
 use crate::command::ConsumerInitRequest;
 use crate::config::CONFIG_FILENAME;
 use crate::installer::CONSUMER_BOOTSTRAP_ASSET;
-use crate::installer::CONSUMER_BOOTSTRAP_POWERSHELL_ASSET;
 
 const GENERATED_FILE_HEADER: &str =
     "# Managed by sc-lint; regenerate with `sc-lint init --just`.\n";
@@ -135,7 +134,6 @@ pub(crate) fn run_consumer_init_at(
                     )
                     .with_documentation(DOCS_SETUP_REFERENCE)
                 })?;
-                set_bootstrap_permissions(&file.path)?;
             }
         }
     }
@@ -177,13 +175,8 @@ fn consumer_integration_files(root: &Path) -> Vec<ConsumerIntegrationFile> {
             kind: ManagedFileKind::Static,
         },
         ConsumerIntegrationFile {
-            path: root.join(".sc-lint/bootstrap"),
-            contents: generated_bootstrap_asset(),
-            kind: ManagedFileKind::Static,
-        },
-        ConsumerIntegrationFile {
-            path: root.join(".sc-lint/bootstrap.ps1"),
-            contents: format!("{GENERATED_FILE_HEADER}{CONSUMER_BOOTSTRAP_POWERSHELL_ASSET}"),
+            path: root.join(".sc-lint/bootstrap.py"),
+            contents: CONSUMER_BOOTSTRAP_ASSET.to_string(),
             kind: ManagedFileKind::Static,
         },
     ]
@@ -223,14 +216,6 @@ fn is_refreshable_generated_config(actual: &str) -> bool {
     body.starts_with(prefix) && body.ends_with(suffix) && body.len() > prefix.len() + suffix.len()
 }
 
-fn generated_bootstrap_asset() -> String {
-    const SHEBANG: &str = "#!/bin/sh\n";
-    let asset = CONSUMER_BOOTSTRAP_ASSET
-        .strip_prefix(SHEBANG)
-        .expect("consumer bootstrap asset must start with a POSIX shell shebang");
-    format!("{SHEBANG}{GENERATED_FILE_HEADER}{asset}")
-}
-
 fn canonical_consumer_config() -> String {
     format!(
         "{GENERATED_FILE_HEADER}{}",
@@ -247,34 +232,6 @@ fn paths_to_strings(paths: &[PathBuf]) -> Vec<String> {
 
 fn paths_to_json(paths: &[PathBuf]) -> Value {
     json!(paths_to_strings(paths))
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Generated bootstrap permission errors use the shared top-level CliError contract."
-)]
-fn set_bootstrap_permissions(path: &Path) -> Result<(), CliError> {
-    if path.file_name().is_some_and(|name| name == "bootstrap") {
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions = fs::metadata(path)
-                .map_err(|error| {
-                    CliError::config("failed to inspect generated bootstrap").with_source(error)
-                })?
-                .permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(path, permissions).map_err(|error| {
-                CliError::config("failed to make generated bootstrap executable")
-                    .with_source(error)
-                    .with_suggested_action(
-                        "Check file permissions, then rerun `sc-lint init --just`.",
-                    )
-                    .with_documentation(DOCS_SETUP_REFERENCE)
-            })?;
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

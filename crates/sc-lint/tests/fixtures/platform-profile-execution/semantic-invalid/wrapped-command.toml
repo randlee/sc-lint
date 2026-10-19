@@ -1,0 +1,5 @@
+[[tool.sc-lint.lint]]
+name = "windows-check"
+command = ["just", "check"]
+platform = "windows"
+target = "x86_64-pc-windows-msvc"

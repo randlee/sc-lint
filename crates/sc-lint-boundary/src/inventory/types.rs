@@ -401,15 +401,6 @@ pub(crate) struct BoundaryInventory {
     pub(crate) planning: PlanningMetadata,
 }
 
-impl BoundaryInventory {
-    pub(crate) fn summary(&self) -> InventorySummary {
-        InventorySummary {
-            boundary_count: self.records.len(),
-            planned_item_count: self.planning.planned_items.len(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct InventorySummary {
     pub(crate) boundary_count: usize,
@@ -448,6 +439,7 @@ pub(crate) struct RawBoundaryRecord {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BoundaryRecord {
+    pub(crate) record_path: std::path::PathBuf,
     pub(crate) boundary_id: BoundaryId,
     pub(crate) owner_package: OwnerPackage,
     pub(crate) owner_crate_path: OwnerCratePath,

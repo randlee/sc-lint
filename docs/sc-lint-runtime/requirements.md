@@ -15,6 +15,11 @@ runtime/concurrency-correctness rules.
 - the crate must keep its machine contract stable through the top-level CLI
   normalization surface
 
+## Stable consumer interfaces
+
+Rule IDs and this analyzer's JSON output are stable consumer contracts
+(`REQ-PRODUCT-002`, [ADR-011](../sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)).
+
 ## Related Docs
 
 - [architecture.md](./architecture.md)

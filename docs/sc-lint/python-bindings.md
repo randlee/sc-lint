@@ -14,7 +14,7 @@ invoke in every consumer; no consumer copies helper scripts any more
 | `sc_lint.__version__` | parsed from `version_json()`; always equals the workspace version. |
 | `sc_lint.binary_path()` | resolves the native `sc-lint` executable: `SC_LINT_BIN`, then the managed install dir (`SC_LINT_INSTALL_DIR`, `$XDG_DATA_HOME/sc-lint/bin`, `~/.local/share/sc-lint/bin`), then `PATH`. |
 | `sc_lint.<helper>` modules | the former `.just/*.py` helpers (`run_lint`, `run_pytests`, `lint_*`, `check_version_sync`, `view_findings`, …) run as `python -m sc_lint.<helper>`. |
-| `sc_lint.tests` | the helper unit tests (`python -m sc_lint.run_pytests`). |
+| `sc_lint.tests` | the tests shipped inside the wheel (`python -m sc_lint.run_pytests`); the runner discovers its bundled `sc_lint.tests` package and does not assume the consumer checkout has the sc-lint repository's test tree. |
 
 The pyo3 layer is a packaging bridge only: `run` accepts argv tokens, never
 shell text, and the package adds no plugin registry or selection policy. The
@@ -22,8 +22,8 @@ boundary record is `boundaries/sc-lint-py/python-bindings.toml`.
 
 ## How consumers get it
 
-`.sc-lint/bootstrap setup --config sc-lint.toml` (POSIX) or
-`bootstrap.ps1` (Windows) provisions `.sc-lint/venv` next to the config file
+`python .sc-lint/bootstrap.py setup --config sc-lint.toml` provisions
+`.sc-lint/venv` next to the config file
 and installs `sc-lint==<minimum_version>` into it:
 
 - `setup --check` exits 4 (`CLI.SC_LINT_PYTHON_UNAVAILABLE`) when the venv is
@@ -39,6 +39,15 @@ The Rust CLI runs helper steps as `<venv python> -m sc_lint.<module>`. In this
 source repository (no consumer venv yet) it falls back to the host interpreter
 with `bindings/sc-lint-py/python` on `PYTHONPATH`, so `cargo test` works
 without a venv.
+
+Consumer tool provisioning reuses the persisted `.sc-lint/install.json`
+`tools` object. After ordinary setup has ensured the product and managed wheel,
+`sc_lint.setup_tools` checks only the cargo package versions and rustup targets
+declared by that consumer; missing entries are installed/added and verified.
+Cargo versions are exact stable versions. The product supplies no default tool
+pins, and lint execution never installs tools. Setup check/dry-run can inspect
+declared tools but never installs or writes. This does not add a new Python
+interpreter-selection policy.
 
 ## Source-repository workflow
 

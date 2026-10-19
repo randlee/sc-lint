@@ -79,3 +79,16 @@ consumer-local.
    Both tables require `config_home_env` to be a string and reject a wrong type
    through the analyzer configuration error path.
 4. The rest of Decision 5 stands.
+
+## Amendment 2026-10-12 — reviewed Phase K adapter pairs
+
+ADR-017 (Accepted by Rand) extends Decisions 3, 5 and 6 for the consumer-neutral
+PORT-010 structural parity rule. A consumer may declare reviewed
+`platform_adapters` pairs under its portability analyzer table. After validation,
+a pair covers its enclosing differently named Unix/Windows module declarations
+and inherited-private implementation items. Unrelated declarations and separately
+Unix-gated public/restricted-visible items retain ordinary parity checks.
+Absent pairs preserve existing findings; malformed declarations are configuration
+errors. This is narrow, explicit adapter configuration, not a general
+repo-configured suppression of production portability leaf rules. See
+[ADR-017, change 1](./ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).

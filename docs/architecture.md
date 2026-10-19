@@ -11,9 +11,11 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-009-observability-boundary-policy.md](./sc-lint/adr/ADR-009-observability-boundary-policy.md)
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md](./sc-lint/adr/ADR-011-interface-versioning-and-published-artifacts.md)
+- [docs/sc-lint/adr/ADR-013-analyzer-shared-support.md](./sc-lint/adr/ADR-013-analyzer-shared-support.md)
 - [docs/sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md](./sc-lint/adr/ADR-012-consumer-adoption-and-just-contract.md)
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
+- [docs/sc-lint/adr/ADR-017-phase-k-consumer-contracts.md](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
 
 For release `0.2.x`, ADR-005 supersedes earlier provisional profile/`xwin`
 rollout notes and is the governing cross-target preflight strategy artifact.
@@ -56,6 +58,23 @@ Dependency rules:
 
 Each change in a phase lands in the lowest layer that can carry it.
 
+## Crate documentation
+
+Crate-specific requirements and architecture are indexed from the [product
+requirements](./requirements.md). The pages are:
+
+| Crate | Requirements | Architecture |
+| --- | --- | --- |
+| `sc-lint` | [requirements](./sc-lint/requirements.md) | [architecture](./sc-lint/architecture.md) |
+| `sc-lint-analyzer-support` | [requirements](./sc-lint-analyzer-support/requirements.md) | [architecture](./sc-lint-analyzer-support/architecture.md) |
+| `sc-lint-attributes` | [requirements](./sc-lint-attributes/requirements.md) | [architecture](./sc-lint-attributes/architecture.md) |
+| `sc-lint-boundary` | [requirements](./sc-lint-boundary/requirements.md) | [architecture](./sc-lint-boundary/architecture.md) |
+| `sc-lint-directives` | [requirements](./sc-lint-directives/requirements.md) | [architecture](./sc-lint-directives/architecture.md) |
+| `sc-lint-portability` | [requirements](./sc-lint-portability/requirements.md) | [architecture](./sc-lint-portability/architecture.md) |
+| `sc-lint-runtime` | [requirements](./sc-lint-runtime/requirements.md) | [architecture](./sc-lint-runtime/architecture.md) |
+| `sc-lint-schema` | [requirements](./sc-lint-schema/requirements.md) | [architecture](./sc-lint-schema/architecture.md) |
+| `sc-lint-py` | [requirements](./sc-lint-py/requirements.md) | [architecture](./sc-lint-py/architecture.md) |
+
 Supporting surfaces outside the four layers:
 
 - `boundaries/` structured boundary definitions and planning metadata
@@ -85,8 +104,17 @@ planned.
   sc-lint's recommended `test` recipe outside the managed block only when the
   consumer `Justfile` has none, after which the consumer owns it.
 - (c) embeds a copy of the (d) bootstrap assets
-  (`crates/sc-lint/assets/bootstrap{,.ps1}`, included by `installer.rs`),
-  byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap{,.ps1}`.
+  (`crates/sc-lint/assets/bootstrap.py`, included by `installer.rs`),
+  byte-identical to `packages/sc-lint-adoption/.sc-lint/bootstrap.py`.
+
+ADR-017's accepted Phase K changes are delivered within these existing
+owners: Rust analyzer crates validate and evaluate analyzer/inventory policy;
+the top-level Rust CLI selects and sequentially executes consumer lint steps;
+the bootstrap delegates `exec` and installation to the existing managed
+product and wheel; and the setup helper provisions only consumer-declared
+tools/targets. The installer remains configuration/rendering glue, not a
+second Rust policy evaluator. The canonical operator-facing account is in the
+offline product guides linked from [configuration](../docs-bundle/configuration.md).
 
 ## Planned Interface Versioning Layer
 
@@ -388,8 +416,8 @@ Current intended distribution is:
   - boundary declarations and attribute-driven boundary policy
   - current owned extensions:
     - `SCB-CALLER-001` named-caller allowlist enforcement
-    - `SCB-DEPENDENCY-001`, `SCB-DEPENDENCY-002`, and
-      `SCB-DEPENDENCY-003` direct workspace package-edge policy
+    - `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-004` direct workspace
+      package-edge policy, including stale configured permissions
     - dedicated operator-visible `dependencies` rule filter, separate from
       both source-graph boundary checks and manifest policy
     - direct-edge scope includes normal, dev, build, and target-specific
@@ -560,7 +588,7 @@ enforcement scope unless later modeled as explicit boundary records.
 
 Consumer repositories do not copy these Python utilities. Their generated
 integration delegates exclusively to installed `sc-lint` and the product-owned
-`.sc-lint/bootstrap` asset as defined by ADR-012.
+`.sc-lint/bootstrap.py` asset as defined by ADR-012.
 
 Phase G extends this consumer-adoption boundary through
 [ADR-015](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md): the
@@ -620,15 +648,18 @@ distribution authority.
 `sc-lint` should treat some rule families as consumer-proven first and
 productized second.
 
-Current planned promotion path from `atm-core`:
+Consumer-proven rule families already shipped in dedicated product crates:
 
-- reusable analyzer families to backport into dedicated tool crates:
-  - `sc-lint-portability`
-    - `PORT-004`
-    - `PORT-005`
-  - `sc-lint-runtime`
-    - `SCB-RUNTIME-001`
-    - `SCB-RUNTIME-002`
+- `sc-lint-portability`: `PORT-004`, `PORT-005`
+- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`
+
+Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
+source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer
+policy, and consumer-declared setup data owned by the adoption kit/managed
+wheel. The top-level CLI remains the sole consumer lint executor; Python
+bindings do not decide lint rules. Final current-facing and offline user docs
+are reconciled by k-10 after implementation. See the
+[Phase K intent](./plans/phase-k/intent.md) and ADR-017 for the exact scope.
 - consumer-local policy families that stay outside `sc-lint` unless extracted
   as a configurable framework:
   - duplicate semantic string-literal policy

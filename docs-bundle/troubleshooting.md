@@ -21,24 +21,55 @@ machine-readable error. The human form includes the same recovery guidance.
 | `CLI.SC_LINT_POST_INSTALL_VERSION_FAILED` | Activated binary failed its version probe | The previous binary should remain active; retry with a verified archive. |
 | `CLI.SC_LINT_INSTALL_ROLLBACK_FAILED` | Previous binary could not be verified after failure | Use the reported backup path and restore it manually before retrying. |
 | `CLI.SC_LINT_INSTALL_ACTIVATION_FAILED` | Atomic activation failed | Choose a writable install directory and retry. |
+| `SETUP_TOOLS.INSPECTION_UNAVAILABLE` | Dry-run cannot inspect declared tools because the managed helper is unavailable | Run ordinary `just setup` to provision the helper and declared tools, then retry `setup --dry-run`. |
 | `CLI.SC_LINT_BACKEND_NOT_FOUND` | A configured lint/test command is missing | Install the named backend, then rerun the profile. |
 | `CLI.SC_LINT_INTEGRATION_CONFLICT` | A product-managed integration path contains user-owned changes | Reconcile or move the named file, then rerun `sc-lint init --just`; it will not overwrite consumer-owned content. |
 | `CLI.SC_LINT_INTEGRATION_OUTDATED` | One or more required product-managed integration files are absent | Run `sc-lint init --just` to create the named managed files, then rerun the check. |
 | `CLI.SC_LINT_DOCS_UNAVAILABLE` | The installed documentation bundle is missing | Install the matching `sc-lint-docs` package and rerun `sc-lint docs`. |
-| `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE` | The Action could not obtain the selected release archive or checksum manifest | Check the exact `version` and release/mirror URLs; make the verified release reachable, then retry. |
-| `ACTION.SC_LINT_CHECKSUM_MISMATCH` | The Action archive digest differs from the selected `checksums.txt` entry | Discard the archive and retry from the trusted release or mirror; do not bypass verification. |
-| `ACTION.SC_LINT_COMPATIBILITY_FAILED` | The extracted release fails the configured E.1 minimum-version preflight | Select a release meeting `minimum_version` or intentionally reconcile `sc-lint.toml`. |
-| `ACTION.SC_LINT_COMMAND_FAILED` | The selected consumer setup, lint, test, or offline-documentation command failed | Inspect the preserved command output, repair the named consumer profile or bundle, then retry. |
+| `CLI.SC_LINT_PROFILE_CONFIG_INVALID` | A consumer lint step, target, selector, or named profile is invalid | Correct the named step or field; a target requires a matching platform and supported literal Cargo command. |
 
 ## Initialization conflicts
 
 `sc-lint init --just` reports
 `CLI.SC_LINT_INTEGRATION_CONFLICT` rather than overwriting a differing
-user-owned `Justfile`, `sc-lint.toml`, `.sc-lint/bootstrap`, or
-`.sc-lint/bootstrap.ps1`. Missing managed
+user-owned `Justfile`, `sc-lint.toml`, or `.sc-lint/bootstrap.py`. Missing managed
 files produce `CLI.SC_LINT_INTEGRATION_OUTDATED` in check mode. Move the
 conflicting file or reconcile it with [the canonical guide](./just-setup.md),
 then rerun initialization.
+
+## Cargo-shear exception migration
+
+The cargo-shear wrapper reads reviewed exceptions from
+`.just/lint-config.toml`:
+
+```toml
+[cargo_shear.allowed_unused_dependencies]
+"sample-app.serde_alias" = "Used by generated serialization code."
+```
+
+Use the Cargo package name before the dot and the dependency key after it. If
+the manifest renames a dependency with `package = "serde"`, the key is the
+manifest alias (here, `serde_alias`); otherwise it is the dependency/package
+name. Use `workspace.{dependency_key}` only for a dependency inherited from a
+virtual-root workspace dependency table. A package whose Cargo package name is
+literally `workspace` is still referred to by its package name, not by the
+reserved root.
+
+Previously accepted path-like keys such as `crates/sample-app.serde` are no
+longer valid. Replace them with `{package}.{dependency_key}` or, only for a
+virtual-root workspace dependency, `workspace.{dependency_key}`. The wrapper
+validates that each exception matches an actual dependency and has a reason;
+stale keys, missing reasons, path-like keys, and cargo-shear output sections it
+cannot parse fail with `SC_LINT_CARGO_SHEAR_CONFIG_INVALID` or a failing check
+rather than silently downgrading or passing. An absent exception table
+preserves the default findings; a present empty table allows no unused
+dependencies. This guide is the offline recovery reference for the compatibility
+change.
+
+The cargo-deny adapter retries a completed command failure only when captured
+output contains “could not resolve hostname”. It makes at most three attempts
+and reports each retry. Policy failures and other command errors are not
+retried; the final attempt's output and status determine the result.
 
 ## Clean-machine bootstrap
 
@@ -50,10 +81,11 @@ just setup
 just lint
 ```
 
-The helpers resolve `SC_LINT_BIN`, the managed install, and `PATH` in that
-order. If none exists, `just setup` downloads the exact configured release and
-verifies its SHA-256 checksum before activation. A failed download or checksum
-does not run lint/test; follow the reported release code above. Set
+`just setup` checks for a compatible product installation. If none is
+available, it downloads the release selected by the configured floor and
+verifies its SHA-256 checksum before activating the complete bundle. A failed
+download, checksum, health, or compatibility check does not run lint/test;
+follow the reported recovery above. Set
 `SC_LINT_INSTALL_DIR` to a writable directory when the default managed
 location is unsuitable.
 

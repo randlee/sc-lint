@@ -11,10 +11,22 @@ Related ADRs:
 - [docs/sc-lint/adr/ADR-010-portability-scope-and-parity.md](./sc-lint/adr/ADR-010-portability-scope-and-parity.md)
 - [docs/sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md](./sc-lint/adr/ADR-015-standard-repo-tools-adoption-kit.md)
 - [docs/sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md](./sc-lint/adr/ADR-016-python-wheel-runtime-and-no-rust-configuration.md)
+- [docs/sc-lint/adr/ADR-017-phase-k-consumer-contracts.md](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md)
 
 Related design docs:
 - [docs/sc-lint/logging.md](./sc-lint/logging.md)
 - [docs/sc-lint-version/requirements.md](./sc-lint-version/requirements.md)
+
+Crate-local requirement and architecture traceability:
+- [`sc-lint`](./sc-lint/requirements.md) ([architecture](./sc-lint/architecture.md))
+- [`sc-lint-analyzer-support`](./sc-lint-analyzer-support/requirements.md) ([architecture](./sc-lint-analyzer-support/architecture.md))
+- [`sc-lint-attributes`](./sc-lint-attributes/requirements.md) ([architecture](./sc-lint-attributes/architecture.md))
+- [`sc-lint-boundary`](./sc-lint-boundary/requirements.md) ([architecture](./sc-lint-boundary/architecture.md))
+- [`sc-lint-directives`](./sc-lint-directives/requirements.md) ([architecture](./sc-lint-directives/architecture.md))
+- [`sc-lint-portability`](./sc-lint-portability/requirements.md) ([architecture](./sc-lint-portability/architecture.md))
+- [`sc-lint-runtime`](./sc-lint-runtime/requirements.md) ([architecture](./sc-lint-runtime/architecture.md))
+- [`sc-lint-schema`](./sc-lint-schema/requirements.md) ([architecture](./sc-lint-schema/architecture.md))
+- [`sc-lint-py`](./sc-lint-py/requirements.md) ([architecture](./sc-lint-py/architecture.md))
 
 For release `0.2.x`, ADR-005 is the approved cross-target preflight strategy
 artifact and supersedes earlier provisional profile/`xwin` rollout notes.
@@ -26,6 +38,17 @@ generic adoption path, and ADR-016 fixes its runtime delivery as a Python wheel
 with no Rust configuration logic. `REQ-PRODUCT-019` obligations on the
 installed end state are unchanged; see the supersession note under that
 requirement.
+
+Phase K's accepted ADR-017 amendments describe delivered contracts, not new
+product defaults: analyzer `exclude_paths_by_rule`, explicit portability
+adapter pairs, optional boundary inventory policies, consumer named lint
+profiles and platform scopes, direct managed `exec`, and consumer-declared
+cargo tools/rustup targets provisioned by setup. Optional declarations remain
+inactive when absent. Consumer tools and policy values are never chosen from
+repository identity. User-facing syntax and recovery are maintained in the
+offline [configuration](../docs-bundle/configuration.md),
+[usage](../docs-bundle/using-sc-lint.md), and
+[troubleshooting](../docs-bundle/troubleshooting.md) guides.
 
 ## Product Purpose
 
@@ -490,8 +513,9 @@ The product should support both:
   without choosing a Cargo package or copying source-repository
   orchestration. The product-owned
   installation must create an idempotent `sc-lint.toml`, thin Just
-  integration, `.sc-lint/bootstrap`, and Windows `.sc-lint/bootstrap.ps1`
-  helpers with non-mutating `--check`/`--dry-run` modes; it must never
+  integration, and one `.sc-lint/bootstrap.py` helper that runs identically
+  on every platform and returns exit codes unchanged, with non-mutating
+  `--check`/`--dry-run` modes; it must never
   overwrite a consumer README or user-owned integration file. Consumer `just
   setup`, `just lint`, `just test`, and `just upgrade` all depend on the same
   compatibility preflight; lint and test execute complete configured profiles.
@@ -507,7 +531,8 @@ The product should support both:
   and which product sprints use for fresh-workspace acceptance. The
   idempotence and never-overwrite obligations above bind the kit: `--dry-run`
   drift reports a unified diff and exits 1, a conflict with a user-owned file
-  exits 2, and the kit has no delete operation. Runtime delivery of the
+  exits 2, and the kit deletes nothing except an unmodified managed file a
+  release retires (ADR-012). Runtime delivery of the
   helpers is governed by ADR-016.
 
 - `REQ-PRODUCT-020`
@@ -521,8 +546,7 @@ The product should support both:
   product location. The selected immutable release artifact is reported
   separately from that floor, which remains the installed-version comparison
   policy. Consumer repositories use the product-owned
-  `.sc-lint/bootstrap` and `.sc-lint/bootstrap.ps1` assets; they delegate
-  `ensure`, `setup`, and `upgrade` to
+  `.sc-lint/bootstrap.py` asset; it delegates `setup` and `upgrade` to
   installed `sc-lint` and never copies source-checkout scripts or overwrites a
   consumer README.
 
@@ -560,16 +584,27 @@ The product should support both:
 
 - `REQ-PRODUCT-023`
   A versioned, reusable, analyzer-agnostic adoption kit must install one
-  drift-detectable consumer end state. Analyzer selection is the sole
-  repo-specific declarative input in `[tool.sc-lint.analyzers]`; profiles
-  select applicable analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry
-  carries the common keys `enabled`, `reason`, `exclude_rules`, `fail_rules`
-  and `exclude_paths` plus that analyzer's own keys (portability:
-  `config_home_env`, `unix_path_prefixes`); each analyzer reads only its own
-  table, and an unknown key is rejected by the analyzer (exit 3) and by the kit
-  installer. Installation is idempotent and `--dry-run` is
-  non-mutating, reporting drift or a managed-file conflict rather than writing.
-  (Amended 2026-10-10, Accepted, #201, #202.)
+  drift-detectable consumer end state. Analyzer selection and optional analyzer
+  policy are declared in `[tool.sc-lint.analyzers]`; profiles select applicable
+  analyzers. Each `[tool.sc-lint.analyzers.<name>]` entry carries the common
+  keys `enabled`, `reason`, `exclude_rules`, `fail_rules`, `exclude_paths` and
+  `exclude_paths_by_rule`, plus that analyzer's own keys. Portability accepts
+  `config_home_env`, `unix_path_prefixes` and reviewed `platform_adapters`;
+  boundary accepts optional manifest dependency allowlists, global dependency
+  ownership and manifest section rules. Each analyzer reads only its own table.
+  Unknown analyzer-level keys, unknown rule names and malformed values are
+  rejected by the analyzer (exit 3) and by the kit installer. Optional manifest
+  records retain upstream nested value shapes and ignored unknown nested keys;
+  an absent or empty family adds no checks, while a present empty dependency
+  allowlist allows none. Per-rule path exclusions filter findings using paths
+  supplied by analyzer-owned adapters without changing the shared Finding schema.
+  Validated platform pairs cover enclosing module declarations and
+  inherited-private items while retaining normal parity checks for unrelated
+  and separately Unix-gated public items. Missing optional fields preserve
+  existing behavior. Installation is idempotent and `--dry-run` is non-mutating,
+  reporting drift or a managed-file conflict rather than writing.
+  (Amended 2026-10-10, Accepted, #201, #202; amended 2026-10-12, Accepted,
+  [ADR-017, changes 1 and compatibility](./sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
 - `REQ-PRODUCT-024`
   The version-matched `sc-lint` wheel delivers every consumer-run helper and
@@ -578,6 +613,13 @@ The product should support both:
   `just test [layer]` is sc-lint's recommended `test` recipe, owned by the
   consumer once installed.
   (Amended 2026-10-10, Accepted, ADR-012 amendment 2026-10-10, #194.)
+
+Phase K's Accepted ADR-017 extends existing adoption and CLI contracts: the
+persisted installer input may declare exact cargo-tool versions and rustup
+targets for ordinary bootstrap setup, while direct binary setup retains its
+meaning and lint never installs tools. The managed-wheel helper owns
+inspection, installation and verification; absent declarations add no work.
+This is an amendment to those contracts, not a new product default.
 
 ## Current Detailed Requirement Areas
 
@@ -607,7 +649,7 @@ The completed Phase `D` execution line required:
   - TOML-backed package dependency policy in boundary inventory records
   - direct workspace package-edge allowlist and forbidden-edge enforcement
   - a dedicated `dependencies` rule filter for package-edge policy
-  - stable fail-only `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-003` rule
+  - stable fail-only `SCB-DEPENDENCY-001` through `SCB-DEPENDENCY-004` rule
     coverage in the default `analyze_workspace` path
   - in-scope direct workspace edges across normal, dev, build, and
     target-specific dependency sections

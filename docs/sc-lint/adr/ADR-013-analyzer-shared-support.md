@@ -56,3 +56,15 @@ machine-report contracts remain in their existing crates.
 3. The second paragraph stands: the support crate defines no rule ids and no
    analyzer-specific policy.
 
+## Amendment 2026-10-12 — per-rule path filtering
+
+| Field | Value |
+| --- | --- |
+| Status | Accepted (Rand, ADR-017, 2026-10-12) |
+| Source | [ADR-017, change 1](./ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts) |
+
+The common analyzer keys also include `exclude_paths_by_rule`. Shared support
+filters findings by their analyzer-supplied normalized paths and rule IDs;
+individual analyzers retain rule ownership and provide their own paths before
+conversion to the unchanged shared Finding schema. The parser's common-key
+list in the 2026-10-10 amendment is extended accordingly.

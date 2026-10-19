@@ -1,8 +1,79 @@
 # Continuous integration
 
-CI should use the reusable GitHub Action below as its primary integration. It
-uses the same consumer product contract as local `just lint` and `just test`,
-but avoids relying on a previously installed binary.
+Use the same complete lint and test operations as local development. Use the
+shipped reusable GitHub Action, `randlee/sc-lint@v1`, for managed adoption; or
+install a verified release archive; or use the generated Just integration.
+
+## Reusable GitHub Action
+
+`randlee/sc-lint@v1` installs a verified release archive, checks the checksum
+against the release's `checksums.txt`, runs the compatibility preflight, and
+then runs the consumer contract. Choose the operation with `operation`: `setup`
+installs and preflights the release, while `lint` (the default) and `test` run
+the consumer commands after the preflight.
+
+```yaml
+- uses: randlee/sc-lint@v1
+  with:
+    operation: lint
+    version: 0.8.0
+```
+
+`version` is required. It is the exact released product SemVer, without a
+leading `v`, and it selects the verified artifact. Do not infer it from Cargo
+metadata or a checkout.
+
+For a reproducible or high-assurance workflow, pin `uses:` to an immutable full
+commit SHA and keep `version` explicit:
+
+```yaml
+- uses: randlee/sc-lint@<full-commit-sha>
+  with:
+    operation: test
+    version: 0.8.0
+```
+
+The `v1` tag identifies the Action interface and is a movable tag, refreshed
+after each release is published. The `version` input identifies the release
+artifact. Neither implies the other.
+
+### Action inputs
+
+| Input | Required | Default | Description |
+| --- | --- | --- | --- |
+| `operation` | No | `lint` | Selects `setup`, `lint`, or `test`. `setup` installs and preflights only. |
+| `version` | Yes | — | Exact released sc-lint SemVer without a leading `v`; selects the verified release artifact. |
+| `config-path` | No | `sc-lint.toml` | Consumer configuration path, relative to `working-directory`. |
+| `artifact-url` | No | `{release-base-url}/v{version}/sc-lint_{version}_{target}.{extension}` | Exact release archive URL, for a mirror or offline runner. |
+| `checksums-url` | No | `{release-base-url}/v{version}/checksums.txt` | URL of the matching `checksums.txt` manifest. |
+| `release-base-url` | No | `https://github.com/randlee/sc-lint/releases/download` | Trusted release download root used to derive the archive and checksum URLs. |
+| `working-directory` | No | `.` | Consumer working directory containing `sc-lint.toml`; relative `config-path` values resolve from here. |
+
+`artifact-url` and `checksums-url` are resolved independently. Supplying one
+overrides only that URL; the other keeps its default derived from
+`release-base-url` and `version`. The archive URL selects the target-specific
+archive, while the checksum URL selects the release's `checksums.txt`.
+
+### Action outputs
+
+| Output | Description |
+| --- | --- |
+| `binary-path` | Absolute path of the verified `sc-lint` binary. |
+| `docs-path` | Absolute path of the shipped offline `sc-lint-docs` directory. Documentation discovery never reaches the network. |
+| `version` | Verified release version selected by the Action. |
+
+The Action does not fall back to a package manager, Cargo, a source checkout,
+or an analyzer package name. When an artifact cannot be reached, it reports
+`ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`.
+
+Stable failure codes are `ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`,
+`ACTION.SC_LINT_CHECKSUM_MISMATCH`, `ACTION.SC_LINT_COMPATIBILITY_FAILED`, and
+`ACTION.SC_LINT_COMMAND_FAILED`. Each has a recovery step in
+[troubleshooting](./troubleshooting.md).
+
+The repository's `.github/actions/*` composites are repository-only workflow
+components for this project's own CI. Consumers use `randlee/sc-lint@v1`, not
+those paths.
 
 ## Machine-readable checks
 
@@ -12,52 +83,13 @@ stable code and recovery action remain visible in build artifacts.
 
 ## Reproducibility
 
-Install a verified release artifact, keep the documentation bundle beside it,
-and avoid source-checkout fallbacks. Run lint and test as separate required
-steps so a failed profile is actionable. Cache dependencies, not an unverified
-sc-lint binary.
+Preserve the archive's declared documentation-bundle path alongside its
+executables when installing by hand.
+Run lint and test as separate required steps so a failed profile is actionable.
+Cache dependencies, not an unverified sc-lint binary. See
+[troubleshooting](./troubleshooting.md) for preflight and backend failures.
 
-See [troubleshooting](./troubleshooting.md) for preflight and backend failures.
-
-## Reusable GitHub Action
-
-For consumer CI, use the versioned Action rather than installing a Cargo
-package, cloning this repository for tooling, or copying product scripts. The
-Action downloads the named E.5 archive, verifies its SHA-256 entry in the
-matching checksum manifest, preflights `sc-lint.toml`, and runs one aggregate
-consumer operation.
-
-```yaml
-name: sc-lint
-
-on: [pull_request]
-
-permissions:
-  contents: read
-
-jobs:
-  lint-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Complete lint profile
-        uses: randlee/sc-lint@v1
-        with:
-          version: 0.7.3
-          operation: lint
-      - name: Complete test profile
-        uses: randlee/sc-lint@v1
-        with:
-          version: 0.7.3
-          operation: test
-```
-
-`operation: setup` downloads, verifies, extracts, and compatibility-preflights
-the release without running a profile. It exposes `binary-path`, `docs-path`,
-and `version` outputs, and adds the binary directory to `PATH` for a later
-step.
-
-## Manual Just alternative
+## Consumer workflow
 
 Generate and commit the managed files during onboarding. A clean CI runner can
 then use the same documented local sequence without a preinstalled binary:
@@ -68,36 +100,20 @@ then use the same documented local sequence without a preinstalled binary:
 - run: just test
 ```
 
-`just setup` downloads the configured `minimum_version` release, verifies its
-checksum manifest entry, and activates it before the profile commands run.
-This path is covered by the consumer lifecycle fixture on POSIX and Windows.
+`just setup` uses the declared minimum version, verifies the matching release
+checksum, and activates the complete managed product before later recipes run.
+Stable errors and recovery guidance are written to stderr for setup,
+preflight, and backend failures.
+The source-maintainer `pytests` task runs only tests bundled in the wheel; it
+does not collect tests from the consumer checkout. See the
+[detailed test-runner note](./best-practices.md#bundled-python-tests).
 
-## Pinning, cache, and offline runners
-
-`randlee/sc-lint@v1` is the supported stable-major form. For a reproducible or
-high-assurance workflow, pin the Action to a reviewed immutable full commit
-SHA and keep `version` explicit:
-
-```yaml
-- uses: randlee/sc-lint@0123456789abcdef0123456789abcdef01234567
-  with:
-    version: 0.7.3
-    operation: lint
-```
-
-The Action needs no token beyond the job's normal checkout permissions; keep
-`contents: read` unless another consumer step needs more. The `version` input
-identifies the product release, while `@v1` or the Action SHA identifies the
-Action code.
-
-For a verified internal mirror or hermetic fixture, pass both `artifact-url`
-and `checksums-url`. The archive must retain its normal E.5 filename and its
-matching checksum entry. Cache dependencies or a verified mirror, not a binary
-copied from another job. An unavailable release produces
-`ACTION.SC_LINT_ARTIFACT_UNAVAILABLE`; it never changes to a package manager or
-source build.
-
-The shipped `sc-lint-docs` bundle is available without network access through
-the `docs-path` output, and the Action checks `sc-lint docs --path` after
-extraction. Preserve stderr in CI logs: it carries the stable error code and
-recovery text for artifact, checksum, compatibility, or profile failure.
+The Rust consumer executor supports named lint profiles and platform scopes. A
+profile is an ordered list of existing lint step names, not a nested profile.
+`--platform-scope host` is the default; `all` reports unsupported cross-platform
+selections as skips, while a named platform selects its tagged steps. Only
+literal cargo `check` and `clippy` commands can declare a target. Native runs
+use Cargo; Linux/macOS to Windows MSVC x86_64 uses `cargo xwin`. Other cross
+target combinations are reported as unsupported, and a missing tool or failed
+supported command fails the run. See [using sc-lint](./using-sc-lint.md) for
+examples and output behavior.
