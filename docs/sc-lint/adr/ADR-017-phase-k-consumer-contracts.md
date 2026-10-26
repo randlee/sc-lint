@@ -110,7 +110,9 @@ Rand ruled 2026-10-26 that consumer-configured lint and test profiles run
 independent steps in parallel and fail slow by default: every planned step runs,
 failures are aggregated, the report keeps declaration order and identifies each
 failed step by index, and any failure exits non-zero. A flag enables fail-fast
-(stop on first failure). Steps requiring Cargo's build lock stay serialized.
+(stop on first failure). Steps requiring Cargo's build lock stay serialized,
+and fail-slow holds inside that serialized lane. A step may declare
+`after_all = true` to start only after every other step has finished.
 This supersedes the sentence of change 4 that keeps consumer profiles
 sequential and fail-fast. Plan authority: `lint-l-6`.
 

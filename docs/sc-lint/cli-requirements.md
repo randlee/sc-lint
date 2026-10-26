@@ -31,12 +31,15 @@ specialized backend tools and mixed Rust/Python implementations.
   - `.just/lint-config.toml`
   with `--root <path>` as the explicit repo-root override.
   (Amended phase L, #137/default-config gap, Pending — Rand approval.)
-  Resolution order for every lint and every Python-backed lint
-  (line-counts, identity-literals, version-sync): an explicit `--config`, then
-  `sc-lint.toml`, then `.just/lint-config.toml` as a fallback only when
-  `sc-lint.toml` is absent. `sc-lint.toml` is never shadowed by the fallback.
-  A lint whose configuration table is missing from the resolved file fails with
-  a structured error; it must not pass silently with "no active limits". The
+  Resolution is per configuration table for every lint and every Python-backed
+  lint (line-counts, identity-literals, version-sync): an explicit `--config`
+  file first, then the table from `sc-lint.toml` when it has one, otherwise the
+  same table from `.just/lint-config.toml`. A table present in `sc-lint.toml`
+  is never shadowed by the fallback file, and a repo whose `sc-lint.toml` lacks
+  a table that only `.just/lint-config.toml` holds (as in atm-core's kit-rendered
+  `sc-lint.toml`) keeps using the fallback table. A lint whose configuration
+  table is found in neither file fails with a structured error; it must not
+  pass silently with "no active limits". The
   repo root is the nearest ancestor holding `sc-lint.toml` or a workspace
   `Cargo.toml`; a `boundaries/` directory is required only by the boundary
   family, and its absence is a structured error for that family alone.
@@ -393,7 +396,10 @@ specialized backend tools and mixed Rust/Python implementations.
   runs even if another fails, the report retains declaration order and
   identifies every failed step by its index, and the command exits non-zero if
   any step fails. The `--fail-fast` flag stops scheduling new steps after the
-  first failure. Steps that require Cargo's build lock stay serialized. Output
+  first failure. Steps that require Cargo's build lock stay serialized, and
+  fail-slow holds inside that serialized lane: a failing step there does not
+  stop later steps in the lane. A step may declare `after_all = true`, which
+  starts it only after every other step has finished. Output
   ordering is deterministic and does not depend on step timing. Generic test groups and test
   argument forwarding are not added.
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
