@@ -105,6 +105,15 @@ Change 4 amendment: Accepted — Rand, 2026-10-14. The ruling changes execution
 semantics only for the built-in source-maintainer lint plan; consumer-configured
 profiles retain their sequential, fail-fast contract.
 
+Change 4 amendment 2 (phase L, #195/#196): Pending — Rand approval required.
+Rand ruled 2026-10-26 that consumer-configured lint and test profiles run
+independent steps in parallel and fail slow by default: every planned step runs,
+failures are aggregated, the report keeps declaration order and identifies each
+failed step by index, and any failure exits non-zero. A flag enables fail-fast
+(stop on first failure). Steps requiring Cargo's build lock stay serialized.
+This supersedes the sentence of change 4 that keeps consumer profiles
+sequential and fail-fast. Plan authority: `lint-l-6`.
+
 Optional manifests/configuration activate policy only when present. An empty
 manifest-policy family array adds no checks; a present allowlist record with
 an empty allowed-dependency list allows none. Retain upstream nested record
