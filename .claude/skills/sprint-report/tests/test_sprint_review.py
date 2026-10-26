@@ -17,6 +17,7 @@ import sprint_dag as dag
 def load_script(name, path):
     loader = importlib.machinery.SourceFileLoader(name, str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
     return module
@@ -58,13 +59,13 @@ class ViewTests(unittest.TestCase):
         snapshot = {'captured_at': 'now', 'errors': {}}
         calls = [] if calls is None else calls
         plan_html = repo / 'plans/phase-d/phase-d-dag.html'
-        with patch.object(dag, 'run_json', return_value=beads), patch.object(dag, 'collect_state', return_value=snapshot), patch.object(dag, 'states', return_value={'dev': {}, 'gate': {}}), patch.object(dag, 'qa_states', return_value={'dev': {}, 'gate': {}}), patch.object(dag, 'overlay', return_value=svg), patch.object(dag, 'render', side_effect=lambda mode, source, target: target.write_text(svg)), patch.object(dag, 'open_wyvern', side_effect=lambda path: calls.append('view')):
+        with patch.object(dag, 'phase_beads', side_effect=AssertionError('the caller passes the phase beads in')), patch.object(dag, 'collect_state', return_value=snapshot), patch.object(dag, 'states', return_value={'dev': {}, 'gate': {}}), patch.object(dag, 'qa_states', return_value={'dev': {}, 'gate': {}}), patch.object(dag, 'overlay', return_value=svg), patch.object(dag, 'render', side_effect=lambda mode, source, target: target.write_text(svg)), patch.object(dag, 'open_wyvern', side_effect=lambda path: calls.append('view')):
             # Dependency availability is a CLI prerequisite, not part of this boundary test.
             with patch.object(dag, 'RENDERER', scratch):
                 (scratch / 'node_modules/@viz-js/viz').mkdir(parents=True, exist_ok=True)
                 with patch.object(dag, 'html_view', return_value='<html>' + svg + '</html>'):
                     dag.generate(repo, index, {}, 'd', output=scratch / 'out/phase-d-dag', open_view=view,
-                                 plan_html=plan_html)
+                                 plan_html=plan_html, beads=beads)
         return plan_html
 
     def test_generation_writes_plan_html_and_never_views_by_default(self):
@@ -96,7 +97,9 @@ class ViewTests(unittest.TestCase):
 
     def test_initial_window_uses_eighty_percent_of_logical_screen_bounds(self):
         page = dag.html_view('<svg/>', 'd', 'root')
-        script = re.search(r'<script id="wyvern-initial-size">(.*?)</script>', page, re.S).group(1)
+        matched = re.search(r'<script id="wyvern-initial-size">(.*?)</script>', page, re.S)
+        assert matched is not None
+        script = matched.group(1)
         harness = r"""
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
@@ -179,9 +182,9 @@ class PlanCheckTests(unittest.TestCase):
             config = repo / '.claude/project/atm-bd-orchestration.yaml'
             config.parent.mkdir(parents=True)
             config.write_text('plans_dir: work/plans\n')
-            (repo / '.atm-bd').mkdir()
-            (repo / '.atm-bd/phase-test.toml').write_text(
-                'plan = "work/plans/phase-test.jsonl"\nroot = "tp-phase-test"\nintegration_branch = "integrate/phase-test"\n')
+            sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'atm-beads/tests'))
+            from phase_fixtures import write_phase
+            write_phase(repo, 'test', 'tp', 'work/plans')
             plan = repo / 'work/plans/phase-test.jsonl'
             plan.parent.mkdir(parents=True)
             plan.write_text('{"sprint": "test-1"}\n')

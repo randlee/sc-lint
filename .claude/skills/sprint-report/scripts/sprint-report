@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 import json
 import re
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "atm-beads/scripts"))
 from sprint_index_common import load_phase_plan, run_json, index_bead_pairs, phase_id, sprint_beads
 from sprint_qa import metadata, choose_round, qa_verdict, qa_icon, findings_summary
+from phase_beads import phase_beads
 from plan_contract import DIFFICULTY_MODELS, difficulty_tiers, model_matches
 import repo_config
 import sc_render
@@ -100,13 +102,14 @@ def is_qa_of(bead: dict[str, Any], dev_id: str) -> bool:
         return True
     if "stage:qa" not in (bead.get("labels") or []):
         return False
-    metadata = bead.get("metadata") if isinstance(bead.get("metadata"), dict) else {}
+    bead_metadata = bead.get("metadata")
+    metadata = bead_metadata if isinstance(bead_metadata, dict) else {}
     return related_bead(bead, dev_id, "parent-child") or bead.get("parent") == dev_id \
         or metadata.get("checked_bead") == dev_id
 
 
 def status_icon(dev: dict[str, Any], sanity: dict[str, Any] | None,
-                findings: list[dict[str, Any]] = (), blocked: bool = False) -> str:
+                findings: Sequence[dict[str, Any]] = (), blocked: bool = False) -> str:
     if blocked or dev.get("status") == "blocked":
         return "🚧"
     if sanity is None:
@@ -272,7 +275,7 @@ def dispatch_rows(ready: list[dict[str, Any]], members: list[dict[str, Any]], ac
     return sorted(rows, key=lambda row: (int(row["priority"]), int(row["layer"]), row["id"]))
 
 
-def render_dispatch(rows: list[dict[str, str]], members: list[dict[str, Any]] = ()) -> str:
+def render_dispatch(rows: list[dict[str, str]], members: Sequence[dict[str, Any]] = ()) -> str:
     devs = dev_members(list(members))
     unknown = sorted(member_name(m) for m in devs if str(m.get("model") or "").lower() in ("", "unknown", "none"))
     head = ["prerequisite: dev agents have roster type `dev` and `model` set"
@@ -311,20 +314,20 @@ def main() -> int:
             ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
             cwd=repo, text=True,
         ).strip())
-        sanity_runs = phase_sanity_iterations(common_dir.parent / ".sc" / "sanity-log", phase)
+        sanity_runs: dict[str, int | None] = dict(phase_sanity_iterations(common_dir.parent / ".sc" / "sanity-log", phase))
         rows = index.get("sprints")
         if not isinstance(rows, list) or not rows:
             raise RuntimeError("sprint index contains no sprints")
+        all_beads = phase_beads(common_dir.parent, phase)
         if args.dag or args.view:
             from sprint_dag import generate
             plan_html = None if args.output else (
                 repo / repo_config.load(repo)["plans_dir"] / f"phase-{phase}" / f"phase-{phase}-dag.html")
             return generate(repo, index, sanity_runs, phase, args.output, args.open, args.view,
-                            plan_html=plan_html)
+                            plan_html=plan_html, beads=all_beads)
         row_ids = list(index_bead_pairs(index))
-        all_beads = run_json(repo, "bd", "list", "--all", "-n", "0", "--json")
         if args.dispatch:
-            ready = run_json(repo, "bd", "ready", "-n", "0", "--json")
+            ready = run_json(repo, "bd", "ready", "-l", f"phase-{phase}", "-n", "0", "--json")
             members = run_json(repo, "atm", "members", "--json")
             if not isinstance(members, list):
                 members = members.get("members", [])
@@ -343,7 +346,7 @@ def main() -> int:
                         descendants.add(str(bead["id"])); changed = True
             print(render_dispatch(dispatch_rows([bead for bead in ready if str(bead.get("id")) in descendants], members, active), members))
             return 0
-        blocked_ids = {bead["id"] for bead in run_json(repo, "bd", "blocked", "--json")}
+        blocked_ids = {bead["id"] for bead in run_json(repo, "bd", "blocked", "-l", f"phase-{phase}", "-l", "stage:dev", "--json")}
         dev_ids = set(row_ids)
         sanity_by_dev: dict[str, dict[str, Any]] = {}
         qa_by_dev: dict[str, list[dict[str, Any]]] = {}
@@ -405,7 +408,8 @@ def main() -> int:
         sanity = live_by_id.get(str(sanity_id)) if sanity_id else None
         sanity_count = sanity_runs.get(str(sanity_id))
         sanity_cell = "?" if sanity_count is None else str(sanity_count) if sanity_count else ""
-        qa = live_by_id.get(str(selected_qa.get(dev_id, {}).get("id"))) if selected_qa.get(dev_id) else None
+        selected = selected_qa.get(dev_id)
+        qa = live_by_id.get(str(selected.get("id"))) if isinstance(selected, dict) else None
         qa_ids = {str(candidate["id"]) for candidate in qa_by_dev.get(dev_id, [])}
         findings = [
             bead for bead in all_beads

@@ -15,7 +15,9 @@ numbered list under `## Deliverables` (a poured bead without one, or without
 `owned_paths`, takes it from its sprint container `metadata.sprint_bead`), pins the target commit, lists the files
 changed since the base (with `--layer-pr`, the union of those PRs' own ranges,
 one `gh api repos/{owner}/{repo}/pulls --paginate` listing joined locally, the checked PR last), renders `dev-sanity-assignment.json.j2` once per
-deliverable with the sc-compose wheel, starts the lint command detached in the
+deliverable with the sc-compose wheel (`external_evidence`: the checked bead's notes when it has any,
+and the checked PR's body with `--layer-pr`, then each `--external-evidence <json-or-file>`, repeatable: one
+well-formed reference such as a `pr_comment`), starts the lint command detached in the
 worktree, and prints one JSON manifest to stdout:
 
   {run_id, reviewers, operational_reviewer, sha, base_sha, sanity_bead, dev_bead, branch, worktree_path,
@@ -68,7 +70,9 @@ IGNORED_STATUS_PATHS = (".beads.gate.lock", ".sc-compose/")
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "atm-beads" / "scripts"))
+sys.path.insert(0, str(HERE))
 import sc_render  # noqa: E402
+from jev_client import evidence_ref  # noqa: E402
 
 TEMPLATE = HERE.parent / "templates" / "dev-sanity-assignment.json.j2"
 CODES = {2: "SANITY.PLAN_INVALID", 3: "SANITY.TARGET_UNREADABLE", 4: "SANITY.COMMIT_MISMATCH", 5: "RENDER_FAILED"}
@@ -83,6 +87,26 @@ class Fail(Exception):
 def die(code, message):
     print(f"{CODES.get(code, 'USAGE')}: {message}", file=sys.stderr)
     return code
+
+
+def extra_evidence(values):
+    """The `--external-evidence` entries: each value is one JSON evidence reference, or a path to a file holding one."""
+    entries = []
+    for value in values:
+        text = value
+        if not value.lstrip().startswith("{"):
+            try:
+                text = Path(value).read_text()
+            except OSError as error:
+                raise Fail(1, f"--external-evidence {value!r} is not JSON and cannot be read as a file: {error}") from error
+        try:
+            entry = json.loads(text)
+        except ValueError as error:
+            raise Fail(1, f"--external-evidence {value!r} is not valid JSON: {error}") from error
+        if not evidence_ref(entry):
+            raise Fail(1, f"--external-evidence {value!r} is not a bead_notes, pr_body or pr_comment reference")
+        entries.append(entry)
+    return entries
 
 
 def load_bead(args, bead_id=None):
@@ -154,7 +178,9 @@ def parse_deliverables(description):
         elif TOP_BULLET.match(line):
             raise Fail(2, f"`## Deliverables` has an unnumbered top-level bullet: {stripped!r}")
         elif FENCE.match(line):
-            fence = FENCE.match(line).group(1)       # closes on the same character, at least this long
+            fence_match = FENCE.match(line)
+            assert fence_match is not None
+            fence = fence_match.group(1)       # closes on the same character, at least this long
             items[-1][1] += " " + stripped
         elif line[0] in " \t" or not prev_blank:    # indented sub-item, or wrapped item text
             items[-1][1] += " " + stripped
@@ -218,6 +244,7 @@ def layer_ranges(worktree, prs):
     if run.returncode != 0:
         raise Fail(3, f"gh api pulls failed: {run.stderr.strip()}")
     listed = {}
+    line = ""
     try:
         for line in run.stdout.splitlines():
             if line.strip():
@@ -391,7 +418,9 @@ def main():
     for flag in ("--task", "--bead", "--worktree", "--branch", "--commit", "--base", "--lint-command", "--scratch"):
         parser.add_argument(flag, required=True)
     parser.add_argument("--bead-json")
+    parser.add_argument("--close-context", type=Path)
     parser.add_argument("--layer-pr", action="append", default=[])
+    parser.add_argument("--external-evidence", action="append", default=[])
     parser.add_argument("--split-only", action="store_true")
     parser.add_argument("--template", type=Path, default=TEMPLATE)
     parser.add_argument("--lint-timeout-seconds", type=int, default=1800)
@@ -412,6 +441,15 @@ def main():
             files = layer_files(args.worktree, args.layer_pr, sha) if args.layer_pr else changed_files(args.worktree, base_sha, sha)
             lint = None
         outside = outside_fence(files, owned)
+        try:
+            close_context = json.loads(args.close_context.read_text()) if args.close_context else {}
+        except (OSError, ValueError) as error:
+            raise Fail(1, f"cannot read --close-context: {error}") from error
+        if not isinstance(close_context, dict):
+            raise Fail(1, "close context must be a JSON object")
+        external = ([{"kind": "bead_notes", "bead": bead["id"], "text": bead["notes"]}] if bead.get("notes") else []) + (
+            [{"kind": "pr_body", "repo": "{owner}/{repo}", "pr": int(args.layer_pr[-1])}] if args.layer_pr and args.layer_pr[-1].isdigit() else [])
+        external += extra_evidence(args.external_evidence)
         assignments = []
         for item in deliverables:
             assignments.append({"number": item["number"], "assignment": render(args.template, {
@@ -419,7 +457,7 @@ def main():
                 "deliverable_number": item["number"], "deliverable_text": item["text"],
                 "deliverables_total": len(deliverables),
                 "owned_paths": owned, "changed_files": files, "files_outside_owned_paths": outside,
-                "context": [],
+                "context": [], "external_evidence": external,
                 "worktree_path": args.worktree, "branch": args.branch, "commit": sha, "base_sha": base_sha,
             })})
         if not args.split_only:
@@ -432,6 +470,8 @@ def main():
                "sha": sha, "base_sha": base_sha, "sanity_bead": args.task, "dev_bead": bead["id"],
                "branch": args.branch, "worktree_path": args.worktree, "deliverables_total": len(deliverables),
                "changed_files": files, "files_outside_owned_paths": outside, "lint": lint,
+               "close_context": close_context, "bead_notes": bead.get("notes") or "",
+               "checked_bead_data": bead,
                "assignments": assignments}, sys.stdout, indent=2)
     print()
     return 0
