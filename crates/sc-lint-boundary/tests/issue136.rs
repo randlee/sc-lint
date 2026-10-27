@@ -206,8 +206,18 @@ fn issue136_record_locks() {
 }
 
 /// Maps atm-core's `collect_manifest_dependency_allowlist_violations` at
-/// commit `f4746d500` to sc-lint's finding contract. With actual runtime
-/// `dep` and dev `devdep`, the case mapping is:
+/// commit `f4746d500` to sc-lint's finding contract. Each atm-core violation
+/// maps to an sc-lint `(RuleId, kind)`:
+/// - a record-lock violation ("boundary record allowed_dependencies
+///   diverges..." or "boundary record dependency sections diverge...") ->
+///   `(ScbManifest006, "manifest_policy_inconsistent")`;
+/// - "Cargo dependency 'x' is not allowlisted" -> `(ScbManifest003,
+///   "manifest_dependency_not_allowlisted")`;
+/// - "allowlisted dependency 'x' is not declared by Cargo.toml" ->
+///   `(ScbManifest006, "manifest_policy_inconsistent")`;
+/// - no violation -> no finding.
+///
+/// With actual runtime `dep` and dev `devdep`, the case mapping is:
 /// - record runtime `[dep, devdep]`, dev `[]` -> no finding;
 /// - record runtime `[dep]`, dev `[]` -> `(ScbManifest006,
 ///   "manifest_policy_inconsistent")` (record union omits `devdep`);
