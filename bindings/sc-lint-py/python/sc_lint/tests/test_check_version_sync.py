@@ -36,49 +36,6 @@ resolver = "2"
 version = "{WORKSPACE_VERSION}"
 """
 
-WINGET_CONFIG = """\
-# Source: atm-core .just/lint-config.toml (integrate/phase-bg) commit f4746d500
-[version_sync.winget]
-enabled = true
-manifest_glob = ".winget/*.yaml"
-package_version_field = "PackageVersion"
-manifest_version_field = "ManifestVersion"
-installer_url_field = "InstallerUrl"
-"""
-
-RELEASE_WIRING_CONFIG = """\
-# Source: atm-core .just/lint-config.toml (integrate/phase-bg) commit f4746d500
-[version_sync.release_wiring]
-enabled = true
-file = ".github/workflows/release.yml"
-required_fragments = [
-  "RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml",
-  "release_artifacts.py build-plan",
-  "release_artifacts.py verify-version-lockstep",
-  "release_gate.sh final origin/main \\"release-candidate-",
-  "release-target-matrix",
-]
-"""
-
-WINGET_SAMPLE = f"""\
-PackageIdentifier: {WINGET_PACKAGE_ID}
-PackageVersion: 1.1.2
-Installers:
-  - Architecture: x64
-    InstallerType: zip
-    InstallerUrl: https://example.invalid/download/v1.1.2/app.zip
-ManifestType: installer
-ManifestVersion: 1.1.2
-"""
-
-RELEASE_SAMPLE = """\
-RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml
-release_artifacts.py build-plan
-release_artifacts.py verify-version-lockstep
-release_gate.sh final origin/main "release-candidate-
-release-target-matrix
-"""
-
 
 def crate_manifest(name: str, extra: str = "") -> str:
     return f"""\
