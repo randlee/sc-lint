@@ -66,6 +66,21 @@ preserves the default findings; a present empty table allows no unused
 dependencies. This guide is the offline recovery reference for the compatibility
 change.
 
+### trybuild fixtures are recognised
+
+The cargo-shear wrapper recognises string-literal globs passed to trybuild
+`.pass("...")` and `.compile_fail("...")` calls in Rust files in the same
+Cargo package. It resolves those globs from the package directory and treats
+matching reported `.rs` files as consumed fixtures, so their
+`allowed_unlinked_files` entries can be removed. Recognition is textual: a
+matching call written in a comment or string can also consume a reported file.
+
+Only plain and raw string literals are interpreted. A glob held in a constant,
+variable, or `format!` call, or one that is empty, absolute, drive-qualified,
+contains a backslash, or contains a `..` path component is not interpreted;
+the file remains reported and may still be allowlisted with a reason. Empty-file
+and unused-dependency checks are unchanged.
+
 The cargo-deny adapter retries a completed command failure only when captured
 output contains “could not resolve hostname”. It makes at most three attempts
 and reports each retry. Policy failures and other command errors are not
