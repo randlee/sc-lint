@@ -25,6 +25,8 @@ from install_helpers import run_subprocess
 PROFILE_FIXTURES = ROOT / "crates" / "sc-lint" / "tests" / "fixtures" / "platform-profile-execution"
 SEMANTIC_INVALID = PROFILE_FIXTURES / "semantic-invalid"
 HOST_PLATFORM = {"darwin": "macos", "win32": "windows"}.get(sys.platform, "linux")
+CONSUMER_STEP_STATUS = re.compile(r"(?:lint\.[\w.]+\.consumer|test): pass \(\d+ steps\)")
+CLI_CONTRACT = ROOT / "docs" / "sc-lint" / "cli-contract.md"
 
 
 def install_profiles(profiles: dict, lint_profiles: dict | None, *, ci_os: list[str] | None = None) -> tuple[Path, "object"]:
@@ -71,6 +73,12 @@ def test_absent_lint_profiles_renders_no_profile_table() -> None:
     consumer = copy_fixture("empty-workspace")
     assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
     assert "lint_profiles" not in (consumer / "sc-lint.toml").read_text()
+
+
+def test_human_output_contract_keeps_consumer_and_test_step_statuses() -> None:
+    contract = CLI_CONTRACT.read_text(encoding="utf-8")
+    assert "`test` and `lint.ci.consumer` render" in contract
+    assert "`<command>: <status> (<n> steps)`" in contract
 
 
 @pytest.mark.parametrize("case", sorted(json.loads((SEMANTIC_INVALID / "expected.json").read_text())))
@@ -186,7 +194,7 @@ def test_consumer_profile_installed_wheel_and_binary(product_artifacts: ProductA
     for arguments in (("ci",), ("ci", "all"), ("ci", "host")):
         command = just_lint(*arguments)
         assert command.returncode == 0, f"just lint {arguments}: {command.stdout}\n{command.stderr}"
-        assert re.search(r"lint\.ci\.consumer: pass \(\d+ steps\)", command.stdout)
+        assert CONSUMER_STEP_STATUS.search(command.stdout)
 
     host_names = ["fmt", "probe", "windows-probe"] if os.name == "nt" else ["fmt", "probe"]
     assert [step["name"] for step in rows("host")] == host_names
