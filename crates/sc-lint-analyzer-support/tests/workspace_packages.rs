@@ -45,38 +45,47 @@ fn workspace_packages_reports_dependency_kinds_and_renames() {
         .workspace_packages();
     let package = packages.first().unwrap();
     assert_eq!(package.name.as_str(), "example");
-    assert!(
-        package
-            .dependencies
-            .iter()
-            .any(|dependency| dependency.name == "tokio"
-                && dependency.kind == PackageDependencyKind::Normal)
-    );
-    assert!(
-        package
-            .dependencies
-            .iter()
-            .any(|dependency| dependency.rename.as_deref() == Some("rt")
-                && dependency.kind == PackageDependencyKind::Normal)
-    );
-    assert!(
-        package
-            .dependencies
-            .iter()
-            .any(|dependency| dependency.kind == PackageDependencyKind::Build)
-    );
-    assert!(
-        package
-            .dependencies
-            .iter()
-            .any(|dependency| dependency.kind == PackageDependencyKind::Development)
-    );
-    assert!(
-        package
-            .dependencies
-            .iter()
-            .any(|dependency| dependency.target.as_deref() == Some("cfg(unix)"))
-    );
+    let dependencies = package
+        .dependencies
+        .iter()
+        .map(|dependency| {
+            (
+                dependency.name.as_str(),
+                dependency.rename.as_deref(),
+                dependency.kind,
+                dependency.target.as_deref(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let expected_dependencies = [
+        ("tokio", None, PackageDependencyKind::Normal, None),
+        ("tokio", Some("rt"), PackageDependencyKind::Normal, None),
+        (
+            "tokio",
+            Some("tokio_unix"),
+            PackageDependencyKind::Normal,
+            Some("cfg(unix)"),
+        ),
+        (
+            "tokio",
+            Some("tokio_build"),
+            PackageDependencyKind::Build,
+            None,
+        ),
+        (
+            "tokio",
+            Some("tokio_dev"),
+            PackageDependencyKind::Development,
+            None,
+        ),
+    ];
+    assert_eq!(dependencies.len(), expected_dependencies.len());
+    for expected in expected_dependencies {
+        assert!(
+            dependencies.contains(&expected),
+            "missing dependency tuple {expected:?} in {dependencies:?}"
+        );
+    }
 }
 
 #[test]

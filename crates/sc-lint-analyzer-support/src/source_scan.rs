@@ -206,6 +206,13 @@ fn classify_target_kinds(kinds: &[cargo_metadata::TargetKind]) -> PackageTargetK
     }
 }
 
+#[cfg(test)]
+pub(super) fn classify_target_kinds_for_test(
+    kinds: &[cargo_metadata::TargetKind],
+) -> PackageTargetKind {
+    classify_target_kinds(kinds)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {
     Test,
