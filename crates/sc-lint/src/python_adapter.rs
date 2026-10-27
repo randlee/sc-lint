@@ -9,8 +9,10 @@ use crate::CliError;
 use crate::CliErrorKind;
 use crate::command::CommandSuccess;
 use crate::command::DispatchTelemetry;
+use crate::config::ConfigCode;
 use crate::config::LoadedConfig;
 use crate::consts;
+use crate::error::ErrorCode;
 
 pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
 
@@ -74,7 +76,7 @@ pub(crate) fn run_python_tool(
         .arg(repo_root)
         .args(
             loaded_config
-                .config_path()
+                .explicit_config()
                 .into_iter()
                 .flat_map(|path| [OsString::from("--config"), path.as_os_str().to_os_string()]),
         )
@@ -229,14 +231,14 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
             .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         })?
         .to_string();
-    let mut error = CliError::new(kind, message)
+    let mut error = CliError::new(kind, message.clone())
         .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()));
     if let Some(details) = error_object
         .get(consts::FIELD_DETAILS)
         .and_then(Value::as_object)
     {
-        error = merge_details(error, details);
+        error = merge_details(error, details, kind, message);
     }
     if let Some(action) = error_object
         .get(consts::FIELD_SUGGESTED_ACTION)
@@ -251,9 +253,21 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
     })
 }
 
-fn merge_details(mut error: CliError, details: &Map<String, Value>) -> CliError {
+fn merge_details(
+    mut error: CliError,
+    details: &Map<String, Value>,
+    kind: CliErrorKind,
+    message: String,
+) -> CliError {
     for (key, value) in details {
         error = error.with_detail(key.clone(), value.clone());
+    }
+    let code = (kind == CliErrorKind::Config)
+        .then(|| error.details.get("code").and_then(Value::as_str))
+        .flatten()
+        .and_then(ConfigCode::from_wire);
+    if let Some(code) = code {
+        error = error.with_code(code.as_str()).with_cause(message);
     }
     error
 }

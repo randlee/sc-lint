@@ -52,6 +52,7 @@ impl ConsumerProfile {
 pub struct LoadedConfig {
     repo_root: Option<RepoRoot>,
     config_path: Option<PathBuf>,
+    explicit_config: Option<PathBuf>,
     logging_root: Option<PathBuf>,
     logging_console: bool,
     mode: LoadedConfigMode,
@@ -84,6 +85,30 @@ pub(crate) enum CompatibilityErrorCode {
     ProbeMalformed,
     VersionUnparsable,
     VersionTooOld,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConfigCode {
+    BoundariesDirMissing,
+    TableMissing,
+}
+
+impl ConfigCode {
+    pub(crate) fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "config.table_missing" => Some(Self::TableMissing),
+            _ => None,
+        }
+    }
+}
+
+impl ErrorCode for ConfigCode {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::BoundariesDirMissing => "config.boundaries_dir_missing",
+            Self::TableMissing => "config.table_missing",
+        }
+    }
 }
 
 impl ErrorCode for CompatibilityErrorCode {
@@ -160,19 +185,19 @@ impl RepoRoot {
         })?;
 
         loop {
-            if current.join("Cargo.toml").is_file() && current.join("boundaries").is_dir() {
+            if current.join(CONFIG_FILENAME).is_file() || workspace_manifest(&current) {
                 return Ok(Self(current));
             }
             let inspected = current.clone();
             if !current.pop() {
                 return Err(CliError::config(format!(
-                    "could not discover the sc-lint repo root from `{}`; last inspected `{}` was missing required sentinels `Cargo.toml` and/or `boundaries`",
+                    "could not discover the sc-lint repo root from `{}`; last inspected `{}` was missing required sentinels sc-lint.toml or Cargo.toml [workspace]",
                     start.display(),
                     inspected.display()
                 ))
                 .with_detail("discovery_start", json!(start.display().to_string()))
                 .with_detail("last_inspected", json!(inspected.display().to_string()))
-                .with_detail("required_sentinels", json!(["Cargo.toml", "boundaries"]))
+                .with_detail("required_sentinels", json!(["sc-lint.toml", "Cargo.toml [workspace]"]))
                 .with_suggested_action(
                     "Run the command inside the repo or pass `--root <path>` to the workspace root.",
                 ));
@@ -183,6 +208,16 @@ impl RepoRoot {
     pub(crate) fn as_path(&self) -> &Path {
         &self.0
     }
+}
+
+fn workspace_manifest(path: &Path) -> bool {
+    let manifest = path.join("Cargo.toml");
+    manifest.is_file()
+        && fs::read_to_string(manifest)
+            .ok()
+            .and_then(|contents| toml::from_str::<toml::Value>(&contents).ok())
+            .and_then(|value| value.get("workspace").cloned())
+            .is_some_and(|value| value.is_table())
 }
 
 impl LoadedConfig {
@@ -204,6 +239,7 @@ impl LoadedConfig {
             return Ok(Self {
                 repo_root: None,
                 config_path: None,
+                explicit_config: None,
                 logging_root: cli.log_root.clone(),
                 logging_console: cli.log_console,
                 mode: LoadedConfigMode::Standard,
@@ -218,7 +254,11 @@ impl LoadedConfig {
             })?
         };
         let repo_root = RepoRoot::discover(&discovery_base)?;
-        let config_path = find_repo_config(repo_root.as_path(), cli.config.as_deref());
+        let explicit_config = cli
+            .config
+            .as_ref()
+            .map(|path| resolve_repo_relative_path(repo_root.as_path(), path));
+        let config_path = find_repo_config(repo_root.as_path(), explicit_config.as_deref());
         let file_config = if let Some(path) = config_path.as_ref() {
             parse_repo_config(path)?
         } else {
@@ -245,6 +285,7 @@ impl LoadedConfig {
         Ok(Self {
             repo_root: Some(repo_root),
             config_path,
+            explicit_config,
             logging_root,
             logging_console,
             mode: LoadedConfigMode::Standard,
@@ -406,6 +447,7 @@ impl LoadedConfig {
         Ok(Self {
             repo_root: None,
             config_path: Some(config_path),
+            explicit_config: None,
             logging_root: cli.log_root.clone(),
             logging_console: cli.log_console,
             mode: LoadedConfigMode::Compatibility(requirement),
@@ -449,6 +491,7 @@ impl LoadedConfig {
         Ok(Self {
             repo_root: None,
             config_path: Some(config_path),
+            explicit_config: None,
             logging_root: cli.log_root.clone(),
             logging_console: cli.log_console,
             mode: LoadedConfigMode::Consumer(ConsumerRequirement {
@@ -480,6 +523,31 @@ impl LoadedConfig {
 
     pub fn config_path(&self) -> Option<&Path> {
         self.config_path.as_deref()
+    }
+
+    pub(crate) fn explicit_config(&self) -> Option<&Path> {
+        self.explicit_config.as_deref()
+    }
+
+    #[expect(
+        clippy::result_large_err,
+        reason = "Boundary configuration failures are part of the stable top-level CliError contract."
+    )]
+    pub(crate) fn require_boundaries_dir(&self) -> Result<(), CliError> {
+        let root = self.require_repo_root()?;
+        if root.join("boundaries").is_dir() {
+            return Ok(());
+        }
+        Err(
+            CliError::config("the boundary family requires a boundaries/ directory")
+                .with_code(ConfigCode::BoundariesDirMissing.as_str())
+                .with_cause(format!(
+                    "no boundaries/directory under repo root{}",
+                    root.display()
+                ))
+                .with_detail("repo_root", json!(root.display().to_string()))
+                .with_suggested_action("create boundaries/ or do not run the boundary family"),
+        )
     }
 
     pub fn logging_root(&self) -> Option<&PathBuf> {

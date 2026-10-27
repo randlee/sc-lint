@@ -14,7 +14,9 @@ from sc_lint.lint_common import iter_string_literal_contents
 from sc_lint.lint_common import iter_workspace_rust_files
 from sc_lint.lint_common import is_code_line
 from sc_lint.lint_common import line_is_suppressed
-from sc_lint.lint_common import load_lint_config
+from sc_lint.lint_common import ConfigError
+from sc_lint.lint_common import resolve_table
+from sc_lint.lint_common import table_missing_error
 from sc_lint.lint_common import monotonic_now
 from sc_lint.lint_common import rust_file_test_scope
 from sc_lint.python_adapter import AdapterError
@@ -194,9 +196,7 @@ class IdentityViolation:
 
 
 def load_forbidden_literals(repo_root: Path, config_path: str | None = None) -> tuple[str, ...]:
-    config = load_lint_config(repo_root, config_path).get("identities", {})
-    if not isinstance(config, dict):
-        raise AdapterError("config", "[identities] must be a TOML table")
+    config, _ = resolve_table("identities", Path(config_path) if config_path else None, repo_root)
     literals = config.get("forbidden_literals", [])
     if not isinstance(literals, list) or not all(isinstance(item, str) for item in literals):
         raise AdapterError("config", "[identities].forbidden_literals must be an array of strings")
@@ -207,9 +207,7 @@ def load_production_canonical_literals(
     repo_root: Path,
     config_path: str | None = None,
 ) -> dict[str, tuple[str, ...]]:
-    config = load_lint_config(repo_root, config_path).get("identities", {})
-    if not isinstance(config, dict):
-        raise AdapterError("config", "[identities] must be a TOML table")
+    config, _ = resolve_table("identities", Path(config_path) if config_path else None, repo_root)
     literal_map = config.get("production_canonical_literals", {})
     if not isinstance(literal_map, dict):
         raise AdapterError("config", "[identities].production_canonical_literals must be a TOML table")
@@ -384,7 +382,8 @@ def main(argv: list[str]) -> int:
             for finding in data["findings"]:
                 print(finding)
         return 0 if not violations else 1
-    except AdapterError as error:
+    except (AdapterError, ConfigError) as caught:
+        error = table_missing_error(caught) if isinstance(caught, ConfigError) else caught
         if args.json:
             write_adapter_json(error_payload(error))
             return 3 if error.kind == "config" else 1
