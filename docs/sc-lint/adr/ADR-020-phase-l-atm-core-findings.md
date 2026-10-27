@@ -1,6 +1,6 @@
 # ADR-020 — Phase L decisions for the atm-core findings
 
-Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications at the end of this ADR are Pending Rand approval.
+Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification is Pending Rand approval together with REQ-CLI-025.
 
 Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
 REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
@@ -107,9 +107,9 @@ make mid-sprint. Approval of this record gates dispatch only.
     A missing `Cargo.lock` is reported as skipped, not as a failure. These key
     names are chosen here because no earlier record defines them.
 
-## Plan-review clarifications (Pending Rand approval)
+## Plan-review clarifications (Accepted — Rand, 2026-10-27, except Sprint l-10)
 
-These clarifications were written by the sprint design fixes for plan review round 2, after the decisions above were approved on 2026-10-27. They narrow or make precise the approved decisions and change none of them, except where a clarification says otherwise. They are Pending Rand approval; per the planning rule they gate dispatch only, not plan review. Numbering is per sprint.
+These clarifications were written by the sprint design fixes for plan review round 2, after the decisions above were approved on 2026-10-27. They narrow or make precise the approved decisions and change none of them, except where a clarification says otherwise. Sprints l-1 to l-9: Accepted — Rand, 2026-10-27 ("approve the adr"). Sprint l-10: Pending Rand approval, together with REQ-CLI-025; per the planning rule that gates dispatch of l-10 only. Numbering is per sprint.
 
 ### Sprint l-1
 Clarifications to decisions 1 to 3 (recorded by `lint-l-1`):
