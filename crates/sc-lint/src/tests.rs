@@ -4877,6 +4877,81 @@ fn mixed_test_forms_rejected() {
     assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED");
 }
 
+/// Selector and step shape errors carry selector recovery only, never the
+/// compatibility setup recovery (phase-end review finding R-4).
+#[test]
+fn selector_shape_errors_carry_selector_recovery_not_compatibility_recovery() {
+    let table =
+        "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\ngroup = [\"unit\"]\n";
+    let (_table_fixture, table_loaded) = load_test_config(&selector_config(table));
+    let duplicate = "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"check\"]\n";
+    let (_row_fixture, row_loaded) = load_consumer_toml(&consumer_toml(duplicate));
+    let cases = [
+        (
+            "test",
+            table_loaded.expect_err("selector with both command and group"),
+            "selector `unit` must declare exactly one of `command` or `group`",
+        ),
+        (
+            "lint",
+            row_loaded.expect_err("duplicate lint step"),
+            "consumer `lint` profile repeats step name `fmt`",
+        ),
+    ];
+    for (profile, error, message) in cases {
+        let config_path = error.details["config_path"]
+            .as_str()
+            .expect("config_path detail")
+            .to_string();
+        assert!(
+            config_path.ends_with("sc-lint.toml"),
+            "{profile}: {config_path}"
+        );
+        assert_eq!(error.kind, CliErrorKind::Config, "{profile}");
+        assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED", "{profile}");
+        assert_eq!(error.message, message, "{profile}");
+        assert_eq!(
+            error.cause.as_deref(),
+            Some(format!("{message} in {config_path}").as_str()),
+            "{profile}"
+        );
+        assert_eq!(
+            error.suggested_action.as_deref(),
+            Some(
+                format!(
+                    "fix the `tool.sc-lint.{profile}` selectors in {config_path} as the cause describes"
+                )
+                .as_str()
+            ),
+            "{profile}"
+        );
+        assert_eq!(error.documentation, None, "{profile}");
+        let mut detail_keys: Vec<&str> = error.details.keys().map(String::as_str).collect();
+        detail_keys.sort_unstable();
+        assert_eq!(detail_keys, ["config_path", "profile"], "{profile}");
+        assert_eq!(error.details["profile"], profile, "{profile}");
+
+        let human = crate::render::render_error_human("test", &error);
+        let envelope = failure_envelope_json("test", error).to_string();
+        for compatibility_text in [
+            "just setup",
+            "installer",
+            "minimum_version",
+            "required_field",
+            "sc-lint docs setup",
+        ] {
+            assert!(
+                !envelope.contains(compatibility_text),
+                "{profile}: envelope carries {compatibility_text:?}: {envelope}"
+            );
+            assert!(
+                !human.contains(compatibility_text),
+                "{profile}: human output carries {compatibility_text:?}: {human}"
+            );
+        }
+    }
+}
+
 #[test]
 fn consumer_lint_after_all_and_platform_skips_keep_declaration_order() {
     let rows = "[[tool.sc-lint.lint]]\nname = \"tail\"\ncommand = [\"cargo\", \"--version\"]\nafter_all = true\n\n[[tool.sc-lint.lint]]\nname = \"win\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"windows\"\n\n[[tool.sc-lint.lint]]\nname = \"bad\"\ncommand = [\"cargo\", \"--version\"]\n\n";

@@ -743,12 +743,17 @@ fn profile_step_fields(
     }
 }
 
+/// A selector or step shape error in a consumer `lint` or `test` profile. It
+/// keeps the malformed-config code but carries selector recovery only: never
+/// the compatibility setup recovery, `required_field` or setup docs.
 pub(crate) fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {
-    compatibility_config_error(
-        CompatibilityErrorCode::ConfigMalformed,
-        message,
-        Some(path),
-        None,
-    )
-    .with_detail("profile", json!(profile))
+    let path_text = path.display().to_string();
+    CliError::config(message.clone())
+        .with_code(CompatibilityErrorCode::ConfigMalformed.as_str())
+        .with_cause(format!("{message} in {path_text}"))
+        .with_suggested_action(format!(
+            "fix the `tool.sc-lint.{profile}` selectors in {path_text} as the cause describes"
+        ))
+        .with_detail("config_path", json!(path_text))
+        .with_detail("profile", json!(profile))
 }
