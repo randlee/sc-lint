@@ -53,6 +53,10 @@ make mid-sprint. Approval of this record gates dispatch only.
    excluded. The rule rejects `std::thread::sleep`, `thread::sleep` after
    `use std::thread`, and `sleep` imported from `std::thread` (including `as`
    aliases), and permits `tokio::time::sleep`.
+   The rule honors the runtime analyzer's `exclude_paths_by_rule` like every
+   other rule (REQ-PRODUCT-023: each exclusion carries a `reason`), so a
+   consumer can stage the migration of existing sites. (Requested by atm-core
+   review of 2026-10-27: three production sleep sites in tokio packages.)
 7. **Consumer test selectors (#196).** REQ-CLI-023's sentence "test argument
    forwarding [is] not added" is superseded for consumer test profiles:
    selectors (one command or a group of selectors), `test.default`, positional
@@ -80,3 +84,25 @@ make mid-sprint. Approval of this record gates dispatch only.
 
     Codes are typed constants in the owning crate and are validated where
     config is parsed, never matched as free strings at call sites.
+
+11. **Delegation edges (#204, supersedes part of the 2026-10-10 #204 amendment).**
+    A method-to-method expression edge between two distinct graph nodes is a
+    delegation edge, and `SCB-CYCLE-002/003` exclude it, when the callee cannot
+    reach the caller through the owner's expression edges. The earlier name and
+    visibility conditions are dropped: a trait-impl method calling a same-named
+    inherent method is a call between two distinct nodes (Rust resolves
+    `self.m()` to the inherent method), and a public method calling a different
+    public method is not recursion. A method that resolves to its own node
+    stays a self-loop. Method-call expressions create edges only when the
+    receiver is exactly `self` (through parentheses, `&` and `*`); a receiver
+    that is a field, local or call result creates none.
+12. **`[version_sync.python]` (#137, REQ-CLI-003).** Keys: `cargo_lock` (bool,
+    default `true`; `false` omits the Cargo.lock check) and `python_manifests`
+    (array of repo-relative `pyproject.toml` paths, default empty; each static
+    `[project].version` must equal the workspace version). The
+    `[version_sync.winget]` and `[version_sync.release_wiring]` subsections keep
+    the keys already implemented (`manifest_glob`, `package_version_field`,
+    `manifest_version_field`, `installer_url_field`; `file`,
+    `required_fragments`), which match atm-core's `.just/lint-config.toml`.
+    A missing `Cargo.lock` is reported as skipped, not as a failure. These key
+    names are chosen here because no earlier record defines them.
