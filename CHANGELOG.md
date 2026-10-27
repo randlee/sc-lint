@@ -81,6 +81,8 @@ All notable changes to sc-lint are documented here.
   continues through all planned steps after failures, reporting every failure
   by plan index in plan order. Consumer-configured lint and test profiles
   remain sequential, declaration-ordered, and fail-fast.
+  [Superseded in 0.8.1: consumer profiles run steps in parallel and fail
+  slow by default, with opt-in `--fail-fast`; see Unreleased.]
 
 ### Compatibility
 
