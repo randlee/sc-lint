@@ -539,14 +539,14 @@ impl LoadedConfig {
             return Ok(());
         }
         Err(
-            CliError::config("the boundary family requires a boundaries/ directory")
+            CliError::config("the boundary family requires a `boundaries/` directory")
                 .with_code(ConfigCode::BoundariesDirMissing.as_str())
                 .with_cause(format!(
-                    "no boundaries/directory under repo root{}",
+                    "no `boundaries/` directory under repo root `{}`",
                     root.display()
                 ))
                 .with_detail("repo_root", json!(root.display().to_string()))
-                .with_suggested_action("create boundaries/ or do not run the boundary family"),
+                .with_suggested_action("create `boundaries/` or do not run the boundary family"),
         )
     }
 
