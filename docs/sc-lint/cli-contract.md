@@ -77,7 +77,7 @@ Initial convention:
   - `lint.fast`
 - `sc-lint lint --consumer --config sc-lint.toml ci`
   - `lint.ci.consumer`
-- `sc-lint test`
+- `sc-lint test [--fail-fast|--list] [<selector> [args...]]`
   - `test`
 - `sc-lint init --just`
   - `init`
@@ -132,7 +132,10 @@ Current implementation status:
   - implemented explicit consumer lint profile path; its configured argv steps
     run from `sc-lint.toml` without source-checkout discovery
 - `test`
-  - implemented explicit consumer test profile path
+  - implemented explicit consumer test profile path: `sc-lint test
+    [--fail-fast|--list] [<selector> [args...]]` runs the default selector (or
+    every `[[tool.sc-lint.test]]` row), the named selector with forwarded
+    arguments, or lists the declared selectors
 - `init`
   - implemented product-owned consumer integration renderer with check,
     dry-run, idempotency, and conflict behavior
@@ -286,6 +289,10 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | --- | --- | --- | --- |
 | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
 | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
+| `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
+| `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
+| `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
+| `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
 
 Codes are typed constants (`ConfigCode` in `config.rs`; `CONFIG_TABLE_MISSING` in `lint_common.py`) and cause text interpolates names.
 
@@ -322,11 +329,24 @@ Cargo manifest, or analyzer package:
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in
-  the configuration directory and any required member failure fails the
-  aggregate command with a structured `CliError`.
-- missing configured executables use
-  `CLI.SC_LINT_BACKEND_NOT_FOUND` with installation recovery and the setup
-  documentation reference.
+  the configuration directory (or a test selector's `cwd` below it). Steps
+  run in parallel (cargo `argv[0]` steps serialized in declaration order,
+  `after_all` steps last) and fail slow: every step runs, and any failure
+  fails the aggregate command with one `profile.steps_failed` error.
+- `profile.steps_failed` (exit 5) carries `details.failed_steps[]`, one
+  `{"index", "name", "exit_code", "message"}` per failed step in declaration
+  order; `index` is the zero-based position in `data.steps[]` (platform-skipped
+  rows included), `exit_code` is `null` when the process did not start or the
+  step panicked, and `message` is the step error and its cause. Under
+  `--fail-fast` it also carries `details.skipped_steps[]`, one
+  `{"index", "name", "reason": "fail-fast"}` per step that never started.
+- a missing configured executable is a failed step whose `message` starts
+  with `<name> failed to start` and includes the spawn error.
+- `sc-lint test --list` runs nothing and returns
+  `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
+  [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
+  "platforms": [...], "cwd": <string|null>, "env_keys": [...], "after_all":
+  bool}]}`, sorted by name.
 
 The generated default configuration uses this shape:
 

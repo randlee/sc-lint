@@ -109,7 +109,8 @@ planned.
 
 ADR-017's accepted Phase K changes are delivered within these existing
 owners: Rust analyzer crates validate and evaluate analyzer/inventory policy;
-the top-level Rust CLI selects and sequentially executes consumer lint steps;
+the top-level Rust CLI selects consumer lint steps and runs them through the
+shared scheduler (parallel, fail slow, opt-in `--fail-fast`);
 the bootstrap delegates `exec` and installation to the existing managed
 product and wheel; and the setup helper provisions only consumer-declared
 tools/targets. The installer remains configuration/rendering glue, not a

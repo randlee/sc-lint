@@ -26,9 +26,33 @@ inspect the preflight without running a profile.
 ## Profiles
 
 Each `[[tool.sc-lint.lint]]` and `[[tool.sc-lint.test]]` entry needs a unique,
-non-empty `name` and a non-empty argv `command` array. Entries run in order and
-any failed entry fails the aggregate profile. Keep commands explicit and
-reproducible; do not hide required work behind an advisory alias.
+non-empty `name` and a non-empty argv `command` array. Entries run
+concurrently (cargo steps serialized in declaration order) and every failed
+entry is reported. Keep commands explicit and reproducible; do not hide
+required work behind an advisory alias.
+
+Instead of rows, `[tool.sc-lint.test]` may be a table of named selectors with
+an optional `default`:
+
+```toml
+[tool.sc-lint.test]
+default = "unit"
+
+[tool.sc-lint.test.selectors.unit]
+command = ["cargo", "test"]
+env = { RUST_LOG = "debug" }
+cwd = "crates/app"
+platforms = ["linux", "macos"]
+after_all = false
+
+[tool.sc-lint.test.selectors.integration]
+command = ["cargo", "test", "--test", "integration"]
+
+[tool.sc-lint.test.selectors.full]
+group = ["unit", "integration"]
+```
+
+A file uses one form; see [Test selectors](./using-sc-lint.md#test-selectors).
 
 ## Analyzer tables
 

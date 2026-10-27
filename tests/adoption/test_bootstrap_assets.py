@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -23,10 +24,12 @@ WINDOWS_SHELL_ASSETS = ("crates/sc-lint/assets/consumer-Justfile", "packages/sc-
 #   usage: .sc-lint/bootstrap <setup|lint|test|upgrade> --config sc-lint.toml [--check] [--dry-run];
 #   .sc-lint/bootstrap lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml;
 #   .sc-lint/bootstrap exec [--config sc-lint.toml] -- <argv...>
-# bootstrap.py must list the same operations and arguments under its own name (AC3).
+# bootstrap.py must list the same operations and arguments under its own name (AC3), plus the
+# l-6 `--fail-fast` lint flag and the test selector grammar.
 CC1D496_USAGE_GRAMMAR = (
     "usage: .sc-lint/bootstrap.py <setup|lint|test|upgrade|exec> --config sc-lint.toml [--check] [--dry-run]",
-    ".sc-lint/bootstrap.py lint [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
+    ".sc-lint/bootstrap.py lint [--fail-fast] [selector] [host|all|linux|macos|windows] --config sc-lint.toml",
+    ".sc-lint/bootstrap.py test [--fail-fast|--list] [selector [args...]] --config sc-lint.toml",
     ".sc-lint/bootstrap.py exec [--config sc-lint.toml] -- <argv...>",
 )
 CC1D496_USAGE_TOKENS = ("setup", "lint", "test", "upgrade", "exec", "--config sc-lint.toml", "[--check]", "[--dry-run]",
@@ -62,7 +65,7 @@ def test_bootstrap_assets_are_identical_and_use_only_stdlib() -> None:
 
 @pytest.mark.parametrize("arguments", [[], ["unknown"], ["setup"], ["setup", "--config"],
     ["setup", "extra", "--config", "a"], ["lint", "a", "b", "c", "--config", "a"],
-    ["lint", "", "all", "--config", "a"], ["test", "a", "b", "--config", "a"],
+    ["lint", "", "all", "--config", "a"], ["test", "--config", "a", "--list", "x"],
     ["exec"], ["exec", "--config", "a", "sc-lint"], ["exec", "--"]])
 def test_usage_errors_report_one_shared_grammar(arguments: list[str]) -> None:
     result = run_subprocess([sys.executable, str(ASSET), *arguments], text=True, capture_output=True, check=False)
@@ -73,6 +76,41 @@ def test_usage_errors_report_one_shared_grammar(arguments: list[str]) -> None:
     for token in CC1D496_USAGE_TOKENS:
         assert token in usage_lines[0], token
     assert ".sc-lint/bootstrap " not in usage_lines[0]
+
+
+def load_bootstrap():
+    spec = importlib.util.spec_from_file_location("sc_lint_bootstrap", ASSET)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_bootstrap_test_forwards_selector_and_args() -> None:
+    bootstrap = load_bootstrap()
+    parsed = bootstrap.parse(["test", "--config", "c", "--fail-fast", "unit", "--nocapture", "--config", "x"])
+    assert parsed == ("test", "c", ["--fail-fast"], ["unit", "--nocapture", "--config", "x"], [])
+
+
+@pytest.mark.parametrize("arguments", [["test", "--config", "c", "--list", "unit"],
+    ["test", "--config", "c", "--list", "--fail-fast"], ["test", "--config", "c", "--fail-fast", "--list"]])
+def test_bootstrap_test_list_conflicts(arguments: list[str]) -> None:
+    bootstrap = load_bootstrap()
+    with pytest.raises(SystemExit) as raised:
+        bootstrap.parse(arguments)
+    assert raised.value.code == 2
+
+
+def test_bootstrap_lint_accepts_fail_fast() -> None:
+    bootstrap = load_bootstrap()
+    parsed = bootstrap.parse(["lint", "--fail-fast", "ci", "all", "--config", "c"])
+    assert parsed == ("lint", "c", ["--fail-fast"], ["ci", "all"], [])
+    for operation in ("setup", "upgrade"):
+        with pytest.raises(SystemExit) as raised:
+            bootstrap.parse([operation, "--config", "c", "--fail-fast"])
+        assert raised.value.code == 2
+    with pytest.raises(SystemExit) as raised:
+        bootstrap.parse(["exec", "--fail-fast", "--", "sc-lint"])
+    assert raised.value.code == 2
 
 
 def test_old_python_fails_before_importing_the_bootstrap() -> None:
@@ -123,7 +161,7 @@ def test_just_reports_bootstrap_unreadable_minimum_version(product_artifacts: Pr
     assert "minimum_version" in result.stderr, result.stderr
 
 
-@pytest.mark.parametrize("arguments", [["lint", "a", "b", "c"], ["test", "a", "b"]])
+@pytest.mark.parametrize("arguments", [["lint", "a", "b", "c"], ["test", "--list", "a"]])
 def test_just_reports_bootstrap_usage_errors(arguments: list[str]) -> None:
     # Bootstrap's own exit 2 through a recipe: the installed Justfile forwards the
     # extra positionals, and the bootstrap rejects them before touching any binary.
