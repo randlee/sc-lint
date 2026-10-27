@@ -43,9 +43,9 @@ specialized backend tools and mixed Rust/Python implementations.
   repo root is the nearest ancestor holding `sc-lint.toml` or a workspace
   `Cargo.toml`; a `boundaries/` directory is required only by the boundary
   family, and its absence is a structured error for that family alone.
-  `sc-lint version-sync` (the Python `check_version_sync` entry) accepts
-  `--root`, `--config` and `--json`, reads a `[version_sync.python]` table, and
-  tolerates a missing `Cargo.lock`.
+  The Python entry `sc_lint.check_version_sync`, run as a `[[tool.sc-lint.lint]]`
+  step, accepts `--root`, `--config` and `--json`, reads a
+  `[version_sync.python]` table, and tolerates a missing `Cargo.lock`.
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
