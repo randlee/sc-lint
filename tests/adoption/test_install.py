@@ -242,7 +242,7 @@ def test_unresolved_template_variables_fail_before_writing(
 ) -> None:
     kit = tmp_path / "kit"
     shutil.copytree(KIT, kit)
-    template = kit / "templates" / "sc-lint.toml.j2"
+    template = kit / "templates" / "sc-lint.toml.tmpl"
     template.write_text(template.read_text().replace("{{ analyzers }}", replacement))
     consumer = tmp_path / "consumer"
     consumer.mkdir()
@@ -262,7 +262,7 @@ def test_unresolved_template_variables_fail_before_writing(
 def test_unspaced_template_variable_is_substituted_by_installer(tmp_path: Path) -> None:
     kit = tmp_path / "kit"
     shutil.copytree(KIT, kit)
-    template = kit / "templates" / "sc-lint.toml.j2"
+    template = kit / "templates" / "sc-lint.toml.tmpl"
     template.write_text(template.read_text().replace("{{ minimum_version }}", "{{minimum_version}}"))
     consumer = tmp_path / "consumer"
     consumer.mkdir()
@@ -283,7 +283,7 @@ def test_unspaced_template_variable_is_substituted_by_installer(tmp_path: Path) 
 def test_unspaced_windows_shell_variable_is_substituted_in_second_pass(tmp_path: Path) -> None:
     kit = tmp_path / "kit"
     shutil.copytree(KIT, kit)
-    template = kit / "templates" / "Justfile.import.j2"
+    template = kit / "templates" / "Justfile.import.tmpl"
     template.write_text(template.read_text().replace("{{ windows_shell }}", "{{windows_shell}}"))
     consumer = tmp_path / "consumer"
     consumer.mkdir()
