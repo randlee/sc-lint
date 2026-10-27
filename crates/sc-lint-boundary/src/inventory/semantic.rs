@@ -721,13 +721,23 @@ fn validate_external_root(
         .ok()
         .flatten()
         .is_some_and(|owner| owner == root_package);
-    if owner_is_local
-        || record
-            .dependencies
-            .allowed_dependents
-            .iter()
-            .any(|dependent| dependent == &root_package)
-    {
+    let dependents_context = format!(
+        "`dependencies.allowed_dependents` for boundary `{}`",
+        record.boundary_id
+    );
+    let dependent_is_allowed = record
+        .dependencies
+        .allowed_dependents
+        .iter()
+        .any(|dependent| {
+            dependent == &root_package
+                || resolver
+                    .resolve_if_known(dependent.as_ref(), &dependents_context)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|package| package == root_package)
+        });
+    if owner_is_local || dependent_is_allowed {
         return;
     }
     diagnostics.push(InventoryDiagnostic::new(

@@ -2108,6 +2108,75 @@ fn issue377_semantic_mutations() {
 }
 
 #[test]
+fn external_root_resolves_allowed_dependent_aliases() {
+    let aliased_fixture = |allowed_dependent: &str, depends_on_owner: bool| {
+        let fixture = WorkspaceFixture::new();
+        fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r"]);
+        fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+        let q_manifest = if depends_on_owner {
+            path_dependency_manifest("q-pkg", "p", "../p", "0.1.0")
+        } else {
+            good_member_manifest("q-pkg", "")
+        };
+        fixture.write(
+            "crates/q/Cargo.toml",
+            &(q_manifest + "\n[lib]\nname = \"q_api\"\npath = \"src/lib.rs\"\n"),
+        );
+        fixture.write(
+            "crates/r/Cargo.toml",
+            &(good_member_manifest("r-pkg", "")
+                + "[lib]\nname = \"r_api\"\npath = \"src/lib.rs\"\n"),
+        );
+        fixture.write_source("p", "lib.rs", "pub struct P;");
+        fixture.write_source("q", "lib.rs", "pub struct Q;");
+        fixture.write_source("r", "lib.rs", "pub struct R;");
+        write_policy_record(
+            &fixture,
+            "p/a.toml",
+            "A",
+            &[allowed_dependent],
+            None,
+            "active",
+        );
+        let record = fixture.root().join("boundaries/p/a.toml");
+        let contents = fs::read_to_string(&record).expect("read aliased record");
+        fs::write(
+            &record,
+            contents.replace("roots = [\"run\"]", "roots = [\"q_api::ExternalRoot\"]"),
+        )
+        .expect("write aliased external root");
+        analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Dependencies),
+        })
+        .expect("aliased external root analyzes")
+    };
+
+    let allowed = aliased_fixture("q_api", true);
+    assert_eq!(
+        allowed.status,
+        ReportStatus::Pass,
+        "{:#?}",
+        allowed.findings
+    );
+    assert!(allowed.findings.is_empty(), "{:#?}", allowed.findings);
+
+    let rejected = aliased_fixture("r_api", false);
+    assert_eq!(
+        rejected.status,
+        ReportStatus::Fail,
+        "{:#?}",
+        rejected.findings
+    );
+    assert_eq!(rejected.findings.len(), 1, "{:#?}", rejected.findings);
+    assert_eq!(rejected.findings[0].kind, "unapproved_composition_root");
+    assert!(rejected.findings[0].message.contains(
+        "external composition root `q_api::ExternalRoot` resolves to `q-pkg`, which is not in dependencies.allowed_dependents"
+    ));
+}
+
+#[test]
 fn external_root_checks_allowed_dependents() {
     let allowed = WorkspaceFixture::new();
     allowed.write_workspace_root_with_members(&["crates/p", "crates/q"]);
