@@ -615,12 +615,49 @@ fn tokio_package_std_thread_sleep_rejected() {
 
 #[test]
 fn tokio_package_import_forms_rejected() {
-    let fixture = tokio_fixture(
-        "use std::{thread as t};\nuse std::thread::{self, sleep};\nuse std::thread::*;\npub fn blocks(d: std::time::Duration) { t::sleep(d); thread::sleep(d); sleep(d); }\n",
-        "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
-    );
-    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
-    assert_eq!(rule_ids(&report), vec![RuleId::ScbRuntime003; 3]);
+    let dependency = "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }";
+    let message_suffix = "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead";
+    let cases: [(&str, &[usize]); 5] = [
+        (
+            "use std::{thread as t};\npub fn blocks(d: std::time::Duration) {\n    t::sleep(d);\n}\n",
+            &[3],
+        ),
+        (
+            "use std::thread::{self, sleep};\npub fn blocks(d: std::time::Duration) {\n    thread::sleep(d);\n    sleep(d);\n}\n",
+            &[3, 4],
+        ),
+        (
+            "use std::thread::*;\npub fn blocks(d: std::time::Duration) {\n    sleep(d);\n}\n",
+            &[3],
+        ),
+        (
+            "use std::*;\npub fn blocks(d: std::time::Duration) {\n    thread::sleep(d);\n}\n",
+            &[3],
+        ),
+        (
+            "pub fn blocks(d: std::time::Duration) {\n    ::std::thread::sleep(d);\n}\n",
+            &[2],
+        ),
+    ];
+
+    for (source, expected_lines) in cases {
+        let fixture = tokio_fixture(source, dependency);
+        let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+
+        assert_eq!(report.status, ReportStatus::Fail);
+        assert_eq!(
+            rule_ids(&report),
+            vec![RuleId::ScbRuntime003; expected_lines.len()]
+        );
+        assert_eq!(report.findings.len(), expected_lines.len());
+        for (finding, expected_line) in report.findings.iter().zip(expected_lines) {
+            assert_eq!(
+                finding_location(&finding.message),
+                ("lib.rs".into(), *expected_line)
+            );
+            assert!(finding.message.ends_with(message_suffix));
+        }
+    }
 }
 
 #[test]
