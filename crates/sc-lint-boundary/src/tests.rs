@@ -128,6 +128,85 @@ fn path_less_exclusion_uses_dunce_root_for_windows_verbatim_case() {
 }
 
 #[test]
+fn per_rule_exclusions_reject_every_boundary_rule_without_source_paths() {
+    let pathless_rules = [
+        "SCB-CYCLE-001",
+        "SCB-BOUNDARY-001",
+        "SCB-BOUNDARY-002",
+        "SCB-BOUNDARY-003",
+        "SCB-BOUNDARY-004",
+        "SCB-CALLER-001",
+        "SCB-DEPENDENCY-001",
+        "SCB-DEPENDENCY-002",
+        "SCB-DEPENDENCY-003",
+        "SCB-DEPENDENCY-004",
+        "SCB-FEATURE-001",
+    ];
+
+    for rule_id in pathless_rules {
+        let fixture = TempDir::new().expect("temp root");
+        fs::write(
+            fixture.path().join("sc-lint.toml"),
+            format!(
+                "[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n\"{rule_id}\" = [\"**/*\"]\n"
+            ),
+        )
+        .expect("write analyzer config");
+
+        let error = sc_lint_analyzer_support::load_analyzer_settings(
+            &BOUNDARY_CATALOG,
+            fixture.path(),
+            None,
+            None,
+        )
+        .expect_err("pathless rules cannot accept path exclusions");
+
+        assert_eq!(
+            error.code(),
+            "ANALYZER_CONFIG.PATH_EXCLUSION_UNSUPPORTED",
+            "rule id: {rule_id}"
+        );
+        assert!(error.to_string().contains(rule_id), "{error}");
+        assert!(error.to_string().contains("remove this entry"), "{error}");
+    }
+}
+
+#[test]
+fn per_rule_path_exclusion_drops_cycle_003_finding_by_node_source() {
+    let fixture = TempDir::new().expect("temp root");
+    let relative = "crates/example/src/lib.rs";
+    fs::write(
+        fixture.path().join("sc-lint.toml"),
+        format!(
+            "[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n\"SCB-CYCLE-003\" = [\"{relative}\"]\n"
+        ),
+    )
+    .expect("write analyzer config");
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.path(),
+        None,
+        Some("cycles"),
+    )
+    .expect("cycle 003 supports source path exclusions");
+
+    let node_id = NodeId::new("crate::example::example::display");
+    let finding = Finding {
+        rule_id: RuleId::ScbCycle003,
+        kind: "trait_impl_self_loop".into(),
+        message: "trait self-loop in example".to_owned(),
+        owner_ids: Vec::new(),
+        node_ids: vec![node_id.clone()],
+    };
+    let report = findings_report(1, vec![finding]);
+    let node_paths = BTreeMap::from([(node_id, fixture.path().join(relative))]);
+
+    let filtered = apply_configured_rule_filter(report, &settings, fixture.path(), &node_paths);
+
+    assert!(filtered.findings.is_empty());
+}
+
+#[test]
 fn catalog_lists_every_rule_id() {
     use RuleId::*;
 

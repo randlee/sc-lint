@@ -162,6 +162,10 @@ const CATALOG: RuleCatalog = RuleCatalog {
         CatalogRuleId::new("EXAMPLE-001"),
         CatalogRuleId::new("EXAMPLE-002"),
     ],
+    path_addressable_rules: &[
+        CatalogRuleId::new("EXAMPLE-001"),
+        CatalogRuleId::new("EXAMPLE-002"),
+    ],
     families: &[(
         "example",
         &[
