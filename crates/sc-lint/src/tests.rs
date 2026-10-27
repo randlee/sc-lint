@@ -86,15 +86,28 @@ fn cli_contract_documents_current_business_verdict_exit_codes() {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
-    assert!(contract.contains(
-        "`sc-lint check interfaces` currently exits `0` for a completed comparison, including one with a breaking-change verdict"
-    ));
+    assert!(contract.contains("`sc-lint check interfaces` is planned, not implemented"));
+    assert!(!contract.contains("currently exits `0` for a completed comparison"));
     assert!(contract.contains(
         "`lint sc-boundary`, `lint sc-portability` and `lint sc-runtime` now exit `10` when `data.status = \"fail\"`; the envelope remains `ok: true`"
     ));
     assert!(contract.contains(
         "command completed successfully; analyzer lint commands use this for a passing verdict, while a failed analyzer verdict uses code `10`"
     ));
+
+    let ParsedInvocation::Immediate(outcome) =
+        crate::parse_args(["sc-lint", "--json", "check", "interfaces"])
+    else {
+        panic!("check interfaces must stop at parse time");
+    };
+    assert_eq!(outcome.exit_code, crate::consts::EXIT_USAGE);
+    let rendered = outcome
+        .rendered
+        .stderr
+        .expect("machine parse error on stderr");
+    let envelope: Value = serde_json::from_str(&rendered).expect("parse-error envelope");
+    assert_eq!(envelope["command"], "cli.parse_error");
+    assert_eq!(envelope["error"]["kind"], "usage");
 }
 
 #[test]
@@ -4989,5 +5002,438 @@ fn human_render_lists_failed_and_skipped_steps() {
     assert_eq!(
         crate::render::render_error_human("test", &error),
         "test: 2 of 3 steps failed: [0] a, [2] c (profile.steps_failed)\nFailed steps:\n  [0] a (exit 101): a exploded\n  [2] c (exit n/a): c panicked during execution: boom\nSkipped steps (fail-fast): b\nfix the failing steps and rerun"
+    );
+}
+
+fn context_with_repo_root(args: &[&str]) -> (Cli, CommandContext, LoadedConfig) {
+    let root = repo_backed_workspace_root();
+    let mut argv = vec![
+        OsString::from("sc-lint"),
+        OsString::from("--root"),
+        root.as_os_str().to_os_string(),
+    ];
+    argv.extend(args.iter().map(OsString::from));
+    let cli = Cli::parse_from(argv);
+    let context = CommandContext::from_cli(&cli).expect("command context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("config loads");
+    (cli, context, loaded)
+}
+
+fn success_envelope_json(command: &str, data: Value) -> Value {
+    let rendered = crate::render::render_success_json(&CommandEnvelope::success(command, data));
+    serde_json::from_str(&rendered).expect("success envelope is json")
+}
+
+fn failure_envelope_json(command: &str, error: CliError) -> Value {
+    let rendered = crate::render::render_error_json(command, &error);
+    serde_json::from_str(&rendered).expect("failure envelope is json")
+}
+
+fn assert_envelope_keys(envelope: &Value, command: &str, success: bool, error_kind: Option<&str>) {
+    let keys = envelope
+        .as_object()
+        .expect("envelope object")
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let expected = if success {
+        vec!["command", "data", "diagnostics", "ok"]
+    } else {
+        vec!["command", "diagnostics", "error", "ok"]
+    };
+    assert_eq!(keys, expected, "envelope keys for {command}");
+    assert_eq!(envelope["ok"], success);
+    assert_eq!(envelope["command"], command);
+    assert!(envelope["diagnostics"].is_array());
+    if let Some(error_kind) = error_kind {
+        assert_eq!(envelope["error"]["kind"], error_kind);
+    }
+}
+
+#[test]
+fn envelope_key_set_identical_across_families() {
+    let mut cases: Vec<(Value, bool, &str, Option<&str>)> = Vec::new();
+
+    let (_, context, loaded) = context_with_repo_root(&["version"]);
+    let version = crate::command::execute(&context, &loaded).expect("version succeeds");
+    cases.push((
+        success_envelope_json(context.command_id(), version.data),
+        true,
+        "version",
+        None,
+    ));
+
+    let (_, context, loaded) = context_with_repo_root(&["docs", "--path"]);
+    let docs = crate::command::execute(&context, &loaded).expect("docs path succeeds");
+    cases.push((
+        success_envelope_json(context.command_id(), docs.data),
+        true,
+        "docs",
+        None,
+    ));
+
+    let installer_fixture = TempDir::new().expect("installer config fixture");
+    let config_path = installer_fixture.path().join("sc-lint.toml");
+    fs::write(
+        &config_path,
+        "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n",
+    )
+    .expect("installer config");
+    let config = config_path.to_str().expect("config path");
+    let cli = Cli::parse_from(["sc-lint", "--config", config, "setup", "--dry-run"]);
+    let context = CommandContext::from_cli(&cli).expect("setup context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("setup config loads");
+    let setup = crate::command::execute(&context, &loaded).expect("setup dry-run succeeds");
+    cases.push((
+        success_envelope_json(context.command_id(), setup.data),
+        true,
+        "setup",
+        None,
+    ));
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config,
+        "upgrade",
+        "--check",
+        "--dry-run",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("upgrade context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("upgrade config loads");
+    let upgrade = crate::command::execute(&context, &loaded).expect("upgrade dry-run succeeds");
+    cases.push((
+        success_envelope_json(context.command_id(), upgrade.data),
+        true,
+        "upgrade",
+        None,
+    ));
+
+    let init_fixture = TempDir::new().expect("init fixture");
+    let cli = Cli::parse_from(["sc-lint", "init", "--just"]);
+    let context = CommandContext::from_cli(&cli).expect("init context");
+    let init = crate::config::run_consumer_init_at(
+        init_fixture.path(),
+        ConsumerInitRequest {
+            just: true,
+            check: false,
+            dry_run: true,
+        },
+    )
+    .expect("init dry-run succeeds");
+    cases.push((
+        success_envelope_json(context.command_id(), init),
+        true,
+        "init",
+        None,
+    ));
+
+    let (_, _, loaded) = context_with_repo_root(&["ci"]);
+    let ci = workflow::run_ci_with(&loaded, &FakeSystemAdapter::new(false))
+        .expect("ci succeeds with fake adapter");
+    cases.push((success_envelope_json("ci", ci.data), true, "ci", None));
+
+    let (_, _, loaded) = context_with_repo_root(&["clippy", "xwin"]);
+    let clippy =
+        workflow::run_clippy_with(&loaded, ClippyTarget::Xwin, &FakeSystemAdapter::new(true))
+            .expect("xwin clippy succeeds with fake adapter");
+    cases.push((
+        success_envelope_json("clippy.xwin", clippy.data),
+        true,
+        "clippy.xwin",
+        None,
+    ));
+
+    let compat_fixture = TempDir::new().expect("compatibility fixture");
+    let compat_config = compat_fixture.path().join("sc-lint.toml");
+    let missing_binary = compat_fixture.path().join("missing-sc-lint");
+    fs::write(
+        &compat_config,
+        "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n",
+    )
+    .expect("compatibility config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        compat_config.to_str().unwrap(),
+        "compatibility",
+        "check",
+        "--binary",
+        missing_binary.to_str().unwrap(),
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("compatibility context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("compatibility config loads");
+    let error = crate::command::execute(&context, &loaded).expect_err("missing binary fails");
+    assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    cases.push((
+        failure_envelope_json(context.command_id(), error),
+        false,
+        "compatibility.check",
+        Some("backend_failure"),
+    ));
+
+    let (_, context, loaded) = context_with_repo_root(&["view", "graph"]);
+    let error = crate::command::execute(&context, &loaded).expect_err("reserved view fails");
+    cases.push((
+        failure_envelope_json(context.command_id(), error),
+        false,
+        "view.graph",
+        Some("capability"),
+    ));
+
+    let (_, _, loaded) = context_with_repo_root(&["check", "xwin"]);
+    let error =
+        workflow::run_check_with(&loaded, CheckTarget::Xwin, &FakeSystemAdapter::new(false))
+            .expect_err("xwin requires capability");
+    cases.push((
+        failure_envelope_json("check.xwin", error),
+        false,
+        "check.xwin",
+        Some("capability"),
+    ));
+
+    let consumer_lint_fixture = TempDir::new().expect("consumer lint config");
+    let consumer_lint_config = consumer_lint_fixture.path().join("sc-lint.toml");
+    fs::write(
+        &consumer_lint_config,
+        "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n\n[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n",
+    )
+    .expect("test-only consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        consumer_lint_config.to_str().unwrap(),
+        "lint",
+        "ci",
+        "--consumer",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer lint context");
+    let error = LoadedConfig::load(&cli, &context).expect_err("lint profile is missing");
+    cases.push((
+        failure_envelope_json(context.command_id(), error),
+        false,
+        "lint.ci.consumer",
+        Some("config"),
+    ));
+
+    let consumer_test_fixture = TempDir::new().expect("consumer test config");
+    let consumer_test_config = consumer_test_fixture.path().join("sc-lint.toml");
+    fs::write(
+        &consumer_test_config,
+        "[tool.sc-lint]\nminimum_version = \"0.4.1\"\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\"]\n",
+    )
+    .expect("lint-only consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        consumer_test_config.to_str().unwrap(),
+        "test",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer test context");
+    let error = LoadedConfig::load(&cli, &context).expect_err("test profile is missing");
+    cases.push((
+        failure_envelope_json(context.command_id(), error),
+        false,
+        "test",
+        Some("config"),
+    ));
+
+    let ParsedInvocation::Immediate(parse_error) =
+        crate::parse_args(["sc-lint", "--json", "unknown-command"])
+    else {
+        panic!("unknown command must fail during parsing");
+    };
+    let rendered = parse_error.rendered.stderr.expect("parse-error json");
+    cases.push((
+        serde_json::from_str(&rendered).expect("parse-error envelope parses"),
+        false,
+        "cli.parse_error",
+        Some("usage"),
+    ));
+
+    for (envelope, success, command, error_kind) in cases {
+        assert_envelope_keys(&envelope, command, success, error_kind);
+    }
+}
+
+#[test]
+fn human_output_fields_present_in_json() {
+    type HumanOutputRow<'a> = (&'a str, &'a [&'a str], Value, &'a [&'a str], bool);
+    let rows: Vec<HumanOutputRow<'_>> = vec![
+        (
+            "analyzer-lint",
+            &["lint", "sc-boundary"],
+            json!({"status":"fail","findings":[{"rule_id":"SCB-CYCLE-001"}]}),
+            &["/data/status", "/data/findings"],
+            false,
+        ),
+        (
+            "profile",
+            &["lint", "fast"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "python-lint-view",
+            &["lint", "line-counts"],
+            json!({"status":"pass","summary":"limits satisfied"}),
+            &["/command", "/data/summary"],
+            false,
+        ),
+        (
+            "version",
+            &["version"],
+            json!({"version":"1.2.3"}),
+            &["/data/version"],
+            false,
+        ),
+        (
+            "installer",
+            &["setup"],
+            json!({"summary":"setup complete"}),
+            &["/data/summary"],
+            false,
+        ),
+        (
+            "docs",
+            &["docs"],
+            json!({"path":"/x/docs","content":"# Guide"}),
+            &["/data/path", "/data/content"],
+            false,
+        ),
+        (
+            "test",
+            &["test"],
+            json!({"status":"pass","steps":[{"name":"unit"},{"name":"doc"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "lint.ci.consumer",
+            &["lint", "ci", "--consumer"],
+            json!({"status":"pass","steps":[{"name":"fmt"},{"name":"clippy"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "init",
+            &["init", "--just"],
+            json!({"status":"created","path":"x","count":3}),
+            &["/command"],
+            true,
+        ),
+        (
+            "compatibility.check",
+            &["compatibility", "check"],
+            json!({"status":"checked","path":"x"}),
+            &["/command"],
+            true,
+        ),
+        (
+            "view.graph",
+            &["view", "graph"],
+            json!({"status":"checked","path":"x"}),
+            &["/command"],
+            true,
+        ),
+    ];
+    let mut family_names = Vec::new();
+    for (family, argv, data, pointers, fallback) in rows {
+        family_names.push(family);
+        let mut full_argv = vec!["sc-lint"];
+        full_argv.extend_from_slice(argv);
+        let cli = Cli::parse_from(full_argv);
+        let context = CommandContext::from_cli(&cli).expect("context");
+        let envelope = CommandEnvelope::success(context.command_id(), data);
+        let human = crate::render::render_success_human(&context, &envelope);
+        if fallback {
+            assert_eq!(human, format!("{}: ok", context.command_id()));
+        }
+        let serialized = serde_json::to_value(&envelope).expect("envelope serializes");
+        for pointer in pointers {
+            let value = serialized
+                .pointer(pointer)
+                .unwrap_or_else(|| panic!("{family}: missing {pointer}"));
+            let token = match value {
+                Value::Array(items) => items.len().to_string(),
+                Value::String(text) => text.clone(),
+                other => other.to_string(),
+            };
+            assert!(!token.is_empty(), "{family}: empty token at {pointer}");
+            assert!(
+                human.contains(&token),
+                "{family}: human output {human:?} omits {pointer} token {token:?}"
+            );
+        }
+    }
+
+    let mut error = CliError::config("minimum version missing")
+        .with_cause("file not found")
+        .with_suggested_action("add the field")
+        .with_documentation("sc-lint docs setup");
+    for (key, value) in [
+        ("minimum_version", json!("1.0")),
+        ("installed_version", json!("0.9")),
+        ("reported_version", json!("0.8")),
+        ("binary_path", json!("/bin/sc-lint")),
+        ("config_path", json!("sc-lint.toml")),
+        ("bundle_path", json!("docs-bundle")),
+        ("required_field", json!("minimum_version")),
+        ("exit_code", json!(7)),
+        ("stdout", json!("stdout text")),
+        ("stderr", json!("stderr text")),
+    ] {
+        error = error.with_detail(key, value);
+    }
+    let error_envelope = failure_envelope_json("compatibility.check", error.clone());
+    let human = crate::render::render_error_human("compatibility.check", &error);
+    family_names.push("error");
+    for pointer in [
+        "/command",
+        "/error/message",
+        "/error/code",
+        "/error/cause",
+        "/error/suggested_action",
+        "/error/docs",
+        "/error/details/minimum_version",
+        "/error/details/installed_version",
+        "/error/details/reported_version",
+        "/error/details/binary_path",
+        "/error/details/config_path",
+        "/error/details/bundle_path",
+        "/error/details/required_field",
+        "/error/details/exit_code",
+        "/error/details/stdout",
+        "/error/details/stderr",
+    ] {
+        let value = error_envelope
+            .pointer(pointer)
+            .unwrap_or_else(|| panic!("error: missing {pointer}"));
+        let token = value
+            .as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| value.to_string());
+        assert!(
+            human.contains(&token),
+            "error human output omits {pointer} token {token:?}"
+        );
+    }
+    family_names.sort_unstable();
+    assert_eq!(
+        family_names,
+        [
+            "analyzer-lint",
+            "compatibility.check",
+            "docs",
+            "error",
+            "init",
+            "installer",
+            "lint.ci.consumer",
+            "profile",
+            "python-lint-view",
+            "test",
+            "version",
+            "view.graph"
+        ]
     );
 }
