@@ -318,6 +318,23 @@ the same matrix before code lands:
 This matrix exists to prevent each command family from inventing its own
 response or error pattern at implementation time.
 
+## Human Output Fields (L8-3)
+
+Rand's 2026-10-27 ruling on L8-3 was “keep option a”: pin the current human
+renderer behavior and verify that each machine-significant human-output field
+is present in the JSON envelope. The rule reflects the existing
+`render_success_human` implementation; it does not request a renderer change.
+
+- `init`, `compatibility.check`, and `view.graph` render exactly
+  `{id}: ok`.
+- `test` and `lint.ci.consumer` render
+  `<command>: <status> (<n> steps)`.
+
+The `human_output_fields_present_in_json` test asserts the exact fallback line
+for the first group and checks command, status, and step-count tokens against
+the JSON envelope for the second group. The remaining families likewise list
+their human-visible machine-significant fields in the test's pointer table.
+
 ## Compatibility And Version-Probe Contract
 
 ## Consumer Integration And Profile Contract
