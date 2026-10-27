@@ -30,24 +30,24 @@ metadata:
     stage: review
     transition: start
 ---
-{% autoescape false -%}
-<atm-review id="{{ task_id }}" phase="{{ phase }}">
+{#- Temporary workaround for sc-compose #784: v1.7.0 rejects autoescape blocks. Revert these | safe filters once a release containing #788 is pinned. -#}
+<atm-review id="{{ task_id | safe }}" phase="{{ phase | safe }}">
   <description>Phase-ending code review. Read-only analysis only; no code changes.</description>
 
-  <branch>{{ branch }}</branch>
-  <commit>{{ commit }}</commit>
-  <worktree>{{ worktree_path }}</worktree>
+  <branch>{{ branch | safe }}</branch>
+  <commit>{{ commit | safe }}</commit>
+  <worktree>{{ worktree_path | safe }}</worktree>
 
   <review-focus>
-{{ review_focus }}
+{{ review_focus | safe }}
   </review-focus>
 
   <review-questions>
-{{ review_questions }}
+{{ review_questions | safe }}
   </review-questions>
 
   <references>
-{{ references }}
+{{ references | safe }}
   </references>
 
   <output-format>
@@ -59,10 +59,10 @@ metadata:
   </output-format>
 
   <workflow>
-    <step id="a">Start the task immediately with `atm task start {{ task_id }} "<one line: what you will do first>"`, then begin the review in the same work session.</step>
+    <step id="a">Start the task immediately with `atm task start {{ task_id | safe }} "<one line: what you will do first>"`, then begin the review in the same work session.</step>
     <step id="b">Read the relevant source and doc files in the specified worktree and commit context.</step>
     <step id="c">Do not make any code changes.</step>
-    <step id="d">Deliver the structured findings report by closing the task with the report as the body: `atm task close {{ task_id }} completed --stdin <<'EOF' … EOF`. Only this close frees your queue: the next assignment stays queued and never starts until `{{ task_id }}` is closed, and a plain `atm send` report does not close it. Re-verify every cited file:line against the current branch and worktree before reporting it; stale or missing evidence is a finding, not a guess. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc }}` with a plain `atm send {{ cc }} --stdin`.{% endif %}</step>
+    <step id="d">Deliver the structured findings report by closing the task with the report as the body: `atm task close {{ task_id | safe }} completed --stdin <<'EOF' … EOF`. Only this close frees your queue: the next assignment stays queued and never starts until `{{ task_id | safe }}` is closed, and a plain `atm send` report does not close it. Re-verify every cited file:line against the current branch and worktree before reporting it; stale or missing evidence is a finding, not a guess. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc | safe }}` with a plain `atm send {{ cc | safe }} --stdin`.{% endif %}</step>
   </workflow>
 </atm-review>
-{%- endautoescape %}
+{#- end of sc-compose #784 workaround -#}
