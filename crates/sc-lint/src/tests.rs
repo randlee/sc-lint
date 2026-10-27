@@ -4666,6 +4666,65 @@ fn selector_forwards_args() {
     );
 }
 
+/// Forwarded arguments without one named command selector (review finding
+/// R-12): the rows form's every-row run is not a group, and an unresolved name
+/// is an unknown selector, not a group.
+#[test]
+fn forwarded_args_report_every_row_runs_and_unknown_names_correctly() {
+    let forwarded = || vec!["--nocapture".to_string()];
+    let rows = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n\n[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n";
+    let (_rows_fixture, loaded) = load_test_config(rows);
+    let loaded = loaded.expect("rows config loads");
+    for selector in [None, Some("all".to_string())] {
+        let request = TestRequest::new(selector.clone(), forwarded(), false);
+        let error = run_test_request(&loaded, &request, &FakeSystemAdapter::new(false))
+            .expect_err("every-row run does not take forwarded args");
+        assert_eq!(error.kind, CliErrorKind::Usage, "{selector:?}");
+        assert_eq!(
+            error.message,
+            "selector 'all' runs every [[tool.sc-lint.test]] row and does not accept forwarded arguments",
+            "{selector:?}"
+        );
+        assert_eq!(
+            error.suggested_action.as_deref(),
+            Some("name a command selector to forward arguments"),
+            "{selector:?}"
+        );
+    }
+    let adapter = FakeSystemAdapter::new(false);
+    let request = TestRequest::new(Some("unit".to_string()), forwarded(), false);
+    run_test_request(&loaded, &request, &adapter).expect("a named row takes forwarded args");
+    assert_eq!(adapter.records()[0].argv, ["cargo", "test", "--nocapture"]);
+
+    let no_default = "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\n";
+    let (_table_fixture, loaded) = load_test_config(&selector_config(no_default));
+    let loaded = loaded.expect("table config loads");
+    let (_, selectors) = loaded.test_selectors().expect("table selectors");
+    let error = selectors
+        .check_forwarded_args(&TestRequest::new(
+            Some("nightly".to_string()),
+            forwarded(),
+            false,
+        ))
+        .expect_err("unresolved name");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert_eq!(error.details["selector"], "nightly");
+    assert!(
+        error
+            .message
+            .starts_with("selector 'nightly' is not declared in "),
+        "{error:?}"
+    );
+    let error = selectors
+        .check_forwarded_args(&TestRequest::new(None, forwarded(), false))
+        .expect_err("no selector and no default");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert!(
+        error.message.starts_with("no selector was named and "),
+        "{error:?}"
+    );
+}
+
 #[test]
 fn selector_group_expands() {
     let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
@@ -4747,9 +4806,14 @@ fn selector_list_prints_names() {
     assert!(adapter.invoked().is_empty(), "--list runs nothing");
 
     let envelope = CommandEnvelope::success(context.command_id(), listed.data);
-    assert_eq!(
-        crate::render::render_success_human(&context, &envelope),
-        "ci: group [unit, nested]\nintegration: cargo test --test integration\nnested: group [integration, unit]\nunit (default): cargo test\nwin-only: cargo test --features windows [windows]"
+    let rendered = crate::render::render_success_human(&context, &envelope);
+    let expected = "ci: group [unit, nested]\nintegration: cargo test --test integration\nnested: group [integration, unit]\nunit (default): cargo test\nwin-only: cargo test --features windows [windows]";
+    assert_eq!(rendered, expected);
+    let windows_contract = CLI_CONTRACT.replace("\r\n", "\n").replace('\n', "\r\n");
+    let normalized_contract = windows_contract.replace("\r\n", "\n");
+    assert!(
+        normalized_contract.contains(expected),
+        "the CLI contract documents the exact selector-list output"
     );
 }
 
@@ -4875,6 +4939,81 @@ fn mixed_test_forms_rejected() {
     let (_fixture, loaded) = load_test_config(mixed);
     let error = loaded.expect_err("both forms in one file");
     assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED");
+}
+
+/// Selector and step shape errors carry selector recovery only, never the
+/// compatibility setup recovery (phase-end review finding R-4).
+#[test]
+fn selector_shape_errors_carry_selector_recovery_not_compatibility_recovery() {
+    let table =
+        "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\ngroup = [\"unit\"]\n";
+    let (_table_fixture, table_loaded) = load_test_config(&selector_config(table));
+    let duplicate = "[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"check\"]\n";
+    let (_row_fixture, row_loaded) = load_consumer_toml(&consumer_toml(duplicate));
+    let cases = [
+        (
+            "test",
+            table_loaded.expect_err("selector with both command and group"),
+            "selector `unit` must declare exactly one of `command` or `group`",
+        ),
+        (
+            "lint",
+            row_loaded.expect_err("duplicate lint step"),
+            "consumer `lint` profile repeats step name `fmt`",
+        ),
+    ];
+    for (profile, error, message) in cases {
+        let config_path = error.details["config_path"]
+            .as_str()
+            .expect("config_path detail")
+            .to_string();
+        assert!(
+            config_path.ends_with("sc-lint.toml"),
+            "{profile}: {config_path}"
+        );
+        assert_eq!(error.kind, CliErrorKind::Config, "{profile}");
+        assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED", "{profile}");
+        assert_eq!(error.message, message, "{profile}");
+        assert_eq!(
+            error.cause.as_deref(),
+            Some(format!("{message} in {config_path}").as_str()),
+            "{profile}"
+        );
+        assert_eq!(
+            error.suggested_action.as_deref(),
+            Some(
+                format!(
+                    "fix the `tool.sc-lint.{profile}` selectors in {config_path} as the cause describes"
+                )
+                .as_str()
+            ),
+            "{profile}"
+        );
+        assert_eq!(error.documentation, None, "{profile}");
+        let mut detail_keys: Vec<&str> = error.details.keys().map(String::as_str).collect();
+        detail_keys.sort_unstable();
+        assert_eq!(detail_keys, ["config_path", "profile"], "{profile}");
+        assert_eq!(error.details["profile"], profile, "{profile}");
+
+        let human = crate::render::render_error_human("test", &error);
+        let envelope = failure_envelope_json("test", error).to_string();
+        for compatibility_text in [
+            "just setup",
+            "installer",
+            "minimum_version",
+            "required_field",
+            "sc-lint docs setup",
+        ] {
+            assert!(
+                !envelope.contains(compatibility_text),
+                "{profile}: envelope carries {compatibility_text:?}: {envelope}"
+            );
+            assert!(
+                !human.contains(compatibility_text),
+                "{profile}: human output carries {compatibility_text:?}: {human}"
+            );
+        }
+    }
 }
 
 #[test]

@@ -86,7 +86,7 @@ pub struct RuntimeErrorSource(Box<str>);
 
 impl From<anyhow_crate::Error> for RuntimeErrorSource {
     fn from(value: anyhow_crate::Error) -> Self {
-        Self(value.to_string().into_boxed_str())
+        Self(format!("{value:#}").into_boxed_str())
     }
 }
 

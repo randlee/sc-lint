@@ -282,7 +282,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 ## Stable codes
 
 | Code | Kind | Cause names | Recovery |
-| --- | --- | --- | --- | --- |
+| --- | --- | --- | --- |
 | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
 | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
@@ -335,8 +335,6 @@ for the first group and checks command, status, and step-count tokens against
 the JSON envelope for the second group. The remaining families likewise list
 their human-visible machine-significant fields in the test's pointer table.
 
-## Compatibility And Version-Probe Contract
-
 ## Consumer Integration And Profile Contract
 
 Consumer mode is selected by command shape, never by a repository name,
@@ -368,6 +366,27 @@ Cargo manifest, or analyzer package:
   [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
   "platforms": [...], "cwd": <string|null>, "env_keys": [...], "after_all":
   bool}]}`, sorted by name.
+
+Human-readable `sc-lint test --list` output contains one selector per line,
+sorted by name, in this form:
+
+`<name>[ (default)]: <command tokens joined by spaces | group [member, member]>[ [platform,platform]]`
+
+The `(default)` marker appears only on the default selector. Group members are
+joined with comma-space; a non-empty platform list is appended in brackets,
+with platform names separated by commas and no spaces. Selectors without a
+platform list have no suffix. Command tokens are joined with a single space
+without shell quoting. An empty selector list produces empty human output.
+
+For example:
+
+```text
+ci: group [unit, nested]
+integration: cargo test --test integration
+nested: group [integration, unit]
+unit (default): cargo test
+win-only: cargo test --features windows [windows]
+```
 
 The generated default configuration uses this shape:
 

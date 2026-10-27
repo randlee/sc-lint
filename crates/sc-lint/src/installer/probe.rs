@@ -5,6 +5,30 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 
 const BACKEND_OUTPUT_DRAIN_TIMEOUT: Duration = Duration::from_millis(50);
 const BACKEND_OUTPUT_STOP_TIMEOUT: Duration = Duration::from_millis(250);
+const VERSION_PROBE_ARGUMENTS: [&str; 2] = ["--json", "version"];
+const VERSION_PROBE_DESCRIPTION: &str = "--json version";
+
+/// Why a bounded probe produced no exit status.
+#[derive(Debug)]
+pub(crate) enum ProbeFailure {
+    /// The binary could not be started; the kind tells a missing binary apart.
+    Start(io::Error),
+    /// The probe started but timed out, could not be waited on, or its output
+    /// could not be drained; the message names the binary and the probe.
+    Probe(String),
+}
+
+impl ProbeFailure {
+    fn into_message(self, binary: &Path, expected_name: &str) -> String {
+        match self {
+            Self::Start(error) => format!(
+                "could not start backend companion `{expected_name}` at `{}`: {error}",
+                binary.display()
+            ),
+            Self::Probe(message) => message,
+        }
+    }
+}
 
 /// Probe the supported CLI help contract and analyzer command surface.
 pub(super) fn backend_cli_failure(
@@ -72,8 +96,35 @@ fn run_backend_probe_with_arguments(
     description: &str,
     timeout: Duration,
 ) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
-    let (mut child, reader) = spawn_backend_probe(binary, expected_name, arguments, description)?;
-    let status = wait_for_backend_probe(&mut child, binary, expected_name, description, timeout)?;
+    run_probe(binary, expected_name, arguments, description, timeout)
+        .map_err(|failure| failure.into_message(binary, expected_name))
+}
+
+/// Runs `<binary> --json version` bounded by `timeout`, with the same
+/// process-tree cleanup and output-drain bounds as the backend probes.
+pub(crate) fn run_version_command(
+    binary: &Path,
+    timeout: Duration,
+) -> Result<(std::process::ExitStatus, Vec<u8>), ProbeFailure> {
+    run_probe(
+        binary,
+        crate::consts::SERVICE_NAME,
+        &VERSION_PROBE_ARGUMENTS,
+        VERSION_PROBE_DESCRIPTION,
+        timeout,
+    )
+}
+
+fn run_probe(
+    binary: &Path,
+    expected_name: &str,
+    arguments: &[&str],
+    description: &str,
+    timeout: Duration,
+) -> Result<(std::process::ExitStatus, Vec<u8>), ProbeFailure> {
+    let (mut child, reader) = spawn_probe(binary, expected_name, arguments, description)?;
+    let status = wait_for_backend_probe(&mut child, binary, expected_name, description, timeout)
+        .map_err(ProbeFailure::Probe)?;
     // `wait_for_backend_probe` reaps a successful leader. Its PID may then be
     // reused, so the output-drain path must not signal the process group by
     // that PID. A lingering descendant is reported as a bounded output timeout.
@@ -82,16 +133,18 @@ fn run_backend_probe_with_arguments(
         BACKEND_OUTPUT_DRAIN_TIMEOUT,
         BACKEND_OUTPUT_STOP_TIMEOUT,
     )
-    .map_err(|error| error.to_probe_message(binary, expected_name, description))?;
+    .map_err(|error| {
+        ProbeFailure::Probe(error.to_probe_message(binary, expected_name, description))
+    })?;
     Ok((status, output))
 }
 
-pub(super) fn spawn_backend_probe(
+pub(super) fn spawn_probe(
     binary: &Path,
     expected_name: &str,
     arguments: &[&str],
     description: &str,
-) -> Result<(Child, ProbeOutputReader), String> {
+) -> Result<(Child, ProbeOutputReader), ProbeFailure> {
     let mut command = Command::new(binary);
     command
         .args(arguments)
@@ -99,21 +152,13 @@ pub(super) fn spawn_backend_probe(
         .stderr(Stdio::null());
     #[cfg(unix)]
     command.process_group(0);
-    let mut child = match command.spawn() {
-        Ok(child) => child,
-        Err(error) => {
-            return Err(format!(
-                "could not start backend companion `{expected_name}` at `{}`: {error}",
-                binary.display()
-            ));
-        }
-    };
+    let mut child = command.spawn().map_err(ProbeFailure::Start)?;
     let Some(stdout) = child.stdout.take() else {
         terminate_probe_processes(&mut child);
-        return Err(format!(
+        return Err(ProbeFailure::Probe(format!(
             "backend companion `{expected_name}` at `{}` did not provide a readable `{description}` stream",
             binary.display(),
-        ));
+        )));
     };
     let (sender, reader) = mpsc::sync_channel(1);
     // The reader is intentionally detached: a descendant that escaped the probe
@@ -390,13 +435,8 @@ fn probe_version_with_timeout(binary: &Path, timeout: Duration) -> Result<Versio
     if !binary.is_file() {
         return Err("binary was not found".to_string());
     }
-    let (status, output) = run_backend_probe_with_arguments(
-        binary,
-        crate::consts::SERVICE_NAME,
-        &["--json", "version"],
-        "--json version",
-        timeout,
-    )?;
+    let (status, output) = run_version_command(binary, timeout)
+        .map_err(|failure| failure.into_message(binary, crate::consts::SERVICE_NAME))?;
     if !status.success() {
         return Err(format!("version probe exited with {status}"));
     }
@@ -590,8 +630,8 @@ mod tests {
         permissions.set_mode(0o755);
         fs::set_permissions(&script, permissions).expect("make probe executable");
 
-        let (mut child, reader) = spawn_backend_probe(&script, "test", &["--help"], "--help")
-            .expect("spawn probe script");
+        let (mut child, reader) =
+            spawn_probe(&script, "test", &["--help"], "--help").expect("spawn probe script");
         wait_for_probe_file(&directory.path().join("ready"));
         let process_id = fs::read_to_string(directory.path().join("pid"))
             .expect("read detached child pid")

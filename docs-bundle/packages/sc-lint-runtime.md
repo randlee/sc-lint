@@ -22,6 +22,15 @@ sc-lint lint ci
 The analyzer reads Rust source under the configured root and emits normalized
 findings. The top-level product owns command dispatch and CI aggregation.
 
+## Runtime rules
+
+- `SCB-RUNTIME-001`: Bare `Condvar::wait(...)` in production code; use a
+  timeout and inspect the result.
+- `SCB-RUNTIME-002`: Discarded `Condvar::wait_timeout*` result; inspect the
+  returned timeout result before proceeding.
+- `SCB-RUNTIME-003`: Blocking `std::thread::sleep` in production Tokio
+  packages; use `tokio::time::sleep(..).await` instead.
+
 ## Finding interpretation and CI
 
 A finding marks a discarded or unbounded runtime operation and includes the

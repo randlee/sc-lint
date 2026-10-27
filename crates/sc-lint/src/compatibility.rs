@@ -3,9 +3,9 @@
 
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
-use std::process::Output;
+use std::process::ExitStatus;
 use std::str::FromStr;
+use std::time::Duration;
 
 use semver::Version;
 use serde::Deserialize;
@@ -18,6 +18,9 @@ use crate::config::parse_repo_config;
 use crate::consumer_integration::BINARY_NOT_FOUND_RECOVERY;
 use crate::consumer_integration::DOCS_SETUP_REFERENCE;
 use crate::error::ErrorCode;
+use crate::installer::BACKEND_PROBE_TIMEOUT;
+use crate::installer::ProbeFailure;
+use crate::installer::run_version_command;
 
 pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
 
@@ -271,15 +274,6 @@ pub(crate) fn validate_version_probe(
     })
 }
 
-pub(crate) fn stderr_or_status(output: &std::process::Output) -> String {
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    if stderr.is_empty() {
-        format!("process exited with status {}", output.status)
-    } else {
-        stderr
-    }
-}
-
 /// Probes the installed sc-lint binary with `--json version` and checks the
 /// reported version against `requirement`.
 #[expect(
@@ -291,21 +285,20 @@ pub(crate) fn evaluate_compatibility(
     binary_override: Option<&Path>,
 ) -> Result<Value, CliError> {
     let binary = binary_override.unwrap_or_else(|| Path::new(crate::consts::SERVICE_NAME));
-    let output = run_version_probe(requirement, binary)?;
-    let probe =
-        serde_json::from_slice::<VersionProbeEnvelope>(&output.stdout).map_err(|error| {
-            compatibility_runtime_error(
-                CompatibilityErrorCode::ProbeMalformed,
-                format!(
-                    "sc-lint binary {} did not emit a valid version probe",
-                    required_by(requirement, binary)
-                ),
-                requirement,
-                binary,
-                None,
-                error.to_string(),
-            )
-        })?;
+    let stdout = run_version_probe(requirement, binary)?;
+    let probe = serde_json::from_slice::<VersionProbeEnvelope>(&stdout).map_err(|error| {
+        compatibility_runtime_error(
+            CompatibilityErrorCode::ProbeMalformed,
+            format!(
+                "sc-lint binary {} did not emit a valid version probe",
+                required_by(requirement, binary)
+            ),
+            requirement,
+            binary,
+            None,
+            error.to_string(),
+        )
+    })?;
     let observed = validate_version_probe(probe, requirement, binary)?;
     if observed < *requirement.minimum_version.as_semver() {
         return Err(compatibility_runtime_error(
@@ -343,8 +336,9 @@ fn required_by(requirement: &CompatibilityRequirement, binary: &Path) -> String 
     )
 }
 
-/// Runs `<binary> --json version`; a binary that cannot start or exits
-/// unsuccessfully is a compatibility runtime error.
+/// Runs `<binary> --json version` bounded by the installer's probe timeout; a
+/// binary that cannot start, times out or exits unsuccessfully is a
+/// compatibility runtime error. Returns the probe's stdout.
 #[expect(
     clippy::result_large_err,
     reason = "The compatibility check must return one stable CliError envelope for each recoverable failure."
@@ -352,29 +346,53 @@ fn required_by(requirement: &CompatibilityRequirement, binary: &Path) -> String 
 fn run_version_probe(
     requirement: &CompatibilityRequirement,
     binary: &Path,
-) -> Result<Output, CliError> {
-    let output = Command::new(binary)
-        .args(["--json", "version"])
-        .output()
-        .map_err(|error| {
-            let (code, verb) = if error.kind() == std::io::ErrorKind::NotFound {
-                (CompatibilityErrorCode::BinaryNotFound, "find")
-            } else {
-                (CompatibilityErrorCode::BinaryExecutionFailed, "execute")
-            };
-            compatibility_runtime_error(
-                code,
-                format!(
-                    "could not {verb} sc-lint binary {}",
-                    required_by(requirement, binary)
-                ),
-                requirement,
-                binary,
-                None,
+) -> Result<Vec<u8>, CliError> {
+    run_version_probe_with(requirement, binary, run_version_command)
+}
+
+/// [`run_version_probe`] with the bounded probe as a seam: production passes
+/// [`run_version_command`], tests a controlled fake. `run` always receives
+/// [`BACKEND_PROBE_TIMEOUT`], the bound `probe_version` uses.
+#[expect(
+    clippy::result_large_err,
+    reason = "The compatibility check must return one stable CliError envelope for each recoverable failure."
+)]
+fn run_version_probe_with(
+    requirement: &CompatibilityRequirement,
+    binary: &Path,
+    run: impl FnOnce(&Path, Duration) -> Result<(ExitStatus, Vec<u8>), ProbeFailure>,
+) -> Result<Vec<u8>, CliError> {
+    let (status, stdout) = run(binary, BACKEND_PROBE_TIMEOUT).map_err(|failure| {
+        let (code, verb, cause) = match failure {
+            ProbeFailure::Start(error) if error.kind() == std::io::ErrorKind::NotFound => (
+                CompatibilityErrorCode::BinaryNotFound,
+                "find",
                 error.to_string(),
-            )
-        })?;
-    if !output.status.success() {
+            ),
+            ProbeFailure::Start(error) => (
+                CompatibilityErrorCode::BinaryExecutionFailed,
+                "execute",
+                error.to_string(),
+            ),
+            ProbeFailure::Probe(message) => (
+                CompatibilityErrorCode::BinaryExecutionFailed,
+                "complete the version probe of",
+                message,
+            ),
+        };
+        compatibility_runtime_error(
+            code,
+            format!(
+                "could not {verb} sc-lint binary {}",
+                required_by(requirement, binary)
+            ),
+            requirement,
+            binary,
+            None,
+            cause,
+        )
+    })?;
+    if !status.success() {
         return Err(compatibility_runtime_error(
             CompatibilityErrorCode::BinaryExecutionFailed,
             format!(
@@ -384,8 +402,101 @@ fn run_version_probe(
             requirement,
             binary,
             None,
-            stderr_or_status(&output),
+            format!("process exited with status {status}"),
         ));
     }
-    Ok(output)
+    Ok(stdout)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+    #[cfg(unix)]
+    use std::os::unix::process::ExitStatusExt;
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
+
+    use super::*;
+
+    fn requirement() -> CompatibilityRequirement {
+        CompatibilityRequirement {
+            minimum_version: MinimumVersion::from_str("0.4.1").expect("minimum version"),
+            config_path: PathBuf::from("sc-lint.toml"),
+        }
+    }
+
+    #[cfg(unix)]
+    fn exit_status(code: i32) -> ExitStatus {
+        ExitStatus::from_raw(code << 8)
+    }
+
+    #[cfg(windows)]
+    fn exit_status(code: u32) -> ExitStatus {
+        ExitStatus::from_raw(code)
+    }
+
+    /// Runs the compatibility probe against a fake that records the timeout it
+    /// was given and returns `result`; no process is started.
+    fn probe_with(
+        result: Result<(ExitStatus, Vec<u8>), ProbeFailure>,
+    ) -> (Result<Vec<u8>, CliError>, Option<Duration>) {
+        let seen = Cell::new(None);
+        let outcome = run_version_probe_with(&requirement(), Path::new("sc-lint"), |_, timeout| {
+            seen.set(Some(timeout));
+            result
+        });
+        (outcome, seen.get())
+    }
+
+    #[test]
+    fn version_probe_is_bounded_by_the_installer_probe_timeout() {
+        let (outcome, timeout) = probe_with(Ok((exit_status(0), b"{}".to_vec())));
+        assert_eq!(timeout, Some(BACKEND_PROBE_TIMEOUT));
+        assert_eq!(outcome.expect("successful probe"), b"{}");
+    }
+
+    #[test]
+    fn version_probe_timeout_is_a_binary_execution_failure() {
+        let timed_out = "backend companion `sc-lint` at `sc-lint` timed out after 15000 ms during its `--json version` probe; process-tree cleanup was attempted";
+        let (outcome, _) = probe_with(Err(ProbeFailure::Probe(timed_out.to_string())));
+        let error = outcome.expect_err("a timed-out probe fails");
+        assert_eq!(error.code(), "CLI.SC_LINT_BINARY_EXECUTION_FAILED");
+        assert_eq!(error.cause.as_deref(), Some(timed_out));
+        assert_eq!(
+            error.message,
+            "could not complete the version probe of sc-lint binary `sc-lint` required at least `0.4.1` by `sc-lint.toml`"
+        );
+    }
+
+    #[test]
+    fn version_probe_start_failures_keep_their_codes() {
+        let (missing, _) = probe_with(Err(ProbeFailure::Start(std::io::Error::from(
+            std::io::ErrorKind::NotFound,
+        ))));
+        assert_eq!(
+            missing.expect_err("missing binary").code(),
+            "CLI.SC_LINT_BINARY_NOT_FOUND"
+        );
+        let (denied, _) = probe_with(Err(ProbeFailure::Start(std::io::Error::from(
+            std::io::ErrorKind::PermissionDenied,
+        ))));
+        assert_eq!(
+            denied.expect_err("unexecutable binary").code(),
+            "CLI.SC_LINT_BINARY_EXECUTION_FAILED"
+        );
+    }
+
+    #[test]
+    fn version_probe_unsuccessful_exit_is_a_binary_execution_failure() {
+        let (outcome, _) = probe_with(Ok((exit_status(3), Vec::new())));
+        let error = outcome.expect_err("non-zero exit fails");
+        assert_eq!(error.code(), "CLI.SC_LINT_BINARY_EXECUTION_FAILED");
+        assert!(
+            error
+                .cause
+                .as_deref()
+                .is_some_and(|cause| cause.starts_with("process exited with status ")),
+            "{error:?}"
+        );
+    }
 }

@@ -6,6 +6,28 @@ All notable changes to sc-lint are documented here.
 
 ### Added
 
+- l-1: Portability checks now account for additional platform `cfg` forms, avoid
+  reporting a `USER` read when the same function reads `USERNAME`, ignore
+  Windows namespace path prefixes, and exempt private helpers in paired
+  platform-adapter files.
+- l-2: Boundary external composition-root checks use each record's
+  `allowed_dependents` policy.
+- l-3: Cycle analysis recognizes `self` method-call edges and delegation between
+  distinct methods; path exclusions also apply to path-less cycle findings.
+- l-4: Repository-root discovery recognizes workspace manifests, and Python lint
+  tables resolve independently across the supported config files. Missing
+  required tables report `config.table_missing`.
+- l-5: Adoption template files rendered by the installer use `.tmpl`; upgrades
+  retire unmodified legacy `.j2` files and report modified files as conflicts.
+- l-7: Tokio-dependent packages are checked for blocking `std::thread::sleep` calls
+  in production targets by `SCB-RUNTIME-003`.
+- l-8: CLI contract checks now document unsupported interface checks, pin the
+  command-family JSON envelope, and reject malformed Python adapter payloads
+  with `backend_payload_drift`.
+- l-9: Version-sync checks support Python manifests and configurable Winget and
+  release-wiring checks.
+- l-10: Cargo-shear no longer reports Rust fixtures consumed by trybuild
+  `.pass()` or `.compile_fail()` harnesses as unlinked files.
 - Consumer test selectors: `[tool.sc-lint.test]` may be a table of named
   `command` or `group` selectors with `default`, `env`, `cwd`, `platforms` and
   `after_all`; `sc-lint test [<selector> [args...]]` forwards arguments to the

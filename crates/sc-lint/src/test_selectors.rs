@@ -260,9 +260,27 @@ impl TestSelectors {
         reason = "Selector resolution returns the shared top-level CliError contract."
     )]
     pub(crate) fn expand(&self, requested: Option<&str>) -> Result<Vec<&TestSelector>, CliError> {
-        if self.legacy && requested.is_none_or(|name| name == CONSUMER_SELECTOR_ALL) {
+        if self.runs_every_row(requested) {
             return Ok(self.entries.iter().collect());
         }
+        let selector = self.resolve(requested)?;
+        let mut expanded = Vec::new();
+        self.push_expanded(selector, &mut expanded, &mut BTreeSet::new());
+        Ok(expanded)
+    }
+
+    /// Rows form: `None` or `all` selects every row rather than one selector.
+    fn runs_every_row(&self, requested: Option<&str>) -> bool {
+        self.legacy && requested.is_none_or(|name| name == CONSUMER_SELECTOR_ALL)
+    }
+
+    /// The one selector `requested` names (table form: `None` is `default`),
+    /// or the `test.unknown_selector` error.
+    #[expect(
+        clippy::result_large_err,
+        reason = "Selector resolution returns the shared top-level CliError contract."
+    )]
+    fn resolve(&self, requested: Option<&str>) -> Result<&TestSelector, CliError> {
         let name = match (requested, &self.default) {
             (Some(name), _) => name,
             (None, Some(default)) => default.as_str(),
@@ -276,7 +294,7 @@ impl TestSelectors {
                 ));
             }
         };
-        let selector = self.find(name).ok_or_else(|| {
+        self.find(name).ok_or_else(|| {
             self.unknown(
                 format!(
                     "selector '{name}' is not declared in {}",
@@ -284,10 +302,7 @@ impl TestSelectors {
                 ),
                 Some(name),
             )
-        })?;
-        let mut expanded = Vec::new();
-        self.push_expanded(selector, &mut expanded, &mut BTreeSet::new());
-        Ok(expanded)
+        })
     }
 
     /// Rejects forwarded arguments unless `request` names a command selector.
@@ -299,13 +314,18 @@ impl TestSelectors {
         if request.args().is_empty() {
             return Ok(());
         }
-        let name = self.selected_name(request.selector());
-        let is_group = self
-            .find(&name)
-            .is_none_or(|selector| matches!(selector.body, SelectorBody::Group(_)));
-        if is_group {
+        let requested = request.selector();
+        if self.runs_every_row(requested) {
             return Err(CliError::usage(format!(
-                "group selector '{name}' does not accept forwarded arguments"
+                "selector '{CONSUMER_SELECTOR_ALL}' runs every [[tool.sc-lint.test]] row and does not accept forwarded arguments"
+            ))
+            .with_suggested_action("name a command selector to forward arguments"));
+        }
+        let selector = self.resolve(requested)?;
+        if matches!(selector.body, SelectorBody::Group(_)) {
+            return Err(CliError::usage(format!(
+                "group selector '{}' does not accept forwarded arguments",
+                selector.name()
             ))
             .with_suggested_action("name a command selector to forward arguments"));
         }
