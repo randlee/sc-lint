@@ -164,7 +164,8 @@ class ConfigError(Exception):
         self.code = code
         self.table = table
         self.searched = searched
-        super().__init__(f"configuration table [{table}] not found in any of: {', '.join(searched)}")
+        self.message = f"configuration table [{table}] not found in any of: {', '.join(searched)}"
+        super().__init__(self.message)
 
 
 def _config_display(path: Path, root: Path) -> str:
@@ -211,7 +212,7 @@ def table_missing_error(error: ConfigError):
     from sc_lint.python_adapter import AdapterError
 
     return AdapterError(
-        "config", str(error),
+        "config", error.message,
         details={"code": CONFIG_TABLE_MISSING, "table": error.table, "searched": error.searched},
         suggested_action="add the table to `sc-lint.toml` or `.just/lint-config.toml`",
     )

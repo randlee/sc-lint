@@ -178,6 +178,11 @@ class LintCommonTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, CONFIG_TABLE_MISSING)
             self.assertEqual(caught.exception.table, "line_counts")
             self.assertEqual(caught.exception.searched, ["sc-lint.toml", ".just/lint-config.toml"])
+            self.assertEqual(
+                caught.exception.message,
+                "configuration table [line_counts] not found in any of: "
+                "sc-lint.toml, .just/lint-config.toml",
+            )
             explicit = Path(outside) / "explicit.toml"
             explicit.write_text("[identities]\n", encoding="utf-8")
             with self.assertRaises(ConfigError) as caught:
