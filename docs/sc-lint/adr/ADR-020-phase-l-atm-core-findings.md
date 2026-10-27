@@ -2,8 +2,9 @@
 
 Status: Pending — Rand approval required (drafted 2026-10-26 on `plans/phase-l`).
 
-Related: ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017, REQ-PRODUCT-004C,
-REQ-PRODUCT-004D, REQ-CLI-023.
+Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
+REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
+REQ-CLI-023.
 Plan authority: `lint-phase-l` and sprints `lint-l-1` to `lint-l-9`.
 
 ## Intent
@@ -13,7 +14,8 @@ make mid-sprint. Approval of this record gates dispatch only.
 
 ## Decisions
 
-1. **PORT-006 and PORT-008 (ADR-010 Decision 6, #641).** An item gated by
+1. **PORT-006 and PORT-008 (narrows ADR-010 Decision 6, #641; this decision
+   supersedes the `cfg(unix)`-only wording there).** An item gated by
    `#[cfg(unix)]`, `#[cfg(target_os = "linux"|"macos")]` or `#[cfg(not(windows))]`
    is a structural parity question exactly as `#[cfg(unix)]` is: PORT-006 leaf
    findings are suppressed inside it. PORT-008 does not report a read of
@@ -24,7 +26,8 @@ make mid-sprint. Approval of this record gates dispatch only.
 3. **PORT-010 (#372).** A `#[cfg(unix)]` function inside a file declared in a
    `platform_adapters` pair is not reported. Other atm-core PORT-010 shapes
    (crate roots such as `crates/atm/src/main.rs`) are classified, not
-   assumed fixed (see `lint-l-1`, L1-4).
+   assumed fixed (see `lint-l-1`, L1-4 for the covered shape and L1-5 for fixtures
+   of the others).
 4. **Dependency policy (#643, #376).** An unexpected runtime dependent is
    reported as `SCB-DEPENDENCY-002` per REQ-SCB-017, using `allowed_dependents`
    unioned across every record of the owner package, dev edges separate. A stale
@@ -38,7 +41,8 @@ make mid-sprint. Approval of this record gates dispatch only.
    is unchanged.
 6. **Tokio sleep rule (#82, REQ-PRODUCT-004C as amended).** The rule is
    `SCB-RUNTIME-003` in `sc-lint-runtime`, reached by the existing
-   `sc-lint lint sc-runtime`. It needs no `tokio` crate dependency: it reads
+   `sc-lint lint sc-runtime`, and fails by default like `SCB-RUNTIME-001/002`;
+   target kinds come from `cargo metadata`. It needs no `tokio` crate dependency: it reads
    package manifests and walks source. No `sc-lint-tokio` crate is created in
    phase L; the reserved boundary manifest stays reserved for Tokio rules
    that need Tokio dependencies or runtime semantics. A "Tokio package" is a
@@ -59,3 +63,20 @@ make mid-sprint. Approval of this record gates dispatch only.
    substitution use `.tmpl`.
 9. **#198 (setup hook).** Won't-do. ADR-016's hook restriction is unchanged;
    consumers use `sc_lint.setup_tools`.
+
+10. **Stable codes (l-4, l-6, l-8).** New codes use the existing error envelope
+    (`kind`, `code`, `cause`, `recovery`; REQ-CLI-005C) and are recorded in the
+    error table of `docs/sc-lint/cli-contract.md` by the sprint that adds them:
+
+    | Code | Kind | Cause names | Recovery text |
+    |---|---|---|---|
+    | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
+    | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
+    | `profile.invalid_after_all` | `config` | the step or group selector and file | remove `after_all` from that selector |
+    | `test.unknown_selector` | `config` | the selector name and file | use a name from `sc-lint test --list` |
+    | `test.group_cycle` | `config` | the selector cycle path | break the cycle in `[tool.sc-lint.test]` |
+    | `profile.steps_failed` | `backend_failure` | `failed_steps[]`: `index`, `name`, `exit_code` in declaration order | fix the failing steps and rerun |
+    | `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the wheel so the payload matches the envelope schema |
+
+    Codes are typed constants in the owning crate and are validated where
+    config is parsed, never matched as free strings at call sites.

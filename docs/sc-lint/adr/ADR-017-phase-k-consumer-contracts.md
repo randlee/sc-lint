@@ -77,7 +77,9 @@ second consumer runner or copy atm-core policy values into product defaults.
    build lock are serialized. These semantics do not apply to
    consumer-configured lint or test profiles: those remain sequential, in
    declaration order, and fail-fast. Generic test groups and test argument
-   forwarding remain outside this phase.
+   forwarding remain outside this phase. [Superseded for profile execution
+   and test selectors by ADR-020 decision 7 and REQ-CLI-023 as amended,
+   phase L.]
 5. Add direct bootstrap `exec` using the existing managed installation and
    environment, preserving argv and child exit status without profile recursion
    (#388). No setup hooks or new interpreter-selection policy are introduced;
@@ -103,7 +105,8 @@ second consumer runner or copy atm-core policy values into product defaults.
 
 Change 4 amendment: Accepted — Rand, 2026-10-14. The ruling changes execution
 semantics only for the built-in source-maintainer lint plan; consumer-configured
-profiles retain their sequential, fail-fast contract.
+profiles retain their sequential, fail-fast contract (superseded by the phase L
+amendment below).
 
 Change 4 amendment 2 (phase L, #195/#196): Accepted — Rand, 2026-10-26.
 Rand ruled 2026-10-26 that consumer-configured lint and test profiles run
