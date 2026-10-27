@@ -5,7 +5,7 @@ Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). P
 Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
 REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
 REQ-CLI-023.
-Plan authority: `lint-phase-l` and sprints `lint-l-1` to `lint-l-9`.
+Plan authority: `lint-phase-l` and sprints `lint-l-1` to `lint-l-10`.
 
 ## Intent
 
@@ -182,5 +182,7 @@ Clarifications to ADR-020 decision 12 (l-9):
 5. Because `[version_sync]` is now resolved per table, a repo without that table (an empty `[version_sync]` suffices) fails the check, including the built-in `version` plan step, with `config.table_missing`. sc-lint's own `.just/lint-config.toml` adds `[version_sync.python]` with `cargo_lock = true`.
 6. `lint_common.load_lint_config` stays a permanently-deprecated shim; l-9 does not edit lint_common.py.
 
-### Sprint l-10 (#647, added at the user's direction after the sprint designs above)
-1. The cargo-shear wrapper treats a path reported in `unlinked_files` as consumed, and not a finding, when a `.pass("<glob>")` or `.compile_fail("<glob>")` call with a string-literal glob in a Rust file of the same package resolves to it, relative to the package directory. No configuration key is added. Non-literal, absolute and `..` globs are not interpreted. Consumed takes precedence over `allowed_unlinked_files`; ordinary unlinked-source detection is unchanged.
+### Sprint l-10 (#647, added at the user's direction after the sprint designs above; governed by REQ-CLI-025)
+1. The cargo-shear wrapper treats a path reported in `unlinked_files` as consumed, and not a finding, when a `.pass("<glob>")` or `.compile_fail("<glob>")` call with a string-literal glob in a Rust file of the same package resolves to a regular file at that path, relative to the package directory. No configuration key is added. Consumed takes precedence over `allowed_unlinked_files` and produces no downgrade line. Ordinary unlinked-source detection is unchanged.
+2. Only plain and raw string literals are interpreted. Non-literal, empty, absolute, drive-letter, backslash and `..` globs are skipped, and a glob Python cannot evaluate is skipped without error; those fixtures stay reported. Matching is textual, so a comment or string that names a harness call can hide an unlinked report only for a path cargo-shear already reported and that the glob resolves to (accepted over-approximation, documented).
+3. Harness files are the `*.rs` files of the same package, scanned in sorted package-relative path order, skipping any `target` directory and the reported unlinked files themselves (a fixture cannot consume itself). The first harness by sorted path then line wins and is named in the note `shear note: <crate_dir>/<path> consumed by trybuild harness <harness>:<line> [unlinked_files]`; the root package omits the `<crate_dir>/` prefix. A package unknown to the workspace metadata consumes nothing.
