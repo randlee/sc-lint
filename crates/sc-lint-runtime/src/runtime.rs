@@ -91,7 +91,9 @@ pub(crate) fn analyze_runtime_liveness(
             collector.visit_file_items(&parsed);
             if sleep_scope.includes(file_context) {
                 for site in crate::sleep::find_blocking_sleeps(&parsed) {
-                    collector.findings.push(RuntimeFinding { rule_id: RuleId::ScbRuntime003, kind: "blocking_thread_sleep_in_tokio_package", message: format!("SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package {}; use tokio::time::sleep(..).await instead", file_context.package), source_path: file_context.source_path.clone(), line: site.line, package: file_context.package.clone(), target: file_context.target.clone(), node_label: format!("crate::{}::{}::{}", file_context.package, file_context.target, site.enclosing_fn.unwrap_or_else(|| "<module>".into())) });
+                    collector
+                        .findings
+                        .push(blocking_sleep_finding(file_context, site));
                 }
             }
             Ok(collector.findings)
@@ -138,6 +140,30 @@ pub(crate) fn analyze_runtime_liveness(
             ))
         })
         .collect()
+}
+
+fn blocking_sleep_finding(
+    file_context: &FileContext,
+    site: crate::sleep::SleepSite,
+) -> RuntimeFinding {
+    RuntimeFinding {
+        rule_id: RuleId::ScbRuntime003,
+        kind: "blocking_thread_sleep_in_tokio_package",
+        message: format!(
+            "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `{}`; use `tokio::time::sleep(..).await` instead",
+            file_context.package
+        ),
+        source_path: file_context.source_path.clone(),
+        line: site.line,
+        package: file_context.package.clone(),
+        target: file_context.target.clone(),
+        node_label: format!(
+            "crate::{}::{}::{}",
+            file_context.package,
+            file_context.target,
+            site.enclosing_fn.unwrap_or_else(|| "<module>".into())
+        ),
+    }
 }
 
 #[derive(Default)]

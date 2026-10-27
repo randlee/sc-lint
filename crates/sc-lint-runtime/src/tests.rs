@@ -600,7 +600,7 @@ fn assert_sleep_report(report: &FindingsReport, line: usize) {
         ("lib.rs".into(), line)
     );
     assert!(report.findings[0].message.ends_with(
-        "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package example; use tokio::time::sleep(..).await instead"
+        "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead"
     ));
 }
 
