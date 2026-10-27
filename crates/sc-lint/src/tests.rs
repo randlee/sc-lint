@@ -31,7 +31,6 @@ use crate::ViewTarget;
 use crate::cli::OutputMode;
 use crate::command::CommandContext;
 use crate::command::ConsumerInitRequest;
-use crate::config::ConsumerProfile;
 use crate::config::ConsumerProfileStep;
 use crate::config::LoadedConfig;
 use crate::profile_plan::CargoVerb;
@@ -44,6 +43,8 @@ use crate::profile_plan::ProfileName;
 use crate::profile_plan::ProfilePlanDetailCode;
 use crate::profile_plan::Target;
 use crate::profile_plan::plan_consumer_lint;
+use crate::scheduler::FailurePolicy;
+use crate::test_selectors::TestRequest;
 use crate::workflow;
 
 const CANONICAL_CONSUMER_JUSTFILE: &str = include_str!("../assets/consumer-Justfile");
@@ -331,10 +332,18 @@ fn consumer_commands_require_an_explicit_consumer_mode() {
             profile: None,
             platform_scope: None,
             rule_filter: None,
+            fail_fast: false,
         })
     ));
     let test = Cli::parse_from(["sc-lint", "test"]);
-    assert!(matches!(test.command, Some(Command::Test { layer: None })));
+    assert!(matches!(
+        test.command,
+        Some(Command::Test {
+            ref selector_and_args,
+            list: false,
+            fail_fast: false,
+        }) if selector_and_args.is_empty()
+    ));
     let init = Cli::parse_from(["sc-lint", "init", "--just", "--check"]);
     assert!(matches!(
         init.command,
@@ -468,8 +477,14 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
     let lint_context = CommandContext::from_cli(&lint_cli).expect("consumer lint context");
     let loaded = LoadedConfig::load(&lint_cli, &lint_context).expect("consumer config");
     let passing = FakeSystemAdapter::new(false);
-    let lint = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Lint, None, &passing)
-        .expect("all lint members run");
+    let lint = workflow::run_consumer_lint_with(
+        &loaded,
+        None,
+        PlatformScope::Host,
+        FailurePolicy::KeepGoing,
+        &passing,
+    )
+    .expect("all lint members run");
     assert_eq!(
         step_names(lint.data["steps"].as_array().expect("steps")),
         vec!["lint-fmt", "lint-clippy"]
@@ -495,9 +510,15 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
     failing
         .failures
         .insert("test-workspace", "configured test failed");
-    let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &failing)
-        .expect_err("a required test member fails the aggregate");
+    let error = workflow::run_consumer_test_with(
+        &loaded,
+        &TestRequest::all(),
+        FailurePolicy::KeepGoing,
+        &failing,
+    )
+    .expect_err("a required test member fails the aggregate");
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    assert_eq!(error.code(), "profile.steps_failed");
     assert_eq!(
         failing
             .invocations
@@ -505,52 +526,6 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
             .expect("fake invocation log lock")
             .as_slice(),
         ["test-workspace"]
-    );
-}
-
-#[test]
-fn consumer_steps_run_in_declaration_order_and_stop_at_the_first_failure() {
-    let fixture = TempDir::new().expect("fixture");
-    let config_path = fixture.path().join("sc-lint.toml");
-    fs::write(
-        &config_path,
-        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.test]]\nname = \"first\"\ncommand = [\"cargo\", \"test\"]\n\n[[tool.sc-lint.test]]\nname = \"second\"\ncommand = [\"cargo\", \"test\", \"--doc\"]\n\n[[tool.sc-lint.test]]\nname = \"third\"\ncommand = [\"cargo\", \"test\", \"--release\"]\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n",
-    )
-    .expect("consumer config");
-    let cli = Cli::parse_from([
-        "sc-lint",
-        "--config",
-        config_path.to_str().expect("config path"),
-        "test",
-    ]);
-    let context = CommandContext::from_cli(&cli).expect("consumer test context");
-    let loaded = LoadedConfig::load(&cli, &context).expect("consumer config");
-
-    let passing = FakeSystemAdapter::new(false);
-    workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &passing)
-        .expect("all layers pass");
-    assert_eq!(
-        passing
-            .invocations
-            .lock()
-            .expect("fake invocation log lock")
-            .as_slice(),
-        ["first", "second", "third"]
-    );
-
-    let mut failing = FakeSystemAdapter::new(false);
-    failing.failures.insert("second", "second layer failed");
-    let error = workflow::run_consumer_profile_with(&loaded, ConsumerProfile::Test, None, &failing)
-        .expect_err("the failing layer stops the run");
-    assert_eq!(error.message, "second layer failed");
-    assert_eq!(
-        failing
-            .invocations
-            .lock()
-            .expect("fake invocation log lock")
-            .as_slice(),
-        ["first", "second"],
-        "the third layer must not run after the second fails"
     );
 }
 
@@ -567,13 +542,13 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
 
     let layer_cli = Cli::parse_from(["sc-lint", "--config", config, "test", "integrate"]);
     let layer_context = CommandContext::from_cli(&layer_cli).expect("test layer context");
-    assert_eq!(layer_context.consumer_selector(), Some("integrate"));
+    assert_eq!(layer_context.test_request().selector(), Some("integrate"));
     let loaded = LoadedConfig::load(&layer_cli, &layer_context).expect("consumer config");
     let adapter = FakeSystemAdapter::new(false);
-    let run = workflow::run_consumer_profile_with(
+    let run = workflow::run_consumer_test_with(
         &loaded,
-        ConsumerProfile::Test,
-        layer_context.consumer_selector(),
+        layer_context.test_request(),
+        FailurePolicy::KeepGoing,
         &adapter,
     )
     .expect("named layer runs");
@@ -590,10 +565,10 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
     let all_cli = Cli::parse_from(["sc-lint", "--config", config, "test", "all"]);
     let all_context = CommandContext::from_cli(&all_cli).expect("all layers context");
     let adapter = FakeSystemAdapter::new(false);
-    let run = workflow::run_consumer_profile_with(
+    let run = workflow::run_consumer_test_with(
         &loaded,
-        ConsumerProfile::Test,
-        all_context.consumer_selector(),
+        all_context.test_request(),
+        FailurePolicy::KeepGoing,
         &adapter,
     )
     .expect("all layers run");
@@ -620,10 +595,11 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
     ]);
     let profile_context = CommandContext::from_cli(&profile_cli).expect("lint profile context");
     let adapter = FakeSystemAdapter::new(false);
-    workflow::run_consumer_profile_with(
+    workflow::run_consumer_lint_with(
         &loaded,
-        ConsumerProfile::Lint,
         profile_context.consumer_selector(),
+        PlatformScope::Host,
+        FailurePolicy::KeepGoing,
         &adapter,
     )
     .expect("named lint profile runs");
@@ -636,14 +612,14 @@ fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
         ["fmt"]
     );
 
-    let error = workflow::run_consumer_profile_with(
+    let error = workflow::run_consumer_test_with(
         &loaded,
-        ConsumerProfile::Test,
-        Some("nightly"),
+        &TestRequest::named("nightly"),
+        FailurePolicy::KeepGoing,
         &FakeSystemAdapter::new(false),
     )
     .expect_err("unknown layer is a configuration error");
-    assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED");
+    assert_eq!(error.code(), "test.unknown_selector");
     assert_eq!(error.details["selector"], "nightly");
     assert_eq!(error.details["available"], json!(["unit", "integrate"]));
 
@@ -672,10 +648,24 @@ fn consumer_missing_backend_is_a_structured_recovery_error() {
     ]);
     let context = CommandContext::from_cli(&cli).expect("consumer context");
     let loaded = LoadedConfig::load(&cli, &context).expect("consumer config");
-    let error = workflow::run_consumer_lint_profile(&loaded, None, PlatformScope::Host)
-        .expect_err("missing backend fails");
-    assert_eq!(error.code(), "CLI.SC_LINT_BACKEND_NOT_FOUND");
-    assert_eq!(error.documentation.as_deref(), Some("sc-lint docs setup"));
+    let error = workflow::run_consumer_lint_profile(
+        &loaded,
+        None,
+        PlatformScope::Host,
+        FailurePolicy::KeepGoing,
+    )
+    .expect_err("missing backend fails");
+    assert_eq!(error.code(), "profile.steps_failed");
+    let failed = &error.details["failed_steps"][0];
+    assert_eq!(failed["index"], 0);
+    assert_eq!(failed["name"], "missing");
+    assert_eq!(failed["exit_code"], Value::Null);
+    assert!(
+        failed["message"]
+            .as_str()
+            .is_some_and(|message| message.starts_with("missing failed to start")),
+        "{failed}"
+    );
     assert!(!error.to_string().to_ascii_lowercase().contains("traceback"));
 }
 
@@ -2311,6 +2301,22 @@ fn lint_profile_keeps_going_and_reports_every_failed_step_by_plan_index() {
         "3 of 14 steps failed: [1] clippy, [6] spell, [8] sc-boundary"
     );
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    assert_eq!(error.code(), "profile.steps_failed");
+    let failed = error.details["failed_steps"]
+        .as_array()
+        .expect("failed_steps array");
+    assert_eq!(failed.len(), 3);
+    for entry in failed {
+        let keys = entry
+            .as_object()
+            .expect("failed step object")
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        assert_eq!(keys, ["exit_code", "index", "message", "name"]);
+    }
+    assert_eq!(failed[1]["index"], 6);
+    assert_eq!(failed[1]["name"], "spell");
     let ran = adapter
         .invocations
         .lock()
@@ -3062,10 +3068,25 @@ fn step_names(steps: &[Value]) -> Vec<String> {
 /// Test hook run on the step's worker thread.
 type StepHook = Box<dyn Fn() + Send + Sync>;
 
+/// What the fake recorded for one `run_step` call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct StepRecord {
+    name: String,
+    argv: Vec<String>,
+    env: Vec<(String, String)>,
+    cwd: Option<PathBuf>,
+}
+
 struct FakeSystemAdapter {
     xwin_available: bool,
     host: crate::profile_plan::Platform,
     failures: HashMap<&'static str, &'static str>,
+    /// Exit code reported (as the `exit_code` detail) by an injected failure.
+    exit_codes: HashMap<&'static str, i32>,
+    /// `start:<name>` / `end:<name>` in the order they happened.
+    events: Mutex<Vec<String>>,
+    /// Every `run_step` call, in run order.
+    records: Mutex<Vec<StepRecord>>,
     /// Runs after the step is logged as started, before it completes.
     on_start: HashMap<&'static str, StepHook>,
     /// Runs when the step completes, before its result is returned.
@@ -3083,6 +3104,9 @@ impl FakeSystemAdapter {
             xwin_available,
             host: crate::profile_plan::Platform::host(),
             failures: HashMap::new(),
+            exit_codes: HashMap::new(),
+            events: Mutex::new(Vec::new()),
+            records: Mutex::new(Vec::new()),
             on_start: HashMap::new(),
             on_finish: HashMap::new(),
             planned_argv: Mutex::new(Vec::new()),
@@ -3104,6 +3128,7 @@ impl FakeSystemAdapter {
             .lock()
             .expect("fake invocation log lock")
             .push(name.to_string());
+        self.event("start", name);
         if let Some(hook) = self.on_start.get(name) {
             hook();
         }
@@ -3111,13 +3136,36 @@ impl FakeSystemAdapter {
             .lock()
             .expect("fake completion log lock")
             .push(name.to_string());
+        self.event("end", name);
         if let Some(hook) = self.on_finish.get(name) {
             hook();
         }
         if let Some(message) = self.failures.get(name) {
-            return Err(Box::new(CliError::backend_failure(*message)));
+            let mut error = CliError::backend_failure(*message);
+            if let Some(code) = self.exit_codes.get(name) {
+                error = error.with_detail(crate::consts::FIELD_EXIT_CODE, json!(code));
+            }
+            return Err(Box::new(error));
         }
         Ok(())
+    }
+
+    fn event(&self, what: &str, name: &str) {
+        self.events
+            .lock()
+            .expect("fake event log lock")
+            .push(format!("{what}:{name}"));
+    }
+
+    fn invoked(&self) -> Vec<String> {
+        self.invocations
+            .lock()
+            .expect("fake invocation log lock")
+            .clone()
+    }
+
+    fn records(&self) -> Vec<StepRecord> {
+        self.records.lock().expect("fake record log lock").clone()
     }
 }
 
@@ -3155,6 +3203,20 @@ impl workflow::SystemAdapter for FakeSystemAdapter {
         _repo_root: &Path,
         step: &workflow::StepPlan,
     ) -> Result<workflow::StepReport, CliError> {
+        let lossy = |value: &OsString| value.to_string_lossy().into_owned();
+        self.records
+            .lock()
+            .expect("fake record log lock")
+            .push(StepRecord {
+                name: step.name().to_string(),
+                argv: step.argv().map(lossy).collect(),
+                env: step
+                    .env()
+                    .iter()
+                    .map(|(key, value)| (lossy(key), lossy(value)))
+                    .collect(),
+                cwd: step.cwd().map(Path::to_path_buf),
+            });
         self.record_step(step.name()).map_err(|error| *error)?;
         Ok(workflow::StepReport::success(step))
     }
@@ -3909,7 +3971,13 @@ fn lint_rows_for(
     scope: PlatformScope,
     adapter: &FakeSystemAdapter,
 ) -> Result<Vec<Value>, CliError> {
-    let success = workflow::run_consumer_lint_with(loaded, selector, scope, adapter)?;
+    let success = workflow::run_consumer_lint_with(
+        loaded,
+        selector,
+        scope,
+        FailurePolicy::KeepGoing,
+        adapter,
+    )?;
     Ok(success.data["steps"]
         .as_array()
         .expect("steps array")
@@ -4063,12 +4131,14 @@ fn test_supported_execution_failure_is_nonzero() {
     let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
     let loaded = loaded.expect("config loads");
 
-    // A failing supported step is a non-zero backend failure and stops the run.
+    // A failing supported step is a non-zero backend failure; the next step
+    // still runs (both are cargo argv[0], so the cargo lane fixes the order).
     let mut failing = FakeSystemAdapter::new(true).on_host(Platform::Linux);
     failing.failures.insert("first", "first step exploded");
     let error = lint_rows_for(&loaded, None, PlatformScope::Host, &failing)
         .expect_err("failing step fails the run");
     assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    assert_eq!(error.code(), "profile.steps_failed");
     assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
     assert_eq!(
         failing
@@ -4076,8 +4146,8 @@ fn test_supported_execution_failure_is_nonzero() {
             .lock()
             .expect("fake invocation log lock")
             .as_slice(),
-        ["first"],
-        "fail-fast"
+        ["first", "second"],
+        "fail slow"
     );
 
     // A supported cross target without cargo-xwin is a capability failure, never a skip.
@@ -4167,4 +4237,757 @@ fn test_installer_shape_only_rust_semantic_rejection() {
         assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE, "{case}");
         assert_eq!(&error.details["detail_code"], detail_code, "{case}");
     }
+}
+
+// ---------------------------------------------------------------------------
+// Shared scheduler, fail-fast and test selectors (Phase L, l-6).
+// ---------------------------------------------------------------------------
+
+fn parallel_step(name: &str) -> workflow::StepPlan {
+    workflow::StepPlan::new(
+        name,
+        "test",
+        workflow::Lane::Parallel,
+        "tool",
+        Vec::<String>::new(),
+    )
+}
+
+fn cargo_step(name: &str) -> workflow::StepPlan {
+    workflow::StepPlan::new(name, "test", workflow::Lane::Cargo, "cargo", ["test"])
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Tests surface the shared CliError contract unchanged."
+)]
+fn run_scheduled(
+    adapter: &FakeSystemAdapter,
+    plans: Vec<workflow::StepPlan>,
+    policy: FailurePolicy,
+) -> Result<Vec<workflow::StepReport>, CliError> {
+    let steps = plans
+        .into_iter()
+        .enumerate()
+        .map(|(index, plan)| crate::scheduler::ScheduledStep::new(index, plan))
+        .collect::<Vec<_>>();
+    crate::scheduler::run_steps_scheduled(Path::new("."), adapter, &steps, policy)
+}
+
+fn sorted(mut names: Vec<String>) -> Vec<String> {
+    names.sort();
+    names
+}
+
+fn detail_names(error: &CliError, key: &str) -> Vec<String> {
+    error.details[key]
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .map(|entry| entry["name"].as_str().expect("entry name").to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Position of `event` in the fake's event log.
+fn event_position(adapter: &FakeSystemAdapter, event: &str) -> usize {
+    adapter
+        .events
+        .lock()
+        .expect("fake event log lock")
+        .iter()
+        .position(|recorded| recorded == event)
+        .unwrap_or_else(|| panic!("{event} was not recorded"))
+}
+
+#[test]
+fn profile_runs_all_steps_when_one_fails() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("b", "b exploded");
+    let error = run_scheduled(
+        &adapter,
+        vec![parallel_step("a"), parallel_step("b"), parallel_step("c")],
+        FailurePolicy::KeepGoing,
+    )
+    .expect_err("b fails the run");
+    assert_eq!(error.message, "1 of 3 steps failed: [1] b");
+    assert_eq!(
+        error.details["failed_steps"],
+        json!([{"index": 1, "name": "b", "exit_code": null, "message": "b exploded"}])
+    );
+    assert_eq!(sorted(adapter.invoked()), ["a", "b", "c"]);
+}
+
+#[test]
+fn cargo_lane_continues_after_failure() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("c1", "c1 exploded");
+    run_scheduled(
+        &adapter,
+        vec![cargo_step("c1"), cargo_step("c2"), cargo_step("c3")],
+        FailurePolicy::KeepGoing,
+    )
+    .expect_err("c1 fails the run");
+    assert_eq!(adapter.invoked(), ["c1", "c2", "c3"]);
+}
+
+#[test]
+fn report_is_in_declaration_order() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    let (y_done, x_waits) = mpsc::channel();
+    let x_waits = Mutex::new(x_waits);
+    // `x` (index 0) cannot finish until `y` (index 1) has.
+    adapter.on_start.insert(
+        "x",
+        Box::new(move || {
+            x_waits
+                .lock()
+                .expect("x receiver lock")
+                .recv_timeout(RENDEZVOUS_TIMEOUT)
+                .expect("y never finished");
+        }),
+    );
+    adapter.on_finish.insert(
+        "y",
+        Box::new(move || y_done.send(()).expect("x is waiting")),
+    );
+    let reports = run_scheduled(
+        &adapter,
+        vec![parallel_step("x"), parallel_step("y")],
+        FailurePolicy::KeepGoing,
+    )
+    .expect("both pass");
+    let names = reports
+        .iter()
+        .map(|report| report.to_json()["name"].as_str().expect("name").to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["x", "y"]);
+    assert_eq!(
+        adapter
+            .completions
+            .lock()
+            .expect("fake completion log lock")
+            .as_slice(),
+        ["y", "x"]
+    );
+}
+
+#[test]
+fn panicking_step_becomes_failed_outcome() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.on_start.insert("b", Box::new(|| panic!("boom")));
+    let error = run_scheduled(
+        &adapter,
+        vec![parallel_step("a"), parallel_step("b"), cargo_step("c")],
+        FailurePolicy::KeepGoing,
+    )
+    .expect_err("the panic fails the run");
+    assert_eq!(error.code(), "profile.steps_failed");
+    let failed = &error.details["failed_steps"];
+    assert_eq!(failed.as_array().map(Vec::len), Some(1));
+    assert_eq!(failed[0]["name"], "b");
+    assert_eq!(failed[0]["index"], 1);
+    assert_eq!(failed[0]["exit_code"], Value::Null);
+    assert_eq!(failed[0]["message"], "b panicked during execution: boom");
+    assert_eq!(sorted(adapter.invoked()), ["a", "b", "c"]);
+}
+
+#[test]
+fn lane_is_cargo_only_for_cargo_argv0() {
+    for program in ["cargo", "/usr/bin/cargo", "cargo.exe", "CARGO"] {
+        assert_eq!(
+            workflow::Lane::for_program(program.as_ref()),
+            workflow::Lane::Cargo,
+            "{program}"
+        );
+    }
+    for program in ["cargo-nextest", "just", "python", "/usr/bin/cargo-xwin"] {
+        assert_eq!(
+            workflow::Lane::for_program(program.as_ref()),
+            workflow::Lane::Parallel,
+            "{program}"
+        );
+    }
+}
+
+#[test]
+fn after_all_step_starts_last() {
+    let adapter = FakeSystemAdapter::new(false);
+    run_scheduled(
+        &adapter,
+        vec![
+            parallel_step("tail").with_after_all(true),
+            parallel_step("a"),
+            cargo_step("c"),
+        ],
+        FailurePolicy::KeepGoing,
+    )
+    .expect("all pass");
+    let started = event_position(&adapter, "start:tail");
+    assert!(event_position(&adapter, "end:a") < started);
+    assert!(event_position(&adapter, "end:c") < started);
+}
+
+#[test]
+fn multiple_after_all_run_in_declaration_order() {
+    let adapter = FakeSystemAdapter::new(false);
+    run_scheduled(
+        &adapter,
+        vec![
+            parallel_step("t1").with_after_all(true),
+            parallel_step("a"),
+            cargo_step("t2").with_after_all(true),
+        ],
+        FailurePolicy::KeepGoing,
+    )
+    .expect("all pass");
+    let events = adapter.events.lock().expect("fake event log lock").clone();
+    assert_eq!(events[2..], ["start:t1", "end:t1", "start:t2", "end:t2"]);
+}
+
+#[test]
+fn fail_fast_stops_scheduling_and_skips_after_all() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("p", "p exploded");
+    let error = run_scheduled(
+        &adapter,
+        vec![
+            parallel_step("p"),
+            parallel_step("tail").with_after_all(true),
+        ],
+        FailurePolicy::FailFast,
+    )
+    .expect_err("p fails the run");
+    assert_eq!(adapter.invoked(), ["p"]);
+    assert_eq!(detail_names(&error, "failed_steps"), ["p"]);
+    assert_eq!(detail_names(&error, "skipped_steps"), ["tail"]);
+}
+
+#[test]
+fn fail_fast_skips_unstarted_cargo_steps_only() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("c1", "c1 exploded");
+    let (p_started, c1_waits) = mpsc::channel();
+    let (c1_finished, p_waits) = mpsc::channel();
+    // `c1` fails only once `p` is running; `p` finishes after `c1` has.
+    let c1_waits = Mutex::new(c1_waits);
+    adapter.on_start.insert(
+        "c1",
+        Box::new(move || {
+            c1_waits
+                .lock()
+                .expect("c1 receiver lock")
+                .recv_timeout(RENDEZVOUS_TIMEOUT)
+                .expect("p never started");
+        }),
+    );
+    adapter.on_finish.insert(
+        "c1",
+        Box::new(move || c1_finished.send(()).expect("p is waiting")),
+    );
+    adapter.on_start.insert(
+        "p",
+        rendezvous_hook(p_started, p_waits, "c1 never finished while p was running"),
+    );
+    let error = run_scheduled(
+        &adapter,
+        vec![
+            cargo_step("c1"),
+            parallel_step("p"),
+            cargo_step("c2"),
+            parallel_step("tail").with_after_all(true),
+        ],
+        FailurePolicy::FailFast,
+    )
+    .expect_err("c1 fails the run");
+    assert_eq!(sorted(adapter.invoked()), ["c1", "p"]);
+    assert_eq!(detail_names(&error, "failed_steps"), ["c1"]);
+    assert_eq!(detail_names(&error, "skipped_steps"), ["c2", "tail"]);
+}
+
+#[test]
+fn skipped_steps_listed_not_failed() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("c1", "c1 exploded");
+    let error = run_scheduled(
+        &adapter,
+        vec![cargo_step("c1"), cargo_step("c2")],
+        FailurePolicy::FailFast,
+    )
+    .expect_err("c1 fails the run");
+    assert_eq!(error.message, "1 of 2 steps failed: [0] c1");
+    assert_eq!(
+        error.details["skipped_steps"],
+        json!([{"index": 1, "name": "c2", "reason": "fail-fast"}])
+    );
+    assert_eq!(detail_names(&error, "failed_steps"), ["c1"]);
+
+    let error = run_scheduled(
+        &adapter,
+        vec![cargo_step("c1"), cargo_step("c2")],
+        FailurePolicy::KeepGoing,
+    )
+    .expect_err("c1 fails the run");
+    assert!(error.details.get("skipped_steps").is_none());
+}
+
+fn selector_config(selectors: &str) -> String {
+    format!(
+        "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n\n[tool.sc-lint.test]\n{selectors}"
+    )
+}
+
+/// The table-form fixture of the selector tests: `ci` groups `unit` then
+/// `nested`, which reaches `unit` again through `integration`.
+const SELECTOR_TABLE: &str = "default = \"unit\"\n\n[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\n\n[tool.sc-lint.test.selectors.integration]\ncommand = [\"cargo\", \"test\", \"--test\", \"integration\"]\nenv = { RUST_LOG = \"debug\", SC_MODE = \"ci\" }\ncwd = \"crates/app\"\n\n[tool.sc-lint.test.selectors.nested]\ngroup = [\"integration\", \"unit\"]\n\n[tool.sc-lint.test.selectors.ci]\ngroup = [\"unit\", \"nested\"]\n\n[tool.sc-lint.test.selectors.win-only]\ncommand = [\"cargo\", \"test\", \"--features\", \"windows\"]\nplatforms = [\"windows\"]\n";
+
+fn load_test_config(text: &str) -> (TempDir, Result<LoadedConfig, CliError>) {
+    let fixture = TempDir::new().expect("fixture");
+    let config_path = fixture.path().join("sc-lint.toml");
+    fs::write(&config_path, text).expect("consumer config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "test",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("consumer test context");
+    let loaded = LoadedConfig::load(&cli, &context);
+    (fixture, loaded)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Tests surface the shared CliError contract unchanged."
+)]
+fn run_test_request(
+    loaded: &LoadedConfig,
+    request: &TestRequest,
+    adapter: &FakeSystemAdapter,
+) -> Result<crate::command::CommandSuccess, CliError> {
+    workflow::run_consumer_test_with(loaded, request, FailurePolicy::KeepGoing, adapter)
+}
+
+#[test]
+fn selector_default_runs_when_none_named() {
+    let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    let run = run_test_request(&loaded, &TestRequest::all(), &adapter).expect("default runs");
+    assert_eq!(run.data["selector"], "unit");
+    assert_eq!(adapter.invoked(), ["unit"]);
+}
+
+#[test]
+fn selector_opt_in_runs_only_named() {
+    let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    run_test_request(&loaded, &TestRequest::named("integration"), &adapter)
+        .expect("named selector runs");
+    assert_eq!(adapter.invoked(), ["integration"]);
+
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    run_test_request(&loaded, &TestRequest::all(), &adapter).expect("default runs");
+    assert!(
+        !adapter.invoked().contains(&"integration".to_string()),
+        "a non-default selector never runs unless named"
+    );
+}
+
+#[test]
+fn selector_forwards_args() {
+    let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    let request = TestRequest::new(
+        Some("unit".to_string()),
+        vec!["--nocapture".to_string()],
+        false,
+    );
+    run_test_request(&loaded, &request, &adapter).expect("unit runs");
+    assert_eq!(adapter.records()[0].argv, ["cargo", "test", "--nocapture"]);
+
+    let request = TestRequest::new(
+        Some("ci".to_string()),
+        vec!["--nocapture".to_string()],
+        false,
+    );
+    let error = run_test_request(&loaded, &request, &FakeSystemAdapter::new(false))
+        .expect_err("a group does not take forwarded args");
+    assert_eq!(error.kind, CliErrorKind::Usage);
+    assert_eq!(
+        error.message,
+        "group selector 'ci' does not accept forwarded arguments"
+    );
+}
+
+#[test]
+fn selector_group_expands() {
+    let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    let run = run_test_request(&loaded, &TestRequest::named("ci"), &adapter).expect("group runs");
+    let steps = run.data["steps"].as_array().expect("steps");
+    // Listed order, nested groups expanded, `unit` (reached twice) runs once.
+    assert_eq!(step_names(steps), ["unit", "integration"]);
+    assert_eq!(adapter.invoked(), ["unit", "integration"]);
+}
+
+#[test]
+fn selector_env_and_cwd_applied() {
+    let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    run_test_request(&loaded, &TestRequest::named("integration"), &adapter)
+        .expect("integration runs");
+    assert_eq!(
+        adapter.records(),
+        [StepRecord {
+            name: "integration".to_string(),
+            argv: ["cargo", "test", "--test", "integration"]
+                .map(String::from)
+                .to_vec(),
+            env: vec![
+                ("RUST_LOG".to_string(), "debug".to_string()),
+                ("SC_MODE".to_string(), "ci".to_string()),
+            ],
+            cwd: Some(PathBuf::from("crates/app")),
+        }]
+    );
+}
+
+#[test]
+fn selector_platform_mismatch_skipped() {
+    let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    let run = run_test_request(&loaded, &TestRequest::named("win-only"), &adapter)
+        .expect("a platform skip is a success");
+    assert_eq!(
+        run.data["steps"],
+        json!([{
+            "name": "win-only",
+            "status": "skipped",
+            "reason": "platform_mismatch",
+            "host": "linux",
+            "platforms": ["windows"],
+        }])
+    );
+    assert!(adapter.invoked().is_empty());
+}
+
+#[test]
+fn selector_list_prints_names() {
+    let (fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let config_path = fixture.path().join("sc-lint.toml");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--config",
+        config_path.to_str().expect("config path"),
+        "test",
+        "--list",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("list context");
+    let adapter = FakeSystemAdapter::new(false);
+    let listed = run_test_request(&loaded, context.test_request(), &adapter).expect("list");
+    let names = listed.data["selectors"]
+        .as_array()
+        .expect("selectors")
+        .iter()
+        .map(|selector| selector["name"].as_str().expect("name").to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["ci", "integration", "nested", "unit", "win-only"]);
+    assert_eq!(listed.data["default"], "unit");
+    assert!(adapter.invoked().is_empty(), "--list runs nothing");
+
+    let envelope = CommandEnvelope::success(context.command_id(), listed.data);
+    assert_eq!(
+        crate::render::render_success_human(&context, &envelope),
+        "ci: group [unit, nested]\nintegration: cargo test --test integration\nnested: group [integration, unit]\nunit (default): cargo test\nwin-only: cargo test --features windows [windows]"
+    );
+}
+
+#[test]
+fn unknown_selector_rejected() {
+    let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
+    let loaded = loaded.expect("selector config loads");
+    let error = run_test_request(
+        &loaded,
+        &TestRequest::named("nightly"),
+        &FakeSystemAdapter::new(false),
+    )
+    .expect_err("unknown CLI name");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert_eq!(error.details["selector"], "nightly");
+    assert_eq!(
+        error.details["available"],
+        json!(["ci", "integration", "nested", "unit", "win-only"])
+    );
+
+    let member = "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\n\n[tool.sc-lint.test.selectors.ci]\ngroup = [\"unit\", \"lint\"]\n";
+    let (_fixture, loaded) = load_test_config(&selector_config(member));
+    let error = loaded.expect_err("unknown group member");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause
+                .starts_with("selector 'lint' listed by group 'ci' is not declared in ")),
+        "{error:?}"
+    );
+
+    let default = "default = \"nightly\"\n\n[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\n";
+    let (_fixture, loaded) = load_test_config(&selector_config(default));
+    let error = loaded.expect_err("unknown default");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert!(
+        error.cause.as_deref().is_some_and(|cause| cause
+            .starts_with("default names selector 'nightly', which is not declared in ")),
+        "{error:?}"
+    );
+
+    let no_default = "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\n";
+    let (_fixture, loaded) = load_test_config(&selector_config(no_default));
+    let loaded = loaded.expect("a config without default loads");
+    let error = run_test_request(&loaded, &TestRequest::all(), &FakeSystemAdapter::new(false))
+        .expect_err("bare invocation without a default");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.starts_with("no selector was named and ")
+                && cause.ends_with(" declares no default")),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn group_cycle_rejected() {
+    let cycle = "[tool.sc-lint.test.selectors.a]\ngroup = [\"b\"]\n\n[tool.sc-lint.test.selectors.b]\ngroup = [\"a\"]\n";
+    let (_fixture, loaded) = load_test_config(&selector_config(cycle));
+    let error = loaded.expect_err("a -> b -> a");
+    assert_eq!(error.code(), "test.group_cycle");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.starts_with("selector group cycle: a -> b -> a in ")),
+        "{error:?}"
+    );
+
+    let self_cycle = "[tool.sc-lint.test.selectors.a]\ngroup = [\"a\"]\n";
+    let (_fixture, loaded) = load_test_config(&selector_config(self_cycle));
+    let error = loaded.expect_err("a -> a");
+    assert_eq!(error.code(), "test.group_cycle");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.starts_with("selector group cycle: a -> a in ")),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn after_all_on_group_rejected() {
+    let group = "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\n\n[tool.sc-lint.test.selectors.ci]\ngroup = [\"unit\"]\nafter_all = false\n";
+    let (_fixture, loaded) = load_test_config(&selector_config(group));
+    let error = loaded.expect_err("a group never takes after_all");
+    assert_eq!(error.code(), "profile.invalid_after_all");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.starts_with("group selector 'ci' in ")
+                && cause.ends_with(" declares after_all")),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn legacy_test_rows_still_run_all() {
+    let rows = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n\n[[tool.sc-lint.test]]\nname = \"first\"\ncommand = [\"cargo\", \"test\"]\n\n[[tool.sc-lint.test]]\nname = \"second\"\ncommand = [\"cargo\", \"test\", \"--doc\"]\n\n[[tool.sc-lint.test]]\nname = \"third\"\ncommand = [\"cargo\", \"test\", \"--release\"]\n";
+    let (_fixture, loaded) = load_test_config(rows);
+    let loaded = loaded.expect("rows config loads");
+    for request in [TestRequest::all(), TestRequest::named("all")] {
+        let adapter = FakeSystemAdapter::new(false);
+        let run = run_test_request(&loaded, &request, &adapter).expect("every row runs");
+        assert_eq!(run.data["selector"], "all");
+        // Every row is cargo argv[0], so the cargo lane fixes the order.
+        assert_eq!(adapter.invoked(), ["first", "second", "third"]);
+    }
+    let adapter = FakeSystemAdapter::new(false);
+    run_test_request(&loaded, &TestRequest::named("second"), &adapter).expect("one row");
+    assert_eq!(adapter.invoked(), ["second"]);
+}
+
+#[test]
+fn mixed_test_forms_rejected() {
+    let mixed = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n\n[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n\n[tool.sc-lint.test]\ndefault = \"unit\"\n";
+    let (_fixture, loaded) = load_test_config(mixed);
+    let error = loaded.expect_err("both forms in one file");
+    assert_eq!(error.code(), "CLI.SC_LINT_CONFIG_MALFORMED");
+}
+
+#[test]
+fn consumer_lint_after_all_and_platform_skips_keep_declaration_order() {
+    let rows = "[[tool.sc-lint.lint]]\nname = \"tail\"\ncommand = [\"cargo\", \"--version\"]\nafter_all = true\n\n[[tool.sc-lint.lint]]\nname = \"win\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"windows\"\n\n[[tool.sc-lint.lint]]\nname = \"bad\"\ncommand = [\"cargo\", \"--version\"]\n\n";
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(rows));
+    let loaded = loaded.expect("lint rows load");
+
+    let adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    let steps = lint_rows_for(&loaded, None, PlatformScope::All, &adapter).expect("all pass");
+    assert_eq!(step_names(&steps), ["tail", "win", "bad"]);
+    assert_eq!(steps[1]["status"], "skipped");
+    assert!(event_position(&adapter, "end:bad") < event_position(&adapter, "start:tail"));
+
+    let mut adapter = FakeSystemAdapter::new(false).on_host(Platform::Linux);
+    adapter.failures.insert("bad", "bad exploded");
+    let error =
+        lint_rows_for(&loaded, None, PlatformScope::All, &adapter).expect_err("bad fails the run");
+    assert_eq!(error.details["failed_steps"][0]["index"], 2);
+    assert_eq!(error.details["failed_steps"][0]["name"], "bad");
+}
+
+#[test]
+fn config_errors_carry_envelope_keys() {
+    let invalid_after_all = "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\nafter_all = \"yes\"\n";
+    let unknown = "[tool.sc-lint.test.selectors.ci]\ngroup = [\"missing\"]\n";
+    let cycle = "[tool.sc-lint.test.selectors.a]\ngroup = [\"a\"]\n";
+    for (selectors, code, name, recovery) in [
+        (
+            invalid_after_all,
+            "profile.invalid_after_all",
+            "'unit'",
+            "remove after_all from that selector",
+        ),
+        (
+            unknown,
+            "test.unknown_selector",
+            "'missing'",
+            "use a name from sc-lint test --list",
+        ),
+        (
+            cycle,
+            "test.group_cycle",
+            "a -> a",
+            "break the cycle in [tool.sc-lint.test]",
+        ),
+    ] {
+        let (fixture, loaded) = load_test_config(&selector_config(selectors));
+        let error = loaded.expect_err(code);
+        let serialized = serde_json::to_value(&error).expect("error serializes");
+        let config = fixture.path().join("sc-lint.toml").display().to_string();
+        assert_eq!(serialized["kind"], "config", "{code}");
+        assert_eq!(serialized["code"], code);
+        let cause = serialized["cause"].as_str().expect("cause");
+        assert!(
+            cause.contains(name) && cause.contains(&config),
+            "{code}: {cause}"
+        );
+        assert_eq!(serialized["suggested_action"], recovery, "{code}");
+    }
+}
+
+#[test]
+fn failed_steps_report_shape() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("clippy", "clippy failed");
+    adapter.exit_codes.insert("clippy", 101);
+    let error = run_scheduled(
+        &adapter,
+        vec![
+            cargo_step("fmt"),
+            parallel_step("spell"),
+            cargo_step("clippy"),
+        ],
+        FailurePolicy::KeepGoing,
+    )
+    .expect_err("clippy fails the run");
+    assert_eq!(
+        error.details["failed_steps"],
+        json!([{"index": 2, "name": "clippy", "exit_code": 101, "message": "clippy failed"}])
+    );
+    assert_eq!(error.kind, CliErrorKind::BackendFailure);
+    assert_eq!(error.code(), "profile.steps_failed");
+    assert_eq!(
+        error.suggested_action.as_deref(),
+        Some("fix the failing steps and rerun")
+    );
+    assert_eq!(error.exit_code(), crate::consts::EXIT_BACKEND_FAILURE);
+}
+
+#[test]
+fn fail_fast_flag_parses_and_selects_policy() {
+    let policy = |argv: &[&str]| {
+        CommandContext::from_cli(&Cli::parse_from(argv))
+            .expect("context")
+            .failure_policy()
+    };
+    assert_eq!(
+        policy(&["sc-lint", "test", "--fail-fast"]),
+        FailurePolicy::FailFast
+    );
+    assert_eq!(
+        policy(&["sc-lint", "lint", "ci", "--consumer", "--fail-fast"]),
+        FailurePolicy::FailFast
+    );
+    assert_eq!(policy(&["sc-lint", "test"]), FailurePolicy::KeepGoing);
+    assert_eq!(
+        policy(&["sc-lint", "lint", "ci", "--consumer"]),
+        FailurePolicy::KeepGoing
+    );
+    assert!(Cli::try_parse_from(["sc-lint", "lint", "ci", "--fail-fast"]).is_err());
+    assert!(Cli::try_parse_from(["sc-lint", "test", "--list", "unit"]).is_err());
+}
+
+#[test]
+fn forwarded_args_parse() {
+    let request = |argv: &[&str]| {
+        CommandContext::from_cli(&Cli::parse_from(argv))
+            .expect("context")
+            .test_request()
+            .clone()
+    };
+    let unit = request(&["sc-lint", "test", "unit", "--nocapture"]);
+    assert_eq!(unit.selector(), Some("unit"));
+    assert_eq!(unit.args(), ["--nocapture"]);
+
+    let cli = Cli::parse_from(["sc-lint", "test", "--fail-fast", "unit", "--fail-fast"]);
+    assert!(matches!(
+        cli.command,
+        Some(Command::Test {
+            fail_fast: true,
+            ..
+        })
+    ));
+    let forwarded = request(&["sc-lint", "test", "--fail-fast", "unit", "--fail-fast"]);
+    assert_eq!(forwarded.selector(), Some("unit"));
+    assert_eq!(forwarded.args(), ["--fail-fast"]);
+}
+
+#[test]
+fn human_render_lists_failed_and_skipped_steps() {
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("a", "a exploded");
+    adapter.exit_codes.insert("a", 101);
+    // `a` fails on the cargo lane before `b` starts, so `b` is skipped; the
+    // Parallel step `c` always starts and panics.
+    adapter.on_start.insert("c", Box::new(|| panic!("boom")));
+    let error = run_scheduled(
+        &adapter,
+        vec![cargo_step("a"), cargo_step("b"), parallel_step("c")],
+        FailurePolicy::FailFast,
+    )
+    .expect_err("a and c fail");
+    assert_eq!(
+        crate::render::render_error_human("test", &error),
+        "test: 2 of 3 steps failed: [0] a, [2] c (profile.steps_failed)\nFailed steps:\n  [0] a (exit 101): a exploded\n  [2] c (exit n/a): c panicked during execution: boom\nSkipped steps (fail-fast): b\nfix the failing steps and rerun"
+    );
 }

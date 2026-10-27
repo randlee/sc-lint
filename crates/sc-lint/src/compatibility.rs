@@ -3,10 +3,13 @@
 
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
+use std::process::Output;
 use std::str::FromStr;
 
 use semver::Version;
 use serde::Deserialize;
+use serde_json::Value;
 use serde_json::json;
 
 use crate::CliError;
@@ -275,4 +278,114 @@ pub(crate) fn stderr_or_status(output: &std::process::Output) -> String {
     } else {
         stderr
     }
+}
+
+/// Probes the installed sc-lint binary with `--json version` and checks the
+/// reported version against `requirement`.
+#[expect(
+    clippy::result_large_err,
+    reason = "The compatibility check must return one stable CliError envelope for each recoverable failure."
+)]
+pub(crate) fn evaluate_compatibility(
+    requirement: &CompatibilityRequirement,
+    binary_override: Option<&Path>,
+) -> Result<Value, CliError> {
+    let binary = binary_override.unwrap_or_else(|| Path::new(crate::consts::SERVICE_NAME));
+    let output = run_version_probe(requirement, binary)?;
+    let probe =
+        serde_json::from_slice::<VersionProbeEnvelope>(&output.stdout).map_err(|error| {
+            compatibility_runtime_error(
+                CompatibilityErrorCode::ProbeMalformed,
+                format!(
+                    "sc-lint binary {} did not emit a valid version probe",
+                    required_by(requirement, binary)
+                ),
+                requirement,
+                binary,
+                None,
+                error.to_string(),
+            )
+        })?;
+    let observed = validate_version_probe(probe, requirement, binary)?;
+    if observed < *requirement.minimum_version.as_semver() {
+        return Err(compatibility_runtime_error(
+            CompatibilityErrorCode::VersionTooOld,
+            format!(
+                "installed sc-lint version `{observed}` at `{}` does not satisfy required minimum `{}` from `{}`",
+                binary.display(),
+                requirement.minimum_version,
+                requirement.config_path.display()
+            ),
+            requirement,
+            binary,
+            Some(&observed),
+            "the installed release is below the repository minimum version".to_string(),
+        ));
+    }
+
+    Ok(json!({
+        "status": "pass",
+        "minimum_version": requirement.minimum_version.to_string(),
+        "installed_version": observed.to_string(),
+        "binary_path": binary.display().to_string(),
+        "config_path": requirement.config_path.display().to_string(),
+    }))
+}
+
+/// `` `<binary>` required at least `<minimum>` by `<config>` ``, the subject of
+/// every probe failure message.
+fn required_by(requirement: &CompatibilityRequirement, binary: &Path) -> String {
+    format!(
+        "`{}` required at least `{}` by `{}`",
+        binary.display(),
+        requirement.minimum_version,
+        requirement.config_path.display()
+    )
+}
+
+/// Runs `<binary> --json version`; a binary that cannot start or exits
+/// unsuccessfully is a compatibility runtime error.
+#[expect(
+    clippy::result_large_err,
+    reason = "The compatibility check must return one stable CliError envelope for each recoverable failure."
+)]
+fn run_version_probe(
+    requirement: &CompatibilityRequirement,
+    binary: &Path,
+) -> Result<Output, CliError> {
+    let output = Command::new(binary)
+        .args(["--json", "version"])
+        .output()
+        .map_err(|error| {
+            let (code, verb) = if error.kind() == std::io::ErrorKind::NotFound {
+                (CompatibilityErrorCode::BinaryNotFound, "find")
+            } else {
+                (CompatibilityErrorCode::BinaryExecutionFailed, "execute")
+            };
+            compatibility_runtime_error(
+                code,
+                format!(
+                    "could not {verb} sc-lint binary {}",
+                    required_by(requirement, binary)
+                ),
+                requirement,
+                binary,
+                None,
+                error.to_string(),
+            )
+        })?;
+    if !output.status.success() {
+        return Err(compatibility_runtime_error(
+            CompatibilityErrorCode::BinaryExecutionFailed,
+            format!(
+                "sc-lint binary {} exited unsuccessfully",
+                required_by(requirement, binary)
+            ),
+            requirement,
+            binary,
+            None,
+            stderr_or_status(&output),
+        ));
+    }
+    Ok(output)
 }

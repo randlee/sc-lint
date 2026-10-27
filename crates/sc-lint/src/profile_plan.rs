@@ -346,6 +346,7 @@ pub struct PlannedStep {
     platform: Option<Platform>,
     target: Option<Target>,
     cargo_verb: Option<CargoVerb>,
+    after_all: bool,
 }
 
 impl PlannedStep {
@@ -384,6 +385,11 @@ impl PlannedStep {
     )]
     pub const fn cargo_verb(&self) -> Option<CargoVerb> {
         self.cargo_verb
+    }
+
+    /// Whether the step starts only after every other step has finished.
+    pub const fn after_all(&self) -> bool {
+        self.after_all
     }
 
     /// Whether this step runs through the `cargo xwin` subcommand.
@@ -504,7 +510,7 @@ pub(crate) fn validate_lint_step(step: &ConsumerProfileStep) -> Result<(), Profi
 ///
 /// # Errors
 /// Returns `UNKNOWN_STEP_FIELD` for any key outside `name`, `command`,
-/// `platform`, `target`, or a `platform` that is not `linux|macos|windows`;
+/// `platform`, `target`, `after_all` (decoded by the loader), or a `platform` that is not `linux|macos|windows`;
 /// returns `TARGET_OS_MISMATCH` for a malformed `target` triple.
 pub(crate) fn decode_lint_step_fields(
     step: &str,
@@ -518,7 +524,7 @@ pub(crate) fn decode_lint_step_fields(
             Some(step),
             Some(key),
             format!("lint step `{step}` has unknown field `{key}`"),
-            "Lint steps accept only `name`, `command`, `platform` and `target`.",
+            "Lint steps accept only `name`, `command`, `platform`, `target` and `after_all`.",
         ));
     }
     let platform = platform
@@ -831,6 +837,7 @@ fn planned(
         platform: step.platform(),
         target: step.target().cloned(),
         cargo_verb: CargoVerb::from_argv(step.command()),
+        after_all: step.after_all(),
     })
 }
 
@@ -880,6 +887,7 @@ pub(crate) struct ConsumerProfileStep {
     command: Vec<String>,
     platform: Option<Platform>,
     target: Option<Target>,
+    after_all: bool,
 }
 
 impl ConsumerProfileStep {
@@ -896,7 +904,18 @@ impl ConsumerProfileStep {
             command,
             platform,
             target,
+            after_all: false,
         }
+    }
+
+    /// Sets the decoded `after_all` flag of the row.
+    pub(crate) const fn with_after_all(mut self, after_all: bool) -> Self {
+        self.after_all = after_all;
+        self
+    }
+
+    pub(crate) const fn after_all(&self) -> bool {
+        self.after_all
     }
 
     pub(crate) fn name(&self) -> &str {

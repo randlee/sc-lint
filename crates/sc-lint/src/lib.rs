@@ -13,6 +13,8 @@ mod installer;
 mod profile_plan;
 pub(crate) mod python_adapter;
 mod render;
+mod scheduler;
+mod test_selectors;
 mod workflow;
 
 #[cfg(test)]

@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -14,14 +13,10 @@ pub(crate) use crate::compatibility::CompatibilityErrorCode;
 pub(crate) use crate::compatibility::CompatibilityRequirement;
 pub use crate::compatibility::MinimumVersion;
 pub(crate) use crate::compatibility::VERSION_PROBE_SCHEMA;
-pub(crate) use crate::compatibility::VersionProbeEnvelope;
 pub(crate) use crate::compatibility::compatibility_config_error;
 pub(crate) use crate::compatibility::compatibility_requirement_from_file;
-pub(crate) use crate::compatibility::compatibility_runtime_error;
 pub(crate) use crate::compatibility::load_compatibility_requirement;
 pub(crate) use crate::compatibility::missing_consumer_field;
-pub(crate) use crate::compatibility::stderr_or_status;
-pub(crate) use crate::compatibility::validate_version_probe;
 pub(crate) use crate::consumer_integration::run_consumer_init;
 #[cfg(test)]
 pub(crate) use crate::consumer_integration::run_consumer_init_at;
@@ -34,6 +29,9 @@ use crate::profile_plan::decode_lint_step_fields;
 use crate::profile_plan::profile_plan_config_error;
 use crate::profile_plan::reject_test_step_fields;
 use crate::profile_plan::validate_lint_step;
+use crate::scheduler::decode_after_all;
+
+use crate::test_selectors::TestSelectors;
 
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 
@@ -80,7 +78,7 @@ struct ConsumerRequirement {
     root: PathBuf,
     lint: Vec<ConsumerProfileStep>,
     lint_profiles: LintProfiles,
-    test: Vec<ConsumerProfileStep>,
+    test: TestSelectors,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -258,56 +256,18 @@ impl LoadedConfig {
         }
     }
 
+    /// The consumer root and the validated `[tool.sc-lint.test]` selectors.
     #[expect(
         clippy::result_large_err,
-        reason = "Consumer profile lookup retains the shared top-level CliError contract."
+        reason = "Consumer test selection retains the shared top-level CliError contract."
     )]
-    /// Resolves the consumer profile steps selected by `selector`.
-    ///
-    /// `None` and [`CONSUMER_SELECTOR_ALL`] select every configured step in
-    /// declaration order; any other value selects the single step with that name.
-    pub(crate) fn consumer_profile(
-        &self,
-        profile: ConsumerProfile,
-        selector: Option<&str>,
-    ) -> Result<(&Path, &[ConsumerProfileStep]), CliError> {
+    pub(crate) fn test_selectors(&self) -> Result<(&Path, &TestSelectors), CliError> {
         let LoadedConfigMode::Consumer(requirement) = &self.mode else {
             return Err(CliError::internal(
                 "consumer profile execution requires a consumer configuration",
             ));
         };
-        let steps = match profile {
-            ConsumerProfile::Lint => &requirement.lint,
-            ConsumerProfile::Test => &requirement.test,
-        };
-        let Some(name) = selector.filter(|name| *name != CONSUMER_SELECTOR_ALL) else {
-            return Ok((&requirement.root, steps));
-        };
-        let step =
-            steps
-                .iter()
-                .find(|step| step.name() == name)
-                .ok_or_else(|| {
-                    let available = steps
-                        .iter()
-                        .map(ConsumerProfileStep::name)
-                        .collect::<Vec<_>>();
-                    consumer_profile_error(
-                self.config_path.as_deref().unwrap_or_else(|| Path::new(CONFIG_FILENAME)),
-                profile.as_str(),
-                format!(
-                    "consumer `{}` profile has no step named `{name}`; configured steps: {}",
-                    profile.as_str(),
-                    available.join(", ")
-                ),
-            )
-            .with_detail("selector", json!(name))
-            .with_detail("available", json!(available))
-            .with_suggested_action(format!(
-                "Pass one of the configured step names or `{CONSUMER_SELECTOR_ALL}`."
-            ))
-                })?;
-        Ok((&requirement.root, std::slice::from_ref(step)))
+        Ok((&requirement.root, &requirement.test))
     }
 
     /// Resolves a consumer lint selector to planner input.
@@ -429,7 +389,7 @@ impl LoadedConfig {
         let lint = validate_consumer_profile("lint", &sc_lint.lint, &config_path)?;
         let lint_profiles = LintProfiles::parse(&sc_lint.lint_profiles, &lint)
             .map_err(|error| profile_plan_config_error(error, &config_path))?;
-        let test = validate_consumer_profile("test", &sc_lint.test, &config_path)?;
+        let test = test_selectors_from_file(sc_lint.test.as_ref(), &config_path)?;
         let root = config_path
             .parent()
             .ok_or_else(|| CliError::internal("consumer configuration has no parent directory"))?
@@ -518,96 +478,7 @@ impl LoadedConfig {
                 "compatibility evaluation requires a compatibility configuration",
             ));
         };
-        let binary = binary_override.unwrap_or_else(|| Path::new(crate::consts::SERVICE_NAME));
-        let output = Command::new(binary)
-            .args(["--json", "version"])
-            .output()
-            .map_err(|error| {
-                let (code, message) = if error.kind() == std::io::ErrorKind::NotFound {
-                    (
-                        CompatibilityErrorCode::BinaryNotFound,
-                        format!(
-                            "could not find sc-lint binary `{}` required at least `{}` by `{}`",
-                            binary.display(),
-                            requirement.minimum_version,
-                            requirement.config_path.display()
-                        ),
-                    )
-                } else {
-                    (
-                        CompatibilityErrorCode::BinaryExecutionFailed,
-                        format!(
-                            "could not execute sc-lint binary `{}` required at least `{}` by `{}`",
-                            binary.display(),
-                            requirement.minimum_version,
-                            requirement.config_path.display()
-                        ),
-                    )
-                };
-                compatibility_runtime_error(
-                    code,
-                    message,
-                    requirement,
-                    binary,
-                    None,
-                    error.to_string(),
-                )
-            })?;
-
-        if !output.status.success() {
-            return Err(compatibility_runtime_error(
-                CompatibilityErrorCode::BinaryExecutionFailed,
-                format!(
-                    "sc-lint binary `{}` required at least `{}` by `{}` exited unsuccessfully",
-                    binary.display(),
-                    requirement.minimum_version,
-                    requirement.config_path.display()
-                ),
-                requirement,
-                binary,
-                None,
-                stderr_or_status(&output),
-            ));
-        }
-
-        let probe =
-            serde_json::from_slice::<VersionProbeEnvelope>(&output.stdout).map_err(|error| {
-                compatibility_runtime_error(
-                    CompatibilityErrorCode::ProbeMalformed,
-                    format!(
-                        "sc-lint binary `{}` required at least `{}` by `{}` did not emit a valid version probe",
-                        binary.display(), requirement.minimum_version, requirement.config_path.display()
-                    ),
-                    requirement,
-                    binary,
-                    None,
-                    error.to_string(),
-                )
-            })?;
-        let observed = validate_version_probe(probe, requirement, binary)?;
-        if observed < *requirement.minimum_version.as_semver() {
-            return Err(compatibility_runtime_error(
-                CompatibilityErrorCode::VersionTooOld,
-                format!(
-                    "installed sc-lint version `{observed}` at `{}` does not satisfy required minimum `{}` from `{}`",
-                    binary.display(),
-                    requirement.minimum_version,
-                    requirement.config_path.display()
-                ),
-                requirement,
-                binary,
-                Some(&observed),
-                "the installed release is below the repository minimum version".to_string(),
-            ));
-        }
-
-        Ok(json!({
-            "status": "pass",
-            "minimum_version": requirement.minimum_version.to_string(),
-            "installed_version": observed.to_string(),
-            "binary_path": binary.display().to_string(),
-            "config_path": requirement.config_path.display().to_string(),
-        }))
+        crate::compatibility::evaluate_compatibility(requirement, binary_override)
     }
 }
 
@@ -631,8 +502,9 @@ pub(crate) struct ScLintConfigFile {
     /// Named lint profiles: an ordered list of declared lint step names.
     #[serde(default)]
     lint_profiles: std::collections::BTreeMap<String, Vec<String>>,
+    /// `[[tool.sc-lint.test]]` rows or a `[tool.sc-lint.test]` selector table.
     #[serde(default)]
-    test: Vec<ConsumerProfileStepFile>,
+    test: Option<toml::Value>,
 }
 
 /// One raw `[[tool.sc-lint.lint|test]]` row. `platform`, `target` and any other
@@ -643,6 +515,7 @@ struct ConsumerProfileStepFile {
     command: Option<Vec<String>>,
     platform: Option<toml::Value>,
     target: Option<toml::Value>,
+    after_all: Option<toml::Value>,
     #[serde(flatten)]
     extra: std::collections::BTreeMap<String, toml::Value>,
 }
@@ -718,6 +591,47 @@ fn load_consumer_config_file(path: &Path) -> Result<RepoConfigFile, CliError> {
     })
 }
 
+/// Decodes `[tool.sc-lint.test]`: rows (validated like before, then
+/// normalized to selectors) or a selector table; absent keeps the existing
+/// "at least one command" error.
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer profile validation returns the shared top-level CliError contract."
+)]
+fn test_selectors_from_file(
+    test: Option<&toml::Value>,
+    path: &Path,
+) -> Result<TestSelectors, CliError> {
+    let rows = match test {
+        Some(toml::Value::Table(table)) => return TestSelectors::parse_table(table, path),
+        None => Vec::new(),
+        Some(toml::Value::Array(rows)) => rows
+            .iter()
+            .map(|row| {
+                row.clone()
+                    .try_into::<ConsumerProfileStepFile>()
+                    .map_err(|error| {
+                        compatibility_config_error(
+                            CompatibilityErrorCode::ConfigMalformed,
+                            format!("failed to parse sc-lint configuration `{}`", path.display()),
+                            Some(path),
+                            Some(error.to_string()),
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => {
+            return Err(consumer_profile_error(
+                path,
+                ConsumerProfile::Test.as_str(),
+                "tool.sc-lint.test must be an array of tables or a table of selectors".to_string(),
+            ));
+        }
+    };
+    let steps = validate_consumer_profile(ConsumerProfile::Test.as_str(), &rows, path)?;
+    Ok(TestSelectors::from_rows(steps, path.to_path_buf()))
+}
+
 #[expect(
     clippy::result_large_err,
     reason = "Consumer profile validation returns the shared top-level CliError contract."
@@ -779,7 +693,9 @@ fn validate_consumer_profile(
             ));
         }
         let (platform, target) = profile_step_fields(profile, name, step, path)?;
-        let declared = ConsumerProfileStep::new(name, command.clone(), platform, target);
+        let after_all = decode_after_all(step.after_all.as_ref(), name, path)?;
+        let declared = ConsumerProfileStep::new(name, command.clone(), platform, target)
+            .with_after_all(after_all);
         if profile == ConsumerProfile::Lint.as_str() {
             validate_lint_step(&declared)
                 .map_err(|error| profile_plan_config_error(error, path))?;
@@ -827,7 +743,7 @@ fn profile_step_fields(
     }
 }
 
-fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {
+pub(crate) fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {
     compatibility_config_error(
         CompatibilityErrorCode::ConfigMalformed,
         message,

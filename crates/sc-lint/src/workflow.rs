@@ -1,7 +1,8 @@
+use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
-use std::thread;
 
 use serde_json::Value;
 use serde_json::json;
@@ -21,6 +22,10 @@ use crate::profile_plan::Platform;
 use crate::profile_plan::PlatformScope;
 use crate::profile_plan::SkipRecord;
 use crate::profile_plan::plan_consumer_lint;
+use crate::scheduler::FailurePolicy;
+use crate::scheduler::ScheduledStep;
+use crate::scheduler::run_steps_scheduled;
+use crate::test_selectors::TestRequest;
 
 pub const WINDOWS_XWIN_TARGET: &str = "x86_64-pc-windows-msvc";
 
@@ -28,13 +33,30 @@ pub const WINDOWS_XWIN_TARGET: &str = "x86_64-pc-windows-msvc";
 ///
 /// Built-in source lint steps declare `Cargo` (needs the shared cargo build
 /// lane) or `Parallel` (independent of it) where they are constructed.
-/// Consumer-configured steps are `Sequential`: they are only ever run by
-/// [`run_steps_sequential`], never classified into a concurrent lane.
+/// Consumer-configured steps are classified by [`Lane::for_program`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Lane {
     Cargo,
     Parallel,
-    Sequential,
+}
+
+impl Lane {
+    /// `Cargo` iff the file stem of `program` is `cargo` (ASCII
+    /// case-insensitive: `cargo`, `/usr/bin/cargo`, `cargo.exe`), else
+    /// `Parallel`. A scheduling hint only: cargo serializes itself on its
+    /// build-directory lock, so a wrapper that runs cargo is merely not
+    /// pre-serialized.
+    pub(crate) fn for_program(program: &OsStr) -> Self {
+        let is_cargo = Path::new(program)
+            .file_stem()
+            .and_then(OsStr::to_str)
+            .is_some_and(|stem| stem.eq_ignore_ascii_case("cargo"));
+        if is_cargo {
+            Self::Cargo
+        } else {
+            Self::Parallel
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,10 +67,12 @@ pub(crate) struct StepPlan {
     command: OsString,
     args: Vec<OsString>,
     env: Vec<(OsString, OsString)>,
+    cwd: Option<PathBuf>,
+    after_all: bool,
 }
 
 impl StepPlan {
-    fn new(
+    pub(crate) fn new(
         name: impl Into<String>,
         kind: impl Into<String>,
         lane: Lane,
@@ -62,11 +86,25 @@ impl StepPlan {
             command: command.into(),
             args: args.into_iter().map(Into::into).collect(),
             env: Vec::new(),
+            cwd: None,
+            after_all: false,
         }
     }
 
-    fn with_env(mut self, key: impl Into<OsString>, value: impl Into<OsString>) -> Self {
+    pub(crate) fn with_env(mut self, key: impl Into<OsString>, value: impl Into<OsString>) -> Self {
         self.env.push((key.into(), value.into()));
+        self
+    }
+
+    /// Runs the step from this repo-root-relative directory.
+    pub(crate) fn with_cwd(mut self, cwd: PathBuf) -> Self {
+        self.cwd = Some(cwd);
+        self
+    }
+
+    /// Starts the step only after every other step has finished.
+    pub(crate) fn with_after_all(mut self, after_all: bool) -> Self {
+        self.after_all = after_all;
         self
     }
 
@@ -75,10 +113,27 @@ impl StepPlan {
         Self::new(
             step.name(),
             ConsumerProfile::Lint.as_str(),
-            Lane::Sequential,
+            Lane::for_program(step.command()),
             step.command().clone(),
             step.args().iter().cloned(),
         )
+        .with_after_all(step.after_all())
+    }
+
+    pub(crate) const fn lane(&self) -> Lane {
+        self.lane
+    }
+
+    pub(crate) const fn after_all(&self) -> bool {
+        self.after_all
+    }
+
+    pub(crate) fn env(&self) -> &[(OsString, OsString)] {
+        &self.env
+    }
+
+    pub(crate) fn cwd(&self) -> Option<&Path> {
+        self.cwd.as_deref()
     }
 
     pub(crate) fn name(&self) -> &str {
@@ -89,15 +144,16 @@ impl StepPlan {
         &self.kind
     }
 
+    /// The program followed by its arguments.
+    pub(crate) fn argv(&self) -> impl Iterator<Item = &OsString> {
+        std::iter::once(&self.command).chain(&self.args)
+    }
+
     pub(crate) fn display_command(&self) -> String {
-        let mut parts = Vec::with_capacity(self.args.len() + 1);
-        parts.push(self.command.to_string_lossy().to_string());
-        parts.extend(
-            self.args
-                .iter()
-                .map(|arg| arg.to_string_lossy().to_string()),
-        );
-        parts.join(" ")
+        self.argv()
+            .map(|part| part.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -128,7 +184,7 @@ impl StepReport {
         self
     }
 
-    fn to_json(&self) -> Value {
+    pub(crate) fn to_json(&self) -> Value {
         let mut row = json!({
             "name": self.name,
             "kind": self.kind,
@@ -205,10 +261,13 @@ impl SystemAdapter for HostSystemAdapter {
     }
 
     fn run_step(&self, repo_root: &Path, step: &StepPlan) -> Result<StepReport, CliError> {
+        let directory = step
+            .cwd()
+            .map_or_else(|| repo_root.to_path_buf(), |cwd| repo_root.join(cwd));
         let output = ProcessCommand::new(&step.command)
-            .current_dir(repo_root)
+            .current_dir(directory)
             .args(&step.args)
-            .envs(step.env.iter().map(|(key, value)| (key, value)))
+            .envs(step.env().iter().map(|(key, value)| (key, value)))
             .output()
             .map_err(|error| {
                 let missing = error.kind() == std::io::ErrorKind::NotFound;
@@ -272,24 +331,21 @@ pub(crate) fn run_consumer_lint_profile(
     loaded_config: &LoadedConfig,
     selector: Option<&str>,
     scope: PlatformScope,
+    policy: FailurePolicy,
 ) -> Result<CommandSuccess, CliError> {
-    run_consumer_lint_with(loaded_config, selector, scope, &HostSystemAdapter)
+    run_consumer_lint_with(loaded_config, selector, scope, policy, &HostSystemAdapter)
 }
 
 #[expect(
     clippy::result_large_err,
     reason = "Consumer test profiles retain the shared top-level CliError contract."
 )]
-pub fn run_consumer_test_profile(
+pub(crate) fn run_consumer_test_profile(
     loaded_config: &LoadedConfig,
-    selector: Option<&str>,
+    request: &TestRequest,
+    policy: FailurePolicy,
 ) -> Result<CommandSuccess, CliError> {
-    run_consumer_profile_with(
-        loaded_config,
-        ConsumerProfile::Test,
-        selector,
-        &HostSystemAdapter,
-    )
+    run_consumer_test_with(loaded_config, request, policy, &HostSystemAdapter)
 }
 
 #[expect(
@@ -349,48 +405,9 @@ pub(crate) fn run_lint_profile_with(
     })))
 }
 
-#[expect(
-    clippy::result_large_err,
-    reason = "Tests and production share the same explicit consumer profile execution path."
-)]
-pub(crate) fn run_consumer_profile_with(
-    loaded_config: &LoadedConfig,
-    profile: ConsumerProfile,
-    selector: Option<&str>,
-    adapter: &dyn SystemAdapter,
-) -> Result<CommandSuccess, CliError> {
-    if profile == ConsumerProfile::Lint {
-        return run_consumer_lint_with(loaded_config, selector, PlatformScope::Host, adapter);
-    }
-    let (root, configured_steps) = loaded_config.consumer_profile(profile, selector)?;
-    let plans = configured_steps
-        .iter()
-        .map(|step| {
-            let (command, args) = step
-                .command()
-                .split_first()
-                .expect("validated command argv");
-            StepPlan::new(
-                step.name(),
-                profile.as_str(),
-                Lane::Sequential,
-                command,
-                args,
-            )
-        })
-        .collect::<Vec<_>>();
-    let steps = run_steps_sequential(root, adapter, &plans)?;
-    Ok(CommandSuccess::direct(json!({
-        "status": "pass",
-        "profile": profile.as_str(),
-        "selector": selector.unwrap_or(CONSUMER_SELECTOR_ALL),
-        "step_count": steps.len(),
-        "steps": steps.into_iter().map(|step| step.to_json()).collect::<Vec<_>>(),
-    })))
-}
-
-/// Plans the selected consumer lint steps for this host; skipped steps are
-/// reported in declaration order.
+/// Plans the selected consumer lint steps for this host, preflights `cargo
+/// xwin`, schedules the runnable steps and merges the platform-skipped rows
+/// back in declaration order.
 #[expect(
     clippy::result_large_err,
     reason = "Consumer lint execution retains the shared top-level CliError contract."
@@ -399,6 +416,7 @@ pub(crate) fn run_consumer_lint_with(
     loaded_config: &LoadedConfig,
     selector: Option<&str>,
     scope: PlatformScope,
+    policy: FailurePolicy,
     adapter: &dyn SystemAdapter,
 ) -> Result<CommandSuccess, CliError> {
     let input = loaded_config.consumer_lint_inputs(selector)?;
@@ -408,41 +426,112 @@ pub(crate) fn run_consumer_lint_with(
         scope,
         adapter.host_platform(),
     )?;
-    let rows = run_decisions(input.root, adapter, &decisions)?;
-    Ok(CommandSuccess::direct(json!({
-        "status": "pass",
-        "profile": ConsumerProfile::Lint.as_str(),
-        "selector": selector.unwrap_or(CONSUMER_SELECTOR_ALL),
-        "step_count": rows.len(),
-        "steps": rows,
-    })))
+    preflight_xwin(input.root, adapter, &decisions)?;
+    let scheduled = decisions
+        .iter()
+        .enumerate()
+        .filter_map(|(position, decision)| match decision {
+            PlanDecision::Run(step) => {
+                Some(ScheduledStep::new(position, StepPlan::from_planned(step)).with_planned(step))
+            }
+            PlanDecision::Skip(_) => None,
+        })
+        .collect::<Vec<_>>();
+    let mut reports = run_steps_scheduled(input.root, adapter, &scheduled, policy)?.into_iter();
+    let rows = decisions
+        .iter()
+        .map(|decision| match decision {
+            PlanDecision::Skip(record) => skipped_row(record),
+            PlanDecision::Run(_) => reports
+                .next()
+                .expect("the scheduler reports every run decision")
+                .to_json(),
+        })
+        .collect::<Vec<_>>();
+    Ok(consumer_success(
+        ConsumerProfile::Lint,
+        selector.unwrap_or(CONSUMER_SELECTOR_ALL),
+        rows,
+    ))
 }
 
-/// Executes planned steps in order, failing on the first failed step. A step
-/// that needs `cargo xwin` fails when it is missing; it is never skipped.
+/// A missing `cargo xwin` is a capability error before anything runs.
 #[expect(
     clippy::result_large_err,
-    reason = "Step execution stays within the top-level CliError contract."
+    reason = "Optional-capability failures stay in the shared top-level CliError contract."
 )]
-fn run_decisions(
+fn preflight_xwin(
     root: &Path,
     adapter: &dyn SystemAdapter,
     decisions: &[PlanDecision],
-) -> Result<Vec<Value>, CliError> {
-    decisions
+) -> Result<(), CliError> {
+    let mut checked = None;
+    for decision in decisions {
+        if let PlanDecision::Run(step) = decision
+            && step.uses_cargo_xwin()
+        {
+            let available = *checked.get_or_insert_with(|| adapter.cargo_xwin_available(root));
+            ensure_xwin_available(step.name(), available)?;
+        }
+    }
+    Ok(())
+}
+
+/// Runs the selected consumer test selectors (or lists them for `--list`).
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer test execution retains the shared top-level CliError contract."
+)]
+pub(crate) fn run_consumer_test_with(
+    loaded_config: &LoadedConfig,
+    request: &TestRequest,
+    policy: FailurePolicy,
+    adapter: &dyn SystemAdapter,
+) -> Result<CommandSuccess, CliError> {
+    let (root, selectors) = loaded_config.test_selectors()?;
+    if request.list() {
+        return Ok(CommandSuccess::direct(selectors.list_json()));
+    }
+    let expanded = selectors.expand(request.selector())?;
+    selectors.check_forwarded_args(request)?;
+    let host = adapter.host_platform();
+    let scheduled = expanded
         .iter()
-        .map(|decision| match decision {
-            PlanDecision::Skip(record) => Ok(skipped_row(record)),
-            PlanDecision::Run(step) => {
-                if step.uses_cargo_xwin() {
-                    ensure_xwin_available(step.name(), adapter.cargo_xwin_available(root))?;
-                }
-                adapter
-                    .run_planned_step(root, step)
-                    .map(|report| report.to_json())
+        .enumerate()
+        .filter(|(_, selector)| selector.runs_on(host))
+        .map(|(position, selector)| {
+            ScheduledStep::new(position, selector.step_plan(request.args()))
+        })
+        .collect::<Vec<_>>();
+    let mut reports = run_steps_scheduled(root, adapter, &scheduled, policy)?.into_iter();
+    let rows = expanded
+        .iter()
+        .map(|selector| {
+            if selector.runs_on(host) {
+                reports
+                    .next()
+                    .expect("the scheduler reports every scheduled selector")
+                    .to_json()
+            } else {
+                selector.skipped_row(host)
             }
         })
-        .collect()
+        .collect::<Vec<_>>();
+    Ok(consumer_success(
+        ConsumerProfile::Test,
+        &selectors.selected_name(request.selector()),
+        rows,
+    ))
+}
+
+fn consumer_success(profile: ConsumerProfile, selector: &str, rows: Vec<Value>) -> CommandSuccess {
+    CommandSuccess::direct(json!({
+        "status": "pass",
+        "profile": profile.as_str(),
+        "selector": selector,
+        "step_count": rows.len(),
+        "steps": rows,
+    }))
 }
 
 #[expect(
@@ -713,50 +802,9 @@ fn xwin_lint_steps(profile: LintProfile, xwin_available: bool) -> Vec<StepPlan> 
     }
 }
 
-/// Runs consumer-configured steps strictly in declaration order and stops at
-/// the first failure, matching the documented consumer profile contract.
-#[expect(
-    clippy::result_large_err,
-    reason = "Step execution stays within the top-level CliError contract."
-)]
-fn run_steps_sequential(
-    repo_root: &Path,
-    adapter: &dyn SystemAdapter,
-    steps: &[StepPlan],
-) -> Result<Vec<StepReport>, CliError> {
-    steps
-        .iter()
-        .map(|step| adapter.run_step(repo_root, step))
-        .collect()
-}
-
-type StepWorker<'scope> = thread::ScopedJoinHandle<'scope, Result<StepReport, CliError>>;
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Worker start failures stay within the top-level CliError contract."
-)]
-fn spawn_parallel_step<'scope, 'env>(
-    scope: &'scope thread::Scope<'scope, 'env>,
-    repo_root: &'env Path,
-    adapter: &'env dyn SystemAdapter,
-    step: &'env StepPlan,
-) -> Result<StepWorker<'scope>, CliError> {
-    thread::Builder::new()
-        .name(format!("sc-lint-{}", step.name()))
-        .spawn_scoped(scope, move || adapter.run_step(repo_root, step))
-        .map_err(|error| {
-            CliError::internal(format!("{} worker failed to start", step.name())).with_source(error)
-        })
-}
-
-/// Runs the built-in source lint plan with keep-going semantics: every step
-/// runs even when another fails, results are reported in plan order, and the
-/// returned error names every failed step by plan index (REQ-CLI-023).
-///
-/// `Lane::Parallel` steps each get their own worker. All other steps run on a
-/// single lane worker in plan order, so cargo steps never contend for the
-/// build directory and start deterministically.
+/// Runs the built-in source lint plan through the shared scheduler with
+/// keep-going semantics (REQ-CLI-023): every step runs, reports keep plan
+/// order, and the error names every failed step by plan index.
 #[expect(
     clippy::result_large_err,
     reason = "Step execution stays within the top-level CliError contract."
@@ -764,105 +812,14 @@ fn spawn_parallel_step<'scope, 'env>(
 fn run_steps_concurrent(
     repo_root: &Path,
     adapter: &dyn SystemAdapter,
-    steps: &[StepPlan],
+    plans: &[StepPlan],
 ) -> Result<Vec<StepReport>, CliError> {
-    thread::scope(|scope| {
-        let ordered = steps
-            .iter()
-            .filter(|step| step.lane != Lane::Parallel)
-            .collect::<Vec<_>>();
-        let lane_worker = thread::Builder::new()
-            .name("sc-lint-cargo-lane".to_string())
-            .spawn_scoped(scope, move || {
-                ordered
-                    .iter()
-                    .map(|step| adapter.run_step(repo_root, step))
-                    .collect::<Vec<_>>()
-            })
-            .map_err(|error| {
-                CliError::internal("the cargo execution lane failed to start").with_source(error)
-            })?;
-
-        let workers = steps
-            .iter()
-            .map(|step| {
-                (step.lane == Lane::Parallel)
-                    .then(|| spawn_parallel_step(scope, repo_root, adapter, step))
-            })
-            .collect::<Vec<_>>();
-
-        let mut lane_results = lane_worker
-            .join()
-            .unwrap_or_else(|_| {
-                steps
-                    .iter()
-                    .filter(|step| step.lane != Lane::Parallel)
-                    .map(|_| {
-                        Err(CliError::internal(
-                            "the cargo execution lane panicked during execution",
-                        ))
-                    })
-                    .collect()
-            })
-            .into_iter();
-        let results = steps
-            .iter()
-            .zip(workers)
-            .map(|(step, worker)| match worker {
-                None => lane_results
-                    .next()
-                    .expect("the lane worker reports every ordered step"),
-                Some(Ok(worker)) => worker.join().unwrap_or_else(|_| {
-                    Err(CliError::internal(format!(
-                        "{} worker panicked during execution",
-                        step.name()
-                    )))
-                }),
-                Some(Err(error)) => Err(error),
-            })
-            .collect::<Vec<_>>();
-        aggregate_step_results(steps, results)
-    })
-}
-
-/// Returns every report in plan order, or one error naming every failed step
-/// with its zero-based plan index, in plan order.
-#[expect(
-    clippy::result_large_err,
-    reason = "Step execution stays within the top-level CliError contract."
-)]
-fn aggregate_step_results(
-    steps: &[StepPlan],
-    results: Vec<Result<StepReport, CliError>>,
-) -> Result<Vec<StepReport>, CliError> {
-    let mut reports = Vec::with_capacity(results.len());
-    let mut failures = Vec::new();
-    for (index, (step, result)) in steps.iter().zip(results).enumerate() {
-        match result {
-            Ok(report) => reports.push(report),
-            Err(error) => failures.push((index, step.name(), error)),
-        }
-    }
-    if failures.is_empty() {
-        return Ok(reports);
-    }
-    let listing = failures
+    let steps = plans
         .iter()
-        .map(|(index, name, _)| format!("[{index}] {name}"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let details = failures
-        .iter()
-        .map(|(index, name, error)| {
-            json!({ "index": index, "step": name, "message": error.message })
-        })
+        .enumerate()
+        .map(|(index, plan)| ScheduledStep::new(index, plan.clone()))
         .collect::<Vec<_>>();
-    Err(CliError::backend_failure(format!(
-        "{} of {} steps failed: {listing}",
-        failures.len(),
-        steps.len()
-    ))
-    .with_detail("failed_steps", Value::Array(details)))
+    run_steps_scheduled(repo_root, adapter, &steps, FailurePolicy::KeepGoing)
 }
 
 fn cargo_step(
