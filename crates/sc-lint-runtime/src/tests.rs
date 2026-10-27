@@ -677,12 +677,15 @@ fn tokio_sleep_excluded_by_exclude_paths_by_rule() {
     assert_eq!(rule_ids(&report), vec![RuleId::ScbRuntime003]);
     assert_eq!(report.status, ReportStatus::Fail);
     assert_eq!(report.findings.len(), 1);
+    assert_eq!(
+        finding_location(&report.findings[0].message),
+        ("lib.rs".into(), 1)
+    );
     assert!(
         report.findings[0]
             .message
-            .contains("crates/other/src/lib.rs")
+            .contains("in Tokio package `other`; use")
     );
-    assert!(report.findings[0].message.contains("Tokio package other;"));
 
     fixture.write_lint_config(
         r#"
