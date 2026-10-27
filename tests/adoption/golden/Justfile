@@ -1,0 +1,14 @@
+set windows-shell := ["cmd.exe", "/c"]
+
+python := if os_family() == "windows" { "python" } else { "python3" }
+
+default: lint
+
+# sc-lint's recommended `test` recipe: runs the `[[tool.sc-lint.test]]` layers in sc-lint.toml.
+# This repository owns it; change or replace it as needed.
+test *layer:
+    {{python}} .sc-lint/bootstrap.py test --config sc-lint.toml {{layer}}
+
+# >>> sc-lint managed integration >>>
+import '.sc-lint/justfile'
+# <<< sc-lint managed integration <<<

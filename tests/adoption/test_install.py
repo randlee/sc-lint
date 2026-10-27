@@ -878,3 +878,16 @@ def test_hyphenated_test_recipe_still_gets_the_recommended_recipe() -> None:
     text = (consumer / "Justfile").read_text()
     assert "test-unit:" in text
     assert text.count("\ntest *layer:") == 1
+
+
+def test_rendered_outputs_unchanged_after_tmpl_rename() -> None:
+    consumer = copy_fixture("empty-workspace")
+    install = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert install.returncode == 0, install.stderr
+    golden = ROOT / "tests" / "adoption" / "golden"
+    for rendered, baseline in (
+        ("sc-lint.toml", "sc-lint.toml"),
+        ("Justfile", "Justfile"),
+        (".github/workflows/sc-lint.yml", "sc-lint.yml"),
+    ):
+        assert (consumer / rendered).read_bytes() == (golden / baseline).read_bytes(), rendered
