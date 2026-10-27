@@ -1,5 +1,6 @@
 mod cli;
 mod command;
+mod compatibility;
 mod config;
 pub mod consts;
 mod consumer_integration;
