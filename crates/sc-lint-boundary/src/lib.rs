@@ -423,8 +423,21 @@ impl GraphBuilder {
 pub fn analyze_workspace(
     options: &AnalyzeOptions,
 ) -> std::result::Result<FindingsReport, BoundaryError> {
+    analyze_workspace_with_paths(options).map(|(report, _)| report)
+}
+
+/// Source file of every graph node, keyed by node id. Path-less findings
+/// (SCB-CYCLE-002/003) resolve their files from it for path exclusions.
+type NodeSourcePaths = BTreeMap<NodeId, PathBuf>;
+
+/// `analyze_workspace` plus the source file of every graph node. The
+/// manifest-only and dependency-only passes build no graph and return an
+/// empty map.
+pub(crate) fn analyze_workspace_with_paths(
+    options: &AnalyzeOptions,
+) -> std::result::Result<(FindingsReport, NodeSourcePaths), BoundaryError> {
     if options.rule == Some(RuleFilter::Manifests) {
-        return analyze_manifests_only(options);
+        return Ok((analyze_manifests_only(options)?, NodeSourcePaths::new()));
     }
 
     let root = options.root.as_path();
@@ -457,7 +470,10 @@ pub fn analyze_workspace(
             .map_err(|e| BoundaryError::package_policy(root, e))?;
         let mut findings = semantic_findings;
         findings.extend(dependency_report.findings);
-        return Ok(findings_report(dependency_report.scanned_crates, findings));
+        return Ok((
+            findings_report(dependency_report.scanned_crates, findings),
+            NodeSourcePaths::new(),
+        ));
     }
     let graph = graph::build_workspace_graph_from(&metadata)
         .map_err(|e| BoundaryError::graph_build(root, e))?;
@@ -496,7 +512,21 @@ pub fn analyze_workspace(
         .iter()
         .filter(|node| node.kind == "crate")
         .count();
-    Ok(findings_report(scanned_crates, findings))
+    Ok((
+        findings_report(scanned_crates, findings),
+        node_source_paths(&graph),
+    ))
+}
+
+fn node_source_paths(graph: &GraphExport) -> NodeSourcePaths {
+    graph
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            let path = node.source_path.as_ref()?;
+            Some((node.id.clone(), PathBuf::from(path)))
+        })
+        .collect()
 }
 
 /// An unfiltered run selects every rule; `--rule X` selects the passes that accept X.
@@ -562,7 +592,7 @@ pub fn analyze_workspace_configured(
     if inventory_free_manifest_policy_selected(&settings) {
         return analyze_inventory_free_manifest_policy(&options, &settings, &policy_config);
     }
-    let mut report = analyze_workspace(&options)?;
+    let (mut report, node_paths) = analyze_workspace_with_paths(&options)?;
     if manifest_policy_selected(&settings) && !policy_config.is_empty() {
         let metadata = graph::load_metadata(&options.root)
             .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?;
@@ -591,7 +621,12 @@ pub fn analyze_workspace_configured(
             ReportStatus::Pass
         };
     }
-    Ok(apply_configured_rule_filter(report, &settings))
+    Ok(apply_configured_rule_filter(
+        report,
+        &settings,
+        &options.root,
+        &node_paths,
+    ))
 }
 
 fn analyze_inventory_free_manifest_policy(
@@ -613,15 +648,32 @@ fn analyze_inventory_free_manifest_policy(
             .map_err(|error| BoundaryError::manifest_policy(&options.root, error))?,
         );
     }
-    Ok(apply_configured_rule_filter(report, settings))
+    Ok(apply_configured_rule_filter(
+        report,
+        settings,
+        options.root.as_path(),
+        &NodeSourcePaths::new(),
+    ))
 }
 
 fn apply_configured_rule_filter(
     mut report: FindingsReport,
     settings: &sc_lint_analyzer_support::AnalyzerSettings,
+    root: &Path,
+    node_paths: &NodeSourcePaths,
 ) -> FindingsReport {
+    let canonical_root = root.canonicalize().ok();
     let findings: Vec<_> = std::mem::take(&mut report.findings)
         .into_iter()
+        .filter(|finding| {
+            !path_less_finding_excluded(
+                finding,
+                settings,
+                root,
+                canonical_root.as_deref(),
+                node_paths,
+            )
+        })
         .map(|finding| {
             let path = manifest_finding_path(&finding);
             (finding, path)
@@ -632,6 +684,45 @@ fn apply_configured_rule_filter(
     report.findings = findings;
     report.status = status;
     report
+}
+
+/// SCB-CYCLE-002/003 findings carry no path; they are excluded when any
+/// source file of their nodes matches a global or per-rule path exclusion.
+fn path_less_finding_excluded(
+    finding: &Finding,
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+    root: &Path,
+    canonical_root: Option<&Path>,
+    node_paths: &NodeSourcePaths,
+) -> bool {
+    if !matches!(finding.rule_id, RuleId::ScbCycle002 | RuleId::ScbCycle003) {
+        return false;
+    }
+    let paths = finding_source_paths(finding, root, canonical_root, node_paths);
+    let paths: Vec<&Path> = paths.iter().map(PathBuf::as_path).collect();
+    settings.excluded_by_any_path(CatalogRuleId::new(finding.rule_id.as_str()), &paths)
+}
+
+/// Repo-relative source files of a finding's nodes. Nodes absent from the
+/// map or outside the root (also after canonicalising it, which covers
+/// symlinked temp roots such as macOS `/var`) contribute nothing.
+fn finding_source_paths(
+    finding: &Finding,
+    root: &Path,
+    canonical_root: Option<&Path>,
+    node_paths: &NodeSourcePaths,
+) -> BTreeSet<PathBuf> {
+    finding
+        .node_ids
+        .iter()
+        .filter_map(|id| node_paths.get(id))
+        .filter_map(|path| {
+            path.strip_prefix(root)
+                .ok()
+                .or_else(|| canonical_root.and_then(|root| path.strip_prefix(root).ok()))
+                .map(Path::to_path_buf)
+        })
+        .collect()
 }
 
 fn manifest_policy_selected(settings: &sc_lint_analyzer_support::AnalyzerSettings) -> bool {

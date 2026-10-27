@@ -116,6 +116,13 @@ distinct methods do not imply a waiver of owner-level cycle diagnostics,
 except for delegation edges (see SCB-CYCLE-002/003 below).
 (Amended 2026-10-10, Accepted, #204.)
 
+Method-call edges: a method-call expression creates a reference only when its
+receiver is exactly `self`, looking through parentheses, `&` and `*`. The
+reference path is `Owner::method` and resolves like `Self::method(self)` per
+the preceding paragraph. A receiver that is a field, local or call result
+creates no edge (there is no type inference), and calls inside macro
+invocations are not seen. (Amended phase L, ADR-020 decision 11.)
+
 ## Edge Model
 
 Current edge kinds:
@@ -158,18 +165,22 @@ Current implemented rule ids:
 - `PORT-002`
 - `PORT-003`
 
-`SCB-CYCLE-002` and `SCB-CYCLE-003` exclude a delegation edge when the callee
-cannot reach back to the caller through the owner's expression edges. Owner
-reference edges record the callee node. A delegation edge is a
-method-to-method expression edge within one owner where the callee's name
-differs from the caller's, and either the callee is not public (private
-helper) or the caller is a trait-impl method (receiver call). A trait-impl
-method that forwards to a method of the same name stays a self-loop.
-(Amended 2026-10-10, Accepted, #204.)
-(Amended phase L, Accepted — Rand, 2026-10-27: ADR-020 decision 11
-replaces the name and visibility conditions above with "distinct nodes and the
-callee cannot reach the caller"; a method resolving to its own node stays a
-self-loop.)
+`SCB-CYCLE-002` and `SCB-CYCLE-003` exclude a delegation edge. A delegation
+edge is a method-to-method expression edge between two distinct graph nodes
+whose callee cannot reach the caller through the owner's expression edges.
+Owner reference edges record the callee node. The callee's name and
+visibility do not matter: a trait-impl method calling a same-named inherent
+method is a call between two distinct nodes, and a public method calling a
+different public method is not recursion. A method that resolves to its own
+node stays a self-loop, and mutual recursion between methods is not a
+delegation edge. (Amended 2026-10-10, Accepted, #204; delegation conditions
+replaced by ADR-020 decision 11, Accepted.)
+
+Exclusion of path-less findings: `SCB-CYCLE-002` and `SCB-CYCLE-003` findings
+carry no path. For `exclude_paths` and `exclude_paths_by_rule` the analyzer
+resolves the repo-relative source files of the finding's `node_ids`, and the
+finding is excluded when any of those files matches a global or per-rule
+pattern. The `Finding` schema is unchanged. (ADR-020 decision 5.)
 
 ## Source-Level Allowances
 

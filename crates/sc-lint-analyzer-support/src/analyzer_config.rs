@@ -498,6 +498,21 @@ impl AnalyzerSettings {
         (kept, status)
     }
 
+    /// True when any of `paths` matches a global `exclude_paths` pattern or a
+    /// `exclude_paths_by_rule` pattern of `rule`. Used for findings that carry
+    /// no path of their own; the analyzer supplies the source files behind the
+    /// finding. A path that is not UTF-8, absolute, or escapes the repository
+    /// root never matches.
+    pub fn excluded_by_any_path(&self, rule: CatalogRuleId, paths: &[&Path]) -> bool {
+        paths
+            .iter()
+            .filter_map(|path| path.to_str())
+            .filter_map(|path| RepoRelativePath::parse(path).ok())
+            .any(|path| {
+                self.path_excluded(path.as_str()) || self.path_excluded_by_rule(rule, &path)
+            })
+    }
+
     fn path_excluded_by_rule(&self, rule_id: CatalogRuleId, path: &RepoRelativePath) -> bool {
         self.exclude_paths_by_rule
             .get(&rule_id)
