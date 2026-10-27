@@ -11,6 +11,15 @@ use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
+fn runtime_error_source_renders_the_full_cause_chain() {
+    let error = anyhow::anyhow!("root cause").context("outer context");
+
+    let source = RuntimeErrorSource::from(error);
+
+    assert_eq!(source.to_string(), "outer context: root cause");
+}
+
+#[test]
 fn outside_source_path_reports_repository_relative_path_error() {
     let root = TempDir::new().unwrap();
     let outside_source = root.path().join("..\u{2f}outside.rs");
