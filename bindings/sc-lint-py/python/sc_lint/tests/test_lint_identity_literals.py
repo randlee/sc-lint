@@ -42,6 +42,13 @@ forbidden_literals = ["{TEAM_LEAD_IDENTITY}"]
             self.assertTrue(any("tests.rs" in item for item in rendered))
             self.assertTrue(any("lib.rs" in item for item in rendered))
 
+    def test_identity_literals_table_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = seed_workspace(Path(tempdir))
+            (repo_root / "sc-lint.toml").write_text("[logging]\nconsole = false\n", encoding="utf-8")
+            (repo_root / ".just/lint-config.toml").write_text('[identities]\nforbidden_literals = ["x"]\n', encoding="utf-8")
+            self.assertEqual(load_forbidden_literals(repo_root), ("x",))
+
     def test_identity_literal_lint_detects_literal_concat_without_false_positives(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = seed_workspace(Path(tempdir))
@@ -171,7 +178,7 @@ fn detects_both() {{ let direct = "{TEAM_LEAD_IDENTITY}"; let assembled = concat
     def test_identity_literal_defaults_do_not_leak_consumer_policy(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = seed_workspace(Path(tempdir))
-            (repo_root / ".just/lint-config.toml").write_text("", encoding="utf-8")
+            (repo_root / ".just/lint-config.toml").write_text("[identities]\n", encoding="utf-8")
 
             result = main(["lint_identity_literals.py", "--root", str(repo_root), "--json"])
 

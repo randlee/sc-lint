@@ -102,6 +102,7 @@ pub fn run_sc_boundary(
     context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
+    loaded_config.require_boundaries_dir()?;
     let repo_root = loaded_config.require_repo_root()?;
     let tool = consts::TOOL_BOUNDARY;
     let report = analyze_workspace_configured(

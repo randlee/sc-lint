@@ -15,6 +15,9 @@ from sc_lint.lint_common import LintDirectivePolicy
 from sc_lint.lint_common import lint_slug
 from sc_lint.lint_common import line_is_suppressed
 from sc_lint.lint_common import load_lint_config
+from sc_lint.lint_common import CONFIG_TABLE_MISSING
+from sc_lint.lint_common import ConfigError
+from sc_lint.lint_common import resolve_table
 from sc_lint.lint_common import make_log_path
 from sc_lint.lint_common import relative_log_path
 from sc_lint.lint_common import render_workspace_crate_table
@@ -77,6 +80,33 @@ class LintCommonTests(unittest.TestCase):
             config = load_lint_config(repo_root)
 
             self.assertEqual(config["portability"]["config_home_env"], "SC_LINT_CONFIG_HOME")
+
+    def test_resolve_table_prefers_explicit_then_repo_then_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / ".just").mkdir()
+            (root / "sc-lint.toml").write_text("[line_counts]\nmax_total_lines = 300\n", encoding="utf-8")
+            (root / ".just/lint-config.toml").write_text("[line_counts]\nmax_total_lines = 500\n", encoding="utf-8")
+            explicit = root / "explicit.toml"
+            explicit.write_text("[line_counts]\nmax_total_lines = 200\n", encoding="utf-8")
+            table, path = resolve_table("line_counts", explicit, root)
+            self.assertEqual((table["max_total_lines"], path), (200, explicit))
+            table, path = resolve_table("line_counts", None, root)
+            self.assertEqual((table["max_total_lines"], path), (300, root / "sc-lint.toml"))
+
+    def test_resolve_table_falls_back_and_reports_missing_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / ".just").mkdir()
+            (root / "sc-lint.toml").write_text("[logging]\nconsole = false\n", encoding="utf-8")
+            (root / ".just/lint-config.toml").write_text("[line_counts]\n", encoding="utf-8")
+            table, path = resolve_table("line_counts", None, root)
+            self.assertEqual((table, path), ({}, root / ".just/lint-config.toml"))
+            (root / ".just/lint-config.toml").unlink()
+            with self.assertRaises(ConfigError) as caught:
+                resolve_table("line_counts", None, root)
+            self.assertEqual(caught.exception.code, CONFIG_TABLE_MISSING)
+            self.assertEqual(caught.exception.searched, ["sc-lint.toml", ".just/lint-config.toml"])
 
     def test_workspace_crates_reads_package_and_crate_path(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

@@ -280,6 +280,15 @@ Parser-level usage failures emitted before `CommandContext` can resolve a
 family-specific path still use this same error taxonomy, but their machine
 envelope `command` value is the fallback identifier `cli.parse_error`.
 
+## Stable codes
+
+| Code | Kind | Cause names | Recovery |
+| --- | --- | --- | --- |
+| `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
+| `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
+
+Codes are typed constants (`ConfigCode` in `config.rs`; `CONFIG_TABLE_MISSING` in `lint_common.py`) and cause text interpolates names.
+
 ## Planned Command-Family Contract Matrix
 
 Every non-interactive command family should be implementation-reviewed against
