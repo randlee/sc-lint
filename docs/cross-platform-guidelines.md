@@ -33,6 +33,32 @@ This applies to:
 - Portability rules in `sc-lint-portability` should continue to evolve as a
   separate lint family.
 
+## PORT-006 Unix Path Literals
+
+- `PORT-006` flags built-in Unix absolute path prefixes in ungated production
+  code.
+- Path literals in items and expression blocks gated by `#[cfg(unix)]`,
+  `#[cfg(target_os = "linux")]`, `#[cfg(target_os = "macos")]`, or
+  `#[cfg(not(windows))]` are exempt. Equivalent nested `all(...)` and `any(...)` cfg lists are recognized
+  when they contain one of those conditions.
+- The same leaf gate suppresses PORT-007, PORT-008 and PORT-009 findings
+  inside those platform-specific paths. It does not change PORT-004 or
+  PORT-010 parity classification.
+- The canonical detector is `attr_is_platform_cfg(...)` in
+  `crates/sc-lint-portability/src/predicates.rs`.
+
+## PORT-007 Windows Path Literals
+
+- `PORT-007` flags drive-absolute and UNC path literals in ungated production
+  code.
+- Literals whose unescaped value starts with the Windows verbatim prefix
+  `\\?\` or device prefix `\\.\` are not reported; they are namespace
+  syntax, not absolute paths for this rule.
+- Other UNC literals, including `\\server\share` and `\\?x`, remain in
+  scope. No reviewed-exception allowlist is provided.
+- The canonical detector is `is_windows_path_literal(...)` in
+  `crates/sc-lint-portability/src/predicates.rs`.
+
 ## PORT-008 Environment Variables
 
 - `PORT-008` flags `HOME`, `USER`, and `XDG_*` lookups in ungated production
@@ -45,6 +71,8 @@ This applies to:
   `dirs::home_dir()`.
 - If the lookup is intentionally Unix-only, wrap the production code path in
   `#[cfg(unix)]` instead of leaving the env lookup ungated.
+- A `USER` read is not reported when the same enclosing function also reads
+  `USERNAME` (including through a closure or nested item in that body).
 
 ## PORT-009 Shell Invocation
 
@@ -70,6 +98,10 @@ This applies to:
   production-facing.
 - If no Windows companion exists, provide an ungated portable implementation or
   an explicit Windows-gated companion instead of leaving the Unix branch alone.
+- A private `#[cfg(unix)]` function or module, or a private inherent-impl
+  method, in either file of a configured `platform_adapters` pair is exempt.
+  `pub`, `pub(crate)`, `pub(super)`, `pub(in ..)` items and trait-impl methods
+  in those files retain their parity checks.
 
 ## Related Docs
 

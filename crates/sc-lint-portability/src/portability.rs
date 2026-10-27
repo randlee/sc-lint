@@ -237,6 +237,7 @@ fn collect_production_path_literal_findings(
             file_context,
             findings,
             config,
+            block_reads_env(&item_fn.block, "USERNAME"),
         ),
         Item::Const(item_const) => visit_expr_for_unix_portability(
             &item_const.expr,
@@ -246,6 +247,7 @@ fn collect_production_path_literal_findings(
             file_context,
             findings,
             config,
+            false,
         ),
         Item::Static(item_static) => visit_expr_for_unix_portability(
             &item_static.expr,
@@ -255,14 +257,9 @@ fn collect_production_path_literal_findings(
             file_context,
             findings,
             config,
+            false,
         ),
         Item::Impl(item_impl) => {
-            parity::collect_impl_method_parity_findings(
-                item_impl,
-                ScopeKind::NonTest,
-                file_context,
-                findings,
-            );
             for impl_item in &item_impl.items {
                 if let ImplItem::Fn(item_fn) = impl_item {
                     let fn_scope = classify_scope(&item_fn.attrs, ScopeKind::NonTest, None);
@@ -276,6 +273,7 @@ fn collect_production_path_literal_findings(
                             file_context,
                             findings,
                             config,
+                            block_reads_env(&item_fn.block, "USERNAME"),
                         );
                     }
                 }
@@ -285,6 +283,7 @@ fn collect_production_path_literal_findings(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn visit_block_for_unix_portability(
     block: &Block,
     inherited_scope: ScopeKind,
@@ -293,6 +292,7 @@ fn visit_block_for_unix_portability(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
     config: &PortabilityConfig,
+    username_read: bool,
 ) {
     for stmt in &block.stmts {
         match stmt {
@@ -315,6 +315,7 @@ fn visit_block_for_unix_portability(
                         file_context,
                         findings,
                         config,
+                        username_read,
                     );
                 }
             }
@@ -326,12 +327,14 @@ fn visit_block_for_unix_portability(
                 file_context,
                 findings,
                 config,
+                username_read,
             ),
             Stmt::Macro(_) => {}
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn visit_expr_for_unix_portability(
     expr: &Expr,
     inherited_scope: ScopeKind,
@@ -340,11 +343,13 @@ fn visit_expr_for_unix_portability(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
     config: &PortabilityConfig,
+    username_read: bool,
 ) {
     if inherited_scope != ScopeKind::NonTest || inherited_unix_gated || inherited_platform_gated {
         return;
     }
-    let mut visitor = ProductionPathLiteralVisitor::new(file_context, findings, config);
+    let mut visitor =
+        ProductionPathLiteralVisitor::new(file_context, findings, config, username_read);
     visitor.visit_expr(expr);
 }
 
@@ -625,6 +630,7 @@ struct ProductionPathLiteralVisitor<'a, 'b> {
     findings: &'b mut Vec<PortabilityFinding>,
     platform_gated_depth: usize,
     config: &'a PortabilityConfig,
+    username_read: bool,
 }
 
 impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
@@ -632,12 +638,14 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
         file_context: &'a FileContext,
         findings: &'b mut Vec<PortabilityFinding>,
         config: &'a PortabilityConfig,
+        username_read: bool,
     ) -> Self {
         Self {
             file_context,
             findings,
             platform_gated_depth: 0,
             config,
+            username_read,
         }
     }
 
@@ -726,6 +734,7 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
         }
         if self.platform_gated_depth == 0
             && let Some(variable_name) = production_env_portability_variable(node)
+            && !(variable_name == "USER" && self.username_read)
         {
             self.push_env_finding(&variable_name, span_start_line(node.span()));
         }
@@ -770,6 +779,15 @@ impl<'ast> Visit<'ast> for FunctionBodyVisitor {
         }
         syn::visit::visit_expr_call(self, node);
     }
+}
+
+fn block_reads_env(block: &Block, name: &str) -> bool {
+    let mut visitor = FunctionBodyVisitor::default();
+    visitor.visit_block(block);
+    visitor
+        .usages
+        .iter()
+        .any(|usage| matches!(usage, Usage::EnvVarCheck { name: env_name, .. } if env_name == name))
 }
 
 fn load_portability_config(
