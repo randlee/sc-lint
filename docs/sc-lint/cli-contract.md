@@ -282,7 +282,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 ## Stable codes
 
 | Code | Kind | Cause names | Recovery |
-| --- | --- | --- | --- | --- |
+| --- | --- | --- | --- |
 | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
 | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
@@ -334,8 +334,6 @@ The `human_output_fields_present_in_json` test asserts the exact fallback line
 for the first group and checks command, status, and step-count tokens against
 the JSON envelope for the second group. The remaining families likewise list
 their human-visible machine-significant fields in the test's pointer table.
-
-## Compatibility And Version-Probe Contract
 
 ## Consumer Integration And Profile Contract
 

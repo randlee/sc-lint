@@ -810,6 +810,7 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "clap",
+ "dunce",
  "quote",
  "rayon",
  "sc-lint-analyzer-support",

@@ -107,7 +107,7 @@ make mid-sprint. Approval of this record gates dispatch only.
     A missing `Cargo.lock` is reported as skipped, not as a failure. These key
     names are chosen here because no earlier record defines them.
 
-## Plan-review clarifications (Accepted — Rand, 2026-10-27, except Sprint l-10)
+## Plan-review clarifications (Accepted — Rand, 2026-10-27)
 
 These clarifications were written by the sprint design fixes for plan review round 2, after the decisions above were approved on 2026-10-27. They narrow or make precise the approved decisions and change none of them, except where a clarification says otherwise. Sprints l-1 to l-9: Accepted — Rand, 2026-10-27 ("approve the adr"). Sprint l-10: Accepted — Rand, 2026-10-27, together with REQ-CLI-025. Numbering is per sprint.
 

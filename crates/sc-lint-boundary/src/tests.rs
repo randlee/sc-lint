@@ -75,6 +75,59 @@ fn rule_ids_match_frozen_contract_baseline() {
 }
 
 #[test]
+fn path_less_exclusion_uses_dunce_root_for_windows_verbatim_case() {
+    let fixture = TempDir::new().expect("temp root");
+    let root = fixture.path().join("workspace-alias");
+    let normalized_root = dunce::canonicalize(fixture.path()).expect("canonical fixture root");
+    let source = normalized_root.join("crates/example/src/lib.rs");
+    let relative = "crates/example/src/lib.rs";
+
+    // Model dunce's Windows result: std canonicalize can return a \\?\
+    // verbatim path, while dunce provides the prefix-free workspace target.
+    // Controlled paths keep this case deterministic and runnable on all hosts.
+    fs::write(
+        fixture.path().join("sc-lint.toml"),
+        format!(
+            r#"[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+"SCB-CYCLE-002" = ["{relative}"]
+"#
+        ),
+    )
+    .expect("write analyzer config");
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.path(),
+        None,
+        Some("cycles"),
+    )
+    .expect("load cycle exclusions");
+
+    let node_id = NodeId::new("crate::example::example::a");
+    let finding = Finding {
+        rule_id: RuleId::ScbCycle002,
+        kind: "recursive_cycle".into(),
+        message: "cycle in example".to_owned(),
+        owner_ids: Vec::new(),
+        node_ids: vec![node_id.clone()],
+    };
+    let node_paths = BTreeMap::from([(node_id, source)]);
+    let report = findings_report(1, vec![finding]);
+    let filtered = apply_configured_rule_filter_with_canonicalizer(
+        report,
+        &settings,
+        &root,
+        &node_paths,
+        |candidate| {
+            assert_eq!(candidate, root);
+            Ok(normalized_root.clone())
+        },
+    );
+
+    assert!(filtered.findings.is_empty());
+    assert_eq!(filtered.status, ReportStatus::Pass);
+}
+
+#[test]
 fn catalog_lists_every_rule_id() {
     use RuleId::*;
 
