@@ -401,7 +401,9 @@ specialized backend tools and mixed Rust/Python implementations.
   stop later steps in the lane. A step may declare `after_all = true`, which
   starts it only after every other step has finished. Output
   ordering is deterministic and does not depend on step timing. Generic test groups and test
-  argument forwarding are not added.
+  argument forwarding are not added, except for consumer test selectors as
+  defined by [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md)
+  (effective when ADR-020 is Accepted).
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
