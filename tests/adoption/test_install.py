@@ -891,3 +891,79 @@ def test_rendered_outputs_unchanged_after_tmpl_rename() -> None:
         (".github/workflows/sc-lint.yml", "sc-lint.yml"),
     ):
         assert (consumer / rendered).read_bytes() == (golden / baseline).read_bytes(), rendered
+
+
+PRE_UPGRADE_TEMPLATES = ("sc-lint.toml.j2", "Justfile.import.j2", "sc-lint-workflow.yml.j2")
+
+
+def _seed_pre_upgrade_state(consumer: Path) -> list[str]:
+    # Synthetic pre-upgrade state: the kit installed the old .j2 copies under
+    # plugins/sc-lint/templates/, recorded as managed and unmodified.
+    assert run("--input", str(FIXTURES / "install.json"), str(consumer)).returncode == 0
+    manifest_path = consumer / ".sc-lint" / "installed.json"
+    manifest = json.loads(manifest_path.read_text())
+    old_paths = []
+    for name in PRE_UPGRADE_TEMPLATES:
+        old = f"plugins/sc-lint/templates/{name}"
+        payload = ("old " + name + "\n").encode()
+        (consumer / old).write_bytes(payload)
+        manifest["managed"][old] = hashlib.sha256(payload).hexdigest()
+        new = f"plugins/sc-lint/templates/{name.removesuffix('.j2')}.tmpl"
+        (consumer / new).unlink()
+        del manifest["managed"][new]
+        old_paths.append(old)
+    manifest_path.write_text(json.dumps(manifest))
+    return old_paths
+
+
+def test_upgrade_dry_run_lists_old_j2_templates_as_deletions() -> None:
+    consumer = copy_fixture("empty-workspace")
+    old_paths = _seed_pre_upgrade_state(consumer)
+    manifest_path = consumer / ".sc-lint" / "installed.json"
+    manifest_before = manifest_path.read_bytes()
+
+    dry_run = run("--dry-run", "--input", str(FIXTURES / "install.json"), str(consumer))
+    assert dry_run.returncode == 1, dry_run.stderr
+    for old in old_paths:
+        assert f"--- {consumer / old}\n+++ /dev/null\n" in dry_run.stdout
+        assert (consumer / old).is_file()
+    assert manifest_path.read_bytes() == manifest_before
+
+
+def test_upgrade_retires_old_j2_templates_and_installs_tmpl() -> None:
+    consumer = copy_fixture("empty-workspace")
+    old_paths = _seed_pre_upgrade_state(consumer)
+
+    upgrade = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert upgrade.returncode == 0, upgrade.stderr
+    managed = json.loads((consumer / ".sc-lint" / "installed.json").read_text())["managed"]
+    for old in old_paths:
+        assert not (consumer / old).exists()
+        assert old not in managed
+    for name in PRE_UPGRADE_TEMPLATES:
+        stem = name.removesuffix(".j2")
+        new = f"plugins/sc-lint/templates/{stem}.tmpl"
+        assert (consumer / new).read_bytes() == (KIT / "templates" / f"{stem}.tmpl").read_bytes()
+        assert new in managed
+
+
+def test_upgrade_with_modified_old_j2_template_conflicts_without_writing() -> None:
+    consumer = copy_fixture("empty-workspace")
+    old_paths = _seed_pre_upgrade_state(consumer)
+    manifest_path = consumer / ".sc-lint" / "installed.json"
+    manifest_before = manifest_path.read_bytes()
+    edited = consumer / "plugins/sc-lint/templates/Justfile.import.j2"
+    edited.write_bytes(b"consumer edit\n")
+
+    conflict = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert conflict.returncode == 2
+    assert (
+        "conflict: plugins/sc-lint/templates/Justfile.import.j2 was modified outside sc-lint"
+        in conflict.stderr
+    )
+    assert edited.read_bytes() == b"consumer edit\n"
+    for old in old_paths:
+        assert (consumer / old).is_file()
+    for name in PRE_UPGRADE_TEMPLATES:
+        assert not (consumer / f"plugins/sc-lint/templates/{name.removesuffix('.j2')}.tmpl").exists()
+    assert manifest_path.read_bytes() == manifest_before
