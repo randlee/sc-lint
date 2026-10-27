@@ -86,7 +86,7 @@ The success envelope's `data` has exactly `ok`, `findings`, `skipped`, and
 | `winget.manifest_glob` | The configured glob matched no Winget manifests. |
 | `winget.package_version` | A Winget `PackageVersion` field differs from the workspace version. |
 | `winget.manifest_version` | A Winget `ManifestVersion` field differs from the workspace version. |
-| `winget.installer_url` | A Winget installer URL encodes a different or unparseable version. |
+| `winget.installer_url` | A Winget installer URL encodes a different or unparsable version. |
 | `winget.missing_field` | A configured Winget version or installer URL field is absent. |
 | `release_wiring.file_missing` | The configured release workflow does not exist. |
 | `release_wiring.fragment` | A configured release workflow fragment is absent. |

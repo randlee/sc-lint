@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from sc_lint.check_version_sync import main
 from sc_lint.check_version_sync import success_message
@@ -381,6 +382,33 @@ class CheckVersionSyncTests(unittest.TestCase):
             code, payload, _ = self.json_result(root)
             self.assertEqual(code, 3)
             self.assertEqual(payload["error"]["kind"], "config")
+            self.assertNotIn("code", payload["error"].get("details", {}))
+
+    def test_version_sync_without_workspace_members_is_config_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self.write_repo(root)
+            (root / "Cargo.toml").write_text(
+                '[workspace]\nmembers = []\n[workspace.package]\nversion = "1.1.2"\n',
+                encoding="utf-8",
+            )
+
+            code, payload, _ = self.json_result(root)
+
+            self.assertEqual(code, 3)
+            self.assertEqual(payload["error"]["kind"], "config")
+            self.assertEqual(payload["error"]["message"], "no workspace member manifests found")
+
+    def test_version_sync_unexpected_error_uses_backend_protocol_envelope(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            with patch("sc_lint.check_version_sync._evaluate", side_effect=RuntimeError("unexpected")):
+                code, payload, _ = self.json_result(root)
+
+            self.assertEqual(code, 1)
+            self.assertFalse(payload["ok"])
+            self.assertEqual(payload["error"]["kind"], "backend_protocol")
+            self.assertIn("unexpected", payload["error"]["message"])
 
     def test_version_sync_without_cargo_lock(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -512,6 +540,22 @@ class CheckVersionSyncTests(unittest.TestCase):
                 code, payload, _ = self.json_result(root)
                 self.assertEqual(code, 3)
                 self.assertEqual(payload["error"]["kind"], "config")
+
+    def test_version_sync_rejects_invalid_winget_and_release_paths(self) -> None:
+        configurations = (
+            '[version_sync.winget]\nenabled = true\nmanifest_glob = "../.winget/*.yaml"\n',
+            '[version_sync.release_wiring]\nenabled = true\nfile = "../release.yml"\n',
+            '[version_sync.release_wiring]\nenabled = true\nfile = "workflow.yml"\nrequired_fragments = "not-an-array"\n',
+        )
+        for config in configurations:
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as tempdir:
+                root = Path(tempdir)
+                self.write_repo(root)
+                self.write_config(root, config)
+                code, payload, _ = self.json_result(root)
+                self.assertEqual(code, 3)
+                self.assertEqual(payload["error"]["kind"], "config")
+                self.assertNotIn("code", payload["error"].get("details", {}))
 
     def test_version_sync_existing_enabled_checks_return_finding_tuples(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
