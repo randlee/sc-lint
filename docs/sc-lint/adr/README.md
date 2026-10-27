@@ -37,6 +37,7 @@ current planning surface.
 ## Draft ADRs
 
 - [`ADR-019-boundary-prefix-patterns-and-feature-independence.md`](./ADR-019-boundary-prefix-patterns-and-feature-independence.md)
+- [`ADR-020-phase-l-atm-core-findings.md`](./ADR-020-phase-l-atm-core-findings.md)
   - prefix patterns in boundary dependency allow-lists and opt-in
     `SCB-FEATURE-001` feature independence (Accepted)
 

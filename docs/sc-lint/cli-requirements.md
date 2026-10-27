@@ -30,6 +30,25 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-lint.toml`
   - `.just/lint-config.toml`
   with `--root <path>` as the explicit repo-root override.
+  (Amended phase L, #137/default-config gap, Accepted — Rand, 2026-10-26.)
+  Resolution is per configuration table for every lint and every Python-backed
+  lint (line-counts, identity-literals, version-sync): an explicit `--config`
+  file first, then the table from `sc-lint.toml` when it has one, otherwise the
+  same table from `.just/lint-config.toml`. A table present in `sc-lint.toml`
+  is never shadowed by the fallback file, and a repo whose `sc-lint.toml` lacks
+  a table that only `.just/lint-config.toml` holds (as in atm-core's kit-rendered
+  `sc-lint.toml`) keeps using the fallback table. A lint whose configuration
+  table is found in neither file fails with a structured error; it must not
+  pass silently with "no active limits". The
+  repo root is the nearest ancestor holding `sc-lint.toml` or a workspace
+  `Cargo.toml`; a `boundaries/` directory is required only by the boundary
+  family, and its absence is a structured error for that family alone.
+  The Python entry `sc_lint.check_version_sync`, run as a `[[tool.sc-lint.lint]]`
+  step, accepts `--root`, `--config` and `--json`, reads a
+  `[version_sync.python]` table, and tolerates a missing `Cargo.lock`.
+  It also supports atm-core's `[version_sync.winget]` and
+  `[version_sync.release_wiring]` subsections (Amended phase L, #137; Accepted —
+  Rand, 2026-10-27).
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
@@ -56,6 +75,9 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-005D`
   Human-readable output must not expose machine-significant information that is
   unavailable through `--json`.
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) A test must enforce this:
+  for each command family, every machine-significant field present in human
+  output is present in the `--json` payload.
 
 - `REQ-CLI-005E`
   The CLI must document and preserve stable request and response models for
@@ -101,6 +123,10 @@ specialized backend tools and mixed Rust/Python implementations.
   - the tests that enforce envelope and error-shape consistency
   Parser-level usage failures that occur before a concrete subcommand path is
   resolved must document the fallback command identifier they use.
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) The contract matrix in
+  `cli-contract.md` must have a row for every command family, including docs,
+  init, test, setup, upgrade and lint.ci.consumer, and a test must assert that
+  the envelope key set is identical across families.
 
 - `REQ-CLI-006`
   The CLI must support both direct Rust-library dispatch and delegated
@@ -134,6 +160,10 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-lint check interfaces`
   and must preserve `sc-lint version` as the tool-version inspection path
   rather than overloading it for interface-version checks.
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) Status: planned, not
+  implemented. `CheckTarget` offers only native and xwin, and `sc-lint check
+  interfaces` is rejected as an unknown target; documentation must not claim
+  it exits 0.
 
 - `REQ-CLI-007A`
   The CLI should support first-class execution modes for common developer
@@ -362,8 +392,21 @@ specialized backend tools and mixed Rust/Python implementations.
   retain plan order and identify every failed step by its plan index; the
   command exits non-zero if any step fails. Steps that require Cargo's build
   lock are serialized. Consumer-configured lint and test profiles remain
-  sequential, declaration-ordered, and fail-fast. Generic test groups and test
-  argument forwarding are not added.
+  sequential, declaration-ordered, and fail-fast.
+  (Amended phase L, #195/#196, Accepted — Rand, 2026-10-26; supersedes the
+  preceding sentence.) Consumer-configured lint and test profiles run
+  independent steps concurrently and fail slow by default: every planned step
+  runs even if another fails, the report retains declaration order and
+  identifies every failed step by its index, and the command exits non-zero if
+  any step fails. The `--fail-fast` flag stops scheduling new steps after the
+  first failure. Steps that require Cargo's build lock stay serialized, and
+  fail-slow holds inside that serialized lane: a failing step there does not
+  stop later steps in the lane. A step may declare `after_all = true`, which
+  starts it only after every other step has finished. Output
+  ordering is deterministic and does not depend on step timing. Generic test groups and test
+  argument forwarding are not added, except for consumer test selectors as
+  defined by [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md)
+  (effective when ADR-020 is Accepted).
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -377,6 +420,15 @@ specialized backend tools and mixed Rust/Python implementations.
   A missing or incomplete bundle must return `CLI.SC_LINT_DOCS_UNAVAILABLE`
   with the searched bundle path, recovery action, and `sc-lint docs
   installation` reference.
+
+- `REQ-CLI-025`
+  The cargo-shear wrapper must not report as unlinked a Rust file that a
+  trybuild harness in the same package consumes through a string-literal
+  `.pass(...)` or `.compile_fail(...)` glob, and must keep reporting every
+  other unlinked file, empty file and unused dependency as before. No
+  per-fixture configuration is required for consumed fixtures.
+  (Added phase L, #647. Pending Rand approval; gates dispatch only. See
+  [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
 ## Contract References
 

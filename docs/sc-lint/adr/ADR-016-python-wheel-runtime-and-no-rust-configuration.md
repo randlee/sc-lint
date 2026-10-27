@@ -50,7 +50,8 @@ silently from their pinned binary. `sc-publish` solves the same problem for
    rustup targets in `.sc-lint/install.json`; product defaults choose none.
    Bootstrap `setup` provisions them through `sc_lint.setup_tools`. Dry-run
    never provisions. Consumer lint and test profiles run sequentially, in
-   declaration order, fail-fast. ADR-017 specifies translation, failure and
+   declaration order, fail-fast [superseded for execution order and failure
+   handling by ADR-020 decision 7 and REQ-CLI-023 as amended, phase L]. ADR-017 specifies translation, failure and
    compatibility behavior.
 
 The bootstrap (`.sc-lint/bootstrap.py`, ADR-012) provisions `.sc-lint/venv`

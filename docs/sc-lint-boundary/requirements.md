@@ -12,6 +12,13 @@ family.
 
 ## Dual-Loader Transition
 
+Amendment (phase L, #586, Accepted — Rand, 2026-10-26): the TOML
+transition is complete and the loader is TOML-only (`inventory/mod.rs`). The
+Markdown-embedded loader and its cross-source checks below are retired; they
+are kept as history. `REQ-SCB-002` to `REQ-SCB-005` are marked retired and the
+item-key parity wording of `REQ-SCB-007` applies to TOML records only.
+Plan authority: `lint-l-8`.
+
 - `REQ-SCB-002`
   During migration, the loader must accept both Markdown-embedded boundary
   records and TOML boundary records while mapping both sources into one shared
