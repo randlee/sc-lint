@@ -5340,6 +5340,10 @@ fn human_output_fields_present_in_json() {
     let mut family_names = Vec::new();
     for (family, argv, data, pointers, fallback) in rows {
         family_names.push(family);
+        assert!(
+            !pointers.is_empty(),
+            "{family}: pointer list must not be empty"
+        );
         let mut full_argv = vec!["sc-lint"];
         full_argv.extend_from_slice(argv);
         let cli = Cli::parse_from(full_argv);
@@ -5355,7 +5359,7 @@ fn human_output_fields_present_in_json() {
                 .pointer(pointer)
                 .unwrap_or_else(|| panic!("{family}: missing {pointer}"));
             let token = match value {
-                Value::Array(items) => items.len().to_string(),
+                Value::Array(items) => format!("({} ", items.len()),
                 Value::String(text) => text.clone(),
                 other => other.to_string(),
             };
