@@ -449,7 +449,7 @@ impl LoadedConfig {
             CliError::config("the boundary family requires a boundaries/ directory")
                 .with_code(ConfigCode::BoundariesDirMissing.as_str())
                 .with_cause(format!(
-                    "no boundaries/directory under repo root{}",
+                    "no boundaries/ directory under repo root {}",
                     root.display()
                 ))
                 .with_detail("repo_root", json!(root.display().to_string()))
