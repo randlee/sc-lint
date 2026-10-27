@@ -4809,8 +4809,10 @@ fn selector_list_prints_names() {
     let rendered = crate::render::render_success_human(&context, &envelope);
     let expected = "ci: group [unit, nested]\nintegration: cargo test --test integration\nnested: group [integration, unit]\nunit (default): cargo test\nwin-only: cargo test --features windows [windows]";
     assert_eq!(rendered, expected);
+    let windows_contract = CLI_CONTRACT.replace("\r\n", "\n").replace('\n', "\r\n");
+    let normalized_contract = windows_contract.replace("\r\n", "\n");
     assert!(
-        CLI_CONTRACT.contains(expected),
+        normalized_contract.contains(expected),
         "the CLI contract documents the exact selector-list output"
     );
 }
