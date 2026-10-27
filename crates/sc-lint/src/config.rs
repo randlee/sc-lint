@@ -25,11 +25,11 @@ pub(crate) use crate::profile_plan::ConsumerProfileStep;
 use crate::profile_plan::LintPlanInput;
 use crate::profile_plan::LintProfiles;
 use crate::profile_plan::ProfileName;
+use crate::profile_plan::decode_after_all;
 use crate::profile_plan::decode_lint_step_fields;
 use crate::profile_plan::profile_plan_config_error;
 use crate::profile_plan::reject_test_step_fields;
 use crate::profile_plan::validate_lint_step;
-use crate::scheduler::decode_after_all;
 
 use crate::test_selectors::TestSelectors;
 

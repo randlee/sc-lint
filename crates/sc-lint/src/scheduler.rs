@@ -72,32 +72,6 @@ impl ProfileCode {
     }
 }
 
-/// Decodes an optional `after_all` value of a lint or test row.
-///
-/// # Errors
-/// Returns `profile.invalid_after_all` for a non-boolean value.
-#[expect(
-    clippy::result_large_err,
-    reason = "Config validation stays within the top-level CliError contract."
-)]
-pub(crate) fn decode_after_all(
-    value: Option<&toml::Value>,
-    step: &str,
-    config_path: &Path,
-) -> Result<bool, CliError> {
-    match value {
-        None => Ok(false),
-        Some(toml::Value::Boolean(after_all)) => Ok(*after_all),
-        Some(_) => Err(ProfileCode::InvalidAfterAll.config_error(
-            format!(
-                "step '{step}' in {} declares a non-boolean after_all",
-                config_path.display()
-            ),
-            config_path,
-        )),
-    }
-}
-
 /// What the scheduler does after the first failed step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FailurePolicy {
