@@ -201,6 +201,16 @@ fn clone_impl_field_clones_are_not_cycles() {
 }
 
 #[test]
+fn non_ignored_trait_returning_self_still_reports_cycle_003() {
+    assert_eq!(
+        cycle_rule_ids(
+            "pub struct T { n: u32 } pub trait Duplicate { fn duplicate(&self) -> Self; } impl Duplicate for T { fn duplicate(&self) -> Self { Self { n: self.n } } }"
+        ),
+        vec![RuleId::ScbCycle003]
+    );
+}
+
+#[test]
 fn delegation_edge_trait_impl_to_same_named_inherent() {
     assert_cases_report_nothing(&["case_3", "case_4", "case_5"]);
 }
