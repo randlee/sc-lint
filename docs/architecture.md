@@ -362,9 +362,9 @@ For release `0.2.x`, this means:
 - `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend
   on `sc-lint-analyzer-support` for the rule-neutral analyzer configuration
   parser (ADR-013 amendment 2026-10-10, Accepted, #201)
-- `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`, and the
-  top-level `sc-lint` CLI may depend on `sc-lint-schema` for the canonical
-  machine-schema types
+- `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`,
+  `sc-lint-analyzer-support`, and the top-level `sc-lint` CLI may depend on
+  `sc-lint-schema` for the canonical machine-schema types
 - the top-level `sc-lint` CLI does not directly depend on
   `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
   integration mode
