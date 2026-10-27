@@ -4747,9 +4747,12 @@ fn selector_list_prints_names() {
     assert!(adapter.invoked().is_empty(), "--list runs nothing");
 
     let envelope = CommandEnvelope::success(context.command_id(), listed.data);
-    assert_eq!(
-        crate::render::render_success_human(&context, &envelope),
-        "ci: group [unit, nested]\nintegration: cargo test --test integration\nnested: group [integration, unit]\nunit (default): cargo test\nwin-only: cargo test --features windows [windows]"
+    let rendered = crate::render::render_success_human(&context, &envelope);
+    let expected = "ci: group [unit, nested]\nintegration: cargo test --test integration\nnested: group [integration, unit]\nunit (default): cargo test\nwin-only: cargo test --features windows [windows]";
+    assert_eq!(rendered, expected);
+    assert!(
+        CLI_CONTRACT.contains(expected),
+        "the CLI contract documents the exact selector-list output"
     );
 }
 

@@ -367,6 +367,27 @@ Cargo manifest, or analyzer package:
   "platforms": [...], "cwd": <string|null>, "env_keys": [...], "after_all":
   bool}]}`, sorted by name.
 
+Human-readable `sc-lint test --list` output contains one selector per line,
+sorted by name, in this form:
+
+`<name>[ (default)]: <command tokens joined by spaces | group [member, member]>[ [platform,platform]]`
+
+The `(default)` marker appears only on the default selector. Group members are
+joined with comma-space; a non-empty platform list is appended in brackets,
+with platform names separated by commas and no spaces. Selectors without a
+platform list have no suffix. Command tokens are joined with a single space
+without shell quoting. An empty selector list produces empty human output.
+
+For example:
+
+```text
+ci: group [unit, nested]
+integration: cargo test --test integration
+nested: group [integration, unit]
+unit (default): cargo test
+win-only: cargo test --features windows [windows]
+```
+
 The generated default configuration uses this shape:
 
 ```toml
