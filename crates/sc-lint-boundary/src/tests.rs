@@ -1394,6 +1394,230 @@ fn assert_issue376_union_row(
     assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
 }
 
+#[derive(Clone, Copy)]
+enum DependentEdge {
+    Normal,
+    Dev,
+    Both,
+}
+
+fn dependents_fixture(
+    edges: &[(&str, DependentEdge)],
+    isolated: &[&str],
+) -> (WorkspaceFixture, AnalyzeOptions) {
+    let mut packages = BTreeSet::from(["p"]);
+    packages.extend(edges.iter().map(|(package, _)| *package));
+    packages.extend(isolated.iter().copied());
+
+    let fixture = WorkspaceFixture::new();
+    let member_paths = packages
+        .iter()
+        .map(|package| format!("crates/{package}"))
+        .collect::<Vec<_>>();
+    fixture.write_workspace_root_with_members(
+        &member_paths.iter().map(String::as_str).collect::<Vec<_>>(),
+    );
+    for package in packages {
+        let manifest = match edges.iter().find(|(name, _)| *name == package) {
+            Some((_, DependentEdge::Normal)) => {
+                path_dependency_manifest(package, "p", "../p", "0.1.0")
+            }
+            Some((_, DependentEdge::Dev)) => good_member_manifest(
+                package,
+                "            [dev-dependencies]\n            p = { path = \"../p\", version = \"0.1.0\" }",
+            ),
+            Some((_, DependentEdge::Both)) => good_member_manifest(
+                package,
+                concat!(
+                    "            [dependencies]\n",
+                    "            p = { path = \"../p\", version = \"0.1.0\" }\n\n",
+                    "            [dev-dependencies]\n",
+                    "            p = { path = \"../p\", version = \"0.1.0\" }",
+                ),
+            ),
+            None => good_member_manifest(package, ""),
+        };
+        fixture.write(&format!("crates/{package}/Cargo.toml"), &manifest);
+        fixture.write_source(package, "lib.rs", "pub struct Fixture;");
+    }
+    let options = AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    };
+    (fixture, options)
+}
+
+fn findings_of(report: &FindingsReport, rule: RuleId) -> Vec<Vec<String>> {
+    report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == rule)
+        .map(|finding| {
+            finding
+                .owner_ids
+                .iter()
+                .map(|owner| owner.as_str().to_owned())
+                .collect()
+        })
+        .collect()
+}
+
+fn assert_dependent_report(
+    fixture: &WorkspaceFixture,
+    expected_002: Vec<Vec<String>>,
+    expected_004: Vec<Vec<String>>,
+    expected_total: usize,
+    expected_status: ReportStatus,
+) {
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("dependent policy analyzes");
+    assert_eq!(report.status, expected_status, "{:#?}", report.findings);
+    assert_eq!(
+        report.findings.len(),
+        expected_total,
+        "{:#?}",
+        report.findings
+    );
+    assert_eq!(
+        findings_of(&report, RuleId::ScbDependency002),
+        expected_002,
+        "{:#?}",
+        report.findings
+    );
+    assert_eq!(
+        findings_of(&report, RuleId::ScbDependency004),
+        expected_004,
+        "{:#?}",
+        report.findings
+    );
+}
+
+#[test]
+fn dependents_union_across_records() {
+    let (fixture, _) = dependents_fixture(
+        &[
+            ("q", DependentEdge::Normal),
+            ("r", DependentEdge::Normal),
+            ("s", DependentEdge::Normal),
+        ],
+        &[],
+    );
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &["r"], None, "active");
+
+    assert_dependent_report(
+        &fixture,
+        vec![vec!["s".into(), "p".into()]],
+        vec![],
+        1,
+        ReportStatus::Fail,
+    );
+}
+
+#[test]
+fn empty_allowed_dev_dependents_falls_back_to_allowed_dependents() {
+    let (omitted_dev, _) = dependents_fixture(&[("q", DependentEdge::Dev)], &[]);
+    write_policy_record(&omitted_dev, "p/a.toml", "A", &["q"], None, "active");
+    assert_dependent_report(&omitted_dev, vec![], vec![], 0, ReportStatus::Pass);
+
+    let (explicit_empty_dev, _) = dependents_fixture(&[("q", DependentEdge::Dev)], &[]);
+    write_policy_record(
+        &explicit_empty_dev,
+        "p/a.toml",
+        "A",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    assert_dependent_report(
+        &explicit_empty_dev,
+        vec![vec!["q".into(), "p".into()]],
+        vec![vec!["q".into(), "p".into()]],
+        2,
+        ReportStatus::Fail,
+    );
+
+    let (other_record_fallback, _) = dependents_fixture(&[("q", DependentEdge::Dev)], &[]);
+    write_policy_record(
+        &other_record_fallback,
+        "p/a.toml",
+        "A",
+        &["q"],
+        Some(&[]),
+        "active",
+    );
+    write_policy_record(
+        &other_record_fallback,
+        "p/b.toml",
+        "B",
+        &["q"],
+        None,
+        "active",
+    );
+    assert_dependent_report(
+        &other_record_fallback,
+        vec![],
+        vec![],
+        0,
+        ReportStatus::Pass,
+    );
+}
+
+#[test]
+fn dev_only_dependent_listed_in_dev_allowlist_reports_nothing() {
+    let (fixture, _) = dependents_fixture(&[("q", DependentEdge::Dev)], &[]);
+    write_policy_record(&fixture, "p/a.toml", "A", &[], Some(&["q"]), "active");
+    assert_dependent_report(&fixture, vec![], vec![], 0, ReportStatus::Pass);
+}
+
+#[test]
+fn normal_dependent_over_dev_edge_not_merged() {
+    let (both_edge, _) = dependents_fixture(&[("q", DependentEdge::Both)], &[]);
+    write_policy_record(&both_edge, "p/a.toml", "A", &[], Some(&["q"]), "active");
+    assert_dependent_report(
+        &both_edge,
+        vec![vec!["q".into(), "p".into()]],
+        vec![vec!["q".into(), "p".into()]],
+        2,
+        ReportStatus::Fail,
+    );
+
+    let (normal_and_dev, _) = dependents_fixture(
+        &[("q", DependentEdge::Normal), ("r", DependentEdge::Dev)],
+        &[],
+    );
+    write_policy_record(&normal_and_dev, "p/a.toml", "A", &["q"], None, "active");
+    assert_dependent_report(
+        &normal_and_dev,
+        vec![vec!["r".into(), "p".into()]],
+        vec![],
+        1,
+        ReportStatus::Fail,
+    );
+}
+
+#[test]
+fn issue643_unexpected_and_stale_dependents() {
+    let (fixture, _) = dependents_fixture(
+        &[("q", DependentEdge::Normal), ("s", DependentEdge::Normal)],
+        &["ghost"],
+    );
+    write_policy_record(&fixture, "p/a.toml", "A", &["q"], None, "active");
+    write_policy_record(&fixture, "p/b.toml", "B", &["ghost"], None, "active");
+    assert_dependent_report(
+        &fixture,
+        vec![vec!["s".into(), "p".into()]],
+        vec![vec!["ghost".into(), "p".into()]],
+        2,
+        ReportStatus::Fail,
+    );
+}
+
 #[test]
 fn issue376_stale_active_gate() {
     for (state, expects_stale) in [
@@ -1575,27 +1799,25 @@ fn issue376_owner_level_active_gate_retains_planned_record_permissions() {
 #[test]
 fn issue377_semantic_mutations() {
     // Valid Rust raw identifiers, owner-local roots, and roots in an explicitly
-    // allowed dependency are all accepted by the semantic inventory pass.
+    // allowed dependent are all accepted by the semantic inventory pass.
     let valid_fixture = WorkspaceFixture::new();
     valid_fixture.write_workspace_root_with_members(&["crates/p", "crates/q"]);
     valid_fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
-    valid_fixture.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    valid_fixture.write(
+        "crates/q/Cargo.toml",
+        &path_dependency_manifest("q", "p", "../p", "0.1.0"),
+    );
     valid_fixture.write_source("p", "lib.rs", "pub struct P;");
     valid_fixture.write_source("q", "lib.rs", "pub struct Q;");
-    write_policy_record(&valid_fixture, "p/a.toml", "A", &[], None, "active");
+    write_policy_record(&valid_fixture, "p/a.toml", "A", &["q"], None, "active");
     let valid_record = valid_fixture.root().join("boundaries/p/a.toml");
     let valid_contents = fs::read_to_string(&valid_record).expect("read valid record");
     fs::write(
         &valid_record,
-        valid_contents
-            .replace(
-                "roots = [\"run\"]",
-                "roots = [\"r#type\", \"p::LocalRoot\", \"q::ExternalRoot\"]",
-            )
-            .replace(
-                "allowed_dependencies = []",
-                "allowed_dependencies = [\"q\"]",
-            ),
+        valid_contents.replace(
+            "roots = [\"run\"]",
+            "roots = [\"r#type\", \"p::LocalRoot\", \"q::ExternalRoot\"]",
+        ),
     )
     .expect("write valid roots");
     let valid_report = analyze_workspace(&AnalyzeOptions {
@@ -1751,6 +1973,96 @@ fn issue377_semantic_mutations() {
             .message
             .contains("boundary `BOUNDARY-PB`")
     );
+}
+
+#[test]
+fn external_root_checks_allowed_dependents() {
+    let allowed = WorkspaceFixture::new();
+    allowed.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    allowed.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    allowed.write(
+        "crates/q/Cargo.toml",
+        &path_dependency_manifest("q", "p", "../p", "0.1.0"),
+    );
+    allowed.write_source("p", "lib.rs", "pub struct P;");
+    allowed.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&allowed, "p/a.toml", "A", &["q"], None, "active");
+    let record = allowed.root().join("boundaries/p/a.toml");
+    let contents = fs::read_to_string(&record).expect("read allowed record");
+    fs::write(
+        &record,
+        contents.replace("roots = [\"run\"]", "roots = [\"q::ExternalRoot\"]"),
+    )
+    .expect("write external root");
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: allowed.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("allowed external root analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+    assert!(report.findings.is_empty(), "{:#?}", report.findings);
+
+    let rejected = WorkspaceFixture::new();
+    rejected.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    rejected.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    rejected.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    rejected.write_source("p", "lib.rs", "pub struct P;");
+    rejected.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&rejected, "p/a.toml", "A", &[], None, "active");
+    let record = rejected.root().join("boundaries/p/a.toml");
+    let contents = fs::read_to_string(&record).expect("read rejected record");
+    fs::write(
+        &record,
+        contents
+            .replace("roots = [\"run\"]", "roots = [\"q::ExternalRoot\"]")
+            .replace(
+                "allowed_dependencies = []",
+                "allowed_dependencies = [\"q\"]",
+            ),
+    )
+    .expect("write unapproved external root");
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: rejected.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("unapproved external root is a semantic finding");
+    assert_eq!(report.status, ReportStatus::Fail, "{:#?}", report.findings);
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id, RuleId::ScbBoundary004);
+    assert_eq!(report.findings[0].kind, "unapproved_composition_root");
+    assert!(report.findings[0].message.contains(
+        "field `composition.roots[0]`: external composition root `q::ExternalRoot` resolves to `q`, which is not in dependencies.allowed_dependents; recovery: add the external package to dependencies.allowed_dependents or keep the root owner-local"
+    ));
+
+    let local = WorkspaceFixture::new();
+    local.write_workspace_root_with_members(&["crates/p", "crates/q"]);
+    local.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+    local.write("crates/q/Cargo.toml", &good_member_manifest("q", ""));
+    local.write_source("p", "lib.rs", "pub struct P;");
+    local.write_source("q", "lib.rs", "pub struct Q;");
+    write_policy_record(&local, "p/a.toml", "A", &[], None, "active");
+    let record = local.root().join("boundaries/p/a.toml");
+    let contents = fs::read_to_string(&record).expect("read local record");
+    fs::write(
+        &record,
+        contents
+            .replace("roots = [\"run\"]", "roots = [\"p::LocalRoot\"]")
+            .replace(
+                "allowed_dependencies = []",
+                "allowed_dependencies = [\"q\"]",
+            ),
+    )
+    .expect("write owner-local root");
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: local.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Dependencies),
+    })
+    .expect("owner-local root analyzes");
+    assert_eq!(report.status, ReportStatus::Pass, "{:#?}", report.findings);
+    assert!(report.findings.is_empty(), "{:#?}", report.findings);
 }
 
 #[test]

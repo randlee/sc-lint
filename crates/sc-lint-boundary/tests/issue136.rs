@@ -205,6 +205,81 @@ fn issue136_record_locks() {
     );
 }
 
+/// Maps atm-core's `collect_manifest_dependency_allowlist_violations` at
+/// commit `f4746d500` to sc-lint's finding contract. With actual runtime
+/// `dep` and dev `devdep`, the case mapping is:
+/// - record runtime `[dep, devdep]`, dev `[]` -> no finding;
+/// - record runtime `[dep]`, dev `[]` -> `(ScbManifest006,
+///   "manifest_policy_inconsistent")` (record union omits `devdep`);
+/// - record runtime `[dep]`, dev `[devdep]` -> no finding;
+/// - record runtime `[dep, devdep]`, dev `[devdep]` -> `(ScbManifest006,
+///   "manifest_policy_inconsistent")` (`devdep` is in the wrong record key).
+#[test]
+fn manifest_allowlist_matches_atm_core_cases() {
+    let cases = [
+        (
+            "allowed_dependencies/allowed",
+            &["dep", "devdep"][..],
+            &[][..],
+            None,
+        ),
+        (
+            "allowed_dependencies/violating",
+            &["dep"][..],
+            &[][..],
+            Some((RuleId::ScbManifest006, "manifest_policy_inconsistent")),
+        ),
+        (
+            "allowed_dev_dependencies/allowed",
+            &["dep"][..],
+            &["devdep"][..],
+            None,
+        ),
+        (
+            "allowed_dev_dependencies/violating",
+            &["dep", "devdep"][..],
+            &["devdep"][..],
+            Some((RuleId::ScbManifest006, "manifest_policy_inconsistent")),
+        ),
+    ];
+
+    for (name, allowed_dependencies, allowed_dev_dependencies, expected) in cases {
+        let fixture = Fixture::new();
+        fixture.workspace_with_dev_dependency();
+        fixture.boundary_record(allowed_dependencies, allowed_dev_dependencies);
+        fixture.write(
+            "sc-lint.toml",
+            r#"
+                [tool.sc-lint.analyzers.boundary]
+                [[tool.sc-lint.analyzers.boundary.manifest_dependency_allowlists]]
+                owner_manifest_path = "crates/app/Cargo.toml"
+                allowed_dependencies = ["dep", "devdep"]
+                boundary_record_path = "boundaries/app/app.toml"
+            "#,
+        );
+
+        let report = analyze(&fixture, Some("SCB-MANIFEST-003,SCB-MANIFEST-006"))
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        let expected_findings = expected.into_iter().collect::<Vec<_>>();
+        let findings = report
+            .findings
+            .iter()
+            .map(|finding| (finding.rule_id, finding.kind.as_str()))
+            .collect::<Vec<_>>();
+        assert_eq!(findings.len(), expected_findings.len(), "{name}");
+        assert_eq!(findings, expected_findings, "{name}");
+        assert_eq!(
+            report.status,
+            if expected_findings.is_empty() {
+                ReportStatus::Pass
+            } else {
+                ReportStatus::Fail
+            },
+            "{name}"
+        );
+    }
+}
+
 #[test]
 fn issue136_ownership() {
     let ownership_config = r#"
@@ -957,6 +1032,30 @@ impl Fixture {
             "crates/app/src/lib.rs",
             "use dep::Dep;\npub fn make() -> Dep { Dep }\n",
         );
+    }
+    fn workspace_with_dev_dependency(&self) {
+        self.write(
+            "Cargo.toml",
+            "[workspace]\nmembers = [\"crates/app\", \"crates/dep\", \"crates/devdep\"]\nresolver = \"2\"\n[workspace.package]\nversion = \"0.1.0\"\nedition = \"2024\"\nrust-version = \"1.85\"\nauthors = [\"test\"]\nlicense = \"MIT\"\nrepository = \"https://example.invalid\"\nhomepage = \"https://example.invalid\"\n",
+        );
+        for dependency in ["dep", "devdep"] {
+            self.write(
+                &format!("crates/{dependency}/Cargo.toml"),
+                &package(dependency, ""),
+            );
+            self.write(
+                &format!("crates/{dependency}/src/lib.rs"),
+                "pub struct Dep;\n",
+            );
+        }
+        self.write(
+            "crates/app/Cargo.toml",
+            &package(
+                "app",
+                "[dependencies]\ndep = { path = \"../dep\" }\n\n[dev-dependencies]\ndevdep = { path = \"../devdep\" }\n",
+            ),
+        );
+        self.write("crates/app/src/lib.rs", "pub struct App;\n");
     }
     fn boundary_record(&self, allowed_dependencies: &[&str], allowed_dev_dependencies: &[&str]) {
         self.write_boundary_record(BoundaryRecord {

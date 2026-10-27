@@ -724,9 +724,9 @@ fn validate_external_root(
     if owner_is_local
         || record
             .dependencies
-            .allowed_dependencies
+            .allowed_dependents
             .iter()
-            .any(|reference| reference.matches(&root_package))
+            .any(|dependent| dependent == &root_package)
     {
         return;
     }
@@ -735,10 +735,10 @@ fn validate_external_root(
         format!("composition.roots[{index}]"),
         InventoryDiagnosticKind::UnapprovedCompositionRoot,
         format!(
-            "external composition root `{}` resolves to `{root_package}`, which is not in dependencies.allowed_dependencies",
+            "external composition root `{}` resolves to `{root_package}`, which is not in dependencies.allowed_dependents",
             root.as_string()
         ),
-        "add the external package to dependencies.allowed_dependencies or keep the root owner-local",
+        "add the external package to dependencies.allowed_dependents or keep the root owner-local",
     ));
 }
 

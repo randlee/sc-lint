@@ -116,11 +116,14 @@ Plan authority: `lint-l-8`.
   Existing syntax, schema, layout and I/O failures remain fatal, and public
   loader signatures remain unchanged. Preserve local composition-root symbols;
   only resolved external crate-qualified roots undergo dependent-policy checks.
+  A resolved external root must name a package listed in that record's
+  `dependencies.allowed_dependents` (`SCB-BOUNDARY-004`, kind
+  `unapproved_composition_root`).
   `SCB-BOUNDARY-004` reports each semantic inventory defect, defaults to
   failure, and remains selected by both `boundaries` and `dependencies` filter
   families; structural loader failures remain fatal.
   (Amended 2026-10-10, Accepted, #203; amended 2026-10-12, Accepted,
-  [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
+  [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts); amended 2026-10-27, Accepted, ADR-020 clarification 4.1.)
 
 - `REQ-SCB-021`
   Package dependency policy is a boundary-inventory rule family owned by
