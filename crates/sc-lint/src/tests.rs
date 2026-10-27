@@ -1376,6 +1376,35 @@ fn repo_root_discovery_walks_up_to_the_workspace_root() {
 }
 
 #[test]
+fn repo_root_discovery_names_the_required_sentinels_with_backticks() {
+    let fixture = AnalysisFixture::new();
+    let start = fixture.root().join("nested");
+    fs::create_dir_all(&start).expect("nested start directory");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        start.to_str().expect("fixture path"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("repo-root context");
+    let error = LoadedConfig::load(&cli, &context).expect_err("repo root discovery fails");
+
+    assert_eq!(error.kind, CliErrorKind::Config);
+    assert!(
+        error
+            .message
+            .contains("missing required sentinels `sc-lint.toml` or `Cargo.toml [workspace]`"),
+        "{}",
+        error.message
+    );
+    assert_eq!(
+        error.details["required_sentinels"],
+        json!(["sc-lint.toml", "Cargo.toml [workspace]"])
+    );
+}
+
+#[test]
 fn malformed_repo_config_returns_cli_config_error() {
     let temp_dir = TempDir::new().expect("temp dir");
     std::fs::write(

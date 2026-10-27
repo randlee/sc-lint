@@ -25,6 +25,7 @@ from sc_lint.lint_common import make_log_path
 from sc_lint.lint_common import relative_log_path
 from sc_lint.lint_common import render_workspace_crate_table
 from sc_lint.lint_common import rust_file_test_scope
+from sc_lint.lint_common import table_missing_error
 from sc_lint.lint_common import workspace_crate_section_lines
 from sc_lint.lint_common import workspace_crates
 from sc_lint.lint_line_counts import main as line_counts_main
@@ -210,9 +211,23 @@ class LintCommonTests(unittest.TestCase):
                         "table": "line_counts",
                         "searched": ["sc-lint.toml", ".just/lint-config.toml"],
                     },
-                    "suggested_action": "add the table to sc-lint.toml or .just/lint-config.toml",
+                    "suggested_action": "add the table to `sc-lint.toml` or `.just/lint-config.toml`",
                 },
             )
+
+    def test_table_missing_error_uses_the_documented_recovery_literal(self) -> None:
+        error = table_missing_error(
+            ConfigError(
+                code=CONFIG_TABLE_MISSING,
+                table="line_counts",
+                searched=["sc-lint.toml", ".just/lint-config.toml"],
+            )
+        )
+
+        self.assertEqual(
+            error.suggested_action,
+            "add the table to `sc-lint.toml` or `.just/lint-config.toml`",
+        )
 
     def test_workspace_crates_reads_package_and_crate_path(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

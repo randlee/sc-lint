@@ -207,13 +207,13 @@ fn boundary_family_fails_without_boundaries_dir() {
     assert_eq!(
         error["cause"],
         format!(
-            "no boundaries/ directory under repo root {}",
+            "no `boundaries/` directory under repo root `{}`",
             canonical_root.display()
         )
     );
     assert_eq!(
         error["suggested_action"],
-        "create boundaries/ or do not run the boundary family"
+        "create `boundaries/` or do not run the boundary family"
     );
     assert_eq!(
         error["details"]["repo_root"],
@@ -336,7 +336,7 @@ fn table_in_neither_file_fails() {
     );
     assert_eq!(
         error["suggested_action"],
-        "add the table to sc-lint.toml or .just/lint-config.toml"
+        "add the table to `sc-lint.toml` or `.just/lint-config.toml`"
     );
 }
 
