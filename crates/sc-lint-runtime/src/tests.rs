@@ -792,6 +792,52 @@ fn module_named_tests_without_cfg_test_is_checked() {
 }
 
 #[test]
+fn test_only_const_and_static_imports_bind_nothing() {
+    assert!(
+        sleep_ids(
+            "#[cfg(test)] const _: () = { use std::thread::sleep as nap; };\n#[cfg(test)] static S: () = { use std::thread; };\nfn f(d: std::time::Duration) { nap(d); thread::sleep(d); }",
+            TOKIO_DEP
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn cfg_attr_test_is_ignored_and_thread_sleep_rejected() {
+    assert_eq!(
+        sleep_ids(
+            "#[cfg_attr(test, allow(dead_code))] fn f(d: std::time::Duration) { std::thread::sleep(d); }\n#[cfg_attr(test, test)] fn g(d: std::time::Duration) { std::thread::sleep(d); }\n#[cfg_attr(test, path = \"x.rs\")] mod m { pub fn h(d: std::time::Duration) { std::thread::sleep(d); } }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003; 3]
+    );
+}
+
+#[test]
+fn fn_named_tests_without_test_attribute_is_checked() {
+    assert_eq!(
+        sleep_ids(
+            "fn tests(d: std::time::Duration) { std::thread::sleep(d); }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn single_segment_test_path_other_than_test_attribute_is_checked() {
+    // Only `#[test]` or a path of two or more segments ending in `test` is
+    // test-only; `#[::test]` names an extern crate path, not the attribute.
+    assert_eq!(
+        sleep_ids(
+            "#[::test] fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
 fn tokio_time_sleep_allowed() {
     assert!(sleep_ids("fn f() { tokio::time::sleep(()); }", TOKIO_DEP).is_empty());
 }

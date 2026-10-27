@@ -114,9 +114,27 @@ impl<'ast> Visit<'ast> for ImportVisitor {
             syn::visit::visit_trait_item_fn(self, item);
         }
     }
+
+    fn visit_item_const(&mut self, item: &'ast syn::ItemConst) {
+        if !is_test_only(&item.attrs) {
+            syn::visit::visit_item_const(self, item);
+        }
+    }
+
+    fn visit_item_static(&mut self, item: &'ast syn::ItemStatic) {
+        if !is_test_only(&item.attrs) {
+            syn::visit::visit_item_static(self, item);
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for CallVisitor {
+    fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
+        if !is_test_only(&item.attrs) {
+            syn::visit::visit_item_use(self, item);
+        }
+    }
+
     fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
         if !is_test_only(&item.attrs) {
             self.visit_function(item.sig.ident.to_string(), &item.block);
@@ -231,15 +249,21 @@ fn has_arguments(segment: &syn::PathSegment) -> bool {
 }
 
 fn is_test_only(attributes: &[syn::Attribute]) -> bool {
-    attributes.iter().any(|attribute| {
-        attribute.path().is_ident("test")
-            || attribute
-                .path()
+    attributes
+        .iter()
+        .any(|attribute| attr_is_test(attribute) || cfg_is_test(attribute))
+}
+
+/// `#[test]`, or a path of two or more segments ending in `test`
+/// (`#[tokio::test]`, `#[async_std::test]`): both expand to a `#[test]` fn.
+fn attr_is_test(attribute: &syn::Attribute) -> bool {
+    let path = attribute.path();
+    path.is_ident("test")
+        || (path.segments.len() >= 2
+            && path
                 .segments
                 .last()
-                .is_some_and(|segment| segment.ident == "test")
-            || cfg_is_test(attribute)
-    })
+                .is_some_and(|segment| segment.ident == "test"))
 }
 
 fn cfg_is_test(attribute: &syn::Attribute) -> bool {
