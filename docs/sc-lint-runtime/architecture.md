@@ -22,6 +22,12 @@ its backend machine contract.
   Tokio-package policy. ADR-020 decision 6 narrows ADR-007: rules requiring no
   Tokio dependency or runtime semantics may live here; `sc-lint-tokio` remains
   reserved for rules that do.
+- `SleepScope` (in `runtime.rs`) decides which files the sleep pass visits. It
+  keeps workspace packages that declare a normal or build `tokio` dependency and
+  have a lib or bin target. Source files of the package's other targets (tests,
+  examples, benches, build scripts) are excluded, and test files are skipped.
+  The runtime analyzer table's `exclude_paths_by_rule` entries then filter
+  `SCB-RUNTIME-003` findings by path.
 
 ## Related Docs
 

@@ -18,6 +18,24 @@ runtime/concurrency-correctness rules.
   remains reserved for rules that need either. The sleep pass uses flattened
   imports, does not expand macros, and treats out-of-line `#[cfg(test)]` module
   files as production files.
+- `SCB-RUNTIME-003` exclusions use the runtime analyzer table:
+
+  ```toml
+  [tool.sc-lint.analyzers.runtime]
+  reason = "staged migration to tokio::time::sleep"
+
+  [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+  "SCB-RUNTIME-003" = ["crates/example/src/lib.rs"]
+  ```
+
+- known limitations of the sleep pass:
+  - `use` imports are flattened across the whole file, including imports inside
+    function bodies
+  - calls are matched by name, not by scope: a local item or binding that reuses
+    an imported name, such as a local `sleep`, is not shadow-checked
+  - macros are not expanded, so a sleep call produced by macro expansion is not
+    seen
+  - out-of-line `#[cfg(test)] mod x;` files are production files
 - the crate must keep its machine contract stable through the top-level CLI
   normalization surface
 

@@ -18,6 +18,12 @@ Current rule families:
     `tokio::time::sleep(..).await`
   - discarded `wait_timeout*` result in production code
 
+Sample `SCB-RUNTIME-003` finding:
+
+```text
+SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead
+```
+
 ## Invocation
 
 Primary product surface:
