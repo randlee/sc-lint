@@ -205,6 +205,10 @@ fn boundary_family_fails_without_boundaries_dir() {
     assert_eq!(error["kind"], "config");
     assert_eq!(error["code"], "config.boundaries_dir_missing");
     assert_eq!(
+        error["message"],
+        "the boundary family requires a `boundaries/` directory"
+    );
+    assert_eq!(
         error["cause"],
         format!(
             "no `boundaries/` directory under repo root `{}`",
