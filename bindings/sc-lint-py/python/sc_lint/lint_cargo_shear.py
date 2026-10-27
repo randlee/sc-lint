@@ -13,16 +13,20 @@ import subprocess
 import sys
 import tomllib
 
+from sc_lint.lint_common import CONFIG_TABLE_MISSING
+from sc_lint.lint_common import ConfigError
 from sc_lint.lint_common import discover_repo_root
-from sc_lint.lint_common import load_lint_config
+from sc_lint.lint_common import resolve_table
 from sc_lint.lint_common import workspace_crate_section_lines
 from sc_lint.lint_common import workspace_crates
 from sc_lint.lint_common import write_console_output
+from sc_lint.python_adapter import AdapterError
 
 
 ERROR_SECTIONS = {"unlinked_files", "empty_files"}
 UNUSED_DEPENDENCY_SECTION = "unused_dependency"
 SUMMARY_SECTION = "summary"
+CARGO_SHEAR_TABLE = "cargo_shear"
 CARGO_SHEAR_ALLOWLIST_FIELD = "cargo_shear.allowed_unused_dependencies"
 CARGO_SHEAR_CONFIG_ERROR = "SC_LINT_CARGO_SHEAR_CONFIG_INVALID"
 PATH_KEY_MIGRATION_DIAGNOSTIC = (
@@ -154,15 +158,14 @@ def manifest_to_package_name(repo_root: Path) -> dict[str, str]:
     }
 
 
+def load_cargo_shear_table(repo_root: Path) -> dict:
+    # Raises ConfigError when no searched config file defines [cargo_shear].
+    table, _config_path = resolve_table(CARGO_SHEAR_TABLE, None, repo_root)
+    return table
+
+
 def load_policy_config(repo_root: Path) -> dict[str, dict[str, str]]:
-    config = load_lint_config(repo_root)
-    cargo_shear = config.get("cargo_shear", {})
-    if not isinstance(cargo_shear, dict):
-        return {
-            "allowed_empty_files": {},
-            "allowed_unlinked_files": {},
-            "allowed_unused_dependencies": {},
-        }
+    cargo_shear = load_cargo_shear_table(repo_root)
 
     def table(name: str, *, require_reason: bool = False) -> dict[str, str]:
         value = cargo_shear.get(name, {})
@@ -189,9 +192,8 @@ def load_policy_config(repo_root: Path) -> dict[str, dict[str, str]]:
 def configured_unused_dependency_allowlist(
     repo_root: Path,
 ) -> tuple[bool, object]:
-    config = load_lint_config(repo_root)
-    cargo_shear = config.get("cargo_shear", {})
-    if not isinstance(cargo_shear, dict) or "allowed_unused_dependencies" not in cargo_shear:
+    cargo_shear = load_cargo_shear_table(repo_root)
+    if "allowed_unused_dependencies" not in cargo_shear:
         return False, {}
     return True, cargo_shear["allowed_unused_dependencies"]
 
@@ -588,9 +590,16 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv[1:])
     repo_root = discover_repo_root(args.root)
 
-    allowlist_supplied, configured_allowlist = configured_unused_dependency_allowlist(
-        repo_root
-    )
+    try:
+        allowlist_supplied, configured_allowlist = configured_unused_dependency_allowlist(
+            repo_root
+        )
+    except (ConfigError, AdapterError) as caught:
+        if isinstance(caught, ConfigError):
+            write_console_output(sys.stderr, f"{CONFIG_TABLE_MISSING}: {caught.message}\n")
+        else:
+            write_console_output(sys.stderr, f"{caught.message}\n")
+        return 3
     metadata: CargoShearWorkspaceMetadata | None = None
     if allowlist_supplied:
         try:

@@ -1105,7 +1105,7 @@ shear/summary
         )
 
     def test_main_from_foreign_cwd_rejects_unlisted_unused_dependency(self) -> None:
-        result, output = self.run_unused_dependency_main_from_foreign_cwd("")
+        result, output = self.run_unused_dependency_main_from_foreign_cwd("[cargo_shear]\n")
 
         self.assertEqual(result, 1)
         self.assertIn(
@@ -1292,6 +1292,8 @@ shear/summary
             stderr="",
         )
         with tempfile.TemporaryDirectory() as tempdir:
+            (Path(tempdir) / ".just").mkdir()
+            (Path(tempdir) / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             with mock.patch("sys.stdout", new_callable=io.StringIO):
                 result = cargo_shear_main(["lint_cargo_shear.py", "--root", tempdir])
 
@@ -1334,6 +1336,8 @@ shear/summary
 
     def test_load_policy_config_defaults_unused_dependency_allowlist(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
+            (Path(tempdir) / ".just").mkdir()
+            (Path(tempdir) / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             self.assertEqual(
                 load_policy_config(Path(tempdir))["allowed_unused_dependencies"],
                 {},
@@ -1510,6 +1514,8 @@ shear/empty_files
 
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             crate = WorkspaceCrate(
                 crate_dir="app",
                 package_name=APP_PACKAGE,
@@ -1559,6 +1565,8 @@ shear/empty_files
 
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             policy = {
                 "allowed_empty_files": {"src/βeta.rs": "reviewed λ"},
                 "allowed_unlinked_files": {},
