@@ -345,17 +345,20 @@ pub(crate) fn is_unix_path_literal(value: &str) -> bool {
         .any(|prefix| value.starts_with(prefix))
 }
 
+pub(crate) fn is_windows_namespace_prefix(value: &str) -> bool {
+    WINDOWS_NAMESPACE_PREFIXES
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+}
+
 pub(crate) fn is_windows_path_literal(value: &str) -> bool {
     let bytes = value.as_bytes();
     let drive_absolute = bytes.len() >= 3
         && bytes[0].is_ascii_alphabetic()
         && bytes[1] == b':'
         && (bytes[2] == b'\\' || bytes[2] == b'/');
-    let unc_absolute = value.starts_with("\\\\")
-        && value.len() > 2
-        && !WINDOWS_NAMESPACE_PREFIXES
-            .iter()
-            .any(|prefix| value.starts_with(prefix));
+    let unc_absolute =
+        value.starts_with("\\\\") && value.len() > 2 && !is_windows_namespace_prefix(value);
     drive_absolute || unc_absolute
 }
 
@@ -454,4 +457,18 @@ fn meta_is_allow_dead_code(meta: &Meta) -> bool {
                 .iter()
                 .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("dead_code")))
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_windows_namespace_prefix;
+
+    #[test]
+    fn namespace_prefix_helper_matches_device_and_verbatim_prefixes_only() {
+        assert!(is_windows_namespace_prefix("\\\\?\\C:\\x"));
+        assert!(is_windows_namespace_prefix("\\\\.\\COM1"));
+        assert!(!is_windows_namespace_prefix("\\\\server\\share"));
+        assert!(!is_windows_namespace_prefix("\\\\?x"));
+        assert!(!is_windows_namespace_prefix("C:\\x"));
+    }
 }
