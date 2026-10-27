@@ -38,7 +38,8 @@ consumer-local.
    built-in pattern detection rather than repo-configured allowlists. Existing
    config-driven behavior in `PORT-002` remains test-scope-only and does not
    set the suppression model for future production env, path, or shell rules.
-6. Explicit `#[cfg(unix)]` production boundaries are treated as structural
+6. [Narrowed by ADR-020 decision 1, phase L: the cfg set and the PORT-008 rule are
+   defined there.] Explicit `#[cfg(unix)]` production boundaries are treated as structural
    parity questions for the shared portability family. Leaf rules may suppress
    inside those items, with the companion-or-fallback decision owned by the
    structural parity rule family instead of parallel per-rule allowlists.

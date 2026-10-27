@@ -46,6 +46,9 @@ specialized backend tools and mixed Rust/Python implementations.
   The Python entry `sc_lint.check_version_sync`, run as a `[[tool.sc-lint.lint]]`
   step, accepts `--root`, `--config` and `--json`, reads a
   `[version_sync.python]` table, and tolerates a missing `Cargo.lock`.
+  It also supports atm-core's `[version_sync.winget]` and
+  `[version_sync.release_wiring]` subsections (Amended phase L, #137; Pending —
+  Rand approval, gates dispatch only).
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.
