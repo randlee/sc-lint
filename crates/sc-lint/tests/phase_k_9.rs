@@ -1,6 +1,8 @@
 use std::ffi::OsString;
 use std::fs;
 use std::io;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
@@ -189,6 +191,95 @@ fn read_child_output(mut stream: impl Read) -> io::Result<Vec<u8>> {
     Ok(output)
 }
 
+fn read_child_output_after_ready(
+    stream: impl Read + Send + 'static,
+    ready: std::sync::mpsc::Sender<io::Result<()>>,
+) -> io::Result<Vec<u8>> {
+    let mut reader = BufReader::new(stream);
+    let mut output = Vec::new();
+    while !output.ends_with(b"timeout child ready\n") {
+        let before = output.len();
+        reader.read_until(b'\n', &mut output)?;
+        if output.len() == before {
+            break;
+        }
+    }
+    ready
+        .send(if output.ends_with(b"timeout child ready\n") {
+            Ok(())
+        } else {
+            Err(io::Error::other("timeout child did not signal readiness"))
+        })
+        .map_err(|_| io::Error::other("readiness receiver dropped"))?;
+    reader.read_to_end(&mut output)?;
+    Ok(output)
+}
+
+#[test]
+fn timeout_output_reader_signals_explicit_readiness() {
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+    let output = read_child_output_after_ready(
+        std::io::Cursor::new(
+            b"test harness preamble\ntimeout child ready\ntimeout child stdout\n".to_vec(),
+        ),
+        ready_tx,
+    )
+    .expect("the controlled output contains the readiness line");
+
+    ready_rx
+        .recv()
+        .expect("the reader reports readiness")
+        .expect("the readiness line is accepted");
+    assert_eq!(
+        output,
+        b"test harness preamble\ntimeout child ready\ntimeout child stdout\n"
+    );
+}
+
+fn run_command_with_timeout_after_ready(
+    command: &mut Command,
+    timeout: Duration,
+) -> io::Result<Output> {
+    let display = format!("{command:?}");
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+    let stdout_reader = thread::spawn(move || read_child_output_after_ready(stdout, ready_tx));
+    let stderr_reader = thread::spawn(move || read_child_output(stderr));
+    ready_rx
+        .recv()
+        .map_err(|_| io::Error::other("timeout child readiness channel closed"))??;
+    let started = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(Output {
+                status,
+                stdout: join_child_output(stdout_reader)?,
+                stderr: join_child_output(stderr_reader)?,
+            });
+        }
+        if started.elapsed() >= timeout {
+            let _ = child.kill();
+            let _ = child.wait()?;
+            let stdout = join_child_output(stdout_reader)?;
+            let stderr = join_child_output(stderr_reader)?;
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!(
+                    "command {display} timed out after {timeout:?}; stdout: {}; stderr: {}",
+                    String::from_utf8_lossy(&stdout),
+                    String::from_utf8_lossy(&stderr)
+                ),
+            ));
+        }
+        thread::yield_now();
+    }
+}
+
 fn join_child_output(reader: thread::JoinHandle<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
     reader
         .join()
@@ -198,9 +289,10 @@ fn join_child_output(reader: thread::JoinHandle<io::Result<Vec<u8>>>) -> io::Res
 #[test]
 fn issue_timeout_child_process() {
     if std::env::var_os("SC_LINT_TEST_TIMEOUT_CHILD").is_some() {
+        println!("timeout child ready");
         println!("timeout child stdout");
         eprintln!("timeout child stderr");
-        thread::sleep(Duration::from_secs(60));
+        thread::park();
     }
 }
 
@@ -210,7 +302,7 @@ fn issue_command_timeout_kills_child_and_reports_output() {
     command
         .args(["--exact", "issue_timeout_child_process", "--nocapture"])
         .env("SC_LINT_TEST_TIMEOUT_CHILD", "1");
-    let error = run_command_with_timeout(&mut command, Duration::from_millis(100))
+    let error = run_command_with_timeout_after_ready(&mut command, Duration::from_millis(100))
         .expect_err("a sleeping child exceeds the deadline");
     let message = error.to_string();
     assert_eq!(error.kind(), io::ErrorKind::TimedOut, "{message}");
