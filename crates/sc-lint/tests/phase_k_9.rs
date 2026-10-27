@@ -4,6 +4,7 @@ use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -220,7 +221,7 @@ fn timeout_output_reader_signals_explicit_readiness() {
     let (ready_tx, ready_rx) = std::sync::mpsc::channel();
     let output = read_child_output_after_ready(
         std::io::Cursor::new(
-            b"test harness preamble\ntimeout child ready\ntimeout child stdout\n".to_vec(),
+            b"test harness preamble\ntimeout child stdout\ntimeout child ready\n".to_vec(),
         ),
         ready_tx,
     )
@@ -232,7 +233,7 @@ fn timeout_output_reader_signals_explicit_readiness() {
         .expect("the readiness line is accepted");
     assert_eq!(
         output,
-        b"test harness preamble\ntimeout child ready\ntimeout child stdout\n"
+        b"test harness preamble\ntimeout child stdout\ntimeout child ready\n"
     );
 }
 
@@ -289,10 +290,15 @@ fn join_child_output(reader: thread::JoinHandle<io::Result<Vec<u8>>>) -> io::Res
 #[test]
 fn issue_timeout_child_process() {
     if std::env::var_os("SC_LINT_TEST_TIMEOUT_CHILD").is_some() {
-        println!("timeout child ready");
         println!("timeout child stdout");
+        io::stdout().flush().expect("flush timeout child stdout");
         eprintln!("timeout child stderr");
-        thread::park();
+        io::stderr().flush().expect("flush timeout child stderr");
+        println!("timeout child ready");
+        io::stdout().flush().expect("flush timeout child readiness");
+        loop {
+            thread::park();
+        }
     }
 }
 
