@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -185,7 +186,7 @@ def test_consumer_profile_installed_wheel_and_binary(product_artifacts: ProductA
     for arguments in (("ci",), ("ci", "all"), ("ci", "host")):
         command = just_lint(*arguments)
         assert command.returncode == 0, f"just lint {arguments}: {command.stdout}\n{command.stderr}"
-        assert "lint.ci.consumer: ok" in command.stdout
+        assert re.search(r"lint\.ci\.consumer: pass \(\d+ steps\)", command.stdout)
 
     host_names = ["fmt", "probe", "windows-probe"] if os.name == "nt" else ["fmt", "probe"]
     assert [step["name"] for step in rows("host")] == host_names
