@@ -47,8 +47,8 @@ specialized backend tools and mixed Rust/Python implementations.
   step, accepts `--root`, `--config` and `--json`, reads a
   `[version_sync.python]` table, and tolerates a missing `Cargo.lock`.
   It also supports atm-core's `[version_sync.winget]` and
-  `[version_sync.release_wiring]` subsections (Amended phase L, #137; Pending —
-  Rand approval, gates dispatch only).
+  `[version_sync.release_wiring]` subsections (Amended phase L, #137; Accepted —
+  Rand, 2026-10-27).
 
 - `REQ-CLI-004`
   The CLI must normalize exit-code behavior across delegated tools.

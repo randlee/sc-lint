@@ -166,7 +166,7 @@ differs from the caller's, and either the callee is not public (private
 helper) or the caller is a trait-impl method (receiver call). A trait-impl
 method that forwards to a method of the same name stays a self-loop.
 (Amended 2026-10-10, Accepted, #204.)
-(Amended phase L, Pending — Rand approval, gates dispatch only: ADR-020 decision 11
+(Amended phase L, Accepted — Rand, 2026-10-27: ADR-020 decision 11
 replaces the name and visibility conditions above with "distinct nodes and the
 callee cannot reach the caller"; a method resolving to its own node stays a
 self-loop.)

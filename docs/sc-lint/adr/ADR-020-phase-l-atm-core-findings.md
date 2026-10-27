@@ -1,6 +1,6 @@
 # ADR-020 — Phase L decisions for the atm-core findings
 
-Status: Pending — Rand approval required (drafted 2026-10-26 on `plans/phase-l`).
+Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`).
 
 Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
 REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
