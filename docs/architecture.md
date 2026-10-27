@@ -228,8 +228,7 @@ Planned later crate:
   - out of current implementation scope until the Phase `C` versioning line
     moves from planning into execution
 - `sc-lint-tokio`
-  - reserved home for Tokio-specific async/runtime lint rules when Tokio-specific
-    dependencies or semantics justify a dedicated crate
+  - reserved for Tokio rules that need Tokio dependencies or runtime semantics
   - represented in structured boundary metadata as a reserved future crate
   - out of current parity scope until a future sprint assigns planned items
 
