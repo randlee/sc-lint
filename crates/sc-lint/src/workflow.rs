@@ -390,7 +390,7 @@ pub(crate) fn run_lint_profile_with(
     let repo_root = loaded_config.require_repo_root()?;
     let xwin_available = adapter.cargo_xwin_available(repo_root);
     let plans = lint_profile_plan(repo_root, profile, xwin_available);
-    let steps = run_steps_concurrent(repo_root, adapter, &plans)?;
+    let steps = run_builtin_plan(repo_root, adapter, &plans)?;
 
     Ok(CommandSuccess::direct(json!({
         "status": "pass",
@@ -653,7 +653,7 @@ pub(crate) fn run_ci_with(
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
     let xwin_available = adapter.cargo_xwin_available(repo_root);
-    let mut steps = run_steps_concurrent(
+    let mut steps = run_builtin_plan(
         repo_root,
         adapter,
         &lint_profile_plan(repo_root, LintProfile::Ci, xwin_available),
@@ -809,7 +809,7 @@ fn xwin_lint_steps(profile: LintProfile, xwin_available: bool) -> Vec<StepPlan> 
     clippy::result_large_err,
     reason = "Step execution stays within the top-level CliError contract."
 )]
-fn run_steps_concurrent(
+fn run_builtin_plan(
     repo_root: &Path,
     adapter: &dyn SystemAdapter,
     plans: &[StepPlan],
