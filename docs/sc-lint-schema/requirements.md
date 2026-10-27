@@ -8,13 +8,15 @@ by analyzer backends and the top-level CLI.
 ## Requirement Traceability
 
 - `REQ-PRODUCT-002DA` requires one canonical top-level success/failure
-  envelope family, normalized at the CLI boundary.
+  envelope family, normalized at the CLI boundary; the `sc-lint-python-v1`
+  adapter payload is validated by `validate_adapter_payload` before normalization.
 - `REQ-PRODUCT-003` and `REQ-PRODUCT-004D` establish the shared-crate and
   analyzer ownership boundaries.
 
 ## Scope Rules
 
 - Types describe transport data; they do not perform analysis or decide policy.
+- The crate may hold pure shape validation of the transport payloads it defines (`validate_adapter_payload`); it still performs no analysis and decides no policy.
 - Backend-native contracts are adapted by the CLI rather than leaking as the
   stable product envelope.
 

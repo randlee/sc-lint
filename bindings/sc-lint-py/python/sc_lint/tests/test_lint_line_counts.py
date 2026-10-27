@@ -54,6 +54,13 @@ max_production_lines = 1
             )
             self.assertEqual(summary["findings"], [])
 
+    def test_line_counts_table_falls_back(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            repo_root = seed_workspace(Path(tempdir))
+            (repo_root / "sc-lint.toml").write_text("[logging]\nconsole = false\n", encoding="utf-8")
+            (repo_root / ".just/lint-config.toml").write_text("[line_counts]\nmax_production_lines = 1\n", encoding="utf-8")
+            self.assertEqual(load_config(repo_root).max_production_lines, 1)
+
 
 def seed_workspace(repo_root: Path) -> Path:
     (repo_root / ".just").mkdir(parents=True, exist_ok=True)

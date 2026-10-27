@@ -2,6 +2,11 @@
 
 ## Role
 
+The neutral `WorkspaceMetadata::workspace_packages()` accessor adapts Cargo
+metadata into dependency and target records without embedding analyzer policy.
+It preserves dependency kinds, renames and target platforms, and target source
+paths and kinds for consumers that need workspace facts.
+
 This library provides rule-neutral AST source discovery, scope classification,
 text report rendering, and shared analyzer configuration parsing. It does not
 define lint rules, rule IDs, or an analyzer command surface.

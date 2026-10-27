@@ -56,9 +56,20 @@ Only literal `cargo check` and `cargo clippy` commands can declare a target.
 Native commands run unchanged, same-host targets add Cargo's `--target`, and
 Linux/macOS to `x86_64-pc-windows-msvc` runs through `cargo xwin`. Other
 cross-target combinations produce an ordered `skipped` workflow row; missing
-tools and failures for supported combinations fail the run. Selection is
-sequential and fail-fast. Generic test groups, parallel or keep-going modes,
-setup hooks, and forwarding extra test arguments are not part of this contract.
+tools and failures for supported combinations fail the run.
+
+Consumer lint and test steps run in parallel by default and fail slow: every
+selected step runs, the report keeps declaration order, and a failed run names
+every failed step. A step whose `argv[0]` is `cargo` runs on one serialized
+cargo lane in declaration order; any other program runs on its own worker
+(there is no worker cap, and cargo still serializes itself on its build
+lock). A step marked `after_all = true` starts only after every other step has
+finished, and several such steps run one at a time in declaration order. Pass
+`--fail-fast` (`sc-lint lint ci --consumer --fail-fast`, `sc-lint test
+--fail-fast`) to stop starting cargo-lane and `after_all` steps after the
+first failure; steps already running finish, and the skipped steps are listed
+separately from the failed ones. Test selectors, forwarded test arguments and
+`sc-lint test --list` are described under [Test selectors](#test-selectors).
 
 ## Profiles, platform scope, and declared tools
 
@@ -125,6 +136,53 @@ download files, or write. If the tools object declares tools but the managed
 `SETUP_TOOLS.INSPECTION_UNAVAILABLE` instead of bootstrapping that helper.
 Run ordinary `just setup` to provision the managed helper and declared tools.
 See [troubleshooting](./troubleshooting.md) for recovery.
+
+## Test selectors
+
+`[tool.sc-lint.test]` is either the `[[tool.sc-lint.test]]` row list (every row
+runs when no name, or `all`, is given; a name runs that row) or a table of
+named selectors. A selector is a `command` argv, or a `group` of other selector
+names expanded in listed order (nested groups expand in place; a command
+reached twice runs once). `default` names the selector a bare `sc-lint test`
+runs; any other selector runs only when named.
+
+```toml
+[tool.sc-lint.test]
+default = "unit"
+
+[tool.sc-lint.test.selectors.unit]
+command = ["cargo", "test"]
+env = { RUST_LOG = "debug" }
+cwd = "crates/app"
+platforms = ["linux", "macos"]
+
+[tool.sc-lint.test.selectors.integration]
+command = ["cargo", "test", "--test", "integration"]
+
+[tool.sc-lint.test.selectors.full]
+group = ["unit", "integration"]
+```
+
+`env` adds string variables to the inherited environment, `cwd` is relative to
+the repository root, and `platforms` (absent or empty means every platform)
+skips the selector on other hosts with a `platform_mismatch` row. `after_all`
+is accepted on command selectors only. Selector names are listed sorted by
+name.
+
+```sh
+sc-lint test --config sc-lint.toml --list
+sc-lint test --config sc-lint.toml integration --nocapture
+just test --fail-fast full
+```
+
+Flags (`--fail-fast`, `--list`, `--config`, `--json`) precede the selector;
+every word after the selector is appended verbatim to its command, so
+`integration --nocapture` runs `cargo test --test integration --nocapture`.
+A group selector does not accept forwarded arguments. `--list` prints the
+declared selectors and runs nothing; it cannot be combined with a selector or
+`--fail-fast`. An unknown name fails with `test.unknown_selector`, a group
+cycle with `test.group_cycle`, and `after_all` on a group with
+`profile.invalid_after_all`.
 
 ## Inspecting output
 

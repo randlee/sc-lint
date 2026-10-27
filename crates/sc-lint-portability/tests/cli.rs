@@ -97,6 +97,36 @@ fn run_invalid_adapter_config(config: &str) -> std::process::Output {
         .unwrap()
 }
 
+fn port010_findings(shape: &str) -> Vec<serde_json::Value> {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/port010")
+        .join(shape);
+    let config = fixture.join("sc-lint.toml");
+    let output = Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
+        .args(["analyze", "--root"])
+        .arg(&fixture)
+        .arg("--config")
+        .arg(config)
+        .args(["--format", "json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "analyzer invocation failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    report["findings"]
+        .as_array()
+        .expect("findings array")
+        .iter()
+        .filter(|finding| finding["rule_id"] == "PORT-010")
+        .cloned()
+        .collect()
+}
+
 #[test]
 fn unknown_rule_filter_exits_two_and_prefixes_error() {
     let output = run_analyzer(
@@ -199,6 +229,37 @@ fn issue372_cli_configured_pair() {
         !String::from_utf8(output.stdout)
             .unwrap()
             .contains("PORT-010")
+    );
+}
+
+#[test]
+fn port010_fixture_unix_helper_in_paired_file() {
+    assert!(port010_findings("unix_helper_in_paired_file").is_empty());
+}
+
+#[test]
+fn port010_fixture_crate_root_main_current_behaviour() {
+    // Records the current classification; the cfg(not(unix)) sibling is not a
+    // portable fallback and this shape is not claimed fixed by L1-4.
+    let findings = port010_findings("crate_root_main");
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(
+        findings[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("restore_default_sigpipe")
+    );
+}
+
+#[test]
+fn port010_fixture_unpaired_pub_item_reported() {
+    let findings = port010_findings("unpaired_pub_item");
+    assert_eq!(findings.len(), 1, "{findings:#?}");
+    assert!(
+        findings[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("raise_descriptor_limit")
     );
 }
 

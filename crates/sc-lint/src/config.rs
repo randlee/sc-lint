@@ -1,10 +1,7 @@
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
-use std::str::FromStr;
 
-use semver::Version;
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json::json;
@@ -12,8 +9,14 @@ use serde_json::json;
 use crate::Cli;
 use crate::CliError;
 use crate::command::CommandContext;
-use crate::consumer_integration::BINARY_NOT_FOUND_RECOVERY;
-use crate::consumer_integration::DOCS_SETUP_REFERENCE;
+pub(crate) use crate::compatibility::CompatibilityErrorCode;
+pub(crate) use crate::compatibility::CompatibilityRequirement;
+pub use crate::compatibility::MinimumVersion;
+pub(crate) use crate::compatibility::VERSION_PROBE_SCHEMA;
+pub(crate) use crate::compatibility::compatibility_config_error;
+pub(crate) use crate::compatibility::compatibility_requirement_from_file;
+pub(crate) use crate::compatibility::load_compatibility_requirement;
+pub(crate) use crate::compatibility::missing_consumer_field;
 pub(crate) use crate::consumer_integration::run_consumer_init;
 #[cfg(test)]
 pub(crate) use crate::consumer_integration::run_consumer_init_at;
@@ -22,13 +25,15 @@ pub(crate) use crate::profile_plan::ConsumerProfileStep;
 use crate::profile_plan::LintPlanInput;
 use crate::profile_plan::LintProfiles;
 use crate::profile_plan::ProfileName;
+use crate::profile_plan::decode_after_all;
 use crate::profile_plan::decode_lint_step_fields;
 use crate::profile_plan::profile_plan_config_error;
 use crate::profile_plan::reject_test_step_fields;
 use crate::profile_plan::validate_lint_step;
 
+use crate::test_selectors::TestSelectors;
+
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
-pub(crate) const VERSION_PROBE_SCHEMA: &str = "sc-lint-version-v1";
 
 /// Selector value that runs every configured consumer profile step in declaration order.
 pub(crate) const CONSUMER_SELECTOR_ALL: &str = "all";
@@ -52,6 +57,7 @@ impl ConsumerProfile {
 pub struct LoadedConfig {
     repo_root: Option<RepoRoot>,
     config_path: Option<PathBuf>,
+    explicit_config: Option<PathBuf>,
     logging_root: Option<PathBuf>,
     logging_console: bool,
     mode: LoadedConfigMode,
@@ -72,67 +78,31 @@ struct ConsumerRequirement {
     root: PathBuf,
     lint: Vec<ConsumerProfileStep>,
     lint_profiles: LintProfiles,
-    test: Vec<ConsumerProfileStep>,
+    test: TestSelectors,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CompatibilityErrorCode {
-    ConfigMissing,
-    ConfigMalformed,
-    BinaryNotFound,
-    BinaryExecutionFailed,
-    ProbeMalformed,
-    VersionUnparsable,
-    VersionTooOld,
+pub(crate) enum ConfigCode {
+    BoundariesDirMissing,
+    TableMissing,
 }
 
-impl ErrorCode for CompatibilityErrorCode {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::ConfigMissing => "CLI.SC_LINT_CONFIG_MISSING",
-            Self::ConfigMalformed => "CLI.SC_LINT_CONFIG_MALFORMED",
-            Self::BinaryNotFound => "CLI.SC_LINT_BINARY_NOT_FOUND",
-            Self::BinaryExecutionFailed => "CLI.SC_LINT_BINARY_EXECUTION_FAILED",
-            Self::ProbeMalformed => "CLI.SC_LINT_VERSION_PROBE_MALFORMED",
-            Self::VersionUnparsable => "CLI.SC_LINT_VERSION_UNPARSABLE",
-            Self::VersionTooOld => "CLI.SC_LINT_VERSION_TOO_OLD",
+impl ConfigCode {
+    pub(crate) fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "config.table_missing" => Some(Self::TableMissing),
+            _ => None,
         }
     }
 }
 
-/// A validated semantic-version floor for a repository's sc-lint installation.
-///
-/// The string is parsed at configuration load time; callers receive this type
-/// rather than a raw string, which prevents lexical version comparisons.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MinimumVersion(Version);
-
-impl MinimumVersion {
-    pub const FIELD_PATH: &'static str = "[tool.sc-lint].minimum_version";
-
-    pub fn as_semver(&self) -> &Version {
-        &self.0
+impl ErrorCode for ConfigCode {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::BoundariesDirMissing => "config.boundaries_dir_missing",
+            Self::TableMissing => "config.table_missing",
+        }
     }
-}
-
-impl FromStr for MinimumVersion {
-    type Err = semver::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Version::parse(value).map(Self)
-    }
-}
-
-impl std::fmt::Display for MinimumVersion {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(formatter)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct CompatibilityRequirement {
-    minimum_version: MinimumVersion,
-    config_path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,19 +130,19 @@ impl RepoRoot {
         })?;
 
         loop {
-            if current.join("Cargo.toml").is_file() && current.join("boundaries").is_dir() {
+            if current.join(CONFIG_FILENAME).is_file() || workspace_manifest(&current) {
                 return Ok(Self(current));
             }
             let inspected = current.clone();
             if !current.pop() {
                 return Err(CliError::config(format!(
-                    "could not discover the sc-lint repo root from `{}`; last inspected `{}` was missing required sentinels `Cargo.toml` and/or `boundaries`",
+                    "could not discover the sc-lint repo root from `{}`; last inspected `{}` was missing required sentinels `sc-lint.toml` or `Cargo.toml [workspace]`",
                     start.display(),
                     inspected.display()
                 ))
                 .with_detail("discovery_start", json!(start.display().to_string()))
                 .with_detail("last_inspected", json!(inspected.display().to_string()))
-                .with_detail("required_sentinels", json!(["Cargo.toml", "boundaries"]))
+                .with_detail("required_sentinels", json!(["sc-lint.toml", "Cargo.toml [workspace]"]))
                 .with_suggested_action(
                     "Run the command inside the repo or pass `--root <path>` to the workspace root.",
                 ));
@@ -183,6 +153,16 @@ impl RepoRoot {
     pub(crate) fn as_path(&self) -> &Path {
         &self.0
     }
+}
+
+fn workspace_manifest(path: &Path) -> bool {
+    let manifest = path.join("Cargo.toml");
+    manifest.is_file()
+        && fs::read_to_string(manifest)
+            .ok()
+            .and_then(|contents| toml::from_str::<toml::Value>(&contents).ok())
+            .and_then(|value| value.get("workspace").cloned())
+            .is_some_and(|value| value.is_table())
 }
 
 impl LoadedConfig {
@@ -204,6 +184,7 @@ impl LoadedConfig {
             return Ok(Self {
                 repo_root: None,
                 config_path: None,
+                explicit_config: None,
                 logging_root: cli.log_root.clone(),
                 logging_console: cli.log_console,
                 mode: LoadedConfigMode::Standard,
@@ -218,7 +199,11 @@ impl LoadedConfig {
             })?
         };
         let repo_root = RepoRoot::discover(&discovery_base)?;
-        let config_path = find_repo_config(repo_root.as_path(), cli.config.as_deref());
+        let explicit_config = cli
+            .config
+            .as_ref()
+            .map(|path| resolve_repo_relative_path(repo_root.as_path(), path));
+        let config_path = find_repo_config(repo_root.as_path(), explicit_config.as_deref());
         let file_config = if let Some(path) = config_path.as_ref() {
             parse_repo_config(path)?
         } else {
@@ -245,6 +230,7 @@ impl LoadedConfig {
         Ok(Self {
             repo_root: Some(repo_root),
             config_path,
+            explicit_config,
             logging_root,
             logging_console,
             mode: LoadedConfigMode::Standard,
@@ -270,56 +256,18 @@ impl LoadedConfig {
         }
     }
 
+    /// The consumer root and the validated `[tool.sc-lint.test]` selectors.
     #[expect(
         clippy::result_large_err,
-        reason = "Consumer profile lookup retains the shared top-level CliError contract."
+        reason = "Consumer test selection retains the shared top-level CliError contract."
     )]
-    /// Resolves the consumer profile steps selected by `selector`.
-    ///
-    /// `None` and [`CONSUMER_SELECTOR_ALL`] select every configured step in
-    /// declaration order; any other value selects the single step with that name.
-    pub(crate) fn consumer_profile(
-        &self,
-        profile: ConsumerProfile,
-        selector: Option<&str>,
-    ) -> Result<(&Path, &[ConsumerProfileStep]), CliError> {
+    pub(crate) fn test_selectors(&self) -> Result<(&Path, &TestSelectors), CliError> {
         let LoadedConfigMode::Consumer(requirement) = &self.mode else {
             return Err(CliError::internal(
                 "consumer profile execution requires a consumer configuration",
             ));
         };
-        let steps = match profile {
-            ConsumerProfile::Lint => &requirement.lint,
-            ConsumerProfile::Test => &requirement.test,
-        };
-        let Some(name) = selector.filter(|name| *name != CONSUMER_SELECTOR_ALL) else {
-            return Ok((&requirement.root, steps));
-        };
-        let step =
-            steps
-                .iter()
-                .find(|step| step.name() == name)
-                .ok_or_else(|| {
-                    let available = steps
-                        .iter()
-                        .map(ConsumerProfileStep::name)
-                        .collect::<Vec<_>>();
-                    consumer_profile_error(
-                self.config_path.as_deref().unwrap_or_else(|| Path::new(CONFIG_FILENAME)),
-                profile.as_str(),
-                format!(
-                    "consumer `{}` profile has no step named `{name}`; configured steps: {}",
-                    profile.as_str(),
-                    available.join(", ")
-                ),
-            )
-            .with_detail("selector", json!(name))
-            .with_detail("available", json!(available))
-            .with_suggested_action(format!(
-                "Pass one of the configured step names or `{CONSUMER_SELECTOR_ALL}`."
-            ))
-                })?;
-        Ok((&requirement.root, std::slice::from_ref(step)))
+        Ok((&requirement.root, &requirement.test))
     }
 
     /// Resolves a consumer lint selector to planner input.
@@ -406,6 +354,7 @@ impl LoadedConfig {
         Ok(Self {
             repo_root: None,
             config_path: Some(config_path),
+            explicit_config: None,
             logging_root: cli.log_root.clone(),
             logging_console: cli.log_console,
             mode: LoadedConfigMode::Compatibility(requirement),
@@ -440,7 +389,7 @@ impl LoadedConfig {
         let lint = validate_consumer_profile("lint", &sc_lint.lint, &config_path)?;
         let lint_profiles = LintProfiles::parse(&sc_lint.lint_profiles, &lint)
             .map_err(|error| profile_plan_config_error(error, &config_path))?;
-        let test = validate_consumer_profile("test", &sc_lint.test, &config_path)?;
+        let test = test_selectors_from_file(sc_lint.test.as_ref(), &config_path)?;
         let root = config_path
             .parent()
             .ok_or_else(|| CliError::internal("consumer configuration has no parent directory"))?
@@ -449,6 +398,7 @@ impl LoadedConfig {
         Ok(Self {
             repo_root: None,
             config_path: Some(config_path),
+            explicit_config: None,
             logging_root: cli.log_root.clone(),
             logging_console: cli.log_console,
             mode: LoadedConfigMode::Consumer(ConsumerRequirement {
@@ -482,6 +432,31 @@ impl LoadedConfig {
         self.config_path.as_deref()
     }
 
+    pub(crate) fn explicit_config(&self) -> Option<&Path> {
+        self.explicit_config.as_deref()
+    }
+
+    #[expect(
+        clippy::result_large_err,
+        reason = "Boundary configuration failures are part of the stable top-level CliError contract."
+    )]
+    pub(crate) fn require_boundaries_dir(&self) -> Result<(), CliError> {
+        let root = self.require_repo_root()?;
+        if root.join("boundaries").is_dir() {
+            return Ok(());
+        }
+        Err(
+            CliError::config("the boundary family requires a `boundaries/` directory")
+                .with_code(ConfigCode::BoundariesDirMissing.as_str())
+                .with_cause(format!(
+                    "no `boundaries/` directory under repo root `{}`",
+                    root.display()
+                ))
+                .with_detail("repo_root", json!(root.display().to_string()))
+                .with_suggested_action("create `boundaries/` or do not run the boundary family"),
+        )
+    }
+
     pub fn logging_root(&self) -> Option<&PathBuf> {
         self.logging_root.as_ref()
     }
@@ -503,121 +478,33 @@ impl LoadedConfig {
                 "compatibility evaluation requires a compatibility configuration",
             ));
         };
-        let binary = binary_override.unwrap_or_else(|| Path::new(crate::consts::SERVICE_NAME));
-        let output = Command::new(binary)
-            .args(["--json", "version"])
-            .output()
-            .map_err(|error| {
-                let (code, message) = if error.kind() == std::io::ErrorKind::NotFound {
-                    (
-                        CompatibilityErrorCode::BinaryNotFound,
-                        format!(
-                            "could not find sc-lint binary `{}` required at least `{}` by `{}`",
-                            binary.display(),
-                            requirement.minimum_version,
-                            requirement.config_path.display()
-                        ),
-                    )
-                } else {
-                    (
-                        CompatibilityErrorCode::BinaryExecutionFailed,
-                        format!(
-                            "could not execute sc-lint binary `{}` required at least `{}` by `{}`",
-                            binary.display(),
-                            requirement.minimum_version,
-                            requirement.config_path.display()
-                        ),
-                    )
-                };
-                compatibility_runtime_error(
-                    code,
-                    message,
-                    requirement,
-                    binary,
-                    None,
-                    error.to_string(),
-                )
-            })?;
-
-        if !output.status.success() {
-            return Err(compatibility_runtime_error(
-                CompatibilityErrorCode::BinaryExecutionFailed,
-                format!(
-                    "sc-lint binary `{}` required at least `{}` by `{}` exited unsuccessfully",
-                    binary.display(),
-                    requirement.minimum_version,
-                    requirement.config_path.display()
-                ),
-                requirement,
-                binary,
-                None,
-                stderr_or_status(&output),
-            ));
-        }
-
-        let probe =
-            serde_json::from_slice::<VersionProbeEnvelope>(&output.stdout).map_err(|error| {
-                compatibility_runtime_error(
-                    CompatibilityErrorCode::ProbeMalformed,
-                    format!(
-                        "sc-lint binary `{}` required at least `{}` by `{}` did not emit a valid version probe",
-                        binary.display(), requirement.minimum_version, requirement.config_path.display()
-                    ),
-                    requirement,
-                    binary,
-                    None,
-                    error.to_string(),
-                )
-            })?;
-        let observed = validate_version_probe(probe, requirement, binary)?;
-        if observed < *requirement.minimum_version.as_semver() {
-            return Err(compatibility_runtime_error(
-                CompatibilityErrorCode::VersionTooOld,
-                format!(
-                    "installed sc-lint version `{observed}` at `{}` does not satisfy required minimum `{}` from `{}`",
-                    binary.display(),
-                    requirement.minimum_version,
-                    requirement.config_path.display()
-                ),
-                requirement,
-                binary,
-                Some(&observed),
-                "the installed release is below the repository minimum version".to_string(),
-            ));
-        }
-
-        Ok(json!({
-            "status": "pass",
-            "minimum_version": requirement.minimum_version.to_string(),
-            "installed_version": observed.to_string(),
-            "binary_path": binary.display().to_string(),
-            "config_path": requirement.config_path.display().to_string(),
-        }))
+        crate::compatibility::evaluate_compatibility(requirement, binary_override)
     }
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
-struct RepoConfigFile {
+pub(crate) struct RepoConfigFile {
     logging: Option<LoggingConfigFile>,
-    tool: Option<ToolConfigFile>,
+    pub(crate) tool: Option<ToolConfigFile>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
-struct ToolConfigFile {
+pub(crate) struct ToolConfigFile {
     #[serde(rename = "sc-lint")]
-    sc_lint: Option<ScLintConfigFile>,
+    pub(crate) sc_lint: Option<ScLintConfigFile>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
-struct ScLintConfigFile {
-    minimum_version: Option<String>,
+pub(crate) struct ScLintConfigFile {
+    pub(crate) minimum_version: Option<String>,
     #[serde(default)]
     lint: Vec<ConsumerProfileStepFile>,
     /// Named lint profiles: an ordered list of declared lint step names.
     #[serde(default)]
     lint_profiles: std::collections::BTreeMap<String, Vec<String>>,
+    /// `[[tool.sc-lint.test]]` rows or a `[tool.sc-lint.test]` selector table.
     #[serde(default)]
-    test: Vec<ConsumerProfileStepFile>,
+    test: Option<toml::Value>,
 }
 
 /// One raw `[[tool.sc-lint.lint|test]]` row. `platform`, `target` and any other
@@ -628,6 +515,7 @@ struct ConsumerProfileStepFile {
     command: Option<Vec<String>>,
     platform: Option<toml::Value>,
     target: Option<toml::Value>,
+    after_all: Option<toml::Value>,
     #[serde(flatten)]
     extra: std::collections::BTreeMap<String, toml::Value>,
 }
@@ -649,7 +537,7 @@ fn find_repo_config(repo_root: &Path, override_path: Option<&Path>) -> Option<Pa
     clippy::result_large_err,
     reason = "Repo config parse failures are part of the stable top-level CliError contract."
 )]
-fn parse_repo_config(path: &Path) -> Result<RepoConfigFile, CliError> {
+pub(crate) fn parse_repo_config(path: &Path) -> Result<RepoConfigFile, CliError> {
     let text = fs::read_to_string(path).map_err(|error| {
         CliError::config(format!("failed to read repo config `{}`", path.display()))
             .with_source(error)
@@ -679,80 +567,6 @@ fn resolve_current_dir_relative_path(current_dir: &Path, candidate: &Path) -> Pa
 
 #[expect(
     clippy::result_large_err,
-    reason = "Consumer configuration is validated before any lint or test command can begin."
-)]
-fn load_compatibility_requirement(path: &Path) -> Result<CompatibilityRequirement, CliError> {
-    if !path.is_file() {
-        return Err(compatibility_config_error(
-            CompatibilityErrorCode::ConfigMissing,
-            format!(
-                "required sc-lint configuration `{}` was not found",
-                path.display()
-            ),
-            Some(path),
-            None,
-        ));
-    }
-    let file_config = parse_repo_config(path).map_err(|error| {
-        compatibility_config_error(
-            CompatibilityErrorCode::ConfigMalformed,
-            format!("failed to parse sc-lint configuration `{}`", path.display()),
-            Some(path),
-            Some(error.to_string()),
-        )
-    })?;
-    let sc_lint = file_config
-        .tool
-        .as_ref()
-        .and_then(|tool| tool.sc_lint.as_ref())
-        .ok_or_else(|| missing_consumer_field(path, "[tool.sc-lint]"))?;
-    compatibility_requirement_from_file(sc_lint, path)
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Consumer configuration validation returns the shared top-level CliError contract."
-)]
-fn compatibility_requirement_from_file(
-    sc_lint: &ScLintConfigFile,
-    path: &Path,
-) -> Result<CompatibilityRequirement, CliError> {
-    let raw_minimum = sc_lint
-        .minimum_version
-        .as_ref()
-        .ok_or_else(|| missing_consumer_field(path, MinimumVersion::FIELD_PATH))?;
-    let minimum_version = MinimumVersion::from_str(raw_minimum).map_err(|error| {
-        compatibility_config_error(
-            CompatibilityErrorCode::ConfigMalformed,
-            format!(
-                "configuration `{}` has malformed `{}` value `{raw_minimum}`",
-                path.display(),
-                MinimumVersion::FIELD_PATH
-            ),
-            Some(path),
-            Some(error.to_string()),
-        )
-    })?;
-    Ok(CompatibilityRequirement {
-        minimum_version,
-        config_path: path.to_path_buf(),
-    })
-}
-
-fn missing_consumer_field(path: &Path, field: &str) -> CliError {
-    compatibility_config_error(
-        CompatibilityErrorCode::ConfigMalformed,
-        format!(
-            "configuration `{}` is missing required field `{field}`",
-            path.display()
-        ),
-        Some(path),
-        None,
-    )
-}
-
-#[expect(
-    clippy::result_large_err,
     reason = "Consumer configuration loading returns the shared top-level CliError contract."
 )]
 fn load_consumer_config_file(path: &Path) -> Result<RepoConfigFile, CliError> {
@@ -775,6 +589,47 @@ fn load_consumer_config_file(path: &Path) -> Result<RepoConfigFile, CliError> {
             Some(error.to_string()),
         )
     })
+}
+
+/// Decodes `[tool.sc-lint.test]`: rows (validated like before, then
+/// normalized to selectors) or a selector table; absent keeps the existing
+/// "at least one command" error.
+#[expect(
+    clippy::result_large_err,
+    reason = "Consumer profile validation returns the shared top-level CliError contract."
+)]
+fn test_selectors_from_file(
+    test: Option<&toml::Value>,
+    path: &Path,
+) -> Result<TestSelectors, CliError> {
+    let rows = match test {
+        Some(toml::Value::Table(table)) => return TestSelectors::parse_table(table, path),
+        None => Vec::new(),
+        Some(toml::Value::Array(rows)) => rows
+            .iter()
+            .map(|row| {
+                row.clone()
+                    .try_into::<ConsumerProfileStepFile>()
+                    .map_err(|error| {
+                        compatibility_config_error(
+                            CompatibilityErrorCode::ConfigMalformed,
+                            format!("failed to parse sc-lint configuration `{}`", path.display()),
+                            Some(path),
+                            Some(error.to_string()),
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => {
+            return Err(consumer_profile_error(
+                path,
+                ConsumerProfile::Test.as_str(),
+                "tool.sc-lint.test must be an array of tables or a table of selectors".to_string(),
+            ));
+        }
+    };
+    let steps = validate_consumer_profile(ConsumerProfile::Test.as_str(), &rows, path)?;
+    Ok(TestSelectors::from_rows(steps, path.to_path_buf()))
 }
 
 #[expect(
@@ -838,7 +693,9 @@ fn validate_consumer_profile(
             ));
         }
         let (platform, target) = profile_step_fields(profile, name, step, path)?;
-        let declared = ConsumerProfileStep::new(name, command.clone(), platform, target);
+        let after_all = decode_after_all(step.after_all.as_ref(), name, path)?;
+        let declared = ConsumerProfileStep::new(name, command.clone(), platform, target)
+            .with_after_all(after_all);
         if profile == ConsumerProfile::Lint.as_str() {
             validate_lint_step(&declared)
                 .map_err(|error| profile_plan_config_error(error, path))?;
@@ -886,7 +743,7 @@ fn profile_step_fields(
     }
 }
 
-fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {
+pub(crate) fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliError {
     compatibility_config_error(
         CompatibilityErrorCode::ConfigMalformed,
         message,
@@ -894,127 +751,4 @@ fn consumer_profile_error(path: &Path, profile: &str, message: String) -> CliErr
         None,
     )
     .with_detail("profile", json!(profile))
-}
-
-fn compatibility_config_error(
-    code: CompatibilityErrorCode,
-    message: impl Into<String>,
-    path: Option<&Path>,
-    cause: Option<String>,
-) -> CliError {
-    let mut error = CliError::config(message)
-        .with_code(code.as_str())
-        .with_suggested_action(BINARY_NOT_FOUND_RECOVERY)
-        .with_documentation(DOCS_SETUP_REFERENCE)
-        .with_detail("required_field", json!(MinimumVersion::FIELD_PATH));
-    if let Some(path) = path {
-        error = error.with_detail("config_path", json!(path.display().to_string()));
-    }
-    error = error.with_cause(cause.unwrap_or_else(|| {
-        "the canonical sc-lint compatibility requirement was absent".to_string()
-    }));
-    error
-}
-
-fn compatibility_runtime_error(
-    code: CompatibilityErrorCode,
-    message: impl Into<String>,
-    requirement: &CompatibilityRequirement,
-    binary: &Path,
-    observed: Option<&Version>,
-    cause: String,
-) -> CliError {
-    let mut error = CliError::backend_failure(message)
-        .with_code(code.as_str())
-        .with_cause(cause)
-        .with_suggested_action(
-            "Run `just setup` (or your repository's sc-lint installer) to install or upgrade sc-lint, then retry.",
-        )
-        .with_documentation(DOCS_SETUP_REFERENCE)
-        .with_detail("minimum_version", json!(requirement.minimum_version.to_string()))
-        .with_detail("binary_path", json!(binary.display().to_string()))
-        .with_detail("config_path", json!(requirement.config_path.display().to_string()));
-    if let Some(observed) = observed {
-        error = error.with_detail("installed_version", json!(observed.to_string()));
-    }
-    error
-}
-
-#[derive(Debug, Deserialize)]
-struct VersionProbeEnvelope {
-    ok: bool,
-    command: String,
-    data: Option<VersionProbeData>,
-}
-
-#[derive(Debug, Deserialize)]
-struct VersionProbeData {
-    tool: String,
-    version: String,
-    contract_schema: String,
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "An invalid external version probe is exposed as a structured recovery error."
-)]
-fn validate_version_probe(
-    probe: VersionProbeEnvelope,
-    requirement: &CompatibilityRequirement,
-    binary: &Path,
-) -> Result<Version, CliError> {
-    let invalid_probe = |cause: String| {
-        compatibility_runtime_error(
-            CompatibilityErrorCode::ProbeMalformed,
-            format!(
-                "sc-lint binary `{}` emitted an unsupported version probe for required minimum `{}` from `{}`",
-                binary.display(),
-                requirement.minimum_version,
-                requirement.config_path.display()
-            ),
-            requirement,
-            binary,
-            None,
-            cause,
-        )
-    };
-    if !probe.ok || probe.command != "version" {
-        return Err(invalid_probe(
-            "the version probe envelope was not a successful `version` result".to_string(),
-        ));
-    }
-    let data = probe.data.ok_or_else(|| {
-        invalid_probe("the version probe envelope did not include data".to_string())
-    })?;
-    if data.tool != crate::consts::SERVICE_NAME || data.contract_schema != VERSION_PROBE_SCHEMA {
-        return Err(invalid_probe(
-            "the version probe contract schema or tool name was unsupported".to_string(),
-        ));
-    }
-    Version::parse(&data.version).map_err(|error| {
-        compatibility_runtime_error(
-            CompatibilityErrorCode::VersionUnparsable,
-            format!(
-                "sc-lint binary `{}` reported unparsable version `{}`; required minimum `{}` comes from `{}`",
-                binary.display(),
-                data.version,
-                requirement.minimum_version,
-                requirement.config_path.display()
-            ),
-            requirement,
-            binary,
-            None,
-            error.to_string(),
-        )
-        .with_detail("reported_version", json!(data.version))
-    })
-}
-
-fn stderr_or_status(output: &std::process::Output) -> String {
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    if stderr.is_empty() {
-        format!("process exited with status {}", output.status)
-    } else {
-        stderr
-    }
 }

@@ -479,6 +479,10 @@ impl WorkspaceFixture {
     }
 
     fn write_package_manifest(&self, package_name: &str) {
+        self.write_package_manifest_with(package_name, "");
+    }
+
+    fn write_package_manifest_with(&self, package_name: &str, extra: &str) {
         self.write(
             &format!("crates/{package_name}/Cargo.toml"),
             &format!(
@@ -487,6 +491,7 @@ impl WorkspaceFixture {
                     name = "{package_name}"
                     version = "0.1.0"
                     edition = "2024"
+                    {extra}
                 "#
             ),
         );
@@ -497,6 +502,30 @@ impl WorkspaceFixture {
             &format!("crates/{package_name}/src/{relative_path}"),
             contents,
         );
+    }
+
+    fn write_tokio_workspace(&self, members: &[&str]) {
+        let members = members
+            .iter()
+            .map(|member| format!("\"crates/{member}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.write(
+            "Cargo.toml",
+            &format!(
+                "[workspace]\nmembers = [{members}]\nexclude = [\"vendor/tokio\", \"vendor/tokio-util\"]\nresolver = \"2\"\n"
+            ),
+        );
+        self.write(
+            "vendor/tokio/Cargo.toml",
+            "[package]\nname = \"tokio\"\nversion = \"1.0.0\"\nedition = \"2024\"\n",
+        );
+        self.write("vendor/tokio/src/lib.rs", "");
+        self.write(
+            "vendor/tokio-util/Cargo.toml",
+            "[package]\nname = \"tokio-util\"\nversion = \"1.0.0\"\nedition = \"2024\"\n",
+        );
+        self.write("vendor/tokio-util/src/lib.rs", "");
     }
 
     fn write_lint_config(&self, contents: &str) {
@@ -553,6 +582,405 @@ fn rule_ids(report: &FindingsReport) -> Vec<RuleId> {
         .iter()
         .map(|finding| finding.rule_id)
         .collect()
+}
+
+fn tokio_fixture(source: &str, dependency: &str) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_tokio_workspace(&["example"]);
+    fixture.write_package_manifest_with("example", dependency);
+    fixture.write_source("example", "lib.rs", source);
+    fixture
+}
+
+fn assert_sleep_report(report: &FindingsReport, line: usize) {
+    assert_eq!(rule_ids(report), vec![RuleId::ScbRuntime003]);
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(
+        finding_location(&report.findings[0].message),
+        ("lib.rs".into(), line)
+    );
+    assert!(report.findings[0].message.ends_with(
+        "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead"
+    ));
+}
+
+#[test]
+fn tokio_package_std_thread_sleep_rejected() {
+    let fixture = tokio_fixture(
+        "pub fn blocks(d: std::time::Duration) {\n    std::thread::sleep(d);\n}\n",
+        "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
+    );
+    assert_sleep_report(&analyze_workspace(&analyze_options(&fixture)).unwrap(), 2);
+}
+
+#[test]
+fn tokio_package_import_forms_rejected() {
+    let dependency = "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }";
+    let message_suffix = "SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead";
+    let cases: [(&str, &[usize]); 5] = [
+        (
+            "use std::{thread as t};\npub fn blocks(d: std::time::Duration) {\n    t::sleep(d);\n}\n",
+            &[3],
+        ),
+        (
+            "use std::thread::{self, sleep};\npub fn blocks(d: std::time::Duration) {\n    thread::sleep(d);\n    sleep(d);\n}\n",
+            &[3, 4],
+        ),
+        (
+            "use std::thread::*;\npub fn blocks(d: std::time::Duration) {\n    sleep(d);\n}\n",
+            &[3],
+        ),
+        (
+            "use std::*;\npub fn blocks(d: std::time::Duration) {\n    thread::sleep(d);\n}\n",
+            &[3],
+        ),
+        (
+            "pub fn blocks(d: std::time::Duration) {\n    ::std::thread::sleep(d);\n}\n",
+            &[2],
+        ),
+    ];
+
+    for (source, expected_lines) in cases {
+        let fixture = tokio_fixture(source, dependency);
+        let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+
+        assert_eq!(report.status, ReportStatus::Fail);
+        assert_eq!(
+            rule_ids(&report),
+            vec![RuleId::ScbRuntime003; expected_lines.len()]
+        );
+        assert_eq!(report.findings.len(), expected_lines.len());
+        for (finding, expected_line) in report.findings.iter().zip(expected_lines) {
+            assert_eq!(
+                finding_location(&finding.message),
+                ("lib.rs".into(), *expected_line)
+            );
+            assert!(finding.message.ends_with(message_suffix));
+        }
+    }
+}
+
+#[test]
+fn tokio_package_aliased_sleep_import_rejected() {
+    let fixture = tokio_fixture(
+        "use std::thread::sleep as nap;\npub fn blocks(d: std::time::Duration) { nap(d); }\n",
+        "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
+    );
+    assert_sleep_report(&analyze_workspace(&analyze_options(&fixture)).unwrap(), 2);
+}
+
+#[test]
+fn test_only_thread_sleep_allowed() {
+    let fixture = tokio_fixture(
+        "#[cfg(test)] use std::thread::sleep as test_sleep;\n#[cfg(test)] mod checks { pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); } }\n#[test] fn unit_test(d: std::time::Duration) { std::thread::sleep(d); }\npub fn uses_test_import(d: std::time::Duration) { test_sleep(d); }\n",
+        "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn tokio_dev_dependency_only_allowed() {
+    let fixture = tokio_fixture(
+        "pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); }\n",
+        "[dev-dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
+fn tokio_sleep_excluded_by_exclude_paths_by_rule() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_tokio_workspace(&["example", "other"]);
+    let dependency = "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }";
+    fixture.write_package_manifest_with("example", dependency);
+    fixture.write_package_manifest_with("other", dependency);
+    let source = "pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); }\n";
+    fixture.write_source("example", "lib.rs", source);
+    fixture.write_source("other", "lib.rs", source);
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.runtime]
+        reason = "staged migration to tokio::time::sleep"
+
+        [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+        "SCB-RUNTIME-003" = ["crates/example/src/lib.rs"]
+        "#,
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert_eq!(rule_ids(&report), vec![RuleId::ScbRuntime003]);
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert_eq!(
+        finding_location(&report.findings[0].message),
+        ("lib.rs".into(), 1)
+    );
+    assert!(
+        report.findings[0]
+            .message
+            .contains("in Tokio package `other`; use")
+    );
+
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.runtime]
+        reason = "staged migration to tokio::time::sleep"
+
+        [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+        "SCB-RUNTIME-003" = ["**/lib.rs"]
+        "#,
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+const TOKIO_DEP: &str = "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }";
+
+fn sleep_ids(source: &str, dependency: &str) -> Vec<RuleId> {
+    let fixture = tokio_fixture(source, dependency);
+    rule_ids(&analyze_workspace(&analyze_options(&fixture)).unwrap())
+}
+
+#[test]
+fn tokio_package_thread_sleep_after_use_rejected() {
+    assert_eq!(
+        sleep_ids(
+            "use std::thread; fn f(d: std::time::Duration) { thread::sleep(d); }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn tokio_package_nested_sleep_sites_rejected() {
+    let source = "fn f(d: std::time::Duration) { let c = || std::thread::sleep(d); c(); } struct S; impl S { fn m(d: std::time::Duration) { std::thread::sleep(d); } } trait T { fn t(d: std::time::Duration) { std::thread::sleep(d); } }";
+    assert_eq!(sleep_ids(source, TOKIO_DEP), vec![RuleId::ScbRuntime003; 3]);
+}
+
+#[test]
+fn bin_target_thread_sleep_rejected() {
+    let fixture = tokio_fixture("fn ignored() {}", TOKIO_DEP);
+    fixture.write(
+        "crates/example/src/main.rs",
+        "fn main() { std::thread::sleep(std::time::Duration::ZERO); }",
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert!(rule_ids(&report).contains(&RuleId::ScbRuntime003));
+}
+
+#[test]
+fn tokio_in_build_dependencies_detected() {
+    assert_eq!(
+        sleep_ids(
+            "fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            "[build-dependencies]\ntokio = { path = \"../../vendor/tokio\" }"
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn tokio_in_target_specific_dependencies_detected() {
+    assert_eq!(
+        sleep_ids(
+            "fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            "[target.'cfg(unix)'.dependencies]\ntokio = { path = \"../../vendor/tokio\" }"
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn tokio_renamed_dependency_detected() {
+    assert_eq!(
+        sleep_ids(
+            "fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            "[dependencies]\nrt = { package = \"tokio\", path = \"../../vendor/tokio\" }"
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn cfg_any_and_not_test_thread_sleep_rejected() {
+    assert_eq!(
+        sleep_ids(
+            "#[cfg(any(test, unix))] fn f(d: std::time::Duration) { std::thread::sleep(d); }\n#[cfg(not(test))] fn g(d: std::time::Duration) { std::thread::sleep(d); }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003; 2]
+    );
+}
+
+#[test]
+fn module_named_tests_without_cfg_test_is_checked() {
+    assert_eq!(
+        sleep_ids(
+            "mod tests { pub fn f(d: std::time::Duration) { std::thread::sleep(d); } }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn test_only_const_and_static_imports_bind_nothing() {
+    assert!(
+        sleep_ids(
+            "#[cfg(test)] const _: () = { use std::thread::sleep as nap; };\n#[cfg(test)] static S: () = { use std::thread; };\nfn f(d: std::time::Duration) { nap(d); thread::sleep(d); }",
+            TOKIO_DEP
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn cfg_attr_test_is_ignored_and_thread_sleep_rejected() {
+    assert_eq!(
+        sleep_ids(
+            "#[cfg_attr(test, allow(dead_code))] fn f(d: std::time::Duration) { std::thread::sleep(d); }\n#[cfg_attr(test, test)] fn g(d: std::time::Duration) { std::thread::sleep(d); }\n#[cfg_attr(test, path = \"x.rs\")] mod m { pub fn h(d: std::time::Duration) { std::thread::sleep(d); } }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003; 3]
+    );
+}
+
+#[test]
+fn fn_named_tests_without_test_attribute_is_checked() {
+    assert_eq!(
+        sleep_ids(
+            "fn tests(d: std::time::Duration) { std::thread::sleep(d); }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn single_segment_test_path_other_than_test_attribute_is_checked() {
+    // Only `#[test]` or a path of two or more segments ending in `test` is
+    // test-only; `#[::test]` names an extern crate path, not the attribute.
+    assert_eq!(
+        sleep_ids(
+            "#[::test] fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            TOKIO_DEP
+        ),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn tokio_time_sleep_allowed() {
+    assert!(sleep_ids("fn f() { tokio::time::sleep(()); }", TOKIO_DEP).is_empty());
+}
+
+#[test]
+fn non_thread_sleep_calls_allowed() {
+    assert!(
+        sleep_ids(
+            "fn sleep(_: std::time::Duration) {} fn f(d: std::time::Duration) { sleep(d); }",
+            TOKIO_DEP
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn tokio_test_attribute_fn_thread_sleep_allowed() {
+    assert!(
+        sleep_ids(
+            "#[tokio::test] async fn f() { std::thread::sleep(std::time::Duration::ZERO); }",
+            TOKIO_DEP
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn cfg_all_test_thread_sleep_allowed() {
+    assert!(
+        sleep_ids(
+            "#[cfg(all(test, unix))] fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            TOKIO_DEP
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn non_tokio_package_thread_sleep_allowed() {
+    assert!(
+        sleep_ids(
+            "fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            ""
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn tokio_util_only_allowed() {
+    assert!(
+        sleep_ids(
+            "fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+            "[dependencies]\ntokio-util = { path = \"../../vendor/tokio-util\" }"
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn tokio_workspace_inherited_dependency_detected() {
+    let fixture = tokio_fixture(
+        "fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+        "[dependencies]\ntokio.workspace = true",
+    );
+    fixture.write(
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"crates/example\"]\nexclude = [\"vendor/tokio\", \"vendor/tokio-util\"]\nresolver = \"2\"\n[workspace.dependencies]\ntokio = { path = \"vendor/tokio\" }\n",
+    );
+    assert_eq!(
+        rule_ids(&analyze_workspace(&analyze_options(&fixture)).unwrap()),
+        vec![RuleId::ScbRuntime003]
+    );
+}
+
+#[test]
+fn bench_and_example_thread_sleep_allowed() {
+    let fixture = tokio_fixture("pub fn clean() {}", TOKIO_DEP);
+    fixture.write(
+        "crates/example/benches/b.rs",
+        "fn main() { std::thread::sleep(std::time::Duration::ZERO); }",
+    );
+    fixture.write(
+        "crates/example/examples/e.rs",
+        "fn main() { std::thread::sleep(std::time::Duration::ZERO); }",
+    );
+    fixture.write_package_manifest_with("example", "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }\n[[bench]]\nname = \"b\"\npath = \"benches/b.rs\"\nharness = false\n[[example]]\nname = \"e\"\npath = \"examples/e.rs\"");
+    assert!(rule_ids(&analyze_workspace(&analyze_options(&fixture)).unwrap()).is_empty());
+}
+
+#[test]
+fn example_under_src_thread_sleep_allowed() {
+    let fixture = tokio_fixture(
+        "pub fn f(d: std::time::Duration) { std::thread::sleep(d); }",
+        TOKIO_DEP,
+    );
+    fixture.write_source(
+        "example",
+        "ex.rs",
+        "pub fn example() { std::thread::sleep(std::time::Duration::ZERO); }",
+    );
+    fixture.write_package_manifest_with("example", "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }\n[[example]]\nname = \"ex\"\npath = \"src/ex.rs\"");
+    assert_eq!(
+        rule_ids(&analyze_workspace(&analyze_options(&fixture)).unwrap()),
+        vec![RuleId::ScbRuntime003]
+    );
 }
 
 #[test]
@@ -742,10 +1170,10 @@ fn exclude_and_fail_rules_apply_to_runtime_findings() {
 fn catalog_lists_every_rule_id() {
     use RuleId::*;
 
-    let every = [ScbRuntime001, ScbRuntime002];
+    let every = [ScbRuntime001, ScbRuntime002, ScbRuntime003];
     for id in every {
         match id {
-            ScbRuntime001 | ScbRuntime002 => {}
+            ScbRuntime001 | ScbRuntime002 | ScbRuntime003 => {}
         }
     }
     assert_eq!(

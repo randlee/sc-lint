@@ -3,6 +3,10 @@ use std::ops::Deref;
 
 use serde::Serialize;
 
+mod adapter_payload;
+
+pub use adapter_payload::{PayloadDrift, validate_adapter_payload};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputFormat {

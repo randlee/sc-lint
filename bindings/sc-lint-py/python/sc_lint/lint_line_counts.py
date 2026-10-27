@@ -9,7 +9,9 @@ import sys
 from sc_lint.lint_common import classify_rust_test_scope
 from sc_lint.lint_common import discover_repo_root
 from sc_lint.lint_common import is_code_line
-from sc_lint.lint_common import load_lint_config
+from sc_lint.lint_common import ConfigError
+from sc_lint.lint_common import resolve_table
+from sc_lint.lint_common import table_missing_error
 from sc_lint.lint_common import monotonic_now
 from sc_lint.lint_common import workspace_manifest_paths
 from sc_lint.python_adapter import AdapterError
@@ -74,9 +76,7 @@ def classify_lines(lines: list[str]) -> tuple[int, int]:
 
 
 def load_config(repo_root: Path, config_path: str | None = None) -> LineLimitConfig:
-    config = load_lint_config(repo_root, config_path).get("line_counts", {})
-    if not isinstance(config, dict):
-        raise AdapterError("config", "[line_counts] must be a TOML table")
+    config, _ = resolve_table("line_counts", Path(config_path) if config_path else None, repo_root)
 
     def parse_limit(name: str) -> int | None:
         value = config.get(name)
@@ -263,7 +263,8 @@ def main(argv: list[str]) -> int:
             for failure in failures:
                 print(failure)
         return 0 if not failures else 1
-    except AdapterError as error:
+    except (AdapterError, ConfigError) as caught:
+        error = table_missing_error(caught) if isinstance(caught, ConfigError) else caught
         if args.json:
             write_adapter_json(error_payload(error))
             return 3 if error.kind == "config" else 1

@@ -25,6 +25,7 @@ optional_variables:
 defaults:
   lead: team-lead
   cc: team-lead
+  sprint_id: ""
   validation_requirements: ""
   dependency_relations: "- See authoritative sprint doc."
 metadata:
@@ -39,56 +40,56 @@ metadata:
     stage: fix
     transition: start
 ---
-{% autoescape false -%}
-<atm-task id="{{ task_id }}" phase="{{ phase }}" mode="fix">
-  <description>{{ description }}</description>
+{#- Temporary workaround for sc-compose #784: v1.7.0 rejects autoescape blocks. Revert these | safe filters once a release containing #788 is pinned. -#}
+<atm-task id="{{ task_id | safe }}" phase="{{ phase | safe }}" mode="fix">
+  <description>{{ description | safe }}</description>
 
-  <branch>{{ branch }}</branch>
-  <worktree>{{ worktree_path }}</worktree>
-  <pr-target>{{ pr_target }}</pr-target>
-  <stack-discipline>`{{ branch }}` is a layer cut from the current top of the phase stack; `{{ pr_target }}` is the layer directly below it. Work only on this layer. Never edit, push to, rebase, or open a PR against any layer below, and never wait for a lower layer's QA or CI. If `{{ pr_target }}` gains commits while you work, run `git fetch origin && git merge origin/{{ pr_target }}` once at task start and once before the final push; the parent wins where copies differ. Once this task closes the layer is frozen: every later finding against it is fixed on a new layer cut from the top of the stack, never here.</stack-discipline>
-  <authoritative-sprint-doc>{{ sprint_doc }}</authoritative-sprint-doc>
+  <branch>{{ branch | safe }}</branch>
+  <worktree>{{ worktree_path | safe }}</worktree>
+  <pr-target>{{ pr_target | safe }}</pr-target>
+  <stack-discipline>`{{ branch | safe }}` is a layer cut from the current top of the phase stack; `{{ pr_target | safe }}` is the layer directly below it. Work only on this layer. Never edit, push to, rebase, or open a PR against any layer below, and never wait for a lower layer's QA or CI. If `{{ pr_target | safe }}` gains commits while you work, run `git fetch origin && git merge origin/{{ pr_target | safe }}` once at task start and once before the final push; the parent wins where copies differ. Once this task closes the layer is frozen: every later finding against it is fixed on a new layer cut from the top of the stack, never here.</stack-discipline>
+  <authoritative-sprint-doc>{{ sprint_doc | safe }}</authoritative-sprint-doc>
 
   <dependency-relations>
-{{ dependency_relations }}
+{{ dependency_relations | safe }}
   </dependency-relations>
 
   <finding-ids>
-{{ finding_ids }}
+{{ finding_ids | safe }}
   </finding-ids>
 
   <triage-records>
-{{ triage_records }}
+{{ triage_records | safe }}
   </triage-records>
 
   <required-fixes>
-{{ required_fixes }}
+{{ required_fixes | safe }}
   </required-fixes>
 
   <acceptance-criteria>
-{{ acceptance_criteria }}
+{{ acceptance_criteria | safe }}
   </acceptance-criteria>
 
   <validation-requirements>
-{{ validation_requirements }}
+{{ validation_requirements | safe }}
   </validation-requirements>
 
   <references>
-{{ references }}
+{{ references | safe }}
   </references>
 
   <workflow>
-    <step id="a">Start the task immediately with `atm task start {{ task_id }} "<one line: what you will do first>"`, then claim the matching bead with `bd update {{ task_id }} --claim` and begin executing in the same work session unless blocked.</step>
-    <step id="b">Read `{{ sprint_doc }}` before editing. Treat it as the authoritative source for sprint scope, retained requirements, deletion targets, validation, and acceptance criteria. If this assignment summary and the sprint doc differ, the sprint doc wins and the mismatch must be reported.</step>
+    <step id="a">Start the task immediately with `atm task start {{ task_id | safe }} "<one line: what you will do first>"`, then claim the matching bead with `bd update {{ task_id | safe }} --claim` and begin executing in the same work session unless blocked.</step>
+    <step id="b">Read `{{ sprint_doc | safe }}` before editing. Treat it as the authoritative source for sprint scope, retained requirements, deletion targets, validation, and acceptance criteria. If this assignment summary and the sprint doc differ, the sprint doc wins and the mismatch must be reported.</step>
     <step id="c">Update the assigned worktree from the target branch before editing. Include all earlier-sprint fixes already merged forward to that branch.</step>
     <step id="c1">Honor the `<dependency-relations>` block above: must-follow merge-forward trigger is parent dev push, not QA; merge parent → child before every round. PR-completion trigger is parent PR merge first. Stop if a parallel-safe relation intersects.</step>
     <step id="d">Read the referenced triage records first. Treat the listed occurrences as the minimum required scope on this branch.</step>
     <step id="d2">Before fixing each finding, verify the defect it describes is still actually present at the cited file:line in this worktree's current state. If a finding does not reproduce — already fixed, superseded by other work, or the described code path no longer exists — refuse to perform speculative or invented work to "address" it. Do not edit unrelated code in its name. Note it in your push/validation report as `not-reproducible` with the file:line you checked instead, and skip it. This applies per-finding, not to the whole task — fix every finding that does reproduce as normal.</step>
     <step id="e">Fix every promoted-branch occurrence in scope. Do not stop at the first location when the triage record marks the finding as repeatable.</step>
-    <step id="f">As soon as the branch is pushable, commit and push immediately. Send branch name and commit hash right away to the assigner (the sender of this message) with a plain `atm send {{ lead }} --stdin` — a progress report, not a close; never close the task on a push. This lets follow-up QA start in parallel. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc }}` with a plain `atm send {{ cc }} --stdin`.{% endif %}</step>
-    <step id="g">Run the required validation after the push report. While it is FAIL, keep fixing and report progress with plain `atm send`. When it is PASS, close the task with the validation report as the body: `atm task close {{ task_id }} completed --stdin <<'EOF' … EOF`, followed by `bd close {{ task_id }}` — PASS plus the gate output lines and, per finding, fixed or `not-reproducible` with the file:line checked. Only this close frees your queue: the next assignment stays queued and never starts until `{{ task_id }}` is closed, and a plain `atm send` report does not close it. Use `atm task close {{ task_id }} refused "<reason>"` only when the whole assignment cannot be done; leave its bead open and add `bd update {{ task_id }} --notes "<reason>"`. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc }}` with a plain `atm send {{ cc }} --stdin`.{% endif %}</step>
-{% if triage_records and triage_records|trim %}    <step id="g1">Triage records are attached to this assignment. Use the `/closing-triage` skill to work them to zero before reporting: `{{ branch }}` is a stacked layer no phase structure declares, so its query runs as `python3 .claude/skills/closing-triage/scripts/query_open_findings.py --branch {{ branch }}{% if sprint_id %} --sprint {{ sprint_id }}{% endif %} --phase {{ phase }} --json` from your worktree. The finding ids it returns are the full scope of this assignment; fix every one in this pass.</step>
+    <step id="f">As soon as the branch is pushable, commit and push immediately. Send branch name and commit hash right away to the assigner (the sender of this message) with a plain `atm send {{ lead | safe }} --stdin` — a progress report, not a close; never close the task on a push. This lets follow-up QA start in parallel. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc | safe }}` with a plain `atm send {{ cc | safe }} --stdin`.{% endif %}</step>
+    <step id="g">Run the required validation after the push report. While it is FAIL, keep fixing and report progress with plain `atm send`. When it is PASS, close the task with the validation report as the body: `atm task close {{ task_id | safe }} completed --stdin <<'EOF' … EOF`, followed by `bd close {{ task_id | safe }}` — PASS plus the gate output lines and, per finding, fixed or `not-reproducible` with the file:line checked. Only this close frees your queue: the next assignment stays queued and never starts until `{{ task_id | safe }}` is closed, and a plain `atm send` report does not close it. Use `atm task close {{ task_id | safe }} refused "<reason>"` only when the whole assignment cannot be done; leave its bead open and add `bd update {{ task_id | safe }} --notes "<reason>"`. {% if cc and cc != lead %}Copy a one-line summary to `{{ cc | safe }}` with a plain `atm send {{ cc | safe }} --stdin`.{% endif %}</step>
+{% if triage_records and triage_records|trim %}    <step id="g1">Triage records are attached to this assignment. Use the `/closing-triage` skill to work them to zero before reporting: `{{ branch | safe }}` is a stacked layer no phase structure declares, so its query runs as `python3 .claude/skills/closing-triage/scripts/query_open_findings.py --branch {{ branch | safe }}{% if sprint_id %} --sprint {{ sprint_id | safe }}{% endif %} --phase {{ phase | safe }} --json` from your worktree. The finding ids it returns are the full scope of this assignment; fix every one in this pass.</step>
 {% endif %}    <step id="h">After the close, read ATM again: the next queued task starts only now.</step>
   </workflow>
 </atm-task>
-{%- endautoescape %}
+{#- end of sc-compose #784 workaround -#}

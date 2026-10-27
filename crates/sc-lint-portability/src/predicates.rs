@@ -9,6 +9,7 @@ use syn::Lit;
 use syn::Meta;
 use syn::Token;
 use syn::UseTree;
+use syn::Visibility;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 
@@ -32,16 +33,21 @@ pub(crate) const UNIX_PATH_PREFIXES: &[&str] = &[
     concat!("/", "var", "/"),
     concat!("/", "tmp", "/"),
 ];
+/// Windows namespace prefixes are device/verbatim syntax, not absolute paths
+/// for PORT-007's drive/UNC portability check.
+pub(crate) const WINDOWS_NAMESPACE_PREFIXES: &[&str] = &["\\\\?\\", "\\\\.\\"];
 
 pub(crate) fn attr_is_cfg_unix(attr: &Attribute) -> bool {
     attr_is_cfg_target(attr, "unix")
 }
 
 pub(crate) fn attr_is_platform_cfg(attr: &Attribute) -> bool {
-    if !attr.path().is_ident("cfg") {
-        return false;
-    }
-    attr_is_cfg_target(attr, "unix") || attr_is_cfg_target(attr, "windows")
+    attr_is_unix_family_cfg(attr) || attr_is_cfg_target(attr, "windows")
+}
+
+pub(crate) fn attr_is_unix_family_cfg(attr: &Attribute) -> bool {
+    attr.path().is_ident("cfg")
+        && nested_cfg_metas(attr).is_some_and(|metas| metas.iter().any(meta_is_unix_family))
 }
 
 pub(crate) fn attr_is_cfg_windows(attr: &Attribute) -> bool {
@@ -167,6 +173,11 @@ pub(crate) fn item_is_test_scoped(item: &Item, inherited_scope: ScopeKind) -> bo
         inherited_scope,
         item_name_hint_is_tests(item),
     ) == ScopeKind::Test
+}
+
+pub(crate) fn item_is_private(item: &Item) -> bool {
+    matches!(item, Item::Fn(item_fn) if matches!(item_fn.vis, Visibility::Inherited))
+        || matches!(item, Item::Mod(item_mod) if matches!(item_mod.vis, Visibility::Inherited))
 }
 
 pub(crate) fn impl_method_is_cfg_unix_production_item(
@@ -334,14 +345,49 @@ pub(crate) fn is_unix_path_literal(value: &str) -> bool {
         .any(|prefix| value.starts_with(prefix))
 }
 
+pub(crate) fn is_windows_namespace_prefix(value: &str) -> bool {
+    WINDOWS_NAMESPACE_PREFIXES
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+}
+
 pub(crate) fn is_windows_path_literal(value: &str) -> bool {
     let bytes = value.as_bytes();
     let drive_absolute = bytes.len() >= 3
         && bytes[0].is_ascii_alphabetic()
         && bytes[1] == b':'
         && (bytes[2] == b'\\' || bytes[2] == b'/');
-    let unc_absolute = value.starts_with("\\\\") && value.len() > 2;
+    let unc_absolute =
+        value.starts_with("\\\\") && value.len() > 2 && !is_windows_namespace_prefix(value);
     drive_absolute || unc_absolute
+}
+
+fn meta_is_unix_family(meta: &Meta) -> bool {
+    match meta {
+        Meta::Path(path) => path.is_ident("unix"),
+        Meta::NameValue(name_value) => {
+            name_value.path.is_ident("target_os")
+                && matches!(
+                    &name_value.value,
+                    Expr::Lit(ExprLit { lit: Lit::Str(lit), .. })
+                        if matches!(lit.value().as_str(), "unix" | "linux" | "macos")
+                )
+        }
+        Meta::List(list) if list.path.is_ident("not") => {
+            Punctuated::<Meta, Token![,]>::parse_terminated
+                .parse2(list.tokens.clone())
+                .ok()
+                .is_some_and(|metas| {
+                    metas.len() == 1
+                        && matches!(metas.first(), Some(Meta::Path(path)) if path.is_ident("windows"))
+                })
+        }
+        Meta::List(list) if list.path.is_ident("target_os") => false,
+        Meta::List(list) => Punctuated::<Meta, Token![,]>::parse_terminated
+            .parse2(list.tokens.clone())
+            .ok()
+            .is_some_and(|metas| metas.iter().any(meta_is_unix_family)),
+    }
 }
 
 fn attr_is_cfg_target(attr: &Attribute, target: &str) -> bool {
@@ -411,4 +457,18 @@ fn meta_is_allow_dead_code(meta: &Meta) -> bool {
                 .iter()
                 .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("dead_code")))
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_windows_namespace_prefix;
+
+    #[test]
+    fn namespace_prefix_helper_matches_device_and_verbatim_prefixes_only() {
+        assert!(is_windows_namespace_prefix("\\\\?\\C:\\x"));
+        assert!(is_windows_namespace_prefix("\\\\.\\COM1"));
+        assert!(!is_windows_namespace_prefix("\\\\server\\share"));
+        assert!(!is_windows_namespace_prefix("\\\\?x"));
+        assert!(!is_windows_namespace_prefix("C:\\x"));
+    }
 }

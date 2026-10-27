@@ -19,6 +19,8 @@ across analyzer crates.
 
 Representative shared schema types include:
 
+- `validate_adapter_payload` and `PayloadDrift` for checking the shape of the
+  Python adapter transport payload before normalization
 - finding records
   - stable rule id, location, message, and severity fields
 - analyzer report payloads

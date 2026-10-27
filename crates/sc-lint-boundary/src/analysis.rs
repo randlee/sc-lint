@@ -542,13 +542,10 @@ fn is_delegation_edge(
     ) else {
         return false;
     };
-    if source.kind != "method" || callee.kind != "method" || callee.label == source.label {
+    if source.kind != "method" || callee.kind != "method" {
         return false;
     }
-    let private_helper = callee.visibility != Some("public");
-    let receiver_call = source.impl_kind == Some(ImplKind::Trait);
-    (private_helper || receiver_call)
-        && !reaches(owner_edges, &edge.target_node_id, &edge.source_node_id)
+    !reaches(owner_edges, &edge.target_node_id, &edge.source_node_id)
 }
 
 fn reaches(owner_edges: &[OwnerRefEdge], from: &NodeId, to: &NodeId) -> bool {

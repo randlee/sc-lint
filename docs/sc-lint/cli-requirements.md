@@ -356,9 +356,15 @@ specialized backend tools and mixed Rust/Python implementations.
   delegates to the installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
   as amended. ADR-017 adds bootstrap `exec` through the existing managed
   installation/environment, preserving argv and child exit status without
-  re-entering consumer profile dispatch. Lint accepts a selector followed by
-  optional platform scope. No setup hooks or interpreter-selection policy is
-  added. The product-owned assets remain the source of consumer bootstrap.
+  re-entering consumer profile dispatch. Bootstrap lint accepts
+  `[--fail-fast] [selector] [host|all|linux|macos|windows]` and requires
+  `--config sc-lint.toml`. Bootstrap test accepts
+  `[--fail-fast|--list] --config sc-lint.toml [selector [args...]]`; its
+  options and config precede the selector, and arguments after the selector
+  are forwarded verbatim. Lint accepts a selector followed by optional
+  platform scope. No setup hooks or interpreter-selection policy is added.
+  The product-owned assets remain the source of consumer bootstrap. (Amended
+  phase L, [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).)
   (Amended 2026-10-12, Accepted,
   [ADR-017, changes 4–6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -403,10 +409,9 @@ specialized backend tools and mixed Rust/Python implementations.
   fail-slow holds inside that serialized lane: a failing step there does not
   stop later steps in the lane. A step may declare `after_all = true`, which
   starts it only after every other step has finished. Output
-  ordering is deterministic and does not depend on step timing. Generic test groups and test
-  argument forwarding are not added, except for consumer test selectors as
-  defined by [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md)
-  (effective when ADR-020 is Accepted).
+  ordering is deterministic and does not depend on step timing. Generic test
+  groups are not added. Consumer test selectors and test argument forwarding
+  follow [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -427,7 +432,7 @@ specialized backend tools and mixed Rust/Python implementations.
   `.pass(...)` or `.compile_fail(...)` glob, and must keep reporting every
   other unlinked file, empty file and unused dependency as before. No
   per-fixture configuration is required for consumed fixtures.
-  (Added phase L, #647. Pending Rand approval; gates dispatch only. See
+  (Added phase L, #647. Approved by Rand 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
 ## Contract References

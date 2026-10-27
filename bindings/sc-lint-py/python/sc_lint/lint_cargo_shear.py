@@ -5,7 +5,9 @@ from dataclasses import dataclass
 import argparse
 import json
 from pathlib import Path
+from pathlib import PurePosixPath
 from pathlib import PureWindowsPath
+import re
 import shutil
 import subprocess
 import sys
@@ -30,6 +32,11 @@ PATH_KEY_MIGRATION_DIAGNOSTIC = (
     'only for a virtual-root workspace dependency. Package roots use their '
     'package name, including a package named workspace; if both resolve to the '
     'same key, rename the package or dependency alias to disambiguate it.'
+)
+TRYBUILD_CALL = re.compile(
+    r'\.\s*(?:pass|compile_fail)\s*\(\s*'
+    r'(?:r(?P<h>#*)"(?P<raw>.*?)"(?P=h)|"(?P<cooked>[^"\\\n]*)")',
+    re.S,
 )
 
 
@@ -345,11 +352,113 @@ def render_metadata_failure(error: Exception) -> str:
     )
 
 
-def evaluate_policy(sections: list[ShearSection], policy: dict[str, dict[str, str]]) -> tuple[list[ShearPolicyFinding], list[str]]:
+def trybuild_harness_globs(
+    package_dir: Path, exclude: frozenset[str]
+) -> list[tuple[str, str, int]]:
+    matches: list[tuple[str, str, int]] = []
+    harnesses = sorted(
+        (
+            path
+            for path in package_dir.rglob("*.rs")
+            if path.is_file()
+        ),
+        key=lambda path: path.relative_to(package_dir).as_posix(),
+    )
+    for harness in harnesses:
+        relative_harness = harness.relative_to(package_dir).as_posix()
+        relative_parts = Path(relative_harness).parts
+        if "target" in relative_parts or relative_harness in exclude:
+            continue
+        source = harness.read_text(encoding="utf-8", errors="replace")
+        for match in TRYBUILD_CALL.finditer(source):
+            glob = match.group("raw")
+            if glob is None:
+                glob = match.group("cooked")
+            if glob is not None:
+                line_number = source.count("\n", 0, match.start()) + 1
+                matches.append((glob, relative_harness, line_number))
+    return matches
+
+
+def _safe_trybuild_glob(glob: str) -> bool:
+    if not glob.strip() or "\\" in glob or "\0" in glob:
+        return False
+    if PurePosixPath(glob).is_absolute() or PureWindowsPath(glob).drive:
+        return False
+    return ".." not in PurePosixPath(glob).parts
+
+
+def trybuild_consumed(
+    sections: list[ShearSection], repo_root: Path
+) -> dict[tuple[int, str], str]:
+    if not any(section.name == "unlinked_files" and section.file_paths for section in sections):
+        return {}
+    try:
+        crate_map = package_to_crate_dir(repo_root)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    consumed: dict[tuple[int, str], str] = {}
+    for section_index, section in enumerate(sections):
+        if section.name != "unlinked_files" or not section.file_paths:
+            continue
+        crate_dir = crate_map.get(infer_package_name(section.body_lines))
+        if crate_dir is None:
+            continue
+        package_dir = repo_root / crate_dir
+        reported = set(section.file_paths)
+        harness_globs = trybuild_harness_globs(package_dir, frozenset(reported))
+        for glob, harness, line_number in harness_globs:
+            if not _safe_trybuild_glob(glob):
+                continue
+            try:
+                matches = sorted(package_dir.glob(glob), key=lambda path: path.as_posix())
+            except (ValueError, NotImplementedError, OSError):
+                continue
+            for path in matches:
+                if not path.is_file():
+                    continue
+                relative_path = path.relative_to(package_dir).as_posix()
+                key = (section_index, relative_path)
+                if relative_path in reported and key not in consumed:
+                    consumed[key] = f"{harness}:{line_number}"
+    return consumed
+
+
+def render_consumed_notes(
+    sections: list[ShearSection],
+    consumed: dict[tuple[int, str], str],
+    repo_root: Path,
+) -> list[str]:
+    if not consumed:
+        return []
+    crate_map = package_to_crate_dir(repo_root)
+    notes: list[str] = []
+    for section_index, section in enumerate(sections):
+        if section.name != "unlinked_files":
+            continue
+        package_name = infer_package_name(section.body_lines)
+        crate_dir = crate_map.get(package_name, package_name)
+        for path in sorted(section.file_paths):
+            harness = consumed.get((section_index, path))
+            if harness is None:
+                continue
+            location = f"{path}" if crate_dir in ("", ".") else f"{crate_dir}/{path}"
+            notes.append(
+                f"shear note: {location} consumed by trybuild harness {harness} [unlinked_files]"
+            )
+    return notes
+
+
+def evaluate_policy(
+    sections: list[ShearSection],
+    policy: dict[str, dict[str, str]],
+    consumed: dict[tuple[int, str], str] | None = None,
+) -> tuple[list[ShearPolicyFinding], list[str]]:
     findings: list[ShearPolicyFinding] = []
     downgraded: list[str] = []
+    consumed = consumed or {}
 
-    for section in sections:
+    for section_index, section in enumerate(sections):
         if section.name not in ERROR_SECTIONS:
             continue
         allowed = (
@@ -358,6 +467,8 @@ def evaluate_policy(sections: list[ShearSection], policy: dict[str, dict[str, st
             else policy["allowed_unlinked_files"]
         )
         for file_path in section.file_paths:
+            if section.name == "unlinked_files" and (section_index, file_path) in consumed:
+                continue
             reason = allowed.get(file_path)
             if reason is not None:
                 downgraded.append(
@@ -510,8 +621,10 @@ def main(argv: list[str]) -> int:
 
     stdout = completed.stdout
     sections = parse_sections(stdout)
+    consumed = trybuild_consumed(sections, repo_root)
+    consumed_notes = render_consumed_notes(sections, consumed, repo_root)
     policy = load_policy_config(repo_root)
-    policy_findings, downgraded = evaluate_policy(sections, policy)
+    policy_findings, downgraded = evaluate_policy(sections, policy, consumed)
 
     if completed.returncode == 1:
         unused_findings, unused_downgraded, only_unused_dependencies = (
@@ -530,6 +643,8 @@ def main(argv: list[str]) -> int:
             for line in render_policy_findings(all_findings):
                 write_console_output(sys.stdout, f"{line}\n")
             for line in unused_downgraded + downgraded:
+                write_console_output(sys.stdout, f"{line}\n")
+            for line in consumed_notes:
                 write_console_output(sys.stdout, f"{line}\n")
             if stdout:
                 write_console_output(sys.stdout, stdout)
@@ -553,6 +668,8 @@ def main(argv: list[str]) -> int:
         if downgraded:
             for line in downgraded:
                 write_console_output(sys.stdout, f"{line}\n")
+        for line in consumed_notes:
+            write_console_output(sys.stdout, f"{line}\n")
         if stdout:
             write_console_output(sys.stdout, stdout)
         return 1
@@ -560,6 +677,8 @@ def main(argv: list[str]) -> int:
     if downgraded:
         for line in downgraded:
             write_console_output(sys.stdout, f"{line}\n")
+    for line in consumed_notes:
+        write_console_output(sys.stdout, f"{line}\n")
     if stdout:
         write_console_output(sys.stdout, stdout)
     if completed.stderr:

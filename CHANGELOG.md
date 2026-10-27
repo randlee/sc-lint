@@ -4,6 +4,35 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Consumer test selectors: `[tool.sc-lint.test]` may be a table of named
+  `command` or `group` selectors with `default`, `env`, `cwd`, `platforms` and
+  `after_all`; `sc-lint test [<selector> [args...]]` forwards arguments to the
+  selected command and `sc-lint test --list` lists the declared selectors
+  ([using sc-lint](docs-bundle/using-sc-lint.md#test-selectors)).
+- `--fail-fast` for `sc-lint test` and `sc-lint lint ci --consumer` (and the
+  bootstrap's `lint`/`test` operations) stops starting cargo-lane and
+  `after_all` steps after the first failure.
+- `after_all = true` on lint rows, test rows and command selectors runs that
+  step after every other step.
+- Stable codes `profile.invalid_after_all`, `test.unknown_selector`,
+  `test.group_cycle` and `profile.steps_failed`
+  ([CLI contract](docs/sc-lint/cli-contract.md#stable-codes)).
+
+### Changed
+
+- Consumer lint and test profiles run independent steps in parallel (steps
+  whose `argv[0]` is `cargo` stay serialized in declaration order) and fail
+  slow: every step runs and every failed step is reported. This supersedes the
+  0.8.0 statement that consumer profiles remain sequential and fail-fast.
+- The built-in plan and consumer profiles now fail with code
+  `profile.steps_failed` and `error.details.failed_steps[]` of
+  `{index, name, exit_code, message}` (zero-based `index`) instead of
+  `{index, step, message}`. A consumer failure no longer returns the first
+  step's own error, and a missing consumer backend now reports
+  `profile.steps_failed` with the spawn error in `message`.
+
 ## [0.8.0] — 2026-10-19
 
 ### Added
@@ -52,6 +81,8 @@ All notable changes to sc-lint are documented here.
   continues through all planned steps after failures, reporting every failure
   by plan index in plan order. Consumer-configured lint and test profiles
   remain sequential, declaration-ordered, and fail-fast.
+  [Superseded in 0.8.1: consumer profiles run steps in parallel and fail
+  slow by default, with opt-in `--fail-fast`; see Unreleased.]
 
 ### Compatibility
 
