@@ -299,7 +299,7 @@ Every non-interactive command family must be implementation-reviewed against
 the same matrix before code lands:
 
 | Command family | Stable `command` pattern | Success payload owner | Applicable top-level error kinds | Enforcing test |
-| --- | --- | --- | --- |
+| --- | --- | --- | --- | --- |
 | `lint` | `lint.<tool-or-profile>` | analyzer backend or lint-profile orchestrator | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope`, `python_backed_lints_and_views_normalize_through_the_top_level_envelope` |
 | `view` | `view.<target>` | view/report backend or adapter layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `reserved_view_commands_use_the_same_failure_envelope_shape`, `envelope_key_set_identical_across_families` |
 | `check` | `check.<target>` | compile/preflight runner | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `explicit_xwin_commands_require_capability`, `envelope_key_set_identical_across_families` |
