@@ -61,6 +61,60 @@ interpreter-selection policy.
   skip with a `just setup` hint when the wheels are absent.
 - Manual build: `maturin build --release -m bindings/sc-lint-py/Cargo.toml`.
 
+## Version-sync tables
+
+The released Python helper is invoked as `python -m sc_lint.check_version_sync`.
+It accepts `--root <path>` to select the repository root, `--config <path>` to
+select an explicit config file, and `--json` for the `sc-lint-python-v1`
+adapter envelope. Text mode prints a success summary on a clean run and one
+finding per line on stderr when versions differ. Exit codes are `0` for a clean
+run (including skipped checks), `1` for findings or an unexpected error, and
+`3` for a configuration error.
+
+The success envelope's `data` has exactly `ok`, `findings`, `skipped`, and
+`workspace_version`. `data.ok` is false when findings exist while the envelope
+`ok` remains true because the check ran successfully. Each finding has exactly
+`check`, `file`, `expected`, and `actual`:
+
+| Check | Meaning |
+| --- | --- |
+| `crate_version` | A workspace member has no valid package version declaration. |
+| `internal_path_dep` | A path dependency's pinned version differs from its target member. |
+| `cargo_lock` | A workspace package is absent from or mismatched in `Cargo.lock`. |
+| `python.version` | A listed static Python project version differs from the workspace version. |
+| `python.manifest_missing` | A listed Python manifest does not exist. |
+| `winget.manifest_glob` | The configured glob matched no Winget manifests. |
+| `winget.package_version` | A Winget `PackageVersion` field differs from the workspace version. |
+| `winget.manifest_version` | A Winget `ManifestVersion` field differs from the workspace version. |
+| `winget.installer_url` | A Winget installer URL encodes a different or unparseable version. |
+| `winget.missing_field` | A configured Winget version or installer URL field is absent. |
+| `release_wiring.file_missing` | The configured release workflow does not exist. |
+| `release_wiring.fragment` | A configured release workflow fragment is absent. |
+
+Configuration is resolved per `[version_sync]` table: `--config` first, then
+`sc-lint.toml`, then `.just/lint-config.toml`; a candidate without that table
+does not stop the search. A missing table in every candidate is the structured
+`config.table_missing` error. Other malformed or unreadable configuration and
+workspace files are configuration errors without a stable code.
+
+`[version_sync.python]` accepts:
+
+| Key | Type and default | Behavior |
+| --- | --- | --- |
+| `cargo_lock` | Boolean, default `true` | Checks workspace package versions in `Cargo.lock`; `false` disables the check. A missing lockfile is recorded in `data.skipped` as `{check: "cargo_lock", file: "Cargo.lock", reason: "missing"}`. |
+| `python_manifests` | Array of repo-relative paths, default `[]` | Each listed `pyproject.toml` must have a static `[project].version` equal to the workspace version. Dynamic, absent, or non-string versions are reported as `python.version`; a missing file is `python.manifest_missing`. |
+
+`[version_sync.winget]` and `[version_sync.release_wiring]` are disabled by
+default with `enabled = false`. The Winget table accepts `enabled`,
+`manifest_glob` (no default; required when enabled), `package_version_field`
+(default `PackageVersion`), `manifest_version_field` (default
+`ManifestVersion`), and `installer_url_field` (default `InstallerUrl`). A glob
+with no files is a `winget.manifest_glob` finding. The release wiring table
+accepts `enabled`, `file` (no default; required when enabled), and
+`required_fragments` (default `[]`); absent files and fragments produce
+`release_wiring.file_missing` and `release_wiring.fragment` findings. Paths
+and globs must be relative to the repository root and stay inside it.
+
 ## Release channel
 
 - `release/publish-artifacts.toml` declares the distribution under

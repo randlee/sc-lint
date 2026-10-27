@@ -1,0 +1,8 @@
+PackageIdentifier: example.synthetic-app
+PackageVersion: 1.1.2
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    InstallerUrl: https://example.invalid/download/v1.1.2/app.zip
+ManifestType: installer
+ManifestVersion: 1.1.2

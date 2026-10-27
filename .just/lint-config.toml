@@ -5,6 +5,9 @@ config_home_env = "SC_LINT_CONFIG_HOME"
 
 [identities]
 
+[version_sync.python]
+cargo_lock = true
+
 [cargo_shear.allowed_empty_files]
 
 [cargo_shear.allowed_unlinked_files]
