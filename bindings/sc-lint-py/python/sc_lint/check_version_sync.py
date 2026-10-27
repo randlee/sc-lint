@@ -249,18 +249,19 @@ def repo_relative(repo_root: Path, value: str, key: str) -> Path:
 
 
 def validate_python_manifests(
-    repo_root: Path,
-    workspace_version: str,
-    manifests: list[str],
+    root: Path,
+    ws: str,
+    config: dict[str, Any],
 ) -> tuple[bool, list[Finding]]:
+    _cargo_lock_enabled, python_manifests = python_settings(config)
     findings: list[Finding] = []
-    for manifest_name in manifests:
-        manifest_path = repo_relative(repo_root, manifest_name, "python.python_manifests")
-        rel_manifest = manifest_path.relative_to(repo_root.resolve()).as_posix()
+    for manifest_name in python_manifests:
+        manifest_path = repo_relative(root, manifest_name, "python.python_manifests")
+        rel_manifest = manifest_path.relative_to(root.resolve()).as_posix()
         if not manifest_path.is_file():
             findings.append(Finding("python.manifest_missing", rel_manifest, "file exists", "absent"))
             continue
-        project_file = read_toml(manifest_path, repo_root)
+        project_file = read_toml(manifest_path, root)
         project = project_file.get("project")
         project = project if isinstance(project, dict) else {}
         version = project.get("version")
@@ -271,9 +272,9 @@ def validate_python_manifests(
             actual = "dynamic" if isinstance(dynamic, list) and "version" in dynamic else "absent"
         else:
             actual = "invalid"
-        if actual != workspace_version:
-            findings.append(Finding("python.version", rel_manifest, workspace_version, actual))
-    return bool(manifests), findings
+        if actual != ws:
+            findings.append(Finding("python.version", rel_manifest, ws, actual))
+    return bool(python_manifests), findings
 
 
 def _enabled(table: dict[str, Any], table_name: str) -> bool:
@@ -383,7 +384,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def _evaluate(root: Path, explicit_config: Path | None) -> tuple[str, list[Finding], list[dict[str, str]], list[str]]:
     config, _config_path = resolve_table("version_sync", explicit_config, root)
     workspace_version = validate_workspace_version(root)
-    cargo_lock_enabled, python_manifests = python_settings(config)
+    cargo_lock_enabled, _python_manifests = python_settings(config)
     findings = validate_crate_versions(root, workspace_version)
     skipped: list[dict[str, str]] = []
     executed = ["workspace member versions", "internal path deps"]
@@ -393,9 +394,9 @@ def _evaluate(root: Path, explicit_config: Path | None) -> tuple[str, list[Findi
         skipped.extend(lock_skipped)
         if not lock_skipped:
             executed.append("Cargo.lock")
-    if python_manifests:
-        _ran, python_findings = validate_python_manifests(root, workspace_version, python_manifests)
-        findings.extend(python_findings)
+    python_ran, python_findings = validate_python_manifests(root, workspace_version, config)
+    findings.extend(python_findings)
+    if python_ran:
         executed.append("python manifests")
     winget_ran, winget_findings = validate_winget_manifests(root, workspace_version, config)
     findings.extend(winget_findings)
