@@ -192,6 +192,26 @@ class CheckVersionSyncTests(unittest.TestCase):
                 [{"check": "cargo_lock", "file": "Cargo.lock", "expected": "synthetic-storage 1.1.2", "actual": "synthetic-storage 1.1.3"}],
             )
 
+    def test_validate_lockfile_reports_workspace_package_absent_from_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            self.write_repo(root)
+            (root / "Cargo.lock").write_text(
+                'version = 3\n\n'
+                f'[[package]]\nname = "{APP_PACKAGE}"\nversion = "1.1.2"\n\n'
+                f'[[package]]\nname = "{CORE_PACKAGE}"\nversion = "1.1.2"\n\n'
+                f'[[package]]\nname = "{DAEMON_PACKAGE}"\nversion = "1.1.2"\n',
+                encoding="utf-8",
+            )
+
+            findings, skipped = validate_lockfile(root, WORKSPACE_VERSION)
+
+            self.assertEqual(skipped, [])
+            self.assertEqual(
+                [finding.to_dict() for finding in findings],
+                [{"check": "cargo_lock", "file": "Cargo.lock", "expected": "synthetic-storage 1.1.2", "actual": "synthetic-storage absent"}],
+            )
+
     def test_success_message_includes_workspace_version(self) -> None:
         self.assertEqual(
             success_message(WORKSPACE_VERSION, ["workspace member versions", "internal path deps", "Cargo.lock"]),
