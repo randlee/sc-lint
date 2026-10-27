@@ -325,6 +325,19 @@ Current implementation status:
   - top-level `sc-lint` invokes the dedicated `sc-lint-runtime` binary
     without adding a direct crate dependency
 
+### Consumer profile implementation boundaries
+
+Consumer test selector configuration decoding lives in
+`crates/sc-lint/src/profile_plan.rs`. The stable profile error codes and their
+configuration error construction live in `crates/sc-lint/src/scheduler.rs`,
+alongside the scheduler that reports those errors. The CLI keeps the test
+selector and its forwarded arguments in one trailing positional field
+(`Command::Test::selector_and_args` in `cli.rs`): this makes every token after
+the selector, including tokens beginning with `-`, pass through to the test
+command. The public invocation remains
+`sc-lint test [--fail-fast|--list] [<selector> [args...]]`; flags precede the
+selector and the trailing words are forwarded verbatim.
+
 ## Backend Crate Isolation
 
 Default backend isolation rule:
