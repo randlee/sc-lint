@@ -66,6 +66,11 @@ preserves the default findings; a present empty table allows no unused
 dependencies. This guide is the offline recovery reference for the compatibility
 change.
 
+The cargo-deny adapter retries a completed command failure only when captured
+output contains “could not resolve hostname”. It makes at most three attempts
+and reports each retry. Policy failures and other command errors are not
+retried; the final attempt's output and status determine the result.
+
 ### trybuild fixtures are recognised
 
 The cargo-shear wrapper recognises string-literal globs passed to trybuild
@@ -80,11 +85,6 @@ variable, or `format!` call, or one that is empty, absolute, drive-qualified,
 contains a backslash, or contains a `..` path component is not interpreted;
 the file remains reported and may still be allowlisted with a reason. Empty-file
 and unused-dependency checks are unchanged.
-
-The cargo-deny adapter retries a completed command failure only when captured
-output contains “could not resolve hostname”. It makes at most three attempts
-and reports each retry. Policy failures and other command errors are not
-retried; the final attempt's output and status determine the result.
 
 ## Clean-machine bootstrap
 
