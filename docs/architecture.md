@@ -443,8 +443,9 @@ Current intended distribution is:
   - current owned rules:
     - `SCB-RUNTIME-001`
     - `SCB-RUNTIME-002`
+    - `SCB-RUNTIME-003`
 - `sc-lint-tokio`
-  - future Tokio-specific runtime rules
+  - reserved for Tokio rules that need Tokio dependencies or runtime semantics
   - must remain distinct from generic runtime rules
 
 ### Phase B Shared Backlog
@@ -651,7 +652,7 @@ productized second.
 Consumer-proven rule families already shipped in dedicated product crates:
 
 - `sc-lint-portability`: `PORT-004`, `PORT-005`
-- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`
+- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`, `SCB-RUNTIME-003`
 
 Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
 source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer

@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -25,7 +26,9 @@ use crate::OwnerId;
 use crate::RuleId;
 use sc_lint_analyzer_support::AnalyzerSettings;
 use sc_lint_analyzer_support::FileContext;
+use sc_lint_analyzer_support::PackageDependencyKind;
 use sc_lint_analyzer_support::PackageName;
+use sc_lint_analyzer_support::PackageTargetKind;
 use sc_lint_analyzer_support::RepoRelativePath;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::TargetName;
@@ -67,6 +70,7 @@ pub(crate) fn analyze_runtime_liveness(
     _settings: &AnalyzerSettings,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let source_files = discover_source_files_with_metadata(workspace)?;
+    let sleep_scope = SleepScope::from_workspace(workspace);
     let file_findings = source_files
         .par_iter()
         .map(|file_context| {
@@ -85,6 +89,11 @@ pub(crate) fn analyze_runtime_liveness(
 
             let mut collector = RuntimeCollector::new(file_context);
             collector.visit_file_items(&parsed);
+            if sleep_scope.includes(file_context) {
+                for site in crate::sleep::find_blocking_sleeps(&parsed) {
+                    collector.findings.push(RuntimeFinding { rule_id: RuleId::ScbRuntime003, kind: "blocking_thread_sleep_in_tokio_package", message: format!("SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package {}; use tokio::time::sleep(..).await instead", file_context.package), source_path: file_context.source_path.clone(), line: site.line, package: file_context.package.clone(), target: file_context.target.clone(), node_label: format!("crate::{}::{}::{}", file_context.package, file_context.target, site.enclosing_fn.unwrap_or_else(|| "<module>".into())) });
+                }
+            }
             Ok(collector.findings)
         })
         .collect::<Vec<Result<Vec<_>>>>()
@@ -129,6 +138,61 @@ pub(crate) fn analyze_runtime_liveness(
             ))
         })
         .collect()
+}
+
+#[derive(Default)]
+struct SleepScope {
+    excluded_roots: BTreeMap<PackageName, BTreeSet<PathBuf>>,
+}
+
+impl SleepScope {
+    fn from_workspace(workspace: &WorkspaceMetadata) -> Self {
+        let packages = workspace
+            .workspace_packages()
+            .into_iter()
+            .filter(package_declares_tokio)
+            .filter_map(|package| {
+                let has_production_target = package.targets.iter().any(|target| {
+                    matches!(target.kind, PackageTargetKind::Lib | PackageTargetKind::Bin)
+                });
+                let excluded = package
+                    .targets
+                    .iter()
+                    .filter(|target| {
+                        !matches!(target.kind, PackageTargetKind::Lib | PackageTargetKind::Bin)
+                    })
+                    .map(|target| canonical_or_original(&target.src_path))
+                    .collect::<BTreeSet<_>>();
+                has_production_target.then_some((package.name, excluded))
+            })
+            .collect();
+        Self {
+            excluded_roots: packages,
+        }
+    }
+
+    fn includes(&self, file: &FileContext) -> bool {
+        !file.is_test_file
+            && self.excluded_roots.contains_key(&file.package)
+            && self
+                .excluded_roots
+                .get(&file.package)
+                .is_some_and(|roots| !roots.contains(&canonical_or_original(&file.source_path)))
+    }
+}
+
+fn package_declares_tokio(package: &sc_lint_analyzer_support::WorkspacePackageInfo) -> bool {
+    package.dependencies.iter().any(|dependency| {
+        dependency.name == "tokio"
+            && matches!(
+                dependency.kind,
+                PackageDependencyKind::Normal | PackageDependencyKind::Build
+            )
+    })
+}
+
+fn canonical_or_original(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
 struct RuntimeCollector<'a> {

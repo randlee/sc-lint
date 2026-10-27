@@ -12,6 +12,10 @@ Current rule families:
 - `SCB-RUNTIME-001`
   - bare `Condvar::wait(...)` in production code
 - `SCB-RUNTIME-002`
+  - discarded `Condvar::wait_timeout*` result
+- `SCB-RUNTIME-003`
+  - blocking `std::thread::sleep` in production Tokio packages; use
+    `tokio::time::sleep(..).await`
   - discarded `wait_timeout*` result in production code
 
 ## Invocation

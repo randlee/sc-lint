@@ -106,6 +106,107 @@ pub struct WorkspaceMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageTargetKind {
+    Lib,
+    Bin,
+    Example,
+    Test,
+    Bench,
+    CustomBuild,
+    Other,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageDependencyKind {
+    Normal,
+    Build,
+    Development,
+    Unknown,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackageDependency {
+    pub name: String,
+    pub rename: Option<String>,
+    pub kind: PackageDependencyKind,
+    pub target: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackageTarget {
+    pub name: TargetName,
+    pub kind: PackageTargetKind,
+    pub src_path: PathBuf,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspacePackageInfo {
+    pub name: PackageName,
+    pub dependencies: Vec<PackageDependency>,
+    pub targets: Vec<PackageTarget>,
+}
+
+impl WorkspaceMetadata {
+    pub fn workspace_packages(&self) -> Vec<WorkspacePackageInfo> {
+        let mut packages = self
+            .metadata
+            .packages
+            .iter()
+            .filter(|package| self.metadata.workspace_members.contains(&package.id))
+            .map(|package| WorkspacePackageInfo {
+                name: PackageName::new(package.name.to_string()),
+                dependencies: package
+                    .dependencies
+                    .iter()
+                    .map(|dependency| PackageDependency {
+                        name: dependency.name.clone(),
+                        rename: dependency.rename.clone(),
+                        kind: match dependency.kind {
+                            cargo_metadata::DependencyKind::Normal => PackageDependencyKind::Normal,
+                            cargo_metadata::DependencyKind::Build => PackageDependencyKind::Build,
+                            cargo_metadata::DependencyKind::Development => {
+                                PackageDependencyKind::Development
+                            }
+                            _ => PackageDependencyKind::Unknown,
+                        },
+                        target: dependency.target.as_ref().map(ToString::to_string),
+                    })
+                    .collect(),
+                targets: package
+                    .targets
+                    .iter()
+                    .map(|target| PackageTarget {
+                        name: TargetName::new(target.name.clone()),
+                        kind: classify_target_kinds(&target.kind),
+                        src_path: target.src_path.clone().into_std_path_buf(),
+                    })
+                    .collect(),
+            })
+            .collect::<Vec<_>>();
+        packages.sort_by(|left, right| left.name.cmp(&right.name));
+        packages
+    }
+}
+
+fn classify_target_kinds(kinds: &[cargo_metadata::TargetKind]) -> PackageTargetKind {
+    use cargo_metadata::TargetKind::*;
+    if kinds.contains(&Bin) {
+        PackageTargetKind::Bin
+    } else if kinds.contains(&Example) {
+        PackageTargetKind::Example
+    } else if kinds.contains(&Test) {
+        PackageTargetKind::Test
+    } else if kinds.contains(&Bench) {
+        PackageTargetKind::Bench
+    } else if kinds.contains(&CustomBuild) {
+        PackageTargetKind::CustomBuild
+    } else if kinds
+        .iter()
+        .any(|kind| matches!(kind, Lib | RLib | DyLib | CDyLib | StaticLib | ProcMacro))
+    {
+        PackageTargetKind::Lib
+    } else {
+        PackageTargetKind::Other
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {
     Test,
     NonTest,

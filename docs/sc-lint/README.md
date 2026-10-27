@@ -200,7 +200,7 @@ Intended crate split:
 - `sc-lint-runtime`
   - analyzer crate for shared std runtime/concurrency rules
 - `sc-lint-tokio`
-  - planned future analyzer crate for Tokio-specific rules
+  - reserved for Tokio rules that need Tokio dependencies or runtime semantics
   - represented now as a reserved future boundary surface only
 - `sc-lint-version`
   - planned future workspace crate for stable interface version checks and
@@ -294,6 +294,7 @@ Implemented code moves for the completed extraction partition:
   surface into `sc-lint-runtime`:
   - `SCB-RUNTIME-001`
   - `SCB-RUNTIME-002`
+  - `SCB-RUNTIME-003`
 - keep the portability wrapper surface pointed at `sc-lint-portability`:
   - `.just/lint_sc_portability.py`
   - `.just/run_lint.py`

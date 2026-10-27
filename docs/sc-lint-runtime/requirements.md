@@ -10,8 +10,14 @@ runtime/concurrency-correctness rules.
 ## Scope Rules
 
 - generic std runtime and liveness rules land here
-- Tokio-specific rules remain out of scope and reserve `sc-lint-tokio` as
-  their later home
+- `SCB-RUNTIME-003` rejects blocking `std::thread::sleep` in production lib/bin
+  targets of workspace packages declaring Tokio. It honors the runtime
+  exclusion settings, including `exclude_paths_by_rule`.
+- ADR-020 decision 6 narrows ADR-007: Tokio-aware rules needing neither a Tokio
+  crate dependency nor Tokio runtime semantics may live here; `sc-lint-tokio`
+  remains reserved for rules that need either. The sleep pass uses flattened
+  imports, does not expand macros, and treats out-of-line `#[cfg(test)]` module
+  files as production files.
 - the crate must keep its machine contract stable through the top-level CLI
   normalization surface
 

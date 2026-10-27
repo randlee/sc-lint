@@ -18,7 +18,10 @@ its backend machine contract.
 - the crate remains separate from `sc-lint-portability` and
   `sc-lint-boundary`
 - generic std concurrency rules stay here
-- Tokio-specific rules remain reserved for `sc-lint-tokio`
+- `sleep.rs` owns the `SCB-RUNTIME-003` AST pass and its production-target and
+  Tokio-package policy. ADR-020 decision 6 narrows ADR-007: rules requiring no
+  Tokio dependency or runtime semantics may live here; `sc-lint-tokio` remains
+  reserved for rules that do.
 
 ## Related Docs
 
