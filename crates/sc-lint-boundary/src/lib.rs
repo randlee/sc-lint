@@ -678,12 +678,24 @@ fn analyze_inventory_free_manifest_policy(
 }
 
 fn apply_configured_rule_filter(
-    mut report: FindingsReport,
+    report: FindingsReport,
     settings: &sc_lint_analyzer_support::AnalyzerSettings,
     root: &Path,
     node_paths: &NodeSourcePaths,
 ) -> FindingsReport {
-    let canonical_root = root.canonicalize().ok();
+    apply_configured_rule_filter_with_canonicalizer(report, settings, root, node_paths, |path| {
+        dunce::canonicalize(path)
+    })
+}
+
+fn apply_configured_rule_filter_with_canonicalizer(
+    mut report: FindingsReport,
+    settings: &sc_lint_analyzer_support::AnalyzerSettings,
+    root: &Path,
+    node_paths: &NodeSourcePaths,
+    canonicalize: impl FnOnce(&Path) -> std::io::Result<PathBuf>,
+) -> FindingsReport {
+    let canonical_root = canonicalize(root).ok();
     let findings: Vec<_> = std::mem::take(&mut report.findings)
         .into_iter()
         .filter(|finding| {
