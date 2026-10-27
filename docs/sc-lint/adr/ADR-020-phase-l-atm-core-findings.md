@@ -36,22 +36,19 @@ make mid-sprint. Approval of this record gates dispatch only.
    files of the finding's `node_ids`; the finding is excluded when any such
    file matches an exclusion. The shared `Finding` schema in `sc-lint-schema`
    is unchanged.
-6. **Tokio sleep rule (#82, REQ-PRODUCT-004C).** The rule lives in a new
-   crate `sc-lint-tokio` with its own binary, dispatched by
-   `sc-lint lint sc-tokio` as a subprocess exactly like `sc-lint-runtime`.
-   `sc-lint` takes no Cargo dependency on it. Rule id `SCB-TOKIO-001`. A
-   "Tokio package" is a workspace package declaring `tokio` in
-   `[dependencies]` or `[build-dependencies]` (including target-specific
-   tables and `package = "tokio"` renames). A production target is a `lib` or
-   `bin` target; `#[cfg(test)]` items, `tests/`, `benches/` and `examples/`
-   are excluded. The rule rejects `std::thread::sleep`, `thread::sleep` after
-   `use std::thread`, and `sleep` imported from `std::thread` (including
-   `as` aliases), and permits `tokio::time::sleep`. No `tokio` crate
-   dependency is added. The boundary manifest becomes
-   `allowed_dependents = []`, `allowed_dependencies =
-   ["sc-lint-analyzer-support", "sc-lint-schema"]` and the undefined
-   `LINT-SC-TOKIO-ISOLATION` lint id is replaced by the existing
-   `SCB-DEPENDENCY-003` forbidden-edge gate.
+6. **Tokio sleep rule (#82, REQ-PRODUCT-004C as amended).** The rule is
+   `SCB-RUNTIME-003` in `sc-lint-runtime`, reached by the existing
+   `sc-lint lint sc-runtime`. It needs no `tokio` crate dependency: it reads
+   package manifests and walks source. No `sc-lint-tokio` crate is created in
+   phase L; the reserved boundary manifest stays reserved for Tokio rules
+   that need Tokio dependencies or runtime semantics. A "Tokio package" is a
+   workspace package declaring `tokio` in `[dependencies]` or
+   `[build-dependencies]` (including target-specific tables and
+   `package = "tokio"` renames). A production target is a `lib` or `bin`
+   target; `#[cfg(test)]` items, `tests/`, `benches/` and `examples/` are
+   excluded. The rule rejects `std::thread::sleep`, `thread::sleep` after
+   `use std::thread`, and `sleep` imported from `std::thread` (including `as`
+   aliases), and permits `tokio::time::sleep`.
 7. **Consumer test selectors (#196).** REQ-CLI-023's sentence "test argument
    forwarding [is] not added" is superseded for consumer test profiles:
    selectors (one command or a group of selectors), `test.default`, positional

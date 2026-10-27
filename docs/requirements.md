@@ -178,6 +178,11 @@ The product should support both:
   Tokio-specific runtime rules must not land in `sc-lint-runtime` by default;
   they should move into `sc-lint-tokio` when Tokio-specific dependencies or
   semantics justify a dedicated crate.
+  (Amended phase L, #82, Accepted — Rand, 2026-10-26.) A Tokio-aware rule that
+  needs no Tokio crate dependency and no Tokio runtime semantics, such as
+  `SCB-RUNTIME-003` (blocking `thread::sleep` in a package that declares
+  `tokio`), may live in `sc-lint-runtime`. The dedicated crate is created only
+  when a Tokio rule needs Tokio dependencies or runtime semantics.
 
 - `REQ-PRODUCT-004D`
   `sc-lint-analyzer-support` owns only shared rule-neutral AST source

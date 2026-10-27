@@ -392,8 +392,8 @@ Implementation remains gated by plan review.
 Phase `L` closes the atm-core findings reported against 0.8.0 (release 0.8.1)
 under [ADR-020](./sc-lint/adr/ADR-020-phase-l-atm-core-findings.md). Its
 authoritative sprint/dependency plan is in the `lint-phase-l` beads;
-`docs/plans/phase-l.jsonl` is the phase index. The new `sc-lint-tokio` crate
-(REQ-PRODUCT-004C) ships in l-7.
+`docs/plans/phase-l.jsonl` is the phase index. The #82 Tokio sleep rule
+ships in `sc-lint-runtime` in l-7 (REQ-PRODUCT-004C as amended).
 
 ## Planning Conventions
 
