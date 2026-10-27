@@ -146,6 +146,20 @@ def test_ci_workflow_resolution_golden() -> None:
     assert lint_lines(consumer) == ["      - run: just lint"]
 
 
+def test_installed_files_match_byte_exact_golden() -> None:
+    consumer = copy_fixture("empty-workspace")
+    result = run("--input", str(FIXTURES / "install.json"), str(consumer))
+    assert result.returncode == 0, result.stderr
+
+    golden = ROOT / "tests" / "adoption" / "golden"
+    for installed, expected in (
+        (consumer / "Justfile", golden / "Justfile"),
+        (consumer / "sc-lint.toml", golden / "sc-lint.toml"),
+        (consumer / ".github" / "workflows" / "sc-lint.yml", golden / "sc-lint.yml"),
+    ):
+        assert installed.read_bytes() == expected.read_bytes(), f"rendered {installed.name} differs from {expected}"
+
+
 @pytest.mark.integration
 def test_consumer_profile_installed_wheel_and_binary(product_artifacts: ProductArtifacts) -> None:
     profiles = {
