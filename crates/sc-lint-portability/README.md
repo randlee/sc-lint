@@ -172,10 +172,17 @@ and PORT-006; configured prefixes never replace or disable the built-ins.
 `targets` is accepted for adopted configurations but is not interpreted by a
 rule yet.
 
-`platform_adapters` lists explicit Unix/Windows module pairs with a review
-reason when their private implementations provide the same interface. Adapter
-handling is limited to the paired modules and enclosed private items; unrelated
-items and separately Unix-gated public items remain subject to parity checks.
+`platform_adapters` records explicit Unix/Windows module pairs and a review
+reason for private implementations intended to provide the same interface. The
+analyzer validates the configured pair but does not compare the implementations'
+interfaces. For each paired module file, the exemption covers private `fn` and
+`mod` items and private inherent-impl methods at file or inline-module scope.
+Public items, trait-impl methods, impls nested in function bodies, unrelated
+items, and separately Unix-gated public items remain subject to parity checks.
+
+Known limitation: a crate-root `main.rs` with a `#[cfg(unix)]` function and a
+`#[cfg(not(unix))]` sibling is still reported by PORT-010. This behavior is
+tracked for follow-up in issue `lint-phase-l.3`.
 
 Pass `--rule-filter PORT-001,PORT-006` to select rules. When provided, the
 filter determines the selected rules instead of `exclude_rules`. Invalid
