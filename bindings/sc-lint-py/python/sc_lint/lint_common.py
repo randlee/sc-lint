@@ -213,7 +213,7 @@ def table_missing_error(error: ConfigError):
     return AdapterError(
         "config", str(error),
         details={"code": CONFIG_TABLE_MISSING, "table": error.table, "searched": error.searched},
-        suggested_action="add the table to sc-lint.toml or .just/lint-config.toml",
+        suggested_action="add the table to `sc-lint.toml` or `.just/lint-config.toml`",
     )
 
 
