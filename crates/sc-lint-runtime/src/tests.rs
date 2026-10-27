@@ -635,10 +635,12 @@ fn tokio_package_aliased_sleep_import_rejected() {
 #[test]
 fn test_only_thread_sleep_allowed() {
     let fixture = tokio_fixture(
-        "#[cfg(test)] mod checks { pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); } }\n#[cfg(any(test, unix))] fn live(d: std::time::Duration) { std::thread::sleep(d); }\n",
+        "#[cfg(test)] use std::thread::sleep as test_sleep;\n#[cfg(test)] mod checks { pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); } }\n#[test] fn unit_test(d: std::time::Duration) { std::thread::sleep(d); }\npub fn uses_test_import(d: std::time::Duration) { test_sleep(d); }\n",
         "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
     );
-    assert_sleep_report(&analyze_workspace(&analyze_options(&fixture)).unwrap(), 2);
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
 }
 
 #[test]
