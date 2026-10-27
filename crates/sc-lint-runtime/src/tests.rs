@@ -656,12 +656,42 @@ fn tokio_dev_dependency_only_allowed() {
 
 #[test]
 fn tokio_sleep_excluded_by_exclude_paths_by_rule() {
-    let fixture = tokio_fixture(
-        "pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); }\n",
-        "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
-    );
+    let fixture = WorkspaceFixture::new();
+    fixture.write_tokio_workspace(&["example", "other"]);
+    let dependency = "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }";
+    fixture.write_package_manifest_with("example", dependency);
+    fixture.write_package_manifest_with("other", dependency);
+    let source = "pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); }\n";
+    fixture.write_source("example", "lib.rs", source);
+    fixture.write_source("other", "lib.rs", source);
     fixture.write_lint_config(
-        "[tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]\n\"SCB-RUNTIME-003\" = [\"crates/example/src/lib.rs\"]\n",
+        r#"
+        [tool.sc-lint.analyzers.runtime]
+        reason = "staged migration to tokio::time::sleep"
+
+        [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+        "SCB-RUNTIME-003" = ["crates/example/src/lib.rs"]
+        "#,
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert_eq!(rule_ids(&report), vec![RuleId::ScbRuntime003]);
+    assert_eq!(report.status, ReportStatus::Fail);
+    assert_eq!(report.findings.len(), 1);
+    assert!(
+        report.findings[0]
+            .message
+            .contains("crates/other/src/lib.rs")
+    );
+    assert!(report.findings[0].message.contains("Tokio package other;"));
+
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.runtime]
+        reason = "staged migration to tokio::time::sleep"
+
+        [tool.sc-lint.analyzers.runtime.exclude_paths_by_rule]
+        "SCB-RUNTIME-003" = ["**/lib.rs"]
+        "#,
     );
     let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
     assert_eq!(report.status, ReportStatus::Pass);
