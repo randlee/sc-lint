@@ -477,31 +477,15 @@ pub(crate) fn analyze_workspace_with_paths(
     }
     let graph = graph::build_workspace_graph_from(&metadata)
         .map_err(|e| BoundaryError::graph_build(root, e))?;
-    let raw_inventory = inventory.as_raw_inventory();
     let mut findings = semantic_findings;
     findings.reserve(inventory.summary().recommended_finding_capacity());
-    let filter = options.rule;
-    use RuleFilter::{Boundaries, Cycles, ForbidExternalImpls, InternalOnly};
-    if rule_selected(filter, &[Cycles]) {
-        findings.extend(analysis::analyze_cycles(&graph));
-    }
-    if rule_selected(filter, &[Boundaries, InternalOnly]) {
-        findings.extend(analysis::analyze_internal_only(&graph));
-    }
-    if rule_selected(filter, &[Boundaries, ForbidExternalImpls]) {
-        findings.extend(analysis::analyze_forbid_external_impls(&graph));
-    }
-    if rule_selected(filter, &[Boundaries]) {
-        findings.extend(analysis::analyze_named_callers(&graph, &raw_inventory));
-    }
-    if filter.is_none() {
-        let package_report = package_policy::analyze_package_policy(&metadata, &inventory)
-            .map_err(|e| BoundaryError::package_policy(root, e))?;
-        findings.extend(package_report.findings);
-        let manifest_report = manifest_policy::analyze_manifest_policy(root, &metadata)
-            .map_err(|e| BoundaryError::manifest_policy(root, e))?;
-        findings.extend(manifest_report.findings);
-    }
+    findings.extend(selected_graph_rule_findings(
+        options.rule,
+        root,
+        &graph,
+        &metadata,
+        &inventory,
+    )?);
     findings.sort_by(|left, right| {
         analysis::finding_sort_key(left)
             .cmp(&analysis::finding_sort_key(right))
@@ -516,6 +500,43 @@ pub(crate) fn analyze_workspace_with_paths(
         findings_report(scanned_crates, findings),
         node_source_paths(&graph),
     ))
+}
+
+/// Findings of every rule pass `filter` selects over the built graph; an
+/// unfiltered run also adds the package and manifest policy passes.
+fn selected_graph_rule_findings(
+    filter: Option<RuleFilter>,
+    root: &Path,
+    graph: &GraphExport,
+    metadata: &cargo_metadata::Metadata,
+    inventory: &inventory::ValidatedInventory,
+) -> std::result::Result<Vec<Finding>, BoundaryError> {
+    use RuleFilter::{Boundaries, Cycles, ForbidExternalImpls, InternalOnly};
+    let mut findings = Vec::new();
+    if rule_selected(filter, &[Cycles]) {
+        findings.extend(analysis::analyze_cycles(graph));
+    }
+    if rule_selected(filter, &[Boundaries, InternalOnly]) {
+        findings.extend(analysis::analyze_internal_only(graph));
+    }
+    if rule_selected(filter, &[Boundaries, ForbidExternalImpls]) {
+        findings.extend(analysis::analyze_forbid_external_impls(graph));
+    }
+    if rule_selected(filter, &[Boundaries]) {
+        findings.extend(analysis::analyze_named_callers(
+            graph,
+            &inventory.as_raw_inventory(),
+        ));
+    }
+    if filter.is_none() {
+        let package_report = package_policy::analyze_package_policy(metadata, inventory)
+            .map_err(|e| BoundaryError::package_policy(root, e))?;
+        findings.extend(package_report.findings);
+        let manifest_report = manifest_policy::analyze_manifest_policy(root, metadata)
+            .map_err(|e| BoundaryError::manifest_policy(root, e))?;
+        findings.extend(manifest_report.findings);
+    }
+    Ok(findings)
 }
 
 fn node_source_paths(graph: &GraphExport) -> NodeSourcePaths {
