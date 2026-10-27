@@ -33,6 +33,12 @@ use crate::scheduler::decode_after_all;
 
 use crate::test_selectors::TestSelectors;
 
+mod version_probe;
+use version_probe::VersionProbeEnvelope;
+use version_probe::compatibility_runtime_error;
+use version_probe::stderr_or_status;
+use version_probe::validate_version_probe;
+
 pub(crate) const CONFIG_FILENAME: &str = "sc-lint.toml";
 
 /// Selector value that runs every configured consumer profile step in declaration order.
