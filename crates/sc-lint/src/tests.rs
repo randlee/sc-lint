@@ -4666,6 +4666,65 @@ fn selector_forwards_args() {
     );
 }
 
+/// Forwarded arguments without one named command selector (review finding
+/// R-12): the rows form's every-row run is not a group, and an unresolved name
+/// is an unknown selector, not a group.
+#[test]
+fn forwarded_args_report_every_row_runs_and_unknown_names_correctly() {
+    let forwarded = || vec!["--nocapture".to_string()];
+    let rows = "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"fmt\"\ncommand = [\"cargo\", \"fmt\", \"--check\"]\n\n[[tool.sc-lint.test]]\nname = \"unit\"\ncommand = [\"cargo\", \"test\"]\n";
+    let (_rows_fixture, loaded) = load_test_config(rows);
+    let loaded = loaded.expect("rows config loads");
+    for selector in [None, Some("all".to_string())] {
+        let request = TestRequest::new(selector.clone(), forwarded(), false);
+        let error = run_test_request(&loaded, &request, &FakeSystemAdapter::new(false))
+            .expect_err("every-row run does not take forwarded args");
+        assert_eq!(error.kind, CliErrorKind::Usage, "{selector:?}");
+        assert_eq!(
+            error.message,
+            "selector 'all' runs every [[tool.sc-lint.test]] row and does not accept forwarded arguments",
+            "{selector:?}"
+        );
+        assert_eq!(
+            error.suggested_action.as_deref(),
+            Some("name a command selector to forward arguments"),
+            "{selector:?}"
+        );
+    }
+    let adapter = FakeSystemAdapter::new(false);
+    let request = TestRequest::new(Some("unit".to_string()), forwarded(), false);
+    run_test_request(&loaded, &request, &adapter).expect("a named row takes forwarded args");
+    assert_eq!(adapter.records()[0].argv, ["cargo", "test", "--nocapture"]);
+
+    let no_default = "[tool.sc-lint.test.selectors.unit]\ncommand = [\"cargo\", \"test\"]\n";
+    let (_table_fixture, loaded) = load_test_config(&selector_config(no_default));
+    let loaded = loaded.expect("table config loads");
+    let (_, selectors) = loaded.test_selectors().expect("table selectors");
+    let error = selectors
+        .check_forwarded_args(&TestRequest::new(
+            Some("nightly".to_string()),
+            forwarded(),
+            false,
+        ))
+        .expect_err("unresolved name");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert_eq!(error.details["selector"], "nightly");
+    assert!(
+        error
+            .message
+            .starts_with("selector 'nightly' is not declared in "),
+        "{error:?}"
+    );
+    let error = selectors
+        .check_forwarded_args(&TestRequest::new(None, forwarded(), false))
+        .expect_err("no selector and no default");
+    assert_eq!(error.code(), "test.unknown_selector");
+    assert!(
+        error.message.starts_with("no selector was named and "),
+        "{error:?}"
+    );
+}
+
 #[test]
 fn selector_group_expands() {
     let (_fixture, loaded) = load_test_config(&selector_config(SELECTOR_TABLE));
