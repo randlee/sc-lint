@@ -109,14 +109,14 @@ The product should support both:
   The top-level CLI must define one canonical success/failure envelope family
   for non-interactive commands so backend-native machine contracts can be
   normalized without leaking backend-specific contract drift.
-  (Amended phase L, #586, Pending — Rand approval.) Backend payloads are
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) Backend payloads are
   validated against the published schema, not only parsed as JSON, and a test
   must reject a drifted payload with a structured error.
 
 - `REQ-PRODUCT-002E`
   Human-readable output must remain a secondary presentation layer and must not
   contain machine-significant detail that is unavailable through machine mode.
-  (Amended phase L, #586, Pending — Rand approval.) Enforced by the test
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) Enforced by the test
   required under `REQ-CLI-005D`.
 
 - `REQ-PRODUCT-002F`

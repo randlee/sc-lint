@@ -105,7 +105,7 @@ Change 4 amendment: Accepted — Rand, 2026-10-14. The ruling changes execution
 semantics only for the built-in source-maintainer lint plan; consumer-configured
 profiles retain their sequential, fail-fast contract.
 
-Change 4 amendment 2 (phase L, #195/#196): Pending — Rand approval required.
+Change 4 amendment 2 (phase L, #195/#196): Accepted — Rand, 2026-10-26.
 Rand ruled 2026-10-26 that consumer-configured lint and test profiles run
 independent steps in parallel and fail slow by default: every planned step runs,
 failures are aggregated, the report keeps declaration order and identifies each

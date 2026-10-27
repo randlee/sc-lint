@@ -30,7 +30,7 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-lint.toml`
   - `.just/lint-config.toml`
   with `--root <path>` as the explicit repo-root override.
-  (Amended phase L, #137/default-config gap, Pending — Rand approval.)
+  (Amended phase L, #137/default-config gap, Accepted — Rand, 2026-10-26.)
   Resolution is per configuration table for every lint and every Python-backed
   lint (line-counts, identity-literals, version-sync): an explicit `--config`
   file first, then the table from `sc-lint.toml` when it has one, otherwise the
@@ -72,7 +72,7 @@ specialized backend tools and mixed Rust/Python implementations.
 - `REQ-CLI-005D`
   Human-readable output must not expose machine-significant information that is
   unavailable through `--json`.
-  (Amended phase L, #586, Pending — Rand approval.) A test must enforce this:
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) A test must enforce this:
   for each command family, every machine-significant field present in human
   output is present in the `--json` payload.
 
@@ -120,7 +120,7 @@ specialized backend tools and mixed Rust/Python implementations.
   - the tests that enforce envelope and error-shape consistency
   Parser-level usage failures that occur before a concrete subcommand path is
   resolved must document the fallback command identifier they use.
-  (Amended phase L, #586, Pending — Rand approval.) The contract matrix in
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) The contract matrix in
   `cli-contract.md` must have a row for every command family, including docs,
   init, test, setup, upgrade and lint.ci.consumer, and a test must assert that
   the envelope key set is identical across families.
@@ -157,7 +157,7 @@ specialized backend tools and mixed Rust/Python implementations.
   - `sc-lint check interfaces`
   and must preserve `sc-lint version` as the tool-version inspection path
   rather than overloading it for interface-version checks.
-  (Amended phase L, #586, Pending — Rand approval.) Status: planned, not
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) Status: planned, not
   implemented. `CheckTarget` offers only native and xwin, and `sc-lint check
   interfaces` is rejected as an unknown target; documentation must not claim
   it exits 0.

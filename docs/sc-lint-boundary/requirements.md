@@ -12,7 +12,7 @@ family.
 
 ## Dual-Loader Transition
 
-Amendment (phase L, #586, Pending — Rand approval required): the TOML
+Amendment (phase L, #586, Accepted — Rand, 2026-10-26): the TOML
 transition is complete and the loader is TOML-only (`inventory/mod.rs`). The
 Markdown-embedded loader and its cross-source checks below are retired; they
 are kept as history. `REQ-SCB-002` to `REQ-SCB-005` are marked retired and the
