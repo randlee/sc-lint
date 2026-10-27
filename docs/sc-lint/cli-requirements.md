@@ -390,7 +390,7 @@ specialized backend tools and mixed Rust/Python implementations.
   command exits non-zero if any step fails. Steps that require Cargo's build
   lock are serialized. Consumer-configured lint and test profiles remain
   sequential, declaration-ordered, and fail-fast.
-  (Amended phase L, #195/#196, Pending — Rand approval; supersedes the
+  (Amended phase L, #195/#196, Accepted — Rand, 2026-10-26; supersedes the
   preceding sentence.) Consumer-configured lint and test profiles run
   independent steps concurrently and fail slow by default: every planned step
   runs even if another fails, the report retains declaration order and
