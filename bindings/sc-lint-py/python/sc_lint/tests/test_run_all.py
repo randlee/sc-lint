@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 import sys
 import tempfile
@@ -21,3 +23,11 @@ class RunAllTests(unittest.TestCase):
     def test_all_passing_commands_succeed(self) -> None:
         python = f'"{sys.executable}"'
         self.assertEqual(run_all.main(["run_all", f"{python} -c pass"]), 0)
+
+    def test_failed_command_reports_stdout_with_failure_summary(self) -> None:
+        python = f'"{sys.executable}"'
+        failing = f"{python} -c \"print('named cargo test failure'); raise SystemExit(1)\""
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            self.assertEqual(run_all.main(["run_all", failing]), 1)
+        self.assertIn("named cargo test failure", stderr.getvalue())

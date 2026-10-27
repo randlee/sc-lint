@@ -5016,18 +5016,28 @@ fn forwarded_args_parse() {
 
 #[test]
 fn human_render_lists_failed_and_skipped_steps() {
-    let mut adapter = FakeSystemAdapter::new(false);
-    adapter.failures.insert("a", "a exploded");
-    adapter.exit_codes.insert("a", 101);
-    // `a` fails on the cargo lane before `b` starts, so `b` is skipped; the
-    // Parallel step `c` always starts and panics.
-    adapter.on_start.insert("c", Box::new(|| panic!("boom")));
-    let error = run_scheduled(
-        &adapter,
-        vec![cargo_step("a"), cargo_step("b"), parallel_step("c")],
-        FailurePolicy::FailFast,
+    // Feed fixed outcomes to the aggregator: scheduler start order between
+    // the cargo lane and parallel workers is intentionally concurrent, so
+    // running real workers here would make the expected fail-fast result race.
+    let steps = vec![
+        crate::scheduler::ScheduledStep::new(0, cargo_step("a")),
+        crate::scheduler::ScheduledStep::new(1, cargo_step("b")),
+        crate::scheduler::ScheduledStep::new(2, parallel_step("c")),
+    ];
+    let error = crate::scheduler::aggregate_outcomes(
+        &steps,
+        vec![
+            crate::scheduler::StepOutcome::Failed(
+                CliError::backend_failure("a exploded")
+                    .with_detail(crate::consts::FIELD_EXIT_CODE, json!(101)),
+            ),
+            crate::scheduler::StepOutcome::Skipped,
+            crate::scheduler::StepOutcome::Failed(CliError::internal(
+                "c panicked during execution: boom",
+            )),
+        ],
     )
-    .expect_err("a and c fail");
+    .expect_err("the controlled outcomes contain failures");
     assert_eq!(
         crate::render::render_error_human("test", &error),
         "test: 2 of 3 steps failed: [0] a, [2] c (profile.steps_failed)\nFailed steps:\n  [0] a (exit 101): a exploded\n  [2] c (exit n/a): c panicked during execution: boom\nSkipped steps (fail-fast): b\nfix the failing steps and rerun"
