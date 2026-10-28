@@ -202,6 +202,138 @@ fn issue377_rule_registration_and_dispatch() {
     );
 }
 
+fn run_sc_boundary(fixture: &Fixture, rule_filter: Option<&str>) -> (Option<i32>, Value) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sc-lint"));
+    command.args([
+        "--json",
+        "--root",
+        fixture.root().to_str().expect("utf-8 root"),
+        "lint",
+        "sc-boundary",
+    ]);
+    if let Some(rule_filter) = rule_filter {
+        command.args(["--rule-filter", rule_filter]);
+    }
+    let output = run_bounded(&mut command, "sc-lint sc-boundary probe");
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "JSON output ({error}): {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+    });
+    (output.status.code(), json)
+}
+
+fn finding_rows(output: &Value) -> Vec<(String, String, Vec<String>)> {
+    output["data"]["findings"]
+        .as_array()
+        .expect("findings array")
+        .iter()
+        .map(|finding| {
+            (
+                finding["rule_id"].as_str().expect("rule id").to_owned(),
+                finding["kind"].as_str().expect("kind").to_owned(),
+                finding["owner_ids"]
+                    .as_array()
+                    .expect("owner ids")
+                    .iter()
+                    .map(|owner| owner.as_str().expect("owner id").to_owned())
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
+/// #643 two-fault probe: `consumer` depends on `example` without being listed,
+/// and `ghost` is listed with no edge. Each rule filter reports exactly its faults.
+#[test]
+fn issue643_rule_filter_on_two_fault_fixture() {
+    let fixture = Fixture::new();
+    fixture.write_members(&[
+        ("example", "", ""),
+        (
+            "consumer",
+            "",
+            "example = { path = \"../example\", version = \"0.1.0\" }",
+        ),
+        ("ghost", "", ""),
+    ]);
+    fixture.write_owner_record("[\"ghost\"]", "[\"Example\"]");
+    let unexpected = (
+        "SCB-DEPENDENCY-002".to_owned(),
+        "package_dependent_not_allowed".to_owned(),
+        vec!["consumer".to_owned(), "example".to_owned()],
+    );
+    let stale = (
+        "SCB-DEPENDENCY-004".to_owned(),
+        "stale_allowed_dependent".to_owned(),
+        vec!["ghost".to_owned(), "example".to_owned()],
+    );
+
+    let (code, output) = run_sc_boundary(&fixture, Some("SCB-DEPENDENCY-002"));
+    assert_eq!(code, Some(10), "{output:#}");
+    assert_eq!(output["data"]["status"], "fail");
+    assert_eq!(
+        finding_rows(&output),
+        vec![unexpected.clone()],
+        "{output:#}"
+    );
+
+    let (code, output) = run_sc_boundary(&fixture, Some("SCB-DEPENDENCY-002,SCB-DEPENDENCY-004"));
+    assert_eq!(code, Some(10), "{output:#}");
+    assert_eq!(output["data"]["status"], "fail");
+    assert_eq!(finding_rows(&output), vec![unexpected, stale], "{output:#}");
+}
+
+/// #642: an external composition root named through the dependent's library
+/// target alias passes SCB-BOUNDARY-004 on an unfiltered run, whether
+/// `allowed_dependents` names the package or the alias; an unlisted root fails.
+#[test]
+fn issue642_lib_alias_composition_root_passes_unfiltered_run() {
+    let fixture = Fixture::new();
+    fixture.write_members(&[
+        ("example", "", ""),
+        (
+            "runtime",
+            "[lib]\nname = \"atm_runtime\"\npath = \"src/lib.rs\"\n",
+            "example = { path = \"../example\", version = \"0.1.0\" }",
+        ),
+    ]);
+    let root = "[\"atm_runtime::composition::assemble_runtime\"]";
+    for allowed in ["[\"runtime\"]", "[\"atm_runtime\"]"] {
+        fixture.write_owner_record(allowed, root);
+        let (code, output) = run_sc_boundary(&fixture, None);
+        let rows = finding_rows(&output);
+        assert!(
+            !rows
+                .iter()
+                .any(|(rule_id, _, _)| rule_id == "SCB-BOUNDARY-004"),
+            "allowed_dependents = {allowed}: {output:#}"
+        );
+        assert_eq!(code, Some(0), "allowed_dependents = {allowed}: {output:#}");
+        assert_eq!(output["data"]["status"], "pass", "{output:#}");
+    }
+
+    fixture.write_owner_record("[]", root);
+    let (code, output) = run_sc_boundary(&fixture, None);
+    assert_eq!(code, Some(10), "{output:#}");
+    let findings = output["data"]["findings"]
+        .as_array()
+        .expect("findings array");
+    let root_findings = findings
+        .iter()
+        .filter(|finding| finding["kind"] == "unapproved_composition_root")
+        .collect::<Vec<_>>();
+    assert_eq!(root_findings.len(), 1, "{output:#}");
+    assert!(
+        root_findings[0]["message"]
+            .as_str()
+            .expect("message")
+            .contains("`atm_runtime::composition::assemble_runtime` resolves to `runtime`"),
+        "{output:#}"
+    );
+}
+
 struct Fixture(TempDir);
 
 impl Fixture {
@@ -247,6 +379,53 @@ impl Fixture {
             "[planning]\ncurrent_sprint = \"K.3\"\n",
         )
         .expect("planning inventory");
+    }
+
+    fn write_members(&self, members: &[(&str, &str, &str)]) {
+        let names = members
+            .iter()
+            .map(|(name, _, _)| format!("\"crates/{name}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        fs::write(
+            self.root().join("Cargo.toml"),
+            format!(
+                "[workspace]\nmembers = [{names}]\nresolver = \"2\"\n\n[workspace.package]\nversion = \"0.1.0\"\nedition = \"2024\"\nrust-version = \"1.94.1\"\nauthors = [\"sc-lint contributors\"]\nlicense = \"MIT OR Apache-2.0\"\nrepository = \"https://example.invalid/sc-lint\"\nhomepage = \"https://example.invalid/sc-lint\"\n"
+            ),
+        )
+        .expect("workspace manifest");
+        for (name, extra, dependencies) in members {
+            fs::create_dir_all(self.root().join(format!("crates/{name}/src")))
+                .expect("member directory");
+            fs::write(
+                self.root().join(format!("crates/{name}/Cargo.toml")),
+                format!(
+                    "[package]\nname = \"{name}\"\nversion.workspace = true\nedition.workspace = true\nrust-version.workspace = true\nauthors.workspace = true\nlicense.workspace = true\nrepository.workspace = true\nhomepage.workspace = true\n\n{extra}\n[dependencies]\n{dependencies}\n"
+                ),
+            )
+            .expect("member manifest");
+            fs::write(
+                self.root().join(format!("crates/{name}/src/lib.rs")),
+                "pub struct Member;\n",
+            )
+            .expect("member source");
+        }
+        fs::create_dir_all(self.root().join("boundaries/example")).expect("boundary directory");
+        fs::write(
+            self.root().join("boundaries/planning.toml"),
+            "[planning]\ncurrent_sprint = \"K.3\"\n",
+        )
+        .expect("planning inventory");
+    }
+
+    fn write_owner_record(&self, allowed_dependents: &str, roots: &str) {
+        fs::write(
+            self.root().join("boundaries/example/example.toml"),
+            format!(
+                "boundary_id = \"BOUNDARY-Example\"\nowner_package = \"example\"\nowner_crate_path = \"example\"\nname = \"Example\"\n\n[public]\nfacade = \"Member\"\n\n[implementation]\ntype = \"Member\"\nmodule = \"example\"\nvisibility = \"public\"\nconstructor = \"none\"\n\n[composition]\nroots = {roots}\n\n[dependencies]\nallowed_dependents = {allowed_dependents}\nallowed_dependencies = []\nforbidden_edges = []\n\n[references]\nscope = \"outside_owner_crate\"\nforbidden = []\n\n[testing]\nallowed_test_double_paths = []\nforbidden_test_bypasses = []\n\n[enforcement]\nlint_rules = []\nreview_gates = []\n\n[status]\nstate = \"concrete_landed\"\n"
+            ),
+        )
+        .expect("owner boundary inventory");
     }
 
     fn write_boundary(&self, facade: &str) {

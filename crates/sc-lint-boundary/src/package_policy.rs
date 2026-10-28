@@ -41,6 +41,13 @@ impl EdgeCategory {
             Self::Dev => "allowed_dependencies or allowed_dev_dependencies",
         }
     }
+
+    fn dependent_allowlists(self) -> &'static str {
+        match self {
+            Self::Runtime => "allowed_dependents",
+            Self::Dev => "allowed_dependents or allowed_dev_dependents",
+        }
+    }
 }
 
 pub(crate) struct PackagePolicyReport {
@@ -323,12 +330,22 @@ fn collect_incoming_policy_findings(
         }
         for dependent in runtime_incoming.get(owner).into_iter().flatten() {
             if !runtime_allowed.contains(dependent) {
-                findings.push(disallowed_dependent_finding(record, dependent, owner));
+                findings.push(disallowed_dependent_finding(
+                    record,
+                    dependent,
+                    owner,
+                    EdgeCategory::Runtime,
+                ));
             }
         }
         for dependent in dev_incoming.get(owner).into_iter().flatten() {
             if !dev_allowed.contains(dependent) {
-                findings.push(disallowed_dependent_finding(record, dependent, owner));
+                findings.push(disallowed_dependent_finding(
+                    record,
+                    dependent,
+                    owner,
+                    EdgeCategory::Dev,
+                ));
             }
         }
     }
@@ -520,16 +537,19 @@ fn disallowed_dependent_finding(
     record: &ValidatedRecord,
     dependent: &WorkspacePackageName,
     owner: &WorkspacePackageName,
+    category: EdgeCategory,
 ) -> Finding {
     Finding {
         rule_id: RuleId::ScbDependency002,
         kind: "package_dependent_not_allowed".into(),
         message: format!(
-            "workspace package `{}` directly depends on `{}` but `{}` is not listed in `{}` allowed_dependents",
+            "workspace package `{}` directly {} on `{}` but `{}` is not listed in `{}` {}",
             dependent,
+            category.verb(),
             owner,
             dependent,
-            record.boundary_id()
+            record.boundary_id(),
+            category.dependent_allowlists()
         ),
         owner_ids: vec![
             OwnerId::new(dependent.as_ref()),

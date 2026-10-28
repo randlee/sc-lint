@@ -2431,8 +2431,20 @@ fn issue_376_reported_consumer_reproducer() {
 
     // Expected: one dev-edge finding for `r`, none for record B's runtime `q`.
     let report = analyze_workspace(&options).expect("reproducer analyzes");
+    assert_eq!(report.status, ReportStatus::Fail, "{:#?}", report.findings);
     assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
-    assert!(mentions(&report.findings[0], "r"), "{:#?}", report.findings);
+    let finding = &report.findings[0];
+    assert_eq!(finding.rule_id, RuleId::ScbDependency002, "{finding:#?}");
+    assert_eq!(finding.kind, "package_dependent_not_allowed");
+    assert_eq!(
+        finding.owner_ids,
+        vec![OwnerId::new("r"), OwnerId::new("p")],
+        "{finding:#?}"
+    );
+    assert_eq!(
+        finding.message,
+        "workspace package `r` directly dev-depends on `p` but `r` is not listed in `BOUNDARY-PA` allowed_dependents or allowed_dev_dependents"
+    );
     assert!(!report.findings.iter().any(|finding| mentions(finding, "q")));
 
     // Listing `r` in `allowed_dev_dependents` clears the dev edge.

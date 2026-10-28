@@ -298,3 +298,82 @@ fn path_exclusion_for_unrelated_file_keeps_finding() {
         (vec![RuleId::ScbCycle002], ReportStatus::Pass)
     );
 }
+
+const TRAIT_SELF_LOOP: &str = "pub struct T; pub trait Run { fn run(&self); } impl Run for T { fn run(&self) { self.run() } }";
+
+fn cycle_findings(source: &str) -> Vec<(RuleId, String, usize)> {
+    let fixture = write_workspace(source);
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.path().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .expect("cycle analysis succeeds")
+    .findings
+    .into_iter()
+    .map(|finding| (finding.rule_id, finding.message, finding.node_ids.len()))
+    .collect()
+}
+
+#[test]
+fn multi_node_trait_impl_cycle_stays_cycle_003() {
+    // Two trait-impl methods calling each other reach back, so neither edge is a
+    // delegation edge (ADR-020 decision 11): each trait reports the two-node loop.
+    let findings = cycle_findings(
+        "pub struct T; pub trait A { fn a(&self); } pub trait B { fn b(&self); } impl A for T { fn a(&self) { self.b() } } impl B for T { fn b(&self) { self.a() } }",
+    );
+    assert_eq!(findings.len(), 2, "{findings:?}");
+    for (via, (rule_id, message, nodes)) in ["A", "B"].iter().zip(&findings) {
+        assert_eq!(*rule_id, RuleId::ScbCycle003, "{findings:?}");
+        assert!(message.ends_with(&format!("via {via}")), "{message}");
+        assert_eq!(*nodes, 2, "{findings:?}");
+    }
+
+    // A trait-impl method looping through a private inherent helper keeps its
+    // SCB-CYCLE-003; the inherent edge adds the SCB-CYCLE-002 type loop.
+    let findings = cycle_findings(
+        "pub struct T; pub trait Run { fn run(&self); } impl Run for T { fn run(&self) { self.helper() } } impl T { fn helper(&self) { self.run() } }",
+    );
+    let rule_ids = findings
+        .iter()
+        .map(|(rule_id, _, _)| *rule_id)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rule_ids,
+        vec![RuleId::ScbCycle002, RuleId::ScbCycle003],
+        "{findings:?}"
+    );
+    assert!(findings[1].1.ends_with("via Run"), "{findings:?}");
+    assert!(
+        findings.iter().all(|(_, _, nodes)| *nodes == 2),
+        "{findings:?}"
+    );
+}
+
+#[test]
+fn path_exclusion_drops_real_cycle_003_finding() {
+    assert_eq!(
+        configured_cycle_rule_ids(TRAIT_SELF_LOOP, ""),
+        (vec![RuleId::ScbCycle003], ReportStatus::Pass)
+    );
+    assert_eq!(
+        configured_cycle_rule_ids(
+            TRAIT_SELF_LOOP,
+            r#"
+[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+"SCB-CYCLE-003" = ["crates/example/src/lib.rs"]
+"#
+        ),
+        (Vec::new(), ReportStatus::Pass)
+    );
+    assert_eq!(
+        configured_cycle_rule_ids(
+            TRAIT_SELF_LOOP,
+            r#"
+[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]
+"SCB-CYCLE-002" = ["crates/example/src/lib.rs"]
+"#
+        ),
+        (vec![RuleId::ScbCycle003], ReportStatus::Pass)
+    );
+}
