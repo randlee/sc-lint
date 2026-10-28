@@ -663,6 +663,7 @@ fn tokio_sleep_report_matches_frozen_json_contract() {
     );
     let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
     let mut actual = serde_json::to_value(report).unwrap();
+    actual["version"] = "<version>".into();
     let message = actual["findings"][0]["message"].as_str().unwrap().replace(
         &fixture
             .root()
