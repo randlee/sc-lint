@@ -142,7 +142,7 @@ impl AnalyzerConfigError {
 }
 
 /// Repo-relative fallback config file consulted when `sc-lint.toml` lacks the
-/// analyzer's table (REQ-CLI-003, ADR-020 decision 14).
+/// analyzer's table (REQ-CLI-003, Sprint l-4 clarification 14).
 const LINT_CONFIG_FALLBACK: &str = ".just/lint-config.toml";
 
 /// Resolves the document that holds this analyzer's table (REQ-CLI-003).

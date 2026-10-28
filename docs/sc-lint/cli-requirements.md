@@ -31,15 +31,16 @@ specialized backend tools and mixed Rust/Python implementations.
   - `.just/lint-config.toml`
   with `--root <path>` as the explicit repo-root override.
   (Amended phase L, #137/default-config gap, Accepted — Rand, 2026-10-26.)
-  Resolution is per configuration table for every lint and every Python-backed
-  lint (line-counts, identity-literals, version-sync): an explicit `--config`
+  Resolution is per configuration table for every lint, including
+  Python-backed lints (line-counts, identity-literals, version-sync): an
+  explicit `--config`
   file first, then the table from `sc-lint.toml` when it has one, otherwise the
   same table from `.just/lint-config.toml`. A table present in `sc-lint.toml`
   is never shadowed by the fallback file, and a repo whose `sc-lint.toml` lacks
   a table that only `.just/lint-config.toml` holds (as in atm-core's kit-rendered
-  `sc-lint.toml`) keeps using the fallback table. A lint whose configuration
-  table is found in neither file fails with a structured error; it must not
-  pass silently with "no active limits". The
+  `sc-lint.toml`) keeps using the fallback table. Python-backed lints fail with
+  `config.table_missing` when their configuration table is found in neither
+  file; Rust analyzers keep their defaults when their table is absent. The
   repo root is the nearest ancestor holding `sc-lint.toml` or a workspace
   `Cargo.toml`; a `boundaries/` directory is required only by the boundary
   family, and its absence is a structured error for that family alone.
