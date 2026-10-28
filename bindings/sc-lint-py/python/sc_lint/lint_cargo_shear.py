@@ -38,7 +38,8 @@ PATH_KEY_MIGRATION_DIAGNOSTIC = (
     'same key, rename the package or dependency alias to disambiguate it.'
 )
 TRYBUILD_CALL = re.compile(
-    r'\.\s*(?:pass|compile_fail)\s*\(\s*'
+    r'(?:\.|\bTestCases\s*::)\s*(?:pass|compile_fail)\s*\(\s*'
+    r'(?:&\s*(?:mut\s+)?[A-Za-z_][A-Za-z0-9_]*\s*,\s*)?'
     r'(?:r(?P<h>#*)"(?P<raw>.*?)"(?P=h)|"(?P<cooked>[^"\\\n]*)")',
     re.S,
 )
@@ -164,8 +165,25 @@ def load_cargo_shear_table(repo_root: Path) -> dict:
     return table
 
 
+def load_cargo_shear_config(repo_root: Path) -> tuple[dict, Path]:
+    # Keep the source path so policy diagnostics point at the selected file.
+    return resolve_table(CARGO_SHEAR_TABLE, None, repo_root)
+
+
+def display_cargo_shear_config_path(config_path: Path, repo_root: Path) -> str:
+    try:
+        return config_path.resolve().relative_to(repo_root.resolve()).as_posix()
+    except ValueError:
+        return config_path.as_posix()
+
+
 def load_policy_config(repo_root: Path) -> dict[str, dict[str, str]]:
     cargo_shear = load_cargo_shear_table(repo_root)
+
+    return policy_from_cargo_shear_table(cargo_shear)
+
+
+def policy_from_cargo_shear_table(cargo_shear: dict) -> dict[str, dict[str, str]]:
 
     def table(name: str, *, require_reason: bool = False) -> dict[str, str]:
         value = cargo_shear.get(name, {})
@@ -455,6 +473,7 @@ def evaluate_policy(
     sections: list[ShearSection],
     policy: dict[str, dict[str, str]],
     consumed: dict[tuple[int, str], str] | None = None,
+    config_path: str = ".just/lint-config.toml",
 ) -> tuple[list[ShearPolicyFinding], list[str]]:
     findings: list[ShearPolicyFinding] = []
     downgraded: list[str] = []
@@ -481,7 +500,7 @@ def evaluate_policy(
                 ShearPolicyFinding(
                     section_name=section.name,
                     file_path=file_path,
-                    reason=f"{section.name} must be fixed or explicitly downgraded in .just/lint-config.toml",
+                    reason=f"{section.name} must be fixed or explicitly downgraded in {config_path}",
                 )
             )
     return findings, downgraded
@@ -525,6 +544,7 @@ def evaluate_unused_dependency_policy(
     sections: list[ShearSection],
     policy: dict[str, dict[str, str]],
     manifest_packages: dict[str, str],
+    config_path: str = ".just/lint-config.toml",
 ) -> tuple[list[ShearPolicyFinding], list[str], bool]:
     findings: list[ShearPolicyFinding] = []
     downgraded: list[str] = []
@@ -552,7 +572,7 @@ def evaluate_unused_dependency_policy(
                     file_path=dependency_key,
                     reason=(
                         "unused dependency must be fixed or explicitly downgraded "
-                        "in .just/lint-config.toml"
+                        f"in {config_path}"
                     ),
                 )
             )
@@ -591,9 +611,9 @@ def main(argv: list[str]) -> int:
     repo_root = discover_repo_root(args.root)
 
     try:
-        allowlist_supplied, configured_allowlist = configured_unused_dependency_allowlist(
-            repo_root
-        )
+        cargo_shear, config_path = load_cargo_shear_config(repo_root)
+        allowlist_supplied = "allowed_unused_dependencies" in cargo_shear
+        configured_allowlist = cargo_shear.get("allowed_unused_dependencies", {})
     except (ConfigError, AdapterError) as caught:
         if isinstance(caught, ConfigError):
             write_console_output(sys.stderr, f"{CONFIG_TABLE_MISSING}: {caught.message}\n")
@@ -632,8 +652,11 @@ def main(argv: list[str]) -> int:
     sections = parse_sections(stdout)
     consumed = trybuild_consumed(sections, repo_root)
     consumed_notes = render_consumed_notes(sections, consumed, repo_root)
-    policy = load_policy_config(repo_root)
-    policy_findings, downgraded = evaluate_policy(sections, policy, consumed)
+    policy = policy_from_cargo_shear_table(cargo_shear)
+    display_config_path = display_cargo_shear_config_path(config_path, repo_root)
+    policy_findings, downgraded = evaluate_policy(
+        sections, policy, consumed, display_config_path
+    )
 
     if completed.returncode == 1:
         unused_findings, unused_downgraded, only_unused_dependencies = (
@@ -645,6 +668,7 @@ def main(argv: list[str]) -> int:
                 # Preserve absent-table parity: without metadata, retain the
                 # existing manifest resolver for child-finding package mapping.
                 else manifest_to_package_name(repo_root),
+                display_config_path,
             )
         )
         if only_unused_dependencies:

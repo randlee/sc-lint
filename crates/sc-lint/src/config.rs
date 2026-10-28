@@ -85,6 +85,7 @@ struct ConsumerRequirement {
 pub(crate) enum ConfigCode {
     BoundariesDirMissing,
     TableMissing,
+    UnknownTable,
 }
 
 impl ConfigCode {
@@ -101,6 +102,7 @@ impl ErrorCode for ConfigCode {
         match self {
             Self::BoundariesDirMissing => "config.boundaries_dir_missing",
             Self::TableMissing => "config.table_missing",
+            Self::UnknownTable => "config.unknown_table",
         }
     }
 }
@@ -542,11 +544,94 @@ pub(crate) fn parse_repo_config(path: &Path) -> Result<RepoConfigFile, CliError>
         CliError::config(format!("failed to read repo config `{}`", path.display()))
             .with_source(error)
     })?;
-    toml::from_str(&text).map_err(|error| {
+    let parse_error = |error: toml::de::Error| {
         CliError::config(format!("failed to parse repo config `{}`", path.display()))
             .with_source(error)
             .with_detail("config_path", Value::String(path.display().to_string()))
-    })
+    };
+    let raw: toml::Table = toml::from_str(&text).map_err(parse_error)?;
+    reject_unknown_tables(path, &raw)?;
+    toml::from_str(&text).map_err(parse_error)
+}
+
+/// Keys `[tool.sc-lint]` may hold; `analyzers` is read by the analyzer crates.
+const SC_LINT_KEYS: &[&str] = &[
+    "minimum_version",
+    "lint",
+    "lint_profiles",
+    "test",
+    "analyzers",
+];
+/// Tables declined as Won't-do by ADR-020 decision 9 (#198), rejected both at
+/// the file root (where #198 proposed them) and under `[tool.sc-lint]`.
+const DECLINED_TABLES: &[&str] = &["setup", "runner"];
+
+/// Rejects keys sc-lint would otherwise silently ignore, so an unsupported
+/// table is never mistaken for config: the declined `[setup]`/`[runner]` at the
+/// file root, and any key under `[tool.sc-lint]` outside `SC_LINT_KEYS`. Other
+/// root tables are deliberately allowed: `[line_counts]`, `[portability]`,
+/// `[identities]`, `[version_sync]`, `[cargo_shear]` and the like belong to the
+/// lint backends, which own their validation.
+#[expect(
+    clippy::result_large_err,
+    reason = "Repo config validation failures are part of the stable top-level CliError contract."
+)]
+fn reject_unknown_tables(path: &Path, raw: &toml::Table) -> Result<(), CliError> {
+    if let Some(key) = DECLINED_TABLES.iter().find(|key| raw.contains_key(**key)) {
+        return Err(unknown_table_error(path, key, SC_LINT_KEYS));
+    }
+    let Some(sc_lint) = raw
+        .get("tool")
+        .and_then(toml::Value::as_table)
+        .and_then(|tool| tool.get("sc-lint"))
+        .and_then(toml::Value::as_table)
+    else {
+        return Ok(());
+    };
+    match sc_lint
+        .keys()
+        .find(|key| !SC_LINT_KEYS.contains(&key.as_str()))
+    {
+        Some(key) => Err(unknown_table_error(
+            path,
+            &format!("tool.sc-lint.{key}"),
+            SC_LINT_KEYS,
+        )),
+        None => Ok(()),
+    }
+}
+
+fn unknown_table_error(path: &Path, key: &str, supported: &[&str]) -> CliError {
+    let declined = DECLINED_TABLES.contains(&key.strip_prefix("tool.sc-lint.").unwrap_or(key));
+    let (cause, action) = if declined {
+        (
+            format!(
+                "`{key}` is not supported: `setup.pre` and `runner.python` are Won't-do (ADR-020 decision 9)"
+            ),
+            "remove the table; provision tools with `sc_lint.setup_tools` and run direct manifest, shear and spell checks as `.sc-lint/venv/bin/python -m sc_lint.<module>`".to_owned(),
+        )
+    } else {
+        (
+            format!("`{key}` is not a supported sc-lint.toml key"),
+            format!(
+                "remove or rename `{key}`; supported keys here are {}",
+                supported
+                    .iter()
+                    .map(|name| format!("`{name}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        )
+    };
+    CliError::config(format!(
+        "unsupported key `{key}` in repo config `{}`",
+        path.display()
+    ))
+    .with_code(ConfigCode::UnknownTable.as_str())
+    .with_cause(cause)
+    .with_detail("config_path", Value::String(path.display().to_string()))
+    .with_detail("key", Value::String(key.to_owned()))
+    .with_suggested_action(action)
 }
 
 fn resolve_repo_relative_path(repo_root: &Path, candidate: &Path) -> PathBuf {

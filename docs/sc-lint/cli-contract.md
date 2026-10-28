@@ -115,6 +115,15 @@ completion events so command telemetry and machine-readable output line up.
 
 Current implementation status:
 
+- `REQ-CLI-003` analyzer config tables (Rust analyzers: portability, boundary,
+  runtime)
+  - implemented per-table resolution: an explicit `--config` file, then the
+    table in `sc-lint.toml`, otherwise the same table in
+    `.just/lint-config.toml`; a table in `sc-lint.toml` is never shadowed
+  - documented deviation: when neither file holds the table, Rust analyzers
+    keep their defaults and do not raise `config.table_missing`. ADR-020
+    decision 15 scopes that failure to `line-counts` and `identity-literals`.
+    Changing it requires a Rand ADR amendment.
 - `version`
   - direct CLI-owned success path
 - `compatibility.check`
@@ -285,11 +294,12 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | --- | --- | --- | --- |
 | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
 | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
+| `config.unknown_table` | `config` | the unsupported key: root or `tool.sc-lint` `setup`/`runner` (ADR-020 decision 9), or any other `[tool.sc-lint]` key outside `minimum_version`, `lint`, `lint_profiles`, `test`, `analyzers`; other root tables belong to the lint backends and are not rejected | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
 | `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
 | `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
 | `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
-| `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the wheel so the payload matches the envelope schema |
+| `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the analyzer backend so its payload matches the published schema |
 
 Codes are typed constants in their owning module (`ConfigCode` in `config.rs`; `CONFIG_TABLE_MISSING` in `lint_common.py`; adapter payload drift in `python_adapter.rs`) and cause text interpolates names.
 
@@ -533,6 +543,14 @@ If the delegated binary:
 - `sc-lint lint sc-boundary|sc-portability|sc-runtime` forwards `--config` and
   `--rule-filter` unchanged; a backend exit 2 becomes a usage error and exit 3
   a config error.
+
+### Rust analyzer backend reports
+
+The Rust analyzer backends emit `FindingsReport` JSON. The top-level CLI
+validates each report against the published
+[`analyzer-report-v1` JSON Schema](../../crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
+before normalization. A shape mismatch fails as `backend_protocol` with code
+`backend_payload_drift` and the failing instance path in `key_path`.
 
 ### Python adapter backend
 

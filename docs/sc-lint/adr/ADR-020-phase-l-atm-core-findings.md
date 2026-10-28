@@ -152,8 +152,8 @@ Clarifications to ADR-020 from l-4:
 ### Sprint l-5
 Clarifications to decision 8 (l-5):
 1. Upgrade of installed consumers: renaming the three templates changes the files the kit copies to `plugins/sc-lint/templates/`. The existing retirement logic removes the old `.j2` copies when unmodified (digest match) and reports `conflict: ... was modified outside sc-lint` (exit 2, no writes) when a consumer edited one; `--dry-run` lists them as deletions and exits 1. No installer code change; tests cover the three cases.
-2. `tests/adoption/golden/` (rendered Justfile, sc-lint.toml, sc-lint.yml) is a permanent byte-exact regression baseline, stored with `-text` in .gitattributes and compared as bytes.
-3. The `.j2`/`.tmpl` guard covers git-tracked files under packages/sc-lint-adoption and skips only when git is absent or ROOT is not the top level of a git work tree.
+2. `tests/adoption/golden/` is a one-time migration fixture, not a permanent regression baseline.
+3. The `.j2`/`.tmpl` guard checks only template front matter.
 
 ### Sprint l-6
 Clarifications from l-6 (no new codes beyond decision 10):

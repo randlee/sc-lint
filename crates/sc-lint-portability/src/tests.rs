@@ -1072,7 +1072,7 @@ fn passes_cfg_unix_gated_unix_path_in_production_code() {
 }
 
 #[test]
-fn port006_suppressed_under_target_os_and_not_windows_cfg() {
+fn port006_item_cfg_suppresses_under_target_os_and_not_windows_cfg() {
     let report = analyze_single_source(
         r#"
         #[cfg(target_os = "linux")]
@@ -1093,6 +1093,92 @@ fn port006_suppressed_under_target_os_and_not_windows_cfg() {
     );
 
     assert!(report.findings.is_empty(), "{:#?}", report.findings);
+}
+
+#[test]
+fn port006_item_cfg_suppresses_platform_specific_path_literals() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(target_os = "linux")]
+        fn linux_path() {
+            let _ = "/var/tmp/atm-ports";
+        }
+
+        #[cfg(windows)]
+        fn windows_paths() {
+            let _ = "C:\\atm-ports";
+            let _ = "\\\\server\\share\\atm-ports";
+        }
+
+        pub fn ungated() {
+            let _ = "/var/tmp/ungated";
+        }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert!(report.findings[0].message.contains("/var/tmp/ungated"));
+}
+
+#[test]
+fn port006_statement_level_cfg_is_not_honored() {
+    let report = analyze_single_source(
+        r#"
+        pub fn gated_statements() {
+            #[cfg(target_os = "linux")]
+            let _ = "/var/tmp/statement-let";
+
+            #[cfg(target_os = "linux")]
+            if consume("x") { let _ = "/var/tmp/statement-if"; }
+
+            #[cfg(target_os = "linux")]
+            consume("/var/tmp/statement-call");
+
+            #[cfg(target_os = "linux")]
+            std::path::Path::new("/var/tmp/statement-method").exists();
+        }
+        "#,
+    );
+
+    let messages = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port006)
+        .map(|finding| finding.message.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(messages.len(), 4, "{:#?}", report.findings);
+    for path in [
+        "/var/tmp/statement-let",
+        "/var/tmp/statement-if",
+        "/var/tmp/statement-call",
+        "/var/tmp/statement-method",
+    ] {
+        assert!(
+            messages.iter().any(|message| message.contains(path)),
+            "statement-level cfg should not suppress {path}: {messages:#?}"
+        );
+    }
+}
+
+#[test]
+fn port006_cfg_block_expression_is_honored() {
+    let report = analyze_single_source(
+        r#"
+        pub fn gated_block() {
+            #[cfg(target_os = "linux")]
+            { let _ = "/var/tmp/block-exempt"; }
+
+            #[cfg(windows)]
+            { let _ = "C:\\block-exempt"; }
+
+            let _ = "/var/tmp/after-block";
+        }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port006);
+    assert!(report.findings[0].message.contains("/var/tmp/after-block"));
 }
 
 #[test]
@@ -1487,6 +1573,31 @@ fn port008_user_read_without_fallback_reported() {
         user_findings
             .iter()
             .all(|finding| finding.message.contains("`USER`"))
+    );
+}
+
+#[test]
+fn port008_impl_method_body_is_checked() {
+    let report = analyze_single_source(
+        r#"
+        pub struct Config;
+        impl Config {
+            pub fn load(&self) {
+                let _ = std::env::var("XDG_CONFIG_HOME");
+            }
+        }
+        "#,
+    );
+
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::Port008)
+            .count(),
+        1,
+        "{:#?}",
+        report.findings
     );
 }
 

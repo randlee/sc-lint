@@ -13,6 +13,7 @@ use serde_json::Value;
 use serde_json::json;
 
 use crate::CliError;
+use crate::config::ConfigCode;
 use crate::config::ScLintConfigFile;
 use crate::config::parse_repo_config;
 use crate::consumer_integration::BINARY_NOT_FOUND_RECOVERY;
@@ -103,6 +104,9 @@ pub(crate) fn load_compatibility_requirement(
         ));
     }
     let file_config = parse_repo_config(path).map_err(|error| {
+        if error.code() == ConfigCode::UnknownTable.as_str() {
+            return error;
+        }
         compatibility_config_error(
             CompatibilityErrorCode::ConfigMalformed,
             format!("failed to parse sc-lint configuration `{}`", path.display()),

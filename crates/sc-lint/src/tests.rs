@@ -10,6 +10,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use clap::Parser;
+use clap::ValueEnum;
 use serde::Serialize;
 use serde::Serializer;
 use serde_json::Value;
@@ -543,6 +544,53 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
 }
 
 #[test]
+fn consumer_profile_runs_parallel_steps_and_reports_every_failure() {
+    let rows = "[[tool.sc-lint.lint]]\nname = \"first\"\ncommand = [\"python\", \"first.py\"]\n\n[[tool.sc-lint.lint]]\nname = \"second\"\ncommand = [\"python\", \"second.py\"]\n";
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(rows));
+    let loaded = loaded.expect("consumer config loads");
+    let (first_started, second_waits) = mpsc::channel();
+    let (second_started, first_waits) = mpsc::channel();
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("first", "first failed");
+    adapter.failures.insert("second", "second failed");
+    adapter.on_start.insert(
+        "first",
+        rendezvous_hook(
+            first_started,
+            first_waits,
+            "second consumer step never started while first was running",
+        ),
+    );
+    adapter.on_start.insert(
+        "second",
+        rendezvous_hook(
+            second_started,
+            second_waits,
+            "first consumer step never started while second was running",
+        ),
+    );
+
+    let error = workflow::run_consumer_lint_with(
+        &loaded,
+        None,
+        PlatformScope::Host,
+        FailurePolicy::KeepGoing,
+        &adapter,
+    )
+    .expect_err("both failing consumer steps fail the profile");
+
+    assert_eq!(error.code(), "profile.steps_failed");
+    assert_eq!(
+        error.details["failed_steps"],
+        json!([
+            {"index": 0, "name": "first", "exit_code": null, "message": "first failed"},
+            {"index": 1, "name": "second", "exit_code": null, "message": "second failed"}
+        ])
+    );
+    assert_eq!(sorted(adapter.invoked()), ["first", "second"]);
+}
+
+#[test]
 fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
     let fixture = TempDir::new().expect("fixture");
     let config_path = fixture.path().join("sc-lint.toml");
@@ -727,10 +775,11 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
     )
     .expect("PATH");
 
-    for recipe in ["lint", "test"] {
+    for (recipe, selector) in [("lint", Some("ci")), ("test", None)] {
         let output = ProcessCommand::new("just")
             .current_dir(root)
             .arg(recipe)
+            .args(selector)
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
@@ -755,7 +804,7 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
             ),
-            "lint --consumer --config sc-lint.toml ci".to_string(),
+            "lint --consumer --config sc-lint.toml ci --profile ci".to_string(),
             format!(
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
@@ -804,10 +853,11 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
     )
     .expect("PATH");
 
-    for recipe in ["lint", "test"] {
+    for (recipe, selector) in [("lint", Some("ci")), ("test", None)] {
         let output = ProcessCommand::new("just")
             .current_dir(root)
             .arg(recipe)
+            .args(selector)
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
@@ -832,7 +882,7 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
             ),
-            "lint --consumer --config sc-lint.toml ci".to_string(),
+            "lint --consumer --config sc-lint.toml ci --profile ci".to_string(),
             format!(
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
@@ -1430,6 +1480,128 @@ fn malformed_repo_config_returns_cli_config_error() {
     assert!(error.cause.is_some());
 }
 
+fn load_error_for_config(config: &str, argv: &[&str]) -> crate::error::CliError {
+    let temp_dir = TempDir::new().expect("temp dir");
+    std::fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        "[workspace]\nmembers=[]\nresolver=\"2\"\n",
+    )
+    .expect("write manifest");
+    std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::write(temp_dir.path().join("sc-lint.toml"), config).expect("write config");
+    let mut args = vec![
+        "sc-lint",
+        "--root",
+        temp_dir.path().to_str().expect("temp path"),
+    ];
+    args.extend_from_slice(argv);
+    let cli = Cli::parse_from(args);
+    let context = CommandContext::from_cli(&cli).expect("context");
+    LoadedConfig::load(&cli, &context).expect_err("config should fail")
+}
+
+#[test]
+fn declined_setup_and_runner_tables_name_adr_020_decision_9() {
+    for (table, config) in [
+        (
+            "tool.sc-lint.setup",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.setup]\npre = [\"python3\", \"tools/setup.py\"]\n",
+        ),
+        (
+            "tool.sc-lint.runner",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.runner]\npython = \".venv\"\n",
+        ),
+        (
+            "setup",
+            "[setup]\npre = [\"python3\", \"x.py\"]\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n",
+        ),
+        (
+            "runner",
+            "[runner]\npython = \".venv\"\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n",
+        ),
+    ] {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let config_path = temp_dir.path().join("sc-lint.toml");
+        std::fs::write(&config_path, config).expect("write config");
+        let compatibility = crate::compatibility::load_compatibility_requirement(&config_path)
+            .expect_err("declined table must fail compatibility loading");
+        let mut errors = vec![compatibility];
+        for argv in [
+            &["lint", "sc-boundary"][..],
+            &["lint", "sc-portability"][..],
+            &["lint", "ci"][..],
+        ] {
+            errors.push(load_error_for_config(config, argv));
+        }
+        // Path 0 is load_compatibility_requirement; the rest are argv loads.
+        for (path, error) in errors.into_iter().enumerate() {
+            assert_eq!(error.kind, CliErrorKind::Config, "{table} path {path}");
+            assert_eq!(error.code(), "config.unknown_table", "{table} path {path}");
+            assert_eq!(error.details.get("key"), Some(&json!(table)));
+            let cause = error.cause.as_deref().expect("cause");
+            assert!(cause.contains("ADR-020 decision 9"), "{cause}");
+            let action = error.suggested_action.as_deref().expect("suggested action");
+            assert!(action.contains("sc_lint.setup_tools"), "{action}");
+            assert!(
+                action.contains(".sc-lint/venv/bin/python -m sc_lint.<module>"),
+                "{action}"
+            );
+        }
+    }
+}
+
+#[test]
+fn unknown_tables_are_rejected_with_a_typed_config_error() {
+    for (key, config) in [
+        (
+            "tool.sc-lint.lints",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[[tool.sc-lint.lints]]\nname = \"x\"\n",
+        ),
+        (
+            "tool.sc-lint.minimum",
+            "[tool.sc-lint]\nminimum = \"0.4.0\"\n",
+        ),
+    ] {
+        let error = load_error_for_config(config, &["lint", "sc-boundary"]);
+        assert_eq!(error.code(), "config.unknown_table", "{key}");
+        assert_eq!(error.details.get("key"), Some(&json!(key)));
+        let cause = error.cause.as_deref().expect("cause");
+        assert!(!cause.contains("ADR-020"), "{cause}");
+        assert!(
+            error
+                .suggested_action
+                .as_deref()
+                .is_some_and(|action| action.contains("supported keys")),
+            "{error:?}"
+        );
+    }
+}
+
+#[test]
+fn supported_sc_lint_tables_still_load() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    std::fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        "[workspace]\nmembers=[]\nresolver=\"2\"\n",
+    )
+    .expect("write manifest");
+    std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::write(
+        temp_dir.path().join("sc-lint.toml"),
+        "[logging]\nconsole = false\n[line_counts]\nlimit = 500\n[portability]\nx = 1\n[identities]\nx = 1\n[version_sync]\nx = 1\n[cargo_shear]\nx = 1\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.lint_profiles]\nfast = [\"a\"]\n[[tool.sc-lint.lint]]\nname = \"a\"\ncommand = [\"true\"]\n[[tool.sc-lint.test]]\nname = \"t\"\ncommand = [\"true\"]\n[tool.sc-lint.analyzers.sc-boundary]\nenabled = true\n",
+    )
+    .expect("write config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        temp_dir.path().to_str().expect("temp path"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("context");
+    LoadedConfig::load(&cli, &context).expect("supported keys load");
+}
+
 #[test]
 fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() {
     let fixture = AnalysisFixture::new();
@@ -1691,6 +1863,9 @@ fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
         tool,
         &json!({
             "tool": tool,
+            "version": "0.8.0",
+            "schema_version": "0.1.0",
+            "scanned_crates": 1,
             "findings": [],
             "status": crate::consts::STATUS_FAIL,
         }),
@@ -1907,6 +2082,9 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
         crate::consts::TOOL_PORTABILITY,
         &json!({
             "tool": crate::consts::TOOL_PORTABILITY,
+            "version": "0.8.0",
+            "schema_version": "0.1.0",
+            "scanned_crates": 1,
             "findings": [],
             "status": "pass",
         }),
@@ -1974,6 +2152,9 @@ fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
         crate::consts::TOOL_RUNTIME,
         &json!({
             "tool": crate::consts::TOOL_RUNTIME,
+            "version": "0.8.0",
+            "schema_version": "0.1.0",
+            "scanned_crates": 1,
             "findings": [],
             "status": "pass",
         }),
@@ -2022,6 +2203,34 @@ fn malformed_backend_json_maps_to_backend_protocol_error() {
     assert_eq!(error.code(), "CLI.BACKEND_PROTOCOL_ERROR");
     assert!(error.cause.is_some());
     assert!(std::error::Error::source(&error).is_some());
+}
+
+#[test]
+fn analyzer_schema_drift_maps_to_structured_backend_protocol_error() {
+    let raw = r#"{
+        "tool":"sc-lint-boundary",
+        "version":"0.8.0",
+        "schema_version":"0.2.0",
+        "status":"pass",
+        "scanned_crates":0,
+        "findings":[{"rule_id":"BOUNDARY-001"}]
+    }"#;
+    let error = crate::dispatch::normalize_backend_json(crate::consts::TOOL_BOUNDARY, raw)
+        .expect_err("schema drift must be rejected");
+
+    assert_eq!(error.kind, CliErrorKind::BackendProtocol);
+    assert_eq!(error.code(), "backend_payload_drift");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.contains("/findings/0"))
+    );
+    assert!(
+        error.details["key_path"]
+            .as_str()
+            .is_some_and(|path| path.starts_with("/findings/0"))
+    );
 }
 
 #[test]
@@ -5207,6 +5416,94 @@ fn failure_envelope_json(command: &str, error: CliError) -> Value {
     serde_json::from_str(&rendered).expect("failure envelope is json")
 }
 
+/// The stable `command` patterns of the REQ-CLI-005I contract matrix in
+/// `docs/sc-lint/cli-contract.md`, one per command-family row.
+fn contract_matrix_patterns() -> Vec<String> {
+    let contract = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/sc-lint/cli-contract.md");
+    let text = fs::read_to_string(&contract).expect("read cli-contract.md");
+    let mut lines = text
+        .lines()
+        .skip_while(|line| !line.starts_with("| Command family | Stable `command` pattern |"))
+        .skip(2);
+    let mut patterns = Vec::new();
+    for line in lines.by_ref().take_while(|line| line.starts_with('|')) {
+        let pattern_cell = line
+            .split('|')
+            .nth(2)
+            .expect("matrix row has a pattern cell");
+        let pattern = pattern_cell
+            .split('`')
+            .nth(1)
+            .unwrap_or_else(|| panic!("matrix pattern is not backticked: {line}"));
+        patterns.push(pattern.to_owned());
+    }
+    assert!(
+        !patterns.is_empty(),
+        "contract matrix not found in {}",
+        contract.display()
+    );
+    patterns
+}
+
+/// The contract-matrix row a concrete command identifier belongs to: an exact
+/// pattern wins, otherwise the longest `<prefix>.<placeholder>` pattern.
+fn contract_matrix_row<'a>(patterns: &'a [String], command: &str) -> Option<&'a str> {
+    if let Some(exact) = patterns.iter().find(|pattern| pattern.as_str() == command) {
+        return Some(exact);
+    }
+    patterns
+        .iter()
+        .filter_map(|pattern| {
+            let prefix = pattern.split_once('<')?.0;
+            command
+                .starts_with(prefix)
+                .then_some((prefix.len(), pattern.as_str()))
+        })
+        .max_by_key(|(prefix_len, _)| *prefix_len)
+        .map(|(_, pattern)| pattern)
+}
+
+/// Every contract-matrix row is exercised by at least one of `commands`, and
+/// every command belongs to a row.
+fn assert_contract_matrix_covered(commands: &[&str], requirement: &str) {
+    let patterns = contract_matrix_patterns();
+    for command in commands {
+        assert!(
+            contract_matrix_row(&patterns, command).is_some(),
+            "{requirement}: `{command}` has no row in the cli-contract.md matrix"
+        );
+    }
+    for pattern in &patterns {
+        assert!(
+            commands
+                .iter()
+                .any(|command| contract_matrix_row(&patterns, command) == Some(pattern.as_str())),
+            "{requirement}: no case covers the cli-contract.md matrix row `{pattern}`"
+        );
+    }
+}
+
+#[test]
+fn contract_matrix_rows_resolve_concrete_commands() {
+    let patterns = contract_matrix_patterns();
+    for (command, row) in [
+        ("lint.sc-boundary", "lint.<tool-or-profile>"),
+        ("lint.ci.consumer", "lint.ci.consumer"),
+        ("check.native", "check.<target>"),
+        ("clippy.xwin", "clippy.<target>"),
+        ("view.graph", "view.<target>"),
+        ("compatibility.check", "compatibility.check"),
+        ("cli.parse_error", "cli.parse_error"),
+    ] {
+        assert_eq!(
+            contract_matrix_row(&patterns, command),
+            Some(row),
+            "{command}"
+        );
+    }
+    assert_eq!(contract_matrix_row(&patterns, "unknown"), None);
+}
+
 fn assert_envelope_keys(envelope: &Value, command: &str, success: bool, error_kind: Option<&str>) {
     let keys = envelope
         .as_object()
@@ -5230,14 +5527,14 @@ fn assert_envelope_keys(envelope: &Value, command: &str, success: bool, error_ki
 
 #[test]
 fn envelope_key_set_identical_across_families() {
-    let mut cases: Vec<(Value, bool, &str, Option<&str>)> = Vec::new();
+    let mut cases: Vec<(Value, bool, String, Option<&str>)> = Vec::new();
 
     let (_, context, loaded) = context_with_repo_root(&["version"]);
     let version = crate::command::execute(&context, &loaded).expect("version succeeds");
     cases.push((
         success_envelope_json(context.command_id(), version.data),
         true,
-        "version",
+        "version".to_owned(),
         None,
     ));
 
@@ -5246,7 +5543,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         success_envelope_json(context.command_id(), docs.data),
         true,
-        "docs",
+        "docs".to_owned(),
         None,
     ));
 
@@ -5265,7 +5562,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         success_envelope_json(context.command_id(), setup.data),
         true,
-        "setup",
+        "setup".to_owned(),
         None,
     ));
     let cli = Cli::parse_from([
@@ -5282,7 +5579,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         success_envelope_json(context.command_id(), upgrade.data),
         true,
-        "upgrade",
+        "upgrade".to_owned(),
         None,
     ));
 
@@ -5301,23 +5598,63 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         success_envelope_json(context.command_id(), init),
         true,
-        "init",
+        "init".to_owned(),
         None,
     ));
 
     let (_, _, loaded) = context_with_repo_root(&["ci"]);
     let ci = workflow::run_ci_with(&loaded, &FakeSystemAdapter::new(false))
         .expect("ci succeeds with fake adapter");
-    cases.push((success_envelope_json("ci", ci.data), true, "ci", None));
-
-    let (_, _, loaded) = context_with_repo_root(&["clippy", "xwin"]);
-    let clippy =
-        workflow::run_clippy_with(&loaded, ClippyTarget::Xwin, &FakeSystemAdapter::new(true))
-            .expect("xwin clippy succeeds with fake adapter");
     cases.push((
-        success_envelope_json("clippy.xwin", clippy.data),
+        success_envelope_json("ci", ci.data),
         true,
-        "clippy.xwin",
+        "ci".to_owned(),
+        None,
+    ));
+
+    for target in ClippyTarget::value_variants() {
+        let name = target.to_possible_value().expect("clippy target name");
+        let (_, context, loaded) = context_with_repo_root(&["clippy", name.get_name()]);
+        let clippy = workflow::run_clippy_with(&loaded, *target, &FakeSystemAdapter::new(true))
+            .expect("clippy succeeds with fake adapter");
+        cases.push((
+            success_envelope_json(context.command_id(), clippy.data),
+            true,
+            context.command_id().to_owned(),
+            None,
+        ));
+    }
+    for target in CheckTarget::value_variants() {
+        let name = target.to_possible_value().expect("check target name");
+        let (_, context, loaded) = context_with_repo_root(&["check", name.get_name()]);
+        let check = workflow::run_check_with(&loaded, *target, &FakeSystemAdapter::new(true))
+            .expect("check succeeds with fake adapter");
+        cases.push((
+            success_envelope_json(context.command_id(), check.data),
+            true,
+            context.command_id().to_owned(),
+            None,
+        ));
+    }
+
+    let lint_fixture = AnalysisFixture::new();
+    lint_fixture.write_workspace_root();
+    lint_fixture.write_package_manifest("example");
+    lint_fixture.write_source("example", "lib.rs", "pub struct Example;\n");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        lint_fixture.root().to_str().expect("lint root"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("lint context");
+    let loaded = LoadedConfig::load(&cli, &context).expect("lint config loads");
+    let lint = crate::command::execute(&context, &loaded).expect("sc-boundary lint succeeds");
+    cases.push((
+        success_envelope_json(context.command_id(), lint.data),
+        true,
+        "lint.sc-boundary".to_owned(),
         None,
     ));
 
@@ -5345,7 +5682,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         failure_envelope_json(context.command_id(), error),
         false,
-        "compatibility.check",
+        "compatibility.check".to_owned(),
         Some("backend_failure"),
     ));
 
@@ -5354,7 +5691,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         failure_envelope_json(context.command_id(), error),
         false,
-        "view.graph",
+        "view.graph".to_owned(),
         Some("capability"),
     ));
 
@@ -5365,7 +5702,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         failure_envelope_json("check.xwin", error),
         false,
-        "check.xwin",
+        "check.xwin".to_owned(),
         Some("capability"),
     ));
 
@@ -5389,7 +5726,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         failure_envelope_json(context.command_id(), error),
         false,
-        "lint.ci.consumer",
+        "lint.ci.consumer".to_owned(),
         Some("config"),
     ));
 
@@ -5411,7 +5748,7 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         failure_envelope_json(context.command_id(), error),
         false,
-        "test",
+        "test".to_owned(),
         Some("config"),
     ));
 
@@ -5424,12 +5761,23 @@ fn envelope_key_set_identical_across_families() {
     cases.push((
         serde_json::from_str(&rendered).expect("parse-error envelope parses"),
         false,
-        "cli.parse_error",
+        "cli.parse_error".to_owned(),
         Some("usage"),
     ));
 
+    let commands = cases
+        .iter()
+        .map(|(_, _, command, _)| command.as_str())
+        .collect::<Vec<_>>();
+    assert_contract_matrix_covered(&commands, "REQ-CLI-005I");
+    for target in ["check.native", "check.xwin", "clippy.native", "clippy.xwin"] {
+        assert!(
+            commands.contains(&target),
+            "REQ-CLI-005I: no case for {target}"
+        );
+    }
     for (envelope, success, command, error_kind) in cases {
-        assert_envelope_keys(&envelope, command, success, error_kind);
+        assert_envelope_keys(&envelope, &command, success, error_kind);
     }
 }
 
@@ -5514,8 +5862,112 @@ fn human_output_fields_present_in_json() {
             &["/command"],
             true,
         ),
+        (
+            "lint.full",
+            &["lint", "full"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "lint.ci",
+            &["lint", "ci"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "ci",
+            &["ci"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "check.native",
+            &["check", "native"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "check.xwin",
+            &["check", "xwin"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "clippy.native",
+            &["clippy", "native"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "clippy.xwin",
+            &["clippy", "xwin"],
+            json!({"status":"pass","steps":[{"name":"a"},{"name":"b"}]}),
+            &["/command", "/data/status", "/data/steps"],
+            false,
+        ),
+        (
+            "lint.sc-portability",
+            &["lint", "sc-portability"],
+            json!({"status":"pass","findings":[]}),
+            &["/data/status", "/data/findings"],
+            false,
+        ),
+        (
+            "lint.sc-runtime",
+            &["lint", "sc-runtime"],
+            json!({"status":"pass","findings":[]}),
+            &["/data/status", "/data/findings"],
+            false,
+        ),
+        (
+            "lint.function-length",
+            &["lint", "function-length"],
+            json!({"status":"pass","summary":"no findings"}),
+            &["/command", "/data/summary"],
+            false,
+        ),
+        (
+            "lint.identity-literals",
+            &["lint", "identity-literals"],
+            json!({"status":"pass","summary":"no findings"}),
+            &["/command", "/data/summary"],
+            false,
+        ),
+        (
+            "view.findings",
+            &["view", "findings"],
+            json!({"status":"pass","summary":"no findings"}),
+            &["/command", "/data/summary"],
+            false,
+        ),
+        (
+            "upgrade",
+            &["upgrade"],
+            json!({"summary":"upgrade complete"}),
+            &["/data/summary"],
+            false,
+        ),
+        (
+            "test.list",
+            &["test", "--list"],
+            json!({"default":"unit","selectors":[{"name":"unit","command":["cargo","test"]},{"name":"all","group":["unit"]}]}),
+            &[
+                "/data/default",
+                "/data/selectors/0/name",
+                "/data/selectors/1/name",
+            ],
+            false,
+        ),
     ];
     let mut family_names = Vec::new();
+    let mut covered_ids = Vec::new();
+    let mut covered_commands = Vec::new();
     for (family, argv, data, pointers, fallback) in rows {
         family_names.push(family);
         assert!(
@@ -5526,6 +5978,8 @@ fn human_output_fields_present_in_json() {
         full_argv.extend_from_slice(argv);
         let cli = Cli::parse_from(full_argv);
         let context = CommandContext::from_cli(&cli).expect("context");
+        covered_ids.push(context.id());
+        covered_commands.push(context.command_id().to_owned());
         let envelope = CommandEnvelope::success(context.command_id(), data);
         let human = crate::render::render_success_human(&context, &envelope);
         if fallback {
@@ -5600,22 +6054,120 @@ fn human_output_fields_present_in_json() {
             "error human output omits {pointer} token {token:?}"
         );
     }
-    family_names.sort_unstable();
+    let ParsedInvocation::Immediate(human_parse) =
+        crate::parse_args(["sc-lint", "unknown-command"])
+    else {
+        panic!("unknown command must fail during parsing");
+    };
+    let ParsedInvocation::Immediate(json_parse) =
+        crate::parse_args(["sc-lint", "--json", "unknown-command"])
+    else {
+        panic!("unknown command must fail during parsing");
+    };
+    let human = human_parse.rendered.stderr.expect("human parse error");
+    let parse_envelope: Value =
+        serde_json::from_str(&json_parse.rendered.stderr.expect("json parse error"))
+            .expect("parse-error envelope parses");
+    family_names.push("cli.parse_error");
+    for pointer in [
+        "/command",
+        "/error/code",
+        "/error/message",
+        "/error/suggested_action",
+    ] {
+        let token = parse_envelope
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("cli.parse_error: missing {pointer}"));
+        assert!(
+            human.contains(token.trim_end()),
+            "cli.parse_error human output omits {pointer} token {token:?}"
+        );
+    }
+    covered_commands.push("cli.parse_error".to_owned());
+
+    let mut unique_families = family_names.clone();
+    unique_families.sort_unstable();
+    unique_families.dedup();
+    assert_eq!(unique_families.len(), family_names.len(), "duplicate rows");
+    for id in every_command_id() {
+        assert!(
+            covered_ids.contains(&id),
+            "REQ-CLI-005D: no human-output row for {id:?}"
+        );
+    }
+    let commands = covered_commands
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_contract_matrix_covered(&commands, "REQ-CLI-005D");
+}
+
+/// Every `CommandId`. `ordinal` has no wildcard arm, so a new variant does not
+/// compile until it is given an ordinal, and the ordinal check below fails until
+/// it is listed here and given a REQ-CLI-005D row.
+fn every_command_id() -> Vec<crate::command::CommandId> {
+    use crate::command::CommandId::*;
+    fn ordinal(id: crate::command::CommandId) -> usize {
+        match id {
+            Ci => 0,
+            CheckNative => 1,
+            CheckXwin => 2,
+            ClippyNative => 3,
+            ClippyXwin => 4,
+            CompatibilityCheck => 5,
+            Docs => 6,
+            Init => 7,
+            ConsumerTest => 8,
+            Setup => 9,
+            Upgrade => 10,
+            LintCi => 11,
+            ConsumerLintCi => 12,
+            LintFast => 13,
+            LintFull => 14,
+            LintFunctionLength => 15,
+            LintIdentityLiterals => 16,
+            LintLineCounts => 17,
+            LintScBoundary => 18,
+            LintScPortability => 19,
+            LintScRuntime => 20,
+            Version => 21,
+            ViewFindings => 22,
+            ViewGraph => 23,
+        }
+    }
+    let ids = vec![
+        Ci,
+        CheckNative,
+        CheckXwin,
+        ClippyNative,
+        ClippyXwin,
+        CompatibilityCheck,
+        Docs,
+        Init,
+        ConsumerTest,
+        Setup,
+        Upgrade,
+        LintCi,
+        ConsumerLintCi,
+        LintFast,
+        LintFull,
+        LintFunctionLength,
+        LintIdentityLiterals,
+        LintLineCounts,
+        LintScBoundary,
+        LintScPortability,
+        LintScRuntime,
+        Version,
+        ViewFindings,
+        ViewGraph,
+    ];
+    let mut ordinals = ids.iter().map(|id| ordinal(*id)).collect::<Vec<_>>();
+    ordinals.sort_unstable();
     assert_eq!(
-        family_names,
-        [
-            "analyzer-lint",
-            "compatibility.check",
-            "docs",
-            "error",
-            "init",
-            "installer",
-            "lint.ci.consumer",
-            "profile",
-            "python-lint-view",
-            "test",
-            "version",
-            "view.graph"
-        ]
+        ordinals,
+        (0..ids.len()).collect::<Vec<_>>(),
+        "every CommandId listed once"
     );
+    ids
 }

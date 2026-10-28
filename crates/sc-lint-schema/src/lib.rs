@@ -4,8 +4,10 @@ use std::ops::Deref;
 use serde::Serialize;
 
 mod adapter_payload;
+mod analyzer_report;
 
 pub use adapter_payload::{PayloadDrift, validate_adapter_payload};
+pub use analyzer_report::{AnalyzerReportDrift, analyzer_report_schema, validate_analyzer_report};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

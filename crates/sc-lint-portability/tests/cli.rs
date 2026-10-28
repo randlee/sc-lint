@@ -127,6 +127,153 @@ fn port010_findings(shape: &str) -> Vec<serde_json::Value> {
         .collect()
 }
 
+fn port010_items(shape: &str) -> Vec<String> {
+    port010_findings(shape)
+        .iter()
+        .map(|finding| {
+            let message = finding["message"].as_str().expect("message string");
+            message
+                .split("item `")
+                .nth(1)
+                .and_then(|rest| rest.split('`').next())
+                .expect("PORT-010 message names an item")
+                .to_string()
+        })
+        .collect()
+}
+
+/// Asserts the exact multiset of PORT-010 items reported for an atm-core
+/// shape fixture; expected names are the analyzer's ground truth on the
+/// pinned source (atm-core f4746d500).
+fn assert_port010_items(shape: &str, expected: &[&str]) {
+    let mut actual = port010_items(shape);
+    actual.sort();
+    let mut expected: Vec<String> = expected.iter().map(|name| (*name).to_string()).collect();
+    expected.sort();
+    assert_eq!(actual, expected, "PORT-010 items for fixture {shape}");
+}
+
+#[test]
+fn port010_fixture_atm_core_atm_temp() {
+    assert_port010_items(
+        "atm_core_atm_temp",
+        &[
+            "is_owned_by_uid",
+            "has_group_or_world_bits",
+            "current_uid",
+            "unix_default_scratch_root",
+        ],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_core_atm_temp_sweeper() {
+    assert_port010_items(
+        "atm_core_atm_temp_sweeper",
+        &["from_metadata", "unix_epoch_time"],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_core_persistence() {
+    assert_port010_items("atm_core_persistence", &["sync_parent_directory"]);
+}
+
+#[test]
+fn port010_fixture_atm_core_transfer_script() {
+    assert_port010_items(
+        "atm_core_transfer_script",
+        &[
+            "unix_synthesized_transfer_script_path",
+            "is_owner_executable",
+        ],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_daemon_bootstrap_lib() {
+    assert_port010_items(
+        "atm_daemon_bootstrap_lib",
+        &["unix_socket_config", "unix_socket_config_for_uid"],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_daemon_bootstrap_protected_trust_root() {
+    assert_port010_items(
+        "atm_daemon_bootstrap_protected_trust_root",
+        &["verify_protected_path", "verify_unix_metadata"],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_daemon_client_lib() {
+    assert_port010_items(
+        "atm_daemon_client_lib",
+        &["unix_socket_path", "try_connect_unix_socket"],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_herdr_transport_socket() {
+    assert_port010_items("atm_herdr_transport_socket", &["connect_unix"]);
+}
+
+#[test]
+fn port010_fixture_atm_http_runtime_client() {
+    assert_port010_items(
+        "atm_http_runtime_client",
+        &["runtime_directory_is_root_owned"],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_http_runtime_client_tail() {
+    assert_port010_items(
+        "atm_http_runtime_client_tail",
+        &[
+            "unix_socket_client",
+            "build_unix_socket_reqwest_client",
+            "unix_socket_generation",
+        ],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_http_runtime_http1_server() {
+    assert_port010_items("atm_http_runtime_http1_server", &["serve_unix_http1"]);
+}
+
+#[test]
+fn port010_fixture_atm_http_runtime_lib() {
+    // Two `get` findings: the impl methods on UnixSocketOwnerUid and UnixSocketMode.
+    assert_port010_items("atm_http_runtime_lib", &["unix_socket", "get", "get"]);
+}
+
+#[test]
+fn port010_fixture_atm_http_runtime_loopback_tcp() {
+    assert_port010_items(
+        "atm_http_runtime_loopback_tcp",
+        &["create_private_record_file", "validate_record_parent"],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_http_runtime_runtime_listener() {
+    assert_port010_items(
+        "atm_http_runtime_runtime_listener",
+        &["bind_configured_unix_listener"],
+    );
+}
+
+#[test]
+fn port010_fixture_atm_http_runtime_runtime_setup() {
+    assert_port010_items(
+        "atm_http_runtime_runtime_setup",
+        &["validate_unix_socket_path"],
+    );
+}
+
 #[test]
 fn unknown_rule_filter_exits_two_and_prefixes_error() {
     let output = run_analyzer(

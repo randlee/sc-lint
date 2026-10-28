@@ -330,6 +330,18 @@ fn finding_location(message: &str) -> (String, usize) {
     (file.to_string(), line.parse().unwrap())
 }
 
+fn finding_relative_location(root: &WorkspaceFixture, message: &str) -> (String, usize) {
+    let head = message.split(": ").next().unwrap();
+    let (path, line) = head.rsplit_once(':').unwrap();
+    let canonical_root = dunce::canonicalize(root.root()).unwrap();
+    let canonical_source = dunce::canonicalize(path).unwrap();
+    let relative = canonical_source.strip_prefix(&canonical_root).unwrap();
+    (
+        relative.to_string_lossy().replace('\\', "/"),
+        line.parse().unwrap(),
+    )
+}
+
 #[test]
 fn parallel_file_analysis_renders_identically_for_multifile_workspaces() {
     let fixture = WorkspaceFixture::new();
@@ -619,7 +631,49 @@ fn tokio_package_std_thread_sleep_rejected() {
         "pub fn blocks(d: std::time::Duration) {\n    std::thread::sleep(d);\n}\n",
         "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
     );
-    assert_sleep_report(&analyze_workspace(&analyze_options(&fixture)).unwrap(), 2);
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    assert_sleep_report(&report, 2);
+    assert_eq!(
+        finding_relative_location(&fixture, &report.findings[0].message),
+        ("crates/example/src/lib.rs".into(), 2)
+    );
+}
+
+#[test]
+fn tokio_sleep_scan_ignores_line_and_doc_comments() {
+    let fixture = tokio_fixture(
+        "// std::thread::sleep(d);\n/// `std::thread::sleep(d)` is blocking.\npub fn blocks(d: std::time::Duration) { std::thread::sleep(d); }\n",
+        "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+
+    assert_sleep_report(&report, 3);
+    assert_eq!(
+        report.findings.len(),
+        1,
+        "comment text is not executable code"
+    );
+}
+
+#[test]
+fn tokio_sleep_report_matches_frozen_json_contract() {
+    let fixture = tokio_fixture(
+        "pub fn blocks(d: std::time::Duration) { std::thread::sleep(d); }\n",
+        "[dependencies]\ntokio = { path = \"../../vendor/tokio\" }",
+    );
+    let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
+    let mut actual = serde_json::to_value(report).unwrap();
+    actual["version"] = "<version>".into();
+    let message = actual["findings"][0]["message"].as_str().unwrap();
+    let detail = message.split_once(": ").unwrap().1;
+    let (relative, line) = finding_relative_location(&fixture, message);
+    actual["findings"][0]["message"] = format!("<root>/{relative}:{line}: {detail}").into();
+    let expected: serde_json::Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/contracts/runtime-003-report.json"
+    ))
+    .expect("runtime-003 baseline is valid JSON");
+
+    assert_eq!(actual, expected);
 }
 
 #[test]

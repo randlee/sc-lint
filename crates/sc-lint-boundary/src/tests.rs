@@ -172,6 +172,36 @@ fn per_rule_exclusions_reject_every_boundary_rule_without_source_paths() {
 }
 
 #[test]
+fn global_path_exclusions_leave_pathless_rule_findings_unchanged() {
+    let fixture = TempDir::new().expect("temp root");
+    fs::write(
+        fixture.path().join("sc-lint.toml"),
+        "[tool.sc-lint.analyzers.boundary]\nexclude_paths = [\"**/*\"]\n",
+    )
+    .expect("write analyzer config");
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.path(),
+        None,
+        None,
+    )
+    .expect("global path exclusions are valid for path-addressable findings");
+    let finding = Finding {
+        rule_id: RuleId::ScbCycle001,
+        kind: "cycle_without_source_path".into(),
+        message: "cycle finding without source paths".to_owned(),
+        owner_ids: Vec::new(),
+        node_ids: Vec::new(),
+    };
+
+    let (kept, _) = settings.apply([(finding, None)], |rule| {
+        sc_lint_analyzer_support::CatalogRuleId::new(rule.as_str())
+    });
+
+    assert_eq!(kept.len(), 1, "a path-less rule has no path to match");
+}
+
+#[test]
 fn per_rule_path_exclusion_drops_cycle_003_finding_by_node_source() {
     let fixture = TempDir::new().expect("temp root");
     let relative = "crates/example/src/lib.rs";
@@ -2431,8 +2461,20 @@ fn issue_376_reported_consumer_reproducer() {
 
     // Expected: one dev-edge finding for `r`, none for record B's runtime `q`.
     let report = analyze_workspace(&options).expect("reproducer analyzes");
+    assert_eq!(report.status, ReportStatus::Fail, "{:#?}", report.findings);
     assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
-    assert!(mentions(&report.findings[0], "r"), "{:#?}", report.findings);
+    let finding = &report.findings[0];
+    assert_eq!(finding.rule_id, RuleId::ScbDependency002, "{finding:#?}");
+    assert_eq!(finding.kind, "package_dependent_not_allowed");
+    assert_eq!(
+        finding.owner_ids,
+        vec![OwnerId::new("r"), OwnerId::new("p")],
+        "{finding:#?}"
+    );
+    assert_eq!(
+        finding.message,
+        "workspace package `r` directly dev-depends on `p` but `r` is not listed in `BOUNDARY-PA` allowed_dependents or allowed_dev_dependents"
+    );
     assert!(!report.findings.iter().any(|finding| mentions(finding, "q")));
 
     // Listing `r` in `allowed_dev_dependents` clears the dev edge.
