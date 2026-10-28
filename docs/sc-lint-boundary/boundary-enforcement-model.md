@@ -145,8 +145,10 @@ Operational rules:
   in `allowed_dev_dependencies` (REQ-SCB-016, amended 2026-10-10, Accepted,
   #203)
 - `SCB-DEPENDENCY-002` reports direct incoming workspace edges not present in
-  `allowed_dependents`, including dev-only edges; its message and finding shape
-  are the same for every edge category and name the owner's first record
+  `allowed_dependents`, including dev-only edges. Its message identifies the
+  edge category: runtime edges say `depends` and name `allowed_dependents`,
+  while dev edges say `dev-depends` and name `allowed_dependents or
+  allowed_dev_dependents`. The message names the owner's first record.
 - `SCB-DEPENDENCY-004` reports stale `allowed_dependents` entries; it is not
   reported as `SCB-DEPENDENCY-002`.
 - `SCB-DEPENDENCY-003` reports exact forbidden direct edges even when the same

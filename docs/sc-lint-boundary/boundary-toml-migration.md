@@ -1,5 +1,9 @@
 # Boundary TOML Migration Plan
 
+> **Historical plan:** The loader migration is complete and TOML is the sole
+> canonical boundary source. The dual-loader phases below describe the retired
+> transition and are not current behavior.
+
 Related ADR:
 - [`../sc-lint/adr/ADR-004-structured-boundary-definitions.md`](../sc-lint/adr/ADR-004-structured-boundary-definitions.md)
 

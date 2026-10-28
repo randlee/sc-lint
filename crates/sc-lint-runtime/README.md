@@ -16,7 +16,6 @@ Current rule families:
 - `SCB-RUNTIME-003`
   - blocking `std::thread::sleep` in production Tokio packages; use
     `tokio::time::sleep(..).await`
-  - discarded `wait_timeout*` result in production code
 
 Sample `SCB-RUNTIME-003` finding:
 
