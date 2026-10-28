@@ -570,6 +570,8 @@ mod tests {
         assert!(!message.contains("process exited"));
     }
 
+    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     #[test]
     fn probe_version_hung_candidate_returns_a_bounded_timeout() {
         let error = run_probe(
