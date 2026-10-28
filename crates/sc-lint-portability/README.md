@@ -115,7 +115,7 @@ PORT-006 hardcoded Unix-only absolute path literal `/var/run/sc-lint` in product
 Production code with a hardcoded Windows runtime path is also flagged:
 
 ```text
-PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction
+PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction (exempt: literals under a Windows-only cfg such as #[cfg(windows)], and `\\?\` verbatim or `\\.\` device namespace prefixes)
 ```
 
 Production code with Unix-centric environment lookups is also flagged:

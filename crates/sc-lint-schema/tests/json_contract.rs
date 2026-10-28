@@ -66,3 +66,48 @@ fn published_analyzer_report_schema_accepts_contract_fixture_and_rejects_drift()
     let error = validate_analyzer_report(&drifted).expect_err("missing finding fields drift");
     assert!(error.instance_path.starts_with("/findings/0"));
 }
+
+/// Removes every `additionalProperties: false` from a schema copy.
+fn without_additional_properties(schema: &mut serde_json::Value) {
+    match schema {
+        serde_json::Value::Object(map) => {
+            map.remove("additionalProperties");
+            map.values_mut().for_each(without_additional_properties);
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(without_additional_properties),
+        _ => {}
+    }
+}
+
+#[test]
+fn published_analyzer_report_schema_rejects_unknown_keys() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/findings-report.json"))
+            .expect("report fixture is JSON");
+    let mut top_level = fixture.clone();
+    top_level["unexpected"] = serde_json::json!(true);
+    let mut in_finding = fixture.clone();
+    in_finding["findings"][0]["unexpected"] = serde_json::json!(true);
+
+    let top_error = validate_analyzer_report(&top_level).expect_err("unknown top-level key");
+    assert_eq!(top_error.instance_path, "$", "{top_error}");
+    assert!(top_error.problem.contains("unexpected"), "{top_error}");
+    let finding_error = validate_analyzer_report(&in_finding).expect_err("unknown finding key");
+    assert_eq!(
+        finding_error.instance_path, "/findings/0",
+        "{finding_error}"
+    );
+    assert!(
+        finding_error.problem.contains("unexpected"),
+        "{finding_error}"
+    );
+
+    // Mutation check: the same documents pass once `additionalProperties: false`
+    // is removed, so the rejections above come from those two keywords.
+    let mut relaxed: serde_json::Value =
+        serde_json::from_str(analyzer_report_schema()).expect("published schema is JSON");
+    without_additional_properties(&mut relaxed);
+    let relaxed = jsonschema::validator_for(&relaxed).expect("relaxed schema compiles");
+    assert!(relaxed.is_valid(&top_level));
+    assert!(relaxed.is_valid(&in_finding));
+}
