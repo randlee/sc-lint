@@ -409,9 +409,13 @@ specialized backend tools and mixed Rust/Python implementations.
   fail-slow holds inside that serialized lane: a failing step there does not
   stop later steps in the lane. A step may declare `after_all = true`, which
   starts it only after every other step has finished. Output
-  ordering is deterministic and does not depend on step timing. Generic test
-  groups are not added. Consumer test selectors and test argument forwarding
-  follow [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
+  ordering is deterministic and does not depend on step timing. Consumer test
+  profiles support named command and group selectors, `default`, environment,
+  working-directory and platform settings, and forwarded command arguments.
+  Limitations: selectors are not declared in `install.json`; `default` is one
+  selector name, a call accepts one selector, selector descriptions and
+  `requires` are not supported, and installer-side selector validation is not
+  added. See [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -432,7 +436,7 @@ specialized backend tools and mixed Rust/Python implementations.
   `.pass(...)` or `.compile_fail(...)` glob, and must keep reporting every
   other unlinked file, empty file and unused dependency as before. No
   per-fixture configuration is required for consumed fixtures.
-  (Added phase L, #647. Approved by Rand 2026-10-27. See
+  (Added phase L, #647. Status: Accepted — Rand, 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
 ## Contract References

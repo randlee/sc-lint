@@ -35,6 +35,11 @@ pub const RUNTIME_CATALOG: RuleCatalog = RuleCatalog {
         CatalogRuleId::new("SCB-RUNTIME-002"),
         CatalogRuleId::new("SCB-RUNTIME-003"),
     ],
+    path_addressable_rules: &[
+        CatalogRuleId::new("SCB-RUNTIME-001"),
+        CatalogRuleId::new("SCB-RUNTIME-002"),
+        CatalogRuleId::new("SCB-RUNTIME-003"),
+    ],
     families: &[],
     default_fail: &[
         CatalogRuleId::new("SCB-RUNTIME-001"),

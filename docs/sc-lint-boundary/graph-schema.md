@@ -207,6 +207,15 @@ Current trait self-loop filtering is configured through:
 This keeps common ecosystem trait families configurable without baking
 repo-specific names into analyzer code.
 
+The shipped defaults cover the derive-family and conversion traits
+(`PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Clone`, `FromStr`,
+`Default`, `From`, `TryFrom`, `Serialize`, `Deserialize`, and `Parse`).
+`Clone` is kept deliberately: a `Clone` impl recurses into field types by
+construction, so its self-loop reflects the type's shape rather than an
+architectural dependency, the same reason `PartialEq` and `Hash` are listed.
+`crates/sc-lint-boundary/src/tests.rs` pins the `Clone` entries with
+`does_not_flag_clone_trait_impl_self_loop`.
+
 ## Stability Notes
 
 Stable enough to build against now:

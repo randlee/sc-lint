@@ -128,6 +128,85 @@ fn path_less_exclusion_uses_dunce_root_for_windows_verbatim_case() {
 }
 
 #[test]
+fn per_rule_exclusions_reject_every_boundary_rule_without_source_paths() {
+    let pathless_rules = [
+        "SCB-CYCLE-001",
+        "SCB-BOUNDARY-001",
+        "SCB-BOUNDARY-002",
+        "SCB-BOUNDARY-003",
+        "SCB-BOUNDARY-004",
+        "SCB-CALLER-001",
+        "SCB-DEPENDENCY-001",
+        "SCB-DEPENDENCY-002",
+        "SCB-DEPENDENCY-003",
+        "SCB-DEPENDENCY-004",
+        "SCB-FEATURE-001",
+    ];
+
+    for rule_id in pathless_rules {
+        let fixture = TempDir::new().expect("temp root");
+        fs::write(
+            fixture.path().join("sc-lint.toml"),
+            format!(
+                "[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n\"{rule_id}\" = [\"**/*\"]\n"
+            ),
+        )
+        .expect("write analyzer config");
+
+        let error = sc_lint_analyzer_support::load_analyzer_settings(
+            &BOUNDARY_CATALOG,
+            fixture.path(),
+            None,
+            None,
+        )
+        .expect_err("pathless rules cannot accept path exclusions");
+
+        assert_eq!(
+            error.code(),
+            "ANALYZER_CONFIG.PATH_EXCLUSION_UNSUPPORTED",
+            "rule id: {rule_id}"
+        );
+        assert!(error.to_string().contains(rule_id), "{error}");
+        assert!(error.to_string().contains("remove this entry"), "{error}");
+    }
+}
+
+#[test]
+fn per_rule_path_exclusion_drops_cycle_003_finding_by_node_source() {
+    let fixture = TempDir::new().expect("temp root");
+    let relative = "crates/example/src/lib.rs";
+    fs::write(
+        fixture.path().join("sc-lint.toml"),
+        format!(
+            "[tool.sc-lint.analyzers.boundary.exclude_paths_by_rule]\n\"SCB-CYCLE-003\" = [\"{relative}\"]\n"
+        ),
+    )
+    .expect("write analyzer config");
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.path(),
+        None,
+        Some("cycles"),
+    )
+    .expect("cycle 003 supports source path exclusions");
+
+    let node_id = NodeId::new("crate::example::example::display");
+    let finding = Finding {
+        rule_id: RuleId::ScbCycle003,
+        kind: "trait_impl_self_loop".into(),
+        message: "trait self-loop in example".to_owned(),
+        owner_ids: Vec::new(),
+        node_ids: vec![node_id.clone()],
+    };
+    let report = findings_report(1, vec![finding]);
+    let node_paths = BTreeMap::from([(node_id, fixture.path().join(relative))]);
+
+    let filtered = apply_configured_rule_filter(report, &settings, fixture.path(), &node_paths);
+
+    assert!(filtered.findings.is_empty());
+}
+
+#[test]
 fn catalog_lists_every_rule_id() {
     use RuleId::*;
 
@@ -2029,6 +2108,75 @@ fn issue377_semantic_mutations() {
 }
 
 #[test]
+fn external_root_resolves_allowed_dependent_aliases() {
+    let aliased_fixture = |allowed_dependent: &str, depends_on_owner: bool| {
+        let fixture = WorkspaceFixture::new();
+        fixture.write_workspace_root_with_members(&["crates/p", "crates/q", "crates/r"]);
+        fixture.write("crates/p/Cargo.toml", &good_member_manifest("p", ""));
+        let q_manifest = if depends_on_owner {
+            path_dependency_manifest("q-pkg", "p", "../p", "0.1.0")
+        } else {
+            good_member_manifest("q-pkg", "")
+        };
+        fixture.write(
+            "crates/q/Cargo.toml",
+            &(q_manifest + "\n[lib]\nname = \"q_api\"\npath = \"src/lib.rs\"\n"),
+        );
+        fixture.write(
+            "crates/r/Cargo.toml",
+            &(good_member_manifest("r-pkg", "")
+                + "[lib]\nname = \"r_api\"\npath = \"src/lib.rs\"\n"),
+        );
+        fixture.write_source("p", "lib.rs", "pub struct P;");
+        fixture.write_source("q", "lib.rs", "pub struct Q;");
+        fixture.write_source("r", "lib.rs", "pub struct R;");
+        write_policy_record(
+            &fixture,
+            "p/a.toml",
+            "A",
+            &[allowed_dependent],
+            None,
+            "active",
+        );
+        let record = fixture.root().join("boundaries/p/a.toml");
+        let contents = fs::read_to_string(&record).expect("read aliased record");
+        fs::write(
+            &record,
+            contents.replace("roots = [\"run\"]", "roots = [\"q_api::ExternalRoot\"]"),
+        )
+        .expect("write aliased external root");
+        analyze_workspace(&AnalyzeOptions {
+            root: fixture.root().to_path_buf(),
+            format: OutputFormat::Json,
+            rule: Some(RuleFilter::Dependencies),
+        })
+        .expect("aliased external root analyzes")
+    };
+
+    let allowed = aliased_fixture("q_api", true);
+    assert_eq!(
+        allowed.status,
+        ReportStatus::Pass,
+        "{:#?}",
+        allowed.findings
+    );
+    assert!(allowed.findings.is_empty(), "{:#?}", allowed.findings);
+
+    let rejected = aliased_fixture("r_api", false);
+    assert_eq!(
+        rejected.status,
+        ReportStatus::Fail,
+        "{:#?}",
+        rejected.findings
+    );
+    assert_eq!(rejected.findings.len(), 1, "{:#?}", rejected.findings);
+    assert_eq!(rejected.findings[0].kind, "unapproved_composition_root");
+    assert!(rejected.findings[0].message.contains(
+        "external composition root `q_api::ExternalRoot` resolves to `q-pkg`, which is not in dependencies.allowed_dependents"
+    ));
+}
+
+#[test]
 fn external_root_checks_allowed_dependents() {
     let allowed = WorkspaceFixture::new();
     allowed.write_workspace_root_with_members(&["crates/p", "crates/q"]);
@@ -3527,6 +3675,42 @@ fn does_not_flag_comparison_like_trait_impl_self_loop() {
 }
 
 #[test]
+fn does_not_flag_clone_trait_impl_self_loop() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+                pub struct Loop(String);
+
+                impl Loop {
+                    fn duplicate(&self) -> Self {
+                        Self::clone(self)
+                    }
+                }
+
+                impl Clone for Loop {
+                    fn clone(&self) -> Self {
+                        self.duplicate()
+                    }
+                }
+            "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
 fn normalizes_trait_paths_for_exact_policy_matching() {
     let path: syn::Path = syn::parse_quote!(serde::Deserialize<'de>);
     assert_eq!(graph::trait_path_key(&path), "serde::Deserialize");
@@ -3547,6 +3731,10 @@ fn default_rule_config_ignores_common_non_architectural_trait_paths() {
         "FromStr"
     ));
     assert!(analysis::is_non_architectural_trait_impl_self_loop("Parse"));
+    assert!(analysis::is_non_architectural_trait_impl_self_loop(
+        "core::clone::Clone"
+    ));
+    assert!(analysis::is_non_architectural_trait_impl_self_loop("Clone"));
     assert!(!analysis::is_non_architectural_trait_impl_self_loop(
         "one::Display"
     ));

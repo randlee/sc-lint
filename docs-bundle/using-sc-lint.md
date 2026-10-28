@@ -137,6 +137,17 @@ download files, or write. If the tools object declares tools but the managed
 Run ordinary `just setup` to provision the managed helper and declared tools.
 See [troubleshooting](./troubleshooting.md) for recovery.
 
+The supported Python invocations for direct manifest, cargo-shear, and spelling
+checks use the managed environment:
+
+```sh
+.sc-lint/venv/bin/python -m sc_lint.lint_manifests
+.sc-lint/venv/bin/python -m sc_lint.lint_cargo_shear
+.sc-lint/venv/bin/python -m sc_lint.lint_codespell
+```
+
+The kit does not add `setup.pre` or a `runner.python` configuration hook.
+
 ## Test selectors
 
 `[tool.sc-lint.test]` is either the `[[tool.sc-lint.test]]` row list (every row

@@ -11,6 +11,7 @@ const IDS: &[CatalogRuleId] = &[CatalogRuleId::new("T-001"), CatalogRuleId::new(
 const CATALOG: RuleCatalog = RuleCatalog {
     analyzer: AnalyzerName::new("demo"),
     rules: IDS,
+    path_addressable_rules: IDS,
     families: &[],
     default_fail: &[],
     own_keys: &[],

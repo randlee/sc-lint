@@ -1,6 +1,6 @@
 # ADR-020 — Phase L decisions for the atm-core findings
 
-Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification: Accepted — Rand, 2026-10-27, together with REQ-CLI-025.
+Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025.
 
 Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
 REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
@@ -19,7 +19,9 @@ make mid-sprint. Approval of this record gates dispatch only.
    `#[cfg(unix)]`, `#[cfg(target_os = "linux"|"macos")]` or `#[cfg(not(windows))]`
    is a structural parity question exactly as `#[cfg(unix)]` is: PORT-006 leaf
    findings are suppressed inside it. PORT-008 does not report a read of
-   `USER` when the same enclosing function also reads `USERNAME`.
+   `USER` when the same enclosing function also reads `USERNAME`. The gate
+   scope is limited to these attribute forms: other `target_os` values and
+   statement-level `#[cfg]` attributes are not honored.
 2. **PORT-007 (#192).** Findings for the exact verbatim and device prefixes
    `\\?\` and `\\.\` are not reported. A reviewed-exception allowlist is not
    added in phase L.
@@ -66,7 +68,9 @@ make mid-sprint. Approval of this record gates dispatch only.
    templates that carry front matter. Templates rendered by `install.py`'s own
    substitution use `.tmpl`.
 9. **#198 (setup hook).** Won't-do. ADR-016's hook restriction is unchanged;
-   consumers use `sc_lint.setup_tools`.
+   `setup.pre` and `runner.python` are not added. Consumers use
+   `sc_lint.setup_tools`; direct manifest, shear, and spell checks use the
+   managed invocation `.sc-lint/venv/bin/python -m sc_lint.<module>`.
 
 10. **Stable codes (l-4, l-6, l-8).** New codes use the existing error envelope
     (`kind`, `code`, `cause`, `recovery`; REQ-CLI-005C) and are recorded in the
@@ -105,11 +109,14 @@ make mid-sprint. Approval of this record gates dispatch only.
     `manifest_version_field`, `installer_url_field`; `file`,
     `required_fragments`), which match atm-core's `.just/lint-config.toml`.
     A missing `Cargo.lock` is reported as skipped, not as a failure. These key
-    names are chosen here because no earlier record defines them.
+    names are chosen here because no earlier record defines them. sc-lint owns
+    the workspace, crate, lockfile, and Python package-version checks; it does
+    not check sibling dependency version pins in `pyproject.toml`. atm-core
+    keeps that dependency-pin check in its own tooling.
 
 ## Plan-review clarifications (Accepted — Rand, 2026-10-27)
 
-These clarifications were written by the sprint design fixes for plan review round 2, after the decisions above were approved on 2026-10-27. They narrow or make precise the approved decisions and change none of them, except where a clarification says otherwise. Sprints l-1 to l-9: Accepted — Rand, 2026-10-27 ("approve the adr"). Sprint l-10: Accepted — Rand, 2026-10-27, together with REQ-CLI-025. Numbering is per sprint.
+These clarifications were written by the sprint design fixes for plan review round 2, after the decisions above were approved on 2026-10-27. They narrow or make precise the approved decisions and change none of them, except where a clarification says otherwise. Sprints l-1 to l-9: Accepted — Rand, 2026-10-27 ("approve the adr"). Sprint l-10: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025. Numbering is per sprint.
 
 ### Sprint l-1
 Clarifications to decisions 1 to 3 (recorded by `lint-l-1`):

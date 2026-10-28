@@ -27,7 +27,7 @@ exclusion and records representative classifications.
 | Fixture | Reduced from | Classification |
 |---|---|---|
 | `unix_helper_in_paired_file` | `crates/atm-http-runtime/src/unix_socket.rs` | Private Unix helper in a configured adapter pair; no PORT-010 finding after L1-4. |
-| `crate_root_main` | `crates/atm/src/main.rs` | Crate-root `main.rs` function with `cfg(unix)` and `cfg(not(unix))` siblings; remains reported. |
+| `crate_root_main` | `crates/atm/src/main.rs` | Crate-root `main.rs` function with `cfg(unix)` and `cfg(not(unix))` siblings; remains reported as a known limitation tracked in issue `lint-phase-l.3`. |
 | `unpaired_pub_item` | `crates/atm-core/src/descriptor_limit.rs` | Unpaired public Unix item; PORT-010 true positive remains. |
 
 The upstream exclusion was rule-scoped (`PORT-010`); no analyzer-wide

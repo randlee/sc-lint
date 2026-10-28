@@ -52,6 +52,8 @@ impl CatalogRuleId {
 pub struct RuleCatalog {
     pub analyzer: AnalyzerName,
     pub rules: &'static [CatalogRuleId],
+    /// Rules whose findings can be associated with source paths for exclusions.
+    pub path_addressable_rules: &'static [CatalogRuleId],
     pub families: &'static [(&'static str, &'static [CatalogRuleId])],
     pub default_fail: &'static [CatalogRuleId],
     pub own_keys: &'static [&'static str],
@@ -109,6 +111,14 @@ pub enum AnalyzerConfigError {
         key: &'static str,
         rule: String,
     },
+    #[error(
+        "{analyzer}: exclude_paths_by_rule for `{rule}` cannot match findings because they have no source path; {recovery}"
+    )]
+    UnsupportedPathExclusion {
+        analyzer: &'static str,
+        rule: String,
+        recovery: &'static str,
+    },
 }
 
 impl AnalyzerConfigError {
@@ -126,6 +136,7 @@ impl AnalyzerConfigError {
             Self::UnknownKey { .. } => "ANALYZER_CONFIG.UNKNOWN_KEY",
             Self::WrongType { .. } => "ANALYZER_CONFIG.WRONG_TYPE",
             Self::UnknownRule { .. } => "ANALYZER_CONFIG.UNKNOWN_RULE",
+            Self::UnsupportedPathExclusion { .. } => "ANALYZER_CONFIG.PATH_EXCLUSION_UNSUPPORTED",
         }
     }
 }
@@ -339,6 +350,13 @@ fn read_rule_path_exclusions(
                     rule: rule.clone(),
                 });
             };
+            if !catalog.path_addressable_rules.contains(&rule_id) {
+                return Err(AnalyzerConfigError::UnsupportedPathExclusion {
+                    analyzer: catalog.analyzer.as_str(),
+                    rule: rule.clone(),
+                    recovery: "remove this entry or choose a rule whose findings have source paths",
+                });
+            }
             let key = format!("exclude_paths_by_rule.{rule}");
             let patterns = read_string_values(Some(patterns), &key, catalog.analyzer.as_str())?
                 .unwrap_or_default();
