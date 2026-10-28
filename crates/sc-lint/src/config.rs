@@ -667,6 +667,9 @@ fn load_consumer_config_file(path: &Path) -> Result<RepoConfigFile, CliError> {
         ));
     }
     parse_repo_config(path).map_err(|error| {
+        if error.code().starts_with("config.") {
+            return error;
+        }
         compatibility_config_error(
             CompatibilityErrorCode::ConfigMalformed,
             format!("failed to parse sc-lint configuration `{}`", path.display()),
@@ -696,11 +699,10 @@ fn test_selectors_from_file(
                 row.clone()
                     .try_into::<ConsumerProfileStepFile>()
                     .map_err(|error| {
-                        compatibility_config_error(
-                            CompatibilityErrorCode::ConfigMalformed,
-                            format!("failed to parse sc-lint configuration `{}`", path.display()),
-                            Some(path),
-                            Some(error.to_string()),
+                        consumer_profile_error(
+                            path,
+                            ConsumerProfile::Test.as_str(),
+                            format!("failed to parse test profile row: {error}"),
                         )
                     })
             })

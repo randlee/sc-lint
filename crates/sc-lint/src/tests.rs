@@ -730,6 +730,10 @@ fn consumer_missing_backend_is_a_structured_recovery_error() {
     assert!(!error.to_string().to_ascii_lowercase().contains("traceback"));
 }
 
+/// Explicit opt-out for the wheel-backed consumer fixture below.
+#[cfg(unix)]
+const SKIP_WHEEL_FIXTURE_ENV: &str = "SC_LINT_SKIP_WHEEL_FIXTURE";
+
 #[cfg(unix)]
 #[test]
 #[serial]
@@ -747,12 +751,16 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
     .expect("generate fixture");
     // The bootstrap provisions `.sc-lint/venv` from PyPI; point it at the
     // wheels `just setup` built so the fixture stays offline.
+    // `just test` builds them first (`_source-venv`); a bare `cargo test` must
+    // build them too or opt out explicitly, never skip silently.
     let wheel_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.sc-lint/wheels");
     if !wheel_dir.is_dir() {
-        eprintln!(
-            "skipping: run `just setup` to build {}",
+        assert!(
+            std::env::var_os(SKIP_WHEEL_FIXTURE_ENV).is_some(),
+            "missing {}: run `just setup` (or `just test`) to build the wheels, or set {SKIP_WHEEL_FIXTURE_ENV}=1 to skip this fixture explicitly",
             wheel_dir.display()
         );
+        eprintln!("skipping: {SKIP_WHEEL_FIXTURE_ENV} is set");
         return;
     }
     let bin_dir = root.join("bin");
@@ -6103,40 +6111,26 @@ fn human_output_fields_present_in_json() {
     assert_contract_matrix_covered(&commands, "REQ-CLI-005D");
 }
 
-/// Every `CommandId`. `ordinal` has no wildcard arm, so a new variant does not
-/// compile until it is given an ordinal, and the ordinal check below fails until
-/// it is listed here and given a REQ-CLI-005D row.
-fn every_command_id() -> Vec<crate::command::CommandId> {
-    use crate::command::CommandId::*;
-    fn ordinal(id: crate::command::CommandId) -> usize {
-        match id {
-            Ci => 0,
-            CheckNative => 1,
-            CheckXwin => 2,
-            ClippyNative => 3,
-            ClippyXwin => 4,
-            CompatibilityCheck => 5,
-            Docs => 6,
-            Init => 7,
-            ConsumerTest => 8,
-            Setup => 9,
-            Upgrade => 10,
-            LintCi => 11,
-            ConsumerLintCi => 12,
-            LintFast => 13,
-            LintFull => 14,
-            LintFunctionLength => 15,
-            LintIdentityLiterals => 16,
-            LintLineCounts => 17,
-            LintScBoundary => 18,
-            LintScPortability => 19,
-            LintScRuntime => 20,
-            Version => 21,
-            ViewFindings => 22,
-            ViewGraph => 23,
+/// Lists every `CommandId` from one token list that also expands to a
+/// wildcard-free `match`: a variant missing from the list leaves the match
+/// non-exhaustive, so the test crate does not compile until the variant is
+/// listed here (and so given a REQ-CLI-005D row). A duplicate entry fails the
+/// check below.
+macro_rules! all_command_ids {
+    ($($variant:ident),+ $(,)?) => {{
+        use crate::command::CommandId;
+        #[allow(dead_code, reason = "exists only to force an exhaustive match")]
+        fn exhaustive(id: CommandId) {
+            match id {
+                $(CommandId::$variant => {})+
+            }
         }
-    }
-    let ids = vec![
+        vec![$(CommandId::$variant),+]
+    }};
+}
+
+fn every_command_id() -> Vec<crate::command::CommandId> {
+    let ids = all_command_ids![
         Ci,
         CheckNative,
         CheckXwin,
@@ -6162,12 +6156,8 @@ fn every_command_id() -> Vec<crate::command::CommandId> {
         ViewFindings,
         ViewGraph,
     ];
-    let mut ordinals = ids.iter().map(|id| ordinal(*id)).collect::<Vec<_>>();
-    ordinals.sort_unstable();
-    assert_eq!(
-        ordinals,
-        (0..ids.len()).collect::<Vec<_>>(),
-        "every CommandId listed once"
-    );
+    for (index, id) in ids.iter().enumerate() {
+        assert!(!ids[..index].contains(id), "{id:?} listed twice");
+    }
     ids
 }

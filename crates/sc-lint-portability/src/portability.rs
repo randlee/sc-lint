@@ -655,7 +655,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
                 "PORT-006 hardcoded Unix-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), std::env::temp_dir(), or a platform-gated path abstraction"
             ),
             RuleId::Port007 => format!(
-                "PORT-007 hardcoded Windows-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction"
+                "PORT-007 hardcoded Windows-only absolute path literal `{value}` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction (exempt: literals under a Windows-only cfg such as #[cfg(windows)], and `\\\\?\\` verbatim or `\\\\.\\` device namespace prefixes)"
             ),
             _ => return,
         };

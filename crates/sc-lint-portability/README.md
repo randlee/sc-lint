@@ -115,7 +115,7 @@ PORT-006 hardcoded Unix-only absolute path literal `/var/run/sc-lint` in product
 Production code with a hardcoded Windows runtime path is also flagged:
 
 ```text
-PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction
+PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction (exempt: literals under a Windows-only cfg such as #[cfg(windows)], and `\\?\` verbatim or `\\.\` device namespace prefixes)
 ```
 
 Production code with Unix-centric environment lookups is also flagged:
@@ -183,7 +183,7 @@ items, and separately Unix-gated public items remain subject to parity checks.
 
 Known limitation: a crate-root `main.rs` with a `#[cfg(unix)]` function and a
 `#[cfg(not(unix))]` sibling is still reported by PORT-010. This behavior is
-tracked for follow-up in issue `lint-phase-l.3`.
+tracked for follow-up in GitHub issue #720.
 
 Pass `--rule-filter PORT-001,PORT-006` to select rules. When provided, the
 filter determines the selected rules instead of `exclude_rules`. Invalid

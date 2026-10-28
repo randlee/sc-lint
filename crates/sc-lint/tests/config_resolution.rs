@@ -295,6 +295,38 @@ fn table_falls_back_per_table() {
 }
 
 #[test]
+fn rust_analyzers_discover_split_file_config_through_cli_dispatch() {
+    // Both Rust analyzer dispatch paths must pass no path when --config was
+    // omitted. The disabled analyzer tables live only in .just; without the
+    // fallback each analyzer tries to load this deliberately invalid workspace.
+    let sandbox = Sandbox::new();
+    sandbox.write("sc-lint.toml", KIT_SC_LINT_TOML);
+    sandbox.write("Cargo.toml", "this is deliberately not a Cargo manifest\n");
+    sandbox.mkdir("boundaries");
+    sandbox.write(
+        ".just/lint-config.toml",
+        "[tool.sc-lint.analyzers.boundary]\nenabled = false\n\n[tool.sc-lint.analyzers.portability]\nenabled = false\n",
+    );
+
+    for target in ["sc-boundary", "sc-portability"] {
+        let output = sandbox.run(&sandbox.path(""), &["lint", target]);
+        let payload = success_json(&output);
+        assert_eq!(
+            payload["data"]["status"],
+            "pass",
+            "{target}: {}",
+            context(&output)
+        );
+        assert_eq!(
+            payload["data"]["findings"],
+            json!([]),
+            "{target}: {}",
+            context(&output)
+        );
+    }
+}
+
+#[test]
 fn sc_lint_toml_table_wins() {
     let sandbox = Sandbox::fixture();
     sandbox.write("sc-lint.toml", LINE_COUNTS_300);
@@ -359,4 +391,36 @@ fn unknown_adapter_code_stays_in_details() {
     assert_eq!(error["message"], "stub failure");
     assert_eq!(error["details"]["code"], "config.unknown_code");
     assert!(error.get("cause").is_none(), "unexpected cause: {error}");
+}
+
+#[test]
+fn consumer_commands_preserve_typed_config_errors_and_row_recovery() {
+    let commands: [&[&str]; 2] = [&["test"], &["lint", "ci", "--consumer"]];
+    for args in commands {
+        let unknown_table = Sandbox::new();
+        unknown_table.write("sc-lint.toml", "[setup]\ncommand = \"nope\"\n");
+        let error = config_error(&unknown_table.run(&unknown_table.path(""), args));
+        assert_eq!(error["code"], "config.unknown_table", "{args:?}");
+        assert!(
+            error["suggested_action"]
+                .as_str()
+                .is_some_and(|action| !action.contains("just setup")),
+            "{args:?}: {error}"
+        );
+
+        let malformed_row = Sandbox::new();
+        malformed_row.write(
+            "sc-lint.toml",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"lint\"\ncommand = [\"cargo\", \"check\"]\n\n[[tool.sc-lint.test]]\nname = 5\ncommand = [\"cargo\", \"test\"]\n",
+        );
+        let error = config_error(&malformed_row.run(&malformed_row.path(""), args));
+        assert_eq!(error["code"], "CLI.SC_LINT_CONFIG_MALFORMED", "{args:?}");
+        assert_eq!(error["details"]["profile"], "test", "{args:?}");
+        assert!(
+            error["suggested_action"]
+                .as_str()
+                .is_some_and(|action| action.contains("test` selectors")),
+            "{args:?}: {error}"
+        );
+    }
 }
