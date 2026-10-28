@@ -12,6 +12,8 @@ from typing import Callable, TextIO
 
 LOG_DIR = Path(".just/logs")
 CONFIG_PATH = Path(".just/lint-config.toml")
+PRIMARY_CONFIG_PATH = Path("sc-lint.toml")
+CONFIG_TABLE_MISSING = "config.table_missing"
 TIMESTAMP_FORMAT = "%Y%m%d%H%M%S"
 LINT_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 DIRECTIVE_RE = re.compile(
@@ -149,11 +151,71 @@ def write_console_output(stream: TextIO, text: str) -> None:
 
 
 def load_lint_config(repo_root: Path, config_path: str | None = None) -> dict:
+    """deprecated: use resolve_table."""
     candidate = Path(config_path) if config_path is not None else CONFIG_PATH
     config_path = candidate if candidate.is_absolute() else repo_root / candidate
     if not config_path.exists():
         return {}
     return tomllib.loads(config_path.read_text(encoding="utf-8"))
+
+
+class ConfigError(Exception):
+    def __init__(self, *, code: str, table: str, searched: list[str]) -> None:
+        self.code = code
+        self.table = table
+        self.searched = searched
+        self.message = f"configuration table [{table}] not found in any of: {', '.join(searched)}"
+        super().__init__(self.message)
+
+
+def _config_display(path: Path, root: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def resolve_table(name: str, explicit: Path | None, root: Path) -> tuple[dict, Path]:
+    from sc_lint.python_adapter import AdapterError
+
+    explicit_path = None if explicit is None else (explicit if explicit.is_absolute() else root / explicit)
+    if explicit_path is not None and not explicit_path.is_file():
+        raise AdapterError("config", f"explicit config file not found: {_config_display(explicit_path, root)}")
+    candidates = [path for path in [explicit_path, root / PRIMARY_CONFIG_PATH, root / CONFIG_PATH] if path]
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for path in candidates:
+        resolved = path.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            unique.append(path)
+    searched = [_config_display(path, root) for path in unique]
+    for path in unique:
+        if not path.is_file():
+            continue
+        display = _config_display(path, root)
+        try:
+            config = tomllib.loads(path.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            raise AdapterError("config", f"failed to parse {display}: {error}") from error
+        if name not in config:
+            continue
+        table = config[name]
+        if not isinstance(table, dict):
+            raise AdapterError("config", f"[{name}] must be a TOML table")
+        return table, path
+    raise ConfigError(code=CONFIG_TABLE_MISSING, table=name, searched=searched)
+
+
+def table_missing_error(error: ConfigError):
+    from sc_lint.python_adapter import AdapterError
+
+    return AdapterError(
+        "config", error.message,
+        details={"code": CONFIG_TABLE_MISSING, "table": error.table, "searched": error.searched},
+        suggested_action="add the table to `sc-lint.toml` or `.just/lint-config.toml`",
+    )
 
 
 def workspace_manifest_paths(repo_root: Path) -> list[Path]:

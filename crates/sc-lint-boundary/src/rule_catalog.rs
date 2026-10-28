@@ -185,11 +185,24 @@ pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
     rule(RuleId::ScbManifest006),
 ];
 
+/// Rules with findings that can be matched to repository source paths.
+pub const PATH_ADDRESSABLE_IDS: &[CatalogRuleId] = &[
+    rule(RuleId::ScbCycle002),
+    rule(RuleId::ScbCycle003),
+    rule(RuleId::ScbManifest001),
+    rule(RuleId::ScbManifest002),
+    rule(RuleId::ScbManifest003),
+    rule(RuleId::ScbManifest004),
+    rule(RuleId::ScbManifest005),
+    rule(RuleId::ScbManifest006),
+];
+
 /// Families keep today's CLI spellings (kebab-case, as clap rendered the old
 /// `RuleFilterArg`); members are what each `RuleFilter` arm runs.
 pub const BOUNDARY_CATALOG: RuleCatalog = RuleCatalog {
     analyzer: AnalyzerName::new("boundary"),
     rules: ALL_BOUNDARY_IDS,
+    path_addressable_rules: PATH_ADDRESSABLE_IDS,
     families: &[
         (
             "cycles",

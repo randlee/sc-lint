@@ -30,7 +30,34 @@ use serde_json::json;
 
 use crate::CliError;
 use crate::config::CONSUMER_SELECTOR_ALL;
+use crate::scheduler::ProfileCode;
 use crate::workflow::WINDOWS_XWIN_TARGET;
+
+/// Decodes an optional `after_all` value of a lint or test row.
+///
+/// # Errors
+/// Returns `profile.invalid_after_all` for a non-boolean value.
+#[expect(
+    clippy::result_large_err,
+    reason = "Config validation stays within the top-level CliError contract."
+)]
+pub(crate) fn decode_after_all(
+    value: Option<&toml::Value>,
+    step: &str,
+    config_path: &Path,
+) -> Result<bool, CliError> {
+    match value {
+        None => Ok(false),
+        Some(toml::Value::Boolean(after_all)) => Ok(*after_all),
+        Some(_) => Err(ProfileCode::InvalidAfterAll.config_error(
+            format!(
+                "step '{step}' in {} declares a non-boolean after_all",
+                config_path.display()
+            ),
+            config_path,
+        )),
+    }
+}
 
 /// Stable top-level code for every invalid consumer profile declaration.
 pub const PROFILE_PLAN_ERROR_CODE: &str = "CLI.SC_LINT_PROFILE_CONFIG_INVALID";
@@ -346,6 +373,7 @@ pub struct PlannedStep {
     platform: Option<Platform>,
     target: Option<Target>,
     cargo_verb: Option<CargoVerb>,
+    after_all: bool,
 }
 
 impl PlannedStep {
@@ -384,6 +412,11 @@ impl PlannedStep {
     )]
     pub const fn cargo_verb(&self) -> Option<CargoVerb> {
         self.cargo_verb
+    }
+
+    /// Whether the step starts only after every other step has finished.
+    pub const fn after_all(&self) -> bool {
+        self.after_all
     }
 
     /// Whether this step runs through the `cargo xwin` subcommand.
@@ -504,7 +537,7 @@ pub(crate) fn validate_lint_step(step: &ConsumerProfileStep) -> Result<(), Profi
 ///
 /// # Errors
 /// Returns `UNKNOWN_STEP_FIELD` for any key outside `name`, `command`,
-/// `platform`, `target`, or a `platform` that is not `linux|macos|windows`;
+/// `platform`, `target`, `after_all` (decoded by the loader), or a `platform` that is not `linux|macos|windows`;
 /// returns `TARGET_OS_MISMATCH` for a malformed `target` triple.
 pub(crate) fn decode_lint_step_fields(
     step: &str,
@@ -518,7 +551,7 @@ pub(crate) fn decode_lint_step_fields(
             Some(step),
             Some(key),
             format!("lint step `{step}` has unknown field `{key}`"),
-            "Lint steps accept only `name`, `command`, `platform` and `target`.",
+            "Lint steps accept only `name`, `command`, `platform`, `target` and `after_all`.",
         ));
     }
     let platform = platform
@@ -831,6 +864,7 @@ fn planned(
         platform: step.platform(),
         target: step.target().cloned(),
         cargo_verb: CargoVerb::from_argv(step.command()),
+        after_all: step.after_all(),
     })
 }
 
@@ -880,6 +914,7 @@ pub(crate) struct ConsumerProfileStep {
     command: Vec<String>,
     platform: Option<Platform>,
     target: Option<Target>,
+    after_all: bool,
 }
 
 impl ConsumerProfileStep {
@@ -896,7 +931,18 @@ impl ConsumerProfileStep {
             command,
             platform,
             target,
+            after_all: false,
         }
+    }
+
+    /// Sets the decoded `after_all` flag of the row.
+    pub(crate) const fn with_after_all(mut self, after_all: bool) -> Self {
+        self.after_all = after_all;
+        self
+    }
+
+    pub(crate) const fn after_all(&self) -> bool {
+        self.after_all
     }
 
     pub(crate) fn name(&self) -> &str {

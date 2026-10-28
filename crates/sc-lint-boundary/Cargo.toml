@@ -21,6 +21,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow.workspace = true
 cargo_metadata.workspace = true
+dunce = "1"
 serde.workspace = true
 serde_json.workspace = true
 sc-lint-directives.workspace = true

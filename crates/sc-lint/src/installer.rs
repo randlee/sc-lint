@@ -35,12 +35,12 @@ mod probe;
 
 use activation::*;
 use probe::*;
-pub(crate) use probe::{probe_backend_version, probe_version};
+pub(crate) use probe::{ProbeFailure, probe_backend_version, probe_version, run_version_command};
 
 const DEFAULT_RELEASE_BASE_URL: &str = "https://github.com/randlee/sc-lint/releases/download";
 const RELEASE_BASE_URL_ENV: &str = "SC_LINT_RELEASE_BASE_URL";
 const INSTALL_DIR_ENV: &str = "SC_LINT_INSTALL_DIR";
-const BACKEND_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
+pub(crate) const BACKEND_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const BACKEND_PROBE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const BACKEND_PROBE_OUTPUT_LIMIT: usize = 64 * 1024;
 #[cfg(test)]
@@ -2264,8 +2264,8 @@ mod tests {
         child_pid_file: &Path,
         ready_fifo: &Path,
     ) -> Option<String> {
-        let (mut child, reader) = spawn_backend_probe(binary, expected_name, &["--help"], "--help")
-            .expect("start backend probe");
+        let (mut child, reader) =
+            spawn_probe(binary, expected_name, &["--help"], "--help").expect("start backend probe");
         let process_id = child.id();
         fs::write(child_pid_file, process_id.to_string()).expect("record probe process group");
 

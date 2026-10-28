@@ -123,7 +123,38 @@ impl<'ast> Visit<'ast> for ReferenceCollector {
         syn::visit::visit_expr_path(self, expr_path);
     }
 
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        if call.turbofish.is_none()
+            && is_self_receiver(&call.receiver)
+            && let Some(owner_name) = &self.owner_name
+        {
+            self.references.insert(CollectedReference {
+                path: format!("{owner_name}::{}", call.method),
+                kind: ReferenceKind::Expr,
+            });
+        }
+        syn::visit::visit_expr_method_call(self, call);
+    }
+
     fn visit_receiver(&mut self, _receiver: &'ast Receiver) {}
+}
+
+/// True when `expr` is exactly `self`, looking through parentheses, invisible
+/// groups, `&`/`&mut` and `*`. Fields, locals and call results are not `self`.
+fn is_self_receiver(expr: &syn::Expr) -> bool {
+    let mut current = expr;
+    loop {
+        current = match current {
+            syn::Expr::Paren(paren) => &paren.expr,
+            syn::Expr::Group(group) => &group.expr,
+            syn::Expr::Reference(reference) => &reference.expr,
+            syn::Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Deref(_)) => &unary.expr,
+            syn::Expr::Path(path) => {
+                return path.qself.is_none() && path.path.is_ident("self");
+            }
+            _ => return false,
+        };
+    }
 }
 
 pub(super) fn collect_references_with(

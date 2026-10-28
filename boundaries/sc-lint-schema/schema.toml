@@ -13,7 +13,7 @@ visibility = "public"
 constructor = "none"
 
 [composition]
-roots = ["OutputFormat", "NodeId", "OwnerId", "FindingsReport", "ReportStatus", "Finding"]
+roots = ["OutputFormat", "NodeId", "OwnerId", "FindingsReport", "ReportStatus", "Finding", "PayloadDrift"]
 
 [dependencies]
 allowed_dependents = ["sc-lint", "sc-lint-analyzer-support", "sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]
