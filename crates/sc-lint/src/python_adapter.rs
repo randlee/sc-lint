@@ -17,7 +17,7 @@ use crate::error::ErrorCode;
 pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
 pub(crate) const BACKEND_PAYLOAD_DRIFT_CODE: &str = "backend_payload_drift";
 pub(crate) const BACKEND_PAYLOAD_DRIFT_RECOVERY: &str =
-    "upgrade or reinstall the wheel so the payload matches the envelope schema";
+    "upgrade or reinstall the analyzer backend so its payload matches the published schema";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PythonTool {

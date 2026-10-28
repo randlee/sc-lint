@@ -13,7 +13,9 @@ types used by analyzer backends and normalized by the top-level CLI.
 ## Boundary Rules
 
 - Shared types carry data and do not implement analysis or policy.
-- The crate may hold pure shape validation of the transport payloads it defines (`validate_adapter_payload`); it still performs no analysis and decides no policy.
+- The crate may hold pure shape validation of the transport payloads it defines
+  (`validate_adapter_payload` and `validate_analyzer_report`); it still
+  performs no analysis and decides no policy.
 - Backend-native machine contracts are normalized by the CLI.
 - This crate remains below the analyzer and CLI layers in the dependency graph.
 

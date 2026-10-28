@@ -1692,6 +1692,9 @@ fn lint_mocked_analyzer_fail_outcome(target: &str, tool: &str) -> (i32, Value) {
         tool,
         &json!({
             "tool": tool,
+            "version": "0.8.0",
+            "schema_version": "0.1.0",
+            "scanned_crates": 1,
             "findings": [],
             "status": crate::consts::STATUS_FAIL,
         }),
@@ -1908,6 +1911,9 @@ fn lint_sc_portability_normalizes_backend_success_through_the_top_level_envelope
         crate::consts::TOOL_PORTABILITY,
         &json!({
             "tool": crate::consts::TOOL_PORTABILITY,
+            "version": "0.8.0",
+            "schema_version": "0.1.0",
+            "scanned_crates": 1,
             "findings": [],
             "status": "pass",
         }),
@@ -1975,6 +1981,9 @@ fn lint_sc_runtime_normalizes_backend_success_through_the_top_level_envelope() {
         crate::consts::TOOL_RUNTIME,
         &json!({
             "tool": crate::consts::TOOL_RUNTIME,
+            "version": "0.8.0",
+            "schema_version": "0.1.0",
+            "scanned_crates": 1,
             "findings": [],
             "status": "pass",
         }),
@@ -2023,6 +2032,34 @@ fn malformed_backend_json_maps_to_backend_protocol_error() {
     assert_eq!(error.code(), "CLI.BACKEND_PROTOCOL_ERROR");
     assert!(error.cause.is_some());
     assert!(std::error::Error::source(&error).is_some());
+}
+
+#[test]
+fn analyzer_schema_drift_maps_to_structured_backend_protocol_error() {
+    let raw = r#"{
+        "tool":"sc-lint-boundary",
+        "version":"0.8.0",
+        "schema_version":"0.2.0",
+        "status":"pass",
+        "scanned_crates":0,
+        "findings":[{"rule_id":"BOUNDARY-001"}]
+    }"#;
+    let error = crate::dispatch::normalize_backend_json(crate::consts::TOOL_BOUNDARY, raw)
+        .expect_err("schema drift must be rejected");
+
+    assert_eq!(error.kind, CliErrorKind::BackendProtocol);
+    assert_eq!(error.code(), "backend_payload_drift");
+    assert!(
+        error
+            .cause
+            .as_deref()
+            .is_some_and(|cause| cause.contains("/findings/0"))
+    );
+    assert!(
+        error.details["key_path"]
+            .as_str()
+            .is_some_and(|path| path.starts_with("/findings/0"))
+    );
 }
 
 #[test]

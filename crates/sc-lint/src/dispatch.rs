@@ -17,6 +17,8 @@ use crate::command::CommandSuccess;
 use crate::command::DispatchTelemetry;
 use crate::config::LoadedConfig;
 use crate::consts;
+use crate::python_adapter::BACKEND_PAYLOAD_DRIFT_CODE;
+use crate::python_adapter::BACKEND_PAYLOAD_DRIFT_RECOVERY;
 
 #[derive(Debug)]
 enum BoundaryDispatchError {
@@ -163,9 +165,20 @@ pub fn run_sc_runtime(
     reason = "Backend protocol violations must remain in the shared top-level CliError contract."
 )]
 pub fn normalize_backend_json(tool: &str, raw: &str) -> Result<Value, CliError> {
-    serde_json::from_str(raw)
+    let value: Value = serde_json::from_str(raw)
         .map_err(BoundaryDispatchError::Normalize)
-        .map_err(|error| error.into_cli_error(tool, None))
+        .map_err(|error| error.into_cli_error(tool, None))?;
+    if let Err(drift) = sc_lint_schema::validate_analyzer_report(&value) {
+        return Err(CliError::backend_protocol(format!(
+            "{tool} returned a report that drifted from the published analyzer schema"
+        ))
+        .with_code(BACKEND_PAYLOAD_DRIFT_CODE)
+        .with_cause(drift.to_string())
+        .with_suggested_action(BACKEND_PAYLOAD_DRIFT_RECOVERY)
+        .with_detail(consts::FIELD_TOOL, json!(tool))
+        .with_detail("key_path", json!(drift.instance_path)));
+    }
+    Ok(value)
 }
 
 #[expect(

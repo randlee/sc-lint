@@ -289,7 +289,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
 | `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
 | `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
-| `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the wheel so the payload matches the envelope schema |
+| `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the analyzer backend so its payload matches the published schema |
 
 Codes are typed constants in their owning module (`ConfigCode` in `config.rs`; `CONFIG_TABLE_MISSING` in `lint_common.py`; adapter payload drift in `python_adapter.rs`) and cause text interpolates names.
 
@@ -533,6 +533,14 @@ If the delegated binary:
 - `sc-lint lint sc-boundary|sc-portability|sc-runtime` forwards `--config` and
   `--rule-filter` unchanged; a backend exit 2 becomes a usage error and exit 3
   a config error.
+
+### Rust analyzer backend reports
+
+The Rust analyzer backends emit `FindingsReport` JSON. The top-level CLI
+validates each report against the published
+[`analyzer-report-v1` JSON Schema](../../crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
+before normalization. A shape mismatch fails as `backend_protocol` with code
+`backend_payload_drift` and the failing instance path in `key_path`.
 
 ### Python adapter backend
 
