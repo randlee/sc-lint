@@ -10,9 +10,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
+use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time::Duration;
-use std::time::Instant;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -25,6 +25,10 @@ use tempfile::TempDir;
 const EXIT_CAPABILITY: i32 = 4;
 // Mirrors `EXIT_BACKEND_FAILURE` in crates/sc-lint/src/consts.rs.
 const EXIT_BACKEND_FAILURE: i32 = 5;
+// Failure ceilings only: a healthy child prints its readiness line before it
+// waits, so these never bound a passing run. They turn a hang into a named error.
+const READY_LINE_DEADLINE: Duration = Duration::from_secs(60);
+const OUTPUT_DRAIN_DEADLINE: Duration = Duration::from_secs(10);
 
 fn profile_fixture(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -137,52 +141,32 @@ fn run_command_with_timeout(command: &mut Command, timeout: Duration) -> io::Res
         .spawn()?;
     let stdout = child.stdout.take().expect("piped stdout");
     let stderr = child.stderr.take().expect("piped stderr");
-    let stdout_reader = thread::spawn(move || read_child_output(stdout));
-    let stderr_reader = thread::spawn(move || read_child_output(stderr));
-    let started = Instant::now();
-
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                return Ok(Output {
-                    status,
-                    stdout: join_child_output(stdout_reader)?,
-                    stderr: join_child_output(stderr_reader)?,
-                });
-            }
-            Ok(None) => {}
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let stdout = join_child_output(stdout_reader).unwrap_or_default();
-                let stderr = join_child_output(stderr_reader).unwrap_or_default();
-                return Err(io::Error::new(
-                    error.kind(),
-                    format!(
-                        "waiting for command {display} failed: {error}; stdout: {}; stderr: {}",
-                        String::from_utf8_lossy(&stdout),
-                        String::from_utf8_lossy(&stderr)
-                    ),
-                ));
-            }
-        }
-
-        if started.elapsed() >= timeout {
-            let _ = child.kill();
-            let _status = child.wait()?;
-            let stdout = join_child_output(stdout_reader)?;
-            let stderr = join_child_output(stderr_reader)?;
-            return Err(io::Error::new(
+    let (stdout_tx, stdout_rx) = std::sync::mpsc::channel();
+    let (stderr_tx, stderr_rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        let _ = stdout_tx.send(read_child_output(stdout));
+    });
+    thread::spawn(move || {
+        let _ = stderr_tx.send(read_child_output(stderr));
+    });
+    match wait_or_kill(child, timeout)? {
+        Waited::Exited(status) => Ok(Output {
+            status,
+            stdout: receive_child_output(&stdout_rx, &display, "stdout")?,
+            stderr: receive_child_output(&stderr_rx, &display, "stderr")?,
+        }),
+        Waited::TimedOut => {
+            let stdout = receive_child_output(&stdout_rx, &display, "stdout")?;
+            let stderr = receive_child_output(&stderr_rx, &display, "stderr")?;
+            Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
                     "command {display} timed out after {timeout:?}; stdout: {}; stderr: {}",
                     String::from_utf8_lossy(&stdout),
                     String::from_utf8_lossy(&stderr)
                 ),
-            ));
+            ))
         }
-
-        thread::sleep(Duration::from_millis(10));
     }
 }
 
@@ -228,8 +212,8 @@ fn timeout_output_reader_signals_explicit_readiness() {
     .expect("the controlled output contains the readiness line");
 
     ready_rx
-        .recv()
-        .expect("the reader reports readiness")
+        .recv_timeout(READY_LINE_DEADLINE)
+        .expect("the reader reports readiness within its deadline")
         .expect("the readiness line is accepted");
     assert_eq!(
         output,
@@ -249,42 +233,118 @@ fn run_command_with_timeout_after_ready(
     let stdout = child.stdout.take().expect("piped stdout");
     let stderr = child.stderr.take().expect("piped stderr");
     let (ready_tx, ready_rx) = std::sync::mpsc::channel();
-    let stdout_reader = thread::spawn(move || read_child_output_after_ready(stdout, ready_tx));
-    let stderr_reader = thread::spawn(move || read_child_output(stderr));
-    ready_rx
-        .recv()
-        .map_err(|_| io::Error::other("timeout child readiness channel closed"))??;
-    let started = Instant::now();
-    loop {
-        if let Some(status) = child.try_wait()? {
-            return Ok(Output {
-                status,
-                stdout: join_child_output(stdout_reader)?,
-                stderr: join_child_output(stderr_reader)?,
-            });
-        }
-        if started.elapsed() >= timeout {
+    let (stdout_tx, stdout_rx) = std::sync::mpsc::channel();
+    let (stderr_tx, stderr_rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        let _ = stdout_tx.send(read_child_output_after_ready(stdout, ready_tx));
+    });
+    thread::spawn(move || {
+        let _ = stderr_tx.send(read_child_output(stderr));
+    });
+    match ready_rx.recv_timeout(READY_LINE_DEADLINE) {
+        Ok(ready) => ready?,
+        Err(RecvTimeoutError::Timeout) => {
             let _ = child.kill();
-            let _ = child.wait()?;
-            let stdout = join_child_output(stdout_reader)?;
-            let stderr = join_child_output(stderr_reader)?;
+            let _ = child.wait();
             return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!(
+                    "command {display} did not print its readiness line within {READY_LINE_DEADLINE:?}"
+                ),
+            ));
+        }
+        Err(RecvTimeoutError::Disconnected) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(io::Error::other(format!(
+                "command {display} readiness channel closed before a result"
+            )));
+        }
+    }
+    match wait_or_kill(child, timeout)? {
+        Waited::Exited(status) => Ok(Output {
+            status,
+            stdout: receive_child_output(&stdout_rx, &display, "stdout")?,
+            stderr: receive_child_output(&stderr_rx, &display, "stderr")?,
+        }),
+        Waited::TimedOut => {
+            let stdout = receive_child_output(&stdout_rx, &display, "stdout")?;
+            let stderr = receive_child_output(&stderr_rx, &display, "stderr")?;
+            Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
                     "command {display} timed out after {timeout:?}; stdout: {}; stderr: {}",
                     String::from_utf8_lossy(&stdout),
                     String::from_utf8_lossy(&stderr)
                 ),
-            ));
+            ))
         }
-        thread::yield_now();
     }
 }
 
-fn join_child_output(reader: thread::JoinHandle<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
+enum Waited {
+    Exited(std::process::ExitStatus),
+    TimedOut,
+}
+
+/// Waits for the child on a thread that owns its handle, so the deadline is a
+/// blocking receive rather than a polling loop. A missed deadline kills the
+/// child by pid and then waits, under a failure ceiling, for the owner to reap it.
+fn wait_or_kill(child: std::process::Child, timeout: Duration) -> io::Result<Waited> {
+    let pid = child.id();
+    let (status_tx, status_rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        let mut child = child;
+        let _ = status_tx.send(child.wait());
+    });
+    match status_rx.recv_timeout(timeout) {
+        Ok(status) => Ok(Waited::Exited(status?)),
+        Err(RecvTimeoutError::Timeout) => {
+            kill_process(pid);
+            let _ = status_rx.recv_timeout(OUTPUT_DRAIN_DEADLINE);
+            Ok(Waited::TimedOut)
+        }
+        Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(
+            "child waiter stopped without an exit status",
+        )),
+    }
+}
+
+/// Kills a child that the waiter thread still owns. Only called on a deadline
+/// miss, before the waiter has reaped it.
+#[cfg(unix)]
+fn kill_process(pid: u32) {
+    let _ = std::process::Command::new("/bin/kill")
+        .args(["-KILL", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+#[cfg(windows)]
+fn kill_process(pid: u32) {
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+/// Receives one output pipe's result, failing with a named error instead of
+/// waiting forever when a grandchild keeps the pipe open.
+fn receive_child_output(
+    reader: &std::sync::mpsc::Receiver<io::Result<Vec<u8>>>,
+    display: &str,
+    stream: &str,
+) -> io::Result<Vec<u8>> {
     reader
-        .join()
-        .map_err(|_| io::Error::other("child output reader panicked"))?
+        .recv_timeout(OUTPUT_DRAIN_DEADLINE)
+        .map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!("command {display} {stream} did not drain within {OUTPUT_DRAIN_DEADLINE:?}: {error}"),
+            )
+        })?
 }
 
 #[test]

@@ -397,10 +397,9 @@ specialized backend tools and mixed Rust/Python implementations.
   keep-going behavior: every planned step runs even if another fails. Reports
   retain plan order and identify every failed step by its plan index; the
   command exits non-zero if any step fails. Steps that require Cargo's build
-  lock are serialized. Consumer-configured lint and test profiles remain
-  sequential, declaration-ordered, and fail-fast.
-  (Amended phase L, #195/#196, Accepted — Rand, 2026-10-26; supersedes the
-  preceding sentence.) Consumer-configured lint and test profiles run
+  lock are serialized.
+  (Amended in phase L, #195/#196, Accepted — Rand, 2026-10-26.)
+  Consumer-configured lint and test profiles run
   independent steps concurrently and fail slow by default: every planned step
   runs even if another fails, the report retains declaration order and
   identifies every failed step by its index, and the command exits non-zero if

@@ -1422,6 +1422,25 @@ fn port007_still_flags_other_unc_literal() {
 }
 
 #[test]
+fn port007_message_names_its_exemptions() {
+    let report = analyze_single_source(
+        r#"
+        pub fn cache() -> &'static str { "C:\\ProgramData\\sc-lint\\cache.json" }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port007);
+    let message = &report.findings[0].message;
+    assert!(
+        message.ends_with(
+        "PORT-007 hardcoded Windows-only absolute path literal `C:\\ProgramData\\sc-lint\\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction (exempt: literals under a Windows-only cfg such as #[cfg(windows)], and `\\\\?\\` verbatim or `\\\\.\\` device namespace prefixes)"
+        ),
+        "{message}"
+    );
+}
+
+#[test]
 fn flags_home_env_lookup_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();

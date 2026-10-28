@@ -37,7 +37,7 @@ not hide other findings in the same file. See
 
 Known limitation: a crate-root `main.rs` with a `#[cfg(unix)]` function and a
 `#[cfg(not(unix))]` sibling is still reported by PORT-010. This behavior is
-tracked for follow-up in issue `lint-phase-l.3`.
+tracked for follow-up in GitHub issue #720.
 
 ## Finding interpretation and CI
 
