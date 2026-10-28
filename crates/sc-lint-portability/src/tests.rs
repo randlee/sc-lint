@@ -1072,7 +1072,7 @@ fn passes_cfg_unix_gated_unix_path_in_production_code() {
 }
 
 #[test]
-fn port006_suppressed_under_target_os_and_not_windows_cfg() {
+fn port006_item_cfg_suppresses_under_target_os_and_not_windows_cfg() {
     let report = analyze_single_source(
         r#"
         #[cfg(target_os = "linux")]
@@ -1085,10 +1085,6 @@ fn port006_suppressed_under_target_os_and_not_windows_cfg() {
         fn all_not_windows() -> &'static str { "/home/d/x" }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         fn any_unix_os() -> &'static str { "/home/e/x" }
-        pub fn blocks() {
-            #[cfg(target_os = "linux")] { let _ = "/home/f/x"; }
-            #[cfg(not(windows))] { let _ = "/home/g/x"; }
-        }
         "#,
     );
 
@@ -1096,14 +1092,21 @@ fn port006_suppressed_under_target_os_and_not_windows_cfg() {
 }
 
 #[test]
-fn port006_statement_cfg_suppresses_unix_path_literal() {
+fn port006_item_cfg_suppresses_platform_specific_path_literals() {
     let report = analyze_single_source(
         r#"
-        pub fn gated_statements() {
-            #[cfg(target_os = "linux")]
+        #[cfg(target_os = "linux")]
+        fn linux_path() {
             let _ = "/var/tmp/atm-ports";
-            #[cfg(windows)]
-            { let _ = "C:\\atm-ports"; let _ = "\\\\server\\share\\atm-ports"; }
+        }
+
+        #[cfg(windows)]
+        fn windows_paths() {
+            let _ = "C:\\atm-ports";
+            let _ = "\\\\server\\share\\atm-ports";
+        }
+
+        pub fn ungated() {
             let _ = "/var/tmp/ungated";
         }
         "#,
@@ -1111,6 +1114,46 @@ fn port006_statement_cfg_suppresses_unix_path_literal() {
 
     assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
     assert!(report.findings[0].message.contains("/var/tmp/ungated"));
+}
+
+#[test]
+fn port006_statement_level_cfg_is_not_honored() {
+    let report = analyze_single_source(
+        r#"
+        pub fn gated_statements() {
+            #[cfg(target_os = "linux")]
+            let _ = "/var/tmp/statement-let";
+
+            #[cfg(target_os = "linux")]
+            { let _ = "/var/tmp/statement-block"; }
+
+            #[cfg(target_os = "linux")]
+            consume("/var/tmp/statement-call");
+
+            #[cfg(target_os = "linux")]
+            std::path::Path::new("/var/tmp/statement-method").exists();
+        }
+        "#,
+    );
+
+    let messages = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port006)
+        .map(|finding| finding.message.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(messages.len(), 4, "{:#?}", report.findings);
+    for path in [
+        "/var/tmp/statement-let",
+        "/var/tmp/statement-block",
+        "/var/tmp/statement-call",
+        "/var/tmp/statement-method",
+    ] {
+        assert!(
+            messages.iter().any(|message| message.contains(path)),
+            "statement-level cfg should not suppress {path}: {messages:#?}"
+        );
+    }
 }
 
 #[test]

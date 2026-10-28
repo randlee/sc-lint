@@ -41,8 +41,9 @@ This applies to:
   `#[cfg(target_os = "linux")]`, `#[cfg(target_os = "macos")]`, or
   `#[cfg(not(windows))]` are exempt. Equivalent nested `all(...)` and `any(...)` cfg lists are recognized
   when they contain one of those conditions.
-- Statement-level cfg attributes on `let` bindings and block/if expressions
-  use the same exemption when their gate matches `attr_is_platform_cfg(...)`.
+- Statement-level `#[cfg]` attributes are not honored. This includes cfg
+  attributes on `let` bindings, block/if expressions, and call expressions,
+  consistent with ADR-020 decision 1.
 - The same leaf gate suppresses PORT-007, PORT-008 and PORT-009 findings
   inside those platform-specific paths. It does not change PORT-004 or
   PORT-010 parity classification.
@@ -53,8 +54,9 @@ This applies to:
 
 - `PORT-007` flags drive-absolute and UNC path literals in ungated production
   code.
-- Windows-gated items and statements are exempt from the portability leaf
-  findings, including drive and UNC path literals.
+- Windows-gated items are exempt from the portability leaf findings,
+  including drive and UNC path literals. Statement-level cfg attributes do
+  not provide this exemption.
 - Literals whose unescaped value starts with the Windows verbatim prefix
   `\\?\` or device prefix `\\.\` are not reported; they are namespace
   syntax, not absolute paths for this rule.
