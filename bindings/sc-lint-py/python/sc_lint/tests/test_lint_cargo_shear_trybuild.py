@@ -289,8 +289,14 @@ class TrybuildMainTests(unittest.TestCase):
         package_map = {"demo": "crates/demo", "workspace": "."}
         with (
             patch.object(lint_cargo_shear, "discover_repo_root", return_value=root),
-            patch.object(lint_cargo_shear, "configured_unused_dependency_allowlist", return_value=(False, {})),
-            patch.object(lint_cargo_shear, "load_policy_config", return_value=POLICY),
+            patch.object(
+                lint_cargo_shear,
+                "load_cargo_shear_config",
+                return_value=(
+                    {key: value for key, value in POLICY.items() if key != "allowed_unused_dependencies"},
+                    root / ".just/lint-config.toml",
+                ),
+            ),
             patch.object(lint_cargo_shear, "package_to_crate_dir", return_value=package_map),
             patch.object(lint_cargo_shear, "workspace_crate_section_lines", return_value=[]),
             patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
