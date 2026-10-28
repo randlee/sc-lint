@@ -544,6 +544,53 @@ fn consumer_profiles_run_every_member_and_fail_the_aggregate_on_member_failure()
 }
 
 #[test]
+fn consumer_profile_runs_parallel_steps_and_reports_every_failure() {
+    let rows = "[[tool.sc-lint.lint]]\nname = \"first\"\ncommand = [\"python\", \"first.py\"]\n\n[[tool.sc-lint.lint]]\nname = \"second\"\ncommand = [\"python\", \"second.py\"]\n";
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(rows));
+    let loaded = loaded.expect("consumer config loads");
+    let (first_started, second_waits) = mpsc::channel();
+    let (second_started, first_waits) = mpsc::channel();
+    let mut adapter = FakeSystemAdapter::new(false);
+    adapter.failures.insert("first", "first failed");
+    adapter.failures.insert("second", "second failed");
+    adapter.on_start.insert(
+        "first",
+        rendezvous_hook(
+            first_started,
+            first_waits,
+            "second consumer step never started while first was running",
+        ),
+    );
+    adapter.on_start.insert(
+        "second",
+        rendezvous_hook(
+            second_started,
+            second_waits,
+            "first consumer step never started while second was running",
+        ),
+    );
+
+    let error = workflow::run_consumer_lint_with(
+        &loaded,
+        None,
+        PlatformScope::Host,
+        FailurePolicy::KeepGoing,
+        &adapter,
+    )
+    .expect_err("both failing consumer steps fail the profile");
+
+    assert_eq!(error.code(), "profile.steps_failed");
+    assert_eq!(
+        error.details["failed_steps"],
+        json!([
+            {"index": 0, "name": "first", "exit_code": null, "message": "first failed"},
+            {"index": 1, "name": "second", "exit_code": null, "message": "second failed"}
+        ])
+    );
+    assert_eq!(sorted(adapter.invoked()), ["first", "second"]);
+}
+
+#[test]
 fn consumer_selectors_pick_one_step_or_all_steps_in_declaration_order() {
     let fixture = TempDir::new().expect("fixture");
     let config_path = fixture.path().join("sc-lint.toml");
@@ -728,10 +775,11 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
     )
     .expect("PATH");
 
-    for recipe in ["lint", "test"] {
+    for (recipe, selector) in [("lint", Some("ci")), ("test", None)] {
         let output = ProcessCommand::new("just")
             .current_dir(root)
             .arg(recipe)
+            .args(selector)
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
@@ -756,7 +804,7 @@ fn generated_consumer_fixture_runs_just_lint_and_test_after_the_shared_preflight
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
             ),
-            "lint --consumer --config sc-lint.toml ci".to_string(),
+            "lint --consumer --config sc-lint.toml ci --profile ci".to_string(),
             format!(
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
@@ -805,10 +853,11 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
     )
     .expect("PATH");
 
-    for recipe in ["lint", "test"] {
+    for (recipe, selector) in [("lint", Some("ci")), ("test", None)] {
         let output = ProcessCommand::new("just")
             .current_dir(root)
             .arg(recipe)
+            .args(selector)
             .env("PATH", &path)
             .env("SC_LINT_BIN", &binary)
             .env("SC_LINT_RECORD", &record)
@@ -833,7 +882,7 @@ fn generated_windows_consumer_fixture_runs_just_lint_and_test_after_shared_prefl
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
             ),
-            "lint --consumer --config sc-lint.toml ci".to_string(),
+            "lint --consumer --config sc-lint.toml ci --profile ci".to_string(),
             format!(
                 "--config sc-lint.toml compatibility check --binary {}",
                 binary.display()
