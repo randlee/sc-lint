@@ -152,8 +152,11 @@ def free_loopback_port() -> int:
         return probe.getsockname()[1]
 
 
-def start_server(root: Path) -> int:
+def start_server(root: Path, lifetime_fd: int | None = None) -> int:
     """Start a dolt sql-server for the workspace; return the port once dolt logs that it is listening.
+
+    `lifetime_fd`, when given, is inherited by the supervisor, which keeps it open until dolt has exited; the caller
+    reads EOF on its other end as "dolt is gone".
 
     Dolt's output is read through a queue, so readiness is a blocking handshake on dolt's own line, not a poll.
     Another listener on the same port cannot satisfy it. A bind collision (dolt prints PORT_IN_USE and exits)
@@ -169,7 +172,8 @@ def start_server(root: Path) -> int:
         server = subprocess.Popen([sys.executable, str(supervisor),
                                    "dolt", "sql-server", "-H", "127.0.0.1", "-P", str(port), f"--data-dir={data}"],
                                   cwd=data, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  stderr=subprocess.STDOUT, text=True, bufsize=1)
+                                  stderr=subprocess.STDOUT, text=True, bufsize=1,
+                                  pass_fds=() if lifetime_fd is None else (lifetime_fd,))
         # Kept referenced: dropping the Popen would close the supervisor's stdin, which stops dolt.
         _SERVERS.append(server)
         lines: queue.Queue = queue.Queue()
@@ -262,22 +266,29 @@ class ServerLifetimeTests(unittest.TestCase):
         root = Path(tempfile.mkdtemp(prefix="server-life-")).resolve()
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         self.addCleanup(stop_server, root)
-        code = ("import sys, time; from pathlib import Path; sys.path.insert(0, sys.argv[1]);"
-                "from test_bead_pour_mock import start_server; print(start_server(Path(sys.argv[2])), flush=True); time.sleep(600)")
-        owner = subprocess.Popen([sys.executable, "-c", code, str(Path(__file__).parent), str(root)],
-                                 stdout=subprocess.PIPE, text=True)
+        # The supervisor holds the write end of a pipe this test reads; it closes only when the supervisor exits,
+        # which it does only after dolt has. EOF on the read end is therefore the signal that dolt is gone.
+        lifetime_read, lifetime_write = os.pipe()
+        self.addCleanup(os.close, lifetime_read)
+        code = ("import os, sys, time; from pathlib import Path; sys.path.insert(0, sys.argv[1]);"
+                "from test_bead_pour_mock import start_server; print(start_server(Path(sys.argv[2]), int(sys.argv[3])), flush=True); time.sleep(600)")
+        owner = subprocess.Popen([sys.executable, "-c", code, str(Path(__file__).parent), str(root), str(lifetime_write)],
+                                 stdout=subprocess.PIPE, text=True, pass_fds=(lifetime_write,))
+        os.close(lifetime_write)
         # The printed port is the handshake: it arrives only after start_server has seen dolt ready.
         self.assertGreater(int(owner.stdout.readline()), 0)
         owner.kill()
         owner.wait()
+        eof = queue.Queue()
+        threading.Thread(target=lambda: eof.put(os.read(lifetime_read, 1)), daemon=True).start()
+        try:
+            released = eof.get(timeout=60)
+        except queue.Empty:
+            self.fail("dolt server outlived the killed test process: its supervisor still held the lifetime pipe after 60 s")
+        self.assertEqual(released, b"")
         marker = str(root / SERVER_DIR)
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            alive = [line for line in subprocess.run(["ps", "-axwwo", "command="], capture_output=True, text=True).stdout.splitlines()
-                     if marker in line]
-            if not alive:
-                break
-            time.sleep(0.5)
+        alive = [line for line in subprocess.run(["ps", "-axwwo", "command="], capture_output=True, text=True).stdout.splitlines()
+                 if marker in line]
         self.assertEqual(alive, [], "dolt server outlived the killed test process")
 
 
