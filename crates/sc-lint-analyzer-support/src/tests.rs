@@ -16,13 +16,117 @@ use sc_lint_schema::ReportStatus;
 use super::AnalyzerConfigError;
 use super::AnalyzerName;
 use super::CatalogRuleId;
+use super::PackageTargetKind;
 use super::RelativePathError;
 use super::RepoRelativePath;
 use super::RuleCatalog;
 use super::analyzer_settings_from;
 use super::load_analyzer_settings;
+use super::load_workspace_metadata;
 use super::relative_slash_path;
 use super::render_findings_report;
+use super::source_scan::classify_target_kinds_for_test as classify_target_kinds;
+
+fn write_workspace_fixture_file(root: &TempDir, path: &str, contents: &str) {
+    let path = root.path().join(path);
+    fs::create_dir_all(path.parent().expect("fixture file parent")).expect("create fixture parent");
+    fs::write(path, contents).expect("write workspace fixture file");
+}
+
+#[test]
+fn workspace_packages_maps_target_kinds() {
+    let root = TempDir::new().unwrap();
+    write_workspace_fixture_file(
+        &root,
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"crates/member\"]\nresolver = \"2\"\n",
+    );
+    for (path, contents) in [
+        ("src/lib.rs", ""),
+        ("src/main.rs", ""),
+        ("examples/demo.rs", ""),
+        ("tests/check.rs", ""),
+        ("benches/bench.rs", ""),
+        ("build.rs", "fn main() {}\n"),
+    ] {
+        write_workspace_fixture_file(&root, &format!("crates/member/{path}"), contents);
+    }
+    write_workspace_fixture_file(
+        &root,
+        "crates/member/Cargo.toml",
+        "[package]\nname = \"member\"\nversion = \"0.1.0\"\nedition = \"2024\"\nbuild = \"build.rs\"\n[[example]]\nname = \"demo\"\npath = \"examples/demo.rs\"\n[[bench]]\nname = \"bench\"\npath = \"benches/bench.rs\"\nharness = false\n",
+    );
+
+    let packages = load_workspace_metadata(root.path())
+        .unwrap()
+        .workspace_packages();
+    let package = packages.first().unwrap();
+    let targets = package
+        .targets
+        .iter()
+        .map(|target| (target.name.as_str(), target.kind))
+        .collect::<Vec<_>>();
+    for expected in [
+        ("member", PackageTargetKind::Lib),
+        ("member", PackageTargetKind::Bin),
+        ("demo", PackageTargetKind::Example),
+        ("check", PackageTargetKind::Test),
+        ("bench", PackageTargetKind::Bench),
+        ("build-script-build", PackageTargetKind::CustomBuild),
+    ] {
+        assert!(
+            targets.contains(&expected),
+            "missing {expected:?} in {targets:?}"
+        );
+    }
+}
+
+#[test]
+fn workspace_packages_excludes_non_members_and_sorts_by_name() {
+    let root = TempDir::new().unwrap();
+    write_workspace_fixture_file(
+        &root,
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"crates/*\"]\nexclude = [\"crates/ignored\"]\nresolver = \"2\"\n",
+    );
+    for name in ["zeta", "alpha", "ignored"] {
+        write_workspace_fixture_file(&root, &format!("crates/{name}/src/lib.rs"), "");
+        write_workspace_fixture_file(
+            &root,
+            &format!("crates/{name}/Cargo.toml"),
+            &format!("[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n"),
+        );
+    }
+
+    let packages = load_workspace_metadata(root.path())
+        .unwrap()
+        .workspace_packages();
+    assert_eq!(
+        packages
+            .iter()
+            .map(|package| package.name.as_str())
+            .collect::<Vec<_>>(),
+        ["alpha", "zeta"]
+    );
+}
+
+#[test]
+fn target_kind_array_mapping_covers_multi_kind_and_unknown() {
+    use cargo_metadata::TargetKind;
+
+    assert_eq!(
+        classify_target_kinds(&[TargetKind::CDyLib, TargetKind::RLib]),
+        PackageTargetKind::Lib
+    );
+    assert_eq!(
+        classify_target_kinds(&[TargetKind::ProcMacro]),
+        PackageTargetKind::Lib
+    );
+    assert_eq!(
+        classify_target_kinds(&[TargetKind::Unknown("future-target".to_owned())]),
+        PackageTargetKind::Other
+    );
+}
 
 #[derive(Serialize)]
 enum TestRule {
@@ -55,6 +159,10 @@ fn text_report_rendering_is_shared_and_stable() {
 const CATALOG: RuleCatalog = RuleCatalog {
     analyzer: AnalyzerName::new("example"),
     rules: &[
+        CatalogRuleId::new("EXAMPLE-001"),
+        CatalogRuleId::new("EXAMPLE-002"),
+    ],
+    path_addressable_rules: &[
         CatalogRuleId::new("EXAMPLE-001"),
         CatalogRuleId::new("EXAMPLE-002"),
     ],
@@ -135,6 +243,55 @@ fn config_without_analyzer_table_yields_defaults() {
 
     assert!(settings.enabled);
     assert_eq!(settings.fail_rules, rule_set(&["EXAMPLE-001"]));
+}
+
+/// Writes `.just/lint-config.toml` under `directory`, the REQ-CLI-003 fallback file.
+fn write_lint_config_fallback(directory: &TempDir, contents: &str) {
+    fs::create_dir_all(directory.path().join(".just")).unwrap();
+    fs::write(directory.path().join(".just/lint-config.toml"), contents).unwrap();
+}
+
+#[test]
+fn fallback_lint_config_supplies_table_missing_from_sc_lint_toml() {
+    let directory = config_dir("[tool.sc-lint.analyzers.other]\nenabled = true\n");
+    write_lint_config_fallback(
+        &directory,
+        "[tool.sc-lint.analyzers.example]\nenabled = false\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert!(!settings.enabled);
+}
+
+#[test]
+fn sc_lint_toml_table_is_not_shadowed_by_fallback_lint_config() {
+    let directory = config_dir("[tool.sc-lint.analyzers.example]\nenabled = true\n");
+    write_lint_config_fallback(
+        &directory,
+        "[tool.sc-lint.analyzers.example]\nenabled = false\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert!(settings.enabled);
+}
+
+#[test]
+fn explicit_config_is_used_without_consulting_fallback_lint_config() {
+    let directory = TempDir::new().unwrap();
+    write_lint_config_fallback(
+        &directory,
+        "[tool.sc-lint.analyzers.example]\nenabled = true\n",
+    );
+    let explicit = directory.path().join("explicit.toml");
+    fs::write(
+        &explicit,
+        "[tool.sc-lint.analyzers.example]\nenabled = false\n",
+    )
+    .unwrap();
+    let settings =
+        load_analyzer_settings(&CATALOG, directory.path(), Some(&explicit), None).unwrap();
+
+    assert!(!settings.enabled);
 }
 
 #[test]

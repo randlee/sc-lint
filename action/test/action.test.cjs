@@ -83,8 +83,8 @@ function fixture(platform, architecture, operation, layout = "nested") {
       env: { GITHUB_OUTPUT: output, GITHUB_PATH: runnerPath, RUNNER_TEMP: root },
       inputs: { operation, version: "0.4.0", configPath: "sc-lint.toml", workingDirectory: root, artifactUrl: "https://fixture/archive", checksumsUrl: "https://fixture/checksums", releaseBaseUrl: "https://fixture" },
       download: async (url) => url.endsWith("archive") ? archive : checksums,
-      execute(binaryPath, args) {
-        calls.push({ binaryPath, args });
+      execute(binaryPath, args, options) {
+        calls.push({ binaryPath, args, options });
         return { status: 0, stdout: args[0] === "docs" ? path.join(path.dirname(binaryPath), "sc-lint-docs") : "ok", stderr: "" };
       },
     },
@@ -92,6 +92,38 @@ function fixture(platform, architecture, operation, layout = "nested") {
     runnerPath,
   };
 }
+
+test("runner-shaped hyphenated inputs drive action execution", async () => {
+  const local = fixture("linux", "x64", "lint");
+  const cwd = path.join(path.dirname(local.options.installRoot), "consumer");
+  delete local.options.inputs;
+  local.options.env = {
+    ...local.options.env,
+    "INPUT_OPERATION": "lint",
+    "INPUT_VERSION": "0.4.0",
+    "INPUT_WORKING-DIRECTORY": cwd,
+    "INPUT_CONFIG-PATH": "consumer.toml",
+    "INPUT_ARTIFACT-URL": "https://fixture/archive",
+    "INPUT_CHECKSUMS-URL": "https://fixture/checksums",
+  };
+  await runAction(local.options);
+  assert.equal(local.calls[0].options.cwd, cwd);
+  assert.deepEqual(local.calls[0].args.slice(0, 2), ["--config", "consumer.toml"]);
+  assert.deepEqual(local.calls[2].args.slice(-2), ["--config", "consumer.toml"]);
+});
+
+test("release-base-url builds artifact URLs when explicit URLs are absent", async () => {
+  const local = fixture("linux", "x64", "setup");
+  const urls = [];
+  delete local.options.inputs;
+  local.options.env = { ...local.options.env, "INPUT_OPERATION": "setup", "INPUT_VERSION": "0.4.0", "INPUT_RELEASE-BASE-URL": "https://mirror/releases/" };
+  local.options.download = async (url) => {
+    urls.push(url);
+    return url.endsWith("checksums.txt") ? local.checksums : local.archive;
+  };
+  await runAction(local.options);
+  assert.deepEqual(urls, ["https://mirror/releases/v0.4.0/sc-lint_0.4.0_x86_64-unknown-linux-gnu.tar.gz", "https://mirror/releases/v0.4.0/checksums.txt"]);
+});
 
 test("legacy flat archive remains accepted", async () => {
   const local = fixture("linux", "x64", "setup", "flat");

@@ -3,12 +3,47 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "packages" / "sc-lint-adoption"
 SKILL = PACKAGE / ".claude" / "skills" / "sc-lint-adoption" / "SKILL.md"
 GUIDE = ROOT / "docs" / "sc-lint" / "adoption.md"
+ASSIGNMENT_TEMPLATE = SKILL.parent / "adopt.xml.j2"
+TEMPLATE_EXPRESSION = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.S)
+PLAIN_SUBSTITUTION = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+
+
+def template_contract(text: str) -> tuple[list[str], set[str]]:
+    """Return the front matter's required_variables and the tokens the body uses."""
+    if not text.startswith("---\n"):
+        raise AssertionError("template has no front matter")
+    front_matter, separator, body = text[len("---\n"):].partition("\n---\n")
+    if not separator:
+        raise AssertionError("template front matter is not closed by ---")
+    required: list[str] = []
+    in_required = False
+    for line in front_matter.splitlines():
+        if line.startswith("required_variables:"):
+            in_required = True
+        elif in_required and line.startswith("  - "):
+            required.append(line[len("  - "):].strip())
+        elif in_required and line.strip():
+            in_required = False
+    if not required:
+        raise AssertionError("template front matter declares no required_variables")
+    tokens: set[str] = set()
+    for expression in TEMPLATE_EXPRESSION.findall(body):
+        if expression.startswith("{#"):
+            continue
+        substitution = PLAIN_SUBSTITUTION.fullmatch(expression)
+        if substitution is None:
+            raise AssertionError(f"unsupported template expression {expression!r}; use a plain {{{{ name }}}}")
+        tokens.add(substitution.group(1))
+    return required, tokens
 
 
 def test_marketplace_advertises_the_adoption_package() -> None:
@@ -68,3 +103,31 @@ def test_established_fixture_exercises_named_test_recipe_migration() -> None:
     install = json.loads((fixture / "install.json").read_text())
     assert "test-integration:\n    just test integration" in justfile
     assert install["test"]["integration"] == ["cargo", "test", "--test", "integration"]
+
+
+def test_assignment_template_front_matter_declares_exactly_its_tokens() -> None:
+    required, tokens = template_contract(ASSIGNMENT_TEMPLATE.read_text())
+    assert len(required) == len(set(required)), f"duplicate required_variables: {required}"
+    assert set(required) == tokens
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("<a>{{ repository }}</a>\n", "no front matter"),
+        ("---\nname: x\nrequired_variables:\n  - repository\n<a>{{ repository }}</a>\n", "not closed"),
+        ("---\nname: x\n---\n<a>{{ repository }}</a>\n", "no required_variables"),
+        ("---\nrequired_variables:\n  - repository\n---\n{% if x %}{{ repository }}{% endif %}\n", "unsupported"),
+    ],
+)
+def test_template_contract_rejects_malformed_templates(text: str, message: str) -> None:
+    with pytest.raises(AssertionError, match=message):
+        template_contract(text)
+
+
+def test_template_contract_reports_token_drift() -> None:
+    required, tokens = template_contract(
+        "---\nrequired_variables:\n  - repository\n  - unused\n---\n<a>{{ repository }}{{ extra }}</a>\n"
+    )
+    assert required == ["repository", "unused"]
+    assert tokens == {"repository", "extra"}

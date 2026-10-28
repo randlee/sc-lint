@@ -51,7 +51,11 @@ function requireInput(inputs, name) {
 }
 
 function actionInputs(env) {
-  const read = (name, fallback = "") => (env[`INPUT_${name.toUpperCase().replace(/-/g, "_")}`] || fallback).trim();
+  const read = (name, fallback = "") => {
+    const runnerKey = `INPUT_${name.toUpperCase().replace(/ /g, "_")}`;
+    const compatibilityKey = `INPUT_${name.toUpperCase().replace(/[- ]/g, "_")}`;
+    return (env[runnerKey] || env[compatibilityKey] || fallback).trim();
+  };
   return {
     operation: read("operation", "lint"),
     version: read("version"),

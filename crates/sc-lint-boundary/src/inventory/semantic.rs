@@ -721,13 +721,23 @@ fn validate_external_root(
         .ok()
         .flatten()
         .is_some_and(|owner| owner == root_package);
-    if owner_is_local
-        || record
-            .dependencies
-            .allowed_dependencies
-            .iter()
-            .any(|reference| reference.matches(&root_package))
-    {
+    let dependents_context = format!(
+        "`dependencies.allowed_dependents` for boundary `{}`",
+        record.boundary_id
+    );
+    let dependent_is_allowed = record
+        .dependencies
+        .allowed_dependents
+        .iter()
+        .any(|dependent| {
+            dependent == &root_package
+                || resolver
+                    .resolve_if_known(dependent.as_ref(), &dependents_context)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|package| package == root_package)
+        });
+    if owner_is_local || dependent_is_allowed {
         return;
     }
     diagnostics.push(InventoryDiagnostic::new(
@@ -735,10 +745,10 @@ fn validate_external_root(
         format!("composition.roots[{index}]"),
         InventoryDiagnosticKind::UnapprovedCompositionRoot,
         format!(
-            "external composition root `{}` resolves to `{root_package}`, which is not in dependencies.allowed_dependencies",
+            "external composition root `{}` resolves to `{root_package}`, which is not in dependencies.allowed_dependents",
             root.as_string()
         ),
-        "add the external package to dependencies.allowed_dependencies or keep the root owner-local",
+        "add the external package to dependencies.allowed_dependents or keep the root owner-local",
     ));
 }
 

@@ -32,8 +32,11 @@ sc-lint docs
 The consumer lint selector, named profiles, and platform scope are described
 in [using sc-lint](../using-sc-lint.md). The `ci` and `full` source-maintainer
 profiles include the runtime analyzer. Consumer test steps remain consumer
-declared; `sc-lint test` executes the configured complete test profile or one
-named layer, sequentially and fail-fast.
+declared; `sc-lint test` runs the default selector (every row of a
+`[[tool.sc-lint.test]]` list) or the named selector, with forwarded arguments.
+Steps run in parallel (cargo steps serialized in declaration order) and fail
+slow, reporting every failed step; `--fail-fast` stops starting new cargo-lane
+and `after_all` steps after the first failure.
 
 ## Output and CI
 

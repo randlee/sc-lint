@@ -1038,7 +1038,10 @@ shear/summary
         self.assertEqual(restrictive_stderr.getvalue(), "cargo-shear warning: ?\n")
 
     def run_unused_dependency_main_from_foreign_cwd(
-        self, allowlist: str, shear_stdout: str | None = None
+        self,
+        allowlist: str,
+        shear_stdout: str | None = None,
+        primary_config: str | None = None,
     ) -> tuple[int, str]:
         """Run main() with --root from another cwd against a real workspace.
 
@@ -1070,6 +1073,8 @@ shear/summary
             )
             (repo_root / ".just").mkdir()
             (repo_root / ".just" / "lint-config.toml").write_text(allowlist, encoding="utf-8")
+            if primary_config is not None:
+                (repo_root / "sc-lint.toml").write_text(primary_config, encoding="utf-8")
             self.assertNotEqual(repo_root.resolve(), Path.cwd().resolve())
             self.assertEqual(
                 manifest_to_package_name(repo_root),
@@ -1105,13 +1110,24 @@ shear/summary
         )
 
     def test_main_from_foreign_cwd_rejects_unlisted_unused_dependency(self) -> None:
-        result, output = self.run_unused_dependency_main_from_foreign_cwd("")
+        result, output = self.run_unused_dependency_main_from_foreign_cwd("[cargo_shear]\n")
 
         self.assertEqual(result, 1)
         self.assertIn(
             f"shear policy error: {APP_PACKAGE}.serde [unused_dependency] unused dependency must be fixed",
             output,
         )
+        self.assertIn("explicitly downgraded in .just/lint-config.toml", output)
+
+    def test_main_error_names_primary_config_when_it_supplies_cargo_shear(self) -> None:
+        result, output = self.run_unused_dependency_main_from_foreign_cwd(
+            "[cargo_shear]\n",
+            primary_config="[cargo_shear]\n",
+        )
+
+        self.assertEqual(result, 1)
+        self.assertIn("explicitly downgraded in sc-lint.toml", output)
+        self.assertNotIn("explicitly downgraded in .just/lint-config.toml", output)
 
     # Section layout of a real cargo-shear run: exit 1 with two unused
     # dependencies (errors) and one unlinked file (warning).
@@ -1292,6 +1308,8 @@ shear/summary
             stderr="",
         )
         with tempfile.TemporaryDirectory() as tempdir:
+            (Path(tempdir) / ".just").mkdir()
+            (Path(tempdir) / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             with mock.patch("sys.stdout", new_callable=io.StringIO):
                 result = cargo_shear_main(["lint_cargo_shear.py", "--root", tempdir])
 
@@ -1334,6 +1352,8 @@ shear/summary
 
     def test_load_policy_config_defaults_unused_dependency_allowlist(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
+            (Path(tempdir) / ".just").mkdir()
+            (Path(tempdir) / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             self.assertEqual(
                 load_policy_config(Path(tempdir))["allowed_unused_dependencies"],
                 {},
@@ -1510,6 +1530,8 @@ shear/empty_files
 
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             crate = WorkspaceCrate(
                 crate_dir="app",
                 package_name=APP_PACKAGE,
@@ -1525,7 +1547,10 @@ shear/empty_files
                 patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
                 patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=["workspace crates:"]),
                 patch("sc_lint.lint_cargo_shear.workspace_crates", return_value=[crate]),
-                patch("sc_lint.lint_cargo_shear.load_policy_config", return_value=policy),
+                patch(
+                    "sc_lint.lint_cargo_shear.load_cargo_shear_config",
+                    return_value=(policy, repo_root / ".just/lint-config.toml"),
+                ),
                 patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=completed),
                 patch("sc_lint.lint_cargo_shear.sys.stdout", stdout),
                 patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),
@@ -1559,6 +1584,8 @@ shear/empty_files
 
         with tempfile.TemporaryDirectory() as tempdir:
             repo_root = Path(tempdir)
+            (repo_root / ".just").mkdir()
+            (repo_root / ".just" / "lint-config.toml").write_text("[cargo_shear]\n", encoding="utf-8")
             policy = {
                 "allowed_empty_files": {"src/βeta.rs": "reviewed λ"},
                 "allowed_unlinked_files": {},
@@ -1567,7 +1594,10 @@ shear/empty_files
                 patch("sc_lint.lint_cargo_shear.discover_repo_root", return_value=repo_root),
                 patch("sc_lint.lint_cargo_shear.shutil.which", return_value="cargo-shear"),
                 patch("sc_lint.lint_cargo_shear.workspace_crate_section_lines", return_value=["workspace crates:"]),
-                patch("sc_lint.lint_cargo_shear.load_policy_config", return_value=policy),
+                patch(
+                    "sc_lint.lint_cargo_shear.load_cargo_shear_config",
+                    return_value=(policy, repo_root / ".just/lint-config.toml"),
+                ),
                 patch("sc_lint.lint_cargo_shear.subprocess.run", return_value=completed),
                 patch("sc_lint.lint_cargo_shear.sys.stdout", stdout),
                 patch("sc_lint.lint_cargo_shear.sys.stderr", stderr),

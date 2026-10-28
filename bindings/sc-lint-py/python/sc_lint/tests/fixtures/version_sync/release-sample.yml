@@ -1,0 +1,5 @@
+RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml
+release_artifacts.py build-plan
+release_artifacts.py verify-version-lockstep
+release_gate.sh final origin/main "release-candidate-
+release-target-matrix

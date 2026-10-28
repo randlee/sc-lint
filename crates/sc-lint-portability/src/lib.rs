@@ -42,6 +42,7 @@ const ALL_PORT_IDS: &[CatalogRuleId] = &[
 pub const PORTABILITY_CATALOG: RuleCatalog = RuleCatalog {
     analyzer: AnalyzerName::new("portability"),
     rules: ALL_PORT_IDS,
+    path_addressable_rules: ALL_PORT_IDS,
     families: &[],
     default_fail: ALL_PORT_IDS,
     own_keys: &[

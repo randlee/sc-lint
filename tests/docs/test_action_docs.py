@@ -65,3 +65,21 @@ def test_ci_docs_match_every_declared_action_input_and_output() -> None:
     assert "`artifact-url` and `checksums-url` are resolved independently" in normalized_docs
     assert "{release-base-url}/v{version}/sc-lint_{version}_{target}.{extension}" in normalized_docs
     assert "{release-base-url}/v{version}/checksums.txt" in normalized_docs
+
+
+def test_runtime_rule_ids_in_readme_have_bundle_entries() -> None:
+    runtime_readme = (ROOT / "crates/sc-lint-runtime/README.md").read_text(encoding="utf-8")
+    bundle_guide = (ROOT / "docs-bundle/packages/sc-lint-runtime.md").read_text(
+        encoding="utf-8"
+    )
+
+    documented_rule_ids = set(re.findall(r"SCB-RUNTIME-\d{3}", runtime_readme))
+    bundle_rule_ids = set(
+        re.findall(r"^- `(SCB-RUNTIME-\d{3})`:", bundle_guide, flags=re.MULTILINE)
+    )
+
+    assert documented_rule_ids, "runtime README must document at least one rule id"
+    assert documented_rule_ids <= bundle_rule_ids, (
+        "runtime docs bundle is missing documented rule ids: "
+        f"{sorted(documented_rule_ids - bundle_rule_ids)}"
+    )

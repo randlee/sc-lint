@@ -49,6 +49,9 @@ pub enum Command {
         /// Run only these rules (`<RULE-ID|family>[,...]`); forwarded unchanged to sc-boundary, sc-portability or sc-runtime.
         #[arg(long = "rule-filter", conflicts_with = "consumer")]
         rule_filter: Option<String>,
+        /// Stop starting new cargo-lane and `after_all` steps after the first failure; running steps finish.
+        #[arg(long = "fail-fast", requires = "consumer")]
+        fail_fast: bool,
     },
     View {
         #[arg(value_enum)]
@@ -104,8 +107,23 @@ pub enum Command {
     },
     /// Run the explicitly configured consumer test profile.
     Test {
-        /// Test layer to run. Omitted or `all` runs every configured layer in declaration order.
-        layer: Option<String>,
+        /// Selector to run, then the arguments appended to its command. Omitted
+        /// runs `default` (every row of a `[[tool.sc-lint.test]]` list). Flags
+        /// (`--fail-fast`, `--list`, `--config`, `--json`) must precede the
+        /// selector; everything after it is forwarded verbatim. One positional,
+        /// so clap stops parsing flags at the selector.
+        #[arg(
+            value_name = "SELECTOR [ARGS]",
+            trailing_var_arg = true,
+            allow_hyphen_values = true
+        )]
+        selector_and_args: Vec<String>,
+        /// Print the declared selectors instead of running them.
+        #[arg(long, conflicts_with_all = ["selector_and_args", "fail_fast"])]
+        list: bool,
+        /// Same as `lint --consumer --fail-fast`.
+        #[arg(long = "fail-fast")]
+        fail_fast: bool,
     },
     Version,
     Ci,
