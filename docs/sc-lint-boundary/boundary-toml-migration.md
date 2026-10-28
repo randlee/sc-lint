@@ -300,14 +300,9 @@ Python-backed still owns:
 - `.just/lint_manifests.py` as the parity oracle for the A.7 manifest-policy migration window
 - repo-level lint workflow orchestration that still runs the Python manifest check alongside Rust validation
 
-## Recommendation
+## Delivered State
 
-Proceed with a dual-loader migration, but treat TOML as the future canonical
-format immediately once support lands.
-
-That gives:
-
-- low migration risk
-- no forced flag day
-- a clean place to add future boundary features
-- a better format for eventual `sc-lint` repo extraction
+The migration is complete: the loader is TOML-only. The dual-loader phases in
+this historical plan are retired and must not be used as current behavior.
+TOML is the sole canonical boundary source; Markdown remains explanatory
+documentation.

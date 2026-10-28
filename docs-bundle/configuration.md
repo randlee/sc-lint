@@ -65,15 +65,17 @@ Each analyzer reads only its own `[tool.sc-lint.analyzers.<name>]` table, where
 - `fail_rules` (rule ids or families) lists the rules that fail the verdict;
   other findings only report. Absent, the analyzer's built-in set applies.
 - `exclude_paths` (globs relative to the workspace root; `**` spans
-  directories) drops findings in matching files. Boundary applies it to
-  SCB-MANIFEST findings, matched on the manifest path, and to SCB-CYCLE-002
-  and SCB-CYCLE-003 findings when any source file behind their nodes matches.
+  directories) drops findings in matching files. In Boundary, only
+  `SCB-MANIFEST-001` through `SCB-MANIFEST-006` carry a finding path;
+  `SCB-CYCLE-002` and `SCB-CYCLE-003` instead use the source files behind
+  their nodes, and are excluded when any such file matches.
 - `exclude_paths_by_rule` maps exact rule ids to arrays of workspace-relative
   globs. It drops only findings from that rule at matching paths; other rules
-  in the same file still run. Boundary supports SCB-MANIFEST-001 through
-  SCB-MANIFEST-006 and SCB-CYCLE-002/003. Entries for rules whose findings have
-  no source path are configuration errors naming the rule; remove the entry or
-  choose a rule with source paths.
+  in the same file still run. Boundary supports `SCB-MANIFEST-001` through
+  `SCB-MANIFEST-006`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
+  other Boundary rules are configuration errors naming the rule because their
+  findings have no source path; configuration loading rejects them before
+  analysis. Remove the entry or choose a rule with source paths.
 
 `portability` also takes `config_home_env`, the environment variable a test
 helper must check before `dirs::home_dir()` (PORT-002 runs only when it is
@@ -85,9 +87,11 @@ whose names differ.
 Only the configured pair and its enclosed private implementation receive the
 adapter treatment; separately Unix-gated public items remain subject to parity
 checks. Boundary accepts the optional manifest dependency policy families
-`manifest_dependency_allowlists`, `global_dependency_ownership` and
-`manifest_section_rules`; its package-edge policy is supplied by its
-inventory. Runtime has no analyzer-specific keys. Any unknown
+`manifest_dependency_allowlists`, `global_dependency_ownership`, and
+`manifest_section_rules`; these are released consumer-owned configuration,
+while atm-core retains its record-lock parity checks for the allowlist fields.
+Its package-edge policy is supplied by its inventory. Runtime has no
+analyzer-specific keys. Any unknown
 key, unknown rule, or wrong value type is a configuration error (exit 3)
 identifying the analyzer and field.
 

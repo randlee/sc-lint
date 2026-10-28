@@ -648,6 +648,10 @@ This is an amendment to those contracts, not a new product default.
 
 ## Phase D Requirements (completed; retained for traceability)
 
+ADR-020 retires `REQ-SCB-002` through `REQ-SCB-005`: they describe the former
+dual-loader transition and remain only as historical text in
+[`sc-lint-boundary/requirements.md`](./sc-lint-boundary/requirements.md).
+
 The completed Phase `D` execution line required:
 
 - delivery of `D.1`, the boundary inventory dependency-policy enforcement
