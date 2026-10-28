@@ -172,6 +172,36 @@ fn per_rule_exclusions_reject_every_boundary_rule_without_source_paths() {
 }
 
 #[test]
+fn global_path_exclusions_leave_pathless_rule_findings_unchanged() {
+    let fixture = TempDir::new().expect("temp root");
+    fs::write(
+        fixture.path().join("sc-lint.toml"),
+        "[tool.sc-lint.analyzers.boundary]\nexclude_paths = [\"**/*\"]\n",
+    )
+    .expect("write analyzer config");
+    let settings = sc_lint_analyzer_support::load_analyzer_settings(
+        &BOUNDARY_CATALOG,
+        fixture.path(),
+        None,
+        None,
+    )
+    .expect("global path exclusions are valid for path-addressable findings");
+    let finding = Finding {
+        rule_id: RuleId::ScbCycle001,
+        kind: "cycle_without_source_path".into(),
+        message: "cycle finding without source paths".to_owned(),
+        owner_ids: Vec::new(),
+        node_ids: Vec::new(),
+    };
+
+    let (kept, _) = settings.apply([(finding, None)], |rule| {
+        sc_lint_analyzer_support::CatalogRuleId::new(rule.as_str())
+    });
+
+    assert_eq!(kept.len(), 1, "a path-less rule has no path to match");
+}
+
+#[test]
 fn per_rule_path_exclusion_drops_cycle_003_finding_by_node_source() {
     let fixture = TempDir::new().expect("temp root");
     let relative = "crates/example/src/lib.rs";

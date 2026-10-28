@@ -26,7 +26,7 @@ exclusion and records representative classifications.
 
 | Fixture | Reduced from | Classification |
 |---|---|---|
-| `unix_helper_in_paired_file` | `crates/atm-http-runtime/src/unix_socket.rs` | Private Unix helper in a configured adapter pair; no PORT-010 finding after L1-4. |
+| `unix_helper_in_paired_file` | `crates/atm-http-runtime/src/unix_socket.rs` | In this fixture, the private Unix helper is in a configured adapter pair and the fixture's `#[cfg(windows)] mod named_pipe` is its companion, so the fixture has no PORT-010 finding. The real atm-core `unix_socket.rs` still fires PORT-010. |
 | `crate_root_main` | `crates/atm/src/main.rs` | Crate-root `main.rs` function with `cfg(unix)` and `cfg(not(unix))` siblings; remains reported as a known limitation tracked in issue `lint-phase-l.3`. |
 | `unpaired_pub_item` | `crates/atm-core/src/descriptor_limit.rs` | Unpaired public Unix item; PORT-010 true positive remains. |
 | `atm_core_atm_temp` | `crates/atm-core/src/atm_temp.rs` | Reduced; reports `is_owned_by_uid`, `has_group_or_world_bits`, `current_uid`, `unix_default_scratch_root`. |
