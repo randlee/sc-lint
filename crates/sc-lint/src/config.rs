@@ -562,18 +562,24 @@ const SC_LINT_KEYS: &[&str] = &[
     "test",
     "analyzers",
 ];
-/// Tables declined as Won't-do by ADR-020 decision 9 (#198).
-const DECLINED_SC_LINT_TABLES: &[&str] = &["setup", "runner"];
+/// Tables declined as Won't-do by ADR-020 decision 9 (#198), rejected both at
+/// the file root (where #198 proposed them) and under `[tool.sc-lint]`.
+const DECLINED_TABLES: &[&str] = &["setup", "runner"];
 
-/// Rejects `[tool.sc-lint]` keys sc-lint would otherwise silently ignore, so an
-/// unsupported table (for example `[tool.sc-lint.setup]`) is never mistaken for
-/// config. Root tables such as `[line_counts]` belong to the lint backends and
-/// are not checked here.
+/// Rejects keys sc-lint would otherwise silently ignore, so an unsupported
+/// table is never mistaken for config: the declined `[setup]`/`[runner]` at the
+/// file root, and any key under `[tool.sc-lint]` outside `SC_LINT_KEYS`. Other
+/// root tables are deliberately allowed: `[line_counts]`, `[portability]`,
+/// `[identities]`, `[version_sync]`, `[cargo_shear]` and the like belong to the
+/// lint backends, which own their validation.
 #[expect(
     clippy::result_large_err,
     reason = "Repo config validation failures are part of the stable top-level CliError contract."
 )]
 fn reject_unknown_tables(path: &Path, raw: &toml::Table) -> Result<(), CliError> {
+    if let Some(key) = DECLINED_TABLES.iter().find(|key| raw.contains_key(**key)) {
+        return Err(unknown_table_error(path, key, SC_LINT_KEYS));
+    }
     let Some(sc_lint) = raw
         .get("tool")
         .and_then(toml::Value::as_table)
@@ -596,9 +602,7 @@ fn reject_unknown_tables(path: &Path, raw: &toml::Table) -> Result<(), CliError>
 }
 
 fn unknown_table_error(path: &Path, key: &str, supported: &[&str]) -> CliError {
-    let declined = key
-        .strip_prefix("tool.sc-lint.")
-        .is_some_and(|name| DECLINED_SC_LINT_TABLES.contains(&name));
+    let declined = DECLINED_TABLES.contains(&key.strip_prefix("tool.sc-lint.").unwrap_or(key));
     let (cause, action) = if declined {
         (
             format!(

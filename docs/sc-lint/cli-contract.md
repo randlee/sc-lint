@@ -294,7 +294,7 @@ envelope `command` value is the fallback identifier `cli.parse_error`.
 | --- | --- | --- | --- |
 | `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
 | `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
-| `config.unknown_table` | `config` | the unsupported key (`tool.sc-lint.setup`/`runner`: ADR-020 decision 9) | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
+| `config.unknown_table` | `config` | the unsupported key: root or `tool.sc-lint` `setup`/`runner` (ADR-020 decision 9), or any other `[tool.sc-lint]` key outside `minimum_version`, `lint`, `lint_profiles`, `test`, `analyzers`; other root tables belong to the lint backends and are not rejected | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
 | `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
 | `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
 | `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |

@@ -1462,11 +1462,32 @@ fn declined_setup_and_runner_tables_name_adr_020_decision_9() {
             "tool.sc-lint.runner",
             "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.runner]\npython = \".venv\"\n",
         ),
+        (
+            "setup",
+            "[setup]\npre = [\"python3\", \"x.py\"]\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n",
+        ),
+        (
+            "runner",
+            "[runner]\npython = \".venv\"\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n",
+        ),
     ] {
-        for argv in [&["lint", "sc-boundary"][..], &["lint", "ci"][..]] {
-            let error = load_error_for_config(config, argv);
-            assert_eq!(error.kind, CliErrorKind::Config, "{table} {argv:?}");
-            assert_eq!(error.code(), "config.unknown_table", "{table} {argv:?}");
+        let temp_dir = TempDir::new().expect("temp dir");
+        let config_path = temp_dir.path().join("sc-lint.toml");
+        std::fs::write(&config_path, config).expect("write config");
+        let compatibility = crate::compatibility::load_compatibility_requirement(&config_path)
+            .expect_err("declined table must fail compatibility loading");
+        let mut errors = vec![compatibility];
+        for argv in [
+            &["lint", "sc-boundary"][..],
+            &["lint", "sc-portability"][..],
+            &["lint", "ci"][..],
+        ] {
+            errors.push(load_error_for_config(config, argv));
+        }
+        // Path 0 is load_compatibility_requirement; the rest are argv loads.
+        for (path, error) in errors.into_iter().enumerate() {
+            assert_eq!(error.kind, CliErrorKind::Config, "{table} path {path}");
+            assert_eq!(error.code(), "config.unknown_table", "{table} path {path}");
             assert_eq!(error.details.get("key"), Some(&json!(table)));
             let cause = error.cause.as_deref().expect("cause");
             assert!(cause.contains("ADR-020 decision 9"), "{cause}");
@@ -1518,7 +1539,7 @@ fn supported_sc_lint_tables_still_load() {
     std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
     std::fs::write(
         temp_dir.path().join("sc-lint.toml"),
-        "[logging]\nconsole = false\n[line_counts]\nlimit = 500\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.lint_profiles]\nfast = [\"a\"]\n[[tool.sc-lint.lint]]\nname = \"a\"\ncommand = [\"true\"]\n[[tool.sc-lint.test]]\nname = \"t\"\ncommand = [\"true\"]\n[tool.sc-lint.analyzers.sc-boundary]\nenabled = true\n",
+        "[logging]\nconsole = false\n[line_counts]\nlimit = 500\n[portability]\nx = 1\n[identities]\nx = 1\n[version_sync]\nx = 1\n[cargo_shear]\nx = 1\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.lint_profiles]\nfast = [\"a\"]\n[[tool.sc-lint.lint]]\nname = \"a\"\ncommand = [\"true\"]\n[[tool.sc-lint.test]]\nname = \"t\"\ncommand = [\"true\"]\n[tool.sc-lint.analyzers.sc-boundary]\nenabled = true\n",
     )
     .expect("write config");
     let cli = Cli::parse_from([
