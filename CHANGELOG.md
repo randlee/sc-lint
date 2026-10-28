@@ -30,6 +30,8 @@ All notable changes to sc-lint are documented here.
 - l-8: CLI contract checks now document unsupported interface checks, pin the
   command-family JSON envelope, and reject malformed Python adapter payloads
   with `backend_payload_drift`.
+- l-8: The CLI rejects unknown `[tool.sc-lint]` configuration keys with
+  `config.unknown_table`; supported keys are documented in the CLI contract.
 - l-9: Version-sync checks support Python manifests and configurable Winget and
   release-wiring checks. Repositories without a `[version_sync]` table now fail
   with `config.table_missing`; consumers using version sync must add the table

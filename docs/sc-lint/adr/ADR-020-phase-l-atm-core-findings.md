@@ -85,7 +85,7 @@ make mid-sprint. Approval of this record gates dispatch only.
     | `test.unknown_selector` | `config` | the selector name and file | use a name from `sc-lint test --list` |
     | `test.group_cycle` | `config` | the selector cycle path | break the cycle in `[tool.sc-lint.test]` |
     | `profile.steps_failed` | `backend_failure` | `failed_steps[]`: `index`, `name`, `exit_code` in declaration order | fix the failing steps and rerun |
-    | `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the wheel so the payload matches the envelope schema |
+    | `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the analyzer backend so its payload matches the published schema |
 
     Codes are typed constants in the owning crate and are validated where
     config is parsed, never matched as free strings at call sites.
@@ -114,6 +114,13 @@ make mid-sprint. Approval of this record gates dispatch only.
     the workspace, crate, lockfile, and Python package-version checks; it does
     not check sibling dependency version pins in `pyproject.toml`. atm-core
     keeps that dependency-pin check in its own tooling.
+
+13. **Closed CLI configuration keys (`config.unknown_table`).** The
+    `[tool.sc-lint]` table accepts only `minimum_version`, `lint`,
+    `lint_profiles`, `test`, and `analyzers`; any other key is rejected with
+    `config.unknown_table`. Root-level `setup` and `runner` are also rejected
+    with that code; other root tables belong to the lint backends and are not
+    rejected. The CLI contract documents the cause and recovery text.
 
 ## Plan-review clarifications (Accepted — Rand, 2026-10-27)
 
@@ -146,14 +153,14 @@ Clarifications to ADR-020 from sprint l-3:
 Clarifications to ADR-020 from l-4:
 13. Repo root (decision 7 area, REQ-CLI-003): the nearest ancestor of the discovery start holding `sc-lint.toml` or a `Cargo.toml` with a `[workspace]` table is the repo root; nearest wins regardless of marker kind; package-only manifests never match. Only `lint sc-boundary` requires `boundaries/`.
 14. Per-table resolution: candidates are the explicit `--config` file, `sc-lint.toml`, `.just/lint-config.toml`, in that order; the first existing file holding the table wins, and a file lacking the table never stops the search. An explicit `--config` file that does not exist is a hard error (`explicit config file not found: <path>`, kind config, no code), not a skipped candidate. A key present with a non-table value, or an unparsable candidate reached during the search, is a hard error of kind config. Rust forwards `--config` only when the user passed it.
-15. Behaviour change: `line-counts` and `identity-literals` now fail with `config.table_missing` when their table (`line_counts`, `identities`) is in none of the files; previously a missing table meant defaults. This repository's `.just/lint-config.toml` gains empty tables to keep its behaviour. `lint_common.load_lint_config` stays as a permanently-deprecated shim.
+15. Behaviour change: Python-backed `line-counts` and `identity-literals` now fail with `config.table_missing` when their table (`line_counts`, `identities`) is in none of the files; previously a missing table meant defaults. Rust analyzers keep their defaults when their table is absent. This repository's `.just/lint-config.toml` gains empty tables to keep the Python-backed lints' behaviour. `lint_common.load_lint_config` stays as a permanently-deprecated shim.
 16. `config.table_missing` crosses the Rust adapter through a closed lookup (`ConfigCode::from_wire`); an unrecognised `details.code` stays in `details` and the error keeps `CLI.CONFIG_ERROR`. The cause equals the Python message (table and files searched, repo-relative posix paths, absolute when outside the repo). `error.suggested_action` carries the decision 10 recovery text.
 
 
 ### Sprint l-5
 Clarifications to decision 8 (l-5):
 1. Upgrade of installed consumers: renaming the three templates changes the files the kit copies to `plugins/sc-lint/templates/`. The existing retirement logic removes the old `.j2` copies when unmodified (digest match) and reports `conflict: ... was modified outside sc-lint` (exit 2, no writes) when a consumer edited one; `--dry-run` lists them as deletions and exits 1. No installer code change; tests cover the three cases.
-2. `tests/adoption/golden/` is a one-time migration fixture, not a permanent regression baseline.
+2. `tests/adoption/golden/` is a permanent regression baseline checked byte-for-byte, not a one-time migration fixture.
 3. The `.j2`/`.tmpl` guard checks only template front matter.
 
 ### Sprint l-6
@@ -175,7 +182,7 @@ ADR-020 decision 6 clarifications (sprint l-7):
 
 ### Sprint l-8
 Clarifications for decision 10 (`backend_payload_drift`) and REQ-PRODUCT-002DA (l-8):
-1. "Published schema" in REQ-PRODUCT-002DA means the `sc-lint-python-v1` payload shape documented in cli-contract.md ("Python adapter backend") and encoded in `sc_lint_schema::validate_adapter_payload`. No JSON Schema file or other artifact is published. Rust backends are typed structs and are not runtime-validated.
+1. "Published schema" in REQ-PRODUCT-002DA means the `sc-lint-python-v1` payload shape documented in cli-contract.md ("Python adapter backend") and encoded in `sc_lint_schema::validate_adapter_payload`. No JSON Schema file or other artifact is published. Rust analyzer reports are validated against the published `analyzer-report-v1.schema.json` before normalization.
 2. The validator lives in `sc-lint-schema` (which gains `serde_json` as a normal dependency, already a workspace dependency; Cargo.lock unchanged). It requires `adapter_schema`, `ok`, `diagnostics` (array of strings); on success `data` (object) and `summary` (string) and no `error`; on failure `error{kind,message}` (strings), optional `error.details` (object) and `error.suggested_action` (string), optional `summary`, and no `data`. Unknown extra keys are allowed. The first drift in that fixed order is reported.
 3. In `parse_adapter_output` the check runs after the existing unknown-`adapter_schema` check (not drift) and before the exit-code and verdict checks, so a drifted payload fails as `backend_payload_drift` even when the process exit code is non-zero.
 4. Column mapping for the decision 10 row: Code -> `CliError::code()` (`backend_payload_drift`, typed constant in `python_adapter.rs`); Kind -> `backend_protocol`; Cause names -> `CliError::cause` (key path text) plus `details.key_path`; Recovery -> `CliError::suggested_action`.
