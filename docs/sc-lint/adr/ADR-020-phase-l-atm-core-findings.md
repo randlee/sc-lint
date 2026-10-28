@@ -21,7 +21,8 @@ make mid-sprint. Approval of this record gates dispatch only.
    findings are suppressed inside it. PORT-008 does not report a read of
    `USER` when the same enclosing function also reads `USERNAME`. The gate
    scope is limited to these attribute forms: other `target_os` values and
-   statement-level `#[cfg]` attributes are not honored.
+   statement-level `#[cfg]` attributes are not honored. A gated block
+   expression (`#[cfg(...)] { ... }`) counts as an item here, as it did before phase L.
 2. **PORT-007 (#192).** Findings for the exact verbatim and device prefixes
    `\\?\` and `\\.\` are not reported. A reviewed-exception allowlist is not
    added in phase L.
