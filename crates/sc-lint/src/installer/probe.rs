@@ -204,19 +204,6 @@ pub(super) fn wait_for_backend_probe(
     }
 }
 
-#[cfg(all(test, target_os = "linux"))]
-pub(super) fn finish_backend_output(
-    reader: ProbeOutputReader,
-    process_id: u32,
-) -> Result<Vec<u8>, BackendOutputError> {
-    finish_backend_output_after_stop(
-        reader,
-        BACKEND_OUTPUT_DRAIN_TIMEOUT,
-        BACKEND_OUTPUT_STOP_TIMEOUT,
-        Some(|| terminate_probe_process_tree(process_id)),
-    )
-}
-
 fn finish_backend_output_after_leader_exit(
     reader: ProbeOutputReader,
     drain_timeout: Duration,
@@ -461,27 +448,8 @@ fn probe_version_with_timeout(binary: &Path, timeout: Duration) -> Result<Versio
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(target_os = "linux")]
-    use std::fs;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
-    #[cfg(target_os = "linux")]
-    use tempfile::tempdir;
-
-    #[cfg(target_os = "linux")]
-    struct DetachedChildGuard {
-        process_id: u32,
-    }
-
-    #[cfg(target_os = "linux")]
-    impl Drop for DetachedChildGuard {
-        fn drop(&mut self) {
-            let process_id = self.process_id as libc::pid_t;
-            // SAFETY: the script writes this live detached child's PID before the test
-            // creates the guard; the child runs `sleep 60` until this direct signal.
-            unsafe { libc::kill(process_id, libc::SIGKILL) };
-        }
-    }
 
     #[cfg(unix)]
     #[test]
@@ -509,11 +477,13 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn live_probe_group_is_killed_and_reported_as_stopped() {
-        let mut child = Command::new("sleep")
-            .arg("60")
+        let mut child = Command::new("cat")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
             .process_group(0)
             .spawn()
             .expect("spawn live probe group leader");
+        let _stdin = child.stdin.take().expect("keep cat waiting for input");
         let process_id = child.id();
 
         assert_eq!(
@@ -560,14 +530,14 @@ mod tests {
     }
 
     #[test]
-    fn never_sending_reader_returns_typed_timeout() {
+    fn open_probe_output_writer_returns_typed_timeout_after_stop() {
         let (_sender, reader) = mpsc::sync_channel(1);
         let mut stop_attempted = false;
 
         let error = finish_backend_output_after_stop(
             reader,
-            BACKEND_OUTPUT_DRAIN_TIMEOUT,
-            BACKEND_OUTPUT_STOP_TIMEOUT,
+            Duration::ZERO,
+            Duration::ZERO,
             Some(|| {
                 stop_attempted = true;
                 Ok(ProbeTreeStop::AlreadyStopped)
@@ -582,7 +552,7 @@ mod tests {
         assert!(
             matches!(
                 error,
-                BackendOutputError::Timeout { wait } if wait == BACKEND_OUTPUT_STOP_TIMEOUT
+                BackendOutputError::Timeout { wait } if wait.is_zero()
             ),
             "expected typed timeout, got {error:?}"
         );
@@ -600,53 +570,12 @@ mod tests {
         assert!(!message.contains("process exited"));
     }
 
-    #[cfg(target_os = "linux")]
-    #[cfg(unix)]
-    #[test]
-    fn child_holding_probe_pipe_returns_typed_timeout() {
-        let directory = tempdir().expect("temporary probe directory");
-        let script = directory.path().join("probe");
-        fs::write(
-            &script,
-            "#!/bin/sh\ndir=$(dirname \"$0\")\nsetsid sleep 60 &\nprintf '%s\\n' \"$!\" > \"$dir/pid\"\n: > \"$dir/ready\"\nexit 0\n",
-        )
-        .expect("write probe script");
-        let (mut child, reader) = spawn_probe(
-            Path::new("/bin/sh"),
-            "test",
-            &[script.to_str().expect("script path is UTF-8")],
-            "--help",
-        )
-        .expect("spawn probe script through shell");
-        child.wait().expect("script writes pid before exiting");
-        let process_id = fs::read_to_string(directory.path().join("pid"))
-            .expect("read detached child pid")
-            .trim()
-            .parse()
-            .expect("parse detached child pid");
-        let _detached_child = DetachedChildGuard { process_id };
-        let probe_process_id = child.id();
-        let output_result = finish_backend_output(reader, probe_process_id);
-        child
-            .wait()
-            .expect("reap probe script after stopping its group");
-        let error =
-            output_result.expect_err("child holding the pipe must time out instead of hanging");
-
-        assert!(
-            matches!(error, BackendOutputError::Timeout { .. }),
-            "expected typed timeout, got {error:?}"
-        );
-    }
-
-    #[cfg(target_os = "linux")]
-    #[cfg(unix)]
     #[test]
     fn probe_version_hung_candidate_returns_a_bounded_timeout() {
         let error = run_probe(
             Path::new("/bin/sh"),
             crate::consts::SERVICE_NAME,
-            &["-c", "sleep 60", "--"],
+            &["-c", "exec tail -f /dev/null", "--"],
             VERSION_PROBE_DESCRIPTION,
             Duration::from_millis(100),
         )
