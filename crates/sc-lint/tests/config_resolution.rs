@@ -295,6 +295,38 @@ fn table_falls_back_per_table() {
 }
 
 #[test]
+fn rust_analyzers_discover_split_file_config_through_cli_dispatch() {
+    // Both Rust analyzer dispatch paths must pass no path when --config was
+    // omitted. The disabled analyzer tables live only in .just; without the
+    // fallback each analyzer tries to load this deliberately invalid workspace.
+    let sandbox = Sandbox::new();
+    sandbox.write("sc-lint.toml", KIT_SC_LINT_TOML);
+    sandbox.write("Cargo.toml", "this is deliberately not a Cargo manifest\n");
+    sandbox.mkdir("boundaries");
+    sandbox.write(
+        ".just/lint-config.toml",
+        "[tool.sc-lint.analyzers.boundary]\nenabled = false\n\n[tool.sc-lint.analyzers.portability]\nenabled = false\n",
+    );
+
+    for target in ["sc-boundary", "sc-portability"] {
+        let output = sandbox.run(&sandbox.path(""), &["lint", target]);
+        let payload = success_json(&output);
+        assert_eq!(
+            payload["data"]["status"],
+            "pass",
+            "{target}: {}",
+            context(&output)
+        );
+        assert_eq!(
+            payload["data"]["findings"],
+            json!([]),
+            "{target}: {}",
+            context(&output)
+        );
+    }
+}
+
+#[test]
 fn sc_lint_toml_table_wins() {
     let sandbox = Sandbox::fixture();
     sandbox.write("sc-lint.toml", LINE_COUNTS_300);
