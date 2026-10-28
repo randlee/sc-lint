@@ -432,7 +432,7 @@ specialized backend tools and mixed Rust/Python implementations.
   `.pass(...)` or `.compile_fail(...)` glob, and must keep reporting every
   other unlinked file, empty file and unused dependency as before. No
   per-fixture configuration is required for consumed fixtures.
-  (Added phase L, #647. Approved by Rand 2026-10-27. See
+  (Added phase L, #647. Status: Accepted — Rand, 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
 ## Contract References
