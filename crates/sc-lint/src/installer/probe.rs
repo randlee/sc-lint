@@ -463,8 +463,6 @@ mod tests {
     use super::*;
     #[cfg(target_os = "linux")]
     use std::fs;
-    #[cfg(target_os = "linux")]
-    use std::os::unix::fs::PermissionsExt;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
     #[cfg(target_os = "linux")]
