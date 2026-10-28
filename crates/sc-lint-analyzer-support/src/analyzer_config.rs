@@ -141,19 +141,45 @@ impl AnalyzerConfigError {
     }
 }
 
+/// Repo-relative fallback config file consulted when `sc-lint.toml` lacks the
+/// analyzer's table (REQ-CLI-003, ADR-020 decision 14).
+const LINT_CONFIG_FALLBACK: &str = ".just/lint-config.toml";
+
+/// Resolves the document that holds this analyzer's table (REQ-CLI-003).
+///
+/// An explicit `--config` file is the only candidate. Otherwise the candidates
+/// are `sc-lint.toml` and then `.just/lint-config.toml`; the first existing file
+/// holding `[tool.sc-lint.analyzers.<analyzer>]` wins, so a table in
+/// `sc-lint.toml` is never shadowed by the fallback file. When no candidate
+/// holds the table, the first existing candidate is returned so keys outside
+/// the analyzer table (such as a legacy top-level table) keep their behaviour.
 pub fn read_config_document(
     analyzer: &'static str,
     root: &Path,
     config: Option<&Path>,
 ) -> Result<toml::Table, AnalyzerConfigError> {
-    let path = match config {
-        Some(path) => path.to_path_buf(),
-        None => match Some(root.join("sc-lint.toml")).filter(|path| path.exists()) {
-            Some(path) => path,
-            None => return Ok(toml::Table::new()),
-        },
-    };
-    let text = fs::read_to_string(&path).map_err(|error| AnalyzerConfigError::Read {
+    if let Some(path) = config {
+        return read_config_file(analyzer, path);
+    }
+    let mut first_existing = None;
+    for candidate in [root.join("sc-lint.toml"), root.join(LINT_CONFIG_FALLBACK)] {
+        if !candidate.exists() {
+            continue;
+        }
+        let document = read_config_file(analyzer, &candidate)?;
+        if analyzer_table(&document, analyzer)?.is_some() {
+            return Ok(document);
+        }
+        first_existing.get_or_insert(document);
+    }
+    Ok(first_existing.unwrap_or_default())
+}
+
+fn read_config_file(
+    analyzer: &'static str,
+    path: &Path,
+) -> Result<toml::Table, AnalyzerConfigError> {
+    let text = fs::read_to_string(path).map_err(|error| AnalyzerConfigError::Read {
         analyzer,
         path: path.display().to_string(),
         source: error,

@@ -245,6 +245,55 @@ fn config_without_analyzer_table_yields_defaults() {
     assert_eq!(settings.fail_rules, rule_set(&["EXAMPLE-001"]));
 }
 
+/// Writes `.just/lint-config.toml` under `directory`, the REQ-CLI-003 fallback file.
+fn write_lint_config_fallback(directory: &TempDir, contents: &str) {
+    fs::create_dir_all(directory.path().join(".just")).unwrap();
+    fs::write(directory.path().join(".just/lint-config.toml"), contents).unwrap();
+}
+
+#[test]
+fn fallback_lint_config_supplies_table_missing_from_sc_lint_toml() {
+    let directory = config_dir("[tool.sc-lint.analyzers.other]\nenabled = true\n");
+    write_lint_config_fallback(
+        &directory,
+        "[tool.sc-lint.analyzers.example]\nenabled = false\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert!(!settings.enabled);
+}
+
+#[test]
+fn sc_lint_toml_table_is_not_shadowed_by_fallback_lint_config() {
+    let directory = config_dir("[tool.sc-lint.analyzers.example]\nenabled = true\n");
+    write_lint_config_fallback(
+        &directory,
+        "[tool.sc-lint.analyzers.example]\nenabled = false\n",
+    );
+    let settings = load_analyzer_settings(&CATALOG, directory.path(), None, None).unwrap();
+
+    assert!(settings.enabled);
+}
+
+#[test]
+fn explicit_config_is_used_without_consulting_fallback_lint_config() {
+    let directory = TempDir::new().unwrap();
+    write_lint_config_fallback(
+        &directory,
+        "[tool.sc-lint.analyzers.example]\nenabled = true\n",
+    );
+    let explicit = directory.path().join("explicit.toml");
+    fs::write(
+        &explicit,
+        "[tool.sc-lint.analyzers.example]\nenabled = false\n",
+    )
+    .unwrap();
+    let settings =
+        load_analyzer_settings(&CATALOG, directory.path(), Some(&explicit), None).unwrap();
+
+    assert!(!settings.enabled);
+}
+
 #[test]
 fn explicit_missing_config_is_a_read_error() {
     let directory = TempDir::new().unwrap();

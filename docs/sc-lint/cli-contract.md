@@ -115,6 +115,15 @@ completion events so command telemetry and machine-readable output line up.
 
 Current implementation status:
 
+- `REQ-CLI-003` analyzer config tables (Rust analyzers: portability, boundary,
+  runtime)
+  - implemented per-table resolution: an explicit `--config` file, then the
+    table in `sc-lint.toml`, otherwise the same table in
+    `.just/lint-config.toml`; a table in `sc-lint.toml` is never shadowed
+  - documented deviation: when neither file holds the table, Rust analyzers
+    keep their defaults and do not raise `config.table_missing`. ADR-020
+    decision 15 scopes that failure to `line-counts` and `identity-literals`.
+    Changing it requires a Rand ADR amendment.
 - `version`
   - direct CLI-owned success path
 - `compatibility.check`
