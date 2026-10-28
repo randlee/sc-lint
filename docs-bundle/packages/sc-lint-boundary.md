@@ -25,7 +25,10 @@ table through `manifest_dependency_allowlists`,
 manifest, `global_dependency_ownership` limits where a dependency may appear
 in manifests and source, and `manifest_section_rules` restricts a dependency
 to named manifest sections. These are optional policy families; an absent
-family adds no checks.
+family adds no checks. The families are released `sc-lint` consumer
+configuration. atm-core keeps parity only for record-lock comparison of
+`allowed_dependencies` and `allowed_dev_dependencies`; the four-case oracle is
+in `crates/sc-lint-boundary/tests/issue136.rs`.
 
 ## Recovering inventory and stale-policy findings
 

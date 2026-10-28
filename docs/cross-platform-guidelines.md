@@ -56,9 +56,9 @@ This applies to:
 
 - `PORT-007` flags drive-absolute and UNC path literals in ungated production
   code.
-- Windows-gated items and block expressions are exempt from the
-  portability leaf findings, including drive and UNC path literals. Cfg on
-  `let`, `if`, and call statements does not provide this exemption.
+- Windows-gated items and block expressions are exempt from the portability
+  leaf findings, including drive and UNC path literals. Cfg on `let`, `if`, and
+  call statements does not provide this exemption.
 - Literals whose unescaped value starts with the Windows verbatim prefix
   `\\?\` or device prefix `\\.\` are not reported; they are namespace
   syntax, not absolute paths for this rule.

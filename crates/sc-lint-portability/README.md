@@ -21,7 +21,8 @@ Use `sc-portability` to catch portability drift such as:
   - hardcoded Unix-only absolute path literals in production code
 - `PORT-007`
   - hardcoded Windows absolute path literals, including drive-letter and UNC
-    forms, in production code
+    forms, in production code; `#[cfg(windows)]`-gated items and expression
+    blocks are exempt, as are the `\\?\` verbatim and `\\.\` device prefixes
 - `PORT-008`
   - direct production lookups of `HOME`, `USER`, and `XDG_*` without a
     platform-neutral abstraction
