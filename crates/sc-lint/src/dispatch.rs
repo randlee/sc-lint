@@ -113,7 +113,7 @@ pub fn run_sc_boundary(
             format: OutputFormat::Json,
             rule: None,
         },
-        loaded_config.config_path(),
+        loaded_config.explicit_config(),
         context.rule_filter(),
     )
     .map_err(|error| BoundaryDispatchError::Analysis(Box::new(error)))
@@ -195,7 +195,7 @@ fn run_delegated_backend(
     let output = ProcessCommand::new(&backend_binary)
         .args(backend_args(
             repo_root,
-            loaded_config.config_path(),
+            loaded_config.explicit_config(),
             rule_filter,
         ))
         .output()

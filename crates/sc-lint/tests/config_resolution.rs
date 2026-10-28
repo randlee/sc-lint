@@ -360,3 +360,35 @@ fn unknown_adapter_code_stays_in_details() {
     assert_eq!(error["details"]["code"], "config.unknown_code");
     assert!(error.get("cause").is_none(), "unexpected cause: {error}");
 }
+
+#[test]
+fn consumer_commands_preserve_typed_config_errors_and_row_recovery() {
+    let commands: [&[&str]; 2] = [&["test"], &["lint", "ci", "--consumer"]];
+    for args in commands {
+        let unknown_table = Sandbox::new();
+        unknown_table.write("sc-lint.toml", "[setup]\ncommand = \"nope\"\n");
+        let error = config_error(&unknown_table.run(&unknown_table.path(""), args));
+        assert_eq!(error["code"], "config.unknown_table", "{args:?}");
+        assert!(
+            error["suggested_action"]
+                .as_str()
+                .is_some_and(|action| !action.contains("just setup")),
+            "{args:?}: {error}"
+        );
+
+        let malformed_row = Sandbox::new();
+        malformed_row.write(
+            "sc-lint.toml",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n\n[[tool.sc-lint.lint]]\nname = \"lint\"\ncommand = [\"cargo\", \"check\"]\n\n[[tool.sc-lint.test]]\nname = 5\ncommand = [\"cargo\", \"test\"]\n",
+        );
+        let error = config_error(&malformed_row.run(&malformed_row.path(""), args));
+        assert_eq!(error["code"], "CLI.SC_LINT_CONFIG_MALFORMED", "{args:?}");
+        assert_eq!(error["details"]["profile"], "test", "{args:?}");
+        assert!(
+            error["suggested_action"]
+                .as_str()
+                .is_some_and(|action| action.contains("test` selectors")),
+            "{args:?}: {error}"
+        );
+    }
+}
