@@ -306,12 +306,14 @@ fn visit_block_for_unix_portability(
                 parity::ParityContext::without_adapters(config),
             ),
             Stmt::Local(local) => {
+                let platform_gated =
+                    inherited_platform_gated || local.attrs.iter().any(attr_is_platform_cfg);
                 if let Some(init) = &local.init {
                     visit_expr_for_unix_portability(
                         &init.expr,
                         inherited_scope,
                         inherited_unix_gated,
-                        inherited_platform_gated,
+                        platform_gated,
                         file_context,
                         findings,
                         config,
@@ -319,16 +321,24 @@ fn visit_block_for_unix_portability(
                     );
                 }
             }
-            Stmt::Expr(expr, _) => visit_expr_for_unix_portability(
-                expr,
-                inherited_scope,
-                inherited_unix_gated,
-                inherited_platform_gated,
-                file_context,
-                findings,
-                config,
-                username_read,
-            ),
+            Stmt::Expr(expr, _) => {
+                let platform_gated = inherited_platform_gated
+                    || match expr {
+                        Expr::Block(block) => block.attrs.iter().any(attr_is_platform_cfg),
+                        Expr::If(expr_if) => expr_if.attrs.iter().any(attr_is_platform_cfg),
+                        _ => false,
+                    };
+                visit_expr_for_unix_portability(
+                    expr,
+                    inherited_scope,
+                    inherited_unix_gated,
+                    platform_gated,
+                    file_context,
+                    findings,
+                    config,
+                    username_read,
+                );
+            }
             Stmt::Macro(_) => {}
         }
     }

@@ -1096,6 +1096,24 @@ fn port006_suppressed_under_target_os_and_not_windows_cfg() {
 }
 
 #[test]
+fn port006_statement_cfg_suppresses_unix_path_literal() {
+    let report = analyze_single_source(
+        r#"
+        pub fn gated_statements() {
+            #[cfg(target_os = "linux")]
+            let _ = "/var/tmp/atm-ports";
+            #[cfg(windows)]
+            { let _ = "C:\\atm-ports"; let _ = "\\\\server\\share\\atm-ports"; }
+            let _ = "/var/tmp/ungated";
+        }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert!(report.findings[0].message.contains("/var/tmp/ungated"));
+}
+
+#[test]
 fn port006_still_fires_on_ungated_item() {
     let report = analyze_single_source(
         r#"
@@ -1487,6 +1505,31 @@ fn port008_user_read_without_fallback_reported() {
         user_findings
             .iter()
             .all(|finding| finding.message.contains("`USER`"))
+    );
+}
+
+#[test]
+fn port008_impl_method_body_is_checked() {
+    let report = analyze_single_source(
+        r#"
+        pub struct Config;
+        impl Config {
+            pub fn load(&self) {
+                let _ = std::env::var("XDG_CONFIG_HOME");
+            }
+        }
+        "#,
+    );
+
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::Port008)
+            .count(),
+        1,
+        "{:#?}",
+        report.findings
     );
 }
 
