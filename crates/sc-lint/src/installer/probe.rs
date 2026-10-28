@@ -13,13 +13,13 @@ const VERSION_PROBE_DESCRIPTION: &str = "--json version";
 pub(crate) enum ProbeFailure {
     /// The binary could not be started; the kind tells a missing binary apart.
     Start(io::Error),
-    /// The probe started but timed out, could not be waited on, or its output
-    /// could not be drained; the message names the binary and the probe.
+    /// The probe failed after start, including timeout, output, or contract
+    /// failures; the message names the failed operation.
     Probe(String),
 }
 
 impl ProbeFailure {
-    fn into_message(self, binary: &Path, expected_name: &str) -> String {
+    pub(crate) fn into_message(self, binary: &Path, expected_name: &str) -> String {
         match self {
             Self::Start(error) => format!(
                 "could not start backend companion `{expected_name}` at `{}`: {error}",
@@ -41,7 +41,7 @@ pub(super) fn backend_cli_failure(
     };
     let (status, output) = match run_backend_probe(binary, expected_name, "--help", timeout) {
         Ok(result) => result,
-        Err(problem) => return Some(problem),
+        Err(problem) => return Some(problem.into_message(binary, expected_name)),
     };
     backend_help_contract_failure(
         &output,
@@ -52,31 +52,41 @@ pub(super) fn backend_cli_failure(
     )
 }
 
-pub(crate) fn probe_backend_version(binary: &Path, expected_name: &str) -> Result<Version, String> {
+pub(crate) fn probe_backend_version(
+    binary: &Path,
+    expected_name: &str,
+) -> Result<Version, ProbeFailure> {
     let (status, output) =
         run_backend_probe(binary, expected_name, "--version", BACKEND_PROBE_TIMEOUT)?;
     if !status.success() {
-        return Err(format!("`--version` probe exited with {status}"));
+        return Err(ProbeFailure::Probe(format!(
+            "`--version` probe exited with {status}"
+        )));
     }
-    let output = String::from_utf8(output)
-        .map_err(|error| format!("`--version` probe output was not UTF-8: {error}"))?;
+    let output = String::from_utf8(output).map_err(|error| {
+        ProbeFailure::Probe(format!("`--version` probe output was not UTF-8: {error}"))
+    })?;
     let mut fields = output.split_whitespace();
-    let reported_name = fields
-        .next()
-        .ok_or_else(|| "`--version` probe returned no identity or version".to_string())?;
+    let reported_name = fields.next().ok_or_else(|| {
+        ProbeFailure::Probe("`--version` probe returned no identity or version".to_string())
+    })?;
     let reported_version = fields
         .next()
-        .ok_or_else(|| "`--version` probe returned no version".to_string())?;
+        .ok_or_else(|| ProbeFailure::Probe("`--version` probe returned no version".to_string()))?;
     if reported_name != expected_name {
-        return Err(format!(
+        return Err(ProbeFailure::Probe(format!(
             "`--version` probe reported backend `{reported_name}`, expected `{expected_name}`"
-        ));
+        )));
     }
     if fields.next().is_some() {
-        return Err("`--version` probe returned unexpected trailing output".to_string());
+        return Err(ProbeFailure::Probe(
+            "`--version` probe returned unexpected trailing output".to_string(),
+        ));
     }
     Version::parse(reported_version).map_err(|error| {
-        format!("`--version` probe reported invalid version `{reported_version}`: {error}")
+        ProbeFailure::Probe(format!(
+            "`--version` probe reported invalid version `{reported_version}`: {error}"
+        ))
     })
 }
 
@@ -85,7 +95,7 @@ pub(super) fn run_backend_probe(
     expected_name: &str,
     argument: &str,
     timeout: Duration,
-) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
+) -> Result<(std::process::ExitStatus, Vec<u8>), ProbeFailure> {
     run_backend_probe_with_arguments(binary, expected_name, &[argument], argument, timeout)
 }
 
@@ -95,9 +105,8 @@ fn run_backend_probe_with_arguments(
     arguments: &[&str],
     description: &str,
     timeout: Duration,
-) -> Result<(std::process::ExitStatus, Vec<u8>), String> {
+) -> Result<(std::process::ExitStatus, Vec<u8>), ProbeFailure> {
     run_probe(binary, expected_name, arguments, description, timeout)
-        .map_err(|failure| failure.into_message(binary, expected_name))
 }
 
 /// Runs `<binary> --json version` bounded by `timeout`, with the same
@@ -414,35 +423,35 @@ pub(super) fn terminate_probe_process_tree(_process_id: u32) -> io::Result<Probe
     ))
 }
 
-pub(crate) fn probe_version(binary: &Path) -> Result<Version, String> {
+pub(crate) fn probe_version(binary: &Path) -> Result<Version, ProbeFailure> {
     probe_version_with_timeout(binary, BACKEND_PROBE_TIMEOUT)
 }
 
-fn probe_version_with_timeout(binary: &Path, timeout: Duration) -> Result<Version, String> {
-    if !binary.is_file() {
-        return Err("binary was not found".to_string());
-    }
-    let (status, output) = run_version_command(binary, timeout)
-        .map_err(|failure| failure.into_message(binary, crate::consts::SERVICE_NAME))?;
+fn probe_version_with_timeout(binary: &Path, timeout: Duration) -> Result<Version, ProbeFailure> {
+    let (status, output) = run_version_command(binary, timeout)?;
     if !status.success() {
-        return Err(format!("version probe exited with {status}"));
+        return Err(ProbeFailure::Probe(format!(
+            "version probe exited with {status}"
+        )));
     }
-    let envelope: Value = serde_json::from_slice(&output).map_err(|error| error.to_string())?;
+    let envelope: Value =
+        serde_json::from_slice(&output).map_err(|error| ProbeFailure::Probe(error.to_string()))?;
     let data = envelope
         .get("data")
-        .ok_or_else(|| "version probe did not include data".to_string())?;
+        .ok_or_else(|| ProbeFailure::Probe("version probe did not include data".to_string()))?;
     if envelope.get("ok").and_then(Value::as_bool) != Some(true)
         || envelope.get("command").and_then(Value::as_str) != Some("version")
         || data.get("tool").and_then(Value::as_str) != Some(crate::consts::SERVICE_NAME)
         || data.get("contract_schema").and_then(Value::as_str) != Some(VERSION_PROBE_SCHEMA)
     {
-        return Err("version probe did not implement sc-lint-version-v1".to_string());
+        return Err(ProbeFailure::Probe(
+            "version probe did not implement sc-lint-version-v1".to_string(),
+        ));
     }
-    let version = data
-        .get("version")
-        .and_then(Value::as_str)
-        .ok_or_else(|| "version probe did not include a version".to_string())?;
-    Version::parse(version).map_err(|error| error.to_string())
+    let version = data.get("version").and_then(Value::as_str).ok_or_else(|| {
+        ProbeFailure::Probe("version probe did not include a version".to_string())
+    })?;
+    Version::parse(version).map_err(|error| ProbeFailure::Probe(error.to_string()))
 }
 
 #[cfg(test)]
@@ -450,6 +459,20 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
+
+    #[test]
+    fn missing_version_probe_returns_typed_start_failure_to_caller() {
+        let fixture = tempfile::tempdir().expect("fixture");
+        let missing_binary = fixture.path().join("missing-sc-lint");
+
+        let failure = probe_version_with_timeout(&missing_binary, Duration::from_secs(1))
+            .expect_err("missing probe executable must fail");
+
+        assert!(matches!(
+            failure,
+            ProbeFailure::Start(error) if error.kind() == io::ErrorKind::NotFound
+        ));
+    }
 
     #[cfg(unix)]
     #[test]
