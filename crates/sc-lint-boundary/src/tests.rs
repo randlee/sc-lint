@@ -3675,6 +3675,42 @@ fn does_not_flag_comparison_like_trait_impl_self_loop() {
 }
 
 #[test]
+fn does_not_flag_clone_trait_impl_self_loop() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+                pub struct Loop(String);
+
+                impl Loop {
+                    fn duplicate(&self) -> Self {
+                        Self::clone(self)
+                    }
+                }
+
+                impl Clone for Loop {
+                    fn clone(&self) -> Self {
+                        self.duplicate()
+                    }
+                }
+            "#,
+    );
+
+    let report = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+        rule: Some(RuleFilter::Cycles),
+    })
+    .unwrap();
+
+    assert_eq!(report.status, ReportStatus::Pass);
+    assert!(report.findings.is_empty());
+}
+
+#[test]
 fn normalizes_trait_paths_for_exact_policy_matching() {
     let path: syn::Path = syn::parse_quote!(serde::Deserialize<'de>);
     assert_eq!(graph::trait_path_key(&path), "serde::Deserialize");
@@ -3695,6 +3731,10 @@ fn default_rule_config_ignores_common_non_architectural_trait_paths() {
         "FromStr"
     ));
     assert!(analysis::is_non_architectural_trait_impl_self_loop("Parse"));
+    assert!(analysis::is_non_architectural_trait_impl_self_loop(
+        "core::clone::Clone"
+    ));
+    assert!(analysis::is_non_architectural_trait_impl_self_loop("Clone"));
     assert!(!analysis::is_non_architectural_trait_impl_self_loop(
         "one::Display"
     ));
