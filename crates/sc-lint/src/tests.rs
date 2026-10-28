@@ -1431,6 +1431,107 @@ fn malformed_repo_config_returns_cli_config_error() {
     assert!(error.cause.is_some());
 }
 
+fn load_error_for_config(config: &str, argv: &[&str]) -> crate::error::CliError {
+    let temp_dir = TempDir::new().expect("temp dir");
+    std::fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        "[workspace]\nmembers=[]\nresolver=\"2\"\n",
+    )
+    .expect("write manifest");
+    std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::write(temp_dir.path().join("sc-lint.toml"), config).expect("write config");
+    let mut args = vec![
+        "sc-lint",
+        "--root",
+        temp_dir.path().to_str().expect("temp path"),
+    ];
+    args.extend_from_slice(argv);
+    let cli = Cli::parse_from(args);
+    let context = CommandContext::from_cli(&cli).expect("context");
+    LoadedConfig::load(&cli, &context).expect_err("config should fail")
+}
+
+#[test]
+fn declined_setup_and_runner_tables_name_adr_020_decision_9() {
+    for (table, config) in [
+        (
+            "tool.sc-lint.setup",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.setup]\npre = [\"python3\", \"tools/setup.py\"]\n",
+        ),
+        (
+            "tool.sc-lint.runner",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.runner]\npython = \".venv\"\n",
+        ),
+    ] {
+        for argv in [&["lint", "sc-boundary"][..], &["lint", "ci"][..]] {
+            let error = load_error_for_config(config, argv);
+            assert_eq!(error.kind, CliErrorKind::Config, "{table} {argv:?}");
+            assert_eq!(error.code(), "config.unknown_table", "{table} {argv:?}");
+            assert_eq!(error.details.get("key"), Some(&json!(table)));
+            let cause = error.cause.as_deref().expect("cause");
+            assert!(cause.contains("ADR-020 decision 9"), "{cause}");
+            let action = error.suggested_action.as_deref().expect("suggested action");
+            assert!(action.contains("sc_lint.setup_tools"), "{action}");
+            assert!(
+                action.contains(".sc-lint/venv/bin/python -m sc_lint.<module>"),
+                "{action}"
+            );
+        }
+    }
+}
+
+#[test]
+fn unknown_tables_are_rejected_with_a_typed_config_error() {
+    for (key, config) in [
+        (
+            "tool.sc-lint.lints",
+            "[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[[tool.sc-lint.lints]]\nname = \"x\"\n",
+        ),
+        (
+            "tool.sc-lint.minimum",
+            "[tool.sc-lint]\nminimum = \"0.4.0\"\n",
+        ),
+    ] {
+        let error = load_error_for_config(config, &["lint", "sc-boundary"]);
+        assert_eq!(error.code(), "config.unknown_table", "{key}");
+        assert_eq!(error.details.get("key"), Some(&json!(key)));
+        let cause = error.cause.as_deref().expect("cause");
+        assert!(!cause.contains("ADR-020"), "{cause}");
+        assert!(
+            error
+                .suggested_action
+                .as_deref()
+                .is_some_and(|action| action.contains("supported keys")),
+            "{error:?}"
+        );
+    }
+}
+
+#[test]
+fn supported_sc_lint_tables_still_load() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    std::fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        "[workspace]\nmembers=[]\nresolver=\"2\"\n",
+    )
+    .expect("write manifest");
+    std::fs::create_dir_all(temp_dir.path().join("boundaries")).expect("write boundaries dir");
+    std::fs::write(
+        temp_dir.path().join("sc-lint.toml"),
+        "[logging]\nconsole = false\n[line_counts]\nlimit = 500\n[tool.sc-lint]\nminimum_version = \"0.4.0\"\n[tool.sc-lint.lint_profiles]\nfast = [\"a\"]\n[[tool.sc-lint.lint]]\nname = \"a\"\ncommand = [\"true\"]\n[[tool.sc-lint.test]]\nname = \"t\"\ncommand = [\"true\"]\n[tool.sc-lint.analyzers.sc-boundary]\nenabled = true\n",
+    )
+    .expect("write config");
+    let cli = Cli::parse_from([
+        "sc-lint",
+        "--root",
+        temp_dir.path().to_str().expect("temp path"),
+        "lint",
+        "sc-boundary",
+    ]);
+    let context = CommandContext::from_cli(&cli).expect("context");
+    LoadedConfig::load(&cli, &context).expect("supported keys load");
+}
+
 #[test]
 fn lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope() {
     let fixture = AnalysisFixture::new();
