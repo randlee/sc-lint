@@ -1144,6 +1144,7 @@ version = "0.8.0"
 dependencies = [
  "anyhow",
  "clap",
+ "dunce",
  "rayon",
  "sc-lint-analyzer-support",
  "sc-lint-schema",

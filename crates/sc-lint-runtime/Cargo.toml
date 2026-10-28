@@ -30,4 +30,5 @@ syn = { version = "2", features = ["full", "parsing", "visit"] }
 thiserror = "1"
 
 [dev-dependencies]
+dunce = "1"
 tempfile = "3"

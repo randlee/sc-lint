@@ -333,9 +333,9 @@ fn finding_location(message: &str) -> (String, usize) {
 fn finding_relative_location(root: &WorkspaceFixture, message: &str) -> (String, usize) {
     let head = message.split(": ").next().unwrap();
     let (path, line) = head.rsplit_once(':').unwrap();
-    let relative = Path::new(path)
-        .strip_prefix(root.root().canonicalize().unwrap())
-        .unwrap();
+    let canonical_root = dunce::canonicalize(root.root()).unwrap();
+    let canonical_source = dunce::canonicalize(path).unwrap();
+    let relative = canonical_source.strip_prefix(&canonical_root).unwrap();
     (
         relative.to_string_lossy().replace('\\', "/"),
         line.parse().unwrap(),
@@ -664,16 +664,10 @@ fn tokio_sleep_report_matches_frozen_json_contract() {
     let report = analyze_workspace(&analyze_options(&fixture)).unwrap();
     let mut actual = serde_json::to_value(report).unwrap();
     actual["version"] = "<version>".into();
-    let message = actual["findings"][0]["message"].as_str().unwrap().replace(
-        &fixture
-            .root()
-            .canonicalize()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-        "<root>",
-    );
-    actual["findings"][0]["message"] = message.into();
+    let message = actual["findings"][0]["message"].as_str().unwrap();
+    let detail = message.split_once(": ").unwrap().1;
+    let (relative, line) = finding_relative_location(&fixture, message);
+    actual["findings"][0]["message"] = format!("<root>/{relative}:{line}: {detail}").into();
     let expected: serde_json::Value = serde_json::from_str(include_str!(
         "../tests/fixtures/contracts/runtime-003-report.json"
     ))

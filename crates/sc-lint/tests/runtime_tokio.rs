@@ -57,8 +57,10 @@ fn sc_lint_runtime_cli_reports_tokio_blocking_sleep_with_full_source_path() {
     assert_eq!(findings[0]["rule_id"], "SCB-RUNTIME-003");
     let message = findings[0]["message"].as_str().expect("finding message");
     let source_path = message.split(":1: ").next().expect("source path prefix");
-    let relative = Path::new(source_path)
-        .strip_prefix(root.canonicalize().expect("canonical fixture root"))
+    let canonical_root = dunce::canonicalize(root).expect("canonical fixture root");
+    let canonical_source = dunce::canonicalize(source_path).expect("canonical finding source");
+    let relative = canonical_source
+        .strip_prefix(&canonical_root)
         .expect("source under fixture root");
     assert_eq!(
         relative.to_string_lossy().replace('\\', "/"),
