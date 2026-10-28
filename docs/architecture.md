@@ -327,8 +327,9 @@ Current implementation status:
 
 ### Consumer profile implementation boundaries
 
-Consumer test selector configuration decoding lives in
-`crates/sc-lint/src/profile_plan.rs`. The stable profile error codes and their
+Consumer test selector decoding lives in
+`crates/sc-lint/src/test_selectors.rs`; row/table configuration dispatch lives
+in `crates/sc-lint/src/config.rs`. The stable profile error codes and their
 configuration error construction live in `crates/sc-lint/src/scheduler.rs`,
 alongside the scheduler that reports those errors. The CLI keeps the test
 selector and its forwarded arguments in one trailing positional field
@@ -355,8 +356,9 @@ Allowed shared support:
 
 For release `0.2.x`, this means:
 
-- `sc-lint-portability` and `sc-lint-runtime` may depend on
-  `sc-lint-directives` when shared directive parsing/types are needed, and on
+- `sc-lint-boundary` and `sc-lint-attributes` may depend on
+  `sc-lint-directives` for shared directive parsing/types, and
+  `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
   implementation
 - `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend

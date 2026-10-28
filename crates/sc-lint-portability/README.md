@@ -183,7 +183,7 @@ items, and separately Unix-gated public items remain subject to parity checks.
 
 Known limitation: a crate-root `main.rs` with a `#[cfg(unix)]` function and a
 `#[cfg(not(unix))]` sibling is still reported by PORT-010. This behavior is
-tracked for follow-up in issue `lint-phase-l.3`.
+tracked for follow-up in GitHub issue #720.
 
 Pass `--rule-filter PORT-001,PORT-006` to select rules. When provided, the
 filter determines the selected rules instead of `exclude_rules`. Invalid
