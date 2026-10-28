@@ -38,7 +38,8 @@ PATH_KEY_MIGRATION_DIAGNOSTIC = (
     'same key, rename the package or dependency alias to disambiguate it.'
 )
 TRYBUILD_CALL = re.compile(
-    r'\.\s*(?:pass|compile_fail)\s*\(\s*'
+    r'(?:\.|\bTestCases\s*::)\s*(?:pass|compile_fail)\s*\(\s*'
+    r'(?:&\s*(?:mut\s+)?[A-Za-z_][A-Za-z0-9_]*\s*,\s*)?'
     r'(?:r(?P<h>#*)"(?P<raw>.*?)"(?P=h)|"(?P<cooked>[^"\\\n]*)")',
     re.S,
 )
