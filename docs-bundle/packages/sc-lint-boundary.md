@@ -21,6 +21,12 @@ table through `manifest_dependency_allowlists`,
 `global_dependency_ownership`, and `manifest_section_rules`; see
 [configuration](../configuration.md) for their syntax.
 
+`manifest_dependency_allowlists` permits named dependencies for an owner
+manifest, `global_dependency_ownership` limits where a dependency may appear
+in manifests and source, and `manifest_section_rules` restricts a dependency
+to named manifest sections. These are optional policy families; an absent
+family adds no checks.
+
 ## Recovering inventory and stale-policy findings
 
 For `SCB-BOUNDARY-004`, use the reported record and field to correct the
@@ -68,6 +74,13 @@ reports `SCB-DEPENDENCY-002`; adding `sample-cli` to a second record for the
 same canonical owner grants it because the incoming lists combine. A separate
 record with an explicit empty dev list does not remove that grant.
 
+To probe both an unexpected runtime dependent and a stale incoming permission
+in a two-fault fixture, select both rule IDs explicitly:
+
+```sh
+sc-lint lint sc-boundary --rule-filter SCB-DEPENDENCY-002,SCB-DEPENDENCY-004 --json
+```
+
 The package-edge rules can be selected with `--rule-filter dependencies`;
 manifest rules can be selected with `--rule-filter manifests`. The complete
 analyzer runs both. `--rule-filter` accepts rule IDs or families and selects
@@ -86,6 +99,8 @@ permission once, even if multiple records supplied it. The finding belongs to
 `dependencies` and fails by default. Remove the stale permission or restore the
 intended direct edge; package-edge checks cover direct workspace members, not
 transitive or external-crate reachability.
+Records with non-active statuses `planned`, `retired`, or `reserved_future` are
+skipped; their dependency policies do not produce findings.
 
 Manifest checks run on the complete analyzer and with
 `--rule-filter manifests`. `SCB-MANIFEST-001` checks required workspace-inherited
@@ -104,6 +119,9 @@ context. A local composition-root symbol such as `run` remains local and is
 preserved; only a resolved external crate-qualified root such as
 `sample_client::Api` participates in dependent-policy validation. An unresolved
 workspace package name also fails instead of being silently skipped.
+For an external composition root, a unique library-target alias resolves to
+its canonical Cargo package before comparison with `allowed_dependents`; the
+policy may use that same resolvable alias.
 
 Newer optional keys remain compatible with existing consumers: omitted
 `exclude_paths_by_rule` and `platform_adapters` retain prior behavior, and an
