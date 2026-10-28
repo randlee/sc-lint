@@ -7,11 +7,12 @@
 
 use serde_json::{Value, json};
 use std::fs;
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Child, Command, ExitStatus, Output, Stdio};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tempfile::TempDir;
 
 const BOOTSTRAP: &str = include_str!("../assets/bootstrap.py");
@@ -62,7 +63,6 @@ fn run_bounded_after_readiness(
     let stdout_path = capture.path().join("stdout");
     let stderr_path = capture.path().join("stderr");
     let stdout = fs::File::create(&stdout_path).expect("create subprocess stdout capture");
-    let stderr = fs::File::create(&stderr_path).expect("create subprocess stderr capture");
     let input = stdin.map(|contents| {
         let mut file = tempfile::tempfile().expect("create subprocess stdin");
         file.write_all(contents).expect("write subprocess stdin");
@@ -73,81 +73,139 @@ fn run_bounded_after_readiness(
     command
         .stdin(input.map_or(Stdio::null(), Stdio::from))
         .stdout(Stdio::from(stdout))
-        .stderr(Stdio::from(stderr));
+        .stderr(Stdio::piped());
 
     let mut child = command
         .spawn()
         .unwrap_or_else(|error| panic!("failed to start {label}: {error}"));
+    // A copier thread drains stderr into the capture file and signals readiness
+    // once the marker is in it, so the readiness wait is a blocking receive.
+    let stderr_pipe = child.stderr.take().expect("piped stderr");
+    let (ready_tx, ready_rx) = mpsc::channel();
+    let (copied_tx, copied_rx) = mpsc::channel();
+    let marker = ready_marker.map(str::to_owned);
+    let copy_path = stderr_path.clone();
+    thread::spawn(move || {
+        copy_stderr(stderr_pipe, &copy_path, marker.as_deref(), &ready_tx);
+        let _ = copied_tx.send(());
+    });
     if let Some(marker) = ready_marker {
-        await_readiness(&mut child, &stderr_path, marker, &label);
-    }
-    let started = Instant::now();
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if started.elapsed() < timeout => {
-                thread::sleep(Duration::from_millis(20));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let status = child.wait().expect("reap timed out subprocess");
-                let stderr = read_capture(&stderr_path, "timed out subprocess stderr");
-                panic!(
-                    "subprocess exceeded {timeout:?}: {label}; status after kill: {status}; stderr: {}",
-                    String::from_utf8_lossy(&stderr)
-                );
-            }
-            Err(error) => {
+        match ready_rx.recv_timeout(READY_CEILING) {
+            Ok(()) => {}
+            Err(RecvTimeoutError::Timeout) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                let stderr = read_capture(&stderr_path, "failed subprocess stderr");
+                panic!("subprocess did not print {marker:?} within {READY_CEILING:?}: {label}");
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                let status = child.wait().expect("reap subprocess that closed stderr");
+                let stderr = read_stderr_after_copy(&copied_rx, &stderr_path, &label);
                 panic!(
-                    "failed waiting for subprocess {label}: {error}; stderr: {}",
+                    "subprocess exited before printing {marker:?}: {label}; status: {status}; stderr: {}",
                     String::from_utf8_lossy(&stderr)
                 );
             }
         }
-    };
-
-    Output {
-        status,
-        stdout: read_capture(&stdout_path, "subprocess stdout"),
-        stderr: read_capture(&stderr_path, "subprocess stderr"),
     }
-}
 
-/// Blocks until the child has written `marker` to stderr, failing if the child
-/// exits first or never reports within `READY_CEILING`.
-fn await_readiness(child: &mut Child, stderr_path: &Path, marker: &str, label: &str) {
-    let started = Instant::now();
-    loop {
-        // Read the exit status before the capture: a marker written just before
-        // exit is then guaranteed to be visible in the capture read below.
-        let exited = match child.try_wait() {
-            Ok(exited) => exited,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("failed waiting for subprocess {label}: {error}");
-            }
-        };
-        let stderr = read_capture(stderr_path, "readiness stderr");
-        if String::from_utf8_lossy(&stderr).contains(marker) {
-            return;
-        }
-        if let Some(status) = exited {
+    match wait_or_kill(child, timeout)
+        .unwrap_or_else(|error| panic!("failed waiting for subprocess {label}: {error}"))
+    {
+        Waited::Exited(status) => Output {
+            status,
+            stdout: read_capture(&stdout_path, "subprocess stdout"),
+            stderr: read_stderr_after_copy(&copied_rx, &stderr_path, &label),
+        },
+        Waited::TimedOut => {
+            let stderr = read_stderr_after_copy(&copied_rx, &stderr_path, &label);
             panic!(
-                "subprocess exited before printing {marker:?}: {label}; status: {status}; stderr: {}",
+                "subprocess exceeded {timeout:?}: {label}; stderr: {}",
                 String::from_utf8_lossy(&stderr)
             );
         }
-        if started.elapsed() >= READY_CEILING {
-            let _ = child.kill();
-            let _ = child.wait();
-            panic!("subprocess did not print {marker:?} within {READY_CEILING:?}: {label}");
-        }
-        thread::sleep(Duration::from_millis(20));
     }
+}
+
+enum Waited {
+    Exited(ExitStatus),
+    TimedOut,
+}
+
+/// Waits for the child on a thread that owns its handle, so the deadline is a
+/// blocking receive rather than a polling loop. A missed deadline kills the
+/// child by pid and then waits, under a failure ceiling, for the owner to reap it.
+fn wait_or_kill(child: Child, timeout: Duration) -> io::Result<Waited> {
+    let pid = child.id();
+    let (status_tx, status_rx) = mpsc::channel();
+    thread::spawn(move || {
+        let mut child = child;
+        let _ = status_tx.send(child.wait());
+    });
+    match status_rx.recv_timeout(timeout) {
+        Ok(status) => Ok(Waited::Exited(status?)),
+        Err(RecvTimeoutError::Timeout) => {
+            kill_process(pid);
+            let _ = status_rx.recv_timeout(READY_CEILING);
+            Ok(Waited::TimedOut)
+        }
+        Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(
+            "child waiter stopped without an exit status",
+        )),
+    }
+}
+
+/// Kills a child that the waiter thread still owns. Only called on a deadline
+/// miss, before the waiter has reaped it.
+#[cfg(unix)]
+fn kill_process(pid: u32) {
+    let _ = Command::new("/bin/kill")
+        .args(["-KILL", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+#[cfg(windows)]
+fn kill_process(pid: u32) {
+    let _ = Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+/// Copies the child's stderr into `path` until the pipe closes, and signals
+/// `ready` once `marker` appears in what has been copied so far.
+fn copy_stderr(mut pipe: impl Read, path: &Path, marker: Option<&str>, ready: &mpsc::Sender<()>) {
+    let Ok(mut file) = fs::File::create(path) else {
+        return;
+    };
+    let mut seen = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let mut announced = false;
+    loop {
+        let read = match pipe.read(&mut chunk) {
+            Ok(0) | Err(_) => break,
+            Ok(read) => read,
+        };
+        let _ = file.write_all(&chunk[..read]);
+        seen.extend_from_slice(&chunk[..read]);
+        if !announced
+            && marker.is_some_and(|marker| String::from_utf8_lossy(&seen).contains(marker))
+        {
+            announced = true;
+            let _ = ready.send(());
+        }
+    }
+}
+
+/// Reads the captured stderr once the copier has reached the end of the pipe.
+/// A pipe held open past the child's exit fails here under a ceiling.
+fn read_stderr_after_copy(copied: &mpsc::Receiver<()>, path: &Path, label: &str) -> Vec<u8> {
+    copied
+        .recv_timeout(READY_CEILING)
+        .unwrap_or_else(|_| panic!("stderr of {label} did not close within {READY_CEILING:?}"));
+    read_capture(path, "subprocess stderr")
 }
 
 #[test]

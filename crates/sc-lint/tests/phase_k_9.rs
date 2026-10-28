@@ -13,7 +13,6 @@ use std::process::Stdio;
 use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time::Duration;
-use std::time::Instant;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -150,52 +149,24 @@ fn run_command_with_timeout(command: &mut Command, timeout: Duration) -> io::Res
     thread::spawn(move || {
         let _ = stderr_tx.send(read_child_output(stderr));
     });
-    let started = Instant::now();
-
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                return Ok(Output {
-                    status,
-                    stdout: receive_child_output(&stdout_rx, &display, "stdout")?,
-                    stderr: receive_child_output(&stderr_rx, &display, "stderr")?,
-                });
-            }
-            Ok(None) => {}
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let stdout =
-                    receive_child_output(&stdout_rx, &display, "stdout").unwrap_or_default();
-                let stderr =
-                    receive_child_output(&stderr_rx, &display, "stderr").unwrap_or_default();
-                return Err(io::Error::new(
-                    error.kind(),
-                    format!(
-                        "waiting for command {display} failed: {error}; stdout: {}; stderr: {}",
-                        String::from_utf8_lossy(&stdout),
-                        String::from_utf8_lossy(&stderr)
-                    ),
-                ));
-            }
-        }
-
-        if started.elapsed() >= timeout {
-            let _ = child.kill();
-            let _status = child.wait()?;
+    match wait_or_kill(child, timeout)? {
+        Waited::Exited(status) => Ok(Output {
+            status,
+            stdout: receive_child_output(&stdout_rx, &display, "stdout")?,
+            stderr: receive_child_output(&stderr_rx, &display, "stderr")?,
+        }),
+        Waited::TimedOut => {
             let stdout = receive_child_output(&stdout_rx, &display, "stdout")?;
             let stderr = receive_child_output(&stderr_rx, &display, "stderr")?;
-            return Err(io::Error::new(
+            Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
                     "command {display} timed out after {timeout:?}; stdout: {}; stderr: {}",
                     String::from_utf8_lossy(&stdout),
                     String::from_utf8_lossy(&stderr)
                 ),
-            ));
+            ))
         }
-
-        thread::sleep(Duration::from_millis(10));
     }
 }
 
@@ -290,31 +261,73 @@ fn run_command_with_timeout_after_ready(
             )));
         }
     }
-    let started = Instant::now();
-    loop {
-        if let Some(status) = child.try_wait()? {
-            return Ok(Output {
-                status,
-                stdout: receive_child_output(&stdout_rx, &display, "stdout")?,
-                stderr: receive_child_output(&stderr_rx, &display, "stderr")?,
-            });
-        }
-        if started.elapsed() >= timeout {
-            let _ = child.kill();
-            let _ = child.wait()?;
+    match wait_or_kill(child, timeout)? {
+        Waited::Exited(status) => Ok(Output {
+            status,
+            stdout: receive_child_output(&stdout_rx, &display, "stdout")?,
+            stderr: receive_child_output(&stderr_rx, &display, "stderr")?,
+        }),
+        Waited::TimedOut => {
             let stdout = receive_child_output(&stdout_rx, &display, "stdout")?;
             let stderr = receive_child_output(&stderr_rx, &display, "stderr")?;
-            return Err(io::Error::new(
+            Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 format!(
                     "command {display} timed out after {timeout:?}; stdout: {}; stderr: {}",
                     String::from_utf8_lossy(&stdout),
                     String::from_utf8_lossy(&stderr)
                 ),
-            ));
+            ))
         }
-        thread::sleep(Duration::from_millis(10));
     }
+}
+
+enum Waited {
+    Exited(std::process::ExitStatus),
+    TimedOut,
+}
+
+/// Waits for the child on a thread that owns its handle, so the deadline is a
+/// blocking receive rather than a polling loop. A missed deadline kills the
+/// child by pid and then waits, under a failure ceiling, for the owner to reap it.
+fn wait_or_kill(child: std::process::Child, timeout: Duration) -> io::Result<Waited> {
+    let pid = child.id();
+    let (status_tx, status_rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        let mut child = child;
+        let _ = status_tx.send(child.wait());
+    });
+    match status_rx.recv_timeout(timeout) {
+        Ok(status) => Ok(Waited::Exited(status?)),
+        Err(RecvTimeoutError::Timeout) => {
+            kill_process(pid);
+            let _ = status_rx.recv_timeout(OUTPUT_DRAIN_DEADLINE);
+            Ok(Waited::TimedOut)
+        }
+        Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(
+            "child waiter stopped without an exit status",
+        )),
+    }
+}
+
+/// Kills a child that the waiter thread still owns. Only called on a deadline
+/// miss, before the waiter has reaped it.
+#[cfg(unix)]
+fn kill_process(pid: u32) {
+    let _ = std::process::Command::new("/bin/kill")
+        .args(["-KILL", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+#[cfg(windows)]
+fn kill_process(pid: u32) {
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
 }
 
 /// Receives one output pipe's result, failing with a named error instead of
