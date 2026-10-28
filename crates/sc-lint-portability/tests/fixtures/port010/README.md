@@ -29,6 +29,26 @@ exclusion and records representative classifications.
 | `unix_helper_in_paired_file` | `crates/atm-http-runtime/src/unix_socket.rs` | Private Unix helper in a configured adapter pair; no PORT-010 finding after L1-4. |
 | `crate_root_main` | `crates/atm/src/main.rs` | Crate-root `main.rs` function with `cfg(unix)` and `cfg(not(unix))` siblings; remains reported as a known limitation tracked in issue `lint-phase-l.3`. |
 | `unpaired_pub_item` | `crates/atm-core/src/descriptor_limit.rs` | Unpaired public Unix item; PORT-010 true positive remains. |
+| `atm_core_atm_temp` | `crates/atm-core/src/atm_temp.rs` | Reduced; reports `is_owned_by_uid`, `has_group_or_world_bits`, `current_uid`, `unix_default_scratch_root`. |
+| `atm_core_atm_temp_sweeper` | `crates/atm-core/src/atm_temp_sweeper.rs` | Reduced; reports `from_metadata`, `unix_epoch_time`. |
+| `atm_core_persistence` | `crates/atm-core/src/persistence.rs` | Reduced; reports `sync_parent_directory`. |
+| `atm_core_transfer_script` | `crates/atm-core/src/transfer_script.rs` | Reduced; reports `unix_synthesized_transfer_script_path`, `is_owner_executable`. |
+| `atm_daemon_bootstrap_lib` | `crates/atm-daemon-bootstrap/src/lib.rs` | Reduced; reports `unix_socket_config`, `unix_socket_config_for_uid`. |
+| `atm_daemon_bootstrap_protected_trust_root` | `crates/atm-daemon-bootstrap/src/protected_trust_root.rs` | Reduced; reports `verify_protected_path`, `verify_unix_metadata`. |
+| `atm_daemon_client_lib` | `crates/atm-daemon-client/src/lib.rs` | Reduced; reports `unix_socket_path`, `try_connect_unix_socket`. |
+| `atm_herdr_transport_socket` | `crates/atm-herdr/src/transport_socket.rs` | Reduced; reports `connect_unix`. |
+| `atm_http_runtime_client` | `crates/atm-http-runtime/src/client.rs` | Reduced; reports `runtime_directory_is_root_owned`. |
+| `atm_http_runtime_client_tail` | `crates/atm-http-runtime/src/client_tail.rs` | Reduced; reports `unix_socket_client`, `build_unix_socket_reqwest_client`, `unix_socket_generation`. |
+| `atm_http_runtime_http1_server` | `crates/atm-http-runtime/src/http1_server.rs` | Reduced; reports `serve_unix_http1`. |
+| `atm_http_runtime_lib` | `crates/atm-http-runtime/src/lib.rs` | Reduced; reports `unix_socket` and two `get` impl methods. |
+| `atm_http_runtime_loopback_tcp` | `crates/atm-http-runtime/src/loopback_tcp.rs` | Reduced; reports `create_private_record_file`, `validate_record_parent`. |
+| `atm_http_runtime_runtime_listener` | `crates/atm-http-runtime/src/runtime_listener.rs` | Reduced; reports `bind_configured_unix_listener`. |
+| `atm_http_runtime_runtime_setup` | `crates/atm-http-runtime/src/runtime_setup.rs` | Reduced; reports `validate_unix_socket_path`. |
+
+Fixtures from `atm_core_atm_temp` onward are function-body-stubbed reductions
+of the pinned sources (cfg-gated items, same-name companions, and their
+containing impls and modules). Their expected findings were produced by the
+analyzer on the full source files and are pinned in `tests/cli.rs`.
 
 The upstream exclusion was rule-scoped (`PORT-010`); no analyzer-wide
 portability exclusion was present. This provenance file is for review and is
