@@ -12,15 +12,18 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import signal
 import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SKILL = Path(__file__).resolve().parents[2]
 ATM_BEADS = SKILL.parent / "atm-beads"
@@ -119,52 +122,95 @@ class Workspace:
 SERVER_DIR = ".dolt-server"   # data directory and log of the workspace's own dolt sql-server
 
 # Runs dolt as its child and stops it when the test process that started it is gone (killed, so class
-# cleanup never ran): the server must not outlive the run.
+# cleanup never ran): the server must not outlive the run. The parent holds the write end of this
+# supervisor's stdin, so EOF on stdin means the parent has exited; no polling is needed to notice that.
 SUPERVISOR = """\
-import os, signal, subprocess, sys, time
-parent = int(sys.argv[1])
-server = subprocess.Popen(sys.argv[2:])
+import signal, subprocess, sys, threading
+server = subprocess.Popen(sys.argv[1:])
 def stop(*_):
     server.terminate()
-    try:
-        server.wait(10)
-    except subprocess.TimeoutExpired:
-        server.kill()
-    sys.exit(0)
+    threading.Timer(10, server.kill).start()
 signal.signal(signal.SIGTERM, stop)
-while server.poll() is None:
-    if os.getppid() != parent:
-        stop()
-    time.sleep(0.5)
-sys.exit(server.returncode)
+def stop_when_parent_is_gone():
+    sys.stdin.buffer.read()
+    stop()
+threading.Thread(target=stop_when_parent_is_gone, daemon=True).start()
+sys.exit(server.wait())
 """
 
 
-def start_server(root: Path) -> int:
-    """Start a dolt sql-server for the workspace on a free loopback port; return the port once it accepts connections."""
-    data = root / SERVER_DIR
-    data.mkdir()
+SERVER_READY = "Server ready. Accepting connections."   # logged by dolt only after it is listening
+PORT_IN_USE = "already in use"                           # dolt's bind-collision message; it then exits
+BIND_ATTEMPTS = 5                                        # a collision picks another port; any other exit fails
+READY_CEILING = 60                                       # failure ceiling only; readiness is awaited, not polled
+
+
+def free_loopback_port() -> int:
+    """A port that was free a moment ago. dolt cannot bind port 0, so the port is picked here and dolt may still find it taken."""
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
+        return probe.getsockname()[1]
+
+
+def start_server(root: Path, lifetime_fd: int | None = None) -> int:
+    """Start a dolt sql-server for the workspace; return the port once dolt logs that it is listening.
+
+    `lifetime_fd`, when given, is inherited by the supervisor, which keeps it open until dolt has exited; the caller
+    reads EOF on its other end as "dolt is gone".
+
+    Dolt's output is read through a queue, so readiness is a blocking handshake on dolt's own line, not a poll.
+    Another listener on the same port cannot satisfy it. A bind collision (dolt prints PORT_IN_USE and exits)
+    retries on a new port, up to BIND_ATTEMPTS."""
+    data = root / SERVER_DIR
+    data.mkdir()
     supervisor = data / "supervise.py"
     supervisor.write_text(SUPERVISOR)
-    with (data / "server.log").open("w") as log:
-        server = subprocess.Popen([sys.executable, str(supervisor), str(os.getpid()),
+    log_path = data / "server.log"
+    log_path.write_text("")
+    for _ in range(BIND_ATTEMPTS):
+        port = free_loopback_port()
+        server = subprocess.Popen([sys.executable, str(supervisor),
                                    "dolt", "sql-server", "-H", "127.0.0.1", "-P", str(port), f"--data-dir={data}"],
-                                  cwd=data, stdout=log, stderr=subprocess.STDOUT)
-    deadline = time.monotonic() + 60
-    while time.monotonic() < deadline:
-        if server.poll() is not None:
+                                  cwd=data, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT, text=True, bufsize=1,
+                                  pass_fds=() if lifetime_fd is None else (lifetime_fd,))
+        # Kept referenced: dropping the Popen would close the supervisor's stdin, which stops dolt.
+        _SERVERS.append(server)
+        lines: queue.Queue = queue.Queue()
+        threading.Thread(target=_relay_output, args=(server.stdout, log_path, lines), daemon=True).start()
+        collided = False
+        while True:
+            try:
+                line = lines.get(timeout=READY_CEILING)
+            except queue.Empty:
+                raise AssertionError(f"dolt sql-server on 127.0.0.1:{port} printed no readiness within {READY_CEILING}s:\n"
+                                     + _tail(log_path)) from None
+            if line is None:   # output closed: dolt has exited
+                break
+            if SERVER_READY in line:
+                return port
+            collided = collided or PORT_IN_USE in line
+        server.wait()
+        if not collided:
             break
-        try:
-            socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
-            return port
-        except OSError:
-            time.sleep(0.2)
-    tail = "\n".join((data / "server.log").read_text(errors="replace").splitlines()[-40:])
-    raise AssertionError(f"dolt sql-server on 127.0.0.1:{port} did not accept connections "
-                         f"(exit {server.poll()}):\n{tail}")
+    raise AssertionError(f"dolt sql-server did not start (exit {server.returncode}):\n{_tail(log_path)}")
+
+
+_SERVERS: list[subprocess.Popen] = []
+
+
+def _relay_output(stream, log_path: Path, lines: queue.Queue) -> None:
+    """Appends dolt's output to the workspace log and hands each line to start_server; None marks its end."""
+    with log_path.open("a") as log:
+        for line in stream:
+            log.write(line)
+            log.flush()
+            lines.put(line)
+    lines.put(None)
+
+
+def _tail(log_path: Path) -> str:
+    return "\n".join(log_path.read_text(errors="replace").splitlines()[-40:])
 
 
 def stop_server(root: Path) -> None:
@@ -220,24 +266,49 @@ class ServerLifetimeTests(unittest.TestCase):
         root = Path(tempfile.mkdtemp(prefix="server-life-")).resolve()
         self.addCleanup(shutil.rmtree, root, ignore_errors=True)
         self.addCleanup(stop_server, root)
-        code = ("import sys, time; from pathlib import Path; sys.path.insert(0, sys.argv[1]);"
-                "from test_bead_pour_mock import start_server; print(start_server(Path(sys.argv[2])), flush=True); time.sleep(600)")
-        owner = subprocess.Popen([sys.executable, "-c", code, str(Path(__file__).parent), str(root)],
-                                 stdout=subprocess.PIPE, text=True)
-        port = int(owner.stdout.readline())
+        # The supervisor holds the write end of a pipe this test reads; it closes only when the supervisor exits,
+        # which it does only after dolt has. EOF on the read end is therefore the signal that dolt is gone.
+        lifetime_read, lifetime_write = os.pipe()
+        self.addCleanup(os.close, lifetime_read)
+        code = ("import os, sys, time; from pathlib import Path; sys.path.insert(0, sys.argv[1]);"
+                "from test_bead_pour_mock import start_server; print(start_server(Path(sys.argv[2]), int(sys.argv[3])), flush=True); time.sleep(600)")
+        owner = subprocess.Popen([sys.executable, "-c", code, str(Path(__file__).parent), str(root), str(lifetime_write)],
+                                 stdout=subprocess.PIPE, text=True, pass_fds=(lifetime_write,))
+        os.close(lifetime_write)
+        # The printed port is the handshake: it arrives only after start_server has seen dolt ready.
+        self.assertGreater(int(owner.stdout.readline()), 0)
         owner.kill()
         owner.wait()
+        eof = queue.Queue()
+        threading.Thread(target=lambda: eof.put(os.read(lifetime_read, 1)), daemon=True).start()
+        try:
+            released = eof.get(timeout=60)
+        except queue.Empty:
+            self.fail("dolt server outlived the killed test process: its supervisor still held the lifetime pipe after 60 s")
+        self.assertEqual(released, b"")
         marker = str(root / SERVER_DIR)
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            alive = [line for line in subprocess.run(["ps", "-axwwo", "command="], capture_output=True, text=True).stdout.splitlines()
-                     if marker in line]
-            if not alive:
-                break
-            time.sleep(0.5)
+        alive = [line for line in subprocess.run(["ps", "-axwwo", "command="], capture_output=True, text=True).stdout.splitlines()
+                 if marker in line]
         self.assertEqual(alive, [], "dolt server outlived the killed test process")
-        with self.assertRaises(OSError):
-            socket.create_connection(("127.0.0.1", port), timeout=1).close()
+
+
+@unittest.skipIf(shutil.which("dolt") is None, "dolt not on PATH: bind-collision test not run")
+class BindCollisionTests(unittest.TestCase):
+    def test_a_port_taken_before_dolt_binds_is_retried_on_a_new_port(self):
+        """The first port is held by a listener, so dolt exits with its collision message; start_server must retry."""
+        root = Path(tempfile.mkdtemp(prefix="bind-collision-")).resolve()
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        self.addCleanup(stop_server, root)
+        held = socket.socket()
+        self.addCleanup(held.close)
+        held.bind(("127.0.0.1", 0))
+        held.listen()
+        taken = held.getsockname()[1]
+        free = free_loopback_port()
+        with mock.patch(f"{__name__}.free_loopback_port", side_effect=[taken, free]):
+            port = start_server(root)
+        self.assertEqual(port, free)
+        self.assertIn(PORT_IN_USE, (root / SERVER_DIR / "server.log").read_text())
 
 
 @unittest.skipUnless(not MISSING, SKIP_REASON)
