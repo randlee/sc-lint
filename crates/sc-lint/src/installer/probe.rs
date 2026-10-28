@@ -485,19 +485,6 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "linux")]
-    fn wait_for_probe_file(path: &Path) {
-        let deadline = Instant::now() + Duration::from_secs(1);
-        while !path.is_file() {
-            assert!(
-                Instant::now() < deadline,
-                "probe did not create {}",
-                path.display()
-            );
-            thread::sleep(Duration::from_millis(10));
-        }
-    }
-
     #[cfg(unix)]
     #[test]
     fn reaped_probe_leader_does_not_signal_its_reusable_group_id() {
@@ -626,13 +613,14 @@ mod tests {
             "#!/bin/sh\ndir=$(dirname \"$0\")\nsetsid sleep 60 &\nprintf '%s\\n' \"$!\" > \"$dir/pid\"\n: > \"$dir/ready\"\nexit 0\n",
         )
         .expect("write probe script");
-        let mut permissions = fs::metadata(&script).expect("probe metadata").permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&script, permissions).expect("make probe executable");
-
-        let (mut child, reader) =
-            spawn_probe(&script, "test", &["--help"], "--help").expect("spawn probe script");
-        wait_for_probe_file(&directory.path().join("ready"));
+        let (mut child, reader) = spawn_probe(
+            Path::new("/bin/sh"),
+            "test",
+            &[script.to_str().expect("script path is UTF-8")],
+            "--help",
+        )
+        .expect("spawn probe script through shell");
+        child.wait().expect("script writes pid before exiting");
         let process_id = fs::read_to_string(directory.path().join("pid"))
             .expect("read detached child pid")
             .trim()
@@ -657,17 +645,15 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn probe_version_hung_candidate_returns_a_bounded_timeout() {
-        let directory = tempdir().expect("temporary probe directory");
-        let script = directory.path().join("candidate");
-        fs::write(&script, "#!/bin/sh\nsleep 60\n").expect("write candidate script");
-        let mut permissions = fs::metadata(&script)
-            .expect("candidate metadata")
-            .permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&script, permissions).expect("make candidate executable");
-
-        let error = probe_version_with_timeout(&script, Duration::from_millis(100))
-            .expect_err("hung version candidate must be bounded");
+        let error = run_probe(
+            Path::new("/bin/sh"),
+            crate::consts::SERVICE_NAME,
+            &["-c", "sleep 60", "--"],
+            VERSION_PROBE_DESCRIPTION,
+            Duration::from_millis(100),
+        )
+        .expect_err("hung version candidate must be bounded")
+        .into_message(Path::new("candidate"), crate::consts::SERVICE_NAME);
 
         assert!(
             error.contains(
