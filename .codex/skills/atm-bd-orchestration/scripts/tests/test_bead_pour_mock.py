@@ -140,8 +140,15 @@ sys.exit(server.returncode)
 """
 
 
+SERVER_READY = "Server ready. Accepting connections."   # logged by dolt only after it is listening
+
+
 def start_server(root: Path) -> int:
-    """Start a dolt sql-server for the workspace on a free loopback port; return the port once it accepts connections."""
+    """Start a dolt sql-server for the workspace on a free loopback port; return the port once dolt itself logs that it is listening.
+
+    The port is picked by binding and releasing it, so dolt can bind it only if nothing else took it meanwhile. A
+    collision makes dolt exit with its own bind error, which the failure tail reports. Readiness is read from this
+    server's own log, so another listener on the same port cannot satisfy it."""
     data = root / SERVER_DIR
     data.mkdir()
     with socket.socket() as probe:
@@ -149,21 +156,20 @@ def start_server(root: Path) -> int:
         port = probe.getsockname()[1]
     supervisor = data / "supervise.py"
     supervisor.write_text(SUPERVISOR)
-    with (data / "server.log").open("w") as log:
+    log_path = data / "server.log"
+    with log_path.open("w") as log:
         server = subprocess.Popen([sys.executable, str(supervisor), str(os.getpid()),
                                    "dolt", "sql-server", "-H", "127.0.0.1", "-P", str(port), f"--data-dir={data}"],
                                   cwd=data, stdout=log, stderr=subprocess.STDOUT)
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
+        if SERVER_READY in log_path.read_text(errors="replace"):
+            return port
         if server.poll() is not None:
             break
-        try:
-            socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
-            return port
-        except OSError:
-            time.sleep(0.2)
-    tail = "\n".join((data / "server.log").read_text(errors="replace").splitlines()[-40:])
-    raise AssertionError(f"dolt sql-server on 127.0.0.1:{port} did not accept connections "
+        time.sleep(0.2)
+    tail = "\n".join(log_path.read_text(errors="replace").splitlines()[-40:])
+    raise AssertionError(f"dolt sql-server on 127.0.0.1:{port} did not report readiness "
                          f"(exit {server.poll()}):\n{tail}")
 
 
@@ -224,7 +230,8 @@ class ServerLifetimeTests(unittest.TestCase):
                 "from test_bead_pour_mock import start_server; print(start_server(Path(sys.argv[2])), flush=True); time.sleep(600)")
         owner = subprocess.Popen([sys.executable, "-c", code, str(Path(__file__).parent), str(root)],
                                  stdout=subprocess.PIPE, text=True)
-        port = int(owner.stdout.readline())
+        # The printed port is the handshake: it arrives only after start_server has seen dolt ready.
+        self.assertGreater(int(owner.stdout.readline()), 0)
         owner.kill()
         owner.wait()
         marker = str(root / SERVER_DIR)
@@ -236,8 +243,6 @@ class ServerLifetimeTests(unittest.TestCase):
                 break
             time.sleep(0.5)
         self.assertEqual(alive, [], "dolt server outlived the killed test process")
-        with self.assertRaises(OSError):
-            socket.create_connection(("127.0.0.1", port), timeout=1).close()
 
 
 @unittest.skipUnless(not MISSING, SKIP_REASON)

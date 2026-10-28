@@ -7,9 +7,9 @@
 
 use serde_json::{Value, json};
 use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
@@ -26,6 +26,10 @@ const MALFORMED_TOOLS: &str =
 
 const SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// Failure ceiling for a child that never reports readiness. It is not the
+/// budget for the child's work: the deadline starts only after readiness.
+const READY_CEILING: Duration = Duration::from_secs(60);
+
 const STUB_HELPER: &str = "import json, os, sys\n\nif __name__ == '__main__':\n    with open(os.environ['SC_LINT_HELPER_LOG'], 'a', encoding='utf-8') as handle:\n        handle.write(json.dumps({'argv': sys.argv[1:], 'cwd': os.getcwd(), 'cargo_home': os.environ.get('CARGO_HOME')}) + '\\n')\n    sys.exit(int(os.environ.get('SC_LINT_HELPER_STATUS', '0')))\n";
 
 /// Run a fixture subprocess with captured output and a hard deadline.
@@ -34,13 +38,31 @@ fn run_bounded(command: &mut Command, stdin: Option<&[u8]>) -> Output {
 }
 
 fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duration) -> Output {
+    run_bounded_after_readiness(command, stdin, None, timeout)
+}
+
+/// Run a fixture subprocess with captured output and a hard deadline.
+///
+/// When `ready_marker` is set, the deadline starts only after the child has
+/// written that marker to stderr, so startup time never consumes the budget.
+fn run_bounded_after_readiness(
+    command: &mut Command,
+    stdin: Option<&[u8]>,
+    ready_marker: Option<&str>,
+    timeout: Duration,
+) -> Output {
     let label = format!(
         "{:?} {:?}",
         command.get_program(),
         command.get_args().collect::<Vec<_>>()
     );
-    let stdout = tempfile::tempfile().expect("create subprocess stdout capture");
-    let stderr = tempfile::tempfile().expect("create subprocess stderr capture");
+    // Captures live at named paths so the readiness check can read them while
+    // the child still holds its own descriptors open.
+    let capture = tempfile::tempdir().expect("create subprocess capture directory");
+    let stdout_path = capture.path().join("stdout");
+    let stderr_path = capture.path().join("stderr");
+    let stdout = fs::File::create(&stdout_path).expect("create subprocess stdout capture");
+    let stderr = fs::File::create(&stderr_path).expect("create subprocess stderr capture");
     let input = stdin.map(|contents| {
         let mut file = tempfile::tempfile().expect("create subprocess stdin");
         file.write_all(contents).expect("write subprocess stdin");
@@ -50,17 +72,16 @@ fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duratio
     });
     command
         .stdin(input.map_or(Stdio::null(), Stdio::from))
-        .stdout(Stdio::from(
-            stdout.try_clone().expect("clone stdout capture"),
-        ))
-        .stderr(Stdio::from(
-            stderr.try_clone().expect("clone stderr capture"),
-        ));
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::from(stderr));
 
-    let started = Instant::now();
     let mut child = command
         .spawn()
         .unwrap_or_else(|error| panic!("failed to start {label}: {error}"));
+    if let Some(marker) = ready_marker {
+        await_readiness(&mut child, &stderr_path, marker, &label);
+    }
+    let started = Instant::now();
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,
@@ -70,7 +91,7 @@ fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duratio
             Ok(None) => {
                 let _ = child.kill();
                 let status = child.wait().expect("reap timed out subprocess");
-                let stderr = captured(stderr, "timed out subprocess stderr");
+                let stderr = read_capture(&stderr_path, "timed out subprocess stderr");
                 panic!(
                     "subprocess exceeded {timeout:?}: {label}; status after kill: {status}; stderr: {}",
                     String::from_utf8_lossy(&stderr)
@@ -79,7 +100,7 @@ fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duratio
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                let stderr = captured(stderr, "failed subprocess stderr");
+                let stderr = read_capture(&stderr_path, "failed subprocess stderr");
                 panic!(
                     "failed waiting for subprocess {label}: {error}; stderr: {}",
                     String::from_utf8_lossy(&stderr)
@@ -90,8 +111,42 @@ fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duratio
 
     Output {
         status,
-        stdout: captured(stdout, "subprocess stdout"),
-        stderr: captured(stderr, "subprocess stderr"),
+        stdout: read_capture(&stdout_path, "subprocess stdout"),
+        stderr: read_capture(&stderr_path, "subprocess stderr"),
+    }
+}
+
+/// Blocks until the child has written `marker` to stderr, failing if the child
+/// exits first or never reports within `READY_CEILING`.
+fn await_readiness(child: &mut Child, stderr_path: &Path, marker: &str, label: &str) {
+    let started = Instant::now();
+    loop {
+        // Read the exit status before the capture: a marker written just before
+        // exit is then guaranteed to be visible in the capture read below.
+        let exited = match child.try_wait() {
+            Ok(exited) => exited,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("failed waiting for subprocess {label}: {error}");
+            }
+        };
+        let stderr = read_capture(stderr_path, "readiness stderr");
+        if String::from_utf8_lossy(&stderr).contains(marker) {
+            return;
+        }
+        if let Some(status) = exited {
+            panic!(
+                "subprocess exited before printing {marker:?}: {label}; status: {status}; stderr: {}",
+                String::from_utf8_lossy(&stderr)
+            );
+        }
+        if started.elapsed() >= READY_CEILING {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("subprocess did not print {marker:?} within {READY_CEILING:?}: {label}");
+        }
+        thread::sleep(Duration::from_millis(20));
     }
 }
 
@@ -99,7 +154,11 @@ fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duratio
 fn bounded_runner_timeout_child() {
     if std::env::var_os("SC_LINT_TIMEOUT_TEST_CHILD").is_some() {
         eprintln!("intentional timeout probe");
-        thread::sleep(Duration::from_secs(30));
+        // Parks until the runner kills it. Unlike a sleep, nothing here ends
+        // the child on its own, so the hang outcome does not depend on timing.
+        loop {
+            thread::park();
+        }
     }
 }
 
@@ -110,7 +169,12 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
         .args(["--exact", "bounded_runner_timeout_child", "--nocapture"])
         .env("SC_LINT_TIMEOUT_TEST_CHILD", "1");
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        run_bounded_for(&mut command, None, Duration::from_secs(2));
+        run_bounded_after_readiness(
+            &mut command,
+            None,
+            Some("intentional timeout probe"),
+            Duration::from_secs(2),
+        );
     }))
     .expect_err("hung subprocess should hit its deadline");
     let panic = match panic.downcast::<String>() {
@@ -124,13 +188,8 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
     assert!(panic.contains("intentional timeout probe"), "{panic}");
 }
 
-fn captured(mut file: std::fs::File, description: &str) -> Vec<u8> {
-    let mut contents = Vec::new();
-    file.seek(SeekFrom::Start(0))
-        .unwrap_or_else(|error| panic!("rewind {description}: {error}"));
-    file.read_to_end(&mut contents)
-        .unwrap_or_else(|error| panic!("read {description}: {error}"));
-    contents
+fn read_capture(path: &Path, description: &str) -> Vec<u8> {
+    fs::read(path).unwrap_or_else(|error| panic!("read {description}: {error}"))
 }
 
 fn host_python() -> PathBuf {

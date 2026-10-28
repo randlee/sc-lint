@@ -74,10 +74,19 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
+                // A grandchild that inherited the pipes can keep them open after
+                // the child exits, so the drain has the same deadline as the kill path.
+                let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
+                let stdout = drain_pipe_reader(stdout_reader, drain_deadline).map_err(|error| {
+                    io::Error::new(error.kind(), format!("{description} stdout: {error}"))
+                })?;
+                let stderr = drain_pipe_reader(stderr_reader, drain_deadline).map_err(|error| {
+                    io::Error::new(error.kind(), format!("{description} stderr: {error}"))
+                })?;
                 return Ok(Output {
                     status,
-                    stdout: receive_pipe_reader(stdout_reader)?,
-                    stderr: receive_pipe_reader(stderr_reader)?,
+                    stdout,
+                    stderr,
                 });
             }
             Ok(None) if started.elapsed() >= timeout => {
@@ -125,12 +134,6 @@ fn read_pipe(mut pipe: impl Read) -> io::Result<Vec<u8>> {
     let mut output = Vec::new();
     pipe.read_to_end(&mut output)?;
     Ok(output)
-}
-
-fn receive_pipe_reader(reader: Receiver<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
-    reader
-        .recv()
-        .map_err(|_| io::Error::other("child output reader stopped without returning output"))?
 }
 
 fn drain_pipe_reader(
