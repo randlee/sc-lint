@@ -1085,6 +1085,10 @@ fn port006_item_cfg_suppresses_under_target_os_and_not_windows_cfg() {
         fn all_not_windows() -> &'static str { "/home/d/x" }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         fn any_unix_os() -> &'static str { "/home/e/x" }
+        pub fn blocks() {
+            #[cfg(target_os = "linux")] { let _ = "/home/f/x"; }
+            #[cfg(not(windows))] { let _ = "/home/g/x"; }
+        }
         "#,
     );
 
@@ -1125,7 +1129,7 @@ fn port006_statement_level_cfg_is_not_honored() {
             let _ = "/var/tmp/statement-let";
 
             #[cfg(target_os = "linux")]
-            { let _ = "/var/tmp/statement-block"; }
+            if consume("x") { let _ = "/var/tmp/statement-if"; }
 
             #[cfg(target_os = "linux")]
             consume("/var/tmp/statement-call");
@@ -1145,7 +1149,7 @@ fn port006_statement_level_cfg_is_not_honored() {
     assert_eq!(messages.len(), 4, "{:#?}", report.findings);
     for path in [
         "/var/tmp/statement-let",
-        "/var/tmp/statement-block",
+        "/var/tmp/statement-if",
         "/var/tmp/statement-call",
         "/var/tmp/statement-method",
     ] {
@@ -1154,6 +1158,27 @@ fn port006_statement_level_cfg_is_not_honored() {
             "statement-level cfg should not suppress {path}: {messages:#?}"
         );
     }
+}
+
+#[test]
+fn port006_cfg_block_expression_is_honored() {
+    let report = analyze_single_source(
+        r#"
+        pub fn gated_block() {
+            #[cfg(target_os = "linux")]
+            { let _ = "/var/tmp/block-exempt"; }
+
+            #[cfg(windows)]
+            { let _ = "C:\\block-exempt"; }
+
+            let _ = "/var/tmp/after-block";
+        }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port006);
+    assert!(report.findings[0].message.contains("/var/tmp/after-block"));
 }
 
 #[test]
