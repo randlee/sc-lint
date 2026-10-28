@@ -4,6 +4,51 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-10-28
+
+Phase L closes the atm-core findings for the 0.8.0 release. Its implementation
+and review fixes are carried by the phase integration PR #716.
+
+### Added
+
+- Consumer test selectors support named commands and groups, a default
+  selector, per-selector environment and working directory, platform filters,
+  forwarded arguments, and `sc-lint test --list` (#196).
+- `SCB-RUNTIME-003` reports blocking `std::thread::sleep` in production
+  targets of workspace packages that declare Tokio (#82).
+- Rust analyzer reports are validated against the bundled
+  `analyzer-report-v1` JSON Schema, and Python adapter payloads are checked
+  against the `sc-lint-python-v1` transport contract (#586).
+- Cargo-shear recognizes trybuild `.pass()` and `.compile_fail()` fixtures as
+  consumed files (#647).
+
+### Changed
+
+- Consumer lint and test steps run concurrently and report all failures in
+  declaration order. Cargo steps remain serialized; `--fail-fast` stops
+  starting eligible steps after a failure (#195).
+- Boundary dependency checks use the union of each owner's
+  `allowed_dependents`; path-less cycle findings can be excluded using their
+  source files. Composition-root, delegation, and per-rule path exclusion
+  behavior is corrected (#642, #643, #376, #204, #385; follow-up PRs #717,
+  #718, and #722).
+- Version-sync checks support Python manifests and configurable Winget and
+  release-wiring fields (#137).
+- Installer-rendered adoption templates use `.tmpl`; front-matter `.j2`
+  remains reserved for sc-compose templates (#604).
+
+### Fixed
+
+- Portability checks honor additional platform `cfg` forms, recognize
+  `USERNAME` fallback, ignore Windows namespace path prefixes, and avoid
+  reporting private helpers in paired adapter files (#641, #192, #372;
+  follow-up PRs #719 and #724).
+- GitHub Action inputs accept hyphenated names such as `working-directory`
+  and `config-path` (#669; follow-up PRs #721 and #725).
+- The reviewed `Clone` default is preserved in cycle analysis, and
+  timing-sensitive CI tests use controlled synchronization (follow-up PRs
+  #728, #729, and #731).
+
 ## [0.8.0] — 2026-10-19
 
 ### Added
