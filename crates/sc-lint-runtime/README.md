@@ -106,6 +106,14 @@ Important limits:
 - no documented backend-specific allowlist or source-annotation suppression
   path in release `0.1.x`
 
+Runtime source discovery scans Rust files under production target source roots.
+It does not resolve Rust module declarations when deciding whether a file is
+test-only. An out-of-line `#[cfg(test)] mod checks;` declared in `src/lib.rs`
+therefore does not mark `src/checks.rs` as a test file; blocking sleeps in that
+file may be reported as production code. Keep test modules inline or place
+them under a Cargo test target until module-aware source classification is
+available.
+
 If a future exception model is added, it must be backend-owned and documented
 explicitly before users rely on it.
 

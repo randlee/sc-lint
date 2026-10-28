@@ -1,0 +1,16 @@
+{
+  "tool": "sc-lint-runtime",
+  "version": "0.8.0",
+  "schema_version": "0.1.0",
+  "status": "fail",
+  "scanned_crates": 1,
+  "findings": [
+    {
+      "rule_id": "SCB-RUNTIME-003",
+      "kind": "blocking_thread_sleep_in_tokio_package",
+      "message": "<root>/crates/example/src/lib.rs:1: SCB-RUNTIME-003 std::thread::sleep blocks the thread in Tokio package `example`; use `tokio::time::sleep(..).await` instead",
+      "owner_ids": ["crate::example::example"],
+      "node_ids": ["crate::example::example::blocks"]
+    }
+  ]
+}
