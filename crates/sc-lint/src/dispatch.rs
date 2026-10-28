@@ -389,7 +389,10 @@ fn validate_path_backend(tool: &str, binary: &Path) -> Result<(), CliError> {
             binary,
             &expected,
             None,
-            format!("`--version` identity/version probe failed: {reason}"),
+            format!(
+                "`--version` identity/version probe failed: {}",
+                reason.into_message(binary, tool)
+            ),
         )),
     }
 }

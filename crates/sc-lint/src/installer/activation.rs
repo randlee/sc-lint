@@ -161,7 +161,8 @@ pub(super) fn verify_activated_payload(
     managed_binary: &Path,
     minimum: &MinimumVersion,
 ) -> Result<Version, String> {
-    let version = probe_version(managed_binary)?;
+    let version = probe_version(managed_binary)
+        .map_err(|failure| failure.into_message(managed_binary, crate::consts::SERVICE_NAME))?;
     if version < *minimum.as_semver() {
         return Err(format!(
             "activated version `{version}` is below required `{minimum}`"

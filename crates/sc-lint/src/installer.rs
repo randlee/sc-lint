@@ -194,10 +194,8 @@ fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, 
         .any(|binary| binary.is_file());
     let managed_existing =
         find_compatible_binary_with(&managed_binary, minimum_version, false, |binary| {
-            let version = probe_version(binary)?;
-            managed_payload_complete(binary)
-                .then_some(version)
-                .ok_or_else(|| "managed release bundle is incomplete".to_string())
+            let version = probe_version(binary).ok()?;
+            managed_payload_complete(binary).then_some(version)
         });
     let existing = managed_existing.or_else(|| {
         // PATH is a supported development fallback when no managed launcher
@@ -205,7 +203,9 @@ fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, 
         // even if an unrelated PATH executable happens to be compatible.
         (!managed_binary.exists() && use_path_candidates)
             .then(|| {
-                find_compatible_binary_with(&managed_binary, minimum_version, true, probe_version)
+                find_compatible_binary_with(&managed_binary, minimum_version, true, |binary| {
+                    probe_version(binary).ok()
+                })
             })
             .flatten()
     });
@@ -314,12 +314,12 @@ fn find_compatible_binary_with<F>(
     probe: F,
 ) -> Option<(PathBuf, Version)>
 where
-    F: Fn(&Path) -> Result<Version, String>,
+    F: Fn(&Path) -> Option<Version>,
 {
     std::iter::once(managed_binary.to_path_buf())
         .chain(path_binary_candidates_if(use_path_candidates))
         .find_map(|binary| {
-            let version = probe(&binary).ok()?;
+            let version = probe(&binary)?;
             (version >= *minimum.as_semver()).then_some((binary, version))
         })
 }
@@ -1957,8 +1957,9 @@ mod tests {
         let managed = fixture.path().join(ReleaseTarget::binary_name());
         let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
         let probe = |path: &Path| {
-            let version = fs::read_to_string(path).map_err(|error| error.to_string())?;
-            Version::parse(version.trim()).map_err(|error| error.to_string())
+            fs::read_to_string(path)
+                .ok()
+                .and_then(|version| Version::parse(version.trim()).ok())
         };
 
         for (version, expected) in [
