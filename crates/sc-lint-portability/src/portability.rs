@@ -628,6 +628,7 @@ struct FunctionBodyVisitor {
 struct ProductionPathLiteralVisitor<'a, 'b> {
     file_context: &'a FileContext,
     findings: &'b mut Vec<PortabilityFinding>,
+    platform_gated_depth: usize,
     config: &'a PortabilityConfig,
     username_read: bool,
 }
@@ -642,6 +643,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
         Self {
             file_context,
             findings,
+            platform_gated_depth: 0,
             config,
             username_read,
         }
@@ -710,14 +712,28 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
 }
 
 impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
+    fn visit_expr_block(&mut self, node: &'ast syn::ExprBlock) {
+        let is_platform_gated = node.attrs.iter().any(attr_is_platform_cfg);
+        if is_platform_gated {
+            self.platform_gated_depth += 1;
+        }
+        syn::visit::visit_expr_block(self, node);
+        if is_platform_gated {
+            self.platform_gated_depth -= 1;
+        }
+    }
+
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
-        if let Some(command_name) = is_shell_command_call(node) {
+        if self.platform_gated_depth == 0
+            && let Some(command_name) = is_shell_command_call(node)
+        {
             self.push_shell_finding(
                 &format!("Command::new(\"{command_name}\")"),
                 span_start_line(node.span()),
             );
         }
-        if let Some(variable_name) = production_env_portability_variable(node)
+        if self.platform_gated_depth == 0
+            && let Some(variable_name) = production_env_portability_variable(node)
             && !(variable_name == "USER" && self.username_read)
         {
             self.push_env_finding(&variable_name, span_start_line(node.span()));
@@ -726,7 +742,9 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
     }
 
     fn visit_expr_lit(&mut self, node: &'ast ExprLit) {
-        if let Lit::Str(lit) = &node.lit {
+        if self.platform_gated_depth == 0
+            && let Lit::Str(lit) = &node.lit
+        {
             let value = lit.value();
             if is_unix_shell_path_literal(&value) {
                 self.push_shell_finding(&value, span_start_line(lit.span()));
