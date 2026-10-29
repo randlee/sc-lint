@@ -12,6 +12,16 @@ workspace_toml = "Cargo.toml"
 rust_toolchain = "1.94.1"
 
 
+[prerelease]
+tag_prefix = "prerelease/v"
+tag_script = ".just/prerelease_tag.py"
+install_root = "~/.sc-lint-builds"
+binaries = ["sc-lint", "sc-lint-boundary", "sc-lint-portability", "sc-lint-runtime"]
+protected_branches = ["main", "develop"]
+selector_dir = { darwin = "~/.local/bin", linux = "~/.local/bin", windows = '%LOCALAPPDATA%\Programs\sc-lint' }
+post_install = "echo staged sc-lint {version} at {stage_dir}"
+verify = "sc-lint --version"
+
 [[release_targets]]
 target = "x86_64-unknown-linux-gnu"
 os = "ubuntu-latest"
