@@ -514,28 +514,32 @@ fn default_log_base() -> Result<PathBuf, CliError> {
 }
 
 fn home_directory() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        std::env::var_os("USERPROFILE")
-            .map(PathBuf::from)
-            .or_else(|| {
-                let drive = std::env::var_os("HOMEDRIVE")?;
-                let path = std::env::var_os("HOMEPATH")?;
-                Some(PathBuf::from(format!(
-                    "{}{}",
-                    drive.to_string_lossy(),
-                    path.to_string_lossy()
-                )))
-            })
-    }
-    #[cfg(unix)]
-    {
-        std::env::var_os("HOME").map(PathBuf::from)
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        None
-    }
+    home_directory_for_platform()
+}
+
+#[cfg(windows)]
+fn home_directory_for_platform() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE")
+        .map(PathBuf::from)
+        .or_else(|| {
+            let drive = std::env::var_os("HOMEDRIVE")?;
+            let path = std::env::var_os("HOMEPATH")?;
+            Some(PathBuf::from(format!(
+                "{}{}",
+                drive.to_string_lossy(),
+                path.to_string_lossy()
+            )))
+        })
+}
+
+#[cfg(unix)]
+fn home_directory_for_platform() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
+}
+
+#[cfg(not(any(unix, windows)))]
+fn home_directory_for_platform() -> Option<PathBuf> {
+    None
 }
 
 fn classify_logger_init_error<E>(error: E) -> CliError

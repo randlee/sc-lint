@@ -12,20 +12,27 @@ family.
 
 ## Dual-Loader Transition
 
-- `REQ-SCB-002`
+Amendment (phase L, #586, Accepted — Rand, 2026-10-26): the TOML
+transition is complete and the loader is TOML-only (`inventory/mod.rs`). The
+Markdown-embedded loader and its cross-source checks below are retired; they
+are kept as history. `REQ-SCB-002` to `REQ-SCB-005` are marked retired and the
+item-key parity wording of `REQ-SCB-007` applies to TOML records only.
+Plan authority: `lint-l-8`.
+
+- `REQ-SCB-002` **(retired)**
   During migration, the loader must accept both Markdown-embedded boundary
   records and TOML boundary records while mapping both sources into one shared
   internal boundary model.
 
-- `REQ-SCB-003`
+- `REQ-SCB-003` **(retired)**
   During the dual-loader phase, duplicate `boundary_id` authority across
   sources is a hard error by default.
 
-- `REQ-SCB-004`
+- `REQ-SCB-004` **(retired)**
   During the dual-loader phase, conflicting definitions for the same
   `boundary_id` across Markdown and TOML are a hard error.
 
-- `REQ-SCB-005`
+- `REQ-SCB-005` **(retired)**
   Any migration equivalence mode that permits duplicate-source fixtures must be
   test-only and disabled in default developer runs and CI.
 
@@ -109,11 +116,14 @@ family.
   Existing syntax, schema, layout and I/O failures remain fatal, and public
   loader signatures remain unchanged. Preserve local composition-root symbols;
   only resolved external crate-qualified roots undergo dependent-policy checks.
+  A resolved external root must name a package listed in that record's
+  `dependencies.allowed_dependents` (`SCB-BOUNDARY-004`, kind
+  `unapproved_composition_root`).
   `SCB-BOUNDARY-004` reports each semantic inventory defect, defaults to
   failure, and remains selected by both `boundaries` and `dependencies` filter
   families; structural loader failures remain fatal.
   (Amended 2026-10-10, Accepted, #203; amended 2026-10-12, Accepted,
-  [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
+  [ADR-017, change 3](../sc-lint/adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts); amended 2026-10-27, Accepted, ADR-020 clarification 4.1.)
 
 - `REQ-SCB-021`
   Package dependency policy is a boundary-inventory rule family owned by

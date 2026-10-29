@@ -1,8 +1,8 @@
 pub fn named_pipe_name(name: &str) -> String {
-    if name.starts_with(r"\\.\pipe\") {
+    if name.starts_with(r"C:\pipe\") {
         name.to_owned()
     } else {
-        format!(r"\\.\pipe\{name}")
+        format!(r"C:\pipe\{name}")
     }
 }
 

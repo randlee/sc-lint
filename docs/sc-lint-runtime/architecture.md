@@ -18,7 +18,34 @@ its backend machine contract.
 - the crate remains separate from `sc-lint-portability` and
   `sc-lint-boundary`
 - generic std concurrency rules stay here
-- Tokio-specific rules remain reserved for `sc-lint-tokio`
+- `sleep.rs` owns the `SCB-RUNTIME-003` AST pass and its production-target and
+  Tokio-package policy. ADR-020 decision 6 narrows ADR-007: rules requiring no
+  Tokio dependency or runtime semantics may live here; `sc-lint-tokio` remains
+  reserved for rules that do.
+- `SleepScope` (in `runtime.rs`) decides which files the sleep pass visits. It
+  keeps workspace packages that declare a normal or build `tokio` dependency and
+  have a lib or bin target. Source files of the package's other targets (tests,
+  examples, benches, build scripts) are excluded, and test files are skipped.
+  The runtime analyzer table's `exclude_paths_by_rule` entries then filter
+  `SCB-RUNTIME-003` findings by path.
+
+## `SCB-RUNTIME-003` Scope (ATM-QA-008)
+
+The accepted L7 design uses a package-scoped `SleepScope` in `runtime.rs`:
+`excluded_roots` maps each eligible `PackageName` to its excluded `PathBuf`s, and
+`includes` checks whether a file is in scope. Eligibility is limited to workspace
+packages declaring a normal or build `tokio` dependency and having a lib or bin
+target. Files belonging to tests, examples, benches, or build scripts are
+excluded; test files are skipped as well.
+
+`analyze_runtime_liveness` builds the scope once before parallel traversal.
+`RuntimeCollector` continues to collect the existing 001/002 rules; after that
+walk, the analyzer separately calls `sleep::find_blocking_sleeps` when the
+scope includes the file. Keeping the package-keyed excluded roots and the
+sleep pass outside `RuntimeCollector` is the accepted alternative for
+ATM-QA-008, recorded in L7 design section B. It preserves the same
+production-file behavior while keeping the new rule's eligibility separate
+from the existing collector.
 
 ## Related Docs
 

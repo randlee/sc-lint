@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime, timezone
+import io
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -15,12 +18,18 @@ from sc_lint.lint_common import LintDirectivePolicy
 from sc_lint.lint_common import lint_slug
 from sc_lint.lint_common import line_is_suppressed
 from sc_lint.lint_common import load_lint_config
+from sc_lint.lint_common import CONFIG_TABLE_MISSING
+from sc_lint.lint_common import ConfigError
+from sc_lint.lint_common import resolve_table
 from sc_lint.lint_common import make_log_path
 from sc_lint.lint_common import relative_log_path
 from sc_lint.lint_common import render_workspace_crate_table
 from sc_lint.lint_common import rust_file_test_scope
+from sc_lint.lint_common import table_missing_error
 from sc_lint.lint_common import workspace_crate_section_lines
 from sc_lint.lint_common import workspace_crates
+from sc_lint.lint_line_counts import main as line_counts_main
+from sc_lint.python_adapter import AdapterError
 from sc_lint.fixture_constants import TEAM_LEAD_IDENTITY
 
 
@@ -77,6 +86,153 @@ class LintCommonTests(unittest.TestCase):
             config = load_lint_config(repo_root)
 
             self.assertEqual(config["portability"]["config_home_env"], "SC_LINT_CONFIG_HOME")
+
+    def test_resolve_table_prefers_explicit_then_sc_lint_toml_then_lint_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / ".just").mkdir()
+            (root / "sc-lint.toml").write_text("[line_counts]\nmax_total_lines = 300\n", encoding="utf-8")
+            (root / ".just/lint-config.toml").write_text("[line_counts]\nmax_total_lines = 500\n", encoding="utf-8")
+            explicit = root / "explicit.toml"
+            explicit.write_text("[line_counts]\nmax_total_lines = 200\n", encoding="utf-8")
+            table, path = resolve_table("line_counts", explicit, root)
+            self.assertEqual((table["max_total_lines"], path), (200, explicit))
+            table, path = resolve_table("line_counts", None, root)
+            self.assertEqual((table["max_total_lines"], path), (300, root / "sc-lint.toml"))
+            (root / "sc-lint.toml").write_text("[logging]\nconsole = false\n", encoding="utf-8")
+            table, path = resolve_table("line_counts", None, root)
+            self.assertEqual((table["max_total_lines"], path), (500, root / ".just/lint-config.toml"))
+
+    def test_resolve_table_falls_back_per_table(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / ".just").mkdir()
+            (root / "sc-lint.toml").write_text("[identities]\nforbidden_literals = []\n", encoding="utf-8")
+            (root / ".just/lint-config.toml").write_text("[line_counts]\nmax_total_lines = 500\n", encoding="utf-8")
+            self.assertEqual(
+                resolve_table("identities", None, root),
+                ({"forbidden_literals": []}, root / "sc-lint.toml"),
+            )
+            self.assertEqual(
+                resolve_table("line_counts", None, root),
+                ({"max_total_lines": 500}, root / ".just/lint-config.toml"),
+            )
+
+    def test_resolve_table_dedupes_explicit_equal_to_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "sc-lint.toml").write_text("[logging]\nconsole = false\n", encoding="utf-8")
+            with self.assertRaises(ConfigError) as caught:
+                resolve_table("line_counts", Path("sc-lint.toml"), root)
+            self.assertEqual(caught.exception.searched, ["sc-lint.toml", ".just/lint-config.toml"])
+
+    def test_resolve_table_explicit_missing_file_is_hard_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "sc-lint.toml").write_text("[line_counts]\nmax_total_lines = 300\n", encoding="utf-8")
+            with self.assertRaises(AdapterError) as caught:
+                resolve_table("line_counts", Path("missing.toml"), root)
+            self.assertEqual(caught.exception.kind, "config")
+            self.assertEqual(caught.exception.message, "explicit config file not found: missing.toml")
+
+    def test_resolve_table_explicit_without_table_falls_through(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "sc-lint.toml").write_text("[line_counts]\nmax_total_lines = 300\n", encoding="utf-8")
+            explicit = root / "explicit.toml"
+            explicit.write_text("[identities]\n", encoding="utf-8")
+            self.assertEqual(
+                resolve_table("line_counts", explicit, root),
+                ({"max_total_lines": 300}, root / "sc-lint.toml"),
+            )
+
+    def test_resolve_table_rejects_non_table_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "sc-lint.toml").write_text("line_counts = 5\n", encoding="utf-8")
+            with self.assertRaises(AdapterError) as caught:
+                resolve_table("line_counts", None, root)
+            self.assertEqual(caught.exception.kind, "config")
+            self.assertEqual(caught.exception.message, "[line_counts] must be a TOML table")
+
+    def test_resolve_table_bad_toml_is_adapter_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / ".just").mkdir()
+            (root / "sc-lint.toml").write_text("[line_counts\n", encoding="utf-8")
+            (root / ".just/lint-config.toml").write_text("[line_counts]\n", encoding="utf-8")
+            with self.assertRaises(AdapterError) as caught:
+                resolve_table("line_counts", None, root)
+            self.assertEqual(caught.exception.kind, "config")
+            self.assertTrue(
+                caught.exception.message.startswith("failed to parse sc-lint.toml: "),
+                caught.exception.message,
+            )
+
+    def test_resolve_table_missing_lists_searched_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir, tempfile.TemporaryDirectory() as outside:
+            root = Path(tempdir)
+            (root / "sc-lint.toml").write_text("[logging]\nconsole = false\n", encoding="utf-8")
+            with self.assertRaises(ConfigError) as caught:
+                resolve_table("line_counts", None, root)
+            self.assertEqual(caught.exception.code, CONFIG_TABLE_MISSING)
+            self.assertEqual(caught.exception.table, "line_counts")
+            self.assertEqual(caught.exception.searched, ["sc-lint.toml", ".just/lint-config.toml"])
+            self.assertEqual(
+                caught.exception.message,
+                "configuration table [line_counts] not found in any of: "
+                "sc-lint.toml, .just/lint-config.toml",
+            )
+            explicit = Path(outside) / "explicit.toml"
+            explicit.write_text("[identities]\n", encoding="utf-8")
+            with self.assertRaises(ConfigError) as caught:
+                resolve_table("line_counts", explicit, root)
+            self.assertEqual(
+                caught.exception.searched,
+                [explicit.resolve().as_posix(), "sc-lint.toml", ".just/lint-config.toml"],
+            )
+
+    def test_config_table_missing_constant_is_wire_string(self) -> None:
+        self.assertEqual(CONFIG_TABLE_MISSING, "config.table_missing")
+
+    def test_config_errors_use_standard_envelope(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            (root / "sc-lint.toml").write_text("[logging]\nconsole = false\n", encoding="utf-8")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = line_counts_main(["lint_line_counts.py", "--root", str(root), "--json"])
+            self.assertEqual(result, 3)
+            self.assertEqual(
+                json.loads(stdout.getvalue())["error"],
+                {
+                    "kind": "config",
+                    "message": (
+                        "configuration table [line_counts] not found in any of: "
+                        "sc-lint.toml, .just/lint-config.toml"
+                    ),
+                    "details": {
+                        "code": "config.table_missing",
+                        "table": "line_counts",
+                        "searched": ["sc-lint.toml", ".just/lint-config.toml"],
+                    },
+                    "suggested_action": "add the table to `sc-lint.toml` or `.just/lint-config.toml`",
+                },
+            )
+
+    def test_table_missing_error_uses_the_documented_recovery_literal(self) -> None:
+        error = table_missing_error(
+            ConfigError(
+                code=CONFIG_TABLE_MISSING,
+                table="line_counts",
+                searched=["sc-lint.toml", ".just/lint-config.toml"],
+            )
+        )
+
+        self.assertEqual(
+            error.suggested_action,
+            "add the table to `sc-lint.toml` or `.just/lint-config.toml`",
+        )
 
     def test_workspace_crates_reads_package_and_crate_path(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

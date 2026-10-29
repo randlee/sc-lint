@@ -184,12 +184,20 @@ impl EnclosingCfg {
 #[derive(Debug, Clone, Default)]
 pub(super) struct PlatformAdapters {
     unix_declarations: BTreeSet<(PathBuf, usize)>,
+    adapter_files: BTreeSet<PathBuf>,
 }
 
 impl PlatformAdapters {
     pub(super) fn suppresses_port010(&self, source_path: &Path, line: usize) -> bool {
         self.unix_declarations
             .contains(&(source_path.to_path_buf(), line))
+    }
+
+    pub(super) fn is_adapter_file(&self, source_path: &Path) -> bool {
+        let key = source_path
+            .canonicalize()
+            .unwrap_or_else(|_| source_path.to_path_buf());
+        self.adapter_files.contains(&key)
     }
 }
 
@@ -223,43 +231,47 @@ pub(super) fn validate(
     let declarations = collect_declarations(workspace).map_err(scan_error)?;
     let root = canonical_root;
     let mut used_files = BTreeSet::new();
-    let mut validate_pair = |root: &Path,
-                             record: &PlatformAdapterRecord,
-                             index: usize|
-     -> Result<ModuleDeclaration, AdapterConfigError> {
-        let unix = validate_path(root, index, "unix_module", &record.unix_module)?;
-        let windows = validate_path(root, index, "windows_module", &record.windows_module)?;
-        let unix_path = canonical_module_path(root, index, "unix_module", &unix)?;
-        let windows_path = canonical_module_path(root, index, "windows_module", &windows)?;
-        ensure_distinct(index, record, &mut used_files, &unix_path, &windows_path)?;
-        let unix_declaration = validate_declaration(
-            &declarations,
-            index,
-            "unix_module",
-            &record.unix_module,
-            &unix_path,
-            "unix",
-        )?;
-        validate_declaration(
-            &declarations,
-            index,
-            "windows_module",
-            &record.windows_module,
-            &windows_path,
-            "windows",
-        )?;
-        Ok(unix_declaration)
-    };
-    let unix_declarations = records
-        .iter()
-        .enumerate()
-        .map(|(index, record)| {
-            validate_pair(&root, record, index)
-                .map(|declaration| (declaration.source_path, declaration.line))
-        })
-        .collect::<Result<_, _>>()?;
+    let mut validate_pair =
+        |root: &Path,
+         record: &PlatformAdapterRecord,
+         index: usize|
+         -> Result<(ModuleDeclaration, PathBuf, PathBuf), AdapterConfigError> {
+            let unix = validate_path(root, index, "unix_module", &record.unix_module)?;
+            let windows = validate_path(root, index, "windows_module", &record.windows_module)?;
+            let unix_path = canonical_module_path(root, index, "unix_module", &unix)?;
+            let windows_path = canonical_module_path(root, index, "windows_module", &windows)?;
+            ensure_distinct(index, record, &mut used_files, &unix_path, &windows_path)?;
+            let unix_declaration = validate_declaration(
+                &declarations,
+                index,
+                "unix_module",
+                &record.unix_module,
+                &unix_path,
+                "unix",
+            )?;
+            validate_declaration(
+                &declarations,
+                index,
+                "windows_module",
+                &record.windows_module,
+                &windows_path,
+                "windows",
+            )?;
+            Ok((unix_declaration, unix_path, windows_path))
+        };
+    let mut unix_declarations = BTreeSet::new();
+    let mut adapter_files = BTreeSet::new();
+    for (index, record) in records.iter().enumerate() {
+        let (declaration, unix_path, windows_path) = validate_pair(&root, record, index)?;
+        unix_declarations.insert((declaration.source_path, declaration.line));
+        adapter_files.insert(unix_path);
+        adapter_files.insert(windows_path);
+    }
 
-    Ok(PlatformAdapters { unix_declarations })
+    Ok(PlatformAdapters {
+        unix_declarations,
+        adapter_files,
+    })
 }
 
 fn ensure_distinct(

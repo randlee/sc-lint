@@ -52,6 +52,8 @@ impl CatalogRuleId {
 pub struct RuleCatalog {
     pub analyzer: AnalyzerName,
     pub rules: &'static [CatalogRuleId],
+    /// Rules whose findings can be associated with source paths for exclusions.
+    pub path_addressable_rules: &'static [CatalogRuleId],
     pub families: &'static [(&'static str, &'static [CatalogRuleId])],
     pub default_fail: &'static [CatalogRuleId],
     pub own_keys: &'static [&'static str],
@@ -109,6 +111,14 @@ pub enum AnalyzerConfigError {
         key: &'static str,
         rule: String,
     },
+    #[error(
+        "{analyzer}: exclude_paths_by_rule for `{rule}` cannot match findings because they have no source path; {recovery}"
+    )]
+    UnsupportedPathExclusion {
+        analyzer: &'static str,
+        rule: String,
+        recovery: &'static str,
+    },
 }
 
 impl AnalyzerConfigError {
@@ -126,23 +136,50 @@ impl AnalyzerConfigError {
             Self::UnknownKey { .. } => "ANALYZER_CONFIG.UNKNOWN_KEY",
             Self::WrongType { .. } => "ANALYZER_CONFIG.WRONG_TYPE",
             Self::UnknownRule { .. } => "ANALYZER_CONFIG.UNKNOWN_RULE",
+            Self::UnsupportedPathExclusion { .. } => "ANALYZER_CONFIG.PATH_EXCLUSION_UNSUPPORTED",
         }
     }
 }
 
+/// Repo-relative fallback config file consulted when `sc-lint.toml` lacks the
+/// analyzer's table (REQ-CLI-003, Sprint l-4 clarification 14).
+const LINT_CONFIG_FALLBACK: &str = ".just/lint-config.toml";
+
+/// Resolves the document that holds this analyzer's table (REQ-CLI-003).
+///
+/// An explicit `--config` file is the only candidate. Otherwise the candidates
+/// are `sc-lint.toml` and then `.just/lint-config.toml`; the first existing file
+/// holding `[tool.sc-lint.analyzers.<analyzer>]` wins, so a table in
+/// `sc-lint.toml` is never shadowed by the fallback file. When no candidate
+/// holds the table, the first existing candidate is returned so keys outside
+/// the analyzer table (such as a legacy top-level table) keep their behaviour.
 pub fn read_config_document(
     analyzer: &'static str,
     root: &Path,
     config: Option<&Path>,
 ) -> Result<toml::Table, AnalyzerConfigError> {
-    let path = match config {
-        Some(path) => path.to_path_buf(),
-        None => match Some(root.join("sc-lint.toml")).filter(|path| path.exists()) {
-            Some(path) => path,
-            None => return Ok(toml::Table::new()),
-        },
-    };
-    let text = fs::read_to_string(&path).map_err(|error| AnalyzerConfigError::Read {
+    if let Some(path) = config {
+        return read_config_file(analyzer, path);
+    }
+    let mut first_existing = None;
+    for candidate in [root.join("sc-lint.toml"), root.join(LINT_CONFIG_FALLBACK)] {
+        if !candidate.exists() {
+            continue;
+        }
+        let document = read_config_file(analyzer, &candidate)?;
+        if analyzer_table(&document, analyzer)?.is_some() {
+            return Ok(document);
+        }
+        first_existing.get_or_insert(document);
+    }
+    Ok(first_existing.unwrap_or_default())
+}
+
+fn read_config_file(
+    analyzer: &'static str,
+    path: &Path,
+) -> Result<toml::Table, AnalyzerConfigError> {
+    let text = fs::read_to_string(path).map_err(|error| AnalyzerConfigError::Read {
         analyzer,
         path: path.display().to_string(),
         source: error,
@@ -339,6 +376,13 @@ fn read_rule_path_exclusions(
                     rule: rule.clone(),
                 });
             };
+            if !catalog.path_addressable_rules.contains(&rule_id) {
+                return Err(AnalyzerConfigError::UnsupportedPathExclusion {
+                    analyzer: catalog.analyzer.as_str(),
+                    rule: rule.clone(),
+                    recovery: "remove this entry or choose a rule whose findings have source paths",
+                });
+            }
             let key = format!("exclude_paths_by_rule.{rule}");
             let patterns = read_string_values(Some(patterns), &key, catalog.analyzer.as_str())?
                 .unwrap_or_default();
@@ -496,6 +540,21 @@ impl AnalyzerSettings {
             ReportStatus::Pass
         };
         (kept, status)
+    }
+
+    /// True when any of `paths` matches a global `exclude_paths` pattern or a
+    /// `exclude_paths_by_rule` pattern of `rule`. Used for findings that carry
+    /// no path of their own; the analyzer supplies the source files behind the
+    /// finding. A path that is not UTF-8, absolute, or escapes the repository
+    /// root never matches.
+    pub fn excluded_by_any_path(&self, rule: CatalogRuleId, paths: &[&Path]) -> bool {
+        paths
+            .iter()
+            .filter_map(|path| path.to_str())
+            .filter_map(|path| RepoRelativePath::parse(path).ok())
+            .any(|path| {
+                self.path_excluded(path.as_str()) || self.path_excluded_by_rule(rule, &path)
+            })
     }
 
     fn path_excluded_by_rule(&self, rule_id: CatalogRuleId, path: &RepoRelativePath) -> bool {

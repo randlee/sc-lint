@@ -1,0 +1,7 @@
+# Source: atm-core .just/lint-config.toml (integrate/phase-bg) commit f4746d500
+[version_sync.winget]
+enabled = true
+manifest_glob = ".winget/*.yaml"
+package_version_field = "PackageVersion"
+manifest_version_field = "ManifestVersion"
+installer_url_field = "InstallerUrl"

@@ -93,7 +93,11 @@ The table supports the common keys `enabled`, `reason`, `exclude_rules`,
 `fail_rules`, `exclude_paths`, and `exclude_paths_by_rule`; boundary has no
 analyzer-specific keys. `exclude_paths_by_rule` maps an exact rule ID to path
 globs and filters findings from that rule without excluding other rules in the
-same file.
+same file. Global and per-rule path exclusions only affect findings with a
+source path (or rules whose analyzer resolves their source paths). A finding
+from a path-less rule that has no source paths cannot be matched by
+`exclude_paths`; it is retained. Per-rule exclusions for such rules are
+rejected as `ANALYZER_CONFIG.PATH_EXCLUSION_UNSUPPORTED`.
 Rule IDs and family names can be used in `--rule-filter`, `exclude_rules`,
 and `fail_rules`.
 

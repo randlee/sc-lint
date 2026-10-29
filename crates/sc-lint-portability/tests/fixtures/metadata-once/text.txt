@@ -1,1 +1,1 @@
-sc-lint-portability 0.8.0 status=fail scanned_crates=1 findings=1
+sc-lint-portability 0.8.1 status=fail scanned_crates=1 findings=1

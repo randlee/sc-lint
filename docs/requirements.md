@@ -109,10 +109,15 @@ The product should support both:
   The top-level CLI must define one canonical success/failure envelope family
   for non-interactive commands so backend-native machine contracts can be
   normalized without leaking backend-specific contract drift.
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) Backend payloads are
+  validated against the published schema, not only parsed as JSON, and a test
+  must reject a drifted payload with a structured error.
 
 - `REQ-PRODUCT-002E`
   Human-readable output must remain a secondary presentation layer and must not
   contain machine-significant detail that is unavailable through machine mode.
+  (Amended phase L, #586, Accepted — Rand, 2026-10-26.) Enforced by the test
+  required under `REQ-CLI-005D`.
 
 - `REQ-PRODUCT-002F`
   Future interactive or graph-exploration features must remain secondary
@@ -173,6 +178,11 @@ The product should support both:
   Tokio-specific runtime rules must not land in `sc-lint-runtime` by default;
   they should move into `sc-lint-tokio` when Tokio-specific dependencies or
   semantics justify a dedicated crate.
+  (Amended phase L, #82, Accepted — Rand, 2026-10-26.) A Tokio-aware rule that
+  needs no Tokio crate dependency and no Tokio runtime semantics, such as
+  `SCB-RUNTIME-003` (blocking `thread::sleep` in a package that declares
+  `tokio`), may live in `sc-lint-runtime`. The dedicated crate is created only
+  when a Tokio rule needs Tokio dependencies or runtime semantics.
 
 - `REQ-PRODUCT-004D`
   `sc-lint-analyzer-support` owns only shared rule-neutral AST source
@@ -637,6 +647,10 @@ This is an amendment to those contracts, not a new product default.
   - see [docs/plans/phase-A/foundation-phase-plan.md](./plans/phase-A/foundation-phase-plan.md)
 
 ## Phase D Requirements (completed; retained for traceability)
+
+ADR-020 retires `REQ-SCB-002` through `REQ-SCB-005`: they describe the former
+dual-loader transition and remain only as historical text in
+[`sc-lint-boundary/requirements.md`](./sc-lint-boundary/requirements.md).
 
 The completed Phase `D` execution line required:
 

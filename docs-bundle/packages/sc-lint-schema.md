@@ -19,11 +19,18 @@ adapter:
 
 ```toml
 [dependencies]
-sc-lint-schema = "0.8.0"
+sc-lint-schema = "0.8.1"
 ```
 
 Keep field names and status values stable; add compatible fields rather than
 changing the meaning of an existing field.
+
+Rust analyzer reports are checked against the crate's bundled
+`analyzer-report-v1` JSON Schema before the CLI normalizes them. The
+`validate_analyzer_report` API returns the first schema mismatch as a
+path and problem. The schema crate also validates the stable
+`sc-lint-python-v1` adapter envelope; unknown keys remain allowed so the
+transport can grow additively. JSON values use `serde_json`.
 
 ## Output and CI
 

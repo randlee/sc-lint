@@ -21,7 +21,8 @@ Use `sc-portability` to catch portability drift such as:
   - hardcoded Unix-only absolute path literals in production code
 - `PORT-007`
   - hardcoded Windows absolute path literals, including drive-letter and UNC
-    forms, in production code
+    forms, in production code; `#[cfg(windows)]`-gated items and expression
+    blocks are exempt, as are the `\\?\` verbatim and `\\.\` device prefixes
 - `PORT-008`
   - direct production lookups of `HOME`, `USER`, and `XDG_*` without a
     platform-neutral abstraction
@@ -114,7 +115,7 @@ PORT-006 hardcoded Unix-only absolute path literal `/var/run/sc-lint` in product
 Production code with a hardcoded Windows runtime path is also flagged:
 
 ```text
-PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction
+PORT-007 hardcoded Windows-only absolute path literal `C:\ProgramData\sc-lint\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction (exempt: literals under a Windows-only cfg such as #[cfg(windows)], and `\\?\` verbatim or `\\.\` device namespace prefixes)
 ```
 
 Production code with Unix-centric environment lookups is also flagged:
@@ -172,10 +173,17 @@ and PORT-006; configured prefixes never replace or disable the built-ins.
 `targets` is accepted for adopted configurations but is not interpreted by a
 rule yet.
 
-`platform_adapters` lists explicit Unix/Windows module pairs with a review
-reason when their private implementations provide the same interface. Adapter
-handling is limited to the paired modules and enclosed private items; unrelated
-items and separately Unix-gated public items remain subject to parity checks.
+`platform_adapters` records explicit Unix/Windows module pairs and a review
+reason for private implementations intended to provide the same interface. The
+analyzer validates the configured pair but does not compare the implementations'
+interfaces. For each paired module file, the exemption covers private `fn` and
+`mod` items and private inherent-impl methods at file or inline-module scope.
+Public items, trait-impl methods, impls nested in function bodies, unrelated
+items, and separately Unix-gated public items remain subject to parity checks.
+
+Known limitation: a crate-root `main.rs` with a `#[cfg(unix)]` function and a
+`#[cfg(not(unix))]` sibling is still reported by PORT-010. This behavior is
+tracked for follow-up in GitHub issue #720.
 
 Pass `--rule-filter PORT-001,PORT-006` to select rules. When provided, the
 filter determines the selected rules instead of `exclude_rules`. Invalid

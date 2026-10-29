@@ -380,7 +380,7 @@ fn bootstrap_exec_uses_managed_product_for_neutral_and_derived_consumers() {
         );
         if derived {
             assert!(
-                String::from_utf8_lossy(&output.stdout).contains("lint.ci.consumer: ok"),
+                String::from_utf8_lossy(&output.stdout).contains("lint.ci.consumer: pass ("),
                 "profile command did not execute the fixture's configured managed version check: {}",
                 String::from_utf8_lossy(&output.stdout)
             );

@@ -77,7 +77,7 @@ Initial convention:
   - `lint.fast`
 - `sc-lint lint --consumer --config sc-lint.toml ci`
   - `lint.ci.consumer`
-- `sc-lint test`
+- `sc-lint test [--fail-fast|--list] [<selector> [args...]]`
   - `test`
 - `sc-lint init --just`
   - `init`
@@ -88,7 +88,7 @@ Initial convention:
 - `sc-lint check xwin`
   - `check.xwin`
 - `sc-lint check interfaces`
-  - `check.interfaces`
+  - `check.interfaces` (planned, not implemented)
 - `sc-lint clippy xwin`
   - `clippy.xwin`
 - `sc-lint ci`
@@ -115,6 +115,16 @@ completion events so command telemetry and machine-readable output line up.
 
 Current implementation status:
 
+- `REQ-CLI-003` analyzer config tables (Rust analyzers: portability, boundary,
+  runtime)
+  - implemented per-table resolution: an explicit `--config` file, then the
+    table in `sc-lint.toml`, otherwise the same table in
+    `.just/lint-config.toml`; a table in `sc-lint.toml` is never shadowed
+  - documented deviation: when neither file holds the table, Rust analyzers
+    keep their defaults and do not raise `config.table_missing`. Sprint l-4
+    clarification 15 scopes that failure to Python-backed `line-counts` and
+    `identity-literals`.
+    Changing it requires a Rand ADR amendment.
 - `version`
   - direct CLI-owned success path
 - `compatibility.check`
@@ -132,7 +142,10 @@ Current implementation status:
   - implemented explicit consumer lint profile path; its configured argv steps
     run from `sc-lint.toml` without source-checkout discovery
 - `test`
-  - implemented explicit consumer test profile path
+  - implemented explicit consumer test profile path: `sc-lint test
+    [--fail-fast|--list] [<selector> [args...]]` runs the default selector (or
+    every `[[tool.sc-lint.test]]` row), the named selector with forwarded
+    arguments, or lists the declared selectors
 - `init`
   - implemented product-owned consumer integration renderer with check,
     dry-run, idempotency, and conflict behavior
@@ -141,7 +154,7 @@ Current implementation status:
 - `check.xwin`
   - implemented capability-gated Windows preflight path
 - `check.interfaces`
-  - planned Phase `C` interface-versioning command path
+  - planned, not implemented Phase `C` interface-versioning command path
 - `clippy.native`
   - implemented native clippy path
 - `clippy.xwin`
@@ -197,13 +210,9 @@ Required properties:
 
 Business-verdict behavior:
 
-- `sc-lint check interfaces` is a business-verdict command rather than a
+- planned, not implemented: `sc-lint check interfaces` is a business-verdict command rather than a
   transport or protocol failure surface
-- a completed comparison that detects breaking changes remains a
-  `CommandEnvelope<T>` result with the negative verdict carried inside `data`
-- `sc-lint check interfaces` currently exits `0` for a completed comparison,
-  including one with a breaking-change verdict; a nonzero exit for that verdict
-  remains planned policy behavior, not a `CliError` reclassification
+- `sc-lint check interfaces` is planned, not implemented; `CheckTarget` offers only `native` and `xwin`, so the CLI rejects it as an unknown target (`cli.parse_error`, `usage`, exit `2`). Once implemented it is intended to be a business-verdict command (REQ-CLI-005J).
 - `lint sc-boundary`, `lint sc-portability` and `lint sc-runtime` now exit `10`
   when `data.status = "fail"`; the envelope remains `ok: true`
 
@@ -280,25 +289,62 @@ Parser-level usage failures emitted before `CommandContext` can resolve a
 family-specific path still use this same error taxonomy, but their machine
 envelope `command` value is the fallback identifier `cli.parse_error`.
 
-## Planned Command-Family Contract Matrix
+## Stable codes
 
-Every non-interactive command family should be implementation-reviewed against
+| Code | Kind | Cause names | Recovery |
+| --- | --- | --- | --- |
+| `config.boundaries_dir_missing` | `config` | the repo root searched | create `boundaries/` or do not run the boundary family |
+| `config.table_missing` | `config` | the table and files searched | add the table to `sc-lint.toml` or `.just/lint-config.toml` |
+| `config.unknown_table` | `config` | the unsupported key: root or `tool.sc-lint` `setup`/`runner` (ADR-020 decision 9), or any other `[tool.sc-lint]` key outside `minimum_version`, `lint`, `lint_profiles`, `test`, `analyzers`; other root tables belong to the lint backends and are not rejected | remove the key; for setup/runner use `sc_lint.setup_tools` and `.sc-lint/venv/bin/python -m sc_lint.<module>` |
+| `profile.invalid_after_all` | `config` | the step or group selector and file | remove after_all from that selector |
+| `test.unknown_selector` | `config` | the selector name and file | use a name from sc-lint test --list |
+| `test.group_cycle` | `config` | the selector cycle path | break the cycle in [tool.sc-lint.test] |
+| `profile.steps_failed` | `backend_failure` | failed_steps[]: index, name, exit_code, message in declaration order (skipped_steps[] under --fail-fast) | fix the failing steps and rerun |
+| `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the analyzer backend so its payload matches the published schema |
+
+Codes are typed constants in their owning module (`ConfigCode` in `config.rs`; `CONFIG_TABLE_MISSING` in `lint_common.py`; adapter payload drift in `python_adapter.rs`) and cause text interpolates names.
+
+## Command-Family Contract Matrix
+
+Every non-interactive command family must be implementation-reviewed against
 the same matrix before code lands:
 
-| Command family | Stable `command` pattern | Success payload owner | Applicable top-level error kinds |
-| --- | --- | --- | --- |
-| `lint` | `lint.<tool-or-profile>` | analyzer backend or lint-profile orchestrator | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
-| `view` | `view.<target>` | view/report backend or adapter layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
-| `check` | `check.<target>` | compile/preflight runner | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
-| `clippy` | `clippy.<target>` | lint-runner backend | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
-| `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` |
-| `version` | `version` | top-level CLI crate | `usage`, `internal` |
-| `compatibility check` | `compatibility.check` | compatibility preflight | `config`, `backend_failure`, `internal` |
+| Command family | Stable `command` pattern | Success payload owner | Applicable top-level error kinds | Enforcing test |
+| --- | --- | --- | --- | --- |
+| `lint` | `lint.<tool-or-profile>` | analyzer backend or lint-profile orchestrator | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `lint_sc_boundary_normalizes_backend_success_through_the_top_level_envelope`, `python_backed_lints_and_views_normalize_through_the_top_level_envelope` |
+| `view` | `view.<target>` | view/report backend or adapter layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `reserved_view_commands_use_the_same_failure_envelope_shape`, `envelope_key_set_identical_across_families` |
+| `check` | `check.<target>` | compile/preflight runner | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `explicit_xwin_commands_require_capability`, `envelope_key_set_identical_across_families` |
+| `clippy` | `clippy.<target>` | lint-runner backend | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `native_and_xwin_preflight_commands_use_success_envelopes`, `envelope_key_set_identical_across_families` |
+| `ci` | `ci` | top-level orchestration layer | `usage`, `config`, `capability`, `backend_failure`, `backend_protocol`, `internal` | `envelope_key_set_identical_across_families` |
+| `version` | `version` | top-level CLI crate | `usage`, `internal` | `version_success_uses_the_canonical_top_level_envelope` |
+| `compatibility check` | `compatibility.check` | compatibility preflight | `config`, `backend_failure`, `internal` | `envelope_key_set_identical_across_families` |
+| `docs` | `docs` | offline documentation discovery (`docs.rs`) | `usage`, `capability` | `envelope_key_set_identical_across_families` |
+| `init` | `init` | consumer integration generator | `usage`, `config`, `internal` | `envelope_key_set_identical_across_families` |
+| `test` | `test` | consumer test-profile orchestration | `usage`, `config`, `backend_failure`, `internal` | `envelope_key_set_identical_across_families` |
+| `setup` | `setup` | managed installer | `usage`, `config`, `backend_failure`, `internal` | `setup_and_upgrade_json_use_the_canonical_top_level_envelope` |
+| `upgrade` | `upgrade` | managed installer | `usage`, `config`, `backend_failure`, `internal` | `setup_and_upgrade_json_use_the_canonical_top_level_envelope` |
+| `lint --consumer` | `lint.ci.consumer` | consumer lint-profile orchestration | `usage`, `config`, `capability`, `backend_failure`, `internal` | `envelope_key_set_identical_across_families` |
+| parser failure | `cli.parse_error` (fixed fallback) | clap parse layer, `entry.rs` `handle_parse_error` | `usage` | `parse_errors_use_the_documented_command_identifier`, `envelope_key_set_identical_across_families` |
 
 This matrix exists to prevent each command family from inventing its own
 response or error pattern at implementation time.
 
-## Compatibility And Version-Probe Contract
+## Human Output Fields (L8-3)
+
+Rand's 2026-10-27 ruling on L8-3 was “keep option a”: pin the current human
+renderer behavior and verify that each machine-significant human-output field
+is present in the JSON envelope. The rule reflects the existing
+`render_success_human` implementation; it does not request a renderer change.
+
+- `init`, `compatibility.check`, and `view.graph` render exactly
+  `{id}: ok`.
+- `test` and `lint.ci.consumer` render
+  `<command>: <status> (<n> steps)`.
+
+The `human_output_fields_present_in_json` test asserts the exact fallback line
+for the first group and checks command, status, and step-count tokens against
+the JSON envelope for the second group. The remaining families likewise list
+their human-visible machine-significant fields in the test's pointer table.
 
 ## Consumer Integration And Profile Contract
 
@@ -313,11 +359,45 @@ Cargo manifest, or analyzer package:
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in
-  the configuration directory and any required member failure fails the
-  aggregate command with a structured `CliError`.
-- missing configured executables use
-  `CLI.SC_LINT_BACKEND_NOT_FOUND` with installation recovery and the setup
-  documentation reference.
+  the configuration directory (or a test selector's `cwd` below it). Steps
+  run in parallel (cargo `argv[0]` steps serialized in declaration order,
+  `after_all` steps last) and fail slow: every step runs, and any failure
+  fails the aggregate command with one `profile.steps_failed` error.
+- `profile.steps_failed` (exit 5) carries `details.failed_steps[]`, one
+  `{"index", "name", "exit_code", "message"}` per failed step in declaration
+  order; `index` is the zero-based position in `data.steps[]` (platform-skipped
+  rows included), `exit_code` is `null` when the process did not start or the
+  step panicked, and `message` is the step error and its cause. Under
+  `--fail-fast` it also carries `details.skipped_steps[]`, one
+  `{"index", "name", "reason": "fail-fast"}` per step that never started.
+- a missing configured executable is a failed step whose `message` starts
+  with `<name> failed to start` and includes the spawn error.
+- `sc-lint test --list` runs nothing and returns
+  `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
+  [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
+  "platforms": [...], "cwd": <string|null>, "env_keys": [...], "after_all":
+  bool}]}`, sorted by name.
+
+Human-readable `sc-lint test --list` output contains one selector per line,
+sorted by name, in this form:
+
+`<name>[ (default)]: <command tokens joined by spaces | group [member, member]>[ [platform,platform]]`
+
+The `(default)` marker appears only on the default selector. Group members are
+joined with comma-space; a non-empty platform list is appended in brackets,
+with platform names separated by commas and no spaces. Selectors without a
+platform list have no suffix. Command tokens are joined with a single space
+without shell quoting. An empty selector list produces empty human output.
+
+For example:
+
+```text
+ci: group [unit, nested]
+integration: cargo test --test integration
+nested: group [integration, unit]
+unit (default): cargo test
+win-only: cargo test --features windows [windows]
+```
 
 The generated default configuration uses this shape:
 
@@ -465,13 +545,21 @@ If the delegated binary:
   `--rule-filter` unchanged; a backend exit 2 becomes a usage error and exit 3
   a config error.
 
+### Rust analyzer backend reports
+
+The Rust analyzer backends emit `FindingsReport` JSON. The top-level CLI
+validates each report against the published
+[`analyzer-report-v1` JSON Schema](../../crates/sc-lint-schema/schema/analyzer-report-v1.schema.json)
+before normalization. A shape mismatch fails as `backend_protocol` with code
+`backend_payload_drift` and the failing instance path in `key_path`.
+
 ### Python adapter backend
 
 For Python-backed utility paths in A.3:
 
 - the CLI invokes the Python tool with `--json`
-- the Python tool emits `sc-lint-python-v1`
-- the CLI validates the adapter schema before exposing any success payload
+- the Python tool emits `sc-lint-python-v1`, whose documented payload shape is validated before normalization: `adapter_schema` is a string, `ok` is a boolean, and `diagnostics` is an array of strings; success requires object `data` and string `summary` with no `error`; failure requires string `error.kind` and `error.message`, permits object `error.details`, string `error.suggested_action` and string `summary`, and has no `data`; unknown additive keys are allowed
+- a payload that matches the adapter version but drifts from this shape fails as `backend_protocol` with code `backend_payload_drift`, including when the Python process exits non-zero
 - adapter-reported failures map into `CliError` by structured fields:
   - `kind`
   - `message`
