@@ -92,20 +92,13 @@ jobs:
             target
           key: ${{ matrix.target }}-cargo-prerelease-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install Linux ARM cross compiler
-        if: ${{ matrix.target == 'aarch64-unknown-linux-gnu' }}
-        run: python3 -m pip install cargo-zigbuild==0.20.1 ziglang==0.12.1
-
       - name: Build release binaries
         shell: bash
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          bins="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "$RELEASE_ARTIFACT_MANIFEST")"
-          if [[ '${{ matrix.target }}' == 'aarch64-unknown-linux-gnu' ]]; then
-            cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 $bins
-          else
-            cargo build --release --target "${{ matrix.target }}" $bins
-          fi
+          bash .github/scripts/build_release_target.sh binaries
           python3 .github/scripts/verify_release_arch.py --manifest "$RELEASE_ARTIFACT_MANIFEST" --target '${{ matrix.target }}' target/${{ matrix.target }}/release
 
       - name: Package manifest-declared prerelease archive
@@ -189,36 +182,34 @@ jobs:
           release_version: ${{ needs.plan.outputs.version }}
           pyproject: ${{ matrix.pyproject }}
           build_system: ${{ matrix.build_system }}
-          install_maturin_zig: ${{ matrix.manylinux != '' && matrix.manylinux != 'off' }}
+          install_maturin_zig: ${{ matrix.os == 'ubuntu-24.04-arm' || (matrix.manylinux != '' && matrix.manylinux != 'off') }}
           rust_toolchain: ${{ needs.plan.outputs.rust_toolchain }}
           workspace_toml: ${{ needs.plan.outputs.workspace_toml }}
       - name: Build declared wheel
         shell: bash
         env:
-          WHEEL_TARGET: ${{ matrix.target }}
-          WHEEL_MANYLINUX: ${{ matrix.manylinux }}
+          BUILD_TARGET: ${{ matrix.target }}
+          BUILD_MANYLINUX: ${{ matrix.manylinux }}
+          BUILD_CARGO_MANIFEST: ${{ matrix.cargo_manifest }}
+          BUILD_SYSTEM: ${{ matrix.build_system }}
+          BUILD_SOURCE: ${{ matrix.source }}
+          BUILD_RUNNER: ${{ matrix.os }}
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
+        run: bash .github/scripts/build_release_target.sh wheel
+      - name: Verify declared wheel platform
+        shell: bash
+        if: ${{ matrix.platform != '' }}
+        env:
+          WHEEL_PLATFORM: ${{ matrix.platform }}
+        run: python3 .github/scripts/release_python.py --asset-dir dist --platform "$WHEEL_PLATFORM"
+      - name: Verify wheel architecture
+        if: ${{ matrix.target != '' }}
+        shell: bash
         run: |
           set -euo pipefail
-          if [[ '${{ matrix.build_system }}' == 'setuptools' ]]; then
-            python -m pip install build==1.3.0
-            python -m build --wheel --outdir dist '${{ matrix.source }}'
-          elif [[ -z "$WHEEL_TARGET" ]]; then
-            maturin build --release --manifest-path '${{ matrix.cargo_manifest }}' --out dist
-          else
-            rustup target add "$WHEEL_TARGET"
-            args=(--release --locked --manifest-path '${{ matrix.cargo_manifest }}' --out dist --target "$WHEEL_TARGET")
-            if [[ "$WHEEL_TARGET" == 'aarch64-pc-windows-msvc' ]]; then
-              export PYO3_CROSS=1 PYO3_CROSS_PYTHON_VERSION=3.11
-              args+=(--features pyo3/generate-import-lib)
-            fi
-            if [[ "$WHEEL_MANYLINUX" != 'off' ]]; then args+=(--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig); fi
-            maturin build "${args[@]}"
-            python3 .github/scripts/release_python.py --asset-dir dist --platform '${{ matrix.platform }}'
-            python3 .github/scripts/verify_release_arch.py --target "$WHEEL_TARGET" dist/*.whl
-            if [[ '${{ matrix.name }}' == 'sc-lint' ]]; then
-              for wheel in dist/*.whl; do [[ "$wheel" == *-cp39-abi3-* ]] || exit 1; done
-            fi
+          python3 .github/scripts/verify_release_arch.py --target '${{ matrix.target }}' dist/*.whl
+          if [[ '${{ matrix.name }}' == 'sc-lint' ]]; then
+            for wheel in dist/*.whl; do [[ "$wheel" == *-cp39-abi3-* ]] || exit 1; done
           fi
       - uses: actions/upload-artifact@v4
         with:

@@ -52,7 +52,7 @@ def test_preflight_rejects_missing_arm_archive(tmp_path):
     path = tmp_path / "manifest.toml"
     path.write_text(manifest.replace(missing, ""))
     script = root / ".github/scripts/check_sc_lint_platforms.py"
-    result = subprocess.run([sys.executable, str(script), str(path)], cwd=root, capture_output=True, text=True)
+    result = subprocess.run([sys.executable, str(script), str(path)], cwd=root, capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
     assert "six release targets" in result.stderr
 
@@ -70,7 +70,7 @@ def test_pypi_verifier_rejects_mislabeled_payload(tmp_path):
         archive.writestr("sc_lint/_native.pyd", data)
     result = subprocess.run(
         [sys.executable, str(root / ".github/scripts/verify_sc_lint_wheels.py"), str(manifest), str(tmp_path)],
-        cwd=root, capture_output=True, text=True,
+        cwd=root, capture_output=True, text=True, timeout=30,
     )
     assert result.returncode != 0
     assert "expected" in result.stderr
@@ -105,6 +105,6 @@ def test_pypi_verifier_accepts_all_six_matching_payloads(tmp_path):
     result = subprocess.run(
         [sys.executable, str(root / ".github/scripts/verify_sc_lint_wheels.py"),
          str(root / "release/publish-artifacts.toml"), str(tmp_path)],
-        cwd=root, capture_output=True, text=True,
+        cwd=root, capture_output=True, text=True, timeout=30,
     )
     assert result.returncode == 0, result.stderr

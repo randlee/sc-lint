@@ -462,6 +462,7 @@ def run_release_gate_readiness(
         "npm_release.py",
         "worker_result.py",
         "release_python.py",
+        "release_platforms.py",
         "release_gate.sh",
     ):
         (scripts_dir / script_name).write_text(
@@ -1236,10 +1237,10 @@ def test_release_workflows_gate_cargo_and_python_legs_on_the_manifest() -> None:
     assert "needs.release-plan.outputs.has_crates == 'true'" in release_text
     assert "needs.release-plan.outputs.has_python_wheels == 'true'" in release_text
     assert "needs.release-plan.outputs.has_python_sdists == 'true'" in release_text
-    assert "Build wheels (maturin)" in release_text
-    assert "Build wheels (setuptools)" in release_text
-    assert "matrix.build_system == 'setuptools'" in release_text
-    assert "python -m build --wheel" in release_text
+    assert "Build declared wheel" in release_text
+    build_recipe = (scripts_root() / "build_release_target.sh").read_text()
+    assert "BUILD_SYSTEM" in build_recipe
+    assert "python -m build --wheel" in build_recipe
     assert "python -m build --sdist" in release_text
     assert "steps.build_plan.outputs.workspace_toml" in release_text
 

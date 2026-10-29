@@ -3,16 +3,10 @@
 from pathlib import Path
 import sys
 import tomllib
+from release_platforms import PLATFORMS
 
 
-targets = {
-    "x86_64-unknown-linux-gnu": "manylinux_2_28_x86_64",
-    "aarch64-unknown-linux-gnu": "manylinux_2_28_aarch64",
-    "x86_64-apple-darwin": "macosx_11_0_x86_64",
-    "aarch64-apple-darwin": "macosx_11_0_arm64",
-    "x86_64-pc-windows-msvc": "win_amd64",
-    "aarch64-pc-windows-msvc": "win_arm64",
-}
+targets = {target: metadata[0] for target, metadata in PLATFORMS.items()}
 with Path(sys.argv[1]).open("rb") as source:
     manifest = tomllib.load(source)
 if manifest["project"]["name"] == "sc-lint":
@@ -25,7 +19,7 @@ if manifest["project"]["name"] == "sc-lint":
         raise SystemExit("sc-lint must declare the six matching Python wheel platforms")
     for entry in manifest["release_targets"] + wheels:
         target = entry["target"]
-        expected_runner = "ubuntu-latest" if "linux" in target else "windows-latest" if "windows" in target else "macos-latest"
+        expected_runner = PLATFORMS[target][1]
         if entry["os"] != expected_runner:
             raise SystemExit(f"{target} must use {expected_runner}")
     channels = manifest["channels"]

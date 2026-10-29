@@ -32,7 +32,7 @@ def test_recipe_requires_running_colima_without_changing_its_lifecycle(tmp_path,
         ["bash", str(SCRIPT), str(archive), str(wheel)],
         env={**os.environ, "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}",
              "CALL_LOG": str(log), "COLIMA_STATUS": "0" if running else "1"},
-        text=True, capture_output=True, check=False,
+        text=True, capture_output=True, check=False, timeout=30,
     )
     calls = log.read_text().splitlines()
     assert [line for line in calls if line.startswith("colima ")] == ["colima status"]

@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import struct
 import zipfile
+from release_platforms import PLATFORMS
 
 
 def machine(data: bytes) -> tuple[str, int]:
@@ -21,14 +22,7 @@ def machine(data: bytes) -> tuple[str, int]:
     raise ValueError("unrecognized executable format")
 
 
-EXPECTED = {
-    "x86_64-unknown-linux-gnu": ("elf", 62),
-    "aarch64-unknown-linux-gnu": ("elf", 183),
-    "x86_64-pc-windows-msvc": ("pe", 0x8664),
-    "aarch64-pc-windows-msvc": ("pe", 0xAA64),
-    "x86_64-apple-darwin": ("macho", 0x01000007),
-    "aarch64-apple-darwin": ("macho", 0x0100000C),
-}
+EXPECTED = {target: metadata[2] for target, metadata in PLATFORMS.items()}
 
 
 def verify(path: Path, target: str, manifest: Path | None = None) -> None:

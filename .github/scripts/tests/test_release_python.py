@@ -59,9 +59,8 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
     wheels = release["jobs"]["build-python-wheels"]
     assert wheels["runs-on"] == "${{ matrix.os }}"
     assert all("maturin-action" not in step.get("uses", "") for step in wheels["steps"])
-    declared = next(step for step in wheels["steps"] if step.get("name") == "Build declared wheel target (maturin)")
-    assert '--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig' in declared["run"]
-    assert '--target "$WHEEL_TARGET"' in declared["run"]
+    declared = next(step for step in wheels["steps"] if step.get("name") == "Build declared wheel")
+    assert declared["run"] == "bash .github/scripts/build_release_target.sh wheel"
     assert declared["env"]["MACOSX_DEPLOYMENT_TARGET"] == "${{ matrix.deployment_target }}"
     assert 'maturin[zig]==1.9.4' in (root / "actions/setup-python-release-build/action.yml").read_text()
     assert "has_release_binaries" in release["jobs"]["build"]["if"]
@@ -78,13 +77,21 @@ def test_prerelease_builds_and_publishes_declared_wheels():
     job = workflow["jobs"]["build-wheels"]
     assert job["strategy"]["matrix"] == "${{ fromJSON(needs.plan.outputs.wheel_matrix) }}"
     build = next(step for step in job["steps"] if step.get("name") == "Build declared wheel")
-    assert "--compatibility \"manylinux_${WHEEL_MANYLINUX}\" --zig" in build["run"]
-    assert "PYO3_CROSS_PYTHON_VERSION=3.11" in build["run"]
-    assert "verify_release_arch.py" in build["run"]
+    assert build["run"] == "bash .github/scripts/build_release_target.sh wheel"
+    assert any("verify_release_arch.py" in step.get("run", "") for step in job["steps"])
     release = workflow["jobs"]["release"]
     assert "build-wheels" in release["needs"]
     publication = next(step for step in release["steps"] if step.get("name") == "Generate checksums and publish GitHub prerelease assets")
     assert "-name '*.whl'" in publication["run"]
+
+
+def test_new_arm_release_targets_never_enter_pr_ci():
+    ci = (INSTALL.PACKAGE_ROOT / ".github/workflows/ci.yml").read_text()
+    for marker in ("aarch64-unknown-linux-gnu", "aarch64-pc-windows-msvc",
+                   "manylinux_2_28_aarch64", "win_arm64", "ubuntu-24.04-arm",
+                   "windows-11-arm", "linux-arm64", "windows-arm64",
+                   "release-target-matrix", "python-wheel-matrix", "build_release_target.sh"):
+        assert marker not in ci
 
 
 @pytest.mark.parametrize('workflow_name', ['release.yml', 'crates-publish.yml'])
