@@ -171,7 +171,7 @@ pub(crate) fn run_setup(loaded: &LoadedConfig, dry_run: bool) -> Result<Value, C
         !CONSUMER_BOOTSTRAP_ASSET.is_empty(),
         "the E.3 consumer bootstrap source asset must be packaged with the product"
     );
-    run(loaded, false, dry_run)
+    run_with_probe(loaded, false, dry_run, |binary| probe_version(binary).ok())
 }
 
 pub(crate) fn run_upgrade(
@@ -179,10 +179,17 @@ pub(crate) fn run_upgrade(
     check_only: bool,
     dry_run: bool,
 ) -> Result<Value, CliError> {
-    run(loaded, check_only, dry_run)
+    run_with_probe(loaded, check_only, dry_run, |binary| {
+        probe_version(binary).ok()
+    })
 }
 
-fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, CliError> {
+pub(crate) fn run_with_probe(
+    loaded: &LoadedConfig,
+    check_only: bool,
+    dry_run: bool,
+    version_probe: impl Fn(&Path) -> Option<Version>,
+) -> Result<Value, CliError> {
     let (minimum_version, config_path) = loaded.compatibility_requirement()?;
     let release_version = ResolvedReleaseVersion::for_minimum(minimum_version);
     let target = ReleaseTarget::detect()?;
@@ -192,23 +199,7 @@ fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, 
     let had_previous_installation = std::iter::once(managed_binary.clone())
         .chain(path_binary_candidates_if(use_path_candidates))
         .any(|binary| binary.is_file());
-    let managed_existing =
-        find_compatible_binary_with(&managed_binary, minimum_version, false, |binary| {
-            let version = probe_version(binary).ok()?;
-            managed_payload_complete(binary).then_some(version)
-        });
-    let existing = managed_existing.or_else(|| {
-        // PATH is a supported development fallback when no managed launcher
-        // exists. A partial managed install must be repaired from the release,
-        // even if an unrelated PATH executable happens to be compatible.
-        (!managed_binary.exists() && use_path_candidates)
-            .then(|| {
-                find_compatible_binary_with(&managed_binary, minimum_version, true, |binary| {
-                    probe_version(binary).ok()
-                })
-            })
-            .flatten()
-    });
+    let existing = find_existing_installation(&managed_binary, minimum_version, version_probe);
 
     if let Some((binary, version)) = existing {
         return Ok(json!({
@@ -265,6 +256,28 @@ fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, 
             "verified sc-lint release activated"
         },
     }))
+}
+
+fn find_existing_installation(
+    managed_binary: &Path,
+    minimum_version: &MinimumVersion,
+    version_probe: impl Fn(&Path) -> Option<Version>,
+) -> Option<(PathBuf, Version)> {
+    let use_path_candidates = env::var_os(INSTALL_DIR_ENV).is_none();
+    let managed_existing =
+        find_compatible_binary_with(managed_binary, minimum_version, false, |binary| {
+            let version = version_probe(binary)?;
+            managed_payload_complete(binary).then_some(version)
+        });
+    managed_existing.or_else(|| {
+        // PATH remains a development fallback only when there is no managed
+        // launcher; partial managed installations must be repaired.
+        (!managed_binary.exists() && use_path_candidates)
+            .then(|| {
+                find_compatible_binary_with(managed_binary, minimum_version, true, version_probe)
+            })
+            .flatten()
+    })
 }
 
 fn managed_install_dir() -> Result<PathBuf, CliError> {
@@ -1688,9 +1701,7 @@ mod tests {
     fn setup_and_upgrade_command_dispatch_covers_all_installation_states_on_every_platform() {
         let fixture = TempDir::new().expect("fixture");
         let config_path = fixture.path().join("sc-lint.toml");
-        let built_binary = built_cli_binary();
-        let built_binary_dir = built_binary.parent().expect("built CLI directory");
-        let install_fixture = TempDir::new_in(built_binary_dir).expect("same-filesystem fixture");
+        let install_fixture = TempDir::new().expect("install fixture");
         let install_dir = install_fixture.path().join("managed");
         fs::create_dir(&install_dir).expect("managed directory");
         let _environment = InstallerEnvironment::set(&[(INSTALL_DIR_ENV, install_dir.as_os_str())]);
@@ -1713,15 +1724,10 @@ mod tests {
         .expect_err("missing binary must use command dispatch");
         assert_eq!(missing_error.code(), "CLI.SC_LINT_BINARY_NOT_FOUND");
 
-        // The built CLI is a native executable on each CI host, so all three
-        // version states exercise the actual installer command path without a
-        // Unix shell fixture or platform-specific permission assumptions. CI
-        // may reuse a cached executable from a preceding workspace build, so
-        // derive the compatible floor from the binary we actually link
-        // rather than assuming it is this test crate's package version.
+        // A placeholder path plus an injected version probe keeps this unit
+        // test independent of whether Cargo built the product executable.
         let managed_binary = install_dir.join(ReleaseTarget::binary_name());
-        // Keep the test process from holding a write fd for the executable it probes.
-        fs::hard_link(&built_binary, &managed_binary).expect("hard link native CLI probe");
+        fs::write(&managed_binary, "controlled probe fixture").expect("managed CLI fixture");
         for backend in MANAGED_BACKENDS {
             write_backend_probe(&install_dir.join(backend), backend);
         }
@@ -1729,21 +1735,31 @@ mod tests {
         fs::create_dir_all(&docs).expect("managed docs");
         fs::write(docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST).expect("manifest");
         fs::write(docs.join("README.md"), "# docs\n").expect("docs overview");
-        let current = probe_version(&managed_binary).expect("probe linked native CLI");
+        let current = package_version.clone();
+        let version_probe = |_: &Path| Some(current.clone());
 
         let mut old_floor = current.clone();
         old_floor.patch += 1;
         write_consumer_config(&config_path, &old_floor);
-        let old = execute_install_command(&config_path, &["upgrade", "--check"]);
+        let old = execute_install_command_with_probe(
+            &config_path,
+            &["upgrade", "--check"],
+            version_probe,
+        );
         assert_eq!(old["status"], "update_required");
 
         write_consumer_config(&config_path, &current);
-        let current_result = execute_install_command(&config_path, &["setup"]);
+        let current_result =
+            execute_install_command_with_probe(&config_path, &["setup"], version_probe);
         assert_eq!(current_result["status"], "current");
         assert_eq!(current_result["installed_version"], current.to_string());
 
         write_consumer_config(&config_path, &Version::new(0, 0, 0));
-        let newer = execute_install_command(&config_path, &["upgrade", "--check"]);
+        let newer = execute_install_command_with_probe(
+            &config_path,
+            &["upgrade", "--check"],
+            version_probe,
+        );
         assert_eq!(newer["status"], "current");
         assert_eq!(newer["installed_version"], current.to_string());
     }
@@ -2042,6 +2058,25 @@ mod tests {
         execute_command(config_path, command_args).expect("installer command")
     }
 
+    fn execute_install_command_with_probe(
+        config_path: &Path,
+        command_args: &[&str],
+        version_probe: impl Fn(&Path) -> Option<Version>,
+    ) -> Value {
+        let mut args = vec![
+            "sc-lint",
+            "--config",
+            config_path.to_str().expect("UTF-8 config path"),
+        ];
+        args.extend_from_slice(command_args);
+        let cli = crate::Cli::parse_from(args);
+        let context = crate::CommandContext::from_cli(&cli).expect("command context");
+        let loaded = crate::LoadedConfig::load(&cli, &context).expect("consumer config");
+        crate::command::execute_installer_with_version_probe(&context, &loaded, version_probe)
+            .map(|success| success.data)
+            .expect("installer command")
+    }
+
     fn write_consumer_config(path: &Path, minimum: &Version) {
         fs::write(
             path,
@@ -2050,6 +2085,7 @@ mod tests {
         .expect("consumer config");
     }
 
+    #[cfg(unix)]
     fn built_cli_binary() -> PathBuf {
         built_artifact_directory().join(ReleaseTarget::binary_name())
     }

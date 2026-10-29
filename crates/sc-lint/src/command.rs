@@ -700,6 +700,33 @@ pub(crate) fn execute(
     }
 }
 
+#[cfg(test)]
+#[expect(
+    clippy::result_large_err,
+    reason = "Installer dispatch tests preserve the product's top-level CliError contract."
+)]
+pub(crate) fn execute_installer_with_version_probe(
+    context: &CommandContext,
+    loaded_config: &LoadedConfig,
+    version_probe: impl Fn(&std::path::Path) -> Option<semver::Version>,
+) -> Result<CommandSuccess, CliError> {
+    match context.id() {
+        CommandId::Setup => Ok(CommandSuccess::direct(installer::run_with_probe(
+            loaded_config,
+            false,
+            context.setup_dry_run(),
+            version_probe,
+        )?)),
+        CommandId::Upgrade => Ok(CommandSuccess::direct(installer::run_with_probe(
+            loaded_config,
+            context.upgrade_check(),
+            context.upgrade_dry_run(),
+            version_probe,
+        )?)),
+        _ => panic!("version-probe dispatch is only for installer commands"),
+    }
+}
+
 #[expect(
     clippy::result_large_err,
     reason = "Reserved bootstrap commands must return the same top-level CliError contract as real command paths."
