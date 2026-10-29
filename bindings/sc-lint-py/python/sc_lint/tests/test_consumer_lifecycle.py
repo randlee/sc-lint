@@ -26,7 +26,7 @@ from functools import partial
 
 
 ROOT = discover_repo_root()
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 GUIDES = (
     "README.md",
     "installation",
