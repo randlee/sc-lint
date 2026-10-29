@@ -1,8 +1,8 @@
-# sc-lint v0.8.1 — More Precise Checks and Better Consumer Test Profiles
+# sc-lint v0.8.2 — More Precise Checks and Better Consumer Test Profiles
 
-**Release:** 0.8.1 · **Install:** `brew install randlee/tap/sc-lint` (Homebrew), `pip install sc-lint` (PyPI), `cargo install sc-lint` (crates.io), or the platform archives on the [release page](https://github.com/randlee/sc-lint/releases/tag/v0.8.1)
+**Release:** 0.8.2 · **Install:** `brew install randlee/tap/sc-lint` (Homebrew), `pip install sc-lint` (PyPI), `cargo install sc-lint` (crates.io), or the platform archives on the [release page](https://github.com/randlee/sc-lint/releases/tag/v0.8.2)
 
-[Changelog](https://github.com/randlee/sc-lint/blob/main/CHANGELOG.md) · [Release notes](https://github.com/randlee/sc-lint/releases/tag/v0.8.1) · [Operator manual](https://github.com/randlee/sc-lint/blob/main/docs-bundle/README.md)
+[Changelog](https://github.com/randlee/sc-lint/blob/main/CHANGELOG.md) · [Release notes](https://github.com/randlee/sc-lint/releases/tag/v0.8.2) · [Operator manual](https://github.com/randlee/sc-lint/blob/main/docs-bundle/README.md)
 
 ---
 

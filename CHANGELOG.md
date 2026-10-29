@@ -65,6 +65,13 @@ All notable changes to sc-lint are documented here.
   step's own error, and a missing consumer backend now reports
   `profile.steps_failed` with the spawn error in `message`.
 
+## [0.8.2] — 2026-10-29
+
+Republish of 0.8.1 under a new version number. The 0.8.1 Windows binaries
+differed between the prerelease and release builds, so no version number is
+shared by two builds. There are no source changes from 0.8.1; 0.8.1 reached
+GitHub and crates.io only.
+
 ## [0.8.1] — 2026-10-28
 
 Phase L closes the atm-core findings for the 0.8.0 release. Its implementation
