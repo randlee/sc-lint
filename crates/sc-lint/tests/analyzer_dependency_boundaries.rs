@@ -12,6 +12,9 @@ const ANALYZERS: [&str; 3] = ["sc-lint-boundary", "sc-lint-portability", "sc-lin
 const ANALYZER_SUPPORT: &str = "sc-lint-analyzer-support";
 const CLI: &str = "sc-lint";
 const POST_KILL_PIPE_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
+/// Failure ceiling for the killed child's exit status. It is not a budget the
+/// passing path depends on: a child that is not reaped within it fails the test.
+const POST_KILL_REAP_CEILING: Duration = Duration::from_secs(30);
 
 #[test]
 fn analyzer_manifests_remain_dependency_independent() {
@@ -52,6 +55,9 @@ fn analyzer_manifests_remain_dependency_independent() {
     );
 }
 
+/// Runs `command` to completion or kills it at `timeout`. The child is owned by
+/// a waiter thread that blocks in `wait()`, so there is no polling loop: the
+/// deadline is a blocking receive, and a miss kills the child by pid.
 fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::Result<Output> {
     let description = format!("{command:?}");
     command
@@ -69,68 +75,86 @@ fn command_output_with_timeout(mut command: Command, timeout: Duration) -> io::R
     thread::spawn(move || {
         let _ = stderr_sender.send(read_pipe(stderr));
     });
-    let started = Instant::now();
+    let pid = child.id();
+    let (status_sender, status_reader) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = status_sender.send(child.wait());
+    });
 
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                return Ok(Output {
-                    status,
-                    stdout: receive_pipe_reader(stdout_reader)?,
-                    stderr: receive_pipe_reader(stderr_reader)?,
-                });
-            }
-            Ok(None) if started.elapsed() >= timeout => {
-                let _ = child.kill();
-                child.wait()?;
-                let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
-                let drain_error = drain_pipe_reader(stdout_reader, drain_deadline)
-                    .err()
-                    .or_else(|| drain_pipe_reader(stderr_reader, drain_deadline).err());
-                let drain_context = drain_error
-                    .map(|error| {
-                        format!("; output pipes did not drain after child termination: {error}")
-                    })
-                    .unwrap_or_default();
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    format!(
-                        "{description} timed out after {timeout:?}; child was killed and reaped{drain_context}"
-                    ),
-                ));
-            }
-            Ok(None) => thread::sleep(Duration::from_millis(10)),
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
-                let drain_error = drain_pipe_reader(stdout_reader, drain_deadline)
-                    .err()
-                    .or_else(|| drain_pipe_reader(stderr_reader, drain_deadline).err());
-                return Err(match drain_error {
-                    Some(drain_error) => io::Error::new(
-                        error.kind(),
-                        format!(
-                            "{error}; output pipes did not drain after child termination: {drain_error}"
-                        ),
-                    ),
-                    None => error,
-                });
-            }
+    match status_reader.recv_timeout(timeout) {
+        Ok(status) => {
+            let status = status.map_err(|error| {
+                io::Error::new(error.kind(), format!("{description} wait: {error}"))
+            })?;
+            // A grandchild that inherited the pipes can keep them open after
+            // the child exits, so the drain has a deadline.
+            let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
+            let stdout = drain_pipe_reader(stdout_reader, drain_deadline).map_err(|error| {
+                io::Error::new(error.kind(), format!("{description} stdout: {error}"))
+            })?;
+            let stderr = drain_pipe_reader(stderr_reader, drain_deadline).map_err(|error| {
+                io::Error::new(error.kind(), format!("{description} stderr: {error}"))
+            })?;
+            Ok(Output {
+                status,
+                stdout,
+                stderr,
+            })
         }
+        Err(RecvTimeoutError::Timeout) => {
+            kill_process(pid);
+            let reaped = status_reader.recv_timeout(POST_KILL_REAP_CEILING).is_ok();
+            let drain_deadline = Instant::now() + POST_KILL_PIPE_DRAIN_TIMEOUT;
+            let drain_error = drain_pipe_reader(stdout_reader, drain_deadline)
+                .err()
+                .or_else(|| drain_pipe_reader(stderr_reader, drain_deadline).err());
+            let drain_context = drain_error
+                .map(|error| {
+                    format!("; output pipes did not drain after child termination: {error}")
+                })
+                .unwrap_or_default();
+            let reap_state = if reaped {
+                "killed and reaped"
+            } else {
+                "killed; exit not confirmed within the reap ceiling"
+            };
+            Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                format!(
+                    "{description} timed out after {timeout:?}; child was {reap_state}{drain_context}"
+                ),
+            ))
+        }
+        Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(format!(
+            "{description}: child waiter stopped without an exit status"
+        ))),
     }
+}
+
+/// Kills a child that the waiter thread still owns. Only called on a deadline
+/// miss, before the waiter has reaped it.
+#[cfg(unix)]
+fn kill_process(pid: u32) {
+    let _ = Command::new("/bin/kill")
+        .args(["-KILL", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+#[cfg(windows)]
+fn kill_process(pid: u32) {
+    let _ = Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
 }
 
 fn read_pipe(mut pipe: impl Read) -> io::Result<Vec<u8>> {
     let mut output = Vec::new();
     pipe.read_to_end(&mut output)?;
     Ok(output)
-}
-
-fn receive_pipe_reader(reader: Receiver<io::Result<Vec<u8>>>) -> io::Result<Vec<u8>> {
-    reader
-        .recv()
-        .map_err(|_| io::Error::other("child output reader stopped without returning output"))?
 }
 
 fn drain_pipe_reader(
@@ -153,7 +177,10 @@ fn drain_pipe_reader(
 #[test]
 fn timeout_child_sleeps_when_requested() {
     if std::env::var_os("SC_LINT_TEST_CHILD_SLEEP").is_some() {
-        thread::sleep(Duration::from_secs(10));
+        // Parks until the deadline kills it, so the outcome does not depend on timing.
+        loop {
+            thread::park();
+        }
     }
 }
 

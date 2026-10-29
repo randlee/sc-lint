@@ -7,11 +7,12 @@
 
 use serde_json::{Value, json};
 use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, Command, ExitStatus, Output, Stdio};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tempfile::TempDir;
 
 const BOOTSTRAP: &str = include_str!("../assets/bootstrap.py");
@@ -26,6 +27,10 @@ const MALFORMED_TOOLS: &str =
 
 const SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// Failure ceiling for a child that never reports readiness. It is not the
+/// budget for the child's work: the deadline starts only after readiness.
+const READY_CEILING: Duration = Duration::from_secs(60);
+
 const STUB_HELPER: &str = "import json, os, sys\n\nif __name__ == '__main__':\n    with open(os.environ['SC_LINT_HELPER_LOG'], 'a', encoding='utf-8') as handle:\n        handle.write(json.dumps({'argv': sys.argv[1:], 'cwd': os.getcwd(), 'cargo_home': os.environ.get('CARGO_HOME')}) + '\\n')\n    sys.exit(int(os.environ.get('SC_LINT_HELPER_STATUS', '0')))\n";
 
 /// Run a fixture subprocess with captured output and a hard deadline.
@@ -34,13 +39,30 @@ fn run_bounded(command: &mut Command, stdin: Option<&[u8]>) -> Output {
 }
 
 fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duration) -> Output {
+    run_bounded_after_readiness(command, stdin, None, timeout)
+}
+
+/// Run a fixture subprocess with captured output and a hard deadline.
+///
+/// When `ready_marker` is set, the deadline starts only after the child has
+/// written that marker to stderr, so startup time never consumes the budget.
+fn run_bounded_after_readiness(
+    command: &mut Command,
+    stdin: Option<&[u8]>,
+    ready_marker: Option<&str>,
+    timeout: Duration,
+) -> Output {
     let label = format!(
         "{:?} {:?}",
         command.get_program(),
         command.get_args().collect::<Vec<_>>()
     );
-    let stdout = tempfile::tempfile().expect("create subprocess stdout capture");
-    let stderr = tempfile::tempfile().expect("create subprocess stderr capture");
+    // Captures live at named paths so the readiness check can read them while
+    // the child still holds its own descriptors open.
+    let capture = tempfile::tempdir().expect("create subprocess capture directory");
+    let stdout_path = capture.path().join("stdout");
+    let stderr_path = capture.path().join("stderr");
+    let stdout = fs::File::create(&stdout_path).expect("create subprocess stdout capture");
     let input = stdin.map(|contents| {
         let mut file = tempfile::tempfile().expect("create subprocess stdin");
         file.write_all(contents).expect("write subprocess stdin");
@@ -50,56 +72,151 @@ fn run_bounded_for(command: &mut Command, stdin: Option<&[u8]>, timeout: Duratio
     });
     command
         .stdin(input.map_or(Stdio::null(), Stdio::from))
-        .stdout(Stdio::from(
-            stdout.try_clone().expect("clone stdout capture"),
-        ))
-        .stderr(Stdio::from(
-            stderr.try_clone().expect("clone stderr capture"),
-        ));
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::piped());
 
-    let started = Instant::now();
     let mut child = command
         .spawn()
         .unwrap_or_else(|error| panic!("failed to start {label}: {error}"));
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if started.elapsed() < timeout => {
-                thread::sleep(Duration::from_millis(20));
-            }
-            Ok(None) => {
-                let _ = child.kill();
-                let status = child.wait().expect("reap timed out subprocess");
-                let stderr = captured(stderr, "timed out subprocess stderr");
-                panic!(
-                    "subprocess exceeded {timeout:?}: {label}; status after kill: {status}; stderr: {}",
-                    String::from_utf8_lossy(&stderr)
-                );
-            }
-            Err(error) => {
+    // A copier thread drains stderr into the capture file and signals readiness
+    // once the marker is in it, so the readiness wait is a blocking receive.
+    let stderr_pipe = child.stderr.take().expect("piped stderr");
+    let (ready_tx, ready_rx) = mpsc::channel();
+    let (copied_tx, copied_rx) = mpsc::channel();
+    let marker = ready_marker.map(str::to_owned);
+    let copy_path = stderr_path.clone();
+    thread::spawn(move || {
+        copy_stderr(stderr_pipe, &copy_path, marker.as_deref(), &ready_tx);
+        let _ = copied_tx.send(());
+    });
+    if let Some(marker) = ready_marker {
+        match ready_rx.recv_timeout(READY_CEILING) {
+            Ok(()) => {}
+            Err(RecvTimeoutError::Timeout) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                let stderr = captured(stderr, "failed subprocess stderr");
+                panic!("subprocess did not print {marker:?} within {READY_CEILING:?}: {label}");
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                let status = child.wait().expect("reap subprocess that closed stderr");
+                let stderr = read_stderr_after_copy(&copied_rx, &stderr_path, &label);
                 panic!(
-                    "failed waiting for subprocess {label}: {error}; stderr: {}",
+                    "subprocess exited before printing {marker:?}: {label}; status: {status}; stderr: {}",
                     String::from_utf8_lossy(&stderr)
                 );
             }
         }
-    };
-
-    Output {
-        status,
-        stdout: captured(stdout, "subprocess stdout"),
-        stderr: captured(stderr, "subprocess stderr"),
     }
+
+    match wait_or_kill(child, timeout)
+        .unwrap_or_else(|error| panic!("failed waiting for subprocess {label}: {error}"))
+    {
+        Waited::Exited(status) => Output {
+            status,
+            stdout: read_capture(&stdout_path, "subprocess stdout"),
+            stderr: read_stderr_after_copy(&copied_rx, &stderr_path, &label),
+        },
+        Waited::TimedOut => {
+            let stderr = read_stderr_after_copy(&copied_rx, &stderr_path, &label);
+            panic!(
+                "subprocess exceeded {timeout:?}: {label}; stderr: {}",
+                String::from_utf8_lossy(&stderr)
+            );
+        }
+    }
+}
+
+enum Waited {
+    Exited(ExitStatus),
+    TimedOut,
+}
+
+/// Waits for the child on a thread that owns its handle, so the deadline is a
+/// blocking receive rather than a polling loop. A missed deadline kills the
+/// child by pid and then waits, under a failure ceiling, for the owner to reap it.
+fn wait_or_kill(child: Child, timeout: Duration) -> io::Result<Waited> {
+    let pid = child.id();
+    let (status_tx, status_rx) = mpsc::channel();
+    thread::spawn(move || {
+        let mut child = child;
+        let _ = status_tx.send(child.wait());
+    });
+    match status_rx.recv_timeout(timeout) {
+        Ok(status) => Ok(Waited::Exited(status?)),
+        Err(RecvTimeoutError::Timeout) => {
+            kill_process(pid);
+            let _ = status_rx.recv_timeout(READY_CEILING);
+            Ok(Waited::TimedOut)
+        }
+        Err(RecvTimeoutError::Disconnected) => Err(io::Error::other(
+            "child waiter stopped without an exit status",
+        )),
+    }
+}
+
+/// Kills a child that the waiter thread still owns. Only called on a deadline
+/// miss, before the waiter has reaped it.
+#[cfg(unix)]
+fn kill_process(pid: u32) {
+    let _ = Command::new("/bin/kill")
+        .args(["-KILL", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+#[cfg(windows)]
+fn kill_process(pid: u32) {
+    let _ = Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+/// Copies the child's stderr into `path` until the pipe closes, and signals
+/// `ready` once `marker` appears in what has been copied so far.
+fn copy_stderr(mut pipe: impl Read, path: &Path, marker: Option<&str>, ready: &mpsc::Sender<()>) {
+    let Ok(mut file) = fs::File::create(path) else {
+        return;
+    };
+    let mut seen = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let mut announced = false;
+    loop {
+        let read = match pipe.read(&mut chunk) {
+            Ok(0) | Err(_) => break,
+            Ok(read) => read,
+        };
+        let _ = file.write_all(&chunk[..read]);
+        seen.extend_from_slice(&chunk[..read]);
+        if !announced
+            && marker.is_some_and(|marker| String::from_utf8_lossy(&seen).contains(marker))
+        {
+            announced = true;
+            let _ = ready.send(());
+        }
+    }
+}
+
+/// Reads the captured stderr once the copier has reached the end of the pipe.
+/// A pipe held open past the child's exit fails here under a ceiling.
+fn read_stderr_after_copy(copied: &mpsc::Receiver<()>, path: &Path, label: &str) -> Vec<u8> {
+    copied
+        .recv_timeout(READY_CEILING)
+        .unwrap_or_else(|_| panic!("stderr of {label} did not close within {READY_CEILING:?}"));
+    read_capture(path, "subprocess stderr")
 }
 
 #[test]
 fn bounded_runner_timeout_child() {
     if std::env::var_os("SC_LINT_TIMEOUT_TEST_CHILD").is_some() {
         eprintln!("intentional timeout probe");
-        thread::sleep(Duration::from_secs(30));
+        // Parks until the runner kills it. Unlike a sleep, nothing here ends
+        // the child on its own, so the hang outcome does not depend on timing.
+        loop {
+            thread::park();
+        }
     }
 }
 
@@ -110,7 +227,12 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
         .args(["--exact", "bounded_runner_timeout_child", "--nocapture"])
         .env("SC_LINT_TIMEOUT_TEST_CHILD", "1");
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        run_bounded_for(&mut command, None, Duration::from_secs(2));
+        run_bounded_after_readiness(
+            &mut command,
+            None,
+            Some("intentional timeout probe"),
+            Duration::from_secs(2),
+        );
     }))
     .expect_err("hung subprocess should hit its deadline");
     let panic = match panic.downcast::<String>() {
@@ -124,13 +246,8 @@ fn bounded_runner_kills_and_reports_a_hung_child() {
     assert!(panic.contains("intentional timeout probe"), "{panic}");
 }
 
-fn captured(mut file: std::fs::File, description: &str) -> Vec<u8> {
-    let mut contents = Vec::new();
-    file.seek(SeekFrom::Start(0))
-        .unwrap_or_else(|error| panic!("rewind {description}: {error}"));
-    file.read_to_end(&mut contents)
-        .unwrap_or_else(|error| panic!("read {description}: {error}"));
-    contents
+fn read_capture(path: &Path, description: &str) -> Vec<u8> {
+    fs::read(path).unwrap_or_else(|error| panic!("read {description}: {error}"))
 }
 
 fn host_python() -> PathBuf {

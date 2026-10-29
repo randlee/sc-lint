@@ -4,6 +4,112 @@ All notable changes to sc-lint are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- l-1: Portability checks now account for additional platform `cfg` forms, avoid
+  reporting a `USER` read when the same function reads `USERNAME`, ignore
+  Windows namespace path prefixes, and exempt private helpers in paired
+  platform-adapter files.
+- l-2: Boundary external composition-root checks authorize dependents using
+  each record's `allowed_dependents` policy only. Consumers that listed an
+  external composition root only in `allowed_dependencies` must move it to
+  `allowed_dependents`.
+- l-3: Cycle analysis recognizes `self` method-call edges and delegation between
+  distinct methods; path exclusions also apply to path-less cycle findings.
+- l-4: Repository-root discovery recognizes workspace manifests, and Python lint
+  tables resolve independently across the supported config files. The
+  `line-counts` and `identity-literals` checks now fail with
+  `config.table_missing` when no supported config file defines their
+  `line_counts` or `identities` table. Consumers running either check must add
+  its table to
+  `sc-lint.toml` or `.just/lint-config.toml`.
+- l-5: Adoption template files rendered by the installer use `.tmpl`; upgrades
+  retire unmodified legacy `.j2` files and report modified files as conflicts.
+- l-7: Tokio-dependent packages are checked for blocking `std::thread::sleep` calls
+  in production targets by `SCB-RUNTIME-003`.
+- l-8: CLI contract checks now document unsupported interface checks, pin the
+  command-family JSON envelope, and reject malformed Python adapter payloads
+  with `backend_payload_drift`.
+- l-8: The CLI rejects unknown `[tool.sc-lint]` configuration keys with
+  `config.unknown_table`; supported keys are documented in the CLI contract.
+- l-9: Version-sync checks support Python manifests and configurable Winget and
+  release-wiring checks. Repositories without a `[version_sync]` table now fail
+  with `config.table_missing`; consumers using version sync must add the table
+  and configure the checks they need.
+- l-10: Cargo-shear no longer reports Rust fixtures consumed by trybuild
+  `.pass()` or `.compile_fail()` harnesses as unlinked files.
+- Consumer test selectors: `[tool.sc-lint.test]` may be a table of named
+  `command` or `group` selectors with `default`, `env`, `cwd`, `platforms` and
+  `after_all`; `sc-lint test [<selector> [args...]]` forwards arguments to the
+  selected command and `sc-lint test --list` lists the declared selectors
+  ([using sc-lint](docs-bundle/using-sc-lint.md#test-selectors)).
+- `--fail-fast` for `sc-lint test` and `sc-lint lint ci --consumer` (and the
+  bootstrap's `lint`/`test` operations) stops starting cargo-lane and
+  `after_all` steps after the first failure.
+- `after_all = true` on lint rows, test rows and command selectors runs that
+  step after every other step.
+- Stable codes `profile.invalid_after_all`, `test.unknown_selector`,
+  `test.group_cycle` and `profile.steps_failed`
+  ([CLI contract](docs/sc-lint/cli-contract.md#stable-codes)).
+
+### Changed
+
+- Consumer lint and test profiles run independent steps in parallel (steps
+  whose `argv[0]` is `cargo` stay serialized in declaration order) and fail
+  slow: every step runs and every failed step is reported. This supersedes the
+  0.8.0 statement that consumer profiles remain sequential and fail-fast.
+- The built-in plan and consumer profiles now fail with code
+  `profile.steps_failed` and `error.details.failed_steps[]` of
+  `{index, name, exit_code, message}` (zero-based `index`) instead of
+  `{index, step, message}`. A consumer failure no longer returns the first
+  step's own error, and a missing consumer backend now reports
+  `profile.steps_failed` with the spawn error in `message`.
+
+## [0.8.1] — 2026-10-28
+
+Phase L closes the atm-core findings for the 0.8.0 release. Its implementation
+and review fixes are carried by the phase integration PR #716.
+
+### Added
+
+- Consumer test selectors support named commands and groups, a default
+  selector, per-selector environment and working directory, platform filters,
+  forwarded arguments, and `sc-lint test --list` (#196).
+- `SCB-RUNTIME-003` reports blocking `std::thread::sleep` in production
+  targets of workspace packages that declare Tokio (#82).
+- Rust analyzer reports are validated against the bundled
+  `analyzer-report-v1` JSON Schema, and Python adapter payloads are checked
+  against the `sc-lint-python-v1` transport contract (#586).
+- Cargo-shear recognizes trybuild `.pass()` and `.compile_fail()` fixtures as
+  consumed files (#647).
+
+### Changed
+
+- Consumer lint and test steps run concurrently and report all failures in
+  declaration order. Cargo steps remain serialized; `--fail-fast` stops
+  starting eligible steps after a failure (#195).
+- Boundary dependency checks use the union of each owner's
+  `allowed_dependents`; path-less cycle findings can be excluded using their
+  source files. Composition-root, delegation, and per-rule path exclusion
+  behavior is corrected (#642, #643, #376, #204, #385; follow-up PRs #717,
+  #718, and #722).
+- Version-sync checks support Python manifests and configurable Winget and
+  release-wiring fields (#137).
+- Installer-rendered adoption templates use `.tmpl`; front-matter `.j2`
+  remains reserved for sc-compose templates (#604).
+
+### Fixed
+
+- Portability checks honor additional platform `cfg` forms, recognize
+  `USERNAME` fallback, ignore Windows namespace path prefixes, and avoid
+  reporting private helpers in paired adapter files (#641, #192, #372;
+  follow-up PRs #719 and #724).
+- GitHub Action inputs accept hyphenated names such as `working-directory`
+  and `config-path` (#669; follow-up PRs #721 and #725).
+- The reviewed `Clone` default is preserved in cycle analysis, and
+  timing-sensitive CI tests use controlled synchronization (follow-up PRs
+  #728, #729, and #731).
+
 ## [0.8.0] — 2026-10-19
 
 ### Added
@@ -52,6 +158,8 @@ All notable changes to sc-lint are documented here.
   continues through all planned steps after failures, reporting every failure
   by plan index in plan order. Consumer-configured lint and test profiles
   remain sequential, declaration-ordered, and fail-fast.
+  [Superseded in 0.8.1: consumer profiles run steps in parallel and fail
+  slow by default, with opt-in `--fail-fast`; see Unreleased.]
 
 ### Compatibility
 

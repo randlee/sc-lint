@@ -1,0 +1,18 @@
+[tool.sc-lint]
+minimum_version = "0.5.0"
+
+[tool.sc-lint.analyzers.runtime]
+enabled = false
+reason = "non-tokio"
+
+[tool.sc-lint.analyzers.portability]
+enabled = true
+targets = ["linux"]
+
+[[tool.sc-lint.lint]]
+name = "ci"
+command = ["cargo", "check"]
+
+[[tool.sc-lint.test]]
+name = "unit"
+command = ["cargo", "test"]

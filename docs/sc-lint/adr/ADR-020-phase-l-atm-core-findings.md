@@ -1,6 +1,6 @@
 # ADR-020 — Phase L decisions for the atm-core findings
 
-Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification is Pending Rand approval together with REQ-CLI-025.
+Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025.
 
 Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
 REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
@@ -19,7 +19,10 @@ make mid-sprint. Approval of this record gates dispatch only.
    `#[cfg(unix)]`, `#[cfg(target_os = "linux"|"macos")]` or `#[cfg(not(windows))]`
    is a structural parity question exactly as `#[cfg(unix)]` is: PORT-006 leaf
    findings are suppressed inside it. PORT-008 does not report a read of
-   `USER` when the same enclosing function also reads `USERNAME`.
+   `USER` when the same enclosing function also reads `USERNAME`. The gate
+   scope is limited to these attribute forms: other `target_os` values and
+   statement-level `#[cfg]` attributes are not honored. A gated block
+   expression (`#[cfg(...)] { ... }`) counts as an item here, as it did before phase L.
 2. **PORT-007 (#192).** Findings for the exact verbatim and device prefixes
    `\\?\` and `\\.\` are not reported. A reviewed-exception allowlist is not
    added in phase L.
@@ -66,7 +69,9 @@ make mid-sprint. Approval of this record gates dispatch only.
    templates that carry front matter. Templates rendered by `install.py`'s own
    substitution use `.tmpl`.
 9. **#198 (setup hook).** Won't-do. ADR-016's hook restriction is unchanged;
-   consumers use `sc_lint.setup_tools`.
+   `setup.pre` and `runner.python` are not added. Consumers use
+   `sc_lint.setup_tools`; direct manifest, shear, and spell checks use the
+   managed invocation `.sc-lint/venv/bin/python -m sc_lint.<module>`.
 
 10. **Stable codes (l-4, l-6, l-8).** New codes use the existing error envelope
     (`kind`, `code`, `cause`, `recovery`; REQ-CLI-005C) and are recorded in the
@@ -80,7 +85,7 @@ make mid-sprint. Approval of this record gates dispatch only.
     | `test.unknown_selector` | `config` | the selector name and file | use a name from `sc-lint test --list` |
     | `test.group_cycle` | `config` | the selector cycle path | break the cycle in `[tool.sc-lint.test]` |
     | `profile.steps_failed` | `backend_failure` | `failed_steps[]`: `index`, `name`, `exit_code` in declaration order | fix the failing steps and rerun |
-    | `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the wheel so the payload matches the envelope schema |
+    | `backend_payload_drift` | `backend_protocol` | the failing JSON key path | upgrade or reinstall the analyzer backend so its payload matches the published schema |
 
     Codes are typed constants in the owning crate and are validated where
     config is parsed, never matched as free strings at call sites.
@@ -105,11 +110,21 @@ make mid-sprint. Approval of this record gates dispatch only.
     `manifest_version_field`, `installer_url_field`; `file`,
     `required_fragments`), which match atm-core's `.just/lint-config.toml`.
     A missing `Cargo.lock` is reported as skipped, not as a failure. These key
-    names are chosen here because no earlier record defines them.
+    names are chosen here because no earlier record defines them. sc-lint owns
+    the workspace, crate, lockfile, and Python package-version checks; it does
+    not check sibling dependency version pins in `pyproject.toml`. atm-core
+    keeps that dependency-pin check in its own tooling.
 
-## Plan-review clarifications (Accepted — Rand, 2026-10-27, except Sprint l-10)
+13. **Closed CLI configuration keys (`config.unknown_table`).** The
+    `[tool.sc-lint]` table accepts only `minimum_version`, `lint`,
+    `lint_profiles`, `test`, and `analyzers`; any other key is rejected with
+    `config.unknown_table`. Root-level `setup` and `runner` are also rejected
+    with that code; other root tables belong to the lint backends and are not
+    rejected. The CLI contract documents the cause and recovery text.
 
-These clarifications were written by the sprint design fixes for plan review round 2, after the decisions above were approved on 2026-10-27. They narrow or make precise the approved decisions and change none of them, except where a clarification says otherwise. Sprints l-1 to l-9: Accepted — Rand, 2026-10-27 ("approve the adr"). Sprint l-10: Pending Rand approval, together with REQ-CLI-025; per the planning rule that gates dispatch of l-10 only. Numbering is per sprint.
+## Plan-review clarifications (Accepted — Rand, 2026-10-27)
+
+These clarifications were written by the sprint design fixes for plan review round 2, after the decisions above were approved on 2026-10-27. They narrow or make precise the approved decisions and change none of them, except where a clarification says otherwise. Sprints l-1 to l-9: Accepted — Rand, 2026-10-27 ("approve the adr"). Sprint l-10: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025. Numbering is per sprint.
 
 ### Sprint l-1
 Clarifications to decisions 1 to 3 (recorded by `lint-l-1`):
@@ -138,15 +153,15 @@ Clarifications to ADR-020 from sprint l-3:
 Clarifications to ADR-020 from l-4:
 13. Repo root (decision 7 area, REQ-CLI-003): the nearest ancestor of the discovery start holding `sc-lint.toml` or a `Cargo.toml` with a `[workspace]` table is the repo root; nearest wins regardless of marker kind; package-only manifests never match. Only `lint sc-boundary` requires `boundaries/`.
 14. Per-table resolution: candidates are the explicit `--config` file, `sc-lint.toml`, `.just/lint-config.toml`, in that order; the first existing file holding the table wins, and a file lacking the table never stops the search. An explicit `--config` file that does not exist is a hard error (`explicit config file not found: <path>`, kind config, no code), not a skipped candidate. A key present with a non-table value, or an unparsable candidate reached during the search, is a hard error of kind config. Rust forwards `--config` only when the user passed it.
-15. Behaviour change: `line-counts` and `identity-literals` now fail with `config.table_missing` when their table (`line_counts`, `identities`) is in none of the files; previously a missing table meant defaults. This repository's `.just/lint-config.toml` gains empty tables to keep its behaviour. `lint_common.load_lint_config` stays as a permanently-deprecated shim.
+15. Behaviour change: Python-backed `line-counts` and `identity-literals` now fail with `config.table_missing` when their table (`line_counts`, `identities`) is in none of the files; previously a missing table meant defaults. Rust analyzers keep their defaults when their table is absent. This repository's `.just/lint-config.toml` gains empty tables to keep the Python-backed lints' behaviour. `lint_common.load_lint_config` stays as a permanently-deprecated shim.
 16. `config.table_missing` crosses the Rust adapter through a closed lookup (`ConfigCode::from_wire`); an unrecognised `details.code` stays in `details` and the error keeps `CLI.CONFIG_ERROR`. The cause equals the Python message (table and files searched, repo-relative posix paths, absolute when outside the repo). `error.suggested_action` carries the decision 10 recovery text.
 
 
 ### Sprint l-5
 Clarifications to decision 8 (l-5):
 1. Upgrade of installed consumers: renaming the three templates changes the files the kit copies to `plugins/sc-lint/templates/`. The existing retirement logic removes the old `.j2` copies when unmodified (digest match) and reports `conflict: ... was modified outside sc-lint` (exit 2, no writes) when a consumer edited one; `--dry-run` lists them as deletions and exits 1. No installer code change; tests cover the three cases.
-2. `tests/adoption/golden/` (rendered Justfile, sc-lint.toml, sc-lint.yml) is a permanent byte-exact regression baseline, stored with `-text` in .gitattributes and compared as bytes.
-3. The `.j2`/`.tmpl` guard covers git-tracked files under packages/sc-lint-adoption and skips only when git is absent or ROOT is not the top level of a git work tree.
+2. `tests/adoption/golden/` is a permanent regression baseline checked byte-for-byte, not a one-time migration fixture.
+3. The `.j2`/`.tmpl` guard checks only template front matter.
 
 ### Sprint l-6
 Clarifications from l-6 (no new codes beyond decision 10):
@@ -167,7 +182,7 @@ ADR-020 decision 6 clarifications (sprint l-7):
 
 ### Sprint l-8
 Clarifications for decision 10 (`backend_payload_drift`) and REQ-PRODUCT-002DA (l-8):
-1. "Published schema" in REQ-PRODUCT-002DA means the `sc-lint-python-v1` payload shape documented in cli-contract.md ("Python adapter backend") and encoded in `sc_lint_schema::validate_adapter_payload`. No JSON Schema file or other artifact is published. Rust backends are typed structs and are not runtime-validated.
+1. "Published schema" in REQ-PRODUCT-002DA means the `sc-lint-python-v1` payload shape documented in cli-contract.md ("Python adapter backend") and encoded in `sc_lint_schema::validate_adapter_payload`. No JSON Schema file or other artifact is published. Rust analyzer reports are validated against the published `analyzer-report-v1.schema.json` before normalization.
 2. The validator lives in `sc-lint-schema` (which gains `serde_json` as a normal dependency, already a workspace dependency; Cargo.lock unchanged). It requires `adapter_schema`, `ok`, `diagnostics` (array of strings); on success `data` (object) and `summary` (string) and no `error`; on failure `error{kind,message}` (strings), optional `error.details` (object) and `error.suggested_action` (string), optional `summary`, and no `data`. Unknown extra keys are allowed. The first drift in that fixed order is reported.
 3. In `parse_adapter_output` the check runs after the existing unknown-`adapter_schema` check (not drift) and before the exit-code and verdict checks, so a drifted payload fails as `backend_payload_drift` even when the process exit code is non-zero.
 4. Column mapping for the decision 10 row: Code -> `CliError::code()` (`backend_payload_drift`, typed constant in `python_adapter.rs`); Kind -> `backend_protocol`; Cause names -> `CliError::cause` (key path text) plus `details.key_path`; Recovery -> `CliError::suggested_action`.
@@ -177,7 +192,7 @@ Clarifications for decision 10 (`backend_payload_drift`) and REQ-PRODUCT-002DA (
 Clarifications to ADR-020 decision 12 (l-9):
 1. The stable finding `check` ids of `sc_lint.check_version_sync` are: `crate_version`, `internal_path_dep`, `cargo_lock`, `python.version`, `python.manifest_missing`, `winget.manifest_glob`, `winget.package_version`, `winget.manifest_version`, `winget.installer_url`, `winget.missing_field`, `release_wiring.file_missing`, `release_wiring.fragment`. A finding has exactly `check`, `file`, `expected`, `actual`.
 2. `--json` uses the Python adapter envelope; `data` is `{ok, findings[], skipped[], workspace_version}`. With findings the envelope `ok` stays true, `data.ok` is false and the exit code is 1. Exit codes: 0 clean, 1 findings or unexpected error, 3 config error.
-3. Config failures of the check other than a missing table (unreadable or unparseable Cargo.toml, Cargo.lock or listed pyproject, missing workspace version, no member manifests, non-array `python_manifests`, non-bool `cargo_lock`, non-table subtables, absolute or `..` paths in `python_manifests`, `manifest_glob` or `file`) are errors of kind `config` without a `code`; they are not stable codes and decision 10's table is unchanged. Only a missing `[version_sync]` table carries `config.table_missing`.
+3. Config failures of the check other than a missing table (unreadable or unparsable Cargo.toml, Cargo.lock or listed pyproject, missing workspace version, no member manifests, non-array `python_manifests`, non-bool `cargo_lock`, non-table subtables, absolute or `..` paths in `python_manifests`, `manifest_glob` or `file`) are errors of kind `config` without a `code`; they are not stable codes and decision 10's table is unchanged. Only a missing `[version_sync]` table carries `config.table_missing`.
 4. A listed pyproject whose `[project].version` is `dynamic` yields a `python.version` finding with actual `dynamic`; absent yields `absent`; a non-string yields `invalid`. A listed but missing pyproject yields `python.manifest_missing`. A missing `Cargo.lock` is reported in `data.skipped[]` as `{check: "cargo_lock", file: "Cargo.lock", reason: "missing"}` and `cargo_lock = false` omits both the check and the entry.
 5. Because `[version_sync]` is now resolved per table, a repo without that table (an empty `[version_sync]` suffices) fails the check, including the built-in `version` plan step, with `config.table_missing`. sc-lint's own `.just/lint-config.toml` adds `[version_sync.python]` with `cargo_lock = true`.
 6. `lint_common.load_lint_config` stays a permanently-deprecated shim; l-9 does not edit lint_common.py.

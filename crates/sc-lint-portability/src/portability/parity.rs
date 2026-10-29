@@ -9,6 +9,7 @@ use super::findings::PortabilityFinding;
 use crate::RuleId;
 use crate::platform_adapters::PlatformAdapters;
 use crate::predicates::attr_is_cfg_unix;
+use crate::predicates::attr_is_cfg_windows;
 use crate::predicates::attr_is_platform_cfg;
 use crate::predicates::has_portable_fallback;
 use crate::predicates::has_windows_companion;
@@ -16,6 +17,7 @@ use crate::predicates::impl_method_has_portable_fallback;
 use crate::predicates::impl_method_has_windows_companion;
 use crate::predicates::impl_method_is_cfg_unix_production_item;
 use crate::predicates::is_cfg_unix_production_item;
+use crate::predicates::item_is_private;
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::classify_scope;
@@ -115,6 +117,14 @@ pub(super) fn visit_item_for_unix_portability(
     let unix_gated = inherited_unix_gated || attrs.iter().any(attr_is_cfg_unix);
     let platform_gated = inherited_platform_gated || attrs.iter().any(attr_is_platform_cfg);
 
+    if scope == ScopeKind::NonTest
+        && !unix_gated
+        && let Item::Impl(item_impl) = item
+        && !attrs.iter().any(attr_is_cfg_windows)
+    {
+        collect_impl_method_parity_findings(item_impl, scope, file_context, findings, context);
+    }
+
     if scope == ScopeKind::NonTest && !platform_gated {
         super::collect_production_path_literal_findings(
             item,
@@ -204,18 +214,25 @@ fn collect_parity_findings(
     }
     for item in items {
         let line = span_start_line(item.span());
-        if is_cfg_unix_production_item(item, inherited_scope)
-            && !context.platform_adapters.is_some_and(|adapters| {
-                adapters.suppresses_port010(&file_context.source_path, line)
-            })
-            && !has_windows_companion(item, items)
-            && !has_portable_fallback(item, items, inherited_scope)
+        let private_adapter_item = item_is_private(item)
+            && context
+                .platform_adapters
+                .is_some_and(|adapters| adapters.is_adapter_file(&file_context.source_path));
+        let configured_exemption = context
+            .platform_adapters
+            .is_some_and(|adapters| adapters.suppresses_port010(&file_context.source_path, line));
+        if !is_cfg_unix_production_item(item, inherited_scope)
+            || private_adapter_item
+            || configured_exemption
+            || has_windows_companion(item, items)
+            || has_portable_fallback(item, items, inherited_scope)
         {
-            let detail = item_identifier(item)
-                .map(ToString::to_string)
-                .unwrap_or_else(|| "cfg(unix) item".to_string());
-            push_cfg_parity_finding(findings, file_context, line, &detail);
+            continue;
         }
+        let detail = item_identifier(item)
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "cfg(unix) item".to_string());
+        push_cfg_parity_finding(findings, file_context, line, &detail);
     }
 }
 
@@ -224,6 +241,7 @@ pub(super) fn collect_impl_method_parity_findings(
     inherited_scope: ScopeKind,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
+    context: ParityContext<'_>,
 ) {
     if inherited_scope != ScopeKind::NonTest {
         return;
@@ -232,16 +250,23 @@ pub(super) fn collect_impl_method_parity_findings(
         let ImplItem::Fn(unix_method) = impl_item else {
             continue;
         };
-        if impl_method_is_cfg_unix_production_item(unix_method, inherited_scope)
-            && !impl_method_has_windows_companion(unix_method, &item_impl.items)
-            && !impl_method_has_portable_fallback(unix_method, &item_impl.items, inherited_scope)
+        let private_adapter_method = item_impl.trait_.is_none()
+            && matches!(unix_method.vis, syn::Visibility::Inherited)
+            && context
+                .platform_adapters
+                .is_some_and(|adapters| adapters.is_adapter_file(&file_context.source_path));
+        if !impl_method_is_cfg_unix_production_item(unix_method, inherited_scope)
+            || private_adapter_method
+            || impl_method_has_windows_companion(unix_method, &item_impl.items)
+            || impl_method_has_portable_fallback(unix_method, &item_impl.items, inherited_scope)
         {
-            push_cfg_parity_finding(
-                findings,
-                file_context,
-                span_start_line(unix_method.span()),
-                &unix_method.sig.ident.to_string(),
-            );
+            continue;
         }
+        push_cfg_parity_finding(
+            findings,
+            file_context,
+            span_start_line(unix_method.span()),
+            &unix_method.sig.ident.to_string(),
+        );
     }
 }

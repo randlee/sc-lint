@@ -1,5 +1,6 @@
 mod cli;
 mod command;
+mod compatibility;
 mod config;
 pub mod consts;
 mod consumer_integration;
@@ -12,6 +13,8 @@ mod installer;
 mod profile_plan;
 pub(crate) mod python_adapter;
 mod render;
+mod scheduler;
+mod test_selectors;
 mod workflow;
 
 #[cfg(test)]

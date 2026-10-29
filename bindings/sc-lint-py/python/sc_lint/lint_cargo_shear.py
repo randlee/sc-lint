@@ -5,22 +5,28 @@ from dataclasses import dataclass
 import argparse
 import json
 from pathlib import Path
+from pathlib import PurePosixPath
 from pathlib import PureWindowsPath
+import re
 import shutil
 import subprocess
 import sys
 import tomllib
 
+from sc_lint.lint_common import CONFIG_TABLE_MISSING
+from sc_lint.lint_common import ConfigError
 from sc_lint.lint_common import discover_repo_root
-from sc_lint.lint_common import load_lint_config
+from sc_lint.lint_common import resolve_table
 from sc_lint.lint_common import workspace_crate_section_lines
 from sc_lint.lint_common import workspace_crates
 from sc_lint.lint_common import write_console_output
+from sc_lint.python_adapter import AdapterError
 
 
 ERROR_SECTIONS = {"unlinked_files", "empty_files"}
 UNUSED_DEPENDENCY_SECTION = "unused_dependency"
 SUMMARY_SECTION = "summary"
+CARGO_SHEAR_TABLE = "cargo_shear"
 CARGO_SHEAR_ALLOWLIST_FIELD = "cargo_shear.allowed_unused_dependencies"
 CARGO_SHEAR_CONFIG_ERROR = "SC_LINT_CARGO_SHEAR_CONFIG_INVALID"
 PATH_KEY_MIGRATION_DIAGNOSTIC = (
@@ -30,6 +36,12 @@ PATH_KEY_MIGRATION_DIAGNOSTIC = (
     'only for a virtual-root workspace dependency. Package roots use their '
     'package name, including a package named workspace; if both resolve to the '
     'same key, rename the package or dependency alias to disambiguate it.'
+)
+TRYBUILD_CALL = re.compile(
+    r'(?:\.|\bTestCases\s*::)\s*(?:pass|compile_fail)\s*\(\s*'
+    r'(?:&\s*(?:mut\s+)?[A-Za-z_][A-Za-z0-9_]*\s*,\s*)?'
+    r'(?:r(?P<h>#*)"(?P<raw>.*?)"(?P=h)|"(?P<cooked>[^"\\\n]*)")',
+    re.S,
 )
 
 
@@ -147,15 +159,31 @@ def manifest_to_package_name(repo_root: Path) -> dict[str, str]:
     }
 
 
+def load_cargo_shear_table(repo_root: Path) -> dict:
+    # Raises ConfigError when no searched config file defines [cargo_shear].
+    table, _config_path = resolve_table(CARGO_SHEAR_TABLE, None, repo_root)
+    return table
+
+
+def load_cargo_shear_config(repo_root: Path) -> tuple[dict, Path]:
+    # Keep the source path so policy diagnostics point at the selected file.
+    return resolve_table(CARGO_SHEAR_TABLE, None, repo_root)
+
+
+def display_cargo_shear_config_path(config_path: Path, repo_root: Path) -> str:
+    try:
+        return config_path.resolve().relative_to(repo_root.resolve()).as_posix()
+    except ValueError:
+        return config_path.as_posix()
+
+
 def load_policy_config(repo_root: Path) -> dict[str, dict[str, str]]:
-    config = load_lint_config(repo_root)
-    cargo_shear = config.get("cargo_shear", {})
-    if not isinstance(cargo_shear, dict):
-        return {
-            "allowed_empty_files": {},
-            "allowed_unlinked_files": {},
-            "allowed_unused_dependencies": {},
-        }
+    cargo_shear = load_cargo_shear_table(repo_root)
+
+    return policy_from_cargo_shear_table(cargo_shear)
+
+
+def policy_from_cargo_shear_table(cargo_shear: dict) -> dict[str, dict[str, str]]:
 
     def table(name: str, *, require_reason: bool = False) -> dict[str, str]:
         value = cargo_shear.get(name, {})
@@ -182,9 +210,8 @@ def load_policy_config(repo_root: Path) -> dict[str, dict[str, str]]:
 def configured_unused_dependency_allowlist(
     repo_root: Path,
 ) -> tuple[bool, object]:
-    config = load_lint_config(repo_root)
-    cargo_shear = config.get("cargo_shear", {})
-    if not isinstance(cargo_shear, dict) or "allowed_unused_dependencies" not in cargo_shear:
+    cargo_shear = load_cargo_shear_table(repo_root)
+    if "allowed_unused_dependencies" not in cargo_shear:
         return False, {}
     return True, cargo_shear["allowed_unused_dependencies"]
 
@@ -345,11 +372,114 @@ def render_metadata_failure(error: Exception) -> str:
     )
 
 
-def evaluate_policy(sections: list[ShearSection], policy: dict[str, dict[str, str]]) -> tuple[list[ShearPolicyFinding], list[str]]:
+def trybuild_harness_globs(
+    package_dir: Path, exclude: frozenset[str]
+) -> list[tuple[str, str, int]]:
+    matches: list[tuple[str, str, int]] = []
+    harnesses = sorted(
+        (
+            path
+            for path in package_dir.rglob("*.rs")
+            if path.is_file()
+        ),
+        key=lambda path: path.relative_to(package_dir).as_posix(),
+    )
+    for harness in harnesses:
+        relative_harness = harness.relative_to(package_dir).as_posix()
+        relative_parts = Path(relative_harness).parts
+        if "target" in relative_parts or relative_harness in exclude:
+            continue
+        source = harness.read_text(encoding="utf-8", errors="replace")
+        for match in TRYBUILD_CALL.finditer(source):
+            glob = match.group("raw")
+            if glob is None:
+                glob = match.group("cooked")
+            if glob is not None:
+                line_number = source.count("\n", 0, match.start()) + 1
+                matches.append((glob, relative_harness, line_number))
+    return matches
+
+
+def _safe_trybuild_glob(glob: str) -> bool:
+    if not glob.strip() or "\\" in glob or "\0" in glob:
+        return False
+    if PurePosixPath(glob).is_absolute() or PureWindowsPath(glob).drive:
+        return False
+    return ".." not in PurePosixPath(glob).parts
+
+
+def trybuild_consumed(
+    sections: list[ShearSection], repo_root: Path
+) -> dict[tuple[int, str], str]:
+    if not any(section.name == "unlinked_files" and section.file_paths for section in sections):
+        return {}
+    try:
+        crate_map = package_to_crate_dir(repo_root)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    consumed: dict[tuple[int, str], str] = {}
+    for section_index, section in enumerate(sections):
+        if section.name != "unlinked_files" or not section.file_paths:
+            continue
+        crate_dir = crate_map.get(infer_package_name(section.body_lines))
+        if crate_dir is None:
+            continue
+        package_dir = repo_root / crate_dir
+        reported = set(section.file_paths)
+        harness_globs = trybuild_harness_globs(package_dir, frozenset(reported))
+        for glob, harness, line_number in harness_globs:
+            if not _safe_trybuild_glob(glob):
+                continue
+            try:
+                matches = sorted(package_dir.glob(glob), key=lambda path: path.as_posix())
+            except (ValueError, NotImplementedError, OSError):
+                continue
+            for path in matches:
+                if not path.is_file():
+                    continue
+                relative_path = path.relative_to(package_dir).as_posix()
+                key = (section_index, relative_path)
+                if relative_path in reported and key not in consumed:
+                    consumed[key] = f"{harness}:{line_number}"
+    return consumed
+
+
+def render_consumed_notes(
+    sections: list[ShearSection],
+    consumed: dict[tuple[int, str], str],
+    repo_root: Path,
+) -> list[str]:
+    if not consumed:
+        return []
+    crate_map = package_to_crate_dir(repo_root)
+    notes: list[str] = []
+    for section_index, section in enumerate(sections):
+        if section.name != "unlinked_files":
+            continue
+        package_name = infer_package_name(section.body_lines)
+        crate_dir = crate_map.get(package_name, package_name)
+        for path in sorted(section.file_paths):
+            harness = consumed.get((section_index, path))
+            if harness is None:
+                continue
+            location = f"{path}" if crate_dir in ("", ".") else f"{crate_dir}/{path}"
+            notes.append(
+                f"shear note: {location} consumed by trybuild harness {harness} [unlinked_files]"
+            )
+    return notes
+
+
+def evaluate_policy(
+    sections: list[ShearSection],
+    policy: dict[str, dict[str, str]],
+    consumed: dict[tuple[int, str], str] | None = None,
+    config_path: str = ".just/lint-config.toml",
+) -> tuple[list[ShearPolicyFinding], list[str]]:
     findings: list[ShearPolicyFinding] = []
     downgraded: list[str] = []
+    consumed = consumed or {}
 
-    for section in sections:
+    for section_index, section in enumerate(sections):
         if section.name not in ERROR_SECTIONS:
             continue
         allowed = (
@@ -358,6 +488,8 @@ def evaluate_policy(sections: list[ShearSection], policy: dict[str, dict[str, st
             else policy["allowed_unlinked_files"]
         )
         for file_path in section.file_paths:
+            if section.name == "unlinked_files" and (section_index, file_path) in consumed:
+                continue
             reason = allowed.get(file_path)
             if reason is not None:
                 downgraded.append(
@@ -368,7 +500,7 @@ def evaluate_policy(sections: list[ShearSection], policy: dict[str, dict[str, st
                 ShearPolicyFinding(
                     section_name=section.name,
                     file_path=file_path,
-                    reason=f"{section.name} must be fixed or explicitly downgraded in .just/lint-config.toml",
+                    reason=f"{section.name} must be fixed or explicitly downgraded in {config_path}",
                 )
             )
     return findings, downgraded
@@ -412,6 +544,7 @@ def evaluate_unused_dependency_policy(
     sections: list[ShearSection],
     policy: dict[str, dict[str, str]],
     manifest_packages: dict[str, str],
+    config_path: str = ".just/lint-config.toml",
 ) -> tuple[list[ShearPolicyFinding], list[str], bool]:
     findings: list[ShearPolicyFinding] = []
     downgraded: list[str] = []
@@ -439,7 +572,7 @@ def evaluate_unused_dependency_policy(
                     file_path=dependency_key,
                     reason=(
                         "unused dependency must be fixed or explicitly downgraded "
-                        "in .just/lint-config.toml"
+                        f"in {config_path}"
                     ),
                 )
             )
@@ -477,9 +610,16 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv[1:])
     repo_root = discover_repo_root(args.root)
 
-    allowlist_supplied, configured_allowlist = configured_unused_dependency_allowlist(
-        repo_root
-    )
+    try:
+        cargo_shear, config_path = load_cargo_shear_config(repo_root)
+        allowlist_supplied = "allowed_unused_dependencies" in cargo_shear
+        configured_allowlist = cargo_shear.get("allowed_unused_dependencies", {})
+    except (ConfigError, AdapterError) as caught:
+        if isinstance(caught, ConfigError):
+            write_console_output(sys.stderr, f"{CONFIG_TABLE_MISSING}: {caught.message}\n")
+        else:
+            write_console_output(sys.stderr, f"{caught.message}\n")
+        return 3
     metadata: CargoShearWorkspaceMetadata | None = None
     if allowlist_supplied:
         try:
@@ -510,8 +650,13 @@ def main(argv: list[str]) -> int:
 
     stdout = completed.stdout
     sections = parse_sections(stdout)
-    policy = load_policy_config(repo_root)
-    policy_findings, downgraded = evaluate_policy(sections, policy)
+    consumed = trybuild_consumed(sections, repo_root)
+    consumed_notes = render_consumed_notes(sections, consumed, repo_root)
+    policy = policy_from_cargo_shear_table(cargo_shear)
+    display_config_path = display_cargo_shear_config_path(config_path, repo_root)
+    policy_findings, downgraded = evaluate_policy(
+        sections, policy, consumed, display_config_path
+    )
 
     if completed.returncode == 1:
         unused_findings, unused_downgraded, only_unused_dependencies = (
@@ -523,6 +668,7 @@ def main(argv: list[str]) -> int:
                 # Preserve absent-table parity: without metadata, retain the
                 # existing manifest resolver for child-finding package mapping.
                 else manifest_to_package_name(repo_root),
+                display_config_path,
             )
         )
         if only_unused_dependencies:
@@ -530,6 +676,8 @@ def main(argv: list[str]) -> int:
             for line in render_policy_findings(all_findings):
                 write_console_output(sys.stdout, f"{line}\n")
             for line in unused_downgraded + downgraded:
+                write_console_output(sys.stdout, f"{line}\n")
+            for line in consumed_notes:
                 write_console_output(sys.stdout, f"{line}\n")
             if stdout:
                 write_console_output(sys.stdout, stdout)
@@ -553,6 +701,8 @@ def main(argv: list[str]) -> int:
         if downgraded:
             for line in downgraded:
                 write_console_output(sys.stdout, f"{line}\n")
+        for line in consumed_notes:
+            write_console_output(sys.stdout, f"{line}\n")
         if stdout:
             write_console_output(sys.stdout, stdout)
         return 1
@@ -560,6 +710,8 @@ def main(argv: list[str]) -> int:
     if downgraded:
         for line in downgraded:
             write_console_output(sys.stdout, f"{line}\n")
+    for line in consumed_notes:
+        write_console_output(sys.stdout, f"{line}\n")
     if stdout:
         write_console_output(sys.stdout, stdout)
     if completed.stderr:

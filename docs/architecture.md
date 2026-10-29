@@ -109,7 +109,8 @@ planned.
 
 ADR-017's accepted Phase K changes are delivered within these existing
 owners: Rust analyzer crates validate and evaluate analyzer/inventory policy;
-the top-level Rust CLI selects and sequentially executes consumer lint steps;
+the top-level Rust CLI selects consumer lint steps and runs them through the
+shared scheduler (parallel, fail slow, opt-in `--fail-fast`);
 the bootstrap delegates `exec` and installation to the existing managed
 product and wheel; and the setup helper provisions only consumer-declared
 tools/targets. The installer remains configuration/rendering glue, not a
@@ -227,8 +228,7 @@ Planned later crate:
   - out of current implementation scope until the Phase `C` versioning line
     moves from planning into execution
 - `sc-lint-tokio`
-  - reserved home for Tokio-specific async/runtime lint rules when Tokio-specific
-    dependencies or semantics justify a dedicated crate
+  - reserved for Tokio rules that need Tokio dependencies or runtime semantics
   - represented in structured boundary metadata as a reserved future crate
   - out of current parity scope until a future sprint assigns planned items
 
@@ -325,6 +325,20 @@ Current implementation status:
   - top-level `sc-lint` invokes the dedicated `sc-lint-runtime` binary
     without adding a direct crate dependency
 
+### Consumer profile implementation boundaries
+
+Consumer test selector decoding lives in
+`crates/sc-lint/src/test_selectors.rs`; row/table configuration dispatch lives
+in `crates/sc-lint/src/config.rs`. The stable profile error codes and their
+configuration error construction live in `crates/sc-lint/src/scheduler.rs`,
+alongside the scheduler that reports those errors. The CLI keeps the test
+selector and its forwarded arguments in one trailing positional field
+(`Command::Test::selector_and_args` in `cli.rs`): this makes every token after
+the selector, including tokens beginning with `-`, pass through to the test
+command. The public invocation remains
+`sc-lint test [--fail-fast|--list] [<selector> [args...]]`; flags precede the
+selector and the trailing words are forwarded verbatim.
+
 ## Backend Crate Isolation
 
 Default backend isolation rule:
@@ -342,16 +356,17 @@ Allowed shared support:
 
 For release `0.2.x`, this means:
 
-- `sc-lint-portability` and `sc-lint-runtime` may depend on
-  `sc-lint-directives` when shared directive parsing/types are needed, and on
+- `sc-lint-boundary` and `sc-lint-attributes` may depend on
+  `sc-lint-directives` for shared directive parsing/types, and
+  `sc-lint-portability` and `sc-lint-runtime` may depend on
   `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
   implementation
 - `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend
   on `sc-lint-analyzer-support` for the rule-neutral analyzer configuration
   parser (ADR-013 amendment 2026-10-10, Accepted, #201)
-- `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`, and the
-  top-level `sc-lint` CLI may depend on `sc-lint-schema` for the canonical
-  machine-schema types
+- `sc-lint-boundary`, `sc-lint-portability`, `sc-lint-runtime`,
+  `sc-lint-analyzer-support`, and the top-level `sc-lint` CLI may depend on
+  `sc-lint-schema` for the canonical machine-schema types
 - the top-level `sc-lint` CLI does not directly depend on
   `sc-lint-portability` or `sc-lint-runtime` in the planned release-1
   integration mode
@@ -443,8 +458,9 @@ Current intended distribution is:
   - current owned rules:
     - `SCB-RUNTIME-001`
     - `SCB-RUNTIME-002`
+    - `SCB-RUNTIME-003`
 - `sc-lint-tokio`
-  - future Tokio-specific runtime rules
+  - reserved for Tokio rules that need Tokio dependencies or runtime semantics
   - must remain distinct from generic runtime rules
 
 ### Phase B Shared Backlog
@@ -651,7 +667,7 @@ productized second.
 Consumer-proven rule families already shipped in dedicated product crates:
 
 - `sc-lint-portability`: `PORT-004`, `PORT-005`
-- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`
+- `sc-lint-runtime`: `SCB-RUNTIME-001`, `SCB-RUNTIME-002`, `SCB-RUNTIME-003`
 
 Phase K follows Accepted ADR-017: conditional reuse of applicable atm-core
 source/tests, consumer-neutral rule semantics in Rust, narrow optional analyzer

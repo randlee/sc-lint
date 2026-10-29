@@ -1,0 +1,11 @@
+# Source: atm-core .just/lint-config.toml (integrate/phase-bg) commit f4746d500
+[version_sync.release_wiring]
+enabled = true
+file = ".github/workflows/release.yml"
+required_fragments = [
+  "RELEASE_ARTIFACT_MANIFEST: release/publish-artifacts.toml",
+  "release_artifacts.py build-plan",
+  "release_artifacts.py verify-version-lockstep",
+  "release_gate.sh final origin/main \"release-candidate-",
+  "release-target-matrix",
+]

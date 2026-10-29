@@ -31,15 +31,16 @@ specialized backend tools and mixed Rust/Python implementations.
   - `.just/lint-config.toml`
   with `--root <path>` as the explicit repo-root override.
   (Amended phase L, #137/default-config gap, Accepted — Rand, 2026-10-26.)
-  Resolution is per configuration table for every lint and every Python-backed
-  lint (line-counts, identity-literals, version-sync): an explicit `--config`
+  Resolution is per configuration table for every lint, including
+  Python-backed lints (line-counts, identity-literals, version-sync): an
+  explicit `--config`
   file first, then the table from `sc-lint.toml` when it has one, otherwise the
   same table from `.just/lint-config.toml`. A table present in `sc-lint.toml`
   is never shadowed by the fallback file, and a repo whose `sc-lint.toml` lacks
   a table that only `.just/lint-config.toml` holds (as in atm-core's kit-rendered
-  `sc-lint.toml`) keeps using the fallback table. A lint whose configuration
-  table is found in neither file fails with a structured error; it must not
-  pass silently with "no active limits". The
+  `sc-lint.toml`) keeps using the fallback table. Python-backed lints fail with
+  `config.table_missing` when their configuration table is found in neither
+  file; Rust analyzers keep their defaults when their table is absent. The
   repo root is the nearest ancestor holding `sc-lint.toml` or a workspace
   `Cargo.toml`; a `boundaries/` directory is required only by the boundary
   family, and its absence is a structured error for that family alone.
@@ -356,9 +357,15 @@ specialized backend tools and mixed Rust/Python implementations.
   delegates to the installed `sc-lint` command. Consumer lint/test entry points follow ADR-016
   as amended. ADR-017 adds bootstrap `exec` through the existing managed
   installation/environment, preserving argv and child exit status without
-  re-entering consumer profile dispatch. Lint accepts a selector followed by
-  optional platform scope. No setup hooks or interpreter-selection policy is
-  added. The product-owned assets remain the source of consumer bootstrap.
+  re-entering consumer profile dispatch. Bootstrap lint accepts
+  `[--fail-fast] [selector] [host|all|linux|macos|windows]` and requires
+  `--config sc-lint.toml`. Bootstrap test accepts
+  `[--fail-fast|--list] --config sc-lint.toml [selector [args...]]`; its
+  options and config precede the selector, and arguments after the selector
+  are forwarded verbatim. Lint accepts a selector followed by optional
+  platform scope. No setup hooks or interpreter-selection policy is added.
+  The product-owned assets remain the source of consumer bootstrap. (Amended
+  phase L, [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).)
   (Amended 2026-10-12, Accepted,
   [ADR-017, changes 4–6](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -391,10 +398,9 @@ specialized backend tools and mixed Rust/Python implementations.
   keep-going behavior: every planned step runs even if another fails. Reports
   retain plan order and identify every failed step by its plan index; the
   command exits non-zero if any step fails. Steps that require Cargo's build
-  lock are serialized. Consumer-configured lint and test profiles remain
-  sequential, declaration-ordered, and fail-fast.
-  (Amended phase L, #195/#196, Accepted — Rand, 2026-10-26; supersedes the
-  preceding sentence.) Consumer-configured lint and test profiles run
+  lock are serialized.
+  (Amended in phase L, #195/#196, Accepted — Rand, 2026-10-26.)
+  Consumer-configured lint and test profiles run
   independent steps concurrently and fail slow by default: every planned step
   runs even if another fails, the report retains declaration order and
   identifies every failed step by its index, and the command exits non-zero if
@@ -403,10 +409,13 @@ specialized backend tools and mixed Rust/Python implementations.
   fail-slow holds inside that serialized lane: a failing step there does not
   stop later steps in the lane. A step may declare `after_all = true`, which
   starts it only after every other step has finished. Output
-  ordering is deterministic and does not depend on step timing. Generic test groups and test
-  argument forwarding are not added, except for consumer test selectors as
-  defined by [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md)
-  (effective when ADR-020 is Accepted).
+  ordering is deterministic and does not depend on step timing. Consumer test
+  profiles support named command and group selectors, `default`, environment,
+  working-directory and platform settings, and forwarded command arguments.
+  Limitations: selectors are not declared in `install.json`; `default` is one
+  selector name, a call accepts one selector, selector descriptions and
+  `requires` are not supported, and installer-side selector validation is not
+  added. See [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).
   (Extended 2026-10-12; amended 2026-10-14, Accepted,
   [ADR-017, change 4](./adr/ADR-017-phase-k-consumer-contracts.md#accepted-changes-to-existing-contracts).)
 
@@ -427,7 +436,7 @@ specialized backend tools and mixed Rust/Python implementations.
   `.pass(...)` or `.compile_fail(...)` glob, and must keep reporting every
   other unlinked file, empty file and unused dependency as before. No
   per-fixture configuration is required for consumed fixtures.
-  (Added phase L, #647. Pending Rand approval; gates dispatch only. See
+  (Added phase L, #647. Status: Accepted — Rand, 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
 ## Contract References

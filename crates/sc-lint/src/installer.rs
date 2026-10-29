@@ -35,12 +35,12 @@ mod probe;
 
 use activation::*;
 use probe::*;
-pub(crate) use probe::{probe_backend_version, probe_version};
+pub(crate) use probe::{ProbeFailure, probe_backend_version, probe_version, run_version_command};
 
 const DEFAULT_RELEASE_BASE_URL: &str = "https://github.com/randlee/sc-lint/releases/download";
 const RELEASE_BASE_URL_ENV: &str = "SC_LINT_RELEASE_BASE_URL";
 const INSTALL_DIR_ENV: &str = "SC_LINT_INSTALL_DIR";
-const BACKEND_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
+pub(crate) const BACKEND_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const BACKEND_PROBE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 const BACKEND_PROBE_OUTPUT_LIMIT: usize = 64 * 1024;
 #[cfg(test)]
@@ -194,10 +194,8 @@ fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, 
         .any(|binary| binary.is_file());
     let managed_existing =
         find_compatible_binary_with(&managed_binary, minimum_version, false, |binary| {
-            let version = probe_version(binary)?;
-            managed_payload_complete(binary)
-                .then_some(version)
-                .ok_or_else(|| "managed release bundle is incomplete".to_string())
+            let version = probe_version(binary).ok()?;
+            managed_payload_complete(binary).then_some(version)
         });
     let existing = managed_existing.or_else(|| {
         // PATH is a supported development fallback when no managed launcher
@@ -205,7 +203,9 @@ fn run(loaded: &LoadedConfig, check_only: bool, dry_run: bool) -> Result<Value, 
         // even if an unrelated PATH executable happens to be compatible.
         (!managed_binary.exists() && use_path_candidates)
             .then(|| {
-                find_compatible_binary_with(&managed_binary, minimum_version, true, probe_version)
+                find_compatible_binary_with(&managed_binary, minimum_version, true, |binary| {
+                    probe_version(binary).ok()
+                })
             })
             .flatten()
     });
@@ -314,12 +314,12 @@ fn find_compatible_binary_with<F>(
     probe: F,
 ) -> Option<(PathBuf, Version)>
 where
-    F: Fn(&Path) -> Result<Version, String>,
+    F: Fn(&Path) -> Option<Version>,
 {
     std::iter::once(managed_binary.to_path_buf())
         .chain(path_binary_candidates_if(use_path_candidates))
         .find_map(|binary| {
-            let version = probe(&binary).ok()?;
+            let version = probe(&binary)?;
             (version >= *minimum.as_semver()).then_some((binary, version))
         })
 }
@@ -896,7 +896,7 @@ mod tests {
     use serial_test::serial;
     use std::ffi::OsString;
     #[cfg(unix)]
-    use std::io::Write;
+    use std::io::{Read, Write};
     use std::str::FromStr;
 
     use tempfile::TempDir;
@@ -906,6 +906,10 @@ mod tests {
     const BACKEND_PROBE_TEST_WATCHDOG: Duration = Duration::from_secs(30);
     #[cfg(unix)]
     const BACKEND_OUTPUT_TEST_WAIT: Duration = Duration::from_secs(5);
+    /// Failure ceiling for the probe's processes to release the liveness FIFO
+    /// after the test kills them. It does not bound the probe under test.
+    #[cfg(unix)]
+    const PROBE_HOLDER_EXIT_CEILING: Duration = Duration::from_secs(30);
 
     #[test]
     fn release_target_matches_the_published_release_matrix() {
@@ -1522,6 +1526,8 @@ mod tests {
         fs::create_dir_all(&staged_bin).expect("staged bin");
         fs::create_dir_all(&staged_docs).expect("staged docs");
         create_probe_ready_fifo(&staged_ready_fifo);
+        let staged_holders_fifo = fixture.path().join("staged-probe-holders");
+        let staged_holders = watch_probe_holders(&staged_holders_fifo);
         fs::write(staged_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("staged launcher");
         for backend in [
@@ -1533,6 +1539,7 @@ mod tests {
         write_hanging_noisy_stub(
             &staged_bin.join(crate::consts::TOOL_RUNTIME),
             &staged_ready_fifo,
+            &staged_holders_fifo,
         );
         fs::write(staged_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("staged docs manifest");
@@ -1571,7 +1578,7 @@ mod tests {
             staged_problem.contains("timed out after 5000 ms"),
             "unexpected staged probe failure: {staged_problem}"
         );
-        assert_probe_children_stopped(&staged_pid_file);
+        assert_probe_holders_exited(&staged_holders, &staged_pid_file);
 
         let installed_root = fixture.path().join("installed");
         let installed_bin = installed_root.join("bin");
@@ -1581,6 +1588,8 @@ mod tests {
         fs::create_dir_all(&installed_bin).expect("installed bin");
         fs::create_dir_all(&installed_docs).expect("installed docs");
         create_probe_ready_fifo(&installed_ready_fifo);
+        let installed_holders_fifo = fixture.path().join("installed-probe-holders");
+        let installed_holders = watch_probe_holders(&installed_holders_fifo);
         fs::write(installed_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("installed launcher");
         for backend in [
@@ -1592,6 +1601,7 @@ mod tests {
         write_hanging_noisy_stub(
             &installed_bin.join(crate::consts::TOOL_RUNTIME),
             &installed_ready_fifo,
+            &installed_holders_fifo,
         );
         fs::write(installed_docs.join("manifest.toml"), MINIMAL_DOCS_MANIFEST)
             .expect("installed docs manifest");
@@ -1622,7 +1632,7 @@ mod tests {
             installed_is_complete.expect("hanging installed companion is rejected");
         assert!(installed_problem.contains(crate::consts::TOOL_RUNTIME));
         assert!(installed_problem.contains("timed out after 5000 ms"));
-        assert_probe_children_stopped(&installed_pid_file);
+        assert_probe_holders_exited(&installed_holders, &installed_pid_file);
     }
 
     #[test]
@@ -1947,8 +1957,9 @@ mod tests {
         let managed = fixture.path().join(ReleaseTarget::binary_name());
         let minimum = MinimumVersion::from_str("0.4.1").expect("minimum");
         let probe = |path: &Path| {
-            let version = fs::read_to_string(path).map_err(|error| error.to_string())?;
-            Version::parse(version.trim()).map_err(|error| error.to_string())
+            fs::read_to_string(path)
+                .ok()
+                .and_then(|version| Version::parse(version.trim()).ok())
         };
 
         for (version, expected) in [
@@ -2229,14 +2240,17 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn write_hanging_noisy_stub(path: &Path, ready_fifo: &Path) {
+    fn write_hanging_noisy_stub(path: &Path, ready_fifo: &Path, holder_fifo: &Path) {
         use std::os::unix::fs::PermissionsExt;
 
         let ready_fifo = ready_fifo.to_string_lossy().replace('\'', "'\\''");
+        let holder_fifo = holder_fifo.to_string_lossy().replace('\'', "'\\''");
+        // The shell holds the liveness FIFO open for writing before it forks, so
+        // both children inherit it. Only process exit releases it.
         fs::write(
             path,
             format!(
-                "#!/bin/sh\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
+                "#!/bin/sh\nexec 8>'{holder_fifo}'\nsleep 600 &\nsleeper=$!\nyes noisy-child &\nnoiser=$!\nprintf '%s %s %s\\n' \"$$\" \"$sleeper\" \"$noiser\" > '{ready_fifo}'\nwait\n"
             ),
         )
         .expect("write hanging noisy backend");
@@ -2256,6 +2270,27 @@ mod tests {
         assert!(status.success(), "mkfifo creates startup handshake");
     }
 
+    /// Creates the liveness FIFO and starts a watcher that reads it to EOF.
+    /// The watcher's result arrives only after every process holding the
+    /// write end has exited, which does not depend on how fast it is reaped.
+    /// Call before starting the probe, because opening the read end blocks
+    /// until the probe opens the write end.
+    #[cfg(unix)]
+    fn watch_probe_holders(path: &Path) -> std::sync::mpsc::Receiver<io::Result<Vec<u8>>> {
+        create_probe_ready_fifo(path);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let path = path.to_path_buf();
+        thread::spawn(move || {
+            let result = fs::File::open(&path).and_then(|mut holder| {
+                let mut released = Vec::new();
+                holder.read_to_end(&mut released)?;
+                Ok(released)
+            });
+            let _ = sender.send(result);
+        });
+        receiver
+    }
+
     #[cfg(unix)]
     fn hanging_backend_cli_failure_after_startup(
         binary: &Path,
@@ -2264,8 +2299,8 @@ mod tests {
         child_pid_file: &Path,
         ready_fifo: &Path,
     ) -> Option<String> {
-        let (mut child, reader) = spawn_backend_probe(binary, expected_name, &["--help"], "--help")
-            .expect("start backend probe");
+        let (mut child, reader) =
+            spawn_probe(binary, expected_name, &["--help"], "--help").expect("start backend probe");
         let process_id = child.id();
         fs::write(child_pid_file, process_id.to_string()).expect("record probe process group");
 
@@ -2361,55 +2396,26 @@ mod tests {
         }
     }
 
+    /// Waits for the probe's processes to release the liveness FIFO. A process
+    /// holds it only while alive, so this proves the kill took effect without
+    /// depending on how quickly the killed processes are reaped.
     #[cfg(unix)]
-    fn assert_probe_children_stopped(child_pid_file: &Path) {
-        let child_pids = fs::read_to_string(child_pid_file)
-            .expect("probe recorded child pids")
-            .split_whitespace()
-            .map(|pid| pid.parse::<u32>().expect("child pid"))
-            .collect::<Vec<_>>();
-        assert_eq!(
-            child_pids.len(),
-            3,
-            "probe recorded parent and both child pids"
-        );
-        for pid in child_pids {
-            let mut details = probe_process_details(pid);
-            for _ in 0..100 {
-                if details
-                    .as_deref()
-                    .is_none_or(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X')))
-                {
-                    break;
-                }
-                thread::sleep(Duration::from_millis(10));
-                details = probe_process_details(pid);
+    fn assert_probe_holders_exited(
+        holders: &std::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>,
+        child_pid_file: &Path,
+    ) {
+        match holders.recv_timeout(PROBE_HOLDER_EXIT_CEILING) {
+            Ok(Ok(_)) => {}
+            Ok(Err(error)) => panic!("backend probe liveness FIFO failed: {error}"),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                terminate_test_probe_processes(child_pid_file);
+                panic!(
+                    "backend probe processes still hold the liveness FIFO after {PROBE_HOLDER_EXIT_CEILING:?}"
+                );
             }
-            if details
-                .as_deref()
-                .is_some_and(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X')))
-            {
-                eprintln!("backend probe child {pid} terminated; process details {details:?}");
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                panic!("backend probe liveness watcher stopped without reporting");
             }
-            assert!(
-                details
-                    .as_deref()
-                    .is_none_or(|details| matches!(details.as_bytes().first(), Some(b'Z' | b'X'))),
-                "backend probe child {pid} remained live with process details {details:?}"
-            );
         }
-    }
-
-    #[cfg(unix)]
-    fn probe_process_details(pid: u32) -> Option<String> {
-        let output = Command::new("ps")
-            .args(["-o", "stat=,ppid=,pgid=,command=", "-p", &pid.to_string()])
-            .output()
-            .ok()?;
-        output
-            .status
-            .success()
-            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
-            .filter(|state| !state.is_empty())
     }
 }

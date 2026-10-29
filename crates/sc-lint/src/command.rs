@@ -1,3 +1,5 @@
+use crate::scheduler::FailurePolicy;
+use crate::test_selectors::TestRequest;
 use serde_json::Value;
 use serde_json::json;
 use std::path::Path;
@@ -117,12 +119,16 @@ enum CommandRequest {
     },
     Init(ConsumerInitRequest),
     Docs(DocsRequest),
-    /// Optional test layer selector for the consumer test command.
-    ConsumerSelector(Option<String>),
-    /// Consumer lint selector (step or named profile) and platform scope.
+    /// Consumer test selector, forwarded arguments or `--list`, and `--fail-fast`.
+    ConsumerTest {
+        request: TestRequest,
+        fail_fast: bool,
+    },
+    /// Consumer lint selector (step or named profile), platform scope and `--fail-fast`.
     ConsumerLint {
         selector: Option<String>,
         scope: PlatformScope,
+        fail_fast: bool,
     },
     /// `--rule-filter` value forwarded unchanged to an analyzer backend.
     RuleFilter(String),
@@ -442,12 +448,34 @@ impl CommandContext {
         }
     }
 
-    /// Selector for consumer profile commands: `None` and `all` run every configured step.
+    /// Selector for `lint --consumer`: `None` and `all` run every configured step.
     pub(crate) fn consumer_selector(&self) -> Option<&str> {
         match &self.request {
-            Some(CommandRequest::ConsumerSelector(selector)) => selector.as_deref(),
             Some(CommandRequest::ConsumerLint { selector, .. }) => selector.as_deref(),
             _ => None,
+        }
+    }
+
+    /// The `sc-lint test` request.
+    pub(crate) fn test_request(&self) -> &TestRequest {
+        match &self.request {
+            Some(CommandRequest::ConsumerTest { request, .. }) => request,
+            _ => unreachable!("the consumer test request is tied to the test command"),
+        }
+    }
+
+    /// `FailFast` iff `--fail-fast` was given to a consumer command.
+    pub(crate) fn failure_policy(&self) -> FailurePolicy {
+        match &self.request {
+            Some(
+                CommandRequest::ConsumerTest {
+                    fail_fast: true, ..
+                }
+                | CommandRequest::ConsumerLint {
+                    fail_fast: true, ..
+                },
+            ) => FailurePolicy::FailFast,
+            _ => FailurePolicy::KeepGoing,
         }
     }
 
@@ -568,16 +596,31 @@ fn command_request(command: &Command) -> Option<CommandRequest> {
             consumer: true,
             profile,
             platform_scope,
+            fail_fast,
             ..
         } => Some(CommandRequest::ConsumerLint {
             selector: profile.clone(),
             scope: platform_scope.map_or(PlatformScope::Host, PlatformScope::from),
+            fail_fast: *fail_fast,
         }),
         Command::Lint {
             rule_filter: Some(filter),
             ..
         } => Some(CommandRequest::RuleFilter(filter.clone())),
-        Command::Test { layer } => Some(CommandRequest::ConsumerSelector(layer.clone())),
+        Command::Test {
+            selector_and_args,
+            list,
+            fail_fast,
+        } => {
+            let (selector, args) = match selector_and_args.split_first() {
+                Some((selector, args)) => (Some(selector.clone()), args.to_vec()),
+                None => (None, Vec::new()),
+            };
+            Some(CommandRequest::ConsumerTest {
+                request: TestRequest::new(selector, args, *list),
+                fail_fast: *fail_fast,
+            })
+        }
         _ => None,
     }
 }
@@ -614,10 +657,13 @@ pub(crate) fn execute(
             loaded_config,
             context.consumer_selector(),
             context.platform_scope(),
+            context.failure_policy(),
         ),
-        CommandId::ConsumerTest => {
-            workflow::run_consumer_test_profile(loaded_config, context.consumer_selector())
-        }
+        CommandId::ConsumerTest => workflow::run_consumer_test_profile(
+            loaded_config,
+            context.test_request(),
+            context.failure_policy(),
+        ),
         CommandId::LintScBoundary => dispatch::run_sc_boundary(context, loaded_config),
         CommandId::LintScPortability => dispatch::run_sc_portability(context, loaded_config),
         CommandId::LintScRuntime => dispatch::run_sc_runtime(context, loaded_config),

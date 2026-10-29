@@ -26,9 +26,33 @@ inspect the preflight without running a profile.
 ## Profiles
 
 Each `[[tool.sc-lint.lint]]` and `[[tool.sc-lint.test]]` entry needs a unique,
-non-empty `name` and a non-empty argv `command` array. Entries run in order and
-any failed entry fails the aggregate profile. Keep commands explicit and
-reproducible; do not hide required work behind an advisory alias.
+non-empty `name` and a non-empty argv `command` array. Entries run
+concurrently (cargo steps serialized in declaration order) and every failed
+entry is reported. Keep commands explicit and reproducible; do not hide
+required work behind an advisory alias.
+
+Instead of rows, `[tool.sc-lint.test]` may be a table of named selectors with
+an optional `default`:
+
+```toml
+[tool.sc-lint.test]
+default = "unit"
+
+[tool.sc-lint.test.selectors.unit]
+command = ["cargo", "test"]
+env = { RUST_LOG = "debug" }
+cwd = "crates/app"
+platforms = ["linux", "macos"]
+after_all = false
+
+[tool.sc-lint.test.selectors.integration]
+command = ["cargo", "test", "--test", "integration"]
+
+[tool.sc-lint.test.selectors.full]
+group = ["unit", "integration"]
+```
+
+A file uses one form; see [Test selectors](./using-sc-lint.md#test-selectors).
 
 ## Analyzer tables
 
@@ -41,11 +65,17 @@ Each analyzer reads only its own `[tool.sc-lint.analyzers.<name>]` table, where
 - `fail_rules` (rule ids or families) lists the rules that fail the verdict;
   other findings only report. Absent, the analyzer's built-in set applies.
 - `exclude_paths` (globs relative to the workspace root; `**` spans
-  directories) drops findings in matching files. Boundary applies it to
-  SCB-MANIFEST findings, matched on the manifest path.
+  directories) drops findings in matching files. In Boundary, only
+  `SCB-MANIFEST-001` through `SCB-MANIFEST-006` carry a finding path;
+  `SCB-CYCLE-002` and `SCB-CYCLE-003` instead use the source files behind
+  their nodes, and are excluded when any such file matches.
 - `exclude_paths_by_rule` maps exact rule ids to arrays of workspace-relative
   globs. It drops only findings from that rule at matching paths; other rules
-  in the same file still run.
+  in the same file still run. Boundary supports `SCB-MANIFEST-001` through
+  `SCB-MANIFEST-006`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
+  other Boundary rules are configuration errors naming the rule because their
+  findings have no source path; configuration loading rejects them before
+  analysis. Remove the entry or choose a rule with source paths.
 
 `portability` also takes `config_home_env`, the environment variable a test
 helper must check before `dirs::home_dir()` (PORT-002 runs only when it is
@@ -57,9 +87,11 @@ whose names differ.
 Only the configured pair and its enclosed private implementation receive the
 adapter treatment; separately Unix-gated public items remain subject to parity
 checks. Boundary accepts the optional manifest dependency policy families
-`manifest_dependency_allowlists`, `global_dependency_ownership` and
-`manifest_section_rules`; its package-edge policy is supplied by its
-inventory. Runtime has no analyzer-specific keys. Any unknown
+`manifest_dependency_allowlists`, `global_dependency_ownership`, and
+`manifest_section_rules`; these are released consumer-owned configuration,
+while atm-core retains its record-lock parity checks for the allowlist fields.
+Its package-edge policy is supplied by its inventory. Runtime has no
+analyzer-specific keys. Any unknown
 key, unknown rule, or wrong value type is a configuration error (exit 3)
 identifying the analyzer and field.
 

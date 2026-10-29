@@ -9,10 +9,15 @@ use crate::CliError;
 use crate::CliErrorKind;
 use crate::command::CommandSuccess;
 use crate::command::DispatchTelemetry;
+use crate::config::ConfigCode;
 use crate::config::LoadedConfig;
 use crate::consts;
+use crate::error::ErrorCode;
 
 pub(crate) const ADAPTER_SCHEMA: &str = "sc-lint-python-v1";
+pub(crate) const BACKEND_PAYLOAD_DRIFT_CODE: &str = "backend_payload_drift";
+pub(crate) const BACKEND_PAYLOAD_DRIFT_RECOVERY: &str =
+    "upgrade or reinstall the analyzer backend so its payload matches the published schema";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PythonTool {
@@ -74,7 +79,7 @@ pub(crate) fn run_python_tool(
         .arg(repo_root)
         .args(
             loaded_config
-                .config_path()
+                .explicit_config()
                 .into_iter()
                 .flat_map(|path| [OsString::from("--config"), path.as_os_str().to_os_string()]),
         )
@@ -178,21 +183,8 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
         .with_source(error)
         .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
     })?;
-    let object = payload.as_object().ok_or_else(|| {
-        CliError::backend_protocol(format!(
-            "{} returned a non-object adapter payload",
-            tool.tool_name()
-        ))
-        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
-    })?;
-    if object.get("adapter_schema").and_then(Value::as_str) != Some(ADAPTER_SCHEMA) {
-        return Err(CliError::backend_protocol(format!(
-            "{} returned an unknown adapter schema",
-            tool.tool_name()
-        ))
-        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
-        .with_detail("expected_schema", json!(ADAPTER_SCHEMA)));
-    }
+    let object = adapter_object(tool, &payload)?;
+    validate_adapter_payload(tool, &payload)?;
     let summary = object
         .get(consts::FIELD_SUMMARY)
         .and_then(Value::as_str)
@@ -229,14 +221,14 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
             .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         })?
         .to_string();
-    let mut error = CliError::new(kind, message)
+    let mut error = CliError::new(kind, message.clone())
         .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
         .with_detail(consts::FIELD_SCRIPT, json!(tool.script_relative_path()));
     if let Some(details) = error_object
         .get(consts::FIELD_DETAILS)
         .and_then(Value::as_object)
     {
-        error = merge_details(error, details);
+        error = merge_details(error, details, kind, message);
     }
     if let Some(action) = error_object
         .get(consts::FIELD_SUGGESTED_ACTION)
@@ -251,9 +243,63 @@ fn parse_adapter_output(tool: PythonTool, raw: &[u8]) -> Result<AdapterResult, C
     })
 }
 
-fn merge_details(mut error: CliError, details: &Map<String, Value>) -> CliError {
+#[expect(
+    clippy::result_large_err,
+    reason = "Adapter normalization failures must use the shared top-level CliError contract."
+)]
+fn adapter_object(tool: PythonTool, payload: &Value) -> Result<&Map<String, Value>, CliError> {
+    let object = payload.as_object().ok_or_else(|| {
+        CliError::backend_protocol(format!(
+            "{} returned a non-object adapter payload",
+            tool.tool_name()
+        ))
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
+    })?;
+    if object.get("adapter_schema").and_then(Value::as_str) != Some(ADAPTER_SCHEMA) {
+        return Err(CliError::backend_protocol(format!(
+            "{} returned an unknown adapter schema",
+            tool.tool_name()
+        ))
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
+        .with_detail("expected_schema", json!(ADAPTER_SCHEMA)));
+    }
+    Ok(object)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Adapter schema drift uses the shared top-level CliError contract."
+)]
+fn validate_adapter_payload(tool: PythonTool, payload: &Value) -> Result<(), CliError> {
+    if let Err(drift) = sc_lint_schema::validate_adapter_payload(payload) {
+        return Err(CliError::backend_protocol(format!(
+            "{} returned a payload that drifted from the sc-lint-python-v1 schema",
+            tool.tool_name()
+        ))
+        .with_code(BACKEND_PAYLOAD_DRIFT_CODE)
+        .with_cause(drift.to_string())
+        .with_suggested_action(BACKEND_PAYLOAD_DRIFT_RECOVERY)
+        .with_detail(consts::FIELD_TOOL, json!(tool.tool_name()))
+        .with_detail("key_path", json!(drift.key_path)));
+    }
+    Ok(())
+}
+
+fn merge_details(
+    mut error: CliError,
+    details: &Map<String, Value>,
+    kind: CliErrorKind,
+    message: String,
+) -> CliError {
     for (key, value) in details {
         error = error.with_detail(key.clone(), value.clone());
+    }
+    let code = (kind == CliErrorKind::Config)
+        .then(|| error.details.get("code").and_then(Value::as_str))
+        .flatten()
+        .and_then(ConfigCode::from_wire);
+    if let Some(code) = code {
+        error = error.with_code(code.as_str()).with_cause(message);
     }
     error
 }
@@ -493,6 +539,64 @@ mod tests {
         assert_eq!(success.data["adapter"], ADAPTER_SCHEMA);
         assert_eq!(success.data["status"], "pass");
     }
+
+    fn malformed_success_payload() -> String {
+        let mut payload = json!({
+            "adapter_schema": ADAPTER_SCHEMA,
+            "ok": true,
+            "summary": "line counts within limits",
+            "data": {"status": "pass"},
+            "diagnostics": []
+        });
+        payload.as_object_mut().unwrap().remove("data");
+        payload.to_string()
+    }
+
+    #[test]
+    fn backend_payload_drift_rejected() {
+        let payload = malformed_success_payload();
+        let error = adapter_outcome(PythonTool::LineCounts, Some(0), payload.as_bytes())
+            .expect_err("schema drift is a protocol error");
+
+        assert_eq!(error.kind, CliErrorKind::BackendProtocol);
+        assert_eq!(error.code(), BACKEND_PAYLOAD_DRIFT_CODE);
+        assert_eq!(error.cause.as_deref(), Some("`data`: missing required key"));
+        assert_eq!(
+            error.suggested_action.as_deref(),
+            Some(BACKEND_PAYLOAD_DRIFT_RECOVERY)
+        );
+        assert_eq!(error.details["key_path"], "data");
+        assert_eq!(error.exit_code(), consts::EXIT_BACKEND_PROTOCOL);
+    }
+
+    #[test]
+    fn backend_payload_drift_precedes_exit_code_check() {
+        let payload = malformed_success_payload();
+        let error = adapter_outcome(PythonTool::LineCounts, Some(1), payload.as_bytes())
+            .expect_err("payload drift takes precedence over process exit status");
+
+        assert_eq!(error.code(), BACKEND_PAYLOAD_DRIFT_CODE);
+        assert_ne!(error.code(), "CLI.BACKEND_EXEC_FAILURE");
+    }
+
+    #[test]
+    fn unknown_adapter_schema_is_not_payload_drift() {
+        let payload = json!({
+            "adapter_schema": "sc-lint-python-v2",
+            "ok": true,
+            "summary": "line counts within limits",
+            "data": {"status": "pass"},
+            "diagnostics": []
+        })
+        .to_string();
+        let error = adapter_outcome(PythonTool::LineCounts, Some(0), payload.as_bytes())
+            .expect_err("foreign schema remains an unknown schema protocol error");
+
+        assert_eq!(error.kind, CliErrorKind::BackendProtocol);
+        assert_eq!(error.code(), "CLI.BACKEND_PROTOCOL_ERROR");
+        assert_ne!(error.code(), BACKEND_PAYLOAD_DRIFT_CODE);
+    }
+
     #[test]
     fn python_module_command_delegates_to_the_running_product_binary() {
         let command = python_module_command(std::path::Path::new("."));

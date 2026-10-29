@@ -1072,6 +1072,189 @@ fn passes_cfg_unix_gated_unix_path_in_production_code() {
 }
 
 #[test]
+fn port006_item_cfg_suppresses_under_target_os_and_not_windows_cfg() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(target_os = "linux")]
+        fn linux() -> &'static str { "/home/a/x" }
+        #[cfg(target_os = "macos")]
+        fn macos() -> &'static str { "/home/b/x" }
+        #[cfg(not(windows))]
+        fn not_windows() -> &'static str { "/home/c/x" }
+        #[cfg(all(not(windows), feature = "x"))]
+        fn all_not_windows() -> &'static str { "/home/d/x" }
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        fn any_unix_os() -> &'static str { "/home/e/x" }
+        pub fn blocks() {
+            #[cfg(target_os = "linux")] { let _ = "/home/f/x"; }
+            #[cfg(not(windows))] { let _ = "/home/g/x"; }
+        }
+        "#,
+    );
+
+    assert!(report.findings.is_empty(), "{:#?}", report.findings);
+}
+
+#[test]
+fn port006_item_cfg_suppresses_platform_specific_path_literals() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(target_os = "linux")]
+        fn linux_path() {
+            let _ = "/var/tmp/atm-ports";
+        }
+
+        #[cfg(windows)]
+        fn windows_paths() {
+            let _ = "C:\\atm-ports";
+            let _ = "\\\\server\\share\\atm-ports";
+        }
+
+        pub fn ungated() {
+            let _ = "/var/tmp/ungated";
+        }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert!(report.findings[0].message.contains("/var/tmp/ungated"));
+}
+
+#[test]
+fn port006_statement_level_cfg_is_not_honored() {
+    let report = analyze_single_source(
+        r#"
+        pub fn gated_statements() {
+            #[cfg(target_os = "linux")]
+            let _ = "/var/tmp/statement-let";
+
+            #[cfg(target_os = "linux")]
+            if consume("x") { let _ = "/var/tmp/statement-if"; }
+
+            #[cfg(target_os = "linux")]
+            consume("/var/tmp/statement-call");
+
+            #[cfg(target_os = "linux")]
+            std::path::Path::new("/var/tmp/statement-method").exists();
+        }
+        "#,
+    );
+
+    let messages = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port006)
+        .map(|finding| finding.message.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(messages.len(), 4, "{:#?}", report.findings);
+    for path in [
+        "/var/tmp/statement-let",
+        "/var/tmp/statement-if",
+        "/var/tmp/statement-call",
+        "/var/tmp/statement-method",
+    ] {
+        assert!(
+            messages.iter().any(|message| message.contains(path)),
+            "statement-level cfg should not suppress {path}: {messages:#?}"
+        );
+    }
+}
+
+#[test]
+fn port006_cfg_block_expression_is_honored() {
+    let report = analyze_single_source(
+        r#"
+        pub fn gated_block() {
+            #[cfg(target_os = "linux")]
+            { let _ = "/var/tmp/block-exempt"; }
+
+            #[cfg(windows)]
+            { let _ = "C:\\block-exempt"; }
+
+            let _ = "/var/tmp/after-block";
+        }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port006);
+    assert!(report.findings[0].message.contains("/var/tmp/after-block"));
+}
+
+#[test]
+fn port006_still_fires_on_ungated_item() {
+    let report = analyze_single_source(
+        r#"
+        pub fn ungated() -> &'static str { "/home/ungated/x" }
+        #[cfg(not(unix))]
+        fn not_unix() -> &'static str { "/home/notunix/x" }
+        #[cfg(target_os = "freebsd")]
+        fn freebsd() -> &'static str { "/home/freebsd/x" }
+        #[cfg(target_family = "unix")]
+        fn family() -> &'static str { "/home/family/x" }
+        #[cfg(not(target_os = "linux"))]
+        fn not_linux() -> &'static str { "/home/notlinux/x" }
+        "#,
+    );
+    let port006 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port006)
+        .collect::<Vec<_>>();
+    assert_eq!(port006.len(), 5, "{port006:#?}");
+    for path in [
+        "/home/ungated/x",
+        "/home/notunix/x",
+        "/home/freebsd/x",
+        "/home/family/x",
+        "/home/notlinux/x",
+    ] {
+        assert!(
+            port006.iter().any(|finding| finding.message.contains(path)),
+            "missing finding for {path}: {port006:#?}"
+        );
+    }
+}
+
+#[test]
+fn port007_to_009_suppressed_under_target_os_cfg() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(target_os = "linux")]
+        fn linux_only() {
+            let _ = "C:\\Users\\x";
+            let _ = std::env::var("HOME");
+            let _ = std::process::Command::new("sh");
+        }
+        "#,
+    );
+
+    assert!(report.findings.is_empty(), "{:#?}", report.findings);
+}
+
+#[test]
+fn port010_impl_method_parity_kept_under_target_os_gated_impl() {
+    let report = analyze_single_source(
+        r#"
+        pub struct W;
+        #[cfg(target_os = "linux")]
+        impl W {
+            #[cfg(unix)]
+            fn only_unix(&self) {}
+        }
+        "#,
+    );
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+
+    assert_eq!(port010.len(), 1, "{port010:#?}");
+    assert!(port010[0].message.contains("only_unix"));
+}
+
+#[test]
 fn flags_hardcoded_unix_path_in_production_code() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
@@ -1174,6 +1357,86 @@ fn flags_hardcoded_windows_path_in_production_code() {
             .filter(|finding| finding.rule_id == RuleId::Port007)
             .count(),
         2
+    );
+}
+
+#[test]
+fn port007_ignores_verbatim_prefix() {
+    let report = analyze_single_source(
+        r#"
+        pub fn display() {
+            let _ = "\\\\?\\";
+            let _ = "\\\\?\\C:\\x";
+        }
+        "#,
+    );
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id != RuleId::Port007),
+        "{:#?}",
+        report.findings
+    );
+}
+
+#[test]
+fn port007_ignores_device_prefix() {
+    let report = analyze_single_source(
+        r#"
+        pub fn display() {
+            let _ = "\\\\.\\";
+            let _ = "\\\\.\\pipe\\x";
+        }
+        "#,
+    );
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id != RuleId::Port007),
+        "{:#?}",
+        report.findings
+    );
+}
+
+#[test]
+fn port007_still_flags_other_unc_literal() {
+    let report = analyze_single_source(
+        r#"
+        pub fn display() {
+            let _ = "\\\\server\\share";
+            let _ = "\\\\?x";
+        }
+        "#,
+    );
+    let port007 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port007)
+        .collect::<Vec<_>>();
+
+    assert_eq!(port007.len(), 2, "{port007:#?}");
+}
+
+#[test]
+fn port007_message_names_its_exemptions() {
+    let report = analyze_single_source(
+        r#"
+        pub fn cache() -> &'static str { "C:\\ProgramData\\sc-lint\\cache.json" }
+        "#,
+    );
+
+    assert_eq!(report.findings.len(), 1, "{:#?}", report.findings);
+    assert_eq!(report.findings[0].rule_id, RuleId::Port007);
+    let message = &report.findings[0].message;
+    assert!(
+        message.ends_with(
+        "PORT-007 hardcoded Windows-only absolute path literal `C:\\ProgramData\\sc-lint\\cache.json` in production code; prefer dirs::cache_dir(), dirs::config_dir(), or a platform-gated path abstraction (exempt: literals under a Windows-only cfg such as #[cfg(windows)], and `\\\\?\\` verbatim or `\\\\.\\` device namespace prefixes)"
+        ),
+        "{message}"
     );
 }
 
@@ -1285,6 +1548,99 @@ fn flags_user_env_lookup_in_production_code() {
             .iter()
             .any(|finding| finding.rule_id == RuleId::Port008)
     );
+}
+
+#[test]
+fn port008_user_read_with_username_fallback_not_reported() {
+    let report = analyze_single_source(
+        r#"
+        pub fn current_user() -> String {
+            std::env::var("USER")
+                .or_else(|_| std::env::var("USERNAME"))
+                .unwrap_or_default()
+        }
+        "#,
+    );
+
+    assert!(
+        report
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id != RuleId::Port008),
+        "{:#?}",
+        report.findings
+    );
+}
+
+#[test]
+fn port008_user_read_without_fallback_reported() {
+    let report = analyze_single_source(
+        r#"
+        pub fn only_user() { let _ = std::env::var("USER"); }
+        pub fn other_fn() { let _ = std::env::var("USERNAME"); }
+        pub fn user_again() { let _ = std::env::var("USER"); }
+        "#,
+    );
+    let user_findings = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port008)
+        .collect::<Vec<_>>();
+
+    assert_eq!(user_findings.len(), 2, "{user_findings:#?}");
+    assert!(
+        user_findings
+            .iter()
+            .all(|finding| finding.message.contains("`USER`"))
+    );
+}
+
+#[test]
+fn port008_impl_method_body_is_checked() {
+    let report = analyze_single_source(
+        r#"
+        pub struct Config;
+        impl Config {
+            pub fn load(&self) {
+                let _ = std::env::var("XDG_CONFIG_HOME");
+            }
+        }
+        "#,
+    );
+
+    assert_eq!(
+        report
+            .findings
+            .iter()
+            .filter(|finding| finding.rule_id == RuleId::Port008)
+            .count(),
+        1,
+        "{:#?}",
+        report.findings
+    );
+}
+
+#[test]
+fn port008_const_and_static_initializers_do_not_use_username_fallback() {
+    let report = analyze_single_source(
+        r#"
+        const CONST_USER: () = {
+            let _ = std::env::var("USER");
+            let _ = std::env::var("USERNAME");
+        };
+        static STATIC_USER: () = {
+            let _ = std::env::var("USER");
+            let _ = std::env::var("USERNAME");
+        };
+        "#,
+    );
+    let user_findings = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port008)
+        .collect::<Vec<_>>();
+
+    assert_eq!(user_findings.len(), 2, "{user_findings:#?}");
 }
 
 #[test]
@@ -2284,6 +2640,116 @@ fn issue372_retains_public_and_unrelated_parity() {
 }
 
 #[test]
+fn port010_unix_helper_in_paired_adapter_file_not_reported() {
+    let fixture = paired_adapter_fixture(
+        "#[cfg(unix)] fn helper() {}\n#[cfg(unix)] mod nested { fn nested_helper() {} }",
+    );
+    let report = analyze_fixture(&fixture);
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+
+    assert!(port010.is_empty(), "{port010:#?}");
+}
+
+#[test]
+fn port010_unix_fn_in_unpaired_file_reported() {
+    let fixture = paired_adapter_fixture("fn connect() {}\n");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(unix)] mod unix_socket;\n#[cfg(windows)] mod named_pipe;\n#[cfg(unix)] mod other;\n",
+    );
+    fixture.write_source("example", "other.rs", "#[cfg(unix)] fn helper() {}\n");
+    let report = analyze_fixture(&fixture);
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("helper")),
+        "{port010:#?}"
+    );
+}
+
+#[test]
+fn port010_pub_unix_item_in_paired_file_keeps_parity_check() {
+    let fixture = paired_adapter_fixture(
+        "#[cfg(unix)] pub fn exposed() {}\n#[cfg(unix)] pub(crate) fn restricted() {}\n#[cfg(unix)] pub(super) fn super_restricted() {}\n#[cfg(unix)] pub(in crate) fn crate_restricted() {}\n",
+    );
+    let report = analyze_fixture(&fixture);
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+
+    for name in [
+        "exposed",
+        "restricted",
+        "super_restricted",
+        "crate_restricted",
+    ] {
+        assert!(
+            port010.iter().any(|finding| finding.message.contains(name)),
+            "missing {name}: {port010:#?}"
+        );
+    }
+}
+
+#[test]
+fn port010_private_unix_method_in_paired_adapter_file_not_reported() {
+    let fixture = paired_adapter_fixture(
+        "pub struct Conn;\nimpl Conn {\n#[cfg(unix)] fn private_helper(&self) {}\n#[cfg(unix)] pub fn public_helper(&self) {}\n}\n",
+    );
+    let report = analyze_fixture(&fixture);
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+
+    assert!(
+        port010
+            .iter()
+            .all(|finding| !finding.message.contains("private_helper")),
+        "{port010:#?}"
+    );
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("public_helper")),
+        "{port010:#?}"
+    );
+}
+
+#[test]
+fn port010_trait_impl_unix_method_in_paired_file_keeps_parity_check() {
+    let fixture = paired_adapter_fixture(
+        "pub struct Conn;\npub trait Probe { fn probe(&self); }\nimpl Probe for Conn { #[cfg(unix)] fn probe(&self) {} }\n",
+    );
+    let report = analyze_fixture(&fixture);
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("probe")),
+        "{port010:#?}"
+    );
+}
+
+#[test]
 fn issue372_nested_file_module_inherits_enclosing_cfg() {
     let fixture = WorkspaceFixture::new();
     fixture.write_workspace_root();
@@ -2810,6 +3276,49 @@ impl WorkspaceFixture {
         }
         fs::write(path, trim_indentation(contents)).unwrap();
     }
+}
+
+fn analyze_single_source(source: &str) -> FindingsReport {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source("example", "lib.rs", source);
+    analyze_fixture(&fixture)
+}
+
+fn analyze_fixture(fixture: &WorkspaceFixture) -> FindingsReport {
+    analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .expect("fixture analysis succeeds")
+}
+
+fn paired_adapter_fixture(unix_source: &str) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_lint_config(
+        r#"
+        [tool.sc-lint.analyzers.portability]
+        [[tool.sc-lint.analyzers.portability.platform_adapters]]
+        unix_module = "crates/example/src/unix_socket.rs"
+        windows_module = "crates/example/src/named_pipe.rs"
+        reason = "Private transport adapters"
+        "#,
+    );
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[cfg(unix)] mod unix_socket;\n#[cfg(windows)] mod named_pipe;\n",
+    );
+    fixture.write_source("example", "unix_socket.rs", unix_source);
+    fixture.write_source(
+        "example",
+        "named_pipe.rs",
+        "#[cfg(unix)] fn windows_private_helper() {}\n",
+    );
+    fixture
 }
 
 fn trim_indentation(input: &str) -> String {
