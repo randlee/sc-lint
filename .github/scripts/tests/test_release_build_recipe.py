@@ -20,6 +20,7 @@ SCRIPT = ROOT / ".github/scripts/build_release_target.sh"
         ("wheel", "aarch64-pc-windows-msvc", "windows-latest", "off", "maturin build --release --locked --manifest-path binding/Cargo.toml --out dist --target aarch64-pc-windows-msvc --features pyo3/generate-import-lib"),
         ("wheel", "aarch64-unknown-linux-gnu", "ubuntu-latest", "2_28", "maturin build --release --locked --manifest-path binding/Cargo.toml --out dist --target aarch64-unknown-linux-gnu --compatibility manylinux_2_28 --zig"),
         ("wheel", "", "ubuntu-24.04-arm", "", "maturin build --release --manifest-path binding/Cargo.toml --out dist --compatibility manylinux2014 --zig"),
+        ("wheel", "", "macos-latest", "", "maturin build --release --manifest-path binding/Cargo.toml --out dist"),
         ("wheel", "", "windows-latest", "", "maturin build --release --manifest-path binding/Cargo.toml --out dist"),
     ],
 )
@@ -31,24 +32,50 @@ def test_shared_recipe_commands(tmp_path, kind, target, runner, manylinux, expec
         command = bindir / name
         command.write_text(
             '#!/bin/sh\n'
-            'printf "%s %s cross=%s version=%s\\n" "$(basename "$0")" "$*" "${PYO3_CROSS-}" "${PYO3_CROSS_PYTHON_VERSION-}" >> "$CALL_LOG"\n'
+            'printf "%s %s cross=%s version=%s deployment_set=%s\\n" "$(basename "$0")" "$*" "${PYO3_CROSS-}" "${PYO3_CROSS_PYTHON_VERSION-}" "${MACOSX_DEPLOYMENT_TARGET+x}" >> "$CALL_LOG"\n'
             'if [ "$1" = .github/scripts/release_artifacts.py ]; then printf "%s\\n" "--bin fixture"; fi\n'
+            'if [ "$1" = -m ] && [ "$2" = venv ]; then mkdir -p "$3/bin"; cp "$0" "$3/bin/python"; fi\n'
         )
         command.chmod(0o755)
     env = {**os.environ, "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}", "CALL_LOG": str(log),
            "BUILD_TARGET": target, "BUILD_RUNNER": runner, "BUILD_MANYLINUX": manylinux,
            "BUILD_SYSTEM": "maturin", "BUILD_SOURCE": "binding", "BUILD_CARGO_MANIFEST": "binding/Cargo.toml",
-           "RELEASE_ARTIFACT_MANIFEST": "release/publish-artifacts.toml"}
+           "RELEASE_ARTIFACT_MANIFEST": "release/publish-artifacts.toml", "RUNNER_TEMP": str(tmp_path),
+           "MACOSX_DEPLOYMENT_TARGET": ""}
     env.pop("PYO3_CROSS", None)
     env.pop("PYO3_CROSS_PYTHON_VERSION", None)
     result = subprocess.run(["bash", str(SCRIPT), kind], cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     lines = log.read_text().splitlines()
     assert any(line.startswith(expected + " cross=") for line in lines)
+    if kind == "wheel":
+        assert any(line.endswith("deployment_set=") for line in lines if line.startswith("maturin "))
     if target == "aarch64-pc-windows-msvc" and kind == "wheel":
-        assert any(line.endswith("cross=1 version=3.11") for line in lines if line.startswith("maturin "))
+        assert any("cross=1 version=3.11 " in line for line in lines if line.startswith("maturin "))
     if kind == "binaries" and target == "aarch64-unknown-linux-gnu":
+        assert any("-m venv " in line for line in lines)
         assert any("pip install cargo-zigbuild==0.20.1 ziglang==0.12.1" in line for line in lines)
+
+
+@pytest.mark.parametrize(("system", "value", "expected"), [
+    ("maturin", "", "unset"), ("setuptools", "", "unset"), ("maturin", "11.0", "11.0"),
+])
+def test_wheel_deployment_target_is_unset_only_when_empty(tmp_path, system, value, expected):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    log = tmp_path / "deployment"
+    for name in ("python", "maturin"):
+        stub = bindir / name
+        stub.write_text('#!/bin/sh\nprintf "%s\\n" "${MACOSX_DEPLOYMENT_TARGET-unset}" >> "$CALL_LOG"\n')
+        stub.chmod(0o755)
+    env = {**os.environ, "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}", "CALL_LOG": str(log),
+           "BUILD_TARGET": "", "BUILD_RUNNER": "macos-latest", "BUILD_SYSTEM": system,
+           "BUILD_SOURCE": "binding", "BUILD_CARGO_MANIFEST": "binding/Cargo.toml",
+           "MACOSX_DEPLOYMENT_TARGET": value}
+    result = subprocess.run(["bash", str(SCRIPT), "wheel"], cwd=ROOT, env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert log.read_text().splitlines() == ([expected, expected] if system == "setuptools" else [expected])
 
 
 def test_both_workflows_use_the_same_build_recipe():

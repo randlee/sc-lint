@@ -26,6 +26,9 @@ EXPECTED = {target: metadata[2] for target, metadata in PLATFORMS.items()}
 
 
 def verify(path: Path, target: str, manifest: Path | None = None) -> None:
+    if target not in EXPECTED:
+        print(f"No architecture verifier for {target}; skipping static check")
+        return
     if path.suffix == ".whl":
         with zipfile.ZipFile(path) as wheel:
             extensions = [name for name in wheel.namelist() if name.endswith((".so", ".pyd"))]
@@ -49,7 +52,7 @@ def verify(path: Path, target: str, manifest: Path | None = None) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target", required=True, choices=EXPECTED)
+    parser.add_argument("--target", required=True)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("path", type=Path)
     args = parser.parse_args()

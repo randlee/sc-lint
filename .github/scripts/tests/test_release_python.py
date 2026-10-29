@@ -85,13 +85,40 @@ def test_prerelease_builds_and_publishes_declared_wheels():
     assert "-name '*.whl'" in publication["run"]
 
 
+def pr_triggered_workflows(workflows):
+    import yaml
+    for path in workflows.iterdir():
+        if path.suffix not in (".yml", ".yaml"):
+            continue
+        workflow = yaml.load(path.read_text(), Loader=yaml.BaseLoader)
+        triggers = workflow.get("on", {})
+        if isinstance(triggers, str):
+            triggers = [triggers]
+        if {"pull_request", "pull_request_target", "merge_group"}.intersection(triggers):
+            yield path
+
+
 def test_new_arm_release_targets_never_enter_pr_ci():
-    ci = (INSTALL.PACKAGE_ROOT / ".github/workflows/ci.yml").read_text()
-    for marker in ("aarch64-unknown-linux-gnu", "aarch64-pc-windows-msvc",
-                   "manylinux_2_28_aarch64", "win_arm64", "ubuntu-24.04-arm",
-                   "windows-11-arm", "linux-arm64", "windows-arm64",
-                   "release-target-matrix", "python-wheel-matrix", "build_release_target.sh"):
-        assert marker not in ci
+    workflows = INSTALL.PACKAGE_ROOT / ".github/workflows"
+    checked = set()
+    for path in pr_triggered_workflows(workflows):
+        checked.add(path.name)
+        text = path.read_text()
+        for marker in ("aarch64-unknown-linux-gnu", "aarch64-pc-windows-msvc", "aarch64-apple-darwin",
+                       "manylinux_2_28_aarch64", "win_arm64", "macosx_11_0_arm64", "ubuntu-24.04-arm",
+                       "windows-11-arm", "linux-arm64", "windows-arm64", "macos-arm64",
+                       "release-target-matrix", "python-wheel-matrix", "build_release_target.sh"):
+            assert marker not in text, f"{path.name} contains {marker}"
+    assert {"ci.yml", "action-fixtures.yml"} <= checked
+
+
+def test_pr_workflow_discovery_covers_all_event_forms(tmp_path):
+    for name, content in {
+        "one.yml": "on: pull_request\n", "two.yaml": "on: [push, pull_request_target]\n",
+        "three.yml": "on:\n  merge_group:\n", "release.yml": "on: push\n",
+    }.items():
+        (tmp_path / name).write_text(content)
+    assert {path.name for path in pr_triggered_workflows(tmp_path)} == {"one.yml", "two.yaml", "three.yml"}
 
 
 @pytest.mark.parametrize('workflow_name', ['release.yml', 'crates-publish.yml'])
@@ -116,7 +143,7 @@ esac
     cargo = tmp_path / 'cargo'
     cargo.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > cargo-args\n')
     cargo.chmod(0o755)
-    result = subprocess.run(['bash', '-c', shell], cwd=tmp_path, env={**os.environ, 'PATH':str(tmp_path)+os.pathsep+os.environ['PATH'], 'RELEASE_ARTIFACT_MANIFEST':'release/publish-artifacts.toml', 'RELEASE_TAG':'v1.2.3'}, capture_output=True, text=True)
+    result = subprocess.run(['bash', '-c', shell], cwd=tmp_path, env={**os.environ, 'PATH':str(tmp_path)+os.pathsep+os.environ['PATH'], 'RELEASE_ARTIFACT_MANIFEST':'release/publish-artifacts.toml', 'RELEASE_TAG':'v1.2.3'}, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     assert (tmp_path / 'cargo-args').read_text().splitlines() == ['publish', '--manifest-path', 'bindings/standalone/Cargo.toml', '--locked']
 

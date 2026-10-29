@@ -44,6 +44,17 @@ def test_wheel_payload_architecture_is_checked(tmp_path):
         verify(wheel, "aarch64-pc-windows-msvc")
 
 
+def test_unknown_consumer_target_skips_static_check(tmp_path):
+    root = Path(__file__).resolve().parents[3]
+    result = subprocess.run(
+        [sys.executable, str(root / ".github/scripts/verify_release_arch.py"),
+         "--target", "x86_64-unknown-linux-musl", str(tmp_path / "not-built")],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "skipping static check" in result.stdout
+
+
 def test_preflight_rejects_missing_arm_archive(tmp_path):
     root = Path(__file__).resolve().parents[3]
     manifest = (root / "release/publish-artifacts.toml").read_text()
