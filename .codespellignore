@@ -5,3 +5,5 @@ de
 # Add project-specific false positives here if codespell reports any.
 # Plan-anchor ids (ANC-001) in docs/plans/*/anchors.json and anchor-runs.
 anc
+# Verbatim user quotes in docs/plans/*/anchors.json keep the speaker's spelling.
+accessment

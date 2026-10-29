@@ -676,6 +676,13 @@ wheel. The top-level CLI remains the sole consumer lint executor; Python
 bindings do not decide lint rules. Final current-facing and offline user docs
 are reconciled by k-10 after implementation. See the
 [Phase K intent](./plans/phase-k/intent.md) and ADR-017 for the exact scope.
+
+Phase J adds no architecture: dependency upgrades run from a repo-local bd
+formula (`.atm-bd/formula/upgrade-<dependency>.formula.toml.j2`, REQ-PRODUCT-025)
+poured through the existing atm-bd-orchestration flow. It changes no crate,
+CLI contract or public interface, so no ADR governs it (`adrs = ["NONE"]`);
+the formula's verdicts, its lead-closed plan gate and the no-agent-merge rule
+are requirements (REQ-PRODUCT-026..031), not architecture decisions.
 - consumer-local policy families that stay outside `sc-lint` unless extracted
   as a configurable framework:
   - duplicate semantic string-literal policy
