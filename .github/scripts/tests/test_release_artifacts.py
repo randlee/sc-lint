@@ -2709,6 +2709,9 @@ def test_release_channel_templates_render_to_valid_ruby_and_json(tmp_path: Path)
             "macos_intel_sha256": "b" * 64,
             "linux_url": "https://example.invalid/linux.tar.gz",
             "linux_sha256": "c" * 64,
+            "linux_arm_url": "https://example.invalid/linux-arm.tar.gz",
+            "linux_arm_sha256": "d" * 64,
+            "has_linux_arm": True,
             "test_binary": "sc-compose-daemon",
             "test_command": "--help",
             "test_output": "Standalone template composition CLI",
@@ -2743,12 +2746,17 @@ def test_release_channel_templates_render_to_valid_ruby_and_json(tmp_path: Path)
             "windows_url": "https://example.invalid/windows.zip",
             "windows_sha256": "d" * 64,
             "extract_dir": "sc-compose_1.4.2_x86_64-pc-windows-msvc",
+            "has_windows_arm64": True,
+            "windows_arm64_url": "https://example.invalid/windows-arm64.zip",
+            "windows_arm64_sha256": "e" * 64,
+            "arm64_extract_dir": "sc-compose_1.4.2_aarch64-pc-windows-msvc",
             "binary": "bin/sc-compose.exe",
         },
     )
     manifest = json.loads(scoop)
     assert manifest["description"] == 'Quoted "description"'
     assert manifest["architecture"]["64bit"]["bin"] == "bin/sc-compose.exe"
+    assert manifest["architecture"]["arm64"]["hash"] == "e" * 64
 
 
 def test_homebrew_formula_tracks_and_binaries_are_documented() -> None:

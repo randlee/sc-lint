@@ -49,12 +49,16 @@ required_variables:
   - channels.scoop.manifest_path
   - channels.scoop.manifest_template
   - channels.scoop.installer_target
+  - channels.scoop.installer_arm64_target
   - channels.scoop.binary
   - channels.scoop.renderer_target
   - channels.winget.workflow
   - channels.winget.dispatch_inputs
   - channels.winget.identifier
   - channels.winget.installer_target
+  - channels.winget.installer_arm64_target
+  - has_winget_arm64
+  - has_scoop_arm64
   - has_readme_dependency_crate
   - has_renderer_archive_path
   - has_workspace_toml
@@ -192,6 +196,9 @@ workflow = {{ channels.winget.workflow }}
 dispatch_inputs = {{ channels.winget.dispatch_inputs }}
 identifier = {{ channels.winget.identifier }}
 installer_target = {{ channels.winget.installer_target }}
+{% if has_winget_arm64 %}
+installer_arm64_target = {{ channels.winget.installer_arm64_target }}
+{% endif %}
 {% endif %}
 
 {% if has_channel_scoop %}
@@ -202,6 +209,9 @@ bucket_repository = {{ channels.scoop.bucket_repository }}
 manifest_path = {{ channels.scoop.manifest_path }}
 manifest_template = {{ channels.scoop.manifest_template }}
 installer_target = {{ channels.scoop.installer_target }}
+{% if has_scoop_arm64 %}
+installer_arm64_target = {{ channels.scoop.installer_arm64_target }}
+{% endif %}
 binary = {{ channels.scoop.binary }}
 renderer_target = {{ channels.scoop.renderer_target }}
 {% endif %}

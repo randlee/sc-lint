@@ -124,6 +124,10 @@ impl ReleaseTarget {
                 triple: "x86_64-unknown-linux-gnu",
                 archive_extension: "tar.gz",
             },
+            ("linux", "aarch64") => Self {
+                triple: "aarch64-unknown-linux-gnu",
+                archive_extension: "tar.gz",
+            },
             ("macos", "x86_64") => Self {
                 triple: "x86_64-apple-darwin",
                 archive_extension: "tar.gz",
@@ -136,11 +140,15 @@ impl ReleaseTarget {
                 triple: "x86_64-pc-windows-msvc",
                 archive_extension: "zip",
             },
+            ("windows", "aarch64") => Self {
+                triple: "aarch64-pc-windows-msvc",
+                archive_extension: "zip",
+            },
             (os, arch) => {
                 return Err(install_error(
                     InstallerErrorCode::UnsupportedPlatform,
                     format!("sc-lint has no verified release for host platform `{os}/{arch}`"),
-                    "The release workflow currently publishes Linux x86_64, macOS x86_64/aarch64, and Windows x86_64 artifacts.",
+                    "The release workflow publishes Linux, macOS, and Windows artifacts for x86_64 and aarch64.",
                     "Install a supported release manually, or use a supported platform and rerun `sc-lint setup`.",
                 )
                 .with_detail("host_os", json!(os))
@@ -917,9 +925,11 @@ mod tests {
         assert!(
             [
                 "x86_64-unknown-linux-gnu",
+                "aarch64-unknown-linux-gnu",
                 "x86_64-apple-darwin",
                 "aarch64-apple-darwin",
                 "x86_64-pc-windows-msvc",
+                "aarch64-pc-windows-msvc",
             ]
             .contains(&target.triple)
         );
@@ -927,7 +937,7 @@ mod tests {
 
     #[test]
     fn unsupported_host_platform_is_a_structured_installer_failure() {
-        for (os, arch) in [("freebsd", "x86_64"), ("linux", "aarch64")] {
+        for (os, arch) in [("freebsd", "x86_64"), ("linux", "riscv64")] {
             let error = ReleaseTarget::detect_for(os, arch)
                 .expect_err("an unpublished platform must not select a release target");
             assert_eq!(
@@ -943,6 +953,22 @@ mod tests {
             assert_eq!(error.details.get("host_os"), Some(&json!(os)));
             assert_eq!(error.details.get("host_arch"), Some(&json!(arch)));
             assert_installer_failure_is_recoverable(&error, "sc-lint setup");
+        }
+    }
+
+    #[test]
+    fn release_targets_select_both_architectures() {
+        for (os, arch, triple, extension) in [
+            ("linux", "x86_64", "x86_64-unknown-linux-gnu", "tar.gz"),
+            ("linux", "aarch64", "aarch64-unknown-linux-gnu", "tar.gz"),
+            ("windows", "x86_64", "x86_64-pc-windows-msvc", "zip"),
+            ("windows", "aarch64", "aarch64-pc-windows-msvc", "zip"),
+        ] {
+            let target = ReleaseTarget::detect_for(os, arch).unwrap();
+            assert_eq!(
+                (target.triple, target.archive_extension),
+                (triple, extension)
+            );
         }
     }
 

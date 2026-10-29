@@ -39,8 +39,9 @@ def wheel_targets(distribution):
                     raise ValueError("macOS wheels require deployment_target")
                 if not item["os"].startswith("macos-") or item["platform"] != f"macosx_{deployment.replace('.', '_')}_{arch}":
                     raise ValueError("macOS wheel runner/target/platform mismatch")
-            elif item["target"] == "x86_64-pc-windows-msvc":
-                if not item["os"].startswith("windows-") or item["platform"] != "win_amd64":
+            elif item["target"] in ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"):
+                expected = "win_arm64" if item["target"].startswith("aarch64-") else "win_amd64"
+                if not item["os"].startswith("windows-") or item["platform"] != expected:
                     raise ValueError("Windows wheel runner/target/platform mismatch")
             else:
                 raise ValueError("unsupported explicit wheel target")

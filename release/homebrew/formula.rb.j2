@@ -17,8 +17,19 @@ class {{ formula_class }} < Formula
   end
 
   on_linux do
+{% if has_linux_arm %}
+    on_intel do
+      url {{ linux_url | tojson }}
+      sha256 {{ linux_sha256 | tojson }}
+    end
+    on_arm do
+      url {{ linux_arm_url | tojson }}
+      sha256 {{ linux_arm_sha256 | tojson }}
+    end
+{% else %}
     url {{ linux_url | tojson }}
     sha256 {{ linux_sha256 | tojson }}
+{% endif %}
   end
 
   def install

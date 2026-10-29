@@ -13,6 +13,25 @@ from conftest import ProductArtifacts
 from install_helpers import FIXTURES, ROOT, copy_fixture, run, run_subprocess
 
 ASSET = ROOT / "crates/sc-lint/assets/bootstrap.py"
+
+
+@pytest.mark.parametrize(
+    ("system", "machine", "expected"),
+    [
+        ("Linux", "x86_64", ("x86_64-unknown-linux-gnu", "tar.gz")),
+        ("Linux", "aarch64", ("aarch64-unknown-linux-gnu", "tar.gz")),
+        ("Windows", "AMD64", ("x86_64-pc-windows-msvc", "zip")),
+        ("Windows", "ARM64", ("aarch64-pc-windows-msvc", "zip")),
+    ],
+)
+def test_release_target_selects_controlled_host(monkeypatch, system, machine, expected):
+    spec = importlib.util.spec_from_file_location("test_bootstrap_target", ASSET)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module.platform, "system", lambda: system)
+    monkeypatch.setattr(module.platform, "machine", lambda: machine)
+    assert module.release_target() == expected
+
 # AC5 (ADR-012 d1): every just asset that ships a windows-shell sets it to exactly this line.
 WINDOWS_SHELL_SETTING = 'set windows-shell := ["cmd.exe", "/c"]'
 # The root-level assets ship the setting; the included `.sc-lint/justfile` and `test.just`

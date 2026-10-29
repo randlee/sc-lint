@@ -235,6 +235,7 @@ jobs:
           python3 .github/scripts/release_artifacts.py validate-manifest \
             --manifest "${RELEASE_ARTIFACT_MANIFEST}" \
             --workspace-toml '${{ steps.build_plan.outputs.workspace_toml }}'
+          python3 .github/scripts/check_sc_lint_platforms.py "${RELEASE_ARTIFACT_MANIFEST}"
 
       - id: publish_order
         name: Validate publish_order dependency graph

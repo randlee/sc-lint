@@ -22,7 +22,10 @@ jobs:
       version: ${{ steps.version.outputs.value }}
       source_sha: ${{ steps.version.outputs.source_sha }}
       rust_toolchain: ${{ steps.version.outputs.rust_toolchain }}
+      workspace_toml: ${{ steps.version.outputs.workspace_toml }}
+      has_python_wheels: ${{ steps.version.outputs.has_python_wheels }}
       matrix: ${{ steps.matrix.outputs.value }}
+      wheel_matrix: ${{ steps.matrix.outputs.wheels }}
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -50,12 +53,15 @@ jobs:
           echo "value=$version" >> "$GITHUB_OUTPUT"
           echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "rust_toolchain=$rust_toolchain" >> "$GITHUB_OUTPUT"
+          echo "workspace_toml=$workspace" >> "$GITHUB_OUTPUT"
+          echo "has_python_wheels=$(jq -r .has_python_wheels <<<"$plan")" >> "$GITHUB_OUTPUT"
       - id: matrix
         shell: bash
         run: |
           set -euo pipefail
           matrix="$(python3 .github/scripts/release_artifacts.py release-target-matrix --manifest "$RELEASE_ARTIFACT_MANIFEST")"
           echo "value=$matrix" >> "$GITHUB_OUTPUT"
+          echo "wheels=$(python3 .github/scripts/release_artifacts.py python-wheel-matrix --manifest "$RELEASE_ARTIFACT_MANIFEST")" >> "$GITHUB_OUTPUT"
   build:
     needs: plan
     strategy:
@@ -86,12 +92,21 @@ jobs:
             target
           key: ${{ matrix.target }}-cargo-prerelease-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Install Linux ARM cross compiler
+        if: ${{ matrix.target == 'aarch64-unknown-linux-gnu' }}
+        run: python3 -m pip install cargo-zigbuild==0.20.1 ziglang==0.12.1
+
       - name: Build release binaries
         shell: bash
         run: |
           set -euo pipefail
           bins="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "$RELEASE_ARTIFACT_MANIFEST")"
-          cargo build --release --target "${{ matrix.target }}" $bins
+          if [[ '${{ matrix.target }}' == 'aarch64-unknown-linux-gnu' ]]; then
+            cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 $bins
+          else
+            cargo build --release --target "${{ matrix.target }}" $bins
+          fi
+          python3 .github/scripts/verify_release_arch.py --manifest "$RELEASE_ARTIFACT_MANIFEST" --target '${{ matrix.target }}' target/${{ matrix.target }}/release
 
       - name: Package manifest-declared prerelease archive
         shell: bash
@@ -157,8 +172,61 @@ jobs:
         with:
           name: ${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
+  build-wheels:
+    if: ${{ needs.plan.outputs.has_python_wheels == 'true' }}
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.wheel_matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.source_sha }}
+      - uses: ./.github/actions/setup-python-release-build
+        with:
+          release_ref: ${{ needs.plan.outputs.source_sha }}
+          release_version: ${{ needs.plan.outputs.version }}
+          pyproject: ${{ matrix.pyproject }}
+          build_system: ${{ matrix.build_system }}
+          install_maturin_zig: ${{ matrix.manylinux != '' && matrix.manylinux != 'off' }}
+          rust_toolchain: ${{ needs.plan.outputs.rust_toolchain }}
+          workspace_toml: ${{ needs.plan.outputs.workspace_toml }}
+      - name: Build declared wheel
+        shell: bash
+        env:
+          WHEEL_TARGET: ${{ matrix.target }}
+          WHEEL_MANYLINUX: ${{ matrix.manylinux }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
+        run: |
+          set -euo pipefail
+          if [[ '${{ matrix.build_system }}' == 'setuptools' ]]; then
+            python -m pip install build==1.3.0
+            python -m build --wheel --outdir dist '${{ matrix.source }}'
+          elif [[ -z "$WHEEL_TARGET" ]]; then
+            maturin build --release --manifest-path '${{ matrix.cargo_manifest }}' --out dist
+          else
+            rustup target add "$WHEEL_TARGET"
+            args=(--release --locked --manifest-path '${{ matrix.cargo_manifest }}' --out dist --target "$WHEEL_TARGET")
+            if [[ "$WHEEL_TARGET" == 'aarch64-pc-windows-msvc' ]]; then
+              export PYO3_CROSS=1 PYO3_CROSS_PYTHON_VERSION=3.11
+              args+=(--features pyo3/generate-import-lib)
+            fi
+            if [[ "$WHEEL_MANYLINUX" != 'off' ]]; then args+=(--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig); fi
+            maturin build "${args[@]}"
+            python3 .github/scripts/release_python.py --asset-dir dist --platform '${{ matrix.platform }}'
+            python3 .github/scripts/verify_release_arch.py --target "$WHEEL_TARGET" dist/*.whl
+            if [[ '${{ matrix.name }}' == 'sc-lint' ]]; then
+              for wheel in dist/*.whl; do [[ "$wheel" == *-cp39-abi3-* ]] || exit 1; done
+            fi
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel-${{ matrix.artifact }}-${{ matrix.id || matrix.os }}
+          path: dist/*.whl
   release:
-    needs: [plan, build]
+    if: ${{ !failure() && !cancelled() && needs.build.result == 'success' && (needs.build-wheels.result == 'success' || needs.build-wheels.result == 'skipped') }}
+    needs: [plan, build, build-wheels]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -174,7 +242,7 @@ jobs:
         run: |
           set -euo pipefail
           find assets -type f -exec cp {} . \;
-          mapfile -t archives < <(find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) -print | sed 's#^./##' | sort)
+          mapfile -t archives < <(find . -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.whl' \) -print | sed 's#^./##' | sort)
           ((${#archives[@]} > 0)) || { echo "no prerelease archives were downloaded" >&2; exit 1; }
           shasum -a 256 "${archives[@]}" > checksums.txt
           tag="${GITHUB_REF_NAME}"

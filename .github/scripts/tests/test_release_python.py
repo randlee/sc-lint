@@ -15,10 +15,11 @@ TARGETS = [
  {"id":"macos-x86_64","os":"macos-15-intel","target":"x86_64-apple-darwin","platform":"macosx_10_13_x86_64","deployment_target":"10.13"},
  {"id":"macos-arm64","os":"macos-latest","target":"aarch64-apple-darwin","platform":"macosx_11_0_arm64","deployment_target":"11.0"},
  {"id":"windows-x86_64","os":"windows-latest","target":"x86_64-pc-windows-msvc","platform":"win_amd64"},
+ {"id":"windows-arm64","os":"windows-latest","target":"aarch64-pc-windows-msvc","platform":"win_arm64"},
 ]
 
 
-def test_five_platform_contract_renders_and_validates(tmp_path):
+def test_six_platform_contract_renders_and_validates(tmp_path):
     values = InstallValuesTests.valid_values()
     values["python_distributions"][0]["wheels"] = TARGETS
     source = tmp_path / "input.json"
@@ -29,7 +30,7 @@ def test_five_platform_contract_renders_and_validates(tmp_path):
     import tomllib
     distribution = tomllib.loads(output.read_text())["python_distributions"][0]
     assert distribution["wheels"] == TARGETS
-    assert len(wheel_targets(distribution)) == 5
+    assert len(wheel_targets(distribution)) == 6
     paths = [Path(f'example-1.2.3-cp310-abi3-{target["platform"]}.whl') for target in TARGETS]
     verify_platforms(distribution, paths)
     with pytest.raises(ValueError, match="missing"):
@@ -68,6 +69,22 @@ def test_workflow_reuses_maturin_zig_and_declares_all_build_dependencies():
     assert {"build-python-wheels", "build-python-sdists", "build-npm"} <= set(github_release["needs"])
     assert "!failure()" in github_release["if"]
     assert "needs.build.result == 'skipped'" in github_release["if"]
+
+
+def test_prerelease_builds_and_publishes_declared_wheels():
+    import yaml
+    root = INSTALL.PACKAGE_ROOT / ".github/workflows"
+    workflow = yaml.safe_load((root / "prerelease-archive.yml").read_text())
+    job = workflow["jobs"]["build-wheels"]
+    assert job["strategy"]["matrix"] == "${{ fromJSON(needs.plan.outputs.wheel_matrix) }}"
+    build = next(step for step in job["steps"] if step.get("name") == "Build declared wheel")
+    assert "--compatibility \"manylinux_${WHEEL_MANYLINUX}\" --zig" in build["run"]
+    assert "PYO3_CROSS_PYTHON_VERSION=3.11" in build["run"]
+    assert "verify_release_arch.py" in build["run"]
+    release = workflow["jobs"]["release"]
+    assert "build-wheels" in release["needs"]
+    publication = next(step for step in release["steps"] if step.get("name") == "Generate checksums and publish GitHub prerelease assets")
+    assert "-name '*.whl'" in publication["run"]
 
 
 @pytest.mark.parametrize('workflow_name', ['release.yml', 'crates-publish.yml'])

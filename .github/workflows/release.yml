@@ -184,12 +184,21 @@ jobs:
             target
           key: ${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Install Linux ARM cross compiler
+        if: ${{ matrix.target == 'aarch64-unknown-linux-gnu' }}
+        run: python3 -m pip install cargo-zigbuild==0.20.1 ziglang==0.12.1
+
       - name: Build release binaries
         shell: bash
         run: |
           set -euo pipefail
           bin_args="$(python3 .github/scripts/release_artifacts.py cargo-build-bin-args --manifest "${RELEASE_ARTIFACT_MANIFEST}")"
-          cargo build --release --target ${{ matrix.target }} ${bin_args}
+          if [[ '${{ matrix.target }}' == 'aarch64-unknown-linux-gnu' ]]; then
+            cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.28 ${bin_args}
+          else
+            cargo build --release --target ${{ matrix.target }} ${bin_args}
+          fi
+          python3 .github/scripts/verify_release_arch.py --manifest "$RELEASE_ARTIFACT_MANIFEST" --target '${{ matrix.target }}' target/${{ matrix.target }}/release
 
       - name: Package manifest-declared release archive
         shell: bash
@@ -402,6 +411,10 @@ jobs:
           set -euo pipefail
           rustup target add "$WHEEL_TARGET"
           args=(--release --locked --manifest-path "$CARGO_MANIFEST" --out dist --target "$WHEEL_TARGET")
+          if [[ "$WHEEL_TARGET" == 'aarch64-pc-windows-msvc' ]]; then
+            export PYO3_CROSS=1 PYO3_CROSS_PYTHON_VERSION=3.11
+            args+=(--features pyo3/generate-import-lib)
+          fi
           if [[ "$WHEEL_MANYLINUX" != "off" ]]; then
             args+=(--compatibility "manylinux_${WHEEL_MANYLINUX}" --zig)
           fi
@@ -417,6 +430,14 @@ jobs:
         env:
           WHEEL_PLATFORM: ${{ matrix.platform }}
         run: python3 .github/scripts/release_python.py --asset-dir dist --platform "$WHEEL_PLATFORM"
+      - name: Verify wheel architecture
+        if: ${{ matrix.target != '' }}
+        shell: bash
+        run: |
+          python3 .github/scripts/verify_release_arch.py --target '${{ matrix.target }}' dist/*.whl
+          if [[ '${{ matrix.name }}' == 'sc-lint' ]]; then
+            for wheel in dist/*.whl; do [[ "$wheel" == *-cp39-abi3-* ]] || { echo "Expected cp39-abi3 wheel: $wheel" >&2; exit 1; }; done
+          fi
       - uses: actions/upload-artifact@v6
         with:
           name: python-wheel-${{ matrix.artifact }}-${{ matrix.id || matrix.os }}

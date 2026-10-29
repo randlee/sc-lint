@@ -112,8 +112,11 @@ class ReleaseArtifactsTests(unittest.TestCase):
         assets.mkdir()
         wheel_names = (
             "sc_lint-0.7.0-cp39-abi3-manylinux_2_28_x86_64.whl",
+            "sc_lint-0.7.0-cp39-abi3-manylinux_2_28_aarch64.whl",
             "sc_lint-0.7.0-cp39-abi3-macosx_11_0_arm64.whl",
+            "sc_lint-0.7.0-cp39-abi3-macosx_11_0_x86_64.whl",
             "sc_lint-0.7.0-cp39-abi3-win_amd64.whl",
+            "sc_lint-0.7.0-cp39-abi3-win_arm64.whl",
         )
         wheel_metadata = "Metadata-Version: 2.1\nName: sc-lint\nVersion: 0.7.0\n\n"
         for wheel_name in wheel_names:
@@ -146,7 +149,10 @@ class ReleaseArtifactsTests(unittest.TestCase):
 
         result = verify(PUBLISH_MANIFEST_PATH)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("'sc-lint': {'wheel': 3, 'sdist': 1}", result.stdout)
+        self.assertIn("'sc-lint': {'wheel': 6, 'sdist': 1}", result.stdout)
+        for name in (wheel_names[1], wheel_names[3], wheel_names[5]):
+            (assets / name).unlink()
+        self.assertNotEqual(verify(PUBLISH_MANIFEST_PATH).returncode, 0)
 
         current_manifest = PUBLISH_MANIFEST_PATH.read_text(encoding="utf-8")
         current_wheels_line = next(

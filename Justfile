@@ -5,6 +5,10 @@ host_python := if os_family() == "windows" { "python" } else { "python3" }
 python_cmd := if os_family() == "windows" { ".\\.sc-lint\\venv\\Scripts\\python.exe" } else { ".sc-lint/venv/bin/python3" }
 sc_lint_binary := if os_family() == "windows" { ".\\target\\debug\\sc-lint.exe" } else { "./target/debug/sc-lint" }
 export SC_LINT_BIN := sc_lint_binary
+
+# Test CI-built Linux ARM archive and wheel on the default Colima VM.
+test-linux-arm-release archive wheel:
+    bash .just/test_linux_arm_release.sh {{quote(archive)}} {{quote(wheel)}}
 adoption_binary := if os_family() == "windows" { "target/adoption-product/debug/sc-lint.exe" } else { "target/adoption-product/debug/sc-lint" }
 
 # Show the curated repo task help.

@@ -9,6 +9,12 @@
       "hash": {{ windows_sha256 | tojson }},
       "extract_dir": {{ extract_dir | tojson }},
       "bin": {{ binary | tojson }}
-    }
+    }{% if has_windows_arm64 %},
+    "arm64": {
+      "url": {{ windows_arm64_url | tojson }},
+      "hash": {{ windows_arm64_sha256 | tojson }},
+      "extract_dir": {{ arm64_extract_dir | tojson }},
+      "bin": {{ binary | tojson }}
+    }{% endif %}
   }
 }

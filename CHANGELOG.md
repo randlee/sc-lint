@@ -6,6 +6,7 @@ All notable changes to sc-lint are documented here.
 
 ### Added
 
+- Release archives and Python wheels cover Linux, macOS and Windows on both x86_64 and ARM64. Managed setup and upgrade select the new Linux and Windows ARM64 archives.
 - l-1: Portability checks now account for additional platform `cfg` forms, avoid
   reporting a `USER` read when the same function reads `USERNAME`, ignore
   Windows namespace path prefixes, and exempt private helpers in paired
