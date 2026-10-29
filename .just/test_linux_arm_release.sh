@@ -5,17 +5,17 @@ archive="$(realpath "$1")"
 wheel="$(realpath "$2")"
 archive_image=debian:13.4
 wheel_image=python:3.9-slim
+if ! colima status >/dev/null 2>&1; then
+    echo 'The default Colima profile must already be running; start it before running this recipe.' >&2
+    exit 1
+fi
 archive_was_present=true
 wheel_was_present=true
 cleanup() {
     if [[ "$archive_was_present" == false ]] && docker --context colima image inspect "$archive_image" >/dev/null 2>&1; then docker --context colima image rm "$archive_image"; fi
     if [[ "$wheel_was_present" == false ]] && docker --context colima image inspect "$wheel_image" >/dev/null 2>&1; then docker --context colima image rm "$wheel_image"; fi
-    colima stop
-    atm send fenix@atm-dev 'Finished lint-leim Colima validation; default profile stopped.'
 }
 trap cleanup EXIT
-atm send fenix@atm-dev 'Starting Colima default profile for lint-leim Linux ARM release validation.'
-colima start
 docker --context colima image inspect "$archive_image" >/dev/null 2>&1 || archive_was_present=false
 docker --context colima image inspect "$wheel_image" >/dev/null 2>&1 || wheel_was_present=false
 docker --context colima run --rm --platform linux/arm64 --mount "type=bind,src=$archive,dst=/release.tar.gz,readonly" "$archive_image" sh -eu -c '

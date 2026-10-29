@@ -108,6 +108,10 @@ jobs:
         with:
           identifier: ${{ fromJSON(needs.verify-release.outputs.channel_config).channel.identifier }}
           release-tag: ${{ inputs.tag }}
+          # The releaser infers architecture from asset filenames. The aarch64
+          # to arm64 mapping remains unverified until the first ARM submission.
+          # Check the generated installer manifest for Architecture: arm64
+          # and the ARM64 asset URL before submitting it.
           installers-regex: ${{ fromJSON(needs.verify-release.outputs.channel_config).channel.installer_arm64_target && format('({0})|({1})', fromJSON(needs.verify-release.outputs.channel_config).asset_patterns[0], fromJSON(needs.verify-release.outputs.channel_config).asset_patterns[1]) || fromJSON(needs.verify-release.outputs.channel_config).asset_patterns[0] }}
           # Must authorize a fork of microsoft/winget-pkgs; the repository
           # GITHUB_TOKEN is intentionally not used for this external channel.

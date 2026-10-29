@@ -6,7 +6,7 @@ python_cmd := if os_family() == "windows" { ".\\.sc-lint\\venv\\Scripts\\python.
 sc_lint_binary := if os_family() == "windows" { ".\\target\\debug\\sc-lint.exe" } else { "./target/debug/sc-lint" }
 export SC_LINT_BIN := sc_lint_binary
 
-# Test CI-built Linux ARM archive and wheel on the default Colima VM.
+# Test CI-built Linux ARM artifacts on an already-running default Colima VM.
 test-linux-arm-release archive wheel:
     bash .just/test_linux_arm_release.sh {{quote(archive)}} {{quote(wheel)}}
 adoption_binary := if os_family() == "windows" { "target/adoption-product/debug/sc-lint.exe" } else { "target/adoption-product/debug/sc-lint" }
