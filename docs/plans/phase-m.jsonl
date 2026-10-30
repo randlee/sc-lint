@@ -1,6 +1,8 @@
-{"sprint": "m-1"}
-{"sprint": "m-2"}
-{"sprint": "m-3"}
-{"sprint": "m-4"}
-{"sprint": "m-5a", "depends_on": ["m-1"]}
-{"sprint": "m-5b", "depends_on": ["m-5a", "m-4"]}
+{"sprint": "m-1", "stack": "phase-m-a", "layer": 1, "pr_target": "develop"}
+{"sprint": "m-5a", "stack": "phase-m-a", "layer": 2, "depends_on": ["m-1"], "pr_target": "sprint/m-1-port010-same-name-siblings"}
+{"sprint": "m-5b", "stack": "phase-m-a", "layer": 3, "depends_on": ["m-5a"], "pr_target": "sprint/m-5a-port010-helper-shapes"}
+{"sprint": "m-5c", "stack": "phase-m-a", "layer": 4, "depends_on": ["m-5b"], "pr_target": "sprint/m-5b-port010-renamed-and-rejected-config"}
+{"sprint": "m-6", "stack": "phase-m-a", "layer": 5, "depends_on": ["m-5c", "m-4"], "pr_target": "sprint/m-5c-port010-portable-sibling-and-unix-module"}
+{"sprint": "m-4", "stack": "phase-m-b", "layer": 1, "pr_target": "develop"}
+{"sprint": "m-2", "stack": "phase-m-c", "layer": 1, "pr_target": "develop"}
+{"sprint": "m-3", "stack": "phase-m-d", "layer": 1, "pr_target": "develop"}

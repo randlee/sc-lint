@@ -43,6 +43,11 @@ current planning surface.
   - prefix patterns in boundary dependency allow-lists and opt-in
     `SCB-FEATURE-001` feature independence (Accepted)
 
+## Withdrawn ADRs
+
+- [`ADR-021-consumer-setup-runner-and-cfg-companions.md`](./ADR-021-consumer-setup-runner-and-cfg-companions.md)
+  - Withdrawn, never accepted; superseded by ADR-022. Do not implement.
+
 ## Index Rules
 
 - add every accepted ADR that affects the release line here

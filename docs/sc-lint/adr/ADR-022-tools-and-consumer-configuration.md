@@ -5,7 +5,7 @@
 | ID | ADR-022 |
 | Status | Pending |
 | Deciders | Rand |
-| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021; REQ-CLI-021, REQ-CLI-023, REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786 |
+| Related | ADR-010, ADR-012, ADR-015, ADR-016, ADR-017, ADR-020, ADR-021 (withdrawn); REQ-CLI-021, REQ-CLI-023, REQ-PRODUCT-023, REQ-SCB-019; #136, #198, #720, #786 |
 
 ## Context
 
@@ -95,9 +95,9 @@ If accepted:
   "per-step/per-layer `env`" promise on lint steps.
 - **ADR-020 decision 9.** The outcome stands: `setup.pre` and `runner.python`
   are not added. The reason becomes decision 6 here.
-- **ADR-021 (Pending).** Superseded and withdrawn. atm-core withdrew the need
-  for its setup and runner keys. Its PORT-010 companion decisions move to
-  Phase M anchors under ADR-010.
+- **ADR-021 (Withdrawn).** Superseded and withdrawn. atm-core withdrew the need
+  for its setup and runner keys. Its PORT-010 companion shapes move to the
+  ADR-010 amendment "PORT-010 companion shapes" (Phase M).
 - **ADR-010 amendment (2026-10-12).** It says "narrow, explicit adapter
   configuration, not a general repo-configured suppression". Decision 4 here
   is consistent with it: a site allowance is narrow and explicit.
