@@ -1,6 +1,6 @@
-# Intent - phase-m (v2)
+# Intent - phase-m (v3)
 
-Drafted 2026-10-30 for Rand's approval. It frames every Phase M anchor. Jev
+Drafted 2026-10-30 for Rand's review. It frames every Phase M anchor. Jev
 judges plan items against the anchors, not this document.
 
 ## Governing direction
@@ -17,8 +17,11 @@ Rand (2026-10-30), on the anchors: "the anchors must be derived from the
 req/adr and the issues we have failed to fix in 2-days of continuous work"
 and "anchors need to be based on requirements".
 
-ADR-022 (Pending) records the direction. sc-lint provides tools and a
-consistent consumer configuration surface. The consumer owns orchestration.
+ADR-022 records the direction. sc-lint provides tools and a consistent
+consumer configuration surface. The consumer owns orchestration. Rand
+(2026-10-30), on ADR-022: "This is a positive step.  This should guide both
+anchors and decisions about how atm-core fixes are handled.  Proceed". Its
+formal Status stays Pending until Rand accepts the text.
 
 ## What this plan is for
 
@@ -56,6 +59,6 @@ consumers run sc-lint.
 
 ## Anchors
 
-Anchors live in `anchors.json` beside this file (v3; v2 is superseded). Each quotes a REQ or ADR
-sentence, together with the issue evidence that shows the gap. Anchors resting
-on ADR-022 are drafted after Rand accepts ADR-022.
+Anchors live in `anchors.json` beside this file (v3; v2 is superseded). Each
+quotes a REQ or ADR sentence, together with the issue evidence that shows the
+gap. Anchors that quote ADR-022 rest on Rand's direction above.
