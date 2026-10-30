@@ -21,8 +21,8 @@ The [#786 shape table](https://github.com/randlee/sc-lint/issues/786#issuecommen
 pins 47 findings in 18 paths at atm-core `6ffaa97be`. Seventeen paths are
 classified false positives; `atm_temp.rs` mixes a false positive with three
 deliberate POSIX-only helpers. S3 generalizes #720 beyond the crate root to
-module functions and inherent methods. S8 conflicts with the existing rule
-that separately Unix-gated public items stay checked.
+module functions and inherent methods. Rand ruled that S8 POSIX-only public
+helpers are exempt because they are not a cross-platform parity gap.
 
 ## Proposed Decision
 
@@ -76,7 +76,7 @@ that separately Unix-gated public items stay checked.
    treatment. This is syntactic matching, not general Boolean equivalence.
 6. **Reviewed declarations (S2/S4/S7).** Add analyzer-owned
    `platform_companions` records, separate from unchanged file-pair
-   `platform_adapters`. Each names `unix_file`, `unix_item`,
+   `platform_adapters`. These three variants name `unix_file`, `unix_item`,
    `counterpart_file`, `counterpart_item`, `kind` and non-empty `reason`.
    Files must be confined existing repository-relative `.rs` files; items
    resolve uniquely in production AST scopes. Kinds are `function` (S2,
@@ -100,21 +100,23 @@ Python/declarative. Rust keeps profile planning, scheduling and runtime
 executable/environment selection; no second Python planner is introduced.
 Decisions 5–6 extend ADR-010/ADR-017 structural parity only as stated.
 
-## Open Rand Ruling — S8
+## Decided Rand Ruling — S8 Exempt
 
 `atm_temp.rs::is_owned_by_uid` and `current_uid` are public POSIX-only
-helpers without Windows counterparts. Existing public-item policy reports
-them. Rand must decide whether a narrowly reviewed declaration may classify
-them as deliberate exceptions, with a required reason, or public items stay
-reported. No exception is approved here. The third deliberate helper,
+helpers without Windows counterparts. Rand ruled on 2026-10-30 that these
+are exempt: the POSIX-only concepts are not a parity gap. Represent this
+through an exact reviewed `platform_companions` record with
+`kind = "posix_only"`, `unix_file`, `unix_item` and non-empty `reason`.
+This variant needs no counterpart fields; validate its confined production
+item and Unix cfg. It does not automatically exempt other public helpers or
+hard-code atm-core names in product defaults. The third deliberate helper,
 `has_group_or_world_bits`, is private and is evaluated under S1.
 
 Final acceptance is zero PORT-010 findings on all 18 paths with exclusions
-removed, while true gaps in negative fixtures remain reported. Keeping S8
-diagnostics conflicts with that acceptance; if Rand chooses it, the acceptance
-must be explicitly reconciled before plan approval. The separate S8 human
-gate blocks m-5b's completed implementation. Do not silently exclude public
-helpers or claim the 18-path result early.
+removed, while true gaps in negative fixtures remain reported. The S8 scope
+ruling is settled and its separate human gate is resolved. ADR-021 as a whole
+remains Pending, including this declaration design; implementation remains
+blocked on its acceptance. Every S8 record requires a reason.
 
 ## Errors And Approval
 
@@ -130,7 +132,9 @@ cause and recovery; rule IDs and finding JSON stay stable.
 
 ADR-021 remains Pending. Its human gate blocks m-1, m-3 and m-5b until Rand
 accepts the applicable decisions and activates the CLI amendment on the
-planning branch. S8 also requires its explicit ruling. m-5a's conservative
+planning branch. Rand also confirmed that `runner.export_env` with
+`PYO3_PYTHON` and the venv on child `PATH` is in m-3 scope; this scope ruling
+does not accept ADR-021 as a whole. m-5a's conservative
 S1/S5/S6 work does not depend on S8 or declarations; it consumes m-1's S3
 proof. Draft anchors are not approval. No post-hook DSL, automatic consumer
 venv creation or new analyzer dependency is proposed.
