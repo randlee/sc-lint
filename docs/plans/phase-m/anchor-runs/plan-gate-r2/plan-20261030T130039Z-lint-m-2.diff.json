@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "lint-m-2",
+    "prev": "plan-20261030T125107Z-lint-m-2",
+    "next": "plan-20261030T130039Z-lint-m-2",
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [],
+    "item_size": {
+      "before_chars": 2302,
+      "after_chars": 2276,
+      "delta_chars": -26,
+      "grew": false
+    },
+    "pass_before": false,
+    "pass_after": false
+  },
+  "error": null
+}
