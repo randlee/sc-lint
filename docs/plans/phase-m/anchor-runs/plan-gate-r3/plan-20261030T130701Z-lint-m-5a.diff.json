@@ -1,0 +1,24 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "lint-m-5a",
+    "prev": "plan-20261030T130044Z-lint-m-5a",
+    "next": "plan-20261030T130701Z-lint-m-5a",
+    "changed": [],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [],
+    "item_size": {
+      "before_chars": 3856,
+      "after_chars": 3840,
+      "delta_chars": -16,
+      "grew": false
+    },
+    "pass_before": false,
+    "pass_after": false
+  },
+  "error": null
+}

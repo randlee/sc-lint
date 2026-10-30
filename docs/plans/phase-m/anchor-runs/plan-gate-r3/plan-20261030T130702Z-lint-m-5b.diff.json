@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "lint-m-5b",
+    "prev": "plan-20261030T130046Z-lint-m-5b",
+    "next": "plan-20261030T130702Z-lint-m-5b",
+    "changed": [
+      {
+        "anchor_id": "ANC-030",
+        "from": "underspecified",
+        "to": "not_applicable",
+        "improved": true
+      }
+    ],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [
+      "ANC-030"
+    ],
+    "item_size": {
+      "before_chars": 4746,
+      "after_chars": 4890,
+      "delta_chars": 144,
+      "grew": true
+    },
+    "pass_before": false,
+    "pass_after": false
+  },
+  "error": null
+}
