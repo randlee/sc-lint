@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | ID | ADR-021 |
-| Status | Pending |
+| Status | Withdrawn (never accepted); superseded by [ADR-022](./ADR-022-tools-and-consumer-configuration.md) |
 | Deciders | Rand |
 | Related | ADR-010, ADR-016, ADR-017, ADR-020; #198, #720, #786 |
 

@@ -364,8 +364,6 @@ specialized backend tools and mixed Rust/Python implementations.
   options and config precede the selector, and arguments after the selector
   are forwarded verbatim. Lint accepts a selector followed by optional
   platform scope. No setup hooks or interpreter-selection policy is added.
-  Proposed REQ-CLI-026 is Pending; it changes this restriction only after
-  Rand accepts ADR-021 on the planning branch.
   The product-owned assets remain the source of consumer bootstrap. (Amended
   phase L, [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).)
   (Amended 2026-10-12, Accepted,
@@ -440,33 +438,6 @@ specialized backend tools and mixed Rust/Python implementations.
   per-fixture configuration is required for consumed fixtures.
   (Added phase L, #647. Status: Accepted — Rand, 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
-
-- `REQ-CLI-026` **(Pending; ineffective until Rand accepts ADR-021)**
-  Consumer bootstrap setup accepts one declarative argv command at
-  `[tool.sc-lint.setup].pre`, executed from the repository root before
-  provisioning, with child failure stopping setup. Check and dry-run modes
-  do not execute it. `[tool.sc-lint.runner].python` selects a consumer venv
-  for exactly a leading `python` in selected lint/test step argv, using
-  `bin/python` on Linux/macOS and `Scripts/python.exe` on Windows.
-  A leading `python` falls back to kit Python when no repository venv is
-  configured. `sc-lint-python -m sc_lint.<module>` and
-  `python -m sc_lint.<module>` use the kit interpreter by default; a consumer
-  may explicitly override it with the venv path `runner.kit_python`.
-  That override also selects the no-runner plain Python fallback, remains
-  independent of `runner.python`, and never falls back silently if missing.
-  The consumer provisions the override environment and required helper
-  package. A configured
-  runner prepends its executable directory to every selected lint/test
-  child's `PATH`, including cargo clippy/xwin;
-  `runner.export_env = ["PYO3_PYTHON"]` additionally exports that absolute
-  interpreter path. Preserve unrelated environment, remaining argv,
-  scheduling, selected profiles and test selectors. List/skipped steps do
-  not require an interpreter. Malformed settings are configuration errors.
-  The proposed failure codes, recovery context and
-  precise scope are defined in
-  [ADR-021](./adr/ADR-021-consumer-setup-runner-and-cfg-companions.md).
-  On acceptance, this narrowly supersedes REQ-CLI-021's exclusion of these
-  settings and the explicit kit-interpreter command marker.
 
 ## Contract References
 
