@@ -2,7 +2,7 @@
 
 Prepared 2026-10-30 by flint for Rand's approval. Nothing is locked. Approving here approves each record's **pass** and **fail** sentence as the frozen fixtures the question tuner and the gates measure against; it does not lock the statements.
 
-Results are from the live runs committed under `anchor-runs/` (rubric r6, check-fixtures r6). Expected: pass → `satisfied`; fail → `not_addressed` or `contradicted`. ✗ marks a sentence that did not land as expected.
+16 active records. Results are from the live runs committed under `anchor-runs/` (rubric r6, check-fixtures r6). Expected: pass → `satisfied`; fail → `not_addressed` or `contradicted`. ✗ marks a sentence that did not land as expected.
 
 Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 
@@ -25,13 +25,12 @@ Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 | ANC-015 | Rand | inconclusive | satisfied / satisfied | contradicted / contradicted |
 | ANC-016 | Rand | inconclusive | satisfied / satisfied | contradicted / contradicted |
 | ANC-017 | Rand | inconclusive | satisfied / satisfied | underspecified ✗ / contradicted |
-| GH-786.table.3 | issue text | inconclusive | satisfied / underspecified ✗ | contradicted / contradicted |
 | GH-198.export-env.3 | issue text | inconclusive | satisfied / satisfied | contradicted / contradicted |
 
 Open items in the summary:
 
 - **ANC-012 fail** and **ANC-017 fail** come back `underspecified` at the plan gate: the default conflict question does not read them as contradicting the statement. Candidates for the question tuner after approval; not reworded toward a pass.
-- **GH-786.table.3 pass** comes back `underspecified` at the dev gate, and its rubric `faithful` cell is `no`. The issue text asks to fix "the applicable findings"; Rand's S8 ruling (ANC-017) and false-alarm definition (ANC-014) now cover the same ground. Recommendation: drop GH-786.table.3 as redundant.
+- **GH-786.table.3** was dropped (retired 2026-10-30): ANC-014 (Rand's false-alarm definition, which is the #786 table) and ANC-017 (S8 exempt) cover it, and its faithful cell kept failing on "the applicable findings" versus "all 47".
 - Every rubric verdict except GH-198.runner-path.2 is `inconclusive` from low confidence on some cell. That does not block fixture approval, but it does block locking.
 
 ## Records
@@ -228,24 +227,6 @@ Open items in the summary:
 **Pass** (satisfied / satisfied): PORT-010 stops reporting pub POSIX-only helpers like is_owned_by_uid and current_uid. Evidence: test port010_pub_posix_helper passes, showing zero findings for that fixture.
 
 **Fail** (underspecified ✗ / contradicted): Keeps reporting pub is_owned_by_uid and current_uid because pub items stay checked.
-
-### GH-786.table.3 — #786: none of the 47 findings reported, exclusions removable
-
-**Statement:** A release must stop PORT-010 reporting all 47 findings for the 18 atm-core paths in sc-lint#786, none of which is a true positive or parity gap, so atm-core can remove its PORT-010 exclusions.
-
-**Quote:**
-
-> A release fixing the applicable findings allows atm-core to remove its PORT-010 exclusions.
-> […]
-> Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design.
-> […]
-> The 47 findings at this head match the issue's list exactly (same files, lines, item names)
-> […]
-> S8  (only the pub caveat) pub cfg(unix)-only POSIX helpers (`is_owned_by_uid`, `current_uid` in atm_temp.rs) with no Windows counterpart because the concept does not exist; Windows uses a different check. Row 1. Sc-lint docs say pub items stay checked, so the sc-lint team must choose: exempt (S1 transitively) or keep reporting. Not a parity gap.
-
-**Pass** (satisfied / underspecified ✗): PORT-010 stops reporting all 47 #786 findings, so atm-core removes its PORT-010 exclusions. Evidence: test port010_issue786_paths passes, showing 0 of the 47 findings across the 18 per-path repros.
-
-**Fail** (contradicted / contradicted): Fixes the same-name sibling shape only, so the other #786 findings are still reported.
 
 ### GH-198.export-env.3 — #198: export PYO3_PYTHON to native steps
 

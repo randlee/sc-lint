@@ -1832,8 +1832,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1852,6 +1852,12 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-10-30T02:48:13+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-014",
+          "reason": "Dropped per team-lead 2026-10-30: covered by ANC-014 (Rand's false-alarm definition = #786 table) and ANC-017 (S8 exempt); faithful kept failing on 'applicable findings' vs 'all 47' (never locked)"
         }
       ]
     },

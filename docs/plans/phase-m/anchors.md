@@ -40,7 +40,7 @@ Intent: `docs/plans/phase-m/intent.md`
 | ANC-015 | proposed | #786/#720: real Windows gaps still reported | 2026-10-30 |
 | ANC-016 | proposed | #136: parity table of atm-core's three boundary settings | 2026-10-30 |
 | ANC-017 | proposed | #786 S8: pub POSIX-only helpers exempt | 2026-10-30 |
-| GH-786.table.3 | proposed | #786: none of the 47 findings reported, exclusions removable | 2026-10-30 |
+| GH-786.table.3 | retired | #786: none of the 47 findings reported, exclusions removable | 2026-10-30 |
 | GH-198.export-env.3 | proposed | #198: export PYO3_PYTHON to native steps | 2026-10-30 |
 
 ## ANC-001
@@ -687,7 +687,7 @@ The 47 findings at this head match the issue's list exactly (same files, lines, 
 […]
 S8  (only the pub caveat) pub cfg(unix)-only POSIX helpers (`is_owned_by_uid`, `current_uid` in atm_temp.rs) with no Windows counterpart because the concept does not exist; Windows uses a different check. Row 1. Sc-lint docs say pub items stay checked, so the sc-lint team must choose: exempt (S1 transitively) or keep reporting. Not a parity gap.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#786 body 'Requested outcome' + https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (incl. S8), 2026-10-30. Status: proposed. Version 2.
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#786 body 'Requested outcome' + https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (incl. S8), 2026-10-30. Status: retired. Version 3.
 
 Summary: #786: none of the 47 findings reported, exclusions removable
 
