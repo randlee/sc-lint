@@ -1,0 +1,146 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T124353Z-ANC-019-integration",
+  "gate": "plan",
+  "created_at": "2026-10-30T12:43:53+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-019-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-019-integration-item.txt",
+    "chars": 205,
+    "truncated": false,
+    "chars_before_reduction": 205,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-019",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must give a consumer a method to override the interpreter that sc-lint runs sc_lint.* wheel helper steps on.",
+      "quote": "Conflict question (team-lead, 2026-10-30): \"GH-198.runner-argv against GH-198.kit-helpers. The literal rule \\\"a leading `python` becomes the `runner.python` interpreter\\\" would also rewrite `python -m sc_lint.*`. The kit-helpers record says those always use the kit interpreter, never overridden.\" Rand (2026-10-30): \"a consumer must have a method to override behavior.\"",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand's ruling on a conflict question from team-lead, 2026-10-30 (lint-uwqw)",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "78765ccf54a04136f27aa4f7dd241800134d7a0a14ce1ac1a3cb25a1c82017ce",
+      "deterministic_check": "A runner test with the consumer override set shows an sc_lint.lint_cargo_deny step resolves to the override interpreter.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "Describes unrelated work.",
+            "unclear": "Its subject cannot be determined.",
+            "yes": "Touches one of these subjects."
+          },
+          "instructions": "Does item.text concern step argv construction, interpreter selection, runner.python, or sc_lint.* wheel helper execution in crates/sc-lint? Judge subject overlap only.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "Silent about this obligation, explicitly denies an override.",
+            "unclear": "Mentions helper interpreter behavior but leaves consumer override inclusion indeterminate.",
+            "yes": "Specifically includes consumer-selectable helper interpreter override."
+          },
+          "instructions": "Does the item explicitly plan or preserve a consumer method to override the interpreter used for sc_lint.* wheel helper steps? Judge the specific obligation, separately from conflict or evidence. A kit default with an override qualifies.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No explicit incompatible behavior.",
+            "unclear": "The described behavior may or may not rule out consumer override.",
+            "yes": "Explicitly forces a helper interpreter with no consumer override."
+          },
+          "instructions": "Does item.text explicitly deny consumers any method to override the interpreter for sc_lint.* wheel helper steps? Judge conflict only. Omission, future deferral and unchanged unspecified behavior are not conflict; keeping a kit default while permitting overrides is compatible.",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 205,
+      "item_shortened": false,
+      "request_bytes": 2064
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-019",
+          "statement": "sc-lint must give a consumer a method to override the interpreter that sc-lint runs sc_lint.* wheel helper steps on.",
+          "scope": "The item changes step argv construction, interpreter selection or runner.python handling in crates/sc-lint."
+        },
+        "item": {
+          "id": "ANC-019-integration",
+          "title": "",
+          "text": "Adds a consumer setting that overrides the interpreter for sc_lint.* helper steps. Evidence: test kit_helper_interpreter_override passes, showing sc_lint.lint_cargo_deny runs on the configured interpreter."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "Describes unrelated work.",
+            "unclear": "Its subject cannot be determined.",
+            "yes": "Touches one of these subjects."
+          },
+          "instructions": "Does item.text concern step argv construction, interpreter selection, runner.python, or sc_lint.* wheel helper execution in crates/sc-lint? Judge subject overlap only.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "Silent about this obligation, explicitly denies an override.",
+            "unclear": "Mentions helper interpreter behavior but leaves consumer override inclusion indeterminate.",
+            "yes": "Specifically includes consumer-selectable helper interpreter override."
+          },
+          "instructions": "Does the item explicitly plan or preserve a consumer method to override the interpreter used for sc_lint.* wheel helper steps? Judge the specific obligation, separately from conflict or evidence. A kit default with an override qualifies.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No explicit incompatible behavior.",
+            "unclear": "The described behavior may or may not rule out consumer override.",
+            "yes": "Explicitly forces a helper interpreter with no consumer override."
+          },
+          "instructions": "Does item.text explicitly deny consumers any method to override the interpreter for sc_lint.* wheel helper steps? Judge conflict only. Omission, future deferral and unchanged unspecified behavior are not conflict; keeping a kit default while permitting overrides is compatible.",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 2064,
+    "max_request_bytes": 24000
+  }
+}

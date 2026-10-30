@@ -1,0 +1,146 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T124354Z-ANC-031-integration",
+  "gate": "plan",
+  "created_at": "2026-10-30T12:43:54+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-031-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-031-integration-item.txt",
+    "chars": 203,
+    "truncated": false,
+    "chars_before_reduction": 203,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-031",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A config-surface gap issue must be filed in randlee/sc-lint for each atm-core [boundaries] key (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) that released sc-lint-boundary does not cover.",
+      "quote": "atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2) (re-registered from GH-136.audit-gaps, ID-only change)",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "6603b68f60d583b6c1b5e1923bbb023de81c252f5881e0afd7d4f990ea838a2e",
+      "deterministic_check": "Each not-covered row in the parity table links a filed GitHub issue labelled as a config-surface gap.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item has no connection to these subjects.",
+            "unclear": "The subject is too vague to establish a connection.",
+            "yes": "The item concerns atm-core boundary coverage, its parity table, or sc-lint-boundary config-surface gap issues."
+          },
+          "instructions": "Does completing the work described by `item.text` bear on the boundary-coverage remainder described in `anchor.statement`?",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "It provides no fulfillment statement, merely mentions the topic, states a missing required issue.",
+            "unclear": "The described filing cannot clearly be matched to the obligation.",
+            "yes": "It states the per-uncovered-key filing action, or explicitly covers the empty-remainder case where all three keys are covered and no issue is due."
+          },
+          "instructions": "Does `item.text` express fulfillment or planned fulfillment of ANC-031: file in randlee/sc-lint a config-surface gap issue for every uncovered one of the three named keys?",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No breach is asserted. Silence and filing no issues after establishing every key is covered are allowed.",
+            "unclear": "The description leaves an expressed potential breach unresolved.",
+            "yes": "A known uncovered key is expressly left without its required issue, including an issue said to remain unfiled."
+          },
+          "instructions": "Does `item.text` explicitly describe a breach of the per-uncovered-key filing requirement? Judge an affirmative breach, not missing discussion.",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 203,
+      "item_shortened": false,
+      "request_bytes": 2235
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-031",
+          "statement": "A config-surface gap issue must be filed in randlee/sc-lint for each atm-core [boundaries] key (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) that released sc-lint-boundary does not cover.",
+          "scope": "The item files sc-lint-boundary config-surface gap issues or links them from the parity table."
+        },
+        "item": {
+          "id": "ANC-031-integration",
+          "title": "",
+          "text": "Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover. Evidence: each not-covered row in docs/plans/phase-m/boundary-parity.md links its filed GitHub issue number."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item has no connection to these subjects.",
+            "unclear": "The subject is too vague to establish a connection.",
+            "yes": "The item concerns atm-core boundary coverage, its parity table, or sc-lint-boundary config-surface gap issues."
+          },
+          "instructions": "Does completing the work described by `item.text` bear on the boundary-coverage remainder described in `anchor.statement`?",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "It provides no fulfillment statement, merely mentions the topic, states a missing required issue.",
+            "unclear": "The described filing cannot clearly be matched to the obligation.",
+            "yes": "It states the per-uncovered-key filing action, or explicitly covers the empty-remainder case where all three keys are covered and no issue is due."
+          },
+          "instructions": "Does `item.text` express fulfillment or planned fulfillment of ANC-031: file in randlee/sc-lint a config-surface gap issue for every uncovered one of the three named keys?",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No breach is asserted. Silence and filing no issues after establishing every key is covered are allowed.",
+            "unclear": "The description leaves an expressed potential breach unresolved.",
+            "yes": "A known uncovered key is expressly left without its required issue, including an issue said to remain unfiled."
+          },
+          "instructions": "Does `item.text` explicitly describe a breach of the per-uncovered-key filing requirement? Judge an affirmative breach, not missing discussion.",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 2235,
+    "max_request_bytes": 24000
+  }
+}

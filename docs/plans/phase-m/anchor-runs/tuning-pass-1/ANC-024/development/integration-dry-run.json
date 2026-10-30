@@ -1,0 +1,159 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T124353Z-ANC-024-integration",
+  "gate": "dev",
+  "created_at": "2026-10-30T12:43:53+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-024-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-024-integration-item.txt",
+    "chars": 298,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-024",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "For the atm-core steps that the Justfile recipes _py, sc_lint_clippy_prefix and _sc-lint-clippy run today, sc-lint must itself select the .bootstrap-venv interpreter those recipes select.",
+      "quote": "atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.\nDefinition question (team-lead, 2026-10-30): \"is \\\"the right Python\\\" the interpreter those three recipes select today, which is `.bootstrap-venv`?\" Rand: \"yes\"",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "cb3d6c79b850b3f691eda901878ccc8d3ebacbe042215beff6ce9c6cd9426b09",
+      "deterministic_check": "Runner tests with stub interpreters show each atm-core step class gets its intended interpreter with no consumer per-OS path.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The described activity has no effect on those runner/interpreter subjects.",
+            "unclear": "Its subject is too vague to determine overlap with the stated scope.",
+            "yes": "The work touches interpreter selection, runner configuration, step argv or step environment in crates/sc-lint, including the named atm-core step classes."
+          },
+          "instructions": "Does `item.text` touch the runner/interpreter subjects listed in `anchor.scope`? Judge subject overlap only.",
+          "type": "choice"
+        },
+        "implemented": {
+          "criteria": {
+            "no": "The specific required selection is absent, merely topical, incomplete, or replaced by another interpreter. A future plan or a deferred change is not delivered.",
+            "unclear": "It refers to Python selection but leaves genuinely ambiguous whether sc-lint selects .bootstrap-venv for the named step classes.",
+            "yes": "The report says the delivered behavior is that sc-lint itself selects the .bootstrap-venv interpreter for all atm-core steps currently run by _py, sc_lint_clippy_prefix and _sc-lint-clippy."
+          },
+          "instructions": "Does `item.text` say the delivered sc-lint itself selects .bootstrap-venv for all atm-core steps currently handled by _py, sc_lint_clippy_prefix and _sc-lint-clippy?",
+          "type": "choice"
+        },
+        "violated": {
+          "criteria": {
+            "no": "It expresses no incompatible decision. Silence, a topic heading, unspecified details or future deferral alone do not conflict.",
+            "unclear": "An expressed approach could contradict the selection obligation but its meaning is unresolved.",
+            "yes": "It expressly selects a different interpreter for any required step class, delegates the required selection back to consumer glue, or rejects sc-lint selecting .bootstrap-venv."
+          },
+          "instructions": "Does `item.text` express a decision incompatible with sc-lint itself choosing .bootstrap-venv for the three recipe step classes in `anchor.statement`? Silence is not an incompatible decision.",
+          "type": "choice"
+        },
+        "evidenced": {
+          "criteria": {
+            "no": "No completed compliant selection claim is made, or it is asserted without a supporting artifact. A future plan is not evidence.",
+            "unclear": "Potential evidence is mentioned but its support for the completed selection claim cannot be determined.",
+            "yes": "A checkable test, test result, path, diff, command or equivalent artifact specifically supports a completed claim that sc-lint selects .bootstrap-venv for the required recipe step classes."
+          },
+          "instructions": "Does `item.text` cite concrete checkable support for its completed claim that sc-lint performs the required .bootstrap-venv selection?",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 298,
+      "item_shortened": false,
+      "request_bytes": 3378
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-024",
+          "statement": "For the atm-core steps that the Justfile recipes _py, sc_lint_clippy_prefix and _sc-lint-clippy run today, sc-lint must itself select the .bootstrap-venv interpreter those recipes select.",
+          "scope": "The item changes interpreter selection, runner config ([tool.sc-lint].runner), step argv or step environment in crates/sc-lint."
+        },
+        "item": {
+          "id": "ANC-024-integration",
+          "title": "",
+          "text": "sc-lint selects the .bootstrap-venv interpreter itself for atm-core's python steps and clippy, so atm-core deletes _py, sc_lint_clippy_prefix and _sc-lint-clippy. Evidence: runner tests with stub interpreters pass, showing each step got the .bootstrap-venv interpreter with no consumer per-OS path."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The described activity has no effect on those runner/interpreter subjects.",
+            "unclear": "Its subject is too vague to determine overlap with the stated scope.",
+            "yes": "The work touches interpreter selection, runner configuration, step argv or step environment in crates/sc-lint, including the named atm-core step classes."
+          },
+          "instructions": "Does `item.text` touch the runner/interpreter subjects listed in `anchor.scope`? Judge subject overlap only.",
+          "type": "choice"
+        },
+        "implemented": {
+          "criteria": {
+            "no": "The specific required selection is absent, merely topical, incomplete, or replaced by another interpreter. A future plan or a deferred change is not delivered.",
+            "unclear": "It refers to Python selection but leaves genuinely ambiguous whether sc-lint selects .bootstrap-venv for the named step classes.",
+            "yes": "The report says the delivered behavior is that sc-lint itself selects the .bootstrap-venv interpreter for all atm-core steps currently run by _py, sc_lint_clippy_prefix and _sc-lint-clippy."
+          },
+          "instructions": "Does `item.text` say the delivered sc-lint itself selects .bootstrap-venv for all atm-core steps currently handled by _py, sc_lint_clippy_prefix and _sc-lint-clippy?",
+          "type": "choice"
+        },
+        "violated": {
+          "criteria": {
+            "no": "It expresses no incompatible decision. Silence, a topic heading, unspecified details or future deferral alone do not conflict.",
+            "unclear": "An expressed approach could contradict the selection obligation but its meaning is unresolved.",
+            "yes": "It expressly selects a different interpreter for any required step class, delegates the required selection back to consumer glue, or rejects sc-lint selecting .bootstrap-venv."
+          },
+          "instructions": "Does `item.text` express a decision incompatible with sc-lint itself choosing .bootstrap-venv for the three recipe step classes in `anchor.statement`? Silence is not an incompatible decision.",
+          "type": "choice"
+        },
+        "evidenced": {
+          "criteria": {
+            "no": "No completed compliant selection claim is made, or it is asserted without a supporting artifact. A future plan is not evidence.",
+            "unclear": "Potential evidence is mentioned but its support for the completed selection claim cannot be determined.",
+            "yes": "A checkable test, test result, path, diff, command or equivalent artifact specifically supports a completed claim that sc-lint selects .bootstrap-venv for the required recipe step classes."
+          },
+          "instructions": "Does `item.text` cite concrete checkable support for its completed claim that sc-lint performs the required .bootstrap-venv selection?",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 3378,
+    "max_request_bytes": 64000
+  }
+}

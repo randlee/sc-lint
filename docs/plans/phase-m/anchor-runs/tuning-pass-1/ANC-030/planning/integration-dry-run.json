@@ -1,0 +1,146 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T124354Z-ANC-030-integration",
+  "gate": "plan",
+  "created_at": "2026-10-30T12:43:54+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-030-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-030-integration-item.txt",
+    "chars": 235,
+    "truncated": false,
+    "chars_before_reduction": 235,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-030",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each of atm-core's three [boundaries] keys (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) must be classified as covered or not covered by the latest released sc-lint-boundary.",
+      "quote": "atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2) (re-registered from GH-136.audit-verify, ID-only change)",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "d5317dc5d508c3e3dc72d33645fa6c04de4d1075c305b4342915932db4fe0b75",
+      "deterministic_check": "Parity table under docs/plans/phase-m/ has a covered/not-covered row with evidence for each of the three keys.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "It concerns an unrelated activity.",
+            "unclear": "The activity cannot be identified.",
+            "yes": "It concerns boundary-key coverage audit or parity-table work."
+          },
+          "instructions": "Does `item.text` concern auditing atm-core boundaries keys against sc-lint-boundary, or editing the parity table? Judge subject overlap only.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "It omits the complete obligation, supplies only topic discussion, assumes coverage, omits keys, or uses only an unreleased baseline.",
+            "unclear": "Coverage classification is mentioned but its completeness or baseline cannot be determined.",
+            "yes": "The complete three-key classification against the current released tool is explicit."
+          },
+          "instructions": "Does `item.text` plan or require a coverage verdict, covered or not covered, for each of manifest_dependency_allowlists, global_dependency_ownership, and manifest_section_rules, against the latest released sc-lint-boundary? All three named keys can be referred to collectively. A not-covered finding counts. Assumptions and an unreleased-only comparison do not.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "It states no incompatible action, including silence, topical discussion, or valid not-covered findings.",
+            "unclear": "A stated approach may or may not contradict the required audit.",
+            "yes": "It assumes coverage without checking, explicitly excludes required keys, or substitutes an unreleased-only baseline."
+          },
+          "instructions": "Does `item.text` explicitly replace the required latest-release three-key audit with an incompatible approach? Silence and work limited to formatting do not conflict.",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 235,
+      "item_shortened": false,
+      "request_bytes": 2411
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-030",
+          "statement": "Each of atm-core's three [boundaries] keys (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) must be classified as covered or not covered by the latest released sc-lint-boundary.",
+          "scope": "The item audits atm-core [boundaries] keys against sc-lint-boundary or writes a parity table."
+        },
+        "item": {
+          "id": "ANC-030-integration",
+          "title": "",
+          "text": "Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered. Evidence: docs/plans/phase-m/boundary-parity.md has one row per key citing the sc-lint-boundary test or code that covers it."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "It concerns an unrelated activity.",
+            "unclear": "The activity cannot be identified.",
+            "yes": "It concerns boundary-key coverage audit or parity-table work."
+          },
+          "instructions": "Does `item.text` concern auditing atm-core boundaries keys against sc-lint-boundary, or editing the parity table? Judge subject overlap only.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "It omits the complete obligation, supplies only topic discussion, assumes coverage, omits keys, or uses only an unreleased baseline.",
+            "unclear": "Coverage classification is mentioned but its completeness or baseline cannot be determined.",
+            "yes": "The complete three-key classification against the current released tool is explicit."
+          },
+          "instructions": "Does `item.text` plan or require a coverage verdict, covered or not covered, for each of manifest_dependency_allowlists, global_dependency_ownership, and manifest_section_rules, against the latest released sc-lint-boundary? All three named keys can be referred to collectively. A not-covered finding counts. Assumptions and an unreleased-only comparison do not.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "It states no incompatible action, including silence, topical discussion, or valid not-covered findings.",
+            "unclear": "A stated approach may or may not contradict the required audit.",
+            "yes": "It assumes coverage without checking, explicitly excludes required keys, or substitutes an unreleased-only baseline."
+          },
+          "instructions": "Does `item.text` explicitly replace the required latest-release three-key audit with an incompatible approach? Silence and work limited to formatting do not conflict.",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 2411,
+    "max_request_bytes": 24000
+  }
+}

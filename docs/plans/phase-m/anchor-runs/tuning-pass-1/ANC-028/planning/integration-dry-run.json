@@ -1,0 +1,146 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T124353Z-ANC-028-integration",
+  "gate": "plan",
+  "created_at": "2026-10-30T12:43:53+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-028-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-028-integration-item.txt",
+    "chars": 239,
+    "truncated": false,
+    "chars_before_reduction": 239,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-028",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When runner.python names a venv, sc-lint must prepend that venv's bin directory (Scripts on Windows) to the PATH of every step's child process.",
+      "quote": "(2) the venv's bin/Scripts dir is prepended to the child's PATH (our `python_cmd` does this today so helpers that spawn `python` stay pinned)\n[…]\n(plus the PATH prepend in (2) applied to every step)",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(2) + mismatch paragraph (re-registered from GH-198.runner-path.2, ID-only change)",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "d0ffa3628f9c129d328a1640c1796f62d6e9488602f108b165d6356273291af0",
+      "deterministic_check": "A step-environment test with injected platform shows PATH starts with the venv bin or Scripts directory for a python step and a native step.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "No: only an unrelated component or activity is involved.",
+            "unclear": "The described component or activity is too vague to decide.",
+            "yes": "Yes: runner.python handling or step child environments are involved."
+          },
+          "instructions": "Would the work described in `item.text` touch the runner.python or step-child-environment subject of ANC-028? Ignore whether the change obeys it.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "It gives no such behavior, gives a clearly different behavior, or discusses only runner.python unset.",
+            "unclear": "It refers to PATH work without specifying the prefix and every-step behavior.",
+            "yes": "The description includes the full conditional PATH prefix for all step types; equivalent bin/Scripts wording counts."
+          },
+          "instructions": "Is the following behavior included in `item.text` as a requirement or plan? When runner.python selects a venv, every step child PATH begins with that venv's bin directory, or Scripts on Windows. Determine whether that specific content appears.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No such prevention is stated. Unset runner.python is outside the trigger and may retain inherited PATH.",
+            "unclear": "A particular stated result is ambiguous about whether it prevents the required behavior.",
+            "yes": "The text restricts the prefix to some steps, puts the directory later, or relies solely on argv rewriting."
+          },
+          "instructions": "Does `item.text` state a proposed choice that prevents the configured venv bin/Scripts directory from being first in every child step PATH? Missing statements and unresolved details do not by themselves prevent it.",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 239,
+      "item_shortened": false,
+      "request_bytes": 2325
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-028",
+          "statement": "When runner.python names a venv, sc-lint must prepend that venv's bin directory (Scripts on Windows) to the PATH of every step's child process.",
+          "scope": "The item changes step child environment or runner.python handling in crates/sc-lint."
+        },
+        "item": {
+          "id": "ANC-028-integration",
+          "title": "",
+          "text": "With runner.python set, sc-lint prepends the venv's bin (Scripts on Windows) directory to every step's PATH. Evidence: test runner_python_prepends_path passes, showing PATH starts with the venv directory for a python step and a cargo step."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "No: only an unrelated component or activity is involved.",
+            "unclear": "The described component or activity is too vague to decide.",
+            "yes": "Yes: runner.python handling or step child environments are involved."
+          },
+          "instructions": "Would the work described in `item.text` touch the runner.python or step-child-environment subject of ANC-028? Ignore whether the change obeys it.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "It gives no such behavior, gives a clearly different behavior, or discusses only runner.python unset.",
+            "unclear": "It refers to PATH work without specifying the prefix and every-step behavior.",
+            "yes": "The description includes the full conditional PATH prefix for all step types; equivalent bin/Scripts wording counts."
+          },
+          "instructions": "Is the following behavior included in `item.text` as a requirement or plan? When runner.python selects a venv, every step child PATH begins with that venv's bin directory, or Scripts on Windows. Determine whether that specific content appears.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No such prevention is stated. Unset runner.python is outside the trigger and may retain inherited PATH.",
+            "unclear": "A particular stated result is ambiguous about whether it prevents the required behavior.",
+            "yes": "The text restricts the prefix to some steps, puts the directory later, or relies solely on argv rewriting."
+          },
+          "instructions": "Does `item.text` state a proposed choice that prevents the configured venv bin/Scripts directory from being first in every child step PATH? Missing statements and unresolved details do not by themselves prevent it.",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 2325,
+    "max_request_bytes": 24000
+  }
+}

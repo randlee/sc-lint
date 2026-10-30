@@ -1,0 +1,159 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T124353Z-ANC-022-integration",
+  "gate": "dev",
+  "created_at": "2026-10-30T12:43:53+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-022-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-022-integration-item.txt",
+    "chars": 251,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-022",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "By default, sc-lint must run sc_lint.* wheel helper steps on the sc-lint kit's own venv interpreter (.sc-lint/venv), even when [tool.sc-lint].runner.python is set.",
+      "quote": "plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.\nConflict question (team-lead, 2026-10-30): \"GH-198.runner-argv against GH-198.kit-helpers. The literal rule \\\"a leading `python` becomes the `runner.python` interpreter\\\" would also rewrite `python -m sc_lint.*`. The kit-helpers record says those always use the kit interpreter, never overridden.\" Rand (2026-10-30): \"a consumer must have a method to override behavior.\"",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; #198 issue text (https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b)) plus Rand's ruling on the runner-argv/kit-helpers conflict, relayed by team-lead 2026-10-30",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "cd912b480185ec8d3ee5e26991ad231b5b305fdf2186747b838b597afd5153b3",
+      "deterministic_check": "A runner test with runner.python set and no consumer override shows an sc_lint.lint_cargo_deny step resolves to the kit venv interpreter.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The work concerns another activity, or expressly excludes helper execution.",
+            "unclear": "The work description is too vague to identify whether helper execution is touched.",
+            "yes": "Helper execution or its interpreter dispatch is touched, including refactoring it without interpreter details."
+          },
+          "instructions": "Does item.text describe work affecting how sc_lint.* wheel helper steps execute or choose their interpreter? Judge only scope overlap. An explicit exclusion of helper execution means ordinary Python-step changes alone are outside this scope.",
+          "type": "choice"
+        },
+        "implemented": {
+          "criteria": {
+            "no": "No such content is stated, a different default is specified, or it is only deferred/future work. This includes ordinary Python-only changes expressly excluding helper execution; exclusion alone does not state the helper default.",
+            "unclear": "The item affirmatively discusses helper interpreter selection but gives too little detail to determine its default or runner.python interaction. Do not use unclear for ordinary Python-only work that expressly excludes helper execution.",
+            "yes": "The full kit-default obligation, including configured runner.python, is explicit as delivered behavior."
+          },
+          "instructions": "Does the delivered account in item.text state that the work implemented this complete obligation? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Future-only intent is not implementation. Judge the claim, independently of supporting evidence. Work limited to ordinary Python scripts and explicitly excluding helper execution does not state this helper-default obligation: answer no. An exclusion of helpers from a change is not a statement about their default interpreter.",
+          "type": "choice"
+        },
+        "violated": {
+          "criteria": {
+            "no": "No incompatible behavior is stated; silence, vague topic mentions, and a separate explicit override preserving the default are not conflict.",
+            "unclear": "The text describes a possible incompatible rule but its actual default versus explicit-override behavior is ambiguous.",
+            "yes": "The text explicitly replaces the helper kit default with runner.python or another default, or otherwise rules out the required default."
+          },
+          "instructions": "Does item.text specify behavior incompatible with this default? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Judge conflict alone: silence and unspecified implementation details are not conflict.",
+          "type": "choice"
+        },
+        "evidenced": {
+          "criteria": {
+            "no": "No supporting artifact is cited, there is only a bare assertion/future intention, or no compliant delivered behavior is claimed.",
+            "unclear": "A possible supporting reference appears, but its connection to the required default cannot be determined.",
+            "yes": "A checkable path, diff, named test/result or command supports the claimed kit default under configured runner.python."
+          },
+          "instructions": "Does item.text cite concrete checkable evidence supporting the claimed delivered ANC-022 default: helpers run on the kit venv despite runner.python when no explicit consumer helper override applies? A named passing test with that assertion, code path, diff or command output can support it; a bare assertion or future intention cannot.",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 251,
+      "item_shortened": false,
+      "request_bytes": 4312
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-022",
+          "statement": "By default, sc-lint must run sc_lint.* wheel helper steps on the sc-lint kit's own venv interpreter (.sc-lint/venv), even when [tool.sc-lint].runner.python is set.",
+          "scope": "The item adds or changes how sc_lint.* helper steps (deny, manifests, shear, spell) are run in crates/sc-lint."
+        },
+        "item": {
+          "id": "ANC-022-integration",
+          "title": "",
+          "text": "With no consumer override, sc_lint.* wheel helper steps run on the kit interpreter even when runner.python is set. Evidence: test kit_helpers_ignore_runner_python passes, showing sc_lint.lint_cargo_deny resolves to the kit venv with runner.python set."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The work concerns another activity, or expressly excludes helper execution.",
+            "unclear": "The work description is too vague to identify whether helper execution is touched.",
+            "yes": "Helper execution or its interpreter dispatch is touched, including refactoring it without interpreter details."
+          },
+          "instructions": "Does item.text describe work affecting how sc_lint.* wheel helper steps execute or choose their interpreter? Judge only scope overlap. An explicit exclusion of helper execution means ordinary Python-step changes alone are outside this scope.",
+          "type": "choice"
+        },
+        "implemented": {
+          "criteria": {
+            "no": "No such content is stated, a different default is specified, or it is only deferred/future work. This includes ordinary Python-only changes expressly excluding helper execution; exclusion alone does not state the helper default.",
+            "unclear": "The item affirmatively discusses helper interpreter selection but gives too little detail to determine its default or runner.python interaction. Do not use unclear for ordinary Python-only work that expressly excludes helper execution.",
+            "yes": "The full kit-default obligation, including configured runner.python, is explicit as delivered behavior."
+          },
+          "instructions": "Does the delivered account in item.text state that the work implemented this complete obligation? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Future-only intent is not implementation. Judge the claim, independently of supporting evidence. Work limited to ordinary Python scripts and explicitly excluding helper execution does not state this helper-default obligation: answer no. An exclusion of helpers from a change is not a statement about their default interpreter.",
+          "type": "choice"
+        },
+        "violated": {
+          "criteria": {
+            "no": "No incompatible behavior is stated; silence, vague topic mentions, and a separate explicit override preserving the default are not conflict.",
+            "unclear": "The text describes a possible incompatible rule but its actual default versus explicit-override behavior is ambiguous.",
+            "yes": "The text explicitly replaces the helper kit default with runner.python or another default, or otherwise rules out the required default."
+          },
+          "instructions": "Does item.text specify behavior incompatible with this default? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Judge conflict alone: silence and unspecified implementation details are not conflict.",
+          "type": "choice"
+        },
+        "evidenced": {
+          "criteria": {
+            "no": "No supporting artifact is cited, there is only a bare assertion/future intention, or no compliant delivered behavior is claimed.",
+            "unclear": "A possible supporting reference appears, but its connection to the required default cannot be determined.",
+            "yes": "A checkable path, diff, named test/result or command supports the claimed kit default under configured runner.python."
+          },
+          "instructions": "Does item.text cite concrete checkable evidence supporting the claimed delivered ANC-022 default: helpers run on the kit venv despite runner.python when no explicit consumer helper override applies? A named passing test with that assertion, code path, diff or command output can support it; a bare assertion or future intention cannot.",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 4312,
+    "max_request_bytes": 64000
+  }
+}

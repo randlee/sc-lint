@@ -1,0 +1,146 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T124354Z-ANC-032-integration",
+  "gate": "plan",
+  "created_at": "2026-10-30T12:43:54+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-032-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-032-integration-item.txt",
+    "chars": 222,
+    "truncated": false,
+    "chars_before_reduction": 222,
+    "code_reduced": {
+      "blocks": 0,
+      "lines": 0
+    }
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-032",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must be able to export the [tool.sc-lint].runner.python venv interpreter as PYO3_PYTHON to native (non-python) steps such as cargo clippy.",
+      "quote": "`runner.python` only rewrites step argv; cargo clippy needs the venv interpreter exported as `PYO3_PYTHON` and the venv dir on PATH for native (non-python) steps.\n[…]\nWe need one more knob, e.g. `runner.export_env = [\"PYO3_PYTHON\"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 C + mismatch paragraph; in scope per Rand 2026-10-30 (re-registered from GH-198.export-env.3, ID-only change)",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "872d7624d5bbbe6828522aa5e357114d134db9e39e7851a455581ab8a43d9e61",
+      "deterministic_check": "A step-environment test shows a cargo clippy step receives PYO3_PYTHON set to the runner.python interpreter when configured.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The work concerns a different subject outside the scope.",
+            "unclear": "The subject is too vague to determine scope overlap.",
+            "yes": "Runner configuration, step environments, or clippy behavior is involved."
+          },
+          "instructions": "Determine whether the described work falls within anchor.scope: runner config, step environment, or cargo clippy. A discussion of those topics is in scope even without the required capability.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The capability is omitted or explicitly rejected; merely naming its topic is insufficient.",
+            "unclear": "Export behavior is described ambiguously, so inclusion of the specific capability cannot be determined.",
+            "yes": "The item explicitly includes, preserves, or plans configurable native export of the runner.python venv interpreter as PYO3_PYTHON."
+          },
+          "instructions": "Does the item carry an explicit commitment or statement supporting native export of the runner.python venv interpreter under the name PYO3_PYTHON? No particular knob or unconditional export is required. Python-only export or a fixed system interpreter does not qualify.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No incompatible behavior is stated; silence and opt-in defaults are not conflict.",
+            "unclear": "A stated behavior might or might not prevent the required export.",
+            "yes": "An explicit behavior prevents the required native export or uses the wrong interpreter."
+          },
+          "instructions": "Is any described planned behavior irreconcilable with ANC-032 native export capability? This includes leaving clippy unable to obtain PYO3_PYTHON or ignoring runner.python. Merely not discussing the capability is no conflict; unset defaults with configurable export are allowed.",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 222,
+      "item_shortened": false,
+      "request_bytes": 2410
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-032",
+          "statement": "sc-lint must be able to export the [tool.sc-lint].runner.python venv interpreter as PYO3_PYTHON to native (non-python) steps such as cargo clippy.",
+          "scope": "The item changes step environment, runner config, or clippy steps in crates/sc-lint."
+        },
+        "item": {
+          "id": "ANC-032-integration",
+          "title": "",
+          "text": "sc-lint can export the runner.python interpreter as PYO3_PYTHON to native steps such as cargo clippy. Evidence: test runner_export_env_pyo3 passes, showing the clippy step's env has PYO3_PYTHON set to the venv interpreter."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The work concerns a different subject outside the scope.",
+            "unclear": "The subject is too vague to determine scope overlap.",
+            "yes": "Runner configuration, step environments, or clippy behavior is involved."
+          },
+          "instructions": "Determine whether the described work falls within anchor.scope: runner config, step environment, or cargo clippy. A discussion of those topics is in scope even without the required capability.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The capability is omitted or explicitly rejected; merely naming its topic is insufficient.",
+            "unclear": "Export behavior is described ambiguously, so inclusion of the specific capability cannot be determined.",
+            "yes": "The item explicitly includes, preserves, or plans configurable native export of the runner.python venv interpreter as PYO3_PYTHON."
+          },
+          "instructions": "Does the item carry an explicit commitment or statement supporting native export of the runner.python venv interpreter under the name PYO3_PYTHON? No particular knob or unconditional export is required. Python-only export or a fixed system interpreter does not qualify.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "No incompatible behavior is stated; silence and opt-in defaults are not conflict.",
+            "unclear": "A stated behavior might or might not prevent the required export.",
+            "yes": "An explicit behavior prevents the required native export or uses the wrong interpreter."
+          },
+          "instructions": "Is any described planned behavior irreconcilable with ANC-032 native export capability? This includes leaving clippy unable to obtain PYO3_PYTHON or ignoring runner.python. Merely not discussing the capability is no conflict; unset defaults with configurable export are allowed.",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 2410,
+    "max_request_bytes": 24000
+  }
+}

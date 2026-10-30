@@ -1,0 +1,159 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T124354Z-ANC-030-integration",
+  "gate": "dev",
+  "created_at": "2026-10-30T12:43:54+00:00",
+  "anchors_path": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "ANC-030-integration",
+    "title": "",
+    "source": "/tmp/lint-h3ro/ANC-030-integration-item.txt",
+    "chars": 235,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": null,
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": true,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-030",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each of atm-core's three [boundaries] keys (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) must be classified as covered or not covered by the latest released sc-lint-boundary.",
+      "quote": "atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2) (re-registered from GH-136.audit-verify, ID-only change)",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "115631c22c3e2510682161461b9fa11e84cd35154d160e10640754eb4ac91685",
+      "deterministic_check": "Parity table under docs/plans/phase-m/ has a covered/not-covered row with evidence for each of the three keys.",
+      "kind": "directive",
+      "leaning": null,
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The activity touches neither.",
+            "unclear": "The activity is too vague to place.",
+            "yes": "The activity touches that verification or table, even if it only reformats it."
+          },
+          "instructions": "Is the activity in `item.text` within the anchor subject: atm-core [boundaries] coverage verification or its parity table?",
+          "type": "choice"
+        },
+        "implemented": {
+          "criteria": {
+            "no": "Only some keys are checked, others are assumed, no determinations are specified, or an unreleased branch replaces the release.",
+            "unclear": "The audit is present but whether its baseline or full key set is included remains ambiguous.",
+            "yes": "Every listed key is included in a release-based coverage determination, explicitly or as the three named keys."
+          },
+          "instructions": "Identify whether `item.text` says the delivered work completed the specified audit: manifest_dependency_allowlists, global_dependency_ownership, and manifest_section_rules each receives a covered/not-covered finding against latest released sc-lint-boundary. The obligation is classification, not achieving supported status. Generic discussion is insufficient. A future plan is not completed work. Present-tense descriptions of work (for example, verifies each key and records its verdict) count as an account of delivery; they need not use past tense. Only explicit future-only intentions fail for being a plan.",
+          "type": "choice"
+        },
+        "violated": {
+          "criteria": {
+            "no": "There is no such choice; missing detail alone, formatting, or classifying a key not covered is not conflict.",
+            "unclear": "A positively stated choice has an uncertain relationship to the obligation.",
+            "yes": "A stated choice skips named keys, substitutes assumed coverage, or replaces latest release with an unreleased baseline."
+          },
+          "instructions": "Does `item.text` positively state a choice incompatible with verifying all three keys against the latest release? Do not infer conflict from absence. Maintaining or reformatting an existing table without reassessing it is not itself a decision to skip keys in the required audit; do not infer that an audit was replaced unless the item explicitly says so.",
+          "type": "choice"
+        },
+        "evidenced": {
+          "criteria": {
+            "no": "The report gives no such support, gives only a claim, or supports a narrower incompatible audit.",
+            "unclear": "A cited reference cannot clearly be linked to the full claim.",
+            "yes": "A named artifact or reproducible check supports the claim for each of the three keys."
+          },
+          "instructions": "Is a concrete source of support cited for the claimed full latest-release coverage classification in `item.text`?",
+          "type": "choice"
+        }
+      },
+      "verdict": null,
+      "answers": null,
+      "min_confidence": null,
+      "explanation": "dry run",
+      "attempts": 0,
+      "item_chars_sent": 235,
+      "item_shortened": false,
+      "request_bytes": 3341
+    }
+  ],
+  "summary": {
+    "counts": {},
+    "failing": [],
+    "leaning_counts": {},
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  },
+  "requests": [
+    {
+      "model": "jev-latest",
+      "state": {
+        "anchor": {
+          "id": "ANC-030",
+          "statement": "Each of atm-core's three [boundaries] keys (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) must be classified as covered or not covered by the latest released sc-lint-boundary.",
+          "scope": "The item audits atm-core [boundaries] keys against sc-lint-boundary or writes a parity table."
+        },
+        "item": {
+          "id": "ANC-030-integration",
+          "title": "",
+          "text": "Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered. Evidence: docs/plans/phase-m/boundary-parity.md has one row per key citing the sc-lint-boundary test or code that covers it."
+        }
+      },
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The activity touches neither.",
+            "unclear": "The activity is too vague to place.",
+            "yes": "The activity touches that verification or table, even if it only reformats it."
+          },
+          "instructions": "Is the activity in `item.text` within the anchor subject: atm-core [boundaries] coverage verification or its parity table?",
+          "type": "choice"
+        },
+        "implemented": {
+          "criteria": {
+            "no": "Only some keys are checked, others are assumed, no determinations are specified, or an unreleased branch replaces the release.",
+            "unclear": "The audit is present but whether its baseline or full key set is included remains ambiguous.",
+            "yes": "Every listed key is included in a release-based coverage determination, explicitly or as the three named keys."
+          },
+          "instructions": "Identify whether `item.text` says the delivered work completed the specified audit: manifest_dependency_allowlists, global_dependency_ownership, and manifest_section_rules each receives a covered/not-covered finding against latest released sc-lint-boundary. The obligation is classification, not achieving supported status. Generic discussion is insufficient. A future plan is not completed work. Present-tense descriptions of work (for example, verifies each key and records its verdict) count as an account of delivery; they need not use past tense. Only explicit future-only intentions fail for being a plan.",
+          "type": "choice"
+        },
+        "violated": {
+          "criteria": {
+            "no": "There is no such choice; missing detail alone, formatting, or classifying a key not covered is not conflict.",
+            "unclear": "A positively stated choice has an uncertain relationship to the obligation.",
+            "yes": "A stated choice skips named keys, substitutes assumed coverage, or replaces latest release with an unreleased baseline."
+          },
+          "instructions": "Does `item.text` positively state a choice incompatible with verifying all three keys against the latest release? Do not infer conflict from absence. Maintaining or reformatting an existing table without reassessing it is not itself a decision to skip keys in the required audit; do not infer that an audit was replaced unless the item explicitly says so.",
+          "type": "choice"
+        },
+        "evidenced": {
+          "criteria": {
+            "no": "The report gives no such support, gives only a claim, or supports a narrower incompatible audit.",
+            "unclear": "A cited reference cannot clearly be linked to the full claim.",
+            "yes": "A named artifact or reproducible check supports the claim for each of the three keys."
+          },
+          "instructions": "Is a concrete source of support cited for the claimed full latest-release coverage classification in `item.text`?",
+          "type": "choice"
+        }
+      }
+    }
+  ],
+  "totals": {
+    "requests": 1,
+    "bytes": 3341,
+    "max_request_bytes": 64000
+  }
+}

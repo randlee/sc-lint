@@ -1891,7 +1891,79 @@
           "PORT-010 still reports atm-core's same-name cfg(not(unix)) siblings, which #786 classifies as false positives."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The obligation is absent, only investigated, or replaced by a statement that a forbidden finding remains. A genuine Windows gap alone does not count.",
+                "unclear": "The text gives mutually ambiguous information and neither yes nor no can be established.",
+                "yes": "The item states the whole required outcome, including both false-alarm classes and removed exclusions."
+              },
+              "instructions": "Read only the described item: does the item commit to eliminating all #786-table false-positive and deliberate-exception findings on atm-core with exclusions removed? Mere investigation is insufficient.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No incompatible behavior is stated. Silence, investigation, and reporting genuine Windows parity gaps are not conflict.",
+                "unclear": "The text gives mutually ambiguous information and neither yes nor no can be established.",
+                "yes": "The item explicitly preserves at least one forbidden finding, or keeps/reintroduces path exclusions as the solution."
+              },
+              "instructions": "Read only the described item: does the described approach conflict with zero #786-table false-alarm findings on unexcluded atm-core? Judge explicit incompatible behavior only.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is unrelated to PORT-010 or its scoped consumer behavior.",
+                "unclear": "The text gives mutually ambiguous information and neither yes nor no can be established.",
+                "yes": "The item concerns PORT-010, its fixtures or docs, or atm-core exclusions and findings."
+              },
+              "instructions": "Read only the described item: is the item within `anchor.scope` by changing or investigating PORT-010 or its consumer exclusions? Ignore whether it complies.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No compliance claim is made, or it is a bare assertion or future intention with no checkable support.",
+                "unclear": "The text gives mutually ambiguous information and neither yes nor no can be established.",
+                "yes": "A named test, command, file/diff or concrete output is cited to support the implemented complete zero-false-alarm outcome."
+              },
+              "instructions": "Read only the described item: is a successful check, named test, command, diff or path cited as support for the claimed zero-false-alarm implementation?",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "The outcome is absent, merely discussed, planned for later, or a forbidden false alarm is explicitly retained.",
+                "unclear": "The text gives mutually ambiguous information and neither yes nor no can be established.",
+                "yes": "The account says the entire required outcome is already implemented; proof is judged separately."
+              },
+              "instructions": "Read only the described item: does the account say the complete unexcluded-atm-core zero-false-alarm outcome for both #786 classes has been built? A future plan does not count.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item is unrelated to PORT-010 or its scoped consumer behavior.",
+                "unclear": "The text gives mutually ambiguous information and neither yes nor no can be established.",
+                "yes": "The item concerns PORT-010, its fixtures or docs, or atm-core exclusions and findings."
+              },
+              "instructions": "Read only the described item: is the item within `anchor.scope` by changing or investigating PORT-010 or its consumer exclusions? Ignore whether it complies.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No incompatible behavior is stated. Silence, investigation, and reporting genuine Windows parity gaps are not conflict.",
+                "unclear": "The text gives mutually ambiguous information and neither yes nor no can be established.",
+                "yes": "The item explicitly preserves at least one forbidden finding, or keeps/reintroduces path exclusions as the solution."
+              },
+              "instructions": "Read only the described item: does the described approach conflict with zero #786-table false-alarm findings on unexcluded atm-core? Judge explicit incompatible behavior only.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 5,
       "status": "locked",
       "promoted_to": null,
@@ -2020,7 +2092,79 @@
           "Records sc-lint coverage for manifest_dependency_allowlists only and leaves the other two settings out of the table."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "It is silent about this specific obligation, mentions only the topic, omits a required component, or rejects the obligation.",
+                "unclear": "It refers to the required table but leaves genuinely ambiguous whether its location or named-key coverage meets the obligation.",
+                "yes": "It explicitly commits to creating or preserving a parity table under docs/plans/phase-m/ recording covered or not-covered for each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules."
+              },
+              "instructions": "Does `item.text` explicitly plan or preserve a parity table under docs/plans/phase-m/ recording covered or not-covered for each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules? Judge inclusion of this obligation only; topic mention alone does not include it.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "It states no incompatible decision. Silence, broad topic mention, and unspecified details alone are not conflict.",
+                "unclear": "An expressed decision could conflict, but its meaning cannot be resolved.",
+                "yes": "It expressly rejects the required table, excludes one of the named settings, or substitutes an external-only table for the required docs location."
+              },
+              "instructions": "Does `item.text` explicitly choose an approach incompatible with a parity table under docs/plans/phase-m/ recording covered or not-covered for each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules? Missing details alone do not establish incompatibility.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The work is unrelated to that audit and table.",
+                "unclear": "Its subject is too vague to identify overlap.",
+                "yes": "The description concerns auditing atm-core boundary settings against sc-lint or producing its Phase M coverage table."
+              },
+              "instructions": "Does `item.text` concern the boundary-coverage audit or its Phase M parity documentation in `anchor.scope`? Judge subject overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No such checkable support is cited, there is only an assertion, a future plan, or no completed compliant table claim.",
+                "unclear": "A potential artifact is cited but its support for the completed table is indeterminate.",
+                "yes": "A concrete path, diff, command result, or equivalent artifact specifically supports a completed claim about the required three-key Phase M table."
+              },
+              "instructions": "Does `item.text` cite concrete checkable support for its claim to have delivered the required Phase M three-setting coverage table?",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "It is silent about this specific obligation, mentions only the topic, omits a required component, or only proposes future work.",
+                "unclear": "It refers to the required table but leaves genuinely ambiguous whether its location or named-key coverage meets the obligation.",
+                "yes": "It states completed creation of a parity table under docs/plans/phase-m/ recording covered or not-covered for each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules."
+              },
+              "instructions": "Does `item.text` report having completed a parity table under docs/plans/phase-m/ recording covered or not-covered for each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules? Judge inclusion of this obligation only; topic mention alone does not include it.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The work is unrelated to that audit and table.",
+                "unclear": "Its subject is too vague to identify overlap.",
+                "yes": "The description concerns auditing atm-core boundary settings against sc-lint or producing its Phase M coverage table."
+              },
+              "instructions": "Does `item.text` concern the boundary-coverage audit or its Phase M parity documentation in `anchor.scope`? Judge subject overlap only.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "It states no incompatible decision. Silence, broad topic mention, and unspecified details alone are not conflict.",
+                "unclear": "An expressed decision could conflict, but its meaning cannot be resolved.",
+                "yes": "It expressly rejects the required table, excludes one of the named settings, or substitutes an external-only table for the required docs location."
+              },
+              "instructions": "Does `item.text` explicitly choose an approach incompatible with a parity table under docs/plans/phase-m/ recording covered or not-covered for each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules? Missing details alone do not establish incompatibility.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 4,
       "status": "locked",
       "promoted_to": null,
@@ -2337,7 +2481,79 @@
           "Hard-codes sc_lint.* helper steps to the kit interpreter with no consumer setting to change it."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "Silent about this obligation, explicitly denies an override.",
+                "unclear": "Mentions helper interpreter behavior but leaves consumer override inclusion indeterminate.",
+                "yes": "Specifically includes consumer-selectable helper interpreter override."
+              },
+              "instructions": "Does the item explicitly plan or preserve a consumer method to override the interpreter used for sc_lint.* wheel helper steps? Judge the specific obligation, separately from conflict or evidence. A kit default with an override qualifies.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No explicit incompatible behavior.",
+                "unclear": "The described behavior may or may not rule out consumer override.",
+                "yes": "Explicitly forces a helper interpreter with no consumer override."
+              },
+              "instructions": "Does item.text explicitly deny consumers any method to override the interpreter for sc_lint.* wheel helper steps? Judge conflict only. Omission, future deferral and unchanged unspecified behavior are not conflict; keeping a kit default while permitting overrides is compatible.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "Describes unrelated work.",
+                "unclear": "Its subject cannot be determined.",
+                "yes": "Touches one of these subjects."
+              },
+              "instructions": "Does item.text concern step argv construction, interpreter selection, runner.python, or sc_lint.* wheel helper execution in crates/sc-lint? Judge subject overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No delivered compliance claim, bare assertion, future plan, or no checkable supporting artifact.",
+                "unclear": "An artifact is cited but its support for the actual override is indeterminate.",
+                "yes": "Names a test, path, diff or command that checks or implements the actual helper override."
+              },
+              "instructions": "Does item.text cite a concrete checkable artifact supporting an actual consumer override of the sc_lint.* wheel helper interpreter? Judge supporting evidence only.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "Silent about this obligation, explicitly denies an override, or only promises future implementation.",
+                "unclear": "Mentions helper interpreter behavior but leaves consumer override inclusion indeterminate.",
+                "yes": "Specifically includes consumer-selectable helper interpreter override as built."
+              },
+              "instructions": "Does the delivered account state it added or preserved a consumer method to override the interpreter used for sc_lint.* wheel helper steps? Judge the specific obligation, separately from conflict or evidence. A kit default with an override qualifies.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "Describes unrelated work.",
+                "unclear": "Its subject cannot be determined.",
+                "yes": "Touches one of these subjects."
+              },
+              "instructions": "Does item.text concern step argv construction, interpreter selection, runner.python, or sc_lint.* wheel helper execution in crates/sc-lint? Judge subject overlap only.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No explicit incompatible behavior.",
+                "unclear": "The described behavior may or may not rule out consumer override.",
+                "yes": "Explicitly forces a helper interpreter with no consumer override."
+              },
+              "instructions": "Does item.text explicitly deny consumers any method to override the interpreter for sc_lint.* wheel helper steps? Judge conflict only. Omission, future deferral and unchanged unspecified behavior are not conflict; keeping a kit default while permitting overrides is compatible.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 3,
       "status": "locked",
       "promoted_to": null,
@@ -2513,7 +2729,79 @@
           "Applies runner.python to every step, including sc_lint.lint_cargo_deny."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "No such content is stated, a different default is specified. This includes ordinary Python-only changes expressly excluding helper execution; exclusion alone does not state the helper default.",
+                "unclear": "The item affirmatively discusses helper interpreter selection but gives too little detail to determine its default or runner.python interaction. Do not use unclear for ordinary Python-only work that expressly excludes helper execution.",
+                "yes": "The full kit-default obligation, including configured runner.python, is explicit as a step, constraint, or preserved behavior."
+              },
+              "instructions": "Does item.text explicitly include this complete obligation in its plan or constraints? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Judge inclusion only. A contradictory interpreter choice does not include the obligation. Work limited to ordinary Python scripts and explicitly excluding helper execution does not state this helper-default obligation: answer no. An exclusion of helpers from a change is not a statement about their default interpreter.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No incompatible behavior is stated; silence, vague topic mentions, and a separate explicit override preserving the default are not conflict.",
+                "unclear": "The text describes a possible incompatible rule but its actual default versus explicit-override behavior is ambiguous.",
+                "yes": "The text explicitly replaces the helper kit default with runner.python or another default, or otherwise rules out the required default."
+              },
+              "instructions": "Does item.text specify behavior incompatible with this default? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Judge conflict alone: silence and unspecified implementation details are not conflict.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The work concerns another activity, or expressly excludes helper execution.",
+                "unclear": "The work description is too vague to identify whether helper execution is touched.",
+                "yes": "Helper execution or its interpreter dispatch is touched, including refactoring it without interpreter details."
+              },
+              "instructions": "Does item.text describe work affecting how sc_lint.* wheel helper steps execute or choose their interpreter? Judge only scope overlap. An explicit exclusion of helper execution means ordinary Python-step changes alone are outside this scope.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No supporting artifact is cited, there is only a bare assertion/future intention, or no compliant delivered behavior is claimed.",
+                "unclear": "A possible supporting reference appears, but its connection to the required default cannot be determined.",
+                "yes": "A checkable path, diff, named test/result or command supports the claimed kit default under configured runner.python."
+              },
+              "instructions": "Does item.text cite concrete checkable evidence supporting the claimed delivered ANC-022 default: helpers run on the kit venv despite runner.python when no explicit consumer helper override applies? A named passing test with that assertion, code path, diff or command output can support it; a bare assertion or future intention cannot.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "No such content is stated, a different default is specified, or it is only deferred/future work. This includes ordinary Python-only changes expressly excluding helper execution; exclusion alone does not state the helper default.",
+                "unclear": "The item affirmatively discusses helper interpreter selection but gives too little detail to determine its default or runner.python interaction. Do not use unclear for ordinary Python-only work that expressly excludes helper execution.",
+                "yes": "The full kit-default obligation, including configured runner.python, is explicit as delivered behavior."
+              },
+              "instructions": "Does the delivered account in item.text state that the work implemented this complete obligation? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Future-only intent is not implementation. Judge the claim, independently of supporting evidence. Work limited to ordinary Python scripts and explicitly excluding helper execution does not state this helper-default obligation: answer no. An exclusion of helpers from a change is not a statement about their default interpreter.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The work concerns another activity, or expressly excludes helper execution.",
+                "unclear": "The work description is too vague to identify whether helper execution is touched.",
+                "yes": "Helper execution or its interpreter dispatch is touched, including refactoring it without interpreter details."
+              },
+              "instructions": "Does item.text describe work affecting how sc_lint.* wheel helper steps execute or choose their interpreter? Judge only scope overlap. An explicit exclusion of helper execution means ordinary Python-step changes alone are outside this scope.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No incompatible behavior is stated; silence, vague topic mentions, and a separate explicit override preserving the default are not conflict.",
+                "unclear": "The text describes a possible incompatible rule but its actual default versus explicit-override behavior is ambiguous.",
+                "yes": "The text explicitly replaces the helper kit default with runner.python or another default, or otherwise rules out the required default."
+              },
+              "instructions": "Does item.text specify behavior incompatible with this default? By default sc_lint.* wheel helpers use the kit venv (.sc-lint/venv) interpreter even when [tool.sc-lint].runner.python is set. A separate explicit consumer helper override may change that default; runner.python alone is not that override. Judge conflict alone: silence and unspecified implementation details are not conflict.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 3,
       "status": "locked",
       "promoted_to": null,
@@ -2627,7 +2915,79 @@
           "Documents that consumers run just bootstrap themselves before sc-lint setup."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The specific obligation is absent, only its topic is mentioned, a required component is omitted, or a conflicting substitute is proposed.",
+                "unclear": "The text refers to bootstrap execution but leaves whether the complete required behavior is included genuinely indeterminate.",
+                "yes": "The item explicitly commits to or preserves sc-lint setup itself runs atm-core's just bootstrap to build .bootstrap-venv, removing the need for atm-core Justfile glue to perform that step."
+              },
+              "instructions": "Is this setup responsibility explicitly included in the planned work in `item.text`: sc-lint setup itself runs atm-core's just bootstrap to build .bootstrap-venv, removing the need for atm-core Justfile glue to perform that step? A general integration reference does not establish it.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "There is no expressed incompatible decision. Omitting bootstrap details, generic topic mention, and deferring implementation until the approved ADR are not conflicts.",
+                "unclear": "An expressed behavior may conflict, but the execution responsibility or required environment cannot be determined.",
+                "yes": "It expressly assigns bootstrap execution solely to users or consumer glue, rules out sc-lint setup invoking just bootstrap, or replaces .bootstrap-venv with a different-only environment."
+              },
+              "instructions": "Does `item.text` explicitly deny the setup command responsibility assigned by `anchor.statement`, or substitute a different-only environment? Missing commitments alone do not deny that responsibility.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The activity is unrelated to setup, provisioning and consumer setup configuration.",
+                "unclear": "The text leaves the subject too vague to determine setup-related overlap.",
+                "yes": "The work concerns sc-lint setup/provisioning, consumer [tool.sc-lint].setup configuration, or the just setup flow."
+              },
+              "instructions": "Is the activity described in `item.text` part of sc-lint setup, its provisioning, consumer setup-hook configuration, or just setup? Assess area overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "There is only a behavior assertion, the required output directory is merely named, implementation is future work, or no concrete support for a completed compliant claim is supplied.",
+                "unclear": "A possible supporting artifact is cited but its connection to completed required setup behavior cannot be determined.",
+                "yes": "A named passing test, observed command result, inspectable diff, path with described contents, or equivalent concrete artifact supports a completed claim of sc-lint setup invoking just bootstrap to create .bootstrap-venv."
+              },
+              "instructions": "Can a reviewer follow a test, observed result, diff, or similarly concrete reference in `item.text` to check the claimed delivered bootstrap self-execution? Judge the support cited, not whether the account asserts success.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "The specific obligation is absent, only its topic is mentioned, a required component is omitted, or the obligation is merely future work.",
+                "unclear": "The text refers to bootstrap execution but leaves whether the complete required behavior is included genuinely indeterminate.",
+                "yes": "Completed work is stated to ensure sc-lint setup itself runs atm-core's just bootstrap to build .bootstrap-venv, removing the need for atm-core Justfile glue to perform that step."
+              },
+              "instructions": "Does the delivered-work account in `item.text` entail sc-lint setup itself runs atm-core's just bootstrap to build .bootstrap-venv, removing the need for atm-core Justfile glue to perform that step? A correctly sequenced future plan counts for planning only.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The activity is unrelated to setup, provisioning and consumer setup configuration.",
+                "unclear": "The text leaves the subject too vague to determine setup-related overlap.",
+                "yes": "The work concerns sc-lint setup/provisioning, consumer [tool.sc-lint].setup configuration, or the just setup flow."
+              },
+              "instructions": "Would carrying out the work in `item.text` touch the setup flow or consumer setup configuration governed by ANC-023? Judge overlap, independent of whether it follows the directive.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "There is no expressed incompatible decision. Omitting bootstrap details, generic topic mention, and deferring implementation until the approved ADR are not conflicts.",
+                "unclear": "An expressed behavior may conflict, but the execution responsibility or required environment cannot be determined.",
+                "yes": "It expressly assigns bootstrap execution solely to users or consumer glue, rules out sc-lint setup invoking just bootstrap, or replaces .bootstrap-venv with a different-only environment."
+              },
+              "instructions": "Is any explicit choice in `item.text` irreconcilable with the required executor (sc-lint setup), bootstrap command (just bootstrap), and target environment (.bootstrap-venv)? Mere omission is not irreconcilability.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 4,
       "status": "locked",
       "promoted_to": null,
@@ -2688,7 +3048,79 @@
           "Leaves atm-core's _py recipe in place because steps still run whatever python is first on PATH."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The specific required selection is absent, merely topical, incomplete, or replaced by another interpreter.",
+                "unclear": "It refers to Python selection but leaves genuinely ambiguous whether sc-lint selects .bootstrap-venv for the named step classes.",
+                "yes": "The item explicitly includes the commitment or existing behavior that sc-lint itself selects the .bootstrap-venv interpreter for all atm-core steps currently run by _py, sc_lint_clippy_prefix and _sc-lint-clippy."
+              },
+              "instructions": "Does `item.text` explicitly include sc-lint itself selecting .bootstrap-venv for all atm-core steps currently handled by _py, sc_lint_clippy_prefix and _sc-lint-clippy?",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "It expresses no incompatible decision. Silence, a topic heading, unspecified details or future deferral alone do not conflict.",
+                "unclear": "An expressed approach could contradict the selection obligation but its meaning is unresolved.",
+                "yes": "It expressly selects a different interpreter for any required step class, delegates the required selection back to consumer glue, or rejects sc-lint selecting .bootstrap-venv."
+              },
+              "instructions": "Does `item.text` express a decision incompatible with sc-lint itself choosing .bootstrap-venv for the three recipe step classes in `anchor.statement`? Silence is not an incompatible decision.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The described activity has no effect on those runner/interpreter subjects.",
+                "unclear": "Its subject is too vague to determine overlap with the stated scope.",
+                "yes": "The work touches interpreter selection, runner configuration, step argv or step environment in crates/sc-lint, including the named atm-core step classes."
+              },
+              "instructions": "Does `item.text` touch the runner/interpreter subjects listed in `anchor.scope`? Judge subject overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No completed compliant selection claim is made, or it is asserted without a supporting artifact. A future plan is not evidence.",
+                "unclear": "Potential evidence is mentioned but its support for the completed selection claim cannot be determined.",
+                "yes": "A checkable test, test result, path, diff, command or equivalent artifact specifically supports a completed claim that sc-lint selects .bootstrap-venv for the required recipe step classes."
+              },
+              "instructions": "Does `item.text` cite concrete checkable support for its completed claim that sc-lint performs the required .bootstrap-venv selection?",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "The specific required selection is absent, merely topical, incomplete, or replaced by another interpreter. A future plan or a deferred change is not delivered.",
+                "unclear": "It refers to Python selection but leaves genuinely ambiguous whether sc-lint selects .bootstrap-venv for the named step classes.",
+                "yes": "The report says the delivered behavior is that sc-lint itself selects the .bootstrap-venv interpreter for all atm-core steps currently run by _py, sc_lint_clippy_prefix and _sc-lint-clippy."
+              },
+              "instructions": "Does `item.text` say the delivered sc-lint itself selects .bootstrap-venv for all atm-core steps currently handled by _py, sc_lint_clippy_prefix and _sc-lint-clippy?",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The described activity has no effect on those runner/interpreter subjects.",
+                "unclear": "Its subject is too vague to determine overlap with the stated scope.",
+                "yes": "The work touches interpreter selection, runner configuration, step argv or step environment in crates/sc-lint, including the named atm-core step classes."
+              },
+              "instructions": "Does `item.text` touch the runner/interpreter subjects listed in `anchor.scope`? Judge subject overlap only.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "It expresses no incompatible decision. Silence, a topic heading, unspecified details or future deferral alone do not conflict.",
+                "unclear": "An expressed approach could contradict the selection obligation but its meaning is unresolved.",
+                "yes": "It expressly selects a different interpreter for any required step class, delegates the required selection back to consumer glue, or rejects sc-lint selecting .bootstrap-venv."
+              },
+              "instructions": "Does `item.text` express a decision incompatible with sc-lint itself choosing .bootstrap-venv for the three recipe step classes in `anchor.statement`? Silence is not an incompatible decision.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 3,
       "status": "locked",
       "promoted_to": null,
@@ -2743,7 +3175,79 @@
           "Makes source-only the new default, so tests/ files stop being checked for every consumer without any setting."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "It omits this behavior, merely mentions the topic, gives incompatible behavior, or (for delivered work) defers it.",
+                "unclear": "It describes a possible scope mode but leaves whether it has the required opt-in/default behavior ambiguous.",
+                "yes": "The description states both opt-in source-only checking and otherwise all-files checking."
+              },
+              "instructions": "Does `item.text` say the complete ANC-025 behavior is planned or preserved: source-only ownership enforcement requires consumer opt-in through a setting, while absence of opt-in keeps all-files checking? Judge the stated behavior only.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No stated behavior conflicts with the required conditional behavior, including silence or deferral.",
+                "unclear": "The described behavior could conflict but is too ambiguous to decide.",
+                "yes": "It makes source-only automatic/default, removes the opt-in option, or fails to check all files without opt-in."
+              },
+              "instructions": "Does `item.text` explicitly prescribe or report dependency ownership behavior incompatible with requiring a consumer opt-in for source-only checking and keeping all-files checking otherwise? Silence and deferral alone do not establish incompatible behavior.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "It concerns unrelated work.",
+                "unclear": "Its subject cannot be determined.",
+                "yes": "It concerns this dependency ownership rule or its scope setting."
+              },
+              "instructions": "Does `item.text` touch global_dependency_ownership, SCB-MANIFEST-004, or their ownership-scope configuration? Judge subject overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "It gives no complete compliance claim or supplies only an unsupported assertion.",
+                "unclear": "A cited artifact might support compliance, but the connection is uncertain.",
+                "yes": "The claim points to a named test, path, diff, command, or comparison supporting the opt-in and default behavior."
+              },
+              "instructions": "Does `item.text` support a claim of the complete ANC-025 behavior with checkable evidence?",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "It omits this behavior, merely mentions the topic, gives incompatible behavior, or (for delivered work) defers it.",
+                "unclear": "It describes a possible scope mode but leaves whether it has the required opt-in/default behavior ambiguous.",
+                "yes": "The description states both opt-in source-only checking and otherwise all-files checking."
+              },
+              "instructions": "Does `item.text` say the complete ANC-025 behavior is reported as delivered: source-only ownership enforcement requires consumer opt-in through a setting, while absence of opt-in keeps all-files checking? Judge the stated behavior only.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "It concerns unrelated work.",
+                "unclear": "Its subject cannot be determined.",
+                "yes": "It concerns this dependency ownership rule or its scope setting."
+              },
+              "instructions": "Does `item.text` touch global_dependency_ownership, SCB-MANIFEST-004, or their ownership-scope configuration? Judge subject overlap only.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No stated behavior conflicts with the required conditional behavior, including silence or deferral.",
+                "unclear": "The described behavior could conflict but is too ambiguous to decide.",
+                "yes": "It makes source-only automatic/default, removes the opt-in option, or fails to check all files without opt-in."
+              },
+              "instructions": "Does `item.text` explicitly prescribe or report dependency ownership behavior incompatible with requiring a consumer opt-in for source-only checking and keeping all-files checking otherwise? Silence and deferral alone do not establish incompatible behavior.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 3,
       "status": "locked",
       "promoted_to": null,
@@ -2797,7 +3301,79 @@
           "Exempts the crate-root main.rs pair only; module and inherent-impl siblings are still reported."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The obligation is omitted or expressly limited or rejected.",
+                "unclear": "The topic appears but it is explicitly undecided whether the exemption is adopted.",
+                "yes": "All required sibling conditions and module, inherent-impl and root coverage are present."
+              },
+              "instructions": "Is the following obligation substantively present as a commitment or existing behavior in `item.text`: PORT-010 emits no finding for a cfg(unix) item paired with a same-name cfg(not(unix)) sibling in that same scope, for modules, inherent impls and crate roots?",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No such incompatible behavior is stated. Silence, deferral, unresolved decisions and tests of nonqualifying different-scope or different-cfg items do not establish incompatibility.",
+                "unclear": "It cannot be determined whether stated behavior reports a qualifying pair.",
+                "yes": "At least one of those qualifying scope forms intentionally still reports the item."
+              },
+              "instructions": "Find an explicit incompatible PORT-010 behavior in `item.text`: would a same-name cfg(not(unix)) sibling in the same module, inherent impl or crate root still leave its cfg(unix) counterpart reported? Judge only stated incompatibility.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "Only unrelated code or content is a work target.",
+                "unclear": "The work target is indeterminate.",
+                "yes": "PORT-010 code or tests are a work target, including its parser allocations."
+              },
+              "instructions": "Is the work described by `item.text` within PORT-010 or its fixtures? Rule parser maintenance is relevant implementation work even if it does not state the required sibling behavior.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "The report supplies only an assertion, a future promise, an incompatible outcome, or no supporting artifact.",
+                "unclear": "Possible evidence is present but its support for delivered compliance is unclear.",
+                "yes": "The delivery claim is backed by a test name/result, command/output, source path or diff."
+              },
+              "instructions": "For a claim of delivered ANC-026 sibling handling in `item.text`, is there a named, checkable supporting artifact?",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "The obligation is omitted or expressly limited or rejected; future intentions do not describe accomplished work.",
+                "unclear": "The topic appears but it is explicitly undecided whether the exemption is adopted.",
+                "yes": "All required sibling conditions and module, inherent-impl and root coverage are present."
+              },
+              "instructions": "Is the following obligation substantively present as an accomplished change in `item.text`: PORT-010 emits no finding for a cfg(unix) item paired with a same-name cfg(not(unix)) sibling in that same scope, for modules, inherent impls and crate roots?",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "Only unrelated code or content is a work target.",
+                "unclear": "The work target is indeterminate.",
+                "yes": "PORT-010 code or tests are a work target, including its parser allocations."
+              },
+              "instructions": "Is the work described by `item.text` within PORT-010 or its fixtures? Rule parser maintenance is relevant implementation work even if it does not state the required sibling behavior.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No such incompatible behavior is stated. Silence, deferral, unresolved decisions and tests of nonqualifying different-scope or different-cfg items do not establish incompatibility.",
+                "unclear": "It cannot be determined whether stated behavior reports a qualifying pair.",
+                "yes": "At least one of those qualifying scope forms intentionally still reports the item."
+              },
+              "instructions": "Find an explicit incompatible PORT-010 behavior in `item.text`: would a same-name cfg(not(unix)) sibling in the same module, inherent impl or crate root still leave its cfg(unix) counterpart reported? Judge only stated incompatibility.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -2852,7 +3428,79 @@
           "Runs setup.pre after sc-lint provisioning has finished."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "It omits the obligation, or explicitly chooses an incompatible format/order/execution behavior.",
+                "unclear": "It discusses setup.pre while leaving required format or execution order open.",
+                "yes": "It commits to both required behaviors."
+              },
+              "instructions": "Read item.text as an item of planned work. Is the whole setup.pre obligation explicitly present as a commitment: argv-list support and just setup running it before provisioning sc-lint? Do not require test evidence for this judgment.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "There is no express incompatible decision; mere silence, an open question or a later implementation plan is insufficient.",
+                "unclear": "A concrete described behavior is too ambiguous to determine compatibility.",
+                "yes": "At least one express decision rejects argv, runs it after provisioning, or refuses to execute a configured hook."
+              },
+              "instructions": "Considering only express incompatibility in item.text, does the planned result break the required setup.pre contract? This contract requires argv-list acceptance and execution by just setup before sc-lint provisioning.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "Only work outside those scope areas is described.",
+                "unclear": "The text is too vague to locate the work.",
+                "yes": "At least one named scope area is affected or directly depended upon."
+              },
+              "instructions": "Is the described work within anchor.scope? Read the scope broadly enough to include ScLintConfigFile, consumer parsing, and just setup or installer changes; determine only whether these areas are touched.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "It supplies only an unsupported implementation assertion, or never claims implementation.",
+                "unclear": "It mentions possible support without making its connection to the implementation claim clear.",
+                "yes": "It cites a relevant concrete test, file/diff, executed command result or event sequence."
+              },
+              "instructions": "For any assertion that ANC-027 was delivered, does the description supply something a reviewer can check to substantiate it? The support must concern argv acceptance and hook execution preceding provisioning.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "It omits the obligation, postpones it, or explicitly chooses an incompatible format/order/execution behavior.",
+                "unclear": "It discusses setup.pre while leaving required format or execution order open.",
+                "yes": "It reports completing both required behaviors."
+              },
+              "instructions": "Read item.text as an account of completed work. Is the whole setup.pre obligation explicitly reported as completed: argv-list support and just setup running it before provisioning sc-lint? Do not require test evidence for this judgment.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "Only work outside those scope areas is described.",
+                "unclear": "The text is too vague to locate the work.",
+                "yes": "At least one named scope area is affected or directly depended upon."
+              },
+              "instructions": "Is the described work within anchor.scope? Read the scope broadly enough to include ScLintConfigFile, consumer parsing, and just setup or installer changes; determine only whether these areas are touched.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "There is no express incompatible decision; mere silence, an open question or a later implementation plan is insufficient.",
+                "unclear": "A concrete described behavior is too ambiguous to determine compatibility.",
+                "yes": "At least one express decision rejects argv, runs it after provisioning, or refuses to execute a configured hook."
+              },
+              "instructions": "Considering only express incompatibility in item.text, does the delivered result break the required setup.pre contract? This contract requires argv-list acceptance and execution by just setup before sc-lint provisioning.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -2907,7 +3555,79 @@
           "Rewrites only the leading python argv, so a helper that spawns python picks up the PATH interpreter."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "It gives no such behavior, gives a clearly different behavior, or discusses only runner.python unset.",
+                "unclear": "It refers to PATH work without specifying the prefix and every-step behavior.",
+                "yes": "The description includes the full conditional PATH prefix for all step types; equivalent bin/Scripts wording counts."
+              },
+              "instructions": "Is the following behavior included in `item.text` as a requirement or plan? When runner.python selects a venv, every step child PATH begins with that venv's bin directory, or Scripts on Windows. Determine whether that specific content appears.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No such prevention is stated. Unset runner.python is outside the trigger and may retain inherited PATH.",
+                "unclear": "A particular stated result is ambiguous about whether it prevents the required behavior.",
+                "yes": "The text restricts the prefix to some steps, puts the directory later, or relies solely on argv rewriting."
+              },
+              "instructions": "Does `item.text` state a proposed choice that prevents the configured venv bin/Scripts directory from being first in every child step PATH? Missing statements and unresolved details do not by themselves prevent it.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "No: only an unrelated component or activity is involved.",
+                "unclear": "The described component or activity is too vague to decide.",
+                "yes": "Yes: runner.python handling or step child environments are involved."
+              },
+              "instructions": "Would the work described in `item.text` touch the runner.python or step-child-environment subject of ANC-028? Ignore whether the change obeys it.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "There is no delivered compliance claim, or it is a bare assertion without supporting artifacts.",
+                "unclear": "An artifact is cited but its support for the compliance claim cannot be determined.",
+                "yes": "A named test, diff, path, command output or comparison supports that compliance claim."
+              },
+              "instructions": "Does `item.text` cite a concrete checkable artifact supporting a claim that the required venv PATH prefix was delivered for every step? Judge supporting evidence only.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "The obligation is absent, explicitly replaced with an incompatible behavior, or only deferred to future work.",
+                "unclear": "It mentions child PATH behavior but omits enough detail to determine prefixing or every-step coverage.",
+                "yes": "It explicitly gives the conditional all-step prefix behavior, including native steps; bin/Scripts is an acceptable platform shorthand."
+              },
+              "instructions": "Does the delivered account in `item.text` say it actually implemented the obligation in `anchor.statement`: with runner.python naming a venv, prepend its bin directory (Scripts on Windows) to every step child PATH? Judge presence of this whole obligation only.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "It describes unrelated work with no effect on these subjects.",
+                "unclear": "Its subject cannot be determined.",
+                "yes": "It changes or discusses step environments, child PATH, or runner.python."
+              },
+              "instructions": "Does `item.text` concern sc-lint step child environments or runner.python handling, the subject of `anchor.scope`? Judge subject overlap only.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "It states no incompatible choice; missing detail alone is not conflict.",
+                "unclear": "A stated behavioral choice has genuinely ambiguous compatibility.",
+                "yes": "It uses argv rewriting alone, appends rather than prepends, or excludes some steps from prepending when a venv is named."
+              },
+              "instructions": "Does the delivered work in `item.text` explicitly conflict with the conditional every-step venv PATH prepend required by `anchor.statement`? Judge incompatible choices only. Silence, unspecified details, future deferral, and preserving PATH when runner.python is unset are not conflicts.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -2962,7 +3682,79 @@
           "Adds atm-core's tests/ directories to allowed_source_roots instead of adding a setting."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The required setting is absent, rejected, deferred, or replaced by roots, excludes, rule disabling, or a mode that includes integration-test targets.",
+                "unclear": "The source-only topic is mentioned but no definite provision of the required configurable scope can be determined.",
+                "yes": "The item commits to supplying or says it supplied a global_dependency_ownership config setting selecting checks limited to src/**/*.rs, excluding integration-test targets."
+              },
+              "instructions": "Does `item.text` explicitly plan or describe the ANC-029 configurable src/**/*.rs-only scope? Judge the complete obligation being stated, independently of proof.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No incompatible decision is stated; silence, investigation, and missing detail alone are not conflict.",
+                "unclear": "The described scope could include integration-test targets but the text does not resolve it.",
+                "yes": "The item explicitly rejects the setting, substitutes roots/excludes/disabling for it, or requires integration-test targets in the supposed source-only mode."
+              },
+              "instructions": "Does `item.text` explicitly choose behavior incompatible with offering the ANC-029 source-only config setting? Judge actual conflict; omission is not conflict.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item concerns another system activity with no dependency-ownership scope connection.",
+                "unclear": "The work area is too vague to determine whether dependency-ownership scope is touched.",
+                "yes": "The item changes, investigates, configures, or tests global_dependency_ownership / SCB-MANIFEST-004 or its source-file scope."
+              },
+              "instructions": "Does `item.text` concern the global_dependency_ownership policy or its SCB-MANIFEST-004 configuration and file scope? Judge subject overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No delivery claim is made, or it has no checkable supporting artifact.",
+                "unclear": "An artifact is mentioned but its support for this setting is indeterminate.",
+                "yes": "The claim of delivered configurable src-only behavior has a supporting path, diff, test name/output, or command result."
+              },
+              "instructions": "For the ANC-029 delivery claimed in `item.text`, is any supporting implementation path, diff, named regression, or command result identified? An assertion or future promise without such support is insufficient.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "The item is wholly silent on source-only scope, explicitly rejects or defers the setting, or substitutes roots/excludes/disabling or a mode including integration tests.",
+                "unclear": "Source-only scope is discussed or investigated, but the text leaves the status of the required configurable setting unresolved.",
+                "yes": "The delivered account says it supplied a global_dependency_ownership config setting selecting checks limited to src/**/*.rs, excluding integration-test targets."
+              },
+              "instructions": "Read `item.text` for delivery status of the global_dependency_ownership config option restricting checks to src/**/*.rs without separate integration-test targets. Distinguish positive delivery, explicit absence or silence, and topical discussion with no resolved status.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item concerns another system activity with no dependency-ownership scope connection.",
+                "unclear": "The work area is too vague to determine whether dependency-ownership scope is touched.",
+                "yes": "The item changes, investigates, configures, or tests global_dependency_ownership / SCB-MANIFEST-004 or its source-file scope."
+              },
+              "instructions": "Would completing the activity in `item.text` touch global_dependency_ownership, SCB-MANIFEST-004, or the policy selection of source files? Evaluate relevance alone.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No incompatible decision is stated; silence, investigation, and missing detail alone are not conflict.",
+                "unclear": "The described scope could include integration-test targets but the text does not resolve it.",
+                "yes": "The item explicitly rejects the setting, substitutes roots/excludes/disabling for it, or requires integration-test targets in the supposed source-only mode."
+              },
+              "instructions": "Is there an explicit incompatible alternative in `item.text` to the source-only setting required by ANC-029? Silence is allowed for this judgment; substituting suppression or scanning integration tests in that mode is incompatible.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -3017,7 +3809,79 @@
           "Verifies manifest_dependency_allowlists only and assumes the other two keys are covered."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "It omits the complete obligation, supplies only topic discussion, assumes coverage, omits keys, or uses only an unreleased baseline.",
+                "unclear": "Coverage classification is mentioned but its completeness or baseline cannot be determined.",
+                "yes": "The complete three-key classification against the current released tool is explicit."
+              },
+              "instructions": "Does `item.text` plan or require a coverage verdict, covered or not covered, for each of manifest_dependency_allowlists, global_dependency_ownership, and manifest_section_rules, against the latest released sc-lint-boundary? All three named keys can be referred to collectively. A not-covered finding counts. Assumptions and an unreleased-only comparison do not.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "It states no incompatible action, including silence, topical discussion, or valid not-covered findings.",
+                "unclear": "A stated approach may or may not contradict the required audit.",
+                "yes": "It assumes coverage without checking, explicitly excludes required keys, or substitutes an unreleased-only baseline."
+              },
+              "instructions": "Does `item.text` explicitly replace the required latest-release three-key audit with an incompatible approach? Silence and work limited to formatting do not conflict.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "It concerns an unrelated activity.",
+                "unclear": "The activity cannot be identified.",
+                "yes": "It concerns boundary-key coverage audit or parity-table work."
+              },
+              "instructions": "Does `item.text` concern auditing atm-core boundaries keys against sc-lint-boundary, or editing the parity table? Judge subject overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "The report gives no such support, gives only a claim, or supports a narrower incompatible audit.",
+                "unclear": "A cited reference cannot clearly be linked to the full claim.",
+                "yes": "A named artifact or reproducible check supports the claim for each of the three keys."
+              },
+              "instructions": "Is a concrete source of support cited for the claimed full latest-release coverage classification in `item.text`?",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "Only some keys are checked, others are assumed, no determinations are specified, or an unreleased branch replaces the release.",
+                "unclear": "The audit is present but whether its baseline or full key set is included remains ambiguous.",
+                "yes": "Every listed key is included in a release-based coverage determination, explicitly or as the three named keys."
+              },
+              "instructions": "Identify whether `item.text` says the delivered work completed the specified audit: manifest_dependency_allowlists, global_dependency_ownership, and manifest_section_rules each receives a covered/not-covered finding against latest released sc-lint-boundary. The obligation is classification, not achieving supported status. Generic discussion is insufficient. A future plan is not completed work. Present-tense descriptions of work (for example, verifies each key and records its verdict) count as an account of delivery; they need not use past tense. Only explicit future-only intentions fail for being a plan.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The activity touches neither.",
+                "unclear": "The activity is too vague to place.",
+                "yes": "The activity touches that verification or table, even if it only reformats it."
+              },
+              "instructions": "Is the activity in `item.text` within the anchor subject: atm-core [boundaries] coverage verification or its parity table?",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "There is no such choice; missing detail alone, formatting, or classifying a key not covered is not conflict.",
+                "unclear": "A positively stated choice has an uncertain relationship to the obligation.",
+                "yes": "A stated choice skips named keys, substitutes assumed coverage, or replaces latest release with an unreleased baseline."
+              },
+              "instructions": "Does `item.text` positively state a choice incompatible with verifying all three keys against the latest release? Do not infer conflict from absence. Maintaining or reformatting an existing table without reassessing it is not itself a decision to skip keys in the required audit; do not infer that an audit was replaced unless the item explicitly says so.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -3072,7 +3936,79 @@
           "Records uncovered keys in the parity table without filing any gap issues."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "It provides no fulfillment statement, merely mentions the topic, states a missing required issue.",
+                "unclear": "The described filing cannot clearly be matched to the obligation.",
+                "yes": "It states the per-uncovered-key filing action, or explicitly covers the empty-remainder case where all three keys are covered and no issue is due."
+              },
+              "instructions": "Does `item.text` express fulfillment or planned fulfillment of ANC-031: file in randlee/sc-lint a config-surface gap issue for every uncovered one of the three named keys?",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No breach is asserted. Silence and filing no issues after establishing every key is covered are allowed.",
+                "unclear": "The description leaves an expressed potential breach unresolved.",
+                "yes": "A known uncovered key is expressly left without its required issue, including an issue said to remain unfiled."
+              },
+              "instructions": "Does `item.text` explicitly describe a breach of the per-uncovered-key filing requirement? Judge an affirmative breach, not missing discussion.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item has no connection to these subjects.",
+                "unclear": "The subject is too vague to establish a connection.",
+                "yes": "The item concerns atm-core boundary coverage, its parity table, or sc-lint-boundary config-surface gap issues."
+              },
+              "instructions": "Does completing the work described by `item.text` bear on the boundary-coverage remainder described in `anchor.statement`?",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "Fulfillment is not claimed, or is claimed without such support.",
+                "unclear": "Potential supporting material is mentioned but its connection is unclear.",
+                "yes": "The filing claim or all-covered exception is supported by an issue reference, parity-table path, or another checkable cited artifact."
+              },
+              "instructions": "Is a claimed fulfillment of ANC-031 accompanied by a specific supporting artifact in `item.text`?",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "It provides no fulfillment statement, merely mentions the topic, states a missing required issue, or describes filing only as a future action.",
+                "unclear": "The described filing cannot clearly be matched to the obligation.",
+                "yes": "It reports that the required issues were filed, or explicitly covers the empty-remainder case where all three keys are covered and no issue is due."
+              },
+              "instructions": "Does `item.text` claim fulfillment of ANC-031: file in randlee/sc-lint a config-surface gap issue for every uncovered one of the three named keys?",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The item has no connection to these subjects.",
+                "unclear": "The subject is too vague to establish a connection.",
+                "yes": "The item concerns atm-core boundary coverage, its parity table, or sc-lint-boundary config-surface gap issues."
+              },
+              "instructions": "Does completing the work described by `item.text` bear on the boundary-coverage remainder described in `anchor.statement`?",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No breach is asserted. Silence and filing no issues after establishing every key is covered are allowed.",
+                "unclear": "The description leaves an expressed potential breach unresolved.",
+                "yes": "A known uncovered key is expressly left without its required issue, including an issue said to remain unfiled."
+              },
+              "instructions": "Does `item.text` explicitly describe a breach of the per-uncovered-key filing requirement? Judge an affirmative breach, not missing discussion.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -3127,7 +4063,79 @@
           "Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "The capability is omitted or explicitly rejected; merely naming its topic is insufficient.",
+                "unclear": "Export behavior is described ambiguously, so inclusion of the specific capability cannot be determined.",
+                "yes": "The item explicitly includes, preserves, or plans configurable native export of the runner.python venv interpreter as PYO3_PYTHON."
+              },
+              "instructions": "Does the item carry an explicit commitment or statement supporting native export of the runner.python venv interpreter under the name PYO3_PYTHON? No particular knob or unconditional export is required. Python-only export or a fixed system interpreter does not qualify.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No incompatible behavior is stated; silence and opt-in defaults are not conflict.",
+                "unclear": "A stated behavior might or might not prevent the required export.",
+                "yes": "An explicit behavior prevents the required native export or uses the wrong interpreter."
+              },
+              "instructions": "Is any described planned behavior irreconcilable with ANC-032 native export capability? This includes leaving clippy unable to obtain PYO3_PYTHON or ignoring runner.python. Merely not discussing the capability is no conflict; unset defaults with configurable export are allowed.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The work concerns a different subject outside the scope.",
+                "unclear": "The subject is too vague to determine scope overlap.",
+                "yes": "Runner configuration, step environments, or clippy behavior is involved."
+              },
+              "instructions": "Determine whether the described work falls within anchor.scope: runner config, step environment, or cargo clippy. A discussion of those topics is in scope even without the required capability.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No compliance claim has checkable support; bare assertion, silence, or only failure evidence.",
+                "unclear": "A possible artifact is mentioned but its support for the capability is ambiguous.",
+                "yes": "A concrete checkable artifact supports the claimed export capability."
+              },
+              "instructions": "Does the description supply something checkable for the claimed configured-interpreter export to native steps, such as a named passing child-environment test or a source diff? Unsupported assertions and artifacts that only show a violation are insufficient.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "The capability is absent, deferred, or explicitly not delivered.",
+                "unclear": "Export behavior is described ambiguously, so inclusion of the specific capability cannot be determined.",
+                "yes": "Delivered work claims configurable native export of the runner.python venv interpreter as PYO3_PYTHON."
+              },
+              "instructions": "Does the work account claim actual support for native export of the runner.python venv interpreter under the name PYO3_PYTHON? No particular knob or unconditional export is required. Python-only export or a fixed system interpreter does not qualify.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "The work concerns a different subject outside the scope.",
+                "unclear": "The subject is too vague to determine scope overlap.",
+                "yes": "Runner configuration, step environments, or clippy behavior is involved."
+              },
+              "instructions": "Determine whether the described work falls within anchor.scope: runner config, step environment, or cargo clippy. A discussion of those topics is in scope even without the required capability.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No incompatible behavior is stated; silence and opt-in defaults are not conflict.",
+                "unclear": "A stated behavior might or might not prevent the required export.",
+                "yes": "An explicit behavior prevents the required native export or uses the wrong interpreter."
+              },
+              "instructions": "Is any described delivered behavior irreconcilable with ANC-032 native export capability? This includes leaving clippy unable to obtain PYO3_PYTHON or ignoring runner.python. Merely not discussing the capability is no conflict; unset defaults with configurable export are allowed.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
@@ -3182,7 +4190,79 @@
           "Rewrites every leading python to runner.python, including python -m sc_lint.lint_cargo_deny."
         ]
       },
-      "question_overrides": {},
+      "question_overrides": {
+        "plan": {
+          "questions": {
+            "addressed": {
+              "criteria": {
+                "no": "Silent, topical only, partial scope, conflicting behavior, or no commitment to this full behavior.",
+                "unclear": "The account suggests this behavior but leaves whether the complete rule holds unresolved.",
+                "yes": "All ordinary lint/test steps, all OSes and the helper exclusion are included as required behavior."
+              },
+              "instructions": "Assess only the described item. Does it explicitly commit to the complete ANC-033 behavior? With runner.python configured, lint and test argv beginning with python resolve to the venv executable (Unix bin/python, Windows Scripts\\python.exe); python -m sc_lint.* helpers are excluded and keep the kit interpreter. Judge the presence of this full requirement, independently of proof. A partial topic mention or one isolated boundary is insufficient.",
+              "type": "choice"
+            },
+            "contradicted": {
+              "criteria": {
+                "no": "No explicit incompatible action is described, including silence, topical investigation, or compliant behavior.",
+                "unclear": "A stated behavior might conflict but its meaning cannot be resolved.",
+                "yes": "It explicitly selects PATH instead of the venv for an ordinary configured lint/test case, limits support by OS or step kind, or applies runner.python to a sc_lint.* helper."
+              },
+              "instructions": "Assess only the described item. Does it explicitly describe behavior incompatible with this rule? With runner.python configured, lint and test argv beginning with python resolve to the venv executable (Unix bin/python, Windows Scripts\\python.exe); python -m sc_lint.* helpers are excluded and keep the kit interpreter. Silence or limited work on another boundary is not conflict.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "It concerns a different subject and cannot affect this behavior.",
+                "unclear": "Its affected area cannot be determined.",
+                "yes": "It changes, plans, investigates, or refactors step argv construction or runner.python handling."
+              },
+              "instructions": "Assess only the described item. Does it touch crates/sc-lint step argv construction or runner.python interpreter handling? Judge subject overlap only.",
+              "type": "choice"
+            }
+          }
+        },
+        "dev": {
+          "questions": {
+            "evidenced": {
+              "criteria": {
+                "no": "No delivered compliance claim is made, or its support is only assertion/intention without a checkable artifact.",
+                "unclear": "An artifact is mentioned but whether it supports delivered compliance is unresolved.",
+                "yes": "A delivered compliance claim includes a supporting test name/output, path, diff, command result, or executable comparison."
+              },
+              "instructions": "Read item.text literally. Does a claim of delivered ANC-033 compliance cite a concrete checkable supporting artifact? Ordinary leading literal python must use runner.python venv for both lint and test steps on every OS; sc_lint.* wheel helpers remain on the kit interpreter. Judge supporting evidence only. A plan, bare assurance, or unrelated artifact is insufficient.",
+              "type": "choice"
+            },
+            "implemented": {
+              "criteria": {
+                "no": "Silent, topical only, partial scope, conflicting behavior, or only future work; the full behavior is not claimed delivered.",
+                "unclear": "The account suggests this behavior but leaves whether the complete rule holds unresolved.",
+                "yes": "All ordinary lint/test steps, all OSes and the helper exclusion are included in the delivered behavior."
+              },
+              "instructions": "Read item.text literally. Does it say the complete ANC-033 behavior was delivered? Future intentions do not count. Ordinary leading literal python must use runner.python venv for both lint and test steps on every OS; sc_lint.* wheel helpers remain on the kit interpreter. Judge the presence of this full requirement, independently of proof. A partial topic mention or one isolated boundary is insufficient.",
+              "type": "choice"
+            },
+            "relevant": {
+              "criteria": {
+                "no": "It concerns a different subject and cannot affect this behavior.",
+                "unclear": "Its affected area cannot be determined.",
+                "yes": "It changes, plans, investigates, or refactors step argv construction or runner.python handling."
+              },
+              "instructions": "Read item.text literally. Does it touch crates/sc-lint step argv construction or runner.python interpreter handling? Judge subject overlap only.",
+              "type": "choice"
+            },
+            "violated": {
+              "criteria": {
+                "no": "No explicit incompatible action is described, including silence, topical investigation, or compliant behavior.",
+                "unclear": "A stated behavior might conflict but its meaning cannot be resolved.",
+                "yes": "It explicitly selects PATH instead of the venv for an ordinary configured lint/test case, limits support by OS or step kind, or applies runner.python to a sc_lint.* helper."
+              },
+              "instructions": "Read item.text literally. Does it explicitly describe behavior incompatible with this rule? Ordinary leading literal python must use runner.python venv for both lint and test steps on every OS; sc_lint.* wheel helpers remain on the kit interpreter. Silence or limited work on another boundary is not conflict.",
+              "type": "choice"
+            }
+          }
+        }
+      },
       "version": 2,
       "status": "locked",
       "promoted_to": null,
