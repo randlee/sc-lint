@@ -174,30 +174,17 @@ impl ReleaseTarget {
     }
 }
 
-pub(crate) fn run_setup(loaded: &LoadedConfig, dry_run: bool) -> Result<Value, CliError> {
-    debug_assert!(
-        !CONSUMER_BOOTSTRAP_ASSET.is_empty(),
-        "the E.3 consumer bootstrap source asset must be packaged with the product"
-    );
-    run_with_probe(loaded, false, dry_run, |binary| probe_version(binary).ok())
-}
-
-pub(crate) fn run_upgrade(
-    loaded: &LoadedConfig,
-    check_only: bool,
-    dry_run: bool,
-) -> Result<Value, CliError> {
-    run_with_probe(loaded, check_only, dry_run, |binary| {
-        probe_version(binary).ok()
-    })
-}
-
-pub(crate) fn run_with_probe(
+pub(crate) fn run_with_probes(
     loaded: &LoadedConfig,
     check_only: bool,
     dry_run: bool,
     version_probe: impl Fn(&Path) -> Option<Version>,
+    payload_complete: impl Fn(&Path) -> bool,
 ) -> Result<Value, CliError> {
+    debug_assert!(
+        !CONSUMER_BOOTSTRAP_ASSET.is_empty(),
+        "the E.3 consumer bootstrap source asset must be packaged with the product"
+    );
     let (minimum_version, config_path) = loaded.compatibility_requirement()?;
     let release_version = ResolvedReleaseVersion::for_minimum(minimum_version);
     let target = ReleaseTarget::detect()?;
@@ -207,19 +194,21 @@ pub(crate) fn run_with_probe(
     let had_previous_installation = std::iter::once(managed_binary.clone())
         .chain(path_binary_candidates_if(use_path_candidates))
         .any(|binary| binary.is_file());
-    let existing = find_existing_installation(&managed_binary, minimum_version, version_probe);
+    let existing = find_existing_installation(
+        &managed_binary,
+        minimum_version,
+        version_probe,
+        payload_complete,
+    );
 
     if let Some((binary, version)) = existing {
-        return Ok(json!({
-            "status": "current",
-            "action": "found",
-            "minimum_version": minimum_version.to_string(),
-            "installed_version": version.to_string(),
-            "binary_path": binary.display().to_string(),
-            "install_dir": install_dir.display().to_string(),
-            "config_path": config_path.display().to_string(),
-            "summary": "a compatible sc-lint installation is already available",
-        }));
+        return Ok(existing_installation_result(
+            minimum_version,
+            &version,
+            &binary,
+            &install_dir,
+            config_path,
+        ));
     }
 
     let archive_name = target.archive_name(&release_version);
@@ -266,16 +255,36 @@ pub(crate) fn run_with_probe(
     }))
 }
 
+fn existing_installation_result(
+    minimum_version: &MinimumVersion,
+    version: &Version,
+    binary: &Path,
+    install_dir: &Path,
+    config_path: &Path,
+) -> Value {
+    json!({
+        "status": "current",
+        "action": "found",
+        "minimum_version": minimum_version.to_string(),
+        "installed_version": version.to_string(),
+        "binary_path": binary.display().to_string(),
+        "install_dir": install_dir.display().to_string(),
+        "config_path": config_path.display().to_string(),
+        "summary": "a compatible sc-lint installation is already available",
+    })
+}
+
 fn find_existing_installation(
     managed_binary: &Path,
     minimum_version: &MinimumVersion,
     version_probe: impl Fn(&Path) -> Option<Version>,
+    payload_complete: impl Fn(&Path) -> bool,
 ) -> Option<(PathBuf, Version)> {
     let use_path_candidates = env::var_os(INSTALL_DIR_ENV).is_none();
     let managed_existing =
         find_compatible_binary_with(managed_binary, minimum_version, false, |binary| {
             let version = version_probe(binary)?;
-            managed_payload_complete(binary).then_some(version)
+            payload_complete(binary).then_some(version)
         });
     managed_existing.or_else(|| {
         // PATH remains a development fallback only when there is no managed
@@ -572,7 +581,7 @@ fn payload_validation_issue_with_probe(
     None
 }
 
-fn managed_payload_complete(binary: &Path) -> bool {
+pub(crate) fn managed_payload_complete(binary: &Path) -> bool {
     managed_payload_validation_issue(binary).is_none()
 }
 
@@ -2098,9 +2107,11 @@ mod tests {
         let cli = crate::Cli::parse_from(args);
         let context = crate::CommandContext::from_cli(&cli).expect("command context");
         let loaded = crate::LoadedConfig::load(&cli, &context).expect("consumer config");
-        crate::command::execute_installer_with_version_probe(&context, &loaded, version_probe)
-            .map(|success| success.data)
-            .expect("installer command")
+        crate::command::execute_installer_with_test_probes(&context, &loaded, version_probe, |_| {
+            true
+        })
+        .map(|success| success.data)
+        .expect("installer command")
     }
 
     fn write_consumer_config(path: &Path, minimum: &Version) {
@@ -2126,6 +2137,7 @@ mod tests {
         built_artifact_directory().join(name)
     }
 
+    #[cfg(unix)]
     fn built_artifact_directory() -> PathBuf {
         env::current_exe()
             .expect("test executable")
@@ -2144,7 +2156,8 @@ mod tests {
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         let artifact_directory = built_artifact_directory();
         let target_dir = artifact_directory.parent().expect("Cargo target directory");
-        let build_status = Command::new("cargo")
+        let mut build = Command::new("cargo");
+        build
             .arg("build")
             .arg("--quiet")
             .arg("--target-dir")
@@ -2159,9 +2172,17 @@ mod tests {
                 "-p",
                 "sc-lint-runtime",
             ])
-            .current_dir(&workspace_root)
-            .status()
-            .expect("build release backend binaries");
+            .current_dir(&workspace_root);
+        build.process_group(0);
+        let mut child = build.spawn().expect("build release backend binaries");
+        let build_status = wait_for_backend_probe(
+            &mut child,
+            Path::new("cargo build"),
+            "cargo",
+            "release fixture build",
+            Duration::from_secs(300),
+        )
+        .expect("release fixture build completes before its deadline");
         assert!(build_status.success(), "backend binaries build");
     }
 
@@ -2264,23 +2285,35 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
 
             let about = backend_about(name).expect("known backend identity");
-            fs::write(
-            path,
-            format!(
-                    "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  printf '%s\\n' 'Usage: {name} <COMMAND>' '{about}' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
-            ),
-        )
-        .expect("backend probe");
+            let script = format!(
+                "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then\n  printf '%s\\n' 'Usage: {name} <COMMAND>' '{about}' 'Commands:' '  analyze  Analyze a workspace'\n  exit 0\nfi\nexit 97\n"
+            );
+            let mut child = Command::new("sh")
+                .args([
+                    "-c",
+                    "cat > \"$1\" && chmod 755 \"$1\"",
+                    "write-backend-probe",
+                ])
+                .arg(path)
+                .stdin(Stdio::piped())
+                .spawn()
+                .expect("backend probe writer starts");
+            child
+                .stdin
+                .take()
+                .expect("backend probe stdin")
+                .write_all(script.as_bytes())
+                .expect("backend probe script");
+            assert!(child.wait().expect("backend probe writer waits").success());
             let mut permissions = fs::metadata(path).expect("probe metadata").permissions();
             permissions.set_mode(0o755);
             fs::set_permissions(path, permissions).expect("make backend probe executable");
         }
         #[cfg(not(unix))]
         {
-            let executable = format!("{name}.exe");
-            let destination = path.with_file_name(format!("{name}.exe"));
-            fs::copy(built_artifact_directory().join(executable), destination)
-                .expect("copy built backend executable");
+            let _ = name;
+            fs::write(path.with_extension("exe"), "controlled backend fixture")
+                .expect("controlled backend placeholder");
         }
     }
 
