@@ -1,0 +1,219 @@
+{
+  "ANC-002": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not plan that behaviour: it covers other companion shapes only, speaks only generally of fewer false positives or better companion matching, says the #[cfg(unix)] function is still reported or that differently named functions are not companions, or is about something else.",
+          "unclear": "The item mentions differently named Windows functions, but it cannot be determined whether PORT-010 will count them as companions.",
+          "yes": "The item says PORT-010 pairs a #[cfg(unix)] function with a differently named #[cfg(windows)] function that does the same job (wording such as renamed companion, different name, Windows counterpart, or an example pair like connect_unix and connect_named_pipe), and that the paired #[cfg(unix)] function is not reported or flagged."
+        },
+        "instructions": "Does `item.text` plan for PORT-010 to count a #[cfg(windows)] function that has a different name but does the same job as the companion of a #[cfg(unix)] function, so that the #[cfg(unix)] function is not reported? The example pair is connect_unix and connect_named_pipe. Judge presence of this specific behaviour only; do not judge conflict.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "The item says none of that: it plans recognition of differently named companions, is silent about them, covers other shapes, keeps reporting only unpaired functions or ones whose Windows neighbour does a different job, or is about something else.",
+          "unclear": "The item says something about how PORT-010 treats differently named #[cfg(windows)] functions that could be read either way.",
+          "yes": "The item says a #[cfg(unix)] function with a differently named, same-job #[cfg(windows)] companion is still reported by PORT-010, is not paired, or is left to suppression instead of being recognised as paired."
+        },
+        "instructions": "Does `item.text` state that PORT-010 will keep reporting a #[cfg(unix)] function even though a differently named #[cfg(windows)] function doing the same job exists, that only identically named #[cfg(windows)] functions count as companions, or that such findings are left in place and silenced by suppression attributes, exclusions, or allowlists instead of PORT-010 recognising the companion? Silence about differently named companions is not a conflict. Still reporting a #[cfg(unix)] function that has no companion, or whose only #[cfg(windows)] neighbour does a different job, is not a conflict. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item is about something that does not affect PORT-010 findings on #[cfg(unix)] items, such as other rules, configuration keys, release work, or unrelated documentation.",
+          "unclear": "The item mentions portability or cfg attributes, but it is impossible to tell whether PORT-010 findings on #[cfg(unix)] items would change.",
+          "yes": "The item changes PORT-010's companion or fallback matching for #[cfg(unix)] items, or changes, keeps, or silences PORT-010 findings on #[cfg(unix)] items."
+        },
+        "instructions": "Does the work described in `item.text` change when or whether PORT-010 reports a #[cfg(unix)] item, for example by changing how PORT-010 pairs a #[cfg(unix)] item with a companion or fallback, or how its PORT-010 findings are produced or silenced? Judge subject overlap only. Do not judge whether the item follows `anchor.statement`.",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-001": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not plan that behaviour: it is silent about it, mentions only PORT-010, the issue, companions or helpers in general without the condition on the callers, covers a different shape, or describes PORT-010 continuing to report such a helper.",
+          "unclear": "The item describes a change to how PORT-010 handles `#[cfg(unix)]` helpers in words that might or might not include the condition on the callers.",
+          "yes": "The item says PORT-010 stops reporting, skips, or treats as covered a private or crate-visible `#[cfg(unix)]` helper because its callers are `#[cfg(unix)]` items with Windows or not(unix) siblings, in any wording (callers, call sites, paired or twin functions, non-unix counterparts)."
+        },
+        "instructions": "`anchor.statement` requires one specific behaviour: PORT-010 treats a private or pub(crate) `#[cfg(unix)]` helper as having a companion, and does not report it, when every caller of that helper is a `#[cfg(unix)]` item that has its own `#[cfg(windows)]` or `#[cfg(not(unix))]` sibling. Does `item.text` plan for, or state as an outcome, that behaviour, including the condition on the helper's callers? Judge presence of this behaviour only; do not judge conflict.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "Nothing in the item conflicts: it follows the requirement, is silent about it, concerns another shape or rule, or keeps reporting only helpers that have a caller without a sibling.",
+          "unclear": "The item describes PORT-010 handling of `#[cfg(unix)]` helpers in a way that might or might not report a helper whose callers all have siblings.",
+          "yes": "The item states that PORT-010 reports or keeps reporting a helper in the situation `anchor.statement` describes, or sets a rule under which such a helper would still be reported."
+        },
+        "instructions": "`anchor.statement` requires that PORT-010 not report a private or pub(crate) `#[cfg(unix)]` helper whose only callers are `#[cfg(unix)]` items that each have a `#[cfg(windows)]` or `#[cfg(not(unix))]` sibling. Does `item.text` plan or state something that cannot be reconciled with that requirement, for example PORT-010 still reporting such a helper, or counting such a helper as covered only when the helper itself has its own sibling? Silence is not conflict. Work on a different shape is not conflict. Reporting a helper that has at least one caller without such a sibling is not conflict, because `anchor.statement` covers only helpers whose callers all have siblings. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item works on something other than PORT-010 reporting, such as another rule, a configuration key, or another crate.",
+          "unclear": "The item text is too vague to tell whether it works on PORT-010 reporting.",
+          "yes": "The item works on when PORT-010 reports a `#[cfg(unix)]` item, for any shape."
+        },
+        "instructions": "Does `item.text` work on PORT-010, sc-lint's `#[cfg(unix)]` companion-parity check? Signals: the item names PORT-010 or companion-parity checking, or changes which `#[cfg(unix)]` items get a finding because of a `#[cfg(windows)]`, `#[cfg(not(unix))]` or other companion. Answer about subject matter only, whichever companion shape the item covers; do not judge whether it follows `anchor.statement`.",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-004": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not plan that: it covers other shapes, rules, or work only; refers to the issue, false positives, or transport code without describing the un-gated loopback-TCP sibling; keeps PORT-010 reporting the shape; or leaves the shape to suppression attributes or consumer code.",
+          "unclear": "The item describes a unix-only transport beside a TCP sibling but it cannot be told whether PORT-010 is planned to stop reporting it.",
+          "yes": "The item states that PORT-010 (or the structural parity rule) will accept, recognize, or stop reporting a unix-only transport, socket, or adapter function or match arm because an always-compiled, un-gated loopback, localhost, or 127.0.0.1 TCP sibling serves Windows."
+        },
+        "instructions": "Does `item.text` plan for PORT-010 to recognize the specific companion shape in `anchor.statement` and stop reporting it? The shape is a `#[cfg(unix)]` transport or adapter function, or a `#[cfg(unix)]` match arm, sitting beside a loopback-TCP sibling (an enum variant or a function) that carries no `#[cfg]` guard and is what Windows uses instead. Judge only whether this shape and the plan not to report it are present in the item; do not judge conflict.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "The item is silent about the shape, covers other work, plans for PORT-010 to recognize the shape, or keeps reporting only cases where no un-gated sibling exists.",
+          "unclear": "The item handles the shape in a way that might or might not leave PORT-010 reporting it.",
+          "yes": "The item says PORT-010 will keep reporting that shape, or handles that shape by another route instead of PORT-010 recognizing it, such as per-site allow attributes, a rule disable or exclusion, or consumer-side `#[cfg(windows)]` duplicates."
+        },
+        "instructions": "Does `item.text` commit to an outcome or approach that `anchor.statement` rules out? `anchor.statement` requires PORT-010 itself to recognize and not report a `#[cfg(unix)]` transport or adapter function or match arm whose un-gated loopback-TCP sibling serves Windows. Silence about this shape is not a conflict. Continuing to report a `#[cfg(unix)]` item whose TCP sibling is itself `#[cfg]`-gated is not a conflict. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item does not involve PORT-010 findings at all; it is about a different rule, tool, configuration surface, or activity.",
+          "unclear": "The item mentions portability or lint findings but it is not possible to tell whether PORT-010 reporting is affected.",
+          "yes": "The item plans, changes, tests, or decides PORT-010 reporting for `#[cfg(unix)]` code in any way, including keeping a PORT-010 finding, suppressing it, or resolving it in consumer code, or is a clear prerequisite for such work."
+        },
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor about the sc-lint rule PORT-010 (`anchor.statement`, `anchor.scope`). Decide whether the work in `item.text` changes, plans, or depends on whether PORT-010 reports a `#[cfg(unix)]` item. Judge subject overlap only; do not judge whether the item follows the anchor.",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-011": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not plan that behaviour: it is silent about it, names only the issue or lint-step configuration in general, adds a different key, supports only one of `env` and `cwd`, or keeps lint steps rejecting them.",
+          "unclear": "The item mentions lint-step environment or working directory, but its wording leaves it open whether lint steps will accept and apply both `env` and `cwd`.",
+          "yes": "The item says lint steps accept `env` and `cwd` (environment variables and working directory, in any wording) and that they apply to the step's command or child process, or that lint steps share the test command selector's handling of these keys."
+        },
+        "instructions": "`anchor.statement` requires one specific behaviour: a `[[tool.sc-lint.lint]]` step accepts both an `env` table and a `cwd` key, and sc-lint applies them to that step's child process with the same meaning they have on a test command selector. Does `item.text` plan for, or state as an outcome, that behaviour, with both `env` and `cwd`? Judge presence of this behaviour only; do not judge conflict.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "Nothing in the item conflicts: it follows the requirement, is silent about it, adds or rejects other keys, or concerns other work.",
+          "unclear": "The item describes lint-step keys in a way that might or might not leave `env` or `cwd` unsupported.",
+          "yes": "The item states that lint steps reject or do not support `env` or `cwd`, or gives them a meaning other than setting the step's child environment and working directory."
+        },
+        "instructions": "`anchor.statement` requires `[[tool.sc-lint.lint]]` steps to accept an `env` table and a `cwd` key, applied to the step's child process with the same meaning as on test command selectors. Does `item.text` plan or state something that cannot be reconciled with that requirement, for example lint steps still rejecting `env` or `cwd`, lint steps limited to keys that exclude them, or env/cwd applied somewhere other than the step's child process? Silence is not conflict. Adding a different key is not conflict. Continuing to reject other unknown keys is not conflict. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item works on something other than lint-step configuration or launching, such as a lint rule, an analyzer, or another crate.",
+          "unclear": "The item text is too vague to tell whether it works on lint steps.",
+          "yes": "The item works on lint-step keys or on how lint steps are run."
+        },
+        "instructions": "Does `item.text` work on sc-lint's `[[tool.sc-lint.lint]]` lint steps? Signals: the item names lint steps or `[[tool.sc-lint.lint]]`, adds or rejects a lint-step key, or changes how the lint runner spawns a step's command. Work on a lint rule such as PORT-010 or SCB-MANIFEST-004 is not work on lint steps. Answer about subject matter only; do not judge whether the item follows `anchor.statement`.",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-010": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not state that outcome: it is silent about PORT-010 site allowances, only investigates or mentions them, changes the attribute without saying PORT-010 skips the annotated item, uses another suppression mechanism, or says annotated items are still reported.",
+          "unclear": "The item names an outcome for an allow(PORT-010) annotated item, but its wording leaves open whether PORT-010 still reports that item.",
+          "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+        },
+        "instructions": "Does `item.text` commit to this outcome, either as new work or by keeping it working: an item that carries `#[sc_lint(allow(PORT-010), reason = \"...\")]` is not reported by PORT-010? Accept words such as honour, skip, suppress, exempt, records no finding, or not reported for the annotated item, function or declaration. Investigating, discussing or documenting site allowances without committing to that outcome does not count, and neither does a change to the attribute that never says PORT-010 leaves the annotated item unreported. Judge presence of the outcome only; do not judge conflict.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances.",
+          "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
+          "yes": "The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided."
+        },
+        "instructions": "Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item is about other rules or other work, such as lint-step env or cwd, SCB-MANIFEST rules, or release work, and touches neither PORT-010 reporting nor the allow attribute.",
+          "unclear": "The item text is too vague to tell whether it touches PORT-010 reporting or the allow attribute.",
+          "yes": "The item changes, extends, investigates, preserves or removes PORT-010 reporting, or the `#[sc_lint(allow(...))]` attribute or per-site allowances, including suppressing PORT-010 by any other mechanism."
+        },
+        "instructions": "Does the work in `item.text` plan, change, preserve, remove, or depend on how PORT-010 decides which items to report, or on the `#[sc_lint(allow(...))]` site-allowance attribute in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes? Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-013": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not state that outcome: it is silent about these paths, covers only one or two of the three prefixes, only names issue #136 or improving path handling without saying these paths stop being reported, says they keep being reported, or is about another rule.",
+          "unclear": "The item talks about how self::, crate:: or super:: paths are treated, but it cannot be determined whether local-module paths with all three prefixes stop being reported.",
+          "yes": "The item states that self::, crate:: and super:: paths whose next segment is a local module (or all such qualified paths) are not reported by SCB-MANIFEST-004, using words such as skips, no finding, not reported, not counted as a use of the crate, or resolved to the local module instead of the owned crate."
+        },
+        "instructions": "Does `item.text` state that SCB-MANIFEST-004 will not report a path beginning with self::, crate:: or super:: as a use of an owned crate when the segment after the prefix is a local module of the crate? All three prefixes must be covered, either named or by a rule that applies to all qualified paths. Judge presence of this outcome only; do not judge conflict.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "The item does not make or keep such paths reported; it fixes them, is silent, or concerns something else.",
+          "unclear": "It is not possible to tell from the item whether such paths would stay reported.",
+          "yes": "The item says such paths are or stay reported, or explicitly keeps the current matching unchanged."
+        },
+        "instructions": "Would carrying out `item.text` leave SCB-MANIFEST-004 reporting a self::X, crate::X or super::X path as a use of owned crate X when X is a local module, because the item says so or explicitly keeps the current matching unchanged? Silence is not a conflict. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item is about a different rule or activity, for example PORT-010, SCB-MANIFEST-003 or other Cargo.toml dependency-table handling, lint step configuration, or release work, and does not touch how SCB-MANIFEST-004 classifies source paths.",
+          "unclear": "The item mentions sc-lint-boundary or manifest rules, but it is not possible to tell whether it touches how SCB-MANIFEST-004 classifies source paths.",
+          "yes": "The item changes, keeps, or depends on SCB-MANIFEST-004's decision about whether a source path (use statements, self::, crate:: or super:: paths, extern crate, ::name or bare crate paths) is a use of an owned dependency, including any plan to resolve atm-core #136 for that check, whether by code, configuration or documentation."
+        },
+        "instructions": "Does `item.text` plan, change, or depend on how the SCB-MANIFEST-004 check (also called global_dependency_ownership or the dependency-ownership rule, in crates/sc-lint-boundary) decides that a path in Rust source is a use of an owned dependency? Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-008": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not state this behaviour: it is silent about typed-error rejection, covers only other companion shapes, names PORT-010 or #786 only in general terms, leaves PORT-010 reporting the case, or handles it outside PORT-010.",
+          "unclear": "The item mentions non-Unix rejection of the config but it cannot be determined whether PORT-010 would stop reporting the `#[cfg(unix)]` accessor or consumer.",
+          "yes": "The item states that PORT-010 stops reporting, or does not report, a `#[cfg(unix)]` accessor or consumer of a cross-platform config type because non-Unix code rejects that config with a typed error (an error type, an `Err(...)` value, or a validation error), in any wording."
+        },
+        "instructions": "`anchor.statement` requires one specific behaviour: PORT-010 counts non-Unix code that rejects a cross-platform config type with a typed error as the portable fallback for a `#[cfg(unix)]` accessor or consumer of that type, so that accessor or consumer is not reported (atm-core #786 shape S7). Does `item.text` plan or state that PORT-010 itself behaves this way? Judge presence of this specific behaviour only; do not judge whether anything in the item conflicts with it.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "Nothing in the item conflicts: it implements the behaviour, is silent about it, covers other shapes or rules, or keeps reporting only genuine parity gaps.",
+          "unclear": "The item describes PORT-010 behaviour for this case so ambiguously that it might or might not keep reporting it.",
+          "yes": "The item states that PORT-010 reports or keeps reporting this typed-error-rejection case, denies that the rejection is a fallback, or silences the case by suppression or workaround while PORT-010 is unchanged."
+        },
+        "instructions": "Does `item.text` state a plan or outcome that cannot be reconciled with `anchor.statement`? Conflicts include: PORT-010 keeps reporting a `#[cfg(unix)]` accessor or consumer of a cross-platform config type even though non-Unix code rejects that config with a typed error; the item says such a typed-error rejection is not a valid portable fallback; or the item leaves PORT-010 reporting that case and silences it with a per-site allow attribute, an exclusion, or a consumer workaround instead. Silence is not a conflict: an item that does not mention this case, or covers only other shapes or rules, does not conflict. Continuing to report a `#[cfg(unix)]` item that has no counterpart and no typed-error rejection does not conflict. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item is about other rules, other configuration keys, release work, or another activity, and says nothing about PORT-010 findings.",
+          "unclear": "The item is too vague to tell whether it touches PORT-010 findings.",
+          "yes": "The item plans, changes, tests, or decides how PORT-010 reports `#[cfg(unix)]` items, or resolves a PORT-010 finding by any means."
+        },
+        "instructions": "Does the work in `item.text` change, test, or decide which `#[cfg(unix)]` items sc-lint's PORT-010 companion-parity check reports or stops reporting? Signals that count: the item edits PORT-010 or crates/sc-lint-portability, adds or changes PORT-010 fixtures, decides how PORT-010 treats a `#[cfg(unix)]` accessor or consumer, or resolves an atm-core PORT-010 finding (issue #786 or #720) in any way, including by suppression. Judge subject overlap only; do not judge whether the item follows `anchor.statement`.",
+        "type": "choice"
+      }
+    }
+  }
+}
