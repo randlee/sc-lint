@@ -176,3 +176,76 @@ Passed:
 - All six live description/acceptance fields contain no retired GH-136/GH-198/GH-786 trace IDs or draft ANC labels; anchors.json and anchors.md are unchanged against the r1 head.
 
 A new planning judge run is required after the lead resolves scope triage. ANC-018/020/021 still await their separate definition work and were not judged in r1.
+
+## Round 2 follow-up (lint-q397)
+
+After r2 at 9ba6b466, reserve ANC-014 for m-5b's final zero-on-18-path acceptance. Keep m-1/m-5a layer notes as plain prose, outside Active Trace. Scope m-5b's name/co-location restrictions to platform_companions declarations, preserving inherited ANC-026 pairing. Add the inline ANC-023 setup citation. These are wording/trace repairs to existing obligations; no new scope. The m-3 ANC-024 wording, all anchors/questions/fixtures and ADR/REQ status remain unchanged. Rand-pending interpreter and scope decisions remain unresolved. No planning-gate PASS is claimed.
+
+Exact live-bead delta:
+
+```diff
+--- lint-m-1/description/before
++++ lint-m-1/description/after
+@@ -5,7 +5,7 @@
+ 2. Replace port010_fixture_crate_root_main_current_behaviour and widen regressions to all S3 source shapes in atm_temp_sweeper.rs::from_metadata (inherent method), persistence.rs::sync_parent_directory, atm-daemon-bootstrap/lib.rs::unix_socket_config, loopback_tcp.rs::{create_private_record_file,validate_record_parent}, and atm/src/main.rs::restore_default_sigpipe. Cover crate roots, inline modules and out-of-line modules. Add true-gap negatives: absent/different-name/different-scope/different-impl/test-only/unrelated-cfg sibling.
+ 3. Update PORT-010 docs and fixture provenance; expose the S3 companion classification to the subsequent conservative-helper pass in m-5a.
+ ## Does Not Close
+-m-5a/m-5b own S1/S2/S4-S8 and final #786 closure. A helper of an S3 paired function is not automatically exempt in m-1. Trait-impl behavior and general Boolean cfg equivalence remain unchanged.
++m-5a/m-5b own S1/S2/S4-S8 and final #786 closure. A helper of an S3 paired function is not automatically exempt in m-1. Trait-impl behavior and general Boolean cfg equivalence remain unchanged. This layer removes the six S3 occurrences; m-5b owns final 47-item closure.
+ 
+ ## Active Trace
+-ANC-026; ANC-018, ANC-020. ANC-014 layer share: the six S3 occurrences produce no PORT-010 finding; final 47-item closure belongs to m-5b.
++ANC-026; ANC-018, ANC-020.
+--- lint-m-3/description/before
++++ lint-m-3/description/after
+@@ -2,7 +2,7 @@
+ #198: replace atm-core's repository-Python, kit-helper and PyO3/clippy glue with supported consumer runtime config. Rand confirmed on 2026-10-30 that runner.export_env (PYO3_PYTHON plus venv on child PATH) is in scope; this does not accept ADR-021 as a whole. Blocked on Rand accepting revised ADR-021 decisions 1-4 and activating REQ-CLI-026.
+ ## Deliverables
+ 1. Accept tool.sc-lint.setup.pre argv, runner.python and runner.kit_python venv paths and runner.export_env list. The consumer commitment is pre=["just","bootstrap"], python=".bootstrap-venv", export_env=["PYO3_PYTHON"]. Validate fields/types/empties and export allowlist; retain root-level table rejection (REQ-CLI-026).
+-2. Run pre=["just","bootstrap"] once from repo root: the consumer bootstrap builds .bootstrap-venv before sc-lint provisioning, replacing atm-core's setup glue, with ADR-021 status/failure and check/dry-run behavior. Synchronize all three bootstrap copies; direct binary setup must not run it again.
++2. ANC-023: Run pre=["just","bootstrap"] once from repo root: the consumer bootstrap builds .bootstrap-venv before sc-lint provisioning, replacing atm-core's setup glue, with ADR-021 status/failure and check/dry-run behavior. Synchronize all three bootstrap copies; direct binary setup must not run it again.
+ 3. Route selected lint AND TEST steps through one runtime resolver: plain python uses runner.python, falling back to kit Python when unset; sc-lint-python -m sc_lint.<module> and python -m sc_lint.<module> use kit Python by default; explicit runner.kit_python selects a consumer-provisioned override venv. runner.python alone never overrides helper choice. Missing selected kit/repo environments fail rather than silently using PATH. Preserve argv, test forwarding, scheduler edges, skipped steps and inspection-only test --list.
+ 4. Prepend configured runner bin/Scripts to every selected step's child PATH, including native cargo clippy, cargo xwin clippy and kit helpers; export PYO3_PYTHON when opted in. Explicit exports replace inherited values, preserve other environment and never modify parent environment. Executable choice for kit helpers follows kit default or explicit runner.kit_python regardless of child PATH.
+ 5. Add deterministic resolver/process/adoption tests, and migration docs for 26 lint + 3 test repository steps, four kit helpers with twelve OS-specific entries, and both native/xwin clippy steps. Show replacement of _py, python_cmd, _sc-lint-py, sc_lint_clippy_prefix and _sc-lint-clippy without embedded per-OS paths. Repository-script steps formerly invoked by _py use runner.python=".bootstrap-venv"; native/xwin clippy recipe steps formerly wrapped by sc_lint_clippy_prefix and _sc-lint-clippy receive that same .bootstrap-venv interpreter through child PATH and PYO3_PYTHON. Any sc_lint.* helper invocation formerly reached through those recipes follows the separate kit default (ANC-022) or explicit kit_python override (ANC-019), not runner.python executable selection.
+--- lint-m-5a/description/before
++++ lint-m-5a/description/after
+@@ -6,7 +6,7 @@
+ 3. Upgrade existing f4746d500 reductions to preserve the actual caller bodies, cfg blocks, imports and enclosing module graph needed for S1/S5 and strict S6 classification. Add S1/S5 positive and true-gap/ambiguous-use negatives, plus S6 non-exemption regressions. Preserve current explicit adapter rules outside the newly proven cases.
+ 4. Extend fixture README/tests with all 18 issue paths, every one of 47 baseline item diagnostics, S1-S8 classifications, owning sprint and expected remaining findings after this layer. Record measured baseline->post-m-1->post-m-5a counts; no claim of zero until m-5b and S8 are complete.
+ ## Does Not Close
+-S2/S4/S7 reviewed declarations, S6 exact-item exceptions and decided S8 public-helper exemption are m-5b; final zero/18-path acceptance belongs there. No name heuristics, consumer default paths, blanket exclusion or widening allowed roots.
++S2/S4/S7 reviewed declarations, S6 exact-item exceptions and decided S8 public-helper exemption are m-5b; final zero/18-path acceptance belongs there. No name heuristics, consumer default paths, blanket exclusion or widening allowed roots. This layer removes proven S1/S5 false positives and reports exact residuals; m-5b owns final zero.
+ 
+ ## Active Trace
+-ANC-018, ANC-020. ANC-014 layer share: remove the proven S1/S5 false positives and report the exact residuals; m-5b owns final zero. ANC-026 preservation: inherited m-1 S3 same-name cfg(not(unix)) pairs remain unreported in module, inherent-impl and crate-root scopes; retain those regressions while adding caller-index fixtures.
++ANC-018, ANC-020. ANC-026 preservation: inherited m-1 S3 same-name cfg(not(unix)) pairs remain unreported in module, inherent-impl and crate-root scopes; retain those regressions while adding caller-index fixtures.
+--- lint-m-5b/description/before
++++ lint-m-5b/description/after
+@@ -1,7 +1,7 @@
+ ## Goal
+ #786: close S2/S4/S7 with explicit reviewed item companions and S6 only through verified parity or approved exact declarations, using m-5a's scope/caller/module index. Rand ruled S8 EXEMPT on 2026-10-30; use exact reviewed posix_only declarations with required reasons. No separate S8 gate remains; whole-ADR acceptance still blocks implementation. This is the owner of final 18-path closure.
+ ## Deliverables
+-1. Implement only the Accepted ADR-021 platform_companions surface: confined Unix/counterpart file refs, uniquely resolved qualified item refs, kind=function|transport|refusal and mandatory reason. Validate production cfg context and counterpart evidence; do not infer intention from names or adjacent code. Feed validated roots into the existing helper proof so their private helpers can qualify.
++1. Implement only the Accepted ADR-021 platform_companions surface: confined Unix/counterpart file refs, uniquely resolved qualified item refs, kind=function|transport|refusal and mandatory reason. Validate production cfg context and counterpart evidence; for platform_companions declarations, do not infer intention from names or adjacent code. Feed validated roots into the existing helper proof so their private helpers can qualify.
+ 2. Cover S2 differently named Windows companions; S4 portable loopback transport selected beside Unix arm/adapter; S7 accessor/config consumer with explicit non-unix refusal; and S6 only through verified counterpart evidence or approved reasoned exact declarations. Private cfg(unix) module status alone never grants an exemption, nor does one module declaration blanket-cover unapproved descendants. Add exact positive fixtures and missing/stale/ambiguous/test-only/wrong-cfg/unsupported-item negatives. Unrelated same-file Unix items keep reporting.
+ 3. Implement the decided S8 exemption for public POSIX-only is_owned_by_uid/current_uid using kind=posix_only with unix_file, unix_item and mandatory reason, without counterpart fields. Validate confined existing production Unix items and exact identity. Never hard-code consumer names in product defaults or make arbitrary public helpers inherit S1. ADR-021 declaration syntax remains Pending until whole-record acceptance.
+ 4. Verify all 18 paths with their PORT-010 exclusions removed using a temporary consumer config at pinned 6ffaa97be. Provide required reviewed declarations/reasons in the fixture/migration example, assert zero PORT-010 findings with the decided S8 exemption, and keep true-gap negative fixtures reported. Update the #786 47-item classification/closure table and its fixture docs and mark #720/#786 closure coverage honestly.
+@@ -9,4 +9,4 @@
+ No Windows behavioral-equivalence claim: consumer investigators only confirmed some sibling existence, not their behavior. No consumer repo edits, generic Boolean cfg solver, default per-repo item list or blanket production suppression.
+ 
+ ## Active Trace
+-ANC-014, ANC-018, ANC-020, ANC-021; ANC-026 preservation from m-1: S3 pairs remain unreported in final verification.
++ANC-014 final acceptance: zero PORT-010 findings on all 18 paths; ANC-018, ANC-020, ANC-021; ANC-026 preservation from m-1: S3 pairs remain unreported in final verification.
+--- lint-m-5b/acceptance_criteria/before
++++ lint-m-5b/acceptance_criteria/after
+@@ -1,5 +1,5 @@
+ ## Acceptance Criteria
+-- issue:#786: every S2/S4/S7 exemption resolves exact production items plus applicable cfg/refusal evidence and nonempty reason; omitted/stale/malformed/ambiguous declarations error or keep the true gap visible. Same-file or similarly named unrelated items never become exempt.
++- issue:#786: every S2/S4/S7 exemption resolves exact production items plus applicable cfg/refusal evidence and nonempty reason; omitted/stale/malformed/ambiguous declarations error or keep the true gap visible. A platform_companions declaration never exempts an unrelated item merely because it shares a file or similar name.
+ - S8 follows Rand's EXEMPT ruling: exact reviewed posix_only records with required reasons produce no PORT-010 findings for is_owned_by_uid/current_uid; unrelated public true-gap fixtures still report. Whole-ADR approval remains required for declaration syntax. Final accepted contract supports zero findings on all 18 pinned paths with PORT-010 exclusions removed.
+ - Final 47-item table and full consumer reproduction show zero PORT-010 findings, including atm_temp.rs mixed cases and all six inherited S3 same-name cfg(not(unix)) pairs in module, inherent-impl and crate-root scopes; synthetic true parity gaps still report. Every configured relation/exception has a reason. Source pin and commands/results recorded in fixture provenance/PR evidence.
+ - req:REQ-PRODUCT-002: finding IDs/schema and existing adapters stable; unknown keys/kinds, non-confined paths, test-only/missing/cfg-invalid/ambiguous refs and missing reasons have deterministic typed errors with indexed fields/recovery. Consumer-neutral shipped defaults contain no atm-core-specific paths/items.
+
+```
+
+Validation: `validate-plan --phase m --index docs/plans/phase-m.jsonl` passed (6 sprints); `validate-plan --ci` passed (4 tracked phase files); `just lint` passed; `just test` passed. A mechanical before/after check confirms m-3 changed only by the inline ANC-023 citation. Anchors and their rendered Markdown are unchanged against the r2 head.
