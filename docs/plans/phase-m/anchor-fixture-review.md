@@ -1,6 +1,6 @@
 # Phase M fixture review
 
-Prepared 2026-10-30 by flint for Rand's approval. Nothing is locked. Approving here approves each record's **pass** and **fail** sentence as the frozen fixtures the question tuner and the gates measure against; it does not lock the statements.
+Prepared 2026-10-30 by flint for Rand's approval. The 18 active records were locked on 2026-10-30 (see intent.md for the amend path). Approving here approves each record's **pass** and **fail** sentence as the frozen fixtures the question tuner and the gates measure against.
 
 18 active records. Results are from the live runs committed under `anchor-runs/` (rubric r11, check-fixtures r11). Expected: pass → `satisfied`; fail → `not_addressed` or `contradicted`. ✗ marks a sentence that did not land as expected. A rubric cell is weak when it is not `yes` at confidence ≥ 0.6.
 
