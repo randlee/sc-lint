@@ -120,8 +120,20 @@ jobs:
               "windows_url": url,
               "windows_sha256": hashlib.file_digest(archive.open("rb"), "sha256").hexdigest(),
               "extract_dir": f"{project['archive_prefix']}_{os.environ['RELEASE_VERSION']}_{target['target']}",
+              "has_windows_arm64": "installer_arm64_target" in channel,
+              "windows_arm64_url": "",
+              "windows_arm64_sha256": "",
+              "arm64_extract_dir": "",
               "binary": channel["binary"],
           }
+          if "installer_arm64_target" in channel:
+              arm_target = config["release_targets"][channel["installer_arm64_target"]]
+              arm_url, arm_archive = download(arm_target)
+              variables.update(
+                  windows_arm64_url=arm_url,
+                  windows_arm64_sha256=hashlib.file_digest(arm_archive.open("rb"), "sha256").hexdigest(),
+                  arm64_extract_dir=f"{project['archive_prefix']}_{os.environ['RELEASE_VERSION']}_{arm_target['target']}",
+              )
           Path("scoop-vars.json").write_text(json.dumps(variables), encoding="utf-8")
           PY
       - name: Render Scoop manifest with published renderer

@@ -100,6 +100,34 @@ jobs:
           fi
           echo "already_published=${already_published}" >> "$GITHUB_OUTPUT"
 
+      - name: Map installer architectures to asset patterns
+        id: installer_patterns
+        shell: bash
+        env:
+          CHANNEL_CONFIG: ${{ needs.verify-release.outputs.channel_config }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+
+          config = json.loads(os.environ["CHANNEL_CONFIG"])
+          channel = config["channel"]
+          targets = {"x64": channel["installer_target"]}
+          if channel.get("installer_arm64_target"):
+              targets["arm64"] = channel["installer_arm64_target"]
+          patterns = []
+          for target_name in targets.values():
+              target = config["release_targets"][target_name]
+              prefix = re.escape(config["project"]["archive_prefix"])
+              pattern = rf"^{prefix}_.*_{re.escape(target_name)}\.{re.escape(target['archive'])}$"
+              if pattern not in config["asset_patterns"]:
+                  raise SystemExit(f"missing verified installer pattern for {target_name}")
+              patterns.append(f"({pattern})")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"regex={'|'.join(patterns)}\n")
+          PY
+
       - name: Publish to Winget
         if: ${{ steps.winget_probe.outputs.already_published != 'true' }}
         # Pinned to the v2 release commit so this leg's behavior cannot change
@@ -108,7 +136,11 @@ jobs:
         with:
           identifier: ${{ fromJSON(needs.verify-release.outputs.channel_config).channel.identifier }}
           release-tag: ${{ inputs.tag }}
-          installers-regex: ${{ fromJSON(needs.verify-release.outputs.channel_config).asset_patterns[0] }}
+          # The releaser infers architecture from asset filenames. The aarch64
+          # to arm64 mapping remains unverified until the first ARM submission.
+          # Check the generated installer manifest for Architecture: arm64
+          # and the ARM64 asset URL before submitting it.
+          installers-regex: ${{ steps.installer_patterns.outputs.regex }}
           # Must authorize a fork of microsoft/winget-pkgs; the repository
           # GITHUB_TOKEN is intentionally not used for this external channel.
           token: ${{ secrets.WINGET_GITHUB_TOKEN }}

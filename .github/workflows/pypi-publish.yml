@@ -79,6 +79,10 @@ jobs:
             --manifest release/publish-artifacts.toml \
             --asset-dir release-assets \
             --copy-to dist
+          # Older immutable tags predate the architecture verifier.
+          if [[ -f .github/scripts/verify_sc_lint_wheels.py ]]; then
+            python3 .github/scripts/verify_sc_lint_wheels.py release/publish-artifacts.toml dist
+          fi
       - name: Select configured Python repository
         shell: bash
         env:

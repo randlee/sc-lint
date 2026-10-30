@@ -294,7 +294,7 @@ def _channel_asset_patterns(manifest: dict, channel_name: str) -> list[str]:
             target_names.append(asset["target"])
     elif channel_name in ("winget", "scoop"):
         _require_keys(channel, ("installer_target",), f"[channels.{channel_name}]")
-        target_names = [channel["installer_target"]]
+        target_names = [channel["installer_target"]] + ([channel["installer_arm64_target"]] if channel.get("installer_arm64_target") else [])
     else:
         return []
 
