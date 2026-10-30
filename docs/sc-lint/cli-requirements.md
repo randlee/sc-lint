@@ -450,7 +450,12 @@ specialized backend tools and mixed Rust/Python implementations.
   `bin/python` on Linux/macOS and `Scripts/python.exe` on Windows.
   A leading `python` falls back to kit Python when no repository venv is
   configured. `sc-lint-python -m sc_lint.<module>` and
-  `python -m sc_lint.<module>` always use the kit interpreter. A configured
+  `python -m sc_lint.<module>` use the kit interpreter by default; a consumer
+  may explicitly override it with the venv path `runner.kit_python`.
+  That override also selects the no-runner plain Python fallback, remains
+  independent of `runner.python`, and never falls back silently if missing.
+  The consumer provisions the override environment and required helper
+  package. A configured
   runner prepends its executable directory to every selected lint/test
   child's `PATH`, including cargo clippy/xwin;
   `runner.export_env = ["PYO3_PYTHON"]` additionally exports that absolute

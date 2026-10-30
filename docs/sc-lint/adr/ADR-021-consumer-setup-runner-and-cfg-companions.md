@@ -42,19 +42,28 @@ helpers are exempt because they are not a cross-platform parity gap.
    from repo root and accept absolute paths. Exactly a leading `python`
    selects `<venv>/bin/python` on Linux/macOS or
    `<venv>/Scripts/python.exe` on Windows. When unset, leading `python`
-   selects the kit interpreter. Preserve subsequent argv, test argument
+   selects the kit interpreter or its explicit consumer override in decision
+   3. Preserve subsequent argv, test argument
    forwarding and scheduler dependencies. Do not rewrite `python3`, explicit
    executable paths or later `python` tokens. Selection applies equally to
    selected lint and test steps; list/skipped/unselected steps do not resolve
    interpreters.
 3. **Kit helpers.** A command `sc-lint-python -m sc_lint.<module> [args...]`
-   explicitly selects the pinned kit interpreter on every OS. Also recognize
+   selects the pinned kit interpreter by default on every OS. Also recognize
    `python -m sc_lint.<module>` as a kit helper before applying the repository
    Python rule. `runner.python` never overrides these helper executables.
+   A consumer may knowingly override that default with the non-empty venv
+   path `[tool.sc-lint.runner].kit_python`. Resolve relative paths from repo
+   root and accept absolute paths. This selects `<venv>/bin/python` or
+   `<venv>/Scripts/python.exe` for both helper forms and the no-runner plain
+   Python fallback. It is separate from `runner.python`; when both are set,
+   repository script steps use `runner.python` and helpers use `kit_python`.
+   Without the override, resolve `.sc-lint/venv/bin/python3` or
+   `Scripts/python.exe`, matching bootstrap's wheel environment. A selected
+   missing default or override fails; never fall back to PATH or source-tree
+   modules. The consumer owns provisioning the override venv and its required
+   `sc_lint` package; setup does not create or populate that environment.
    This replaces OS-specific paths without adding one command per helper.
-   Resolve consumer kit Python only from `.sc-lint/venv/bin/python3` or
-   `Scripts/python.exe`, matching bootstrap's wheel environment; never use
-   PATH or source-tree modules if that consumer environment is missing.
    Existing source-maintainer adapters retain their separate source fallback.
 4. **Child environment.** When `runner.python` is configured, prepend its
    bin/Scripts directory to each selected consumer step's child `PATH`,
@@ -91,6 +100,16 @@ helpers are exempt because they are not a cross-platform parity gap.
    exact Unix item, not the whole file, unrelated public items or arbitrary
    callers. The reason records reviewed equivalence/refusal; the analyzer
    checks structure, not behavioral equivalence of platform implementations.
+7. **Strict module boundaries.** A private `cfg(unix)` module alone is not
+   an exemption. Preserve a PORT-010 finding on an unpaired module boundary
+   unless a verified counterpart or approved, reasoned exact declaration
+   covers the exact item. Building module/cfg context is analysis, not an
+   exemption for the module or its descendants: m-5a retains S6 findings;
+   m-5b may apply approved declarations to the exact items they name.
+   No blanket file or private module opt-out is introduced. Rand's approved
+   exception path is an exact
+   reviewed declaration with a required reason; no counterpart means strict
+   reporting unless that path explicitly applies.
 
 Decisions 1–4 supersede ADR-020 decision 9 and amend decision 13's closed key
 list only for nested `setup`/`runner`; root-level tables remain rejected.
@@ -98,7 +117,7 @@ They amend ADR-016 and REQ-CLI-021 only for these runtime settings; proposed
 REQ-CLI-026 becomes effective on acceptance. Bootstrap/scaffolding stay
 Python/declarative. Rust keeps profile planning, scheduling and runtime
 executable/environment selection; no second Python planner is introduced.
-Decisions 5–6 extend ADR-010/ADR-017 structural parity only as stated.
+Decisions 5–7 extend ADR-010/ADR-017 structural parity only as stated.
 
 ## Decided Rand Ruling — S8 Exempt
 
@@ -108,7 +127,9 @@ are exempt: the POSIX-only concepts are not a parity gap. Represent this
 through an exact reviewed `platform_companions` record with
 `kind = "posix_only"`, `unix_file`, `unix_item` and non-empty `reason`.
 This variant needs no counterpart fields; validate its confined production
-item and Unix cfg. It does not automatically exempt other public helpers or
+item and Unix cfg. This is the approved, reasoned opt-out path Rand requested,
+not automatic suppression of public POSIX-only items. It does not exempt
+other public helpers or
 hard-code atm-core names in product defaults. The third deliberate helper,
 `has_group_or_world_bits`, is private and is evaluated under S1.
 
