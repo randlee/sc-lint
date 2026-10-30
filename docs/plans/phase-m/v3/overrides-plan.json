@@ -34,29 +34,29 @@
     "questions": {
       "addressed": {
         "criteria": {
-          "no": "The item does not plan it: no mention, an undecided rework, another shape, another visibility, a helper with an unpaired caller, continued reporting, or suppression by per-site allows instead of the rule.",
-          "unclear": "The item describes changing PORT-010 helper handling, but whether it applies to helpers with paired callers cannot be told.",
-          "yes": "The item plans or states that PORT-010 stops reporting, skips, or treats as covered such a helper because its callers are paired, in any wording."
+          "no": "`item.text` makes no such commitment: it does not mention helpers of such items, covers only the caller or transport functions or other shapes, only keeps reporting helpers of callers without any companion, defers, keeps the finding, carves out recognised companion kinds or helper chains, or hides findings with allows or exclusions.",
+          "unclear": "`item.text` mentions an outcome for such helpers that cannot be read either way.",
+          "yes": "`item.text` commits that such helpers get no PORT-010 finding, in the statement's words or a paraphrase, for some or all of the companion kinds, with no carve-out keeping others reported."
         },
-        "instructions": "Read `item.text` as a plan. After it is done, will PORT-010 by its own logic give no finding for a private or pub(crate) `#[cfg(unix)]` helper whose every caller is a `#[cfg(unix)]` item that has its own `#[cfg(windows)]` or `#[cfg(not(unix))]` sibling, and does the item say so, naming that condition on the callers? Judge only whether this behaviour is planned.",
+        "instructions": "Does `item.text` commit to the outcome `anchor.statement` requires, namely no PORT-010 finding for a private or pub(crate) #[cfg(unix)] helper whose every production reference is a call inside a #[cfg(unix)] item that has a recognised companion (a #[cfg(windows)] or #[cfg(not(unix))] sibling, a renamed non-Unix counterpart, an un-gated portable alternative such as a loopback TCP function, or being itself such an accepted helper)? The commitment must be about the helper, not about the caller or transport function. Partial wording that names one companion kind counts; wording that keeps any such helper reported does not. Judge commitment only, not conflict.",
         "type": "choice"
       },
       "contradicted": {
         "criteria": {
-          "no": "Nothing in the item conflicts: it follows the requirement, is silent about it, concerns another shape or rule, or keeps reporting only helpers that have a caller without a sibling.",
-          "unclear": "The item describes PORT-010 handling of `#[cfg(unix)]` helpers in a way that might or might not report a helper whose callers all have siblings.",
-          "yes": "The item states that PORT-010 reports or keeps reporting a helper in the situation `anchor.statement` describes, or sets a rule under which such a helper would still be reported."
+          "no": "The item plans no such thing: it stops reporting such helpers (for some or all companion kinds), is silent about them, defers, or keeps findings only outside that situation.",
+          "unclear": "The item's plan for such helpers cannot be read either way.",
+          "yes": "The item plans that some such helper is still reported: the rule is unchanged and the finding is kept or hidden with an allow or exclusion, only some companion kinds or only the helper's own sibling are accepted, or acceptance does not pass through helper chains."
         },
-        "instructions": "`anchor.statement` requires that PORT-010 not report a private or pub(crate) `#[cfg(unix)]` helper whose only callers are `#[cfg(unix)]` items that each have a `#[cfg(windows)]` or `#[cfg(not(unix))]` sibling. Does `item.text` plan or state something that cannot be reconciled with that requirement, for example PORT-010 still reporting such a helper, or counting such a helper as covered only when the helper itself has its own sibling? Silence is not conflict. Work on a different shape is not conflict. Reporting a helper that has at least one caller without such a sibling is not conflict, because `anchor.statement` covers only helpers whose callers all have siblings. Judge conflict only.",
+        "instructions": "`anchor.statement` forbids PORT-010 from reporting a private or pub(crate) #[cfg(unix)] helper whose callers are all #[cfg(unix)] items with a recognised companion (a #[cfg(windows)] or #[cfg(not(unix))] sibling, a renamed non-Unix counterpart, an un-gated portable alternative such as a loopback TCP function, or being itself such an accepted helper). Does `item.text` plan the opposite for some such helper? Not conflict: planning that PORT-010 stops reporting such helpers, even for only one companion kind; silence; a deferred decision; work on other shapes; still reporting a helper that has a caller with no companion of any kind; still reporting exported pub functions; per-site allows on unix-only-by-design sites. Judge conflict only.",
         "type": "choice"
       },
       "relevant": {
         "criteria": {
-          "no": "The item works only on something else: another PORT-010 shape (trait impls, exported pub functions, helpers with a caller that has no sibling, per-site allows for other shapes), another rule, a configuration key, or another crate.",
-          "unclear": "The item mentions PORT-010 and `#[cfg(unix)]` helpers but is too vague to tell whether it concerns helpers whose callers have siblings.",
-          "yes": "The item decides, changes or reworks PORT-010's handling of such a helper (one whose callers are `#[cfg(unix)]` items with Windows or not(unix) siblings), in any wording, alone or together with other shapes."
+          "no": "No subject is such a helper: the item covers only other PORT-010 shapes (the #[cfg(unix)] transport or caller functions themselves without their helpers, trait impls, unix-only modules, unix-only-by-design sites allowed per site, exported pub functions, helpers with a caller that has no companion of any kind), other rules, configuration, or release work.",
+          "unclear": "`item.text` mentions #[cfg(unix)] helpers in wording that cannot be placed as S1 or another subject.",
+          "yes": "One subject in `item.text` is such a helper, whatever the item plans for it."
         },
-        "instructions": "Does `item.text` work on how PORT-010, sc-lint's `#[cfg(unix)]` companion-parity check, treats a private or pub(crate) `#[cfg(unix)]` helper whose callers are `#[cfg(unix)]` items that have `#[cfg(windows)]` or `#[cfg(not(unix))]` siblings (#786 shape S1)? Answer about subject matter only, in either direction (stop reporting, keep reporting, or rework the handling); do not judge whether the item follows `anchor.statement`.",
+        "instructions": "List the PORT-010 subjects `item.text` works on. Is one of them a private or pub(crate) #[cfg(unix)] helper whose callers are #[cfg(unix)] items with a recognised companion (a #[cfg(windows)] or #[cfg(not(unix))] sibling, a renamed non-Unix counterpart, an un-gated portable alternative such as a loopback TCP function, or being itself such an accepted helper), that is #786 S1? A #[cfg(unix)] transport function beside a loopback TCP alternative is S4, but a helper called only by such a transport is S1. Judge subject presence only; do not judge whether the item follows `anchor.statement`.",
         "type": "choice"
       }
     }
@@ -251,11 +251,11 @@
     "questions": {
       "addressed": {
         "criteria": {
-          "no": "`item.text` makes no such commitment: it does not mention the shape, mentions it but defers or investigates it, says the rule keeps the finding, hides the finding through an exclusion list or allow attribute while the rule is unchanged, or covers other work.",
-          "unclear": "`item.text` mentions an outcome for the shape that cannot be read as either committing or not committing to PORT-010 giving no finding.",
-          "yes": "`item.text` commits that PORT-010 gives such a helper no finding, in the statement's words or a paraphrase, alone or among other shapes."
+          "no": "`item.text` makes no such commitment: it does not mention the shape, mentions it but defers or investigates it, says the rule keeps the finding, hides the finding through an exclusion list or allow attribute while the rule is unchanged, or commits only to other shapes such as #786 S4: a #[cfg(unix)] transport or adapter function or match arm whose Windows path is an un-gated loopback TCP function or enum variant, including when the Unix and non-Unix uses sit in branches or match arms of one caller.",
+          "unclear": "`item.text` mentions an outcome for the S5 shape that cannot be read as either committing or not committing to PORT-010 giving no finding.",
+          "yes": "`item.text` commits that PORT-010 gives such an S5 helper no finding, in the statement's words or a paraphrase, alone or among other shapes."
         },
-        "instructions": "`anchor.statement` requires one outcome from the PORT-010 rule: no finding for a #[cfg(unix)] helper used only inside a #[cfg(unix)] block of a function that also has a #[cfg(not(unix))] block in the same body. Does `item.text` commit to a change in PORT-010 that produces that outcome? Judge commitment to the outcome only, not conflict.",
+        "instructions": "`anchor.statement` requires one outcome from the PORT-010 rule: no finding for a #[cfg(unix)] helper used only inside a #[cfg(unix)] block of a function that also has a #[cfg(not(unix))] block in the same body (#786 S5). Does `item.text` commit to a change in PORT-010 that produces that outcome? Judge commitment to the outcome only, not conflict.",
         "type": "choice"
       },
       "contradicted": {
@@ -269,11 +269,11 @@
       },
       "relevant": {
         "criteria": {
-          "no": "`item.text` does not refer to that shape. Items about PORT-010 helpers of separate paired functions, renamed companion functions, unix-only-by-design sites, items about other rules such as leaf PORT rules, configuration, or release work are no.",
-          "unclear": "`item.text` refers to PORT-010 and cfg blocks in wording that might or might not include helpers used inside a #[cfg(unix)] block of a function with a #[cfg(not(unix))] block.",
-          "yes": "`item.text` refers to PORT-010 together with a Unix-only helper called from a #[cfg(unix)] block or Unix branch of a function that has a #[cfg(not(unix))] block or non-Unix branch in the same body, or to #786 shape S5 or its rows 10 and 16."
+          "no": "`item.text` covers only other subjects: other PORT-010 shapes such as S4 loopback TCP siblings, paired or renamed companion functions, unix-only modules or unix-only-by-design sites; rules other than PORT-010; configuration; release work.",
+          "unclear": "`item.text` describes PORT-010 work on cfg blocks or branches that cannot be placed as either S5 or another shape.",
+          "yes": "`item.text` names #786 S5 or rows 10 or 16, or describes PORT-010 and a Unix-only helper used from the #[cfg(unix)] block or Unix branch of a function whose own body has a #[cfg(not(unix))] block or non-Unix branch, without that being the S4 loopback TCP case."
         },
-        "instructions": "Does `item.text` refer, in connection with PORT-010, to a #[cfg(unix)] helper used from a #[cfg(unix)] block inside a function whose body also has a #[cfg(not(unix))] block (atm-core #786 shape S5)? Judge whether that subject is present only, whatever the item plans for it. Do not judge whether the item follows `anchor.statement`.",
+        "instructions": "`anchor.scope` covers one #786 shape only: S5, a #[cfg(unix)] helper used from a #[cfg(unix)] block inside a function whose body also has a #[cfg(not(unix))] block (atm-core #786 shape S5, rows 10 and 16). Other #786 shapes have their own anchors, among them S4, where a #[cfg(unix)] transport or adapter function or match arm sits beside an un-gated loopback TCP function or enum variant that Windows uses, even when both are reached from branches of one caller. Does `item.text` refer to the S5 subject in connection with PORT-010? Judge subject presence only, whatever the item plans for it. Do not judge whether the item follows `anchor.statement`.",
         "type": "choice"
       }
     }
@@ -282,29 +282,29 @@
     "questions": {
       "addressed": {
         "criteria": {
-          "no": "The specific change is absent, deferred, only alluded to, or stated for only some of the three scopes.",
-          "unclear": "The item states something close to the change but it cannot be told whether it is the change itself.",
-          "yes": "The specific change is stated as part of this item, in any wording, and none of the three scopes is excluded."
+          "no": "`item.text` does not commit: it names the issue or shape but leaves the approach to be decided, does groundwork only, covers other shapes only, keeps the finding or hides it with allows, or carves out a scope (such as src/bin files or inherent impls) or an item kind (such as consts or types).",
+          "unclear": "`item.text` states an outcome close to this that cannot be read as the full commitment or not.",
+          "yes": "`item.text` states, in any wording, that PORT-010 does not report such an item in modules, inherent impls and crate roots, with no scope or item kind carved out."
         },
-        "instructions": "Does `item.text` state, as a step or commitment of this item, the specific change in `anchor.statement` (no PORT-010 report for a `#[cfg(unix)]` item that has a same-name `#[cfg(not(unix))]` sibling in the same scope, covering modules, inherent impls and the crate root)? Naming the issue, the shape (S3, #720) or the topic without stating what PORT-010 will do does not count, nor does preparatory work left for a later item. Judge presence only, not conflict.",
+        "instructions": "`anchor.statement` requires that PORT-010 not report a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same module, inherent impl or crate root. Does `item.text` commit to that outcome as part of this item? Saying 'crate root' covers lib.rs, main.rs and src/bin files. Still reporting pairs that differ in name, kind or scope is consistent with the commitment. Judge commitment only, not conflict.",
         "type": "choice"
       },
       "contradicted": {
         "criteria": {
-          "no": "The item does not say PORT-010 reports such an item: it complies, is silent, defers the work, or only keeps reporting cases outside the anchor (a counterpart in another scope or with another name).",
-          "unclear": "The item's wording might or might not mean such an item is still reported.",
-          "yes": "The item says PORT-010 reports, or keeps reporting, a `#[cfg(unix)]` item with a same-name `#[cfg(not(unix))]` sibling in the same module, inherent impl block or crate root, for example by limiting the exemption to some of those scopes or by relying on per-site allow attributes."
+          "no": "`item.text` does not: it removes the finding in all those scopes, is silent, defers, or keeps findings only outside that situation.",
+          "unclear": "`item.text` describes PORT-010's treatment of such items in wording that cannot be read either way.",
+          "yes": "`item.text` says or sets a rule under which such an item keeps its PORT-010 finding in some listed scope or for some item kind."
         },
-        "instructions": "`anchor.statement` forbids PORT-010 from reporting a `#[cfg(unix)]` item that has a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl block, or crate root). Does `item.text` say PORT-010 will report, or keep reporting, such an item in any of those scopes? Silence, deferral or groundwork is not a conflict. Reporting an item whose `#[cfg(not(unix))]` counterpart is in a different scope or has a different name is not a conflict. Judge conflict only.",
+        "instructions": "Does `item.text` plan that PORT-010 keeps a finding, shown or hidden, on a #[cfg(unix)] item whose #[cfg(not(unix))] sibling has the same name and kind and sits in the same module, inherent impl or crate root (lib.rs, main.rs or a src/bin file)? Examples: PORT-010 reports or keeps reporting such an item in any of those scopes; the exemption covers only some scopes (for example lib.rs and main.rs but not src/bin files, or not inherent impls); only #[cfg(windows)] twins count; only some item kinds count while same-name, same-kind consts, statics or types stay reported; or the finding is kept and hidden with a per-site allow, exclusion or allowlist. Not this: planning that such items stop being reported; silence; deferral or groundwork; work on other shapes; still reporting an item whose #[cfg(not(unix))] counterpart is in a different scope, has a different name, or is a different kind of item. Judge conflict only.",
         "type": "choice"
       },
       "relevant": {
         "criteria": {
-          "no": "The item works on something else: another PORT-010 case that involves no same-name `#[cfg(not(unix))]` sibling, another rule, configuration, release or process work.",
-          "unclear": "The item mentions PORT-010 or cfg(unix) companions, but it is not possible to tell whether same-name sibling handling is part of the work.",
-          "yes": "The item works on PORT-010's handling of same-name `#[cfg(unix)]` / `#[cfg(not(unix))]` sibling pairs (also called shape S3 of atm-core #786, or #720), or builds a direct prerequisite for that handling."
+          "no": "`item.text` covers only other PORT-010 shapes that involve no same-name #[cfg(not(unix))] sibling (helpers of paired callers, differently named or renamed companions, un-gated loopback TCP alternatives, unix-only modules, unix-only-by-design sites allowed per site), other rules, configuration, or release work. Merely saying that earlier sprints' tests still pass is not work on this subject.",
+          "unclear": "`item.text` describes PORT-010 companion work that cannot be placed as same-name sibling handling or as another subject.",
+          "yes": "`item.text` names #786 S3 or #720, or describes PORT-010 and a #[cfg(unix)] item with a same-name #[cfg(not(unix))] item in the same module, impl or crate root, or builds what that handling directly needs."
         },
-        "instructions": "Does `item.text` plan or change how sc-lint's PORT-010 rule treats a `#[cfg(unix)]` item that has an item with the same name gated `#[cfg(not(unix))]` in the same scope (a module, an inherent impl block, or the crate root), or build something that handling directly needs? Judge subject overlap only. Do not judge whether the item obeys `anchor.statement`.",
+        "instructions": "`anchor.scope` covers one subject: how PORT-010 treats a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same scope, where the scope is a module, an inherent impl, or a crate root (lib.rs, main.rs or a src/bin file) (#720, #786 shape S3). Is that subject, or a direct prerequisite for handling it, present in `item.text`? Judge subject presence only, whatever the item plans; do not judge whether the item obeys `anchor.statement`.",
         "type": "choice"
       }
     }
@@ -331,11 +331,11 @@
       },
       "relevant": {
         "criteria": {
-          "no": "The item concerns only other PORT-010 shapes or cases, another rule, configuration, or unrelated work, and never touches the cfg(unix) module declaration.",
-          "unclear": "The item mentions PORT-010 or #786 but it cannot be told whether the cfg(unix) module declaration is within its work.",
-          "yes": "The item names or clearly covers PORT-010's handling of a `#[cfg(unix)] mod ...;` declaration or shape S6, including plans that fix, keep, suppress, refactor, or defer that handling, or that fix every PORT-010 false positive from #786 as a whole."
+          "no": "The item's PORT-010 rule change is confined to other named shapes or cases, or the item concerns another rule, configuration, or unrelated work; fixture collection, finding inventories, and generic not-closed notes do not count as touching the declaration.",
+          "unclear": "The item changes PORT-010 behaviour without identifying the shapes or cases it covers, so it cannot be told whether the cfg(unix) module declaration is included.",
+          "yes": "The item's PORT-010 work includes, names, or defers by name the `#[cfg(unix)] mod ...;` declaration or shape S6, or undertakes to fix every #786 PORT-010 false positive."
         },
-        "instructions": "`anchor.statement` governs one behaviour: whether sc-lint's PORT-010 rule reports the declaration line of a `#[cfg(unix)] mod x;` module (shape S6 in atm-core issue #786). Does the work in `item.text` plan, change, test, defer, or depend on how PORT-010 treats such a `#[cfg(unix)]` module declaration? PORT-010 work that concerns only other cases (paired cfg(unix)/cfg(windows) functions, items in an always-compiled module, real parity gaps) and work on other rules or configuration do not touch this subject. Judge subject overlap only, not whether the item obeys the anchor.",
+        "instructions": "`anchor.statement` governs whether sc-lint's PORT-010 rule reports the declaration line of a `#[cfg(unix)] mod x;` module (shape S6 in atm-core issue #786). First identify which PORT-010 shapes or cases `item.text` says its rule change covers. The subject is touched when that coverage includes the cfg(unix) module declaration or S6, when the item names that declaration or S6 to keep, suppress, refactor, or defer it, or when the item undertakes to fix every #786 PORT-010 false positive. The subject is not touched when the rule change is limited to other named shapes or cases, even if the item also re-extracts every #786 file as a fixture, labels findings by shape, or lists other shapes as not closed; nor by work on other rules or configuration. Judge subject overlap only, not whether the item obeys the anchor.",
         "type": "choice"
       }
     }

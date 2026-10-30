@@ -13,7 +13,7 @@ sprints fit together.
 | [ADR-010 amendment 2026-10-30](../../sc-lint/adr/ADR-010-portability-scope-and-parity.md) PORT-010 companion shapes | Pending | — | lint-m-adr010 blocks dispatch of m-1 (and so all of stack A) |
 | ADR-021 | Withdrawn | — | none; superseded by ADR-022 and the ADR-010 amendment |
 | REQ-PRODUCT-004AA (PORT-010), REQ-SCB-019, REQ-CLI-021 | Accepted | — | none; the PORT-010 shape sub-bullets are contingent on the ADR-010 amendment |
-| Anchors `v3/anchors.json` ANC-001..013 | Locked | — | planning and development gates |
+| Anchors `v3/anchors.json` ANC-001..013 | Locked; ANC-001/002/003/004/005/008/011/013 rewritten to match the plan, pending review | — | planning and development gates |
 | Intent `v3/intent.md` | Rand direction 2026-10-30 | — | framing only |
 
 ## Sprints
@@ -101,10 +101,28 @@ acceptance check, not a CI test, and a non-zero result fails m-6.
    test)` gate forms and test-reference rule added after review.
 3. S6 scope: do `pub` modules and items inside a `#[cfg(unix)] mod x;` count,
    or only non-public ones (ANC-006/007 as locked say all)?
-4. Anchor evidence wording that no longer matches the code. Each is flagged
-   here rather than reworded:
-   - ANC-003's fail fixture says main.rs is exempt today; it is not.
-   - ANC-004 talks of reporting a match arm, but PORT-010 reports only the
-     function.
-   - ANC-011's evidence uses a relative `PYO3_PYTHON`, which the tool that
-     reads it resolves from its own working directory.
+4. Review the anchor rewrites. On Rand's direction "rewrite to match the
+   plan", each statement now describes the behaviour the plan builds. Quotes
+   are unchanged. The plan questions were retuned against a frozen oracle,
+   and plan gate r11 passes all 8 beads with every anchor covered.
+   - ANC-001 v4: the S1 helper rule covers any caller with a companion PORT-010
+     recognises (a sibling, a renamed counterpart, a portable alternative, or
+     another such helper). New fixtures, including the helper of an S4 pair.
+   - ANC-002: renamed pairs need the same return type, and each function is
+     called only from the matching gated branch of one caller.
+   - ANC-003 v4: siblings must have the same name and kind and be in the same
+     scope (a module, an inherent impl or a crate root, including `main.rs`
+     and `src/bin`).
+   - ANC-004 v4: a Unix transport function is not reported when its caller's
+     non-Unix branch or match arm uses an un-gated loopback TCP alternative.
+     This replaces the match-arm wording.
+   - ANC-005: helpers of any visibility, called only inside `#[cfg(unix)]`
+     blocks of a function that also has a `#[cfg(not(unix))]` block.
+   - ANC-008: the portable fallback takes the config type and returns an error
+     on every path.
+   - ANC-011: the pass fixture uses an absolute `PYO3_PYTHON`.
+   - ANC-013: `self::`, `crate::` and `super::` paths anywhere in the code, and
+     bare `X::` in a module declaring its own `mod X`.
+5. The ANC-003 tuner left one case open: a bead that states the outcome for
+   only some of the module / inherent impl / crate-root scopes. Recommendation:
+   add a fail fixture for that case.
