@@ -364,6 +364,8 @@ specialized backend tools and mixed Rust/Python implementations.
   options and config precede the selector, and arguments after the selector
   are forwarded verbatim. Lint accepts a selector followed by optional
   platform scope. No setup hooks or interpreter-selection policy is added.
+  Proposed REQ-CLI-026 is Pending; it changes this restriction only after
+  Rand accepts ADR-021 on the planning branch.
   The product-owned assets remain the source of consumer bootstrap. (Amended
   phase L, [ADR-020 decision 7](./adr/ADR-020-phase-l-atm-core-findings.md).)
   (Amended 2026-10-12, Accepted,
@@ -438,6 +440,21 @@ specialized backend tools and mixed Rust/Python implementations.
   per-fixture configuration is required for consumed fixtures.
   (Added phase L, #647. Status: Accepted — Rand, 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
+
+- `REQ-CLI-026` **(Pending; ineffective until Rand accepts ADR-021)**
+  Consumer bootstrap setup accepts one declarative argv command at
+  `[tool.sc-lint.setup].pre`, executed from the repository root before
+  provisioning, with child failure stopping setup. Check and dry-run modes
+  do not execute it. `[tool.sc-lint.runner].python` selects a consumer venv
+  for exactly a leading `python` in selected lint/test step argv, using
+  `bin/python` on Linux/macOS and `Scripts/python.exe` on Windows.
+  Preserve other argv, scheduling, selected profiles and test selectors.
+  Missing settings preserve existing behavior; malformed settings are
+  configuration errors. The proposed failure codes, recovery context and
+  precise scope are defined in
+  [ADR-021](./adr/ADR-021-consumer-setup-runner-and-cfg-companions.md).
+  On acceptance, this narrowly supersedes REQ-CLI-021's exclusion of these
+  settings. It adds no kit-interpreter step form.
 
 ## Contract References
 
