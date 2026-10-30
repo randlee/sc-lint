@@ -15,8 +15,8 @@ Intent: `docs/plans/phase-m/intent.md`
 | ANC-007 | retired | A7 #136: three-key parity audit | 2026-10-30 |
 | ANC-008 | retired | #786/#720: no PORT-010 false alarms on atm-core's excluded code | 2026-10-30 |
 | ANC-009 | retired | #786/#720: real Windows gaps still reported | 2026-10-30 |
-| ANC-010 | proposed | #198: sc-lint runs the consumer setup step | 2026-10-30 |
-| ANC-011 | proposed | #198: sc-lint uses the right Python itself | 2026-10-30 |
+| ANC-010 | retired | #198: sc-lint runs the consumer setup step | 2026-10-30 |
+| ANC-011 | retired | #198: sc-lint uses the right Python itself | 2026-10-30 |
 | ANC-012 | proposed | #136: dependency ownership on source files only | 2026-10-30 |
 | ANC-013 | retired | #136: record coverage of atm-core's three boundary settings | 2026-10-30 |
 | GH-786.table | retired | #786 table: none of the 47 findings reported | 2026-10-30 |
@@ -48,6 +48,8 @@ Intent: `docs/plans/phase-m/intent.md`
 | ANC-021 | proposed | #786 S8: pub POSIX-only helpers exempt via approved exception | 2026-10-30 |
 | ANC-022 | proposed | #198: sc_lint.* helpers default to the kit interpreter | 2026-10-30 |
 | GH-198.runner-argv.2 | proposed | #198: runner.python resolves leading python, except sc_lint.* helpers | 2026-10-30 |
+| ANC-023 | proposed | #198: sc-lint runs the consumer setup step (just bootstrap) | 2026-10-30 |
+| ANC-024 | proposed | #198: sc-lint selects the .bootstrap-venv interpreter itself | 2026-10-30 |
 
 ## ANC-001
 
@@ -217,7 +219,7 @@ Anchor: sc-lint's setup command must itself run atm-core's setup step (today a J
 
 > atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
 
-Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 6.
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: retired. Version 7.
 
 Summary: #198: sc-lint runs the consumer setup step
 
@@ -235,7 +237,7 @@ Anchor: sc-lint must itself select the Python interpreter for each atm-core lint
 
 > atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
 
-Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 5.
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: retired. Version 6.
 
 Summary: #198: sc-lint uses the right Python itself
 
@@ -838,3 +840,41 @@ Deterministic check to pair with the development gate: Injected-platform argv te
 Fixtures:
 - pass: With runner.python set, a leading python in any lint or test step runs that venv's interpreter on every OS, and python -m sc_lint.* helper steps are left alone. Evidence: test runner_python_argv passes, showing .venv/bin/python on unix and .venv\Scripts\python.exe on windows for a lint step and a test step.
 - fail: Rewrites every leading python to runner.python, including python -m sc_lint.lint_cargo_deny.
+
+## ANC-023
+
+Anchor: sc-lint's setup command must itself run atm-core's setup step, building .bootstrap-venv by running just bootstrap, so atm-core's Justfile glue no longer has to.
+
+> atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
+Definition question (team-lead, 2026-10-30): "does \"the setup step\" mean building `.bootstrap-venv` by running `just bootstrap`?" Rand: "yes"
+
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 3.
+
+Summary: #198: sc-lint runs the consumer setup step (just bootstrap)
+
+Scope: The item changes sc-lint setup/provisioning, consumer config ([tool.sc-lint].setup), or the just setup flow.
+
+Deterministic check to pair with the development gate: A setup test with a configured just bootstrap stub shows sc-lint setup runs it itself, before provisioning.
+
+Fixtures:
+- pass: sc-lint setup runs atm-core's setup step itself, building .bootstrap-venv by running just bootstrap. Evidence: test setup_runs_configured_step passes, showing a configured just bootstrap stub ran during sc-lint setup.
+- fail: Documents that consumers run just bootstrap themselves before sc-lint setup.
+
+## ANC-024
+
+Anchor: For the atm-core steps that the Justfile recipes _py, sc_lint_clippy_prefix and _sc-lint-clippy run today, sc-lint must itself select the .bootstrap-venv interpreter those recipes select.
+
+> atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
+Definition question (team-lead, 2026-10-30): "is \"the right Python\" the interpreter those three recipes select today, which is `.bootstrap-venv`?" Rand: "yes"
+
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: sc-lint selects the .bootstrap-venv interpreter itself
+
+Scope: The item changes interpreter selection, runner config ([tool.sc-lint].runner), step argv or step environment in crates/sc-lint.
+
+Deterministic check to pair with the development gate: Runner tests with stub interpreters show each atm-core step class gets its intended interpreter with no consumer per-OS path.
+
+Fixtures:
+- pass: sc-lint selects the .bootstrap-venv interpreter itself for atm-core's python steps and clippy, so atm-core deletes _py, sc_lint_clippy_prefix and _sc-lint-clippy. Evidence: runner tests with stub interpreters pass, showing each step got the .bootstrap-venv interpreter with no consumer per-OS path.
+- fail: Leaves atm-core's _py recipe in place because steps still run whatever python is first on PATH.

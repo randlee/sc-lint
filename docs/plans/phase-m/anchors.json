@@ -514,8 +514,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 6,
-      "status": "proposed",
+      "version": 7,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -564,6 +564,12 @@
             "statement"
           ],
           "previous_statement": "The sc-lint setup command must itself run atm-core's repository setup step, which atm-core currently runs through its own Justfile recipes."
+        },
+        {
+          "at": "2026-10-30T03:34:10+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-023",
+          "reason": "Rand answered the definition question 'yes' (2026-10-30); quote extended"
         }
       ]
     },
@@ -589,8 +595,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
-      "status": "proposed",
+      "version": 6,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -631,6 +637,12 @@
             "statement"
           ],
           "previous_statement": "sc-lint must choose the right Python interpreter for atm-core's steps itself, so atm-core can delete _py, sc_lint_clippy_prefix and _sc-lint-clippy."
+        },
+        {
+          "at": "2026-10-30T03:34:10+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-024",
+          "reason": "Rand answered the definition question 'yes' (2026-10-30); quote extended"
         }
       ]
     },
@@ -2377,6 +2389,103 @@
         },
         {
           "at": "2026-10-30T03:32:14+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-023",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's setup command must itself run atm-core's setup step, building .bootstrap-venv by running just bootstrap, so atm-core's Justfile glue no longer has to.",
+      "quote": "atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.\nDefinition question (team-lead, 2026-10-30): \"does \\\"the setup step\\\" mean building `.bootstrap-venv` by running `just bootstrap`?\" Rand: \"yes\"",
+      "kind": "directive",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "summary": "#198: sc-lint runs the consumer setup step (just bootstrap)",
+      "scope": "The item changes sc-lint setup/provisioning, consumer config ([tool.sc-lint].setup), or the just setup flow.",
+      "deterministic_check": "A setup test with a configured just bootstrap stub shows sc-lint setup runs it itself, before provisioning.",
+      "fixtures": {
+        "pass": [
+          "sc-lint setup runs atm-core's setup step itself, building .bootstrap-venv by running just bootstrap. Evidence: test setup_runs_configured_step passes, showing a configured just bootstrap stub ran during sc-lint setup."
+        ],
+        "fail": [
+          "Documents that consumers run just bootstrap themselves before sc-lint setup."
+        ]
+      },
+      "question_overrides": {},
+      "version": 3,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T03:34:10+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T03:34:10+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T03:34:15+00:00",
+          "event": "updated",
+          "fields": [
+            "deterministic_check"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-024",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "For the atm-core steps that the Justfile recipes _py, sc_lint_clippy_prefix and _sc-lint-clippy run today, sc-lint must itself select the .bootstrap-venv interpreter those recipes select.",
+      "quote": "atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.\nDefinition question (team-lead, 2026-10-30): \"is \\\"the right Python\\\" the interpreter those three recipes select today, which is `.bootstrap-venv`?\" Rand: \"yes\"",
+      "kind": "directive",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "summary": "#198: sc-lint selects the .bootstrap-venv interpreter itself",
+      "scope": "The item changes interpreter selection, runner config ([tool.sc-lint].runner), step argv or step environment in crates/sc-lint.",
+      "deterministic_check": "Runner tests with stub interpreters show each atm-core step class gets its intended interpreter with no consumer per-OS path.",
+      "fixtures": {
+        "pass": [
+          "sc-lint selects the .bootstrap-venv interpreter itself for atm-core's python steps and clippy, so atm-core deletes _py, sc_lint_clippy_prefix and _sc-lint-clippy. Evidence: runner tests with stub interpreters pass, showing each step got the .bootstrap-venv interpreter with no consumer per-OS path."
+        ],
+        "fail": [
+          "Leaves atm-core's _py recipe in place because steps still run whatever python is first on PATH."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T03:34:10+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T03:34:10+00:00",
           "event": "updated",
           "fields": [
             "fixtures"

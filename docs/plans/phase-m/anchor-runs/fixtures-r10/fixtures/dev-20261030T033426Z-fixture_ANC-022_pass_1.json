@@ -1,0 +1,110 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T033426Z-fixture_ANC-022_pass_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T03:34:26+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-022:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 251,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-022",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "By default, sc-lint must run sc_lint.* wheel helper steps on the sc-lint kit's own venv interpreter (.sc-lint/venv), even when [tool.sc-lint].runner.python is set.",
+      "quote": "plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.\nConflict question (team-lead, 2026-10-30): \"GH-198.runner-argv against GH-198.kit-helpers. The literal rule \\\"a leading `python` becomes the `runner.python` interpreter\\\" would also rewrite `python -m sc_lint.*`. The kit-helpers record says those always use the kit interpreter, never overridden.\" Rand (2026-10-30): \"a consumer must have a method to override behavior.\"",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; #198 issue text (https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b)) plus Rand's ruling on the runner-argv/kit-helpers conflict, relayed by team-lead 2026-10-30",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "A runner test with runner.python set and no consumer override shows an sc_lint.lint_cargo_deny step resolves to the kit venv interpreter.",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.0,
+            "unclear": 0.01
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.98,
+            "no": 0.01,
+            "unclear": 0.01
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.98,
+            "no": 0.01,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.97,
+      "explanation": "The directive was followed and evidenced.",
+      "usage": {
+        "input_tokens": 1265,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 251,
+      "item_shortened": false,
+      "request_bytes": 4043
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}
