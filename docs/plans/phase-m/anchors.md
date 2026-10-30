@@ -52,11 +52,11 @@ Fixtures:
 
 ## ANC-003
 
-Anchor: The consumer sc-lint config must accept setup.pre, an argv list that just setup runs before sc-lint provisioning.
+Anchor: The [tool.sc-lint] consumer config must accept setup.pre, an argv list that just setup runs before sc-lint provisioning.
 
 > these are the p1 items from atm-core: - randlee/sc-lint#198 (consumer setup hook and step runner): atm-core keeps _py, sc_lint_clippy_prefix and _sc-lint-clippy until it ships.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say setup.pre is not added and root-level setup is rejected with config.unknown_table, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say setup.pre is not added and root-level setup is rejected with config.unknown_table, 2026-10-30. Status: proposed. Version 3.
 
 Summary: A3 #198: consumer setup.pre hook (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).)
 
@@ -65,16 +65,16 @@ Scope: The item edits ScLintConfigFile or consumer config parsing in crates/sc-l
 Deterministic check to pair with the development gate: A config-parse test accepts setup.pre; a setup test with a stub command records that it ran before provisioning; ADR-020 decisions 9 and 13 are amended.
 
 Fixtures:
-- pass: Adds setup.pre to ScLintConfigFile; just setup runs the configured argv before provisioning, shown by a stub-command ordering test.
-- fail: Keeps rejecting root-level setup with config.unknown_table, so consumers still need Justfile glue before just setup.
+- pass: Adds [tool.sc-lint].setup.pre to ScLintConfigFile; just setup runs the configured argv before provisioning, shown by a stub-command ordering test.
+- fail: Keeps rejecting [tool.sc-lint].setup with config.unknown_table, so consumers still need Justfile glue before just setup.
 
 ## ANC-004
 
-Anchor: The consumer sc-lint config must accept runner.python, a venv path whose interpreter replaces a leading python in each lint and test step argv on Linux, macOS and Windows.
+Anchor: The [tool.sc-lint] consumer config must accept runner.python, a venv path whose interpreter replaces a leading python in each lint and test step argv on Linux, macOS and Windows.
 
 > these are the p1 items from atm-core: - randlee/sc-lint#198 (consumer setup hook and step runner): atm-core keeps _py, sc_lint_clippy_prefix and _sc-lint-clippy until it ships.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198 and atm-core comment 2026-10-29 item 2. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say runner.python is not added, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198 and atm-core comment 2026-10-29 item 2. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say runner.python is not added, 2026-10-30. Status: proposed. Version 3.
 
 Summary: A4 #198: consumer runner.python (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).)
 
