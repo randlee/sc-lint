@@ -1,0 +1,112 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T022931Z-fixture_GH-198.export-env_pass_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T02:29:31+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:GH-198.export-env:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 103,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "GH-198.export-env",
+      "source_type": "REQ",
+      "source_ref": "GH-198.export-env",
+      "statement": "sc-lint must let a consumer export the runner.python interpreter as PYO3_PYTHON to steps that are not Python steps, such as cargo clippy.",
+      "quote": "We need one more knob, e.g. `runner.export_env = [\"PYO3_PYTHON\"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (mismatch with ADR-021); NEEDS Rand scope ruling",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "A step-environment test shows a cargo clippy step receives PYO3_PYTHON set to the runner.python interpreter when configured.",
+      "kind": "directive",
+      "leaning": "asserted_only",
+      "verdict": "asserted_only",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.77,
+          "probabilities": {
+            "yes": 0.08,
+            "no": 0.85,
+            "unclear": 0.07
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "Compliance is asserted but no concrete evidence (paths, diffs, commands, tests) is cited.",
+      "usage": {
+        "input_tokens": 1215,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 103,
+      "item_shortened": false,
+      "request_bytes": 3863
+    }
+  ],
+  "summary": {
+    "counts": {
+      "asserted_only": 1
+    },
+    "failing": [
+      "GH-198.export-env"
+    ],
+    "leaning_counts": {
+      "asserted_only": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

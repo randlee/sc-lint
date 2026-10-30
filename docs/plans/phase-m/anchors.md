@@ -6,13 +6,28 @@ Intent: `docs/plans/phase-m/intent.md`
 
 | ID | Status | Summary | Stated |
 | --- | --- | --- | --- |
-| ANC-001 | proposed | A1 #786: PORT-010 per-shape classification of the 18 atm-core paths | 2026-10-30 |
-| ANC-002 | proposed | A2 #720: PORT-010 crate-root cfg(unix)/cfg(not(unix)) companion | 2026-10-30 |
-| ANC-003 | proposed | A3 #198: consumer setup.pre hook (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).) | 2026-10-30 |
-| ANC-004 | proposed | A4 #198: consumer runner.python (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).) | 2026-10-30 |
-| ANC-005 | proposed | A5 #198: wheel-only sc_lint helpers on the kit interpreter (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving). Design also awaits atm-core input.) | 2026-10-30 |
-| ANC-006 | proposed | A6 #136: source-only scope for global_dependency_ownership | 2026-10-30 |
-| ANC-007 | proposed | A7 #136: three-key parity audit | 2026-10-30 |
+| ANC-001 | retired | A1 #786: PORT-010 per-shape classification of the 18 atm-core paths | 2026-10-30 |
+| ANC-002 | retired | A2 #720: PORT-010 crate-root cfg(unix)/cfg(not(unix)) companion | 2026-10-30 |
+| ANC-003 | retired | A3 #198: consumer setup.pre hook (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).) | 2026-10-30 |
+| ANC-004 | retired | A4 #198: consumer runner.python (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).) | 2026-10-30 |
+| ANC-005 | retired | A5 #198: wheel-only sc_lint helpers on the kit interpreter (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving). Design also awaits atm-core input.) | 2026-10-30 |
+| ANC-006 | retired | A6 #136: source-only scope for global_dependency_ownership | 2026-10-30 |
+| ANC-007 | retired | A7 #136: three-key parity audit | 2026-10-30 |
+| ANC-008 | proposed | #786/#720: no PORT-010 false alarms on atm-core's excluded code | 2026-10-30 |
+| ANC-009 | proposed | #786/#720: real Windows gaps still reported | 2026-10-30 |
+| ANC-010 | proposed | #198: sc-lint runs the consumer setup step | 2026-10-30 |
+| ANC-011 | proposed | #198: sc-lint uses the right Python itself | 2026-10-30 |
+| ANC-012 | proposed | #136: dependency ownership on source files only | 2026-10-30 |
+| ANC-013 | proposed | #136: record coverage of atm-core's three boundary settings | 2026-10-30 |
+| GH-786.table | proposed | #786 table: none of the 47 findings reported | 2026-10-30 |
+| GH-786.S3 | proposed | #720/S3: same-name cfg(not(unix)) sibling, all scopes | 2026-10-30 |
+| GH-198.setup-pre | proposed | #198: [tool.sc-lint].setup.pre | 2026-10-30 |
+| GH-198.runner-argv | proposed | #198: runner.python resolves leading python, lint and test | 2026-10-30 |
+| GH-198.runner-path | proposed | #198: runner.python venv dir prepended to child PATH | 2026-10-30 |
+| GH-198.kit-helpers | proposed | #198: sc_lint.* helpers on the kit interpreter | 2026-10-30 |
+| GH-198.export-env | proposed | #198: export PYO3_PYTHON for native steps (Rand scope ruling needed) | 2026-10-30 |
+| GH-136.src-only | proposed | #136: source-only scope setting for global_dependency_ownership | 2026-10-30 |
+| GH-136.audit | proposed | #136: audit the three atm-core keys, file gaps | 2026-10-30 |
 
 ## ANC-001
 
@@ -20,7 +35,7 @@ Anchor: Each PORT-010 finding in sc-lint#786 must be resolved by shape classific
 
 > these are the p1 items from atm-core: - randlee/sc-lint#786 (PORT-010): all 18 excluded atm-core paths still emit 1–17 findings on 0.8.2, so I removed no exclusions. sc-lint.toml cites it with a release-based removal condition. This is the one that keeps atm-core exclusions in place.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; acceptance text from sc-lint#786 'Requested outcome' at atm-core d70ff224, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; acceptance text from sc-lint#786 'Requested outcome' at atm-core d70ff224, 2026-10-30. Status: retired. Version 3.
 
 Summary: A1 #786: PORT-010 per-shape classification of the 18 atm-core paths
 
@@ -38,7 +53,7 @@ Anchor: PORT-010 must give a crate-root #[cfg(unix)] fn with a #[cfg(not(unix))]
 
 > these are the p1 items from atm-core: - randlee/sc-lint#720 (PORT-010): a crate-root cfg(unix) fn with a cfg(not(unix)) sibling is still reported. It covers only main.rs.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; acceptance criteria from sc-lint#720, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; acceptance criteria from sc-lint#720, 2026-10-30. Status: retired. Version 3.
 
 Summary: A2 #720: PORT-010 crate-root cfg(unix)/cfg(not(unix)) companion
 
@@ -56,7 +71,7 @@ Anchor: The [tool.sc-lint] consumer config must accept setup.pre, an argv list t
 
 > these are the p1 items from atm-core: - randlee/sc-lint#198 (consumer setup hook and step runner): atm-core keeps _py, sc_lint_clippy_prefix and _sc-lint-clippy until it ships.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say setup.pre is not added and root-level setup is rejected with config.unknown_table, 2026-10-30. Status: proposed. Version 3.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say setup.pre is not added and root-level setup is rejected with config.unknown_table, 2026-10-30. Status: retired. Version 4.
 
 Summary: A3 #198: consumer setup.pre hook (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).)
 
@@ -74,7 +89,7 @@ Anchor: The [tool.sc-lint] consumer config must accept runner.python, a venv pat
 
 > these are the p1 items from atm-core: - randlee/sc-lint#198 (consumer setup hook and step runner): atm-core keeps _py, sc_lint_clippy_prefix and _sc-lint-clippy until it ships.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198 and atm-core comment 2026-10-29 item 2. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say runner.python is not added, 2026-10-30. Status: proposed. Version 3.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198 and atm-core comment 2026-10-29 item 2. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say runner.python is not added, 2026-10-30. Status: retired. Version 4.
 
 Summary: A4 #198: consumer runner.python (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving).)
 
@@ -92,7 +107,7 @@ Anchor: A consumer step must run a wheel-only sc_lint.<module> helper on the sc-
 
 > these are the p1 items from atm-core: - randlee/sc-lint#198 (consumer setup hook and step runner): atm-core keeps _py, sc_lint_clippy_prefix and _sc-lint-clippy until it ships.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; need stated in atm-core comment on sc-lint#198 2026-10-29 item 1 (no step form to run a wheel-only module on the kit interpreter). Design undecided; awaits atm-core input, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; need stated in atm-core comment on sc-lint#198 2026-10-29 item 1 (no step form to run a wheel-only module on the kit interpreter). Design undecided; awaits atm-core input, 2026-10-30. Status: retired. Version 3.
 
 Summary: A5 #198: wheel-only sc_lint helpers on the kit interpreter (CONDITIONAL on a new ADR superseding ADR-020 decisions 9/13 and REQ-CLI-021 (clint drafting, Rand approving). Design also awaits atm-core input.)
 
@@ -110,7 +125,7 @@ Anchor: global_dependency_ownership must offer a source-only scope in which SCB-
 
 > these are the p1 items from atm-core: - randlee/sc-lint#136 (manifest dependency allowlists and global ownership versus the released manifest_policy): documented as a gap in the #2295 body.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; repro from atm-core comment on sc-lint#136 2026-10-29 (eight SCB-MANIFEST-004 findings on 0.8.2), 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; repro from atm-core comment on sc-lint#136 2026-10-29 (eight SCB-MANIFEST-004 findings on 0.8.2), 2026-10-30. Status: retired. Version 3.
 
 Summary: A6 #136: source-only scope for global_dependency_ownership
 
@@ -128,7 +143,7 @@ Anchor: Phase M must classify each atm-core [boundaries] key (manifest_dependenc
 
 > these are the p1 items from atm-core: - randlee/sc-lint#136 (manifest dependency allowlists and global ownership versus the released manifest_policy): documented as a gap in the #2295 body.
 
-Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; audit scope from sc-lint#136 body and team-lead A7 definition (2026-10-30), 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning session; atm-core P1 list pasted by Rand; audit scope from sc-lint#136 body and team-lead A7 definition (2026-10-30), 2026-10-30. Status: retired. Version 3.
 
 Summary: A7 #136: three-key parity audit
 
@@ -139,3 +154,274 @@ Deterministic check to pair with the development gate: A parity table under docs
 Fixtures:
 - pass: Writes a parity table with one row per atm-core [boundaries] key, citing evidence, and links a filed GitHub issue for each gap row.
 - fail: Declares #136 resolved because SCB-MANIFEST-003..006 shipped, without checking each key against atm-core behaviour.
+
+## ANC-008
+
+Anchor: With atm-core's PORT-010 exclusions removed, PORT-010 must report zero false alarms on atm-core.
+
+> atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.
+
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #786/#720: no PORT-010 false alarms on atm-core's excluded code
+
+Scope: The item changes PORT-010 in crates/sc-lint-portability, its fixtures or docs, or atm-core PORT-010 exclusions.
+
+Deterministic check to pair with the development gate: Per-path #786 repro on atm-core with every PORT-010 exclusion removed reports no finding classified false positive or deliberate exception.
+
+Fixtures:
+- pass: With all atm-core PORT-010 exclusions removed, the #786 repro reports no false alarm.
+- fail: PORT-010 still reports atm-core's same-name cfg(not(unix)) siblings as missing Windows support.
+
+## ANC-009
+
+Anchor: PORT-010 must still report a real Windows gap: a cfg(unix) item with no Windows counterpart.
+
+> atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.
+
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #786/#720: real Windows gaps still reported
+
+Scope: The item changes PORT-010 exemptions, classification or suppression in crates/sc-lint-portability.
+
+Deterministic check to pair with the development gate: A port010 fixture with a cfg(unix) fn and no Windows, cfg(not(unix)) or portable counterpart still reports PORT-010.
+
+Fixtures:
+- pass: Keeps a regression fixture where a cfg(unix) fn with no Windows counterpart still reports PORT-010.
+- fail: Exempts every cfg(unix) fn in a file once any Windows code exists anywhere in that file.
+
+## ANC-010
+
+Anchor: sc-lint must run atm-core's setup step itself, so atm-core needs no Justfile glue to run it.
+
+> atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
+
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: sc-lint runs the consumer setup step
+
+Scope: The item changes sc-lint setup/provisioning, consumer config ([tool.sc-lint].setup), or the just setup flow.
+
+Deterministic check to pair with the development gate: A setup test with a stub configured command shows sc-lint runs it with no consumer Justfile recipe.
+
+Fixtures:
+- pass: Adds a configured setup step that sc-lint runs during setup, so atm-core drops its Justfile setup recipe.
+- fail: Documents that consumers keep a Justfile recipe to run their own setup before sc-lint.
+
+## ANC-011
+
+Anchor: sc-lint must choose the right Python interpreter for atm-core's steps itself, so atm-core can delete _py, sc_lint_clippy_prefix and _sc-lint-clippy.
+
+> atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
+
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: sc-lint uses the right Python itself
+
+Scope: The item changes interpreter selection, runner config ([tool.sc-lint].runner), step argv or step environment in crates/sc-lint.
+
+Deterministic check to pair with the development gate: Runner tests with stub interpreters show each atm-core step class gets its intended interpreter with no consumer per-OS path.
+
+Fixtures:
+- pass: Adds runner.python so atm-core's Python steps and clippy get the repo venv interpreter without the _py or clippy-prefix recipes.
+- fail: Leaves atm-core's _py recipe in place because steps still run whatever python is first on PATH.
+
+## ANC-012
+
+Anchor: sc-lint must be able to enforce dependency ownership on source files only.
+
+> sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.
+
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #136: dependency ownership on source files only
+
+Scope: The item changes global_dependency_ownership or SCB-MANIFEST-004 in crates/sc-lint-boundary, or their config keys.
+
+Deterministic check to pair with the development gate: A boundary test shows an ownership violation in src/ is reported and the same import in a tests/ target is not, under the source-only setting.
+
+Fixtures:
+- pass: Adds a source-only ownership setting so imports in crates/*/tests/ are not checked and src/ imports still are.
+- fail: Tells atm-core to list its tests/ directories as allowed source roots to silence ownership findings.
+
+## ANC-013
+
+Anchor: Phase M must record which of atm-core's three boundary settings sc-lint already covers.
+
+> sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.
+
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #136: record coverage of atm-core's three boundary settings
+
+Scope: The item audits atm-core [boundaries] settings against sc-lint-boundary or writes a parity table.
+
+Deterministic check to pair with the development gate: A parity table under docs/plans/phase-m/ has one covered/not-covered row per atm-core boundary setting, with evidence.
+
+Fixtures:
+- pass: Writes a table showing, for each of atm-core's three boundary settings, whether sc-lint covers it, with evidence.
+- fail: Marks #136 done because some manifest rules shipped, without checking each of the three settings.
+
+## GH-786.table
+
+Anchor: PORT-010 must report none of the 47 findings listed for the 18 atm-core paths in sc-lint#786, because none is a true positive.
+
+> Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design.
+The 47 findings at this head match the issue's list exactly (same files, lines, item names)
+
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#786 comment 6513016641, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #786 table: none of the 47 findings reported
+
+Scope: The item changes PORT-010 classification in crates/sc-lint-portability or its #786 fixtures.
+
+Deterministic check to pair with the development gate: Rerun the #786 per-path repro on atm-core 6ffaa97be with each path's exclusion removed: 0 of the 47 findings remain.
+
+Fixtures:
+- pass: The #786 per-path repro now reports none of the 47 listed findings.
+- fail: Fixes the same-name sibling shape only, so the other #786 findings are still reported.
+
+## GH-786.S3
+
+Anchor: PORT-010 must not report a cfg(unix) item that has a same-name #[cfg(not(unix))] sibling in the same scope, whether that scope is a module, an inherent impl, or the crate root.
+
+> S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (S3; generalizes #720), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #720/S3: same-name cfg(not(unix)) sibling, all scopes
+
+Scope: The item changes PORT-010 sibling detection or port010 fixtures (crate_root_main, module, inherent impl).
+
+Deterministic check to pair with the development gate: port010 fixtures for module, inherent-impl and crate-root same-name cfg(unix)/cfg(not(unix)) pairs report nothing.
+
+Fixtures:
+- pass: Adds fixtures for module, inherent-impl and crate-root same-name cfg(unix)/cfg(not(unix)) pairs; none reports PORT-010.
+- fail: Exempts the crate-root main.rs pair only; module and inherent-impl siblings are still reported.
+
+## GH-198.setup-pre
+
+Anchor: Consumer config must accept setup.pre, an argv that just setup runs before sc-lint provisioning.
+
+> Proposal: `setup.pre` (argv run by `just setup` before sc-lint provisioning)
+
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#198 issue body, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: [tool.sc-lint].setup.pre
+
+Scope: The item edits ScLintConfigFile or consumer config parsing, or the just setup / installer flow.
+
+Deterministic check to pair with the development gate: Config-parse test accepts setup.pre; a stub-command test shows it runs before provisioning.
+
+Fixtures:
+- pass: Adds setup.pre; just setup runs the configured argv before provisioning, shown by a stub-command ordering test.
+- fail: Runs setup.pre after sc-lint provisioning has finished.
+
+## GH-198.runner-argv
+
+Anchor: When runner.python names a venv, a leading python in any lint or test step argv must resolve to that venv's interpreter on every OS.
+
+> (1) a leading `"python"` in any lint **or test** step argv resolves to that venv's interpreter on every OS
+
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(1),(3), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: runner.python resolves leading python, lint and test
+
+Scope: The item changes step argv construction or runner.python handling in crates/sc-lint.
+
+Deterministic check to pair with the development gate: Injected-platform argv tests: bin/python on Unix, Scripts\python.exe on Windows, for both a lint step and a test step.
+
+Fixtures:
+- pass: A leading python in lint and test steps runs the runner.python venv interpreter, bin/python on Unix and Scripts\python.exe on Windows.
+- fail: Applies runner.python to lint steps only; test steps still run python from PATH.
+
+## GH-198.runner-path
+
+Anchor: When runner.python names a venv, sc-lint must prepend that venv's bin directory (Scripts on Windows) to each step child's PATH.
+
+> (2) the venv's bin/Scripts dir is prepended to the child's PATH (our `python_cmd` does this today so helpers that spawn `python` stay pinned)
+
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(2), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: runner.python venv dir prepended to child PATH
+
+Scope: The item changes step child environment or runner.python handling in crates/sc-lint.
+
+Deterministic check to pair with the development gate: A step-environment test with injected platform shows PATH starts with the venv bin or Scripts directory.
+
+Fixtures:
+- pass: Each step child gets PATH with the runner.python venv bin (Scripts on Windows) directory first.
+- fail: Rewrites only the leading python argv, so a helper that spawns python picks up the PATH interpreter.
+
+## GH-198.kit-helpers
+
+Anchor: sc-lint must run sc_lint.* wheel helper steps on the kit interpreter and must never apply runner.python to them.
+
+> plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: sc_lint.* helpers on the kit interpreter
+
+Scope: The item adds or changes how sc_lint.* helper steps (deny, manifests, shear, spell) are run in crates/sc-lint.
+
+Deterministic check to pair with the development gate: A runner test with runner.python set shows an sc_lint.lint_cargo_deny step still resolves to the kit venv interpreter.
+
+Fixtures:
+- pass: An sc_lint.* helper step runs on the kit venv interpreter even when runner.python is set.
+- fail: Applies runner.python to every step, including sc_lint.lint_cargo_deny.
+
+## GH-198.export-env
+
+Anchor: sc-lint must let a consumer export the runner.python interpreter as PYO3_PYTHON to steps that are not Python steps, such as cargo clippy.
+
+> We need one more knob, e.g. `runner.export_env = ["PYO3_PYTHON"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (mismatch with ADR-021); NEEDS Rand scope ruling, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: export PYO3_PYTHON for native steps (Rand scope ruling needed)
+
+Scope: The item changes step environment, runner config, or clippy steps in crates/sc-lint.
+
+Deterministic check to pair with the development gate: A step-environment test shows a cargo clippy step receives PYO3_PYTHON set to the runner.python interpreter when configured.
+
+Fixtures:
+- pass: Adds runner.export_env so a clippy step receives PYO3_PYTHON pointing at the runner.python interpreter.
+- fail: Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix.
+
+## GH-136.src-only
+
+Anchor: global_dependency_ownership must offer a config setting that limits the ownership check to src/**/*.rs and excludes integration-test targets.
+
+> The previous atm-core checker passes on this tree because it scans `src/**/*.rs` and does not treat separate integration-test targets as production source. There is no config setting to preserve that source-only scope.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 comment 2026-10-29, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #136: source-only scope setting for global_dependency_ownership
+
+Scope: The item changes global_dependency_ownership or SCB-MANIFEST-004 config in crates/sc-lint-boundary.
+
+Deterministic check to pair with the development gate: Boundary test reproducing the #136 tree: the seven crates/*/tests/ findings disappear under the setting and crates/atm/src/commands/mod.rs is still reported.
+
+Fixtures:
+- pass: Adds a source-only setting; the #136 repro drops the seven tests/ findings and still reports crates/atm/src/commands/mod.rs.
+- fail: Adds atm-core's tests/ directories to allowed_source_roots instead of adding a setting.
+
+## GH-136.audit
+
+Anchor: Phase M must check each of the three atm-core [boundaries] keys against released sc-lint-boundary and file a config-surface gap issue for each key not covered.
+
+> Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #136: audit the three atm-core keys, file gaps
+
+Scope: The item audits atm-core [boundaries] keys or files sc-lint-boundary config-surface gap issues.
+
+Deterministic check to pair with the development gate: Parity table rows for manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules; each uncovered row links an issue.
+
+Fixtures:
+- pass: Checks all three atm-core keys and links a filed gap issue for each one sc-lint does not cover.
+- fail: Checks the keys but records gaps only in a doc, with no gap issues filed.

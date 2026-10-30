@@ -1,0 +1,102 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T022928Z-fixture_GH-198.setup-pre_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T02:29:28+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:GH-198.setup-pre:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 55,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "GH-198.setup-pre",
+      "source_type": "REQ",
+      "source_ref": "GH-198.setup-pre",
+      "statement": "Consumer config must accept setup.pre, an argv that just setup runs before sc-lint provisioning.",
+      "quote": "Proposal: `setup.pre` (argv run by `just setup` before sc-lint provisioning)",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#198 issue body",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "Config-parse test accepts setup.pre; a stub-command test shows it runs before provisioning.",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.43,
+          "probabilities": {
+            "yes": 0.21,
+            "no": 0.62,
+            "unclear": 0.17
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.98,
+            "no": 0.02,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.43,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1009,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 55,
+      "item_shortened": false,
+      "request_bytes": 3035
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "GH-198.setup-pre"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}
