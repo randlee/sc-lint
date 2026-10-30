@@ -56,6 +56,6 @@ consumers run sc-lint.
 
 ## Anchors
 
-Anchors live in `anchors.json` beside this file. Each quotes a REQ or ADR
+Anchors live in `anchors.json` beside this file (v3; v2 is superseded). Each quotes a REQ or ADR
 sentence, together with the issue evidence that shows the gap. Anchors resting
 on ADR-022 are drafted after Rand accepts ADR-022.

@@ -1,0 +1,102 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T164254Z-fixture_ANC-012_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T16:42:54+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-012:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 110,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-012",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.",
+      "quote": "ADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 6: \"sc-lint does not add setup hooks or interpreter-selection policy. These are consumer orchestration. A consumer expresses them with step argv, step `env` and its own recipes.\"\n\nADR-020 decision 9 (Accepted): \"**#198 (setup hook).** Won't-do. ADR-016's hook restriction is unchanged; `setup.pre` and `runner.python` are not added.\"",
+      "stated_by": "ADR-022 decision 6 + ADR-020 decision 9",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P12",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "contradicted",
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.52,
+          "probabilities": {
+            "yes": 0.68,
+            "no": 0.29,
+            "unclear": 0.03
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1036,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 110,
+      "item_shortened": false,
+      "request_bytes": 3130
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-012"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

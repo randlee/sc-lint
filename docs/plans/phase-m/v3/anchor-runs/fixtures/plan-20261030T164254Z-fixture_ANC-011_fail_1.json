@@ -1,0 +1,163 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T164254Z-fixture_ANC-011_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T16:42:54+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-011:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 134,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-011",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A [[tool.sc-lint.lint]] step in sc-lint.toml must accept an env table and a cwd key, applied to that step's child process, with the same meaning they have on a test command selector.",
+      "quote": "ADR-016 (Accepted), How To Extend: \"Use declarative `sc-lint.toml` lint profiles, test layers, per-analyzer tables, step argv/exclusions, platform conditionals and per-step/per-layer `env`.\"\n\nADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 3.2: \"Parallel constructs accept parallel keys. A lint step and a test command selector accept the same execution keys: `command`, `env`, `cwd`, platform restriction and `after_all`.\"",
+      "stated_by": "ADR-016 How To Extend + ADR-022 decision 3.2 + #198",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P11",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "near_threshold": true,
+      "unstable": true,
+      "answers_second": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.44,
+          "probabilities": {
+            "yes": 0.13,
+            "no": 0.63,
+            "unclear": 0.24
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.55,
+          "probabilities": {
+            "yes": 0.7,
+            "no": 0.28,
+            "unclear": 0.02
+          }
+        }
+      },
+      "verdict_first": "contradicted",
+      "verdict_second": "underspecified",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.37,
+          "probabilities": {
+            "yes": 0.15,
+            "no": 0.58,
+            "unclear": 0.27
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.64,
+          "probabilities": {
+            "yes": 0.76,
+            "no": 0.22,
+            "unclear": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.37,
+      "explanation": "Jev was not confident (min confidence 0.37); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1063,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "no",
+          "confidence": 0.37
+        },
+        {
+          "ask": "second",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "no",
+          "confidence": 0.44
+        },
+        {
+          "ask": "second",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "yes",
+          "confidence": 0.55
+        }
+      ],
+      "attempts": 2,
+      "item_chars_sent": 134,
+      "item_shortened": false,
+      "request_bytes": 3213
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 1
+    },
+    "failing": [
+      "ANC-011"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [
+      "ANC-011"
+    ],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

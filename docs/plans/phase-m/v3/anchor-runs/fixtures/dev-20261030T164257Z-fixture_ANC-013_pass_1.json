@@ -1,0 +1,110 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T164257Z-fixture_ANC-013_pass_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T16:42:57+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-013:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 222,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-013",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's SCB-MANIFEST-004 check must not report a use self::X::..., use crate::X::... or use super::X::... path as a use of the owned crate X when X is a local module.",
+      "quote": "Issue #136 (atm-core, 2026-10-30): \"`mod.rs:11` is `pub mod cron;` (file `commands/cron.rs`), and `crates/atm/Cargo.toml` has no `cron` dependency, so nothing imports the cron crate: it is **not a true violation and should not be reported**. [...] in a scratch file with no external dependency, 0.8.2 flags `use self::cron::X;`, `use crate::cron::X;` and `use super::cron::X;`, i.e. it matches the first path segment textually and does not distinguish a local module from the extern crate.\"\n\nREQ-SCB-019 (docs/sc-lint-boundary/requirements.md): \"Manifest findings use `SCB-MANIFEST-003` for a disallowed configured dependency, `-004` for a configured ownership violation, [...]\"",
+      "stated_by": "REQ-SCB-019 + #136 atm-core answer 5",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P13f",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive was followed and evidenced.",
+      "usage": {
+        "input_tokens": 1291,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 222,
+      "item_shortened": false,
+      "request_bytes": 4057
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

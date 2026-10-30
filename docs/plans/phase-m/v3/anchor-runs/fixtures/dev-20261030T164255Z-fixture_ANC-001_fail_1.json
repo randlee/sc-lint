@@ -1,0 +1,112 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T164255Z-fixture_ANC-001_fail_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T16:42:55+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-001:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 111,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-001",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's PORT-010 companion-parity check must count a private or pub(crate) #[cfg(unix)] helper as having a companion, and not report it, when its only callers are #[cfg(unix)] items that themselves have a #[cfg(windows)] or #[cfg(not(unix))] sibling.",
+      "quote": "REQ-PRODUCT-004AA/PORT-010 (docs/requirements.md): \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"\n\nADR-010 decision 6 (Accepted): \"Explicit `#[cfg(unix)]` production boundaries are treated as structural parity questions for the shared portability family. Leaf rules may suppress inside those items, with the companion-or-fallback decision owned by the structural parity rule family instead of parallel per-rule allowlists.\"\n\nIssue #786 (atm-core verdict table, 2026-10-30): \"Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S1  Private (or pub(crate)) cfg(unix) helper whose only callers are cfg(unix) items that themselves have a Windows/not(unix) sibling. Rows 1, 2, 3, 5, 6, 7, 10, 11.\"",
+      "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P1a",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.98,
+            "no": 0.01,
+            "unclear": 0.01
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.96,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.97,
+            "unclear": 0.02
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.72,
+          "probabilities": {
+            "yes": 0.81,
+            "no": 0.17,
+            "unclear": 0.02
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.99,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.72,
+      "explanation": "The delivered work went against this anchor.",
+      "usage": {
+        "input_tokens": 1263,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 111,
+      "item_shortened": false,
+      "request_bytes": 3990
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-001"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}
