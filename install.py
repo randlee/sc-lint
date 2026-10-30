@@ -316,9 +316,9 @@ def load_install_values(path: Path) -> dict[str, object]:
         if len(asset_keys) != len(set(asset_keys)):
             raise argparse.ArgumentTypeError("channels.homebrew.assets keys must be unique")
         required_asset_keys = {"macos_arm", "macos_intel", "linux"}
-        if set(asset_keys) != required_asset_keys:
+        if not required_asset_keys <= set(asset_keys) or set(asset_keys) - required_asset_keys - {"linux_arm"}:
             raise argparse.ArgumentTypeError(
-                "channels.homebrew.assets must declare exactly: macos_arm, macos_intel, linux"
+                "channels.homebrew.assets must declare macos_arm, macos_intel, linux and optionally linux_arm"
             )
     for name, fields in {
         "winget": ("identifier", "installer_target"),
@@ -336,6 +336,8 @@ def load_install_values(path: Path) -> dict[str, object]:
         channel = _require_mapping(channels[name], f"channels.{name}")
         for field in fields:
             _require_string(channel.get(field), f"channels.{name}.{field}")
+        if "installer_arm64_target" in channel:
+            _require_string(channel["installer_arm64_target"], f"channels.{name}.installer_arm64_target")
 
     if "homebrew" in channels or "scoop" in channels:
         _require_string(project.get("renderer_archive_path"), "project.renderer_archive_path")
@@ -404,6 +406,9 @@ def template_values(values: dict[str, object]) -> dict[str, object]:
             ]
         converted_channels[name] = converted
 
+    for name in ("winget", "scoop"):
+        converted_channels[name].setdefault("installer_arm64_target", "")
+
     release_binaries = []
     for binary_value in _require_array(values["release_binaries"], "release_binaries"):
         binary = _require_mapping(binary_value, "release_binaries entry")
@@ -464,6 +469,8 @@ def template_values(values: dict[str, object]) -> dict[str, object]:
         "has_rust_toolchain": "rust_toolchain" in project,
         "has_sc_lint_source_revision": "sc_lint_source_revision" in project,
         "has_prerelease": "prerelease" in values,
+        "has_winget_arm64": "installer_arm64_target" in channels.get("winget", {}),
+        "has_scoop_arm64": "installer_arm64_target" in channels.get("scoop", {}),
         **{f"has_channel_{name}": name in channels for name in CHANNEL_NAMES},
     }
 

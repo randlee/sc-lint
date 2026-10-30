@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 import re
+from release_platforms import PLATFORMS, wheel_platform
 
 
 def wheel_targets(distribution):
@@ -30,17 +31,20 @@ def wheel_targets(distribution):
                 if manylinux != "2_28":
                     raise ValueError("explicit Linux wheels require manylinux=2_28")
                 arch = item["target"].split("-", 1)[0]
-                if not item["os"].startswith("ubuntu-") or item["platform"] != f"manylinux_2_28_{arch}":
+                expected = wheel_platform(item["target"]) if item["target"] in PLATFORMS else f"manylinux_2_28_{arch}"
+                if not item["os"].startswith("ubuntu-") or item["platform"] != expected:
                     raise ValueError("Linux wheel runner/target/platform mismatch")
             elif item["target"].endswith("apple-darwin"):
                 deployment = item.get("deployment_target")
                 arch = "arm64" if item["target"].startswith("aarch64-") else "x86_64"
                 if not isinstance(deployment, str) or not re.fullmatch(r"[0-9]+\.[0-9]+", deployment):
                     raise ValueError("macOS wheels require deployment_target")
-                if not item["os"].startswith("macos-") or item["platform"] != f"macosx_{deployment.replace('.', '_')}_{arch}":
+                expected = wheel_platform(item["target"], deployment) if item["target"] in PLATFORMS else f"macosx_{deployment.replace('.', '_')}_{arch}"
+                if not item["os"].startswith("macos-") or item["platform"] != expected:
                     raise ValueError("macOS wheel runner/target/platform mismatch")
-            elif item["target"] == "x86_64-pc-windows-msvc":
-                if not item["os"].startswith("windows-") or item["platform"] != "win_amd64":
+            elif item["target"] in PLATFORMS and wheel_platform(item["target"]).startswith("win_"):
+                expected = wheel_platform(item["target"])
+                if not item["os"].startswith("windows-") or item["platform"] != expected:
                     raise ValueError("Windows wheel runner/target/platform mismatch")
             else:
                 raise ValueError("unsupported explicit wheel target")
