@@ -412,8 +412,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -432,6 +432,12 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-10-30T02:46:59+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-014",
+          "reason": "Rand answered definitions/S8/export_env scope 2026-10-30; quote or context changed (never locked)"
         }
       ]
     },
@@ -457,8 +463,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -477,6 +483,12 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-015",
+          "reason": "Rand answered definitions/S8/export_env scope 2026-10-30; quote or context changed (never locked)"
         }
       ]
     },
@@ -686,8 +698,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -706,6 +718,12 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-016",
+          "reason": "Rand answered definitions/S8/export_env scope 2026-10-30; quote or context changed (never locked)"
         }
       ]
     },
@@ -1214,8 +1232,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1234,6 +1252,12 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "retired",
+          "replaced_by": "GH-786.table.3",
+          "reason": "Rand answered definitions/S8/export_env scope 2026-10-30; quote or context changed (never locked)"
         }
       ]
     },
@@ -1363,8 +1387,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "proposed",
+      "version": 4,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1390,6 +1414,12 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "retired",
+          "replaced_by": "GH-198.export-env.3",
+          "reason": "Rand answered definitions/S8/export_env scope 2026-10-30; quote or context changed (never locked)"
         }
       ]
     },
@@ -1593,6 +1623,276 @@
         },
         {
           "at": "2026-10-30T02:33:43+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-014",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "With atm-core's PORT-010 exclusions removed, PORT-010 must report no finding that sc-lint#786's table classifies as a false positive or deliberate exception.",
+      "quote": "atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.\nDefinition question (team-lead, 2026-10-30): \"false alarm = a finding #786's table classifies as false positive or deliberate exception\" Rand: \"yes\"",
+      "kind": "directive",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "summary": "#786/#720: no PORT-010 false alarms on atm-core",
+      "scope": "The item changes PORT-010 in crates/sc-lint-portability, its fixtures or docs, or atm-core PORT-010 exclusions.",
+      "deterministic_check": "#786 per-path repro on atm-core with every PORT-010 exclusion removed reports no finding the #786 table classifies as false positive or deliberate exception.",
+      "fixtures": {
+        "pass": [
+          "PORT-010 stops reporting every #786 finding classified false positive or deliberate exception, so atm-core removes its exclusions. Evidence: test port010_issue786_paths passes, showing zero such findings with all exclusions removed."
+        ],
+        "fail": [
+          "PORT-010 still reports atm-core's same-name cfg(not(unix)) siblings, which #786 classifies as false positives."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:46:59+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:46:59+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-015",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "PORT-010 must still report a cfg(unix) item that has no Windows, cfg(not(unix)) or portable counterpart.",
+      "quote": "atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.\nDefinition question (team-lead, 2026-10-30): \"real Windows gap = a cfg(unix) item with no Windows, cfg(not(unix)) or portable counterpart\" Rand: \"yes\"",
+      "kind": "directive",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "summary": "#786/#720: real Windows gaps still reported",
+      "scope": "The item changes PORT-010 exemptions, classification or suppression in crates/sc-lint-portability.",
+      "deterministic_check": "A port010 fixture with a cfg(unix) fn and no Windows, cfg(not(unix)) or portable counterpart still reports PORT-010.",
+      "fixtures": {
+        "pass": [
+          "PORT-010 keeps reporting a cfg(unix) fn with no Windows, cfg(not(unix)) or portable counterpart. Evidence: test port010_real_gap_still_reported passes, showing one PORT-010 finding for that fixture."
+        ],
+        "fail": [
+          "Exempts every cfg(unix) fn in a file once any Windows code exists anywhere in that file."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:46:59+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:46:59+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-016",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The Phase M docs must contain a parity table recording whether sc-lint covers each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules.",
+      "quote": "sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.\nDefinition question (team-lead, 2026-10-30): \"we know = written in a parity table in the Phase M docs for manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules\" Rand: \"yes\"",
+      "kind": "directive",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "summary": "#136: parity table of atm-core's three boundary settings",
+      "scope": "The item audits atm-core [boundaries] settings against sc-lint-boundary or writes a parity table in the Phase M docs.",
+      "deterministic_check": "docs/plans/phase-m/ contains a parity table with one covered/not-covered row for each of the three settings.",
+      "fixtures": {
+        "pass": [
+          "Writes a parity table in the Phase M docs with a covered or not-covered row for each of the three settings. Evidence: docs/plans/phase-m/boundary-parity.md has those three rows, each citing its source."
+        ],
+        "fail": [
+          "Records sc-lint coverage for manifest_dependency_allowlists only and leaves the other two settings out of the table."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-017",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "PORT-010 must exempt pub cfg(unix)-only POSIX helpers that have no Windows counterpart because the concept does not exist, such as is_owned_by_uid and current_uid.",
+      "quote": "S8  (only the pub caveat) pub cfg(unix)-only POSIX helpers (`is_owned_by_uid`, `current_uid` in atm_temp.rs) with no Windows counterpart because the concept does not exist; Windows uses a different check. Row 1. Sc-lint docs say pub items stay checked, so the sc-lint team must choose: exempt (S1 transitively) or keep reporting. Not a parity gap.\nRand ruling (relayed by team-lead 2026-10-30): \"S8 = EXEMPT pub POSIX-only helpers\"",
+      "kind": "directive",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; #786 S8 text plus Rand's ruling relayed by team-lead 2026-10-30",
+      "summary": "#786 S8: pub POSIX-only helpers exempt",
+      "scope": "The item changes PORT-010 handling of pub items or helper exemptions in crates/sc-lint-portability.",
+      "deterministic_check": "A port010 fixture of atm_temp.rs-style pub is_owned_by_uid/current_uid helpers reports no PORT-010 finding; PORT-010 docs state the pub-helper exemption.",
+      "fixtures": {
+        "pass": [
+          "PORT-010 stops reporting pub POSIX-only helpers like is_owned_by_uid and current_uid. Evidence: test port010_pub_posix_helper passes, showing zero findings for that fixture."
+        ],
+        "fail": [
+          "Keeps reporting pub is_owned_by_uid and current_uid because pub items stay checked."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GH-786.table.3",
+      "source_type": "REQ",
+      "source_ref": "GH-786.table.3",
+      "statement": "A release must stop PORT-010 reporting all 47 findings for the 18 atm-core paths in sc-lint#786, none of which is a true positive or parity gap, so atm-core can remove its PORT-010 exclusions.",
+      "quote": "A release fixing the applicable findings allows atm-core to remove its PORT-010 exclusions.\n[…]\nResult: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design.\n[…]\nThe 47 findings at this head match the issue's list exactly (same files, lines, item names)\n[…]\nS8  (only the pub caveat) pub cfg(unix)-only POSIX helpers (`is_owned_by_uid`, `current_uid` in atm_temp.rs) with no Windows counterpart because the concept does not exist; Windows uses a different check. Row 1. Sc-lint docs say pub items stay checked, so the sc-lint team must choose: exempt (S1 transitively) or keep reporting. Not a parity gap.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#786 body 'Requested outcome' + https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (incl. S8)",
+      "summary": "#786: none of the 47 findings reported, exclusions removable",
+      "scope": "The item changes PORT-010 classification in crates/sc-lint-portability or its #786 fixtures.",
+      "deterministic_check": "Rerun the #786 per-path repro on atm-core 6ffaa97be with each path's exclusion removed: 0 of the 47 findings remain.",
+      "fixtures": {
+        "pass": [
+          "PORT-010 stops reporting all 47 #786 findings, so atm-core removes its PORT-010 exclusions. Evidence: test port010_issue786_paths passes, showing 0 of the 47 findings across the 18 per-path repros."
+        ],
+        "fail": [
+          "Fixes the same-name sibling shape only, so the other #786 findings are still reported."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GH-198.export-env.3",
+      "source_type": "REQ",
+      "source_ref": "GH-198.export-env.3",
+      "statement": "sc-lint must be able to export the runner.python venv interpreter as PYO3_PYTHON to native (non-python) steps such as cargo clippy.",
+      "quote": "`runner.python` only rewrites step argv; cargo clippy needs the venv interpreter exported as `PYO3_PYTHON` and the venv dir on PATH for native (non-python) steps.\n[…]\nWe need one more knob, e.g. `runner.export_env = [\"PYO3_PYTHON\"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 C + mismatch paragraph; in scope per Rand 2026-10-30",
+      "summary": "#198: export PYO3_PYTHON to native steps",
+      "scope": "The item changes step environment, runner config, or clippy steps in crates/sc-lint.",
+      "deterministic_check": "A step-environment test shows a cargo clippy step receives PYO3_PYTHON set to the runner.python interpreter when configured.",
+      "fixtures": {
+        "pass": [
+          "sc-lint can export the runner.python interpreter as PYO3_PYTHON to native steps such as cargo clippy. Evidence: test runner_export_env_pyo3 passes, showing the clippy step's env has PYO3_PYTHON set to the venv interpreter."
+        ],
+        "fail": [
+          "Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:47:00+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:47:00+00:00",
           "event": "updated",
           "fields": [
             "fixtures"

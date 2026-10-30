@@ -1,0 +1,118 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T024717Z-fixture_ANC-017_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T02:47:17+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-017:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 83,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-017",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "PORT-010 must exempt pub cfg(unix)-only POSIX helpers that have no Windows counterpart because the concept does not exist, such as is_owned_by_uid and current_uid.",
+      "quote": "S8  (only the pub caveat) pub cfg(unix)-only POSIX helpers (`is_owned_by_uid`, `current_uid` in atm_temp.rs) with no Windows counterpart because the concept does not exist; Windows uses a different check. Row 1. Sc-lint docs say pub items stay checked, so the sc-lint team must choose: exempt (S1 transitively) or keep reporting. Not a parity gap.\nRand ruling (relayed by team-lead 2026-10-30): \"S8 = EXEMPT pub POSIX-only helpers\"",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; #786 S8 text plus Rand's ruling relayed by team-lead 2026-10-30",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "A port010 fixture of atm_temp.rs-style pub is_owned_by_uid/current_uid helpers reports no PORT-010 finding; PORT-010 docs state the pub-helper exemption.",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "verdict": "underspecified",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.38,
+          "probabilities": {
+            "yes": 0.22,
+            "no": 0.59,
+            "unclear": 0.19
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.24,
+          "probabilities": {
+            "yes": 0.49,
+            "no": 0.49,
+            "unclear": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.24,
+      "explanation": "Jev was not confident (min confidence 0.24); the anchor or the bead may be underspecified.",
+      "usage": {
+        "input_tokens": 1034,
+        "output_tokens": 117
+      },
+      "low_questions": [
+        {
+          "ask": "first",
+          "role": "compliance",
+          "question_id": "addressed",
+          "choice": "no",
+          "confidence": 0.38
+        },
+        {
+          "ask": "first",
+          "role": "conflict",
+          "question_id": "contradicted",
+          "choice": "yes",
+          "confidence": 0.24
+        }
+      ],
+      "attempts": 1,
+      "item_chars_sent": 83,
+      "item_shortened": false,
+      "request_bytes": 3116
+    }
+  ],
+  "summary": {
+    "counts": {
+      "underspecified": 1
+    },
+    "failing": [
+      "ANC-017"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

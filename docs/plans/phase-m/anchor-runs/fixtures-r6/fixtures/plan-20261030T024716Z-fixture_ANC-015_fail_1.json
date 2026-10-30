@@ -1,0 +1,104 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T024716Z-fixture_ANC-015_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T02:47:16+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-015:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 88,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-015",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "PORT-010 must still report a cfg(unix) item that has no Windows, cfg(not(unix)) or portable counterpart.",
+      "quote": "atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.\nDefinition question (team-lead, 2026-10-30): \"real Windows gap = a cfg(unix) item with no Windows, cfg(not(unix)) or portable counterpart\" Rand: \"yes\"",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "A port010 fixture with a cfg(unix) fn and no Windows, cfg(not(unix)) or portable counterpart still reports PORT-010.",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.92,
+          "probabilities": {
+            "yes": 0.95,
+            "no": 0.03,
+            "unclear": 0.02
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.67,
+          "probabilities": {
+            "yes": 0.09,
+            "no": 0.78,
+            "unclear": 0.13
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.62,
+          "probabilities": {
+            "yes": 0.75,
+            "no": 0.23,
+            "unclear": 0.02
+          }
+        }
+      },
+      "min_confidence": 0.62,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1027,
+        "output_tokens": 117
+      },
+      "attempts": 2,
+      "item_chars_sent": 88,
+      "item_shortened": false,
+      "request_bytes": 3061
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-015"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}
