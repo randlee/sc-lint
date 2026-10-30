@@ -10,131 +10,40 @@ Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 
 | ID | Source | Rubric | Weak rubric cells | Pass (plan / dev) | Fail (plan / dev) |
 |---|---|---|---|---|---|
-| GH-786.S3 | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
-| GH-198.setup-pre.2 | issue text | inconclusive | self_contained yes@0.4 | satisfied / satisfied | contradicted / contradicted |
-| GH-198.runner-path.2 | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
-| GH-136.src-only.2 | issue text | inconclusive | faithful None@None | satisfied / satisfied | contradicted / contradicted |
-| GH-136.audit-verify | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
-| GH-136.audit-gaps | issue text | inconclusive | faithful yes@0.53 | satisfied / satisfied | contradicted / contradicted |
 | ANC-014 | Rand | inconclusive | faithful yes@0.4 | satisfied / satisfied | contradicted / contradicted |
 | ANC-016 | Rand | testable | — | satisfied / satisfied | contradicted / contradicted |
-| GH-198.export-env.3 | issue text | inconclusive | single_constraint yes@0.58, faithful yes@0.43 | satisfied / satisfied | contradicted / contradicted |
 | ANC-018 | Rand | inconclusive | observable no@0.56, faithful no@0.22, self_contained no@0.77 | satisfied / satisfied | contradicted / contradicted |
 | ANC-019 | Rand | inconclusive | observable yes@0.42, faithful yes@0.49 | satisfied / satisfied | contradicted / contradicted |
 | ANC-020 | Rand | inconclusive | observable no@0.43, self_contained no@0.92 | satisfied / satisfied | contradicted / contradicted |
 | ANC-021 | Rand | inconclusive | observable no@0.26, faithful yes@0.38, self_contained no@0.92 | satisfied / satisfied | contradicted / contradicted |
 | ANC-022 | Rand | testable | — | satisfied / satisfied | contradicted / contradicted |
-| GH-198.runner-argv.2 | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
 | ANC-023 | Rand | inconclusive | single_constraint yes@0.52, faithful yes@0.42, self_contained yes@0.55 | satisfied / satisfied | contradicted / contradicted |
 | ANC-024 | Rand | inconclusive | self_contained yes@0.4 | satisfied / satisfied | contradicted / contradicted |
 | ANC-025 | Rand | inconclusive | single_constraint yes@0.55, faithful no@0.46 | satisfied / satisfied | contradicted / contradicted |
+| ANC-026 | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
+| ANC-027 | issue text | inconclusive | self_contained yes@0.4 | satisfied / satisfied | contradicted / contradicted |
+| ANC-028 | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
+| ANC-029 | issue text | inconclusive | faithful None@None | satisfied / satisfied | contradicted / contradicted |
+| ANC-030 | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
+| ANC-031 | issue text | inconclusive | faithful yes@0.53 | satisfied / satisfied | contradicted / contradicted |
+| ANC-032 | issue text | inconclusive | single_constraint yes@0.58, faithful yes@0.43 | satisfied / satisfied | contradicted / contradicted |
+| ANC-033 | issue text | testable | — | satisfied / satisfied | contradicted / contradicted |
 
 ## Open items
 
+- **ID-only re-registration (2026-10-30, lint-mr6d):** GH-786.S3 → ANC-026, GH-198.setup-pre.2 → ANC-027, GH-198.runner-path.2 → ANC-028, GH-136.src-only.2 → ANC-029, GH-136.audit-verify → ANC-030, GH-136.audit-gaps → ANC-031, GH-198.export-env.3 → ANC-032, GH-198.runner-argv.2 → ANC-033. Same quote, statement and fixtures; the rubric and fixture results below are the r11 runs recorded under the old IDs.
+
 - **Rand's 2026-10-30 conflict rulings (lint-uwqw):**
   - Exception path: ANC-018 records the path; ANC-020 replaces ANC-015 (report unless an approved exception opts it out); ANC-021 replaces ANC-017 (S8 helpers exempt only through an approved exception, not blanket).
-  - Consumer override: ANC-019 records the override; ANC-022 replaces GH-198.kit-helpers (kit interpreter is the default); GH-198.runner-argv.2 replaces GH-198.runner-argv (a leading python resolves to runner.python except sc_lint.* helpers, per the issue's (b) text).
+  - Consumer override: ANC-019 records the override; ANC-022 replaces GH-198.kit-helpers (kit interpreter is the default); ANC-033 replaces GH-198.runner-argv (a leading python resolves to runner.python except sc_lint.* helpers, per the issue's (b) text).
 - **New question for Rand:** ANC-018, ANC-020 and ANC-021 rate **not self-contained** at high confidence (0.82–0.96). "Approved exception path/declaration" is not defined in his words: what form the declaration takes and who approves it. ADR-021 (Pending) proposes explicit reviewed declarations; the anchors do not claim that without his answer.
 - **ANC-010 / ANC-011:** Rand answered "yes" to both definitions (2026-10-30). ANC-023 replaces ANC-010 (setup step = building .bootstrap-venv by running just bootstrap; the pass fixture no longer says atm-core deletes a setup recipe) and ANC-024 replaces ANC-011 (the .bootstrap-venv interpreter). ANC-024 self_contained fell to 0.24 in r10; not reworded toward a pass.
-- **ANC-012:** Rand answered "opt-in" (2026-10-30); the hold is released. ANC-025 replaces ANC-012: source-only enforcement is an opt-in setting and all-files checking stays the default. A second fail sentence covers flipping the default (contradicted at both gates). The original fail sentence is still `underspecified` at the plan gate and goes to the question tuner after approval; it is not reworded toward a pass. GH-136.src-only.2 already asks for a setting and is unchanged.
+- **ANC-012:** Rand answered "opt-in" (2026-10-30); the hold is released. ANC-025 replaces ANC-012: source-only enforcement is an opt-in setting and all-files checking stays the default. A second fail sentence covers flipping the default (contradicted at both gates). The original fail sentence is still `underspecified` at the plan gate and goes to the question tuner after approval; it is not reworded toward a pass. ANC-029 already asks for a setting and is unchanged.
 - **ANC-014 fail** was `underspecified` at the plan gate in r10 only and landed again in r11; run noise.
 - **Noise-level cells:** other weak cells sit between 0.3 and 0.6 and move ±0.1–0.2 between runs on unchanged statements.
 - **Retired 2026-10-30:** GH-786.table.3 (covered by ANC-014 and ANC-021), ANC-010, ANC-011, ANC-012, ANC-015, ANC-017, GH-198.kit-helpers, GH-198.runner-argv.
 
 ## Records
-
-### GH-786.S3 — #720/S3: same-name cfg(not(unix)) sibling, all scopes
-
-**Statement:** PORT-010 must not report a cfg(unix) item that has a same-name #[cfg(not(unix))] sibling in the same scope, whether that scope is a module, an inherent impl, or the crate root.
-
-**Quote:**
-
-> S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.
-
-**Rubric:** testable (weak: —)
-
-**Pass** (satisfied / satisfied): PORT-010 stops reporting a cfg(unix) item that has a same-name cfg(not(unix)) sibling in a module, an inherent impl or the crate root. Evidence: test port010_same_name_sibling passes, showing zero findings for fixtures of all three scopes.
-
-**Fail** (contradicted / contradicted): Exempts the crate-root main.rs pair only; module and inherent-impl siblings are still reported.
-
-### GH-198.setup-pre.2 — #198: [tool.sc-lint].setup.pre runs before provisioning
-
-**Statement:** [tool.sc-lint].setup.pre must accept an argv list that the sc-lint setup command (just setup) runs before it provisions sc-lint.
-
-**Quote:**
-
-> `setup.pre` (argv run by `just setup` before sc-lint provisioning)
-> […]
-> [tool.sc-lint.setup]
-> pre = ["just", "bootstrap"]
-> […]
-> **(c) Commitment:** yes, we commit to this split now and will adopt in the first release that ships it
-
-**Rubric:** inconclusive (weak: self_contained yes@0.4)
-
-**Pass** (satisfied / satisfied): [tool.sc-lint].setup.pre takes an argv that just setup runs before sc-lint provisioning. Evidence: test setup_pre_runs_before_provisioning passes, showing the stub command ran before provisioning started.
-
-**Fail** (contradicted / contradicted): Runs setup.pre after sc-lint provisioning has finished.
-
-### GH-198.runner-path.2 — #198: runner.python venv dir prepended to every step's PATH
-
-**Statement:** When runner.python names a venv, sc-lint must prepend that venv's bin directory (Scripts on Windows) to the PATH of every step's child process.
-
-**Quote:**
-
-> (2) the venv's bin/Scripts dir is prepended to the child's PATH (our `python_cmd` does this today so helpers that spawn `python` stay pinned)
-> […]
-> (plus the PATH prepend in (2) applied to every step)
-
-**Rubric:** testable (weak: —)
-
-**Pass** (satisfied / satisfied): With runner.python set, sc-lint prepends the venv's bin (Scripts on Windows) directory to every step's PATH. Evidence: test runner_python_prepends_path passes, showing PATH starts with the venv directory for a python step and a cargo step.
-
-**Fail** (contradicted / contradicted): Rewrites only the leading python argv, so a helper that spawns python picks up the PATH interpreter.
-
-### GH-136.src-only.2 — #136: source-only scope setting for global_dependency_ownership
-
-**Statement:** global_dependency_ownership must offer a config setting that restricts its check to src/**/*.rs, the source-only scope atm-core's checker uses.
-
-**Quote:**
-
-> The released 0.8.2 `global_dependency_ownership` policy has no source-only scope equivalent to the atm-core consumer check.
-> […]
-> The previous atm-core checker passes on this tree because it scans `src/**/*.rs` and does not treat separate integration-test targets as production source. There is no config setting to preserve that source-only scope. atm-core therefore retains this rule locally pending a released source-only scope; no roots or excludes were added to suppress the findings.
-
-**Rubric:** inconclusive (weak: faithful None@None)
-
-**Pass** (satisfied / satisfied): global_dependency_ownership gains a source-only scope setting that checks src/**/*.rs and not integration-test targets, with no roots or excludes added. Evidence: test issue136_source_only_scope passes, showing the seven crates/*/tests/ findings gone and crates/atm/src/commands/mod.rs still reported.
-
-**Fail** (contradicted / contradicted): Adds atm-core's tests/ directories to allowed_source_roots instead of adding a setting.
-
-### GH-136.audit-verify — #136 audit: verify coverage of the three keys
-
-**Statement:** Each of atm-core's three [boundaries] keys (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) must be classified as covered or not covered by the latest released sc-lint-boundary.
-
-**Quote:**
-
-> atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
-
-**Rubric:** testable (weak: —)
-
-**Pass** (satisfied / satisfied): Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered. Evidence: docs/plans/phase-m/boundary-parity.md has one row per key citing the sc-lint-boundary test or code that covers it.
-
-**Fail** (contradicted / contradicted): Verifies manifest_dependency_allowlists only and assumes the other two keys are covered.
-
-### GH-136.audit-gaps — #136 audit: file a gap per uncovered key
-
-**Statement:** A config-surface gap issue must be filed in randlee/sc-lint for each atm-core [boundaries] key (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) that released sc-lint-boundary does not cover.
-
-**Quote:**
-
-> atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
-
-**Rubric:** inconclusive (weak: faithful yes@0.53)
-
-**Pass** (satisfied / satisfied): Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover. Evidence: each not-covered row in docs/plans/phase-m/boundary-parity.md links its filed GitHub issue number.
-
-**Fail** (contradicted / contradicted): Records uncovered keys in the parity table without filing any gap issues.
 
 ### ANC-014 — #786/#720: no PORT-010 false alarms on atm-core
 
@@ -166,23 +75,7 @@ Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 
 **Fail** (contradicted / contradicted): Records sc-lint coverage for manifest_dependency_allowlists only and leaves the other two settings out of the table.
 
-### GH-198.export-env.3 — #198: export PYO3_PYTHON to native steps
-
-**Statement:** sc-lint must be able to export the [tool.sc-lint].runner.python venv interpreter as PYO3_PYTHON to native (non-python) steps such as cargo clippy.
-
-**Quote:**
-
-> `runner.python` only rewrites step argv; cargo clippy needs the venv interpreter exported as `PYO3_PYTHON` and the venv dir on PATH for native (non-python) steps.
-> […]
-> We need one more knob, e.g. `runner.export_env = ["PYO3_PYTHON"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.
-
-**Rubric:** inconclusive (weak: single_constraint yes@0.58, faithful yes@0.43)
-
-**Pass** (satisfied / satisfied): sc-lint can export the runner.python interpreter as PYO3_PYTHON to native steps such as cargo clippy. Evidence: test runner_export_env_pyo3 passes, showing the clippy step's env has PYO3_PYTHON set to the venv interpreter.
-
-**Fail** (contradicted / contradicted): Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix.
-
-### ANC-018 — PORT-010 approved exception path
+### ANC-018 — [pending definition: approved exception path] PORT-010 approved exception path
 
 **Statement:** sc-lint's PORT-010 rule must offer an approved exception path through which a consumer knowingly opts a #[cfg(unix)] item out of reporting.
 
@@ -210,7 +103,7 @@ Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 
 **Fail** (contradicted / contradicted): Hard-codes sc_lint.* helper steps to the kit interpreter with no consumer setting to change it.
 
-### ANC-020 — #786/#720: real Windows gaps reported unless an approved exception
+### ANC-020 — [pending definition: approved exception path] #786/#720: real Windows gaps reported unless an approved exception
 
 **Statement:** sc-lint's PORT-010 rule must report every #[cfg(unix)] item that has no #[cfg(windows)], #[cfg(not(unix))] or portable counterpart, unless an approved exception declaration opts it out.
 
@@ -226,7 +119,7 @@ Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 
 **Fail** (contradicted / contradicted): Exempts every cfg(unix) fn in a file once any Windows code exists anywhere in that file.
 
-### ANC-021 — #786 S8: pub POSIX-only helpers exempt via approved exception
+### ANC-021 — [pending definition: approved exception path] #786 S8: pub POSIX-only helpers exempt via approved exception
 
 **Statement:** sc-lint's PORT-010 rule must exempt pub POSIX-only #[cfg(unix)] helpers such as is_owned_by_uid and current_uid in crates/atm-core/src/atm_temp.rs only through an approved exception declaration.
 
@@ -256,21 +149,6 @@ Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 **Pass** (satisfied / satisfied): With no consumer override, sc_lint.* wheel helper steps run on the kit interpreter even when runner.python is set. Evidence: test kit_helpers_ignore_runner_python passes, showing sc_lint.lint_cargo_deny resolves to the kit venv with runner.python set.
 
 **Fail** (contradicted / contradicted): Applies runner.python to every step, including sc_lint.lint_cargo_deny.
-
-### GH-198.runner-argv.2 — #198: runner.python resolves leading python, except sc_lint.* helpers
-
-**Statement:** When [tool.sc-lint].runner.python names a venv, a leading python in any lint or test step argv that does not run an sc_lint.* wheel helper must resolve to that venv's interpreter on every OS.
-
-**Quote:**
-
-> (1) a leading `"python"` in any lint **or test** step argv resolves to that venv's interpreter on every OS
-> plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
-
-**Rubric:** testable (weak: —)
-
-**Pass** (satisfied / satisfied): With runner.python set, a leading python in any lint or test step runs that venv's interpreter on every OS, and python -m sc_lint.* helper steps are left alone. Evidence: test runner_python_argv passes, showing .venv/bin/python on unix and .venv\Scripts\python.exe on windows for a lint step and a test step.
-
-**Fail** (contradicted / contradicted): Rewrites every leading python to runner.python, including python -m sc_lint.lint_cargo_deny.
 
 ### ANC-023 — #198: sc-lint runs the consumer setup step (just bootstrap)
 
@@ -318,3 +196,127 @@ Reply per record: **approve**, **edit** (give the new sentence), or **drop**.
 **Fail** (contradicted / contradicted): Dependency ownership keeps checking every file, including tests/, and offers no way to limit it to source files.
 
 **Fail** (contradicted / contradicted): Makes source-only the new default, so tests/ files stop being checked for every consumer without any setting.
+
+### ANC-026 — #720/S3: same-name cfg(not(unix)) sibling, all scopes
+
+**Statement:** PORT-010 must not report a cfg(unix) item that has a same-name #[cfg(not(unix))] sibling in the same scope, whether that scope is a module, an inherent impl, or the crate root.
+
+**Quote:**
+
+> S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.
+
+**Rubric:** testable (weak: —)
+
+**Pass** (satisfied / satisfied): PORT-010 stops reporting a cfg(unix) item that has a same-name cfg(not(unix)) sibling in a module, an inherent impl or the crate root. Evidence: test port010_same_name_sibling passes, showing zero findings for fixtures of all three scopes.
+
+**Fail** (contradicted / contradicted): Exempts the crate-root main.rs pair only; module and inherent-impl siblings are still reported.
+
+### ANC-027 — #198: [tool.sc-lint].setup.pre runs before provisioning
+
+**Statement:** [tool.sc-lint].setup.pre must accept an argv list that the sc-lint setup command (just setup) runs before it provisions sc-lint.
+
+**Quote:**
+
+> `setup.pre` (argv run by `just setup` before sc-lint provisioning)
+> […]
+> [tool.sc-lint.setup]
+> pre = ["just", "bootstrap"]
+> […]
+> **(c) Commitment:** yes, we commit to this split now and will adopt in the first release that ships it
+
+**Rubric:** inconclusive (weak: self_contained yes@0.4)
+
+**Pass** (satisfied / satisfied): [tool.sc-lint].setup.pre takes an argv that just setup runs before sc-lint provisioning. Evidence: test setup_pre_runs_before_provisioning passes, showing the stub command ran before provisioning started.
+
+**Fail** (contradicted / contradicted): Runs setup.pre after sc-lint provisioning has finished.
+
+### ANC-028 — #198: runner.python venv dir prepended to every step's PATH
+
+**Statement:** When runner.python names a venv, sc-lint must prepend that venv's bin directory (Scripts on Windows) to the PATH of every step's child process.
+
+**Quote:**
+
+> (2) the venv's bin/Scripts dir is prepended to the child's PATH (our `python_cmd` does this today so helpers that spawn `python` stay pinned)
+> […]
+> (plus the PATH prepend in (2) applied to every step)
+
+**Rubric:** testable (weak: —)
+
+**Pass** (satisfied / satisfied): With runner.python set, sc-lint prepends the venv's bin (Scripts on Windows) directory to every step's PATH. Evidence: test runner_python_prepends_path passes, showing PATH starts with the venv directory for a python step and a cargo step.
+
+**Fail** (contradicted / contradicted): Rewrites only the leading python argv, so a helper that spawns python picks up the PATH interpreter.
+
+### ANC-029 — #136: source-only scope setting for global_dependency_ownership
+
+**Statement:** global_dependency_ownership must offer a config setting that restricts its check to src/**/*.rs, the source-only scope atm-core's checker uses.
+
+**Quote:**
+
+> The released 0.8.2 `global_dependency_ownership` policy has no source-only scope equivalent to the atm-core consumer check.
+> […]
+> The previous atm-core checker passes on this tree because it scans `src/**/*.rs` and does not treat separate integration-test targets as production source. There is no config setting to preserve that source-only scope. atm-core therefore retains this rule locally pending a released source-only scope; no roots or excludes were added to suppress the findings.
+
+**Rubric:** inconclusive (weak: faithful None@None)
+
+**Pass** (satisfied / satisfied): global_dependency_ownership gains a source-only scope setting that checks src/**/*.rs and not integration-test targets, with no roots or excludes added. Evidence: test issue136_source_only_scope passes, showing the seven crates/*/tests/ findings gone and crates/atm/src/commands/mod.rs still reported.
+
+**Fail** (contradicted / contradicted): Adds atm-core's tests/ directories to allowed_source_roots instead of adding a setting.
+
+### ANC-030 — #136 audit: verify coverage of the three keys
+
+**Statement:** Each of atm-core's three [boundaries] keys (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) must be classified as covered or not covered by the latest released sc-lint-boundary.
+
+**Quote:**
+
+> atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
+
+**Rubric:** testable (weak: —)
+
+**Pass** (satisfied / satisfied): Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered. Evidence: docs/plans/phase-m/boundary-parity.md has one row per key citing the sc-lint-boundary test or code that covers it.
+
+**Fail** (contradicted / contradicted): Verifies manifest_dependency_allowlists only and assumes the other two keys are covered.
+
+### ANC-031 — #136 audit: file a gap per uncovered key
+
+**Statement:** A config-surface gap issue must be filed in randlee/sc-lint for each atm-core [boundaries] key (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) that released sc-lint-boundary does not cover.
+
+**Quote:**
+
+> atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
+
+**Rubric:** inconclusive (weak: faithful yes@0.53)
+
+**Pass** (satisfied / satisfied): Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover. Evidence: each not-covered row in docs/plans/phase-m/boundary-parity.md links its filed GitHub issue number.
+
+**Fail** (contradicted / contradicted): Records uncovered keys in the parity table without filing any gap issues.
+
+### ANC-032 — #198: export PYO3_PYTHON to native steps
+
+**Statement:** sc-lint must be able to export the [tool.sc-lint].runner.python venv interpreter as PYO3_PYTHON to native (non-python) steps such as cargo clippy.
+
+**Quote:**
+
+> `runner.python` only rewrites step argv; cargo clippy needs the venv interpreter exported as `PYO3_PYTHON` and the venv dir on PATH for native (non-python) steps.
+> […]
+> We need one more knob, e.g. `runner.export_env = ["PYO3_PYTHON"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.
+
+**Rubric:** inconclusive (weak: single_constraint yes@0.58, faithful yes@0.43)
+
+**Pass** (satisfied / satisfied): sc-lint can export the runner.python interpreter as PYO3_PYTHON to native steps such as cargo clippy. Evidence: test runner_export_env_pyo3 passes, showing the clippy step's env has PYO3_PYTHON set to the venv interpreter.
+
+**Fail** (contradicted / contradicted): Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix.
+
+### ANC-033 — #198: runner.python resolves leading python, except sc_lint.* helpers
+
+**Statement:** When [tool.sc-lint].runner.python names a venv, a leading python in any lint or test step argv that does not run an sc_lint.* wheel helper must resolve to that venv's interpreter on every OS.
+
+**Quote:**
+
+> (1) a leading `"python"` in any lint **or test** step argv resolves to that venv's interpreter on every OS
+> plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
+
+**Rubric:** testable (weak: —)
+
+**Pass** (satisfied / satisfied): With runner.python set, a leading python in any lint or test step runs that venv's interpreter on every OS, and python -m sc_lint.* helper steps are left alone. Evidence: test runner_python_argv passes, showing .venv/bin/python on unix and .venv\Scripts\python.exe on windows for a lint step and a test step.
+
+**Fail** (contradicted / contradicted): Rewrites every leading python to runner.python, including python -m sc_lint.lint_cargo_deny.

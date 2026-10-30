@@ -858,8 +858,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 7,
-      "status": "locked",
+      "version": 8,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -917,6 +917,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:18+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-026",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -1402,8 +1408,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
-      "status": "locked",
+      "version": 6,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1446,6 +1452,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-027",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -1471,8 +1483,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
-      "status": "locked",
+      "version": 5,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1507,6 +1519,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-028",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -1590,8 +1608,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 6,
-      "status": "locked",
+      "version": 7,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1642,6 +1660,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-029",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -1718,8 +1742,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
-      "status": "locked",
+      "version": 6,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1762,6 +1786,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-030",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -1787,8 +1817,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
-      "status": "locked",
+      "version": 6,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1831,6 +1861,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-031",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -2165,8 +2201,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 5,
-      "status": "locked",
+      "version": 6,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -2210,6 +2246,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-032",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -2526,8 +2568,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 3,
-      "status": "locked",
+      "version": 4,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -2555,6 +2597,12 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-033",
+          "reason": "ID-only re-registration: the tuner request schema accepts only ANC-###; same quote, statement and fixtures"
         }
       ]
     },
@@ -2725,6 +2773,446 @@
           "confirmed_by": "Rand",
           "confirmed_at": "2026-10-30",
           "relayed_by": "team-lead (lint-f7m3)"
+        }
+      ]
+    },
+    {
+      "id": "ANC-026",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "PORT-010 must not report a cfg(unix) item that has a same-name #[cfg(not(unix))] sibling in the same scope, whether that scope is a module, an inherent impl, or the crate root.",
+      "quote": "S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (S3; generalizes #720) (re-registered from GH-786.S3, ID-only change)",
+      "summary": "#720/S3: same-name cfg(not(unix)) sibling, all scopes",
+      "scope": "The item changes PORT-010 sibling detection or port010 fixtures (crate_root_main, module, inherent impl).",
+      "deterministic_check": "port010 fixtures for module, inherent-impl and crate-root same-name cfg(unix)/cfg(not(unix)) pairs report nothing.",
+      "fixtures": {
+        "pass": [
+          "PORT-010 stops reporting a cfg(unix) item that has a same-name cfg(not(unix)) sibling in a module, an inherent impl or the crate root. Evidence: test port010_same_name_sibling passes, showing zero findings for fixtures of all three scopes."
+        ],
+        "fail": [
+          "Exempts the crate-root main.rs pair only; module and inherent-impl siblings are still reported."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:18+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:18+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-786.S3; no wording change"
+        }
+      ]
+    },
+    {
+      "id": "ANC-027",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "[tool.sc-lint].setup.pre must accept an argv list that the sc-lint setup command (just setup) runs before it provisions sc-lint.",
+      "quote": "`setup.pre` (argv run by `just setup` before sc-lint provisioning)\n[…]\n[tool.sc-lint.setup]\npre = [\"just\", \"bootstrap\"]\n[…]\n**(c) Commitment:** yes, we commit to this split now and will adopt in the first release that ships it",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#198 body + https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a),(c) (re-registered from GH-198.setup-pre.2, ID-only change)",
+      "summary": "#198: [tool.sc-lint].setup.pre runs before provisioning",
+      "scope": "The item edits ScLintConfigFile or consumer config parsing, or the just setup / installer flow.",
+      "deterministic_check": "Config-parse test accepts [tool.sc-lint].setup.pre; a stub-command test records it ran before provisioning.",
+      "fixtures": {
+        "pass": [
+          "[tool.sc-lint].setup.pre takes an argv that just setup runs before sc-lint provisioning. Evidence: test setup_pre_runs_before_provisioning passes, showing the stub command ran before provisioning started."
+        ],
+        "fail": [
+          "Runs setup.pre after sc-lint provisioning has finished."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:18+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:18+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-198.setup-pre.2; no wording change"
+        }
+      ]
+    },
+    {
+      "id": "ANC-028",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When runner.python names a venv, sc-lint must prepend that venv's bin directory (Scripts on Windows) to the PATH of every step's child process.",
+      "quote": "(2) the venv's bin/Scripts dir is prepended to the child's PATH (our `python_cmd` does this today so helpers that spawn `python` stay pinned)\n[…]\n(plus the PATH prepend in (2) applied to every step)",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(2) + mismatch paragraph (re-registered from GH-198.runner-path.2, ID-only change)",
+      "summary": "#198: runner.python venv dir prepended to every step's PATH",
+      "scope": "The item changes step child environment or runner.python handling in crates/sc-lint.",
+      "deterministic_check": "A step-environment test with injected platform shows PATH starts with the venv bin or Scripts directory for a python step and a native step.",
+      "fixtures": {
+        "pass": [
+          "With runner.python set, sc-lint prepends the venv's bin (Scripts on Windows) directory to every step's PATH. Evidence: test runner_python_prepends_path passes, showing PATH starts with the venv directory for a python step and a cargo step."
+        ],
+        "fail": [
+          "Rewrites only the leading python argv, so a helper that spawns python picks up the PATH interpreter."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-198.runner-path.2; no wording change"
+        }
+      ]
+    },
+    {
+      "id": "ANC-029",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "global_dependency_ownership must offer a config setting that restricts its check to src/**/*.rs, the source-only scope atm-core's checker uses.",
+      "quote": "The released 0.8.2 `global_dependency_ownership` policy has no source-only scope equivalent to the atm-core consumer check.\n[…]\nThe previous atm-core checker passes on this tree because it scans `src/**/*.rs` and does not treat separate integration-test targets as production source. There is no config setting to preserve that source-only scope. atm-core therefore retains this rule locally pending a released source-only scope; no roots or excludes were added to suppress the findings.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 comment 2026-10-29 (re-registered from GH-136.src-only.2, ID-only change)",
+      "summary": "#136: source-only scope setting for global_dependency_ownership",
+      "scope": "The item changes global_dependency_ownership or SCB-MANIFEST-004 config in crates/sc-lint-boundary.",
+      "deterministic_check": "Boundary test reproducing the #136 tree: the seven crates/*/tests/ findings disappear under the setting and crates/atm/src/commands/mod.rs is still reported.",
+      "fixtures": {
+        "pass": [
+          "global_dependency_ownership gains a source-only scope setting that checks src/**/*.rs and not integration-test targets, with no roots or excludes added. Evidence: test issue136_source_only_scope passes, showing the seven crates/*/tests/ findings gone and crates/atm/src/commands/mod.rs still reported."
+        ],
+        "fail": [
+          "Adds atm-core's tests/ directories to allowed_source_roots instead of adding a setting."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-136.src-only.2; no wording change"
+        }
+      ]
+    },
+    {
+      "id": "ANC-030",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Each of atm-core's three [boundaries] keys (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) must be classified as covered or not covered by the latest released sc-lint-boundary.",
+      "quote": "atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2) (re-registered from GH-136.audit-verify, ID-only change)",
+      "summary": "#136 audit: verify coverage of the three keys",
+      "scope": "The item audits atm-core [boundaries] keys against sc-lint-boundary or writes a parity table.",
+      "deterministic_check": "Parity table under docs/plans/phase-m/ has a covered/not-covered row with evidence for each of the three keys.",
+      "fixtures": {
+        "pass": [
+          "Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered. Evidence: docs/plans/phase-m/boundary-parity.md has one row per key citing the sc-lint-boundary test or code that covers it."
+        ],
+        "fail": [
+          "Verifies manifest_dependency_allowlists only and assumes the other two keys are covered."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-136.audit-verify; no wording change"
+        }
+      ]
+    },
+    {
+      "id": "ANC-031",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A config-surface gap issue must be filed in randlee/sc-lint for each atm-core [boundaries] key (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) that released sc-lint-boundary does not cover.",
+      "quote": "atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2) (re-registered from GH-136.audit-gaps, ID-only change)",
+      "summary": "#136 audit: file a gap per uncovered key",
+      "scope": "The item files sc-lint-boundary config-surface gap issues or links them from the parity table.",
+      "deterministic_check": "Each not-covered row in the parity table links a filed GitHub issue labelled as a config-surface gap.",
+      "fixtures": {
+        "pass": [
+          "Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover. Evidence: each not-covered row in docs/plans/phase-m/boundary-parity.md links its filed GitHub issue number."
+        ],
+        "fail": [
+          "Records uncovered keys in the parity table without filing any gap issues."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-136.audit-gaps; no wording change"
+        }
+      ]
+    },
+    {
+      "id": "ANC-032",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must be able to export the [tool.sc-lint].runner.python venv interpreter as PYO3_PYTHON to native (non-python) steps such as cargo clippy.",
+      "quote": "`runner.python` only rewrites step argv; cargo clippy needs the venv interpreter exported as `PYO3_PYTHON` and the venv dir on PATH for native (non-python) steps.\n[…]\nWe need one more knob, e.g. `runner.export_env = [\"PYO3_PYTHON\"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 C + mismatch paragraph; in scope per Rand 2026-10-30 (re-registered from GH-198.export-env.3, ID-only change)",
+      "summary": "#198: export PYO3_PYTHON to native steps",
+      "scope": "The item changes step environment, runner config, or clippy steps in crates/sc-lint.",
+      "deterministic_check": "A step-environment test shows a cargo clippy step receives PYO3_PYTHON set to the runner.python interpreter when configured.",
+      "fixtures": {
+        "pass": [
+          "sc-lint can export the runner.python interpreter as PYO3_PYTHON to native steps such as cargo clippy. Evidence: test runner_export_env_pyo3 passes, showing the clippy step's env has PYO3_PYTHON set to the venv interpreter."
+        ],
+        "fail": [
+          "Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:19+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-198.export-env.3; no wording change"
+        }
+      ]
+    },
+    {
+      "id": "ANC-033",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "When [tool.sc-lint].runner.python names a venv, a leading python in any lint or test step argv that does not run an sc_lint.* wheel helper must resolve to that venv's interpreter on every OS.",
+      "quote": "(1) a leading `\"python\"` in any lint **or test** step argv resolves to that venv's interpreter on every OS\nplain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(1),(3) and (b) (re-registered from GH-198.runner-argv.2, ID-only change)",
+      "summary": "#198: runner.python resolves leading python, except sc_lint.* helpers",
+      "scope": "The item changes step argv construction or runner.python handling in crates/sc-lint.",
+      "deterministic_check": "Injected-platform argv tests: bin/python on Unix, Scripts\\python.exe on Windows, for a lint step and a test step; a python -m sc_lint.* step is not rewritten.",
+      "fixtures": {
+        "pass": [
+          "With runner.python set, a leading python in any lint or test step runs that venv's interpreter on every OS, and python -m sc_lint.* helper steps are left alone. Evidence: test runner_python_argv passes, showing .venv/bin/python on unix and .venv\\Scripts\\python.exe on windows for a lint step and a test step."
+        ],
+        "fail": [
+          "Rewrites every leading python to runner.python, including python -m sc_lint.lint_cargo_deny."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "locked",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "created",
+          "status": "locked"
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T06:42:20+00:00",
+          "event": "locked",
+          "status": "locked",
+          "confirmation": "we can lock the anchors, but if tuning requires updating them, they will need to be changed",
+          "confirmed_by": "Rand",
+          "confirmed_at": "2026-10-30",
+          "relayed_by": "team-lead (lint-mr6d)",
+          "note": "ID-only change from GH-198.runner-argv.2; no wording change"
         }
       ]
     }
