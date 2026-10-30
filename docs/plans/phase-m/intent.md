@@ -10,16 +10,16 @@ The P1 list is #786 and #720 (`PORT-010`), #198 (consumer setup hook and step ru
 
 ## What success looks like
 
-- On a release that includes Phase M, atm-core can remove its `PORT-010` exclusions for the #786 paths and the #720 same-name sibling shape in every scope, while real cross-platform parity gaps are still reported (ANC-008, ANC-009, GH-786.table, GH-786.S3).
-- atm-core can drop its local source-only ownership checker, because `global_dependency_ownership` offers a source-only scope (ANC-012, GH-136.src-only).
-- Each of atm-core's three `[boundaries]` keys has a recorded coverage verdict, and every remaining gap has an issue (ANC-013, GH-136.audit).
+- On a release that includes Phase M, atm-core can remove its `PORT-010` exclusions for the #786 paths and the #720 same-name sibling shape in every scope, while real cross-platform parity gaps are still reported (ANC-008, ANC-009, GH-786.table.2, GH-786.S3).
+- atm-core can drop its local source-only ownership checker, because `global_dependency_ownership` offers a source-only scope (ANC-012, GH-136.src-only.2).
+- Each of atm-core's three `[boundaries]` keys has a recorded coverage verdict, and every remaining gap has an issue (ANC-013, GH-136.audit.2).
 - Conditional on a new ADR approved by Rand that supersedes ADR-020 decisions 9 and 13 and REQ-CLI-021: atm-core can delete its `_py`, `sc_lint_clippy_prefix`, `_sc-lint-clippy` and `_sc-lint-py` Justfile glue for #198 (ANC-010, ANC-011, GH-198.*).
 - Each sprint traces to its GitHub issue and carries a deterministic regression for the reported consumer failure.
 
 ## What is deliberately out of scope
 
 - Suppressing findings by blanket exclusion, by disabling a rule, or by widening allowed roots for atm-core paths.
-- #198 work (ANC-010, ANC-011, GH-198.*) before the superseding ADR is Accepted. GH-198.export-env waits for Rand's scope ruling, and the pub POSIX-only helper case (S8) waits for Rand's ruling.
+- #198 work (ANC-010, ANC-011, GH-198.*) before the superseding ADR is Accepted. GH-198.export-env.2 waits for Rand's scope ruling, and the pub POSIX-only helper case (S8) waits for Rand's ruling.
 - Other atm-core gaps that are not on the P1 list (for example #783, #784, #195 and #385), the 0.8.3 release-platform work, and any new process or tooling changes.
 
 ## Anchors

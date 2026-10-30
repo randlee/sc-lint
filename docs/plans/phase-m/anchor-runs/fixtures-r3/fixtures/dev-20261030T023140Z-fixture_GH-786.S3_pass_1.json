@@ -1,0 +1,110 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T023140Z-fixture_GH-786.S3_pass_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T02:31:40+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:GH-786.S3:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 191,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "GH-786.S3",
+      "source_type": "REQ",
+      "source_ref": "GH-786.S3",
+      "statement": "PORT-010 must not report a cfg(unix) item that has a same-name #[cfg(not(unix))] sibling in the same scope, whether that scope is a module, an inherent impl, or the crate root.",
+      "quote": "S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (S3; generalizes #720)",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "port010 fixtures for module, inherent-impl and crate-root same-name cfg(unix)/cfg(not(unix)) pairs report nothing.",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.73,
+          "probabilities": {
+            "yes": 0.82,
+            "no": 0.09,
+            "unclear": 0.09
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.86,
+          "probabilities": {
+            "yes": 0.08,
+            "no": 0.91,
+            "unclear": 0.01
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.89,
+          "probabilities": {
+            "yes": 0.93,
+            "no": 0.06,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.73,
+      "explanation": "The directive was followed and evidenced.",
+      "usage": {
+        "input_tokens": 1270,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 191,
+      "item_shortened": false,
+      "request_bytes": 3995
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

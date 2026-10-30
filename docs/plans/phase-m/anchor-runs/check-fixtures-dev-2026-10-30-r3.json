@@ -1,0 +1,428 @@
+{
+  "success": true,
+  "data": {
+    "gate": "dev",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "ANC-008",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "With all atm-core PORT-010 exclusions removed, the #786 repro reports no false alarm.",
+        "verdict": "asserted_only",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-008_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-008",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports atm-core's same-name cfg(not(unix)) siblings as missing Windows support.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-008_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-009",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Keeps a regression fixture where a cfg(unix) fn with no Windows counterpart still reports PORT-010.",
+        "verdict": "asserted_only",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-009_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-009",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Exempts every cfg(unix) fn in a file once any Windows code exists anywhere in that file.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-009_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-010",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test setup_runs_configured_step shows sc-lint setup runs the consumer's configured setup command with no Justfile recipe; it passes, and atm-core's setup recipe is deleted in the adoption diff.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-010_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-010",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Documents that consumers keep a Justfile recipe to run their own setup before sc-lint.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-010_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-011",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Runner tests with stub interpreters show python steps use the repo venv and clippy gets PYO3_PYTHON; the adoption diff deletes _py, sc_lint_clippy_prefix and _sc-lint-clippy.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-011_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-011",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Leaves atm-core's _py recipe in place because steps still run whatever python is first on PATH.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-011_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-012",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test ownership_source_only reports an ownership violation in src/ and not the same import in tests/ under the source-only setting; it passes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-012_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-012",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Tells atm-core to list its tests/ directories as allowed source roots to silence ownership findings.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_ANC-012_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-013",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Writes a table showing, for each of atm-core's three boundary settings, whether sc-lint covers it, with evidence.",
+        "verdict": "asserted_only",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_ANC-013_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-013",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Marks #136 done because some manifest rules shipped, without checking each of the three settings.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_ANC-013_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-786.S3",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Fixtures port010/same_name_sibling/{module,inherent_impl,crate_root} each pair cfg(unix) and cfg(not(unix)) fns; test port010_same_name_sibling reports zero findings for all three and passes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-786.S3_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-786.S3",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Exempts the crate-root main.rs pair only; module and inherent-impl siblings are still reported.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-786.S3_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-198.runner-argv",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test runner_python_argv asserts a leading python in a lint step and a test step resolves to .venv/bin/python on unix and .venv\\Scripts\\python.exe on windows; it passes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.runner-argv_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-198.runner-argv",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Applies runner.python to lint steps only; test steps still run python from PATH.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.runner-argv_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-198.kit-helpers",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test kit_helpers_ignore_runner_python sets runner.python and asserts an sc_lint.lint_cargo_deny step still resolves to the kit venv interpreter; it passes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.kit-helpers_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-198.kit-helpers",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Applies runner.python to every step, including sc_lint.lint_cargo_deny.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.kit-helpers_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-786.table.2",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test port010_issue786_paths runs the 18 per-path repros against vendored atm-core 6ffaa97be sources and asserts 0 of the 47 findings remain; it passes in CI.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-786.table.2_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-786.table.2",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Fixes the same-name sibling shape only, so the other #786 findings are still reported.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-786.table.2_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-198.setup-pre.2",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test setup_pre_runs_before_provisioning configures setup.pre = [stub], runs just setup, and asserts the stub's recorded timestamp precedes provisioning; it passes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.setup-pre.2_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-198.setup-pre.2",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Runs setup.pre after sc-lint provisioning has finished.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.setup-pre.2_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-198.runner-path.2",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test runner_python_prepends_path asserts PATH starts with .venv/bin on unix and .venv\\Scripts on windows for both a python step and a cargo step; it passes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.runner-path.2_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-198.runner-path.2",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Rewrites only the leading python argv, so a helper that spawns python picks up the PATH interpreter.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.runner-path.2_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-198.export-env.2",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test runner_export_env_pyo3 configures runner.export_env = [\"PYO3_PYTHON\"] and asserts a cargo clippy step's env has PYO3_PYTHON = the venv interpreter path; it passes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.export-env.2_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-198.export-env.2",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.export-env.2_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-136.src-only.2",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Test issue136_source_only_scope reproduces the #136 tree: with the setting, the seven crates/*/tests/ findings are gone and crates/atm/src/commands/mod.rs is still reported; it passes.",
+        "verdict": "underspecified",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-136.src-only.2_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-136.src-only.2",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Adds atm-core's tests/ directories to allowed_source_roots instead of adding a setting.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-136.src-only.2_fail_1.json"
+      },
+      {
+        "anchor_id": "GH-136.audit.2",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "docs/plans/phase-m/boundary-parity.md has one row per key with the sc-lint-boundary test that covers it, and links issue #NNN for each uncovered key.",
+        "verdict": "underspecified",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023142Z-fixture_GH-136.audit.2_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-136.audit.2",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Checks the keys but records gaps only in a doc, with no gap issues filed.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023142Z-fixture_GH-136.audit.2_fail_1.json"
+      }
+    ],
+    "mismatches": [
+      "ANC-008:pass:1",
+      "ANC-009:pass:1",
+      "ANC-013:pass:1",
+      "GH-136.src-only.2:pass:1",
+      "GH-136.audit.2:pass:1"
+    ],
+    "pass": false,
+    "path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures",
+    "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures",
+    "runs": [
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-008_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-008_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-009_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-009_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-010_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-010_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-011_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-011_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023139Z-fixture_ANC-012_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_ANC-012_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_ANC-013_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_ANC-013_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-786.S3_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-786.S3_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.runner-argv_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.runner-argv_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.kit-helpers_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023140Z-fixture_GH-198.kit-helpers_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-786.table.2_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-786.table.2_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.setup-pre.2_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.setup-pre.2_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.runner-path.2_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.runner-path.2_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.export-env.2_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-198.export-env.2_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-136.src-only.2_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023141Z-fixture_GH-136.src-only.2_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023142Z-fixture_GH-136.audit.2_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r3/fixtures/dev-20261030T023142Z-fixture_GH-136.audit.2_fail_1.json"
+    ]
+  },
+  "error": null
+}
