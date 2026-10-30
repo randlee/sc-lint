@@ -1,0 +1,112 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T015015Z-fixture_ANC-007_fail_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T01:50:15+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-007:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 115,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "Phase M must classify each atm-core [boundaries] key (manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules) as covered or not by released sc-lint-boundary, filing an issue per gap.",
+      "quote": "these are the p1 items from atm-core: - randlee/sc-lint#136 (manifest dependency allowlists and global ownership versus the released manifest_policy): documented as a gap in the #2295 body.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning session; atm-core P1 list pasted by Rand; audit scope from sc-lint#136 body and team-lead A7 definition (2026-10-30)",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "A parity table under docs/plans/phase-m/ has one row per key with covered/gap and evidence; each gap row links a GitHub issue.",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.94,
+          "probabilities": {
+            "yes": 0.96,
+            "no": 0.03,
+            "unclear": 0.01
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.82,
+          "probabilities": {
+            "yes": 0.06,
+            "no": 0.88,
+            "unclear": 0.06
+          }
+        }
+      },
+      "min_confidence": 0.94,
+      "explanation": "The delivered work went against this anchor.",
+      "usage": {
+        "input_tokens": 1255,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 115,
+      "item_shortened": false,
+      "request_bytes": 3994
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-007"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

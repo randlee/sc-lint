@@ -1,0 +1,210 @@
+{
+  "success": true,
+  "data": {
+    "gate": "dev",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "ANC-001",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Adds one port010 fixture per classified #786 shape; the exempt adapter cases report nothing and the real-gap cases still report PORT-010.",
+        "verdict": "asserted_only",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-001_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-001",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Adds the 18 atm-core paths to a default PORT-010 exclusion list so the #786 repro reports nothing.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-001_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-002",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Replaces port010_fixture_crate_root_main_current_behaviour with a test pinning the decided classification and documents it in the PORT-010 docs.",
+        "verdict": "underspecified",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-002_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-002",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Stops reporting the crate-root main.rs shape with no fixture change and no PORT-010 docs update.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-002_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-003",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Adds [tool.sc-lint].setup.pre to ScLintConfigFile; just setup runs the configured argv before provisioning, shown by a stub-command ordering test.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-003_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-003",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Keeps rejecting [tool.sc-lint].setup with config.unknown_table, so consumers still need Justfile glue before just setup.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-003_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-004",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Adds runner.python; a step argv starting with python runs the venv's bin/python on Unix and Scripts\\python.exe on Windows, covered by injected-platform tests.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-004_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-004",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Runs a step's leading python from PATH regardless of the configured runner.python venv.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-004_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-005",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Adds a module step kind so {\"module\": \"sc_lint.lint_cargo_deny\"} runs on the kit venv interpreter on every OS.",
+        "verdict": "asserted_only",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-005_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-005",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Documents that consumers must call .sc-lint/venv/bin/python or Scripts\\python.exe themselves for each OS.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-005_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-006",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Adds a source-only ownership scope; the #136 repro drops the seven crates/*/tests/ findings and still reports crates/atm/src/commands/mod.rs importing cron.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-006_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-006",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Tells atm-core to add its tests/ directories to allowed_source_roots or excludes to silence the findings.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-006_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-007",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Writes a parity table with one row per atm-core [boundaries] key, citing evidence, and links a filed GitHub issue for each gap row.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-007_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-007",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Declares #136 resolved because SCB-MANIFEST-003..006 shipped, without checking each key against atm-core behaviour.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-007_fail_1.json"
+      }
+    ],
+    "mismatches": [
+      "ANC-001:pass:1",
+      "ANC-002:pass:1",
+      "ANC-005:pass:1"
+    ],
+    "pass": false,
+    "path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures",
+    "run_path": "docs/plans/phase-m/anchor-runs/fixtures/fixtures",
+    "runs": [
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-001_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-001_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-002_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-002_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-003_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-003_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015014Z-fixture_ANC-004_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-004_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-005_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-005_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-006_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-006_fail_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-007_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures/fixtures/dev-20261030T015015Z-fixture_ANC-007_fail_1.json"
+    ]
+  },
+  "error": null
+}

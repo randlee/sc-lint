@@ -1,0 +1,100 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T015000Z-fixture_ANC-003_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T01:50:00+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-003:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 146,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "The [tool.sc-lint] consumer config must accept setup.pre, an argv list that just setup runs before sc-lint provisioning.",
+      "quote": "these are the p1 items from atm-core: - randlee/sc-lint#198 (consumer setup hook and step runner): atm-core keeps _py, sc_lint_clippy_prefix and _sc-lint-clippy until it ships.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning session; atm-core P1 list pasted by Rand; proposal text from sc-lint#198. CONFLICT: ADR-020 decisions 9 and 13 (Accepted, Rand 2026-10-27) say setup.pre is not added and root-level setup is rejected with config.unknown_table",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "A config-parse test accepts setup.pre; a setup test with a stub command records that it ran before provisioning; ADR-020 decisions 9 and 13 are amended.",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1064,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 146,
+      "item_shortened": false,
+      "request_bytes": 3225
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

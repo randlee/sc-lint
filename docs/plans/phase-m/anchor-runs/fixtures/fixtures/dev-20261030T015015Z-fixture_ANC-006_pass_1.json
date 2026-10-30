@@ -1,0 +1,110 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T015015Z-fixture_ANC-006_pass_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T01:50:15+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-006:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 156,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "global_dependency_ownership must offer a source-only scope in which SCB-MANIFEST-004 skips integration-test targets under crates/*/tests/ but still reports imports in production src files.",
+      "quote": "these are the p1 items from atm-core: - randlee/sc-lint#136 (manifest dependency allowlists and global ownership versus the released manifest_policy): documented as a gap in the #2295 body.",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning session; atm-core P1 list pasted by Rand; repro from atm-core comment on sc-lint#136 2026-10-29 (eight SCB-MANIFEST-004 findings on 0.8.2)",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "A boundary test reproducing the #136 tree: the seven crates/*/tests/ findings disappear under the source-only scope and crates/atm/src/commands/mod.rs importing cron is still reported; no allowed_source_roots or excludes added.",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.0,
+            "unclear": 0.01
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.73,
+          "probabilities": {
+            "yes": 0.82,
+            "no": 0.12,
+            "unclear": 0.06
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive was followed and evidenced.",
+      "usage": {
+        "input_tokens": 1265,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 156,
+      "item_shortened": false,
+      "request_bytes": 4044
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}
