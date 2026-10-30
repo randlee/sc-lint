@@ -1,0 +1,102 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T154442Z-fixture_ANC-005_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T15:44:42+00:00",
+  "anchors_path": "anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-005:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 126,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-005",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report a #[cfg(unix)] helper used only inside a #[cfg(unix)] block of a function whose #[cfg(not(unix))] block is in the same function body.",
+      "quote": "Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S5  cfg(unix) helper used only inside a cfg(unix) block of a function whose cfg(not(unix)) block is in the same body. Rows 10, 16.",
+      "stated_by": "ISSUE #786 (atm-core per-path verdict table, 2026-10-30)",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v2 re-derivation from REQ/ADR and issue text, 2026-10-30; candidate MS5",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.25,
+          "probabilities": {
+            "yes": 0.5,
+            "no": 0.4,
+            "unclear": 0.1
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.77,
+          "probabilities": {
+            "yes": 0.85,
+            "no": 0.14,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.25,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1090,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 126,
+      "item_shortened": false,
+      "request_bytes": 3282
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-005"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

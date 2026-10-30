@@ -1,0 +1,3842 @@
+[
+ {
+  "bundle": "B0",
+  "case_id": "C01-fixture-pass",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C01-fixture-pass/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C01-fixture-pass/r1",
+    "attempt": 1,
+    "request_sha256": "1725691c4f8bbd6b5ad1e37496d0a6187d0052e28998de0b2451fcd4368b51dc",
+    "response_sha256": "54cd4f1f78b5f62171fef5b184e89876ebb478ed093dbbae296fdfa524fcf608",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.98,
+      "probabilities": {
+       "no": 0.01,
+       "unclear": 0.0,
+       "yes": 0.99
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 1.0,
+       "unclear": 0.0,
+       "yes": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C01-fixture-pass",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C01-fixture-pass/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C01-fixture-pass/r2",
+    "attempt": 1,
+    "request_sha256": "1725691c4f8bbd6b5ad1e37496d0a6187d0052e28998de0b2451fcd4368b51dc",
+    "response_sha256": "54cd4f1f78b5f62171fef5b184e89876ebb478ed093dbbae296fdfa524fcf608",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.98,
+      "probabilities": {
+       "no": 0.01,
+       "unclear": 0.0,
+       "yes": 0.99
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 1.0,
+       "unclear": 0.0,
+       "yes": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C02-fixture-fail",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C02-fixture-fail/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C02-fixture-fail/r1",
+    "attempt": 1,
+    "request_sha256": "82f87e80cb4b2e1880fa307c3761ec5364352142ab05e78c2d39f7a626f52252",
+    "response_sha256": "60ed170ddc8abc976ddcef81564571b90e70cdba086a80bc9cb454a336e96c55",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.43,
+      "probabilities": {
+       "no": 0.32,
+       "unclear": 0.06,
+       "yes": 0.62
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.55,
+      "probabilities": {
+       "no": 0.7,
+       "unclear": 0.01,
+       "yes": 0.29
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C02-fixture-fail",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C02-fixture-fail/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C02-fixture-fail/r2",
+    "attempt": 1,
+    "request_sha256": "82f87e80cb4b2e1880fa307c3761ec5364352142ab05e78c2d39f7a626f52252",
+    "response_sha256": "fbddce107351fb8190188605870511c5e9b83634927a31392ca8f895713da822",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.42,
+      "probabilities": {
+       "no": 0.32,
+       "unclear": 0.07,
+       "yes": 0.61
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.58,
+      "probabilities": {
+       "no": 0.72,
+       "unclear": 0.01,
+       "yes": 0.27
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C03-compliant-paraphrase-fn/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C03-compliant-paraphrase-fn/r1",
+    "attempt": 1,
+    "request_sha256": "fba2751088a3146e6536eadc9e1e41a5673b11deeafb9c37e2a44899ac772449",
+    "response_sha256": "2be3dd42bc599ae2cba00c79b5828f57deb47a30acd47acecc786ff4c93c06c1",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.96,
+      "probabilities": {
+       "no": 0.97,
+       "unclear": 0.01,
+       "yes": 0.02
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C03-compliant-paraphrase-fn/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C03-compliant-paraphrase-fn/r2",
+    "attempt": 1,
+    "request_sha256": "fba2751088a3146e6536eadc9e1e41a5673b11deeafb9c37e2a44899ac772449",
+    "response_sha256": "19e83c04dee8674c47d18c600ef409831603a590666d7a7a7b5f3180ca2cdf68",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.97,
+      "probabilities": {
+       "no": 0.98,
+       "unclear": 0.01,
+       "yes": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C04-boundary-guarded-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C04-boundary-guarded-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "b61efe37a1186e1b6eed4b3a378c9210ecc123d9f1b60bad3856c5597b1fb242",
+    "response_sha256": "529e0337e22b549a0e25c0085829cc772302350981cac1fa526b2d33091edf1c",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.96,
+      "probabilities": {
+       "no": 0.97,
+       "unclear": 0.0,
+       "yes": 0.03
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C04-boundary-guarded-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C04-boundary-guarded-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "b61efe37a1186e1b6eed4b3a378c9210ecc123d9f1b60bad3856c5597b1fb242",
+    "response_sha256": "529e0337e22b549a0e25c0085829cc772302350981cac1fa526b2d33091edf1c",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.96,
+      "probabilities": {
+       "no": 0.97,
+       "unclear": 0.0,
+       "yes": 0.03
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C05-silent-other-shape/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C05-silent-other-shape/r1",
+    "attempt": 1,
+    "request_sha256": "395dfbe3e36bef81dff938e56bfa068f7965f2a3cff5ff42e19880462c628ecf",
+    "response_sha256": "2aad981e0d0ff0eacfed5e8a6c2082152c6bf25f2abe8fae90fd545f1058f0c7",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.96,
+      "probabilities": {
+       "no": 0.03,
+       "unclear": 0.0,
+       "yes": 0.97
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.2,
+      "probabilities": {
+       "no": 0.47,
+       "unclear": 0.22,
+       "yes": 0.31
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.34,
+      "probabilities": {
+       "no": 0.4,
+       "unclear": 0.04,
+       "yes": 0.56
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C05-silent-other-shape/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C05-silent-other-shape/r2",
+    "attempt": 1,
+    "request_sha256": "395dfbe3e36bef81dff938e56bfa068f7965f2a3cff5ff42e19880462c628ecf",
+    "response_sha256": "e47a3d9220de8f3ae5829eef1f6f5abaa102784575f76d4366da6bda99e9b660",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.94,
+      "probabilities": {
+       "no": 0.04,
+       "unclear": 0.0,
+       "yes": 0.96
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.26,
+      "probabilities": {
+       "no": 0.51,
+       "unclear": 0.2,
+       "yes": 0.29
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.3,
+      "probabilities": {
+       "no": 0.43,
+       "unclear": 0.04,
+       "yes": 0.53
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C06-topical-only",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C06-topical-only/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C06-topical-only/r1",
+    "attempt": 1,
+    "request_sha256": "0f21d97d740f2b71ea9a7d0b03b1f0e2adb94a124d57e6839a308aa11b666c9c",
+    "response_sha256": "6a04455911aae7d39885bd24963768ea82602050533eac6a74fa10d0b59218b4",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "unclear",
+      "confidence": 0.3,
+      "probabilities": {
+       "no": 0.36,
+       "unclear": 0.53,
+       "yes": 0.11
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.97,
+      "probabilities": {
+       "no": 0.98,
+       "unclear": 0.01,
+       "yes": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C06-topical-only",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C06-topical-only/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C06-topical-only/r2",
+    "attempt": 1,
+    "request_sha256": "0f21d97d740f2b71ea9a7d0b03b1f0e2adb94a124d57e6839a308aa11b666c9c",
+    "response_sha256": "e9149b4964962a2dedc81587791d4c47766f956b62091aff15eea8688a2d1dd8",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "unclear",
+      "confidence": 0.31,
+      "probabilities": {
+       "no": 0.39,
+       "unclear": 0.54,
+       "yes": 0.07
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.97,
+      "probabilities": {
+       "no": 0.98,
+       "unclear": 0.01,
+       "yes": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C07-boundary-other-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C07-boundary-other-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "8d10573ba8b16bc34618bf8f35b5a5bea2fdf1c26b236f3e036343e9e5448d52",
+    "response_sha256": "5d2acec6cb1babe69ad1326c21e1c9003e9d648a7ce5f355f20ca26794b815e6",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.91,
+      "probabilities": {
+       "no": 0.06,
+       "unclear": 0.0,
+       "yes": 0.94
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.43,
+      "probabilities": {
+       "no": 0.21,
+       "unclear": 0.17,
+       "yes": 0.62
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.48,
+      "probabilities": {
+       "no": 0.65,
+       "unclear": 0.04,
+       "yes": 0.31
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C07-boundary-other-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C07-boundary-other-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "8d10573ba8b16bc34618bf8f35b5a5bea2fdf1c26b236f3e036343e9e5448d52",
+    "response_sha256": "1590e6c79cdd31073194bcd8270fa98dcd4b12de8e6d8f14070669ac26843e6e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.92,
+      "probabilities": {
+       "no": 0.05,
+       "unclear": 0.0,
+       "yes": 0.95
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.46,
+      "probabilities": {
+       "no": 0.22,
+       "unclear": 0.14,
+       "yes": 0.64
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.38,
+      "probabilities": {
+       "no": 0.59,
+       "unclear": 0.05,
+       "yes": 0.36
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C08-conflict",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C08-conflict/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C08-conflict/r1",
+    "attempt": 1,
+    "request_sha256": "857c1860b46515d8b3ed58353c57fbd25e17a8f13dc6296663b6d9d80a3f4f68",
+    "response_sha256": "8599107d1ca6c2f1fbcb6e24b1a15377855d9d6271a12310e0ed24804021ccca",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.43,
+      "probabilities": {
+       "no": 0.62,
+       "unclear": 0.1,
+       "yes": 0.28
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C08-conflict",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C08-conflict/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C08-conflict/r2",
+    "attempt": 1,
+    "request_sha256": "857c1860b46515d8b3ed58353c57fbd25e17a8f13dc6296663b6d9d80a3f4f68",
+    "response_sha256": "d20477c3e52037d2416cb57ba0d361163c4e5035630d636e95b968d41f660d54",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.4,
+      "probabilities": {
+       "no": 0.6,
+       "unclear": 0.1,
+       "yes": 0.3
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 0.0,
+       "unclear": 0.0,
+       "yes": 1.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C09-irrelevant-feature/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C09-irrelevant-feature/r1",
+    "attempt": 1,
+    "request_sha256": "f981fad1749be7818ebfc211e1f572f2eb598bae1e3a785e20eda8dcb88d6600",
+    "response_sha256": "26ba5cd69f497b0a9d53db084fcc63905d55f65609fc0c1dd8ef14ece9dd5096",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "no": 0.99,
+       "unclear": 0.0,
+       "yes": 0.01
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 1.0,
+       "unclear": 0.0,
+       "yes": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "no": 0.99,
+       "unclear": 0.0,
+       "yes": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C09-irrelevant-feature/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C09-irrelevant-feature/r2",
+    "attempt": 1,
+    "request_sha256": "f981fad1749be7818ebfc211e1f572f2eb598bae1e3a785e20eda8dcb88d6600",
+    "response_sha256": "26ba5cd69f497b0a9d53db084fcc63905d55f65609fc0c1dd8ef14ece9dd5096",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "no": 0.99,
+       "unclear": 0.0,
+       "yes": 0.01
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 1.0,
+       "unclear": 0.0,
+       "yes": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "no": 0.99,
+       "unclear": 0.0,
+       "yes": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B0/C10-irrelevant-same-crate/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C10-irrelevant-same-crate/r1",
+    "attempt": 1,
+    "request_sha256": "1aae637ae32d54e6435b6bd49f8fc0d4fa230ef48b6f7b2fd3036074af8ca25f",
+    "response_sha256": "09de0e6e76181670ee3d63e922a45a968e365ca2e131a72cdf4919bc2abd2da1",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.94,
+      "probabilities": {
+       "no": 0.96,
+       "unclear": 0.0,
+       "yes": 0.04
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 1.0,
+       "unclear": 0.0,
+       "yes": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.94,
+      "probabilities": {
+       "no": 0.96,
+       "unclear": 0.0,
+       "yes": 0.04
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B0",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B0/C10-irrelevant-same-crate/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B0/C10-irrelevant-same-crate/r2",
+    "attempt": 1,
+    "request_sha256": "1aae637ae32d54e6435b6bd49f8fc0d4fa230ef48b6f7b2fd3036074af8ca25f",
+    "response_sha256": "c20b8b91d044f47b230fd9c28578aea37f86be509ab611dc63da62e45ca78b18",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.94,
+      "probabilities": {
+       "no": 0.96,
+       "unclear": 0.0,
+       "yes": 0.04
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "no": 1.0,
+       "unclear": 0.0,
+       "yes": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.91,
+      "probabilities": {
+       "no": 0.94,
+       "unclear": 0.0,
+       "yes": 0.06
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C01-fixture-pass",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C01-fixture-pass/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C01-fixture-pass/r1",
+    "attempt": 1,
+    "request_sha256": "2e65a393ca8c1f8877f5554e4c508e795b3a7fa63b9e10f9fe08c899d0af0f6c",
+    "response_sha256": "02b729c2a314eb67386c08f3113b9eaa24b20d5a726d1cb2a5b7fe67f7760f29",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.99,
+       "no": 0.01,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C01-fixture-pass",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C01-fixture-pass/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C01-fixture-pass/r2",
+    "attempt": 1,
+    "request_sha256": "2e65a393ca8c1f8877f5554e4c508e795b3a7fa63b9e10f9fe08c899d0af0f6c",
+    "response_sha256": "9e09d00653c86428e72b7befc21a4ac09bbe8797466303baa3c8c20f1e3b15d4",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C02-fixture-fail",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C02-fixture-fail/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C02-fixture-fail/r1",
+    "attempt": 1,
+    "request_sha256": "2f4778b939fc1234f237f911cedeababbc691cf3b59ad680d61cc1282d794849",
+    "response_sha256": "5286369e4e7ceb9232f79afe785661bf0db574351491fc14e2b7b980b3dff28e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.79,
+      "probabilities": {
+       "yes": 0.12,
+       "no": 0.86,
+       "unclear": 0.02
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.92,
+      "probabilities": {
+       "yes": 0.95,
+       "no": 0.05,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C02-fixture-fail",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C02-fixture-fail/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C02-fixture-fail/r2",
+    "attempt": 1,
+    "request_sha256": "2f4778b939fc1234f237f911cedeababbc691cf3b59ad680d61cc1282d794849",
+    "response_sha256": "f76e38636b174800d741a7946642c0be43e7808e158a226431a754c331124593",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.99,
+       "no": 0.0,
+       "unclear": 0.01
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.83,
+      "probabilities": {
+       "yes": 0.09,
+       "no": 0.89,
+       "unclear": 0.02
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.92,
+      "probabilities": {
+       "yes": 0.95,
+       "no": 0.05,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C03-compliant-paraphrase-fn/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C03-compliant-paraphrase-fn/r1",
+    "attempt": 1,
+    "request_sha256": "4e5a6c4efc607c3bc4a5c39127b42bfd7fa0654be37463ddd9617c19545cb169",
+    "response_sha256": "cc5f62b46fef40d0f59404ee0bcb04ea087e110eca825be3f775eb859b48bad5",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C03-compliant-paraphrase-fn/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C03-compliant-paraphrase-fn/r2",
+    "attempt": 1,
+    "request_sha256": "4e5a6c4efc607c3bc4a5c39127b42bfd7fa0654be37463ddd9617c19545cb169",
+    "response_sha256": "cc5f62b46fef40d0f59404ee0bcb04ea087e110eca825be3f775eb859b48bad5",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C04-boundary-guarded-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C04-boundary-guarded-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "9ce6a210bffab62284ea0ba6356d16ad632d1c202d7fbf3845691de66421ce18",
+    "response_sha256": "2c04031a0953cb9ec5665010473b05145eb95aa073a86df692c252aa2e699b8b",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C04-boundary-guarded-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C04-boundary-guarded-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "9ce6a210bffab62284ea0ba6356d16ad632d1c202d7fbf3845691de66421ce18",
+    "response_sha256": "2c04031a0953cb9ec5665010473b05145eb95aa073a86df692c252aa2e699b8b",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C05-silent-other-shape/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C05-silent-other-shape/r1",
+    "attempt": 1,
+    "request_sha256": "03bcb23fc42a599bd7b00b6218b67567c8653e6de1bcb9d1920f78b59284fbd2",
+    "response_sha256": "6f19753cc3db603d61a8b72bddabdf64e186033e0852007de9a79aa747dda2fc",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.99,
+       "no": 0.01,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C05-silent-other-shape/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C05-silent-other-shape/r2",
+    "attempt": 1,
+    "request_sha256": "03bcb23fc42a599bd7b00b6218b67567c8653e6de1bcb9d1920f78b59284fbd2",
+    "response_sha256": "cf55ad9f56dbf967c8c7bfe4211afc5e409579fe3bd0be5bd101318be6911aef",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C06-topical-only",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C06-topical-only/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C06-topical-only/r1",
+    "attempt": 1,
+    "request_sha256": "801541739685d6702cd8d532f3b35f2c5a7b02ed3115336ac08acb717e560406",
+    "response_sha256": "164f6af6b67d9c86fa1af7eaa72ef6e3de6edf50b0c79ceaa65c2e7e0718d1b7",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.6,
+      "probabilities": {
+       "yes": 0.73,
+       "no": 0.03,
+       "unclear": 0.24
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.97,
+      "probabilities": {
+       "yes": 0.02,
+       "no": 0.98,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C06-topical-only",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C06-topical-only/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C06-topical-only/r2",
+    "attempt": 1,
+    "request_sha256": "801541739685d6702cd8d532f3b35f2c5a7b02ed3115336ac08acb717e560406",
+    "response_sha256": "55150bbfce6e2f2b0c0467e9f1462c1f74be2a9fe8635763b60d0c5da8d21485",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.68,
+      "probabilities": {
+       "yes": 0.79,
+       "no": 0.03,
+       "unclear": 0.18
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C07-boundary-other-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C07-boundary-other-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "7f5239a6c39c0aab87dd164529b18b3b09f925df318cbd1820ae1474c75dfd3b",
+    "response_sha256": "fc33677041de13b9ee718c7ea77a1dd57462dd3d6465843f049dbe56bdb9893c",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C07-boundary-other-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C07-boundary-other-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "7f5239a6c39c0aab87dd164529b18b3b09f925df318cbd1820ae1474c75dfd3b",
+    "response_sha256": "fc33677041de13b9ee718c7ea77a1dd57462dd3d6465843f049dbe56bdb9893c",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C08-conflict",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C08-conflict/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C08-conflict/r1",
+    "attempt": 1,
+    "request_sha256": "11e5acfcc7355670589023281b6f9f57d54e85e18879defc50d7c26218246ad8",
+    "response_sha256": "f6d8ae9bebae3824fac7caa527337a952de611c68ab546b172b1df76c9cd740a",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.82,
+      "probabilities": {
+       "yes": 0.88,
+       "no": 0.11,
+       "unclear": 0.01
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.99,
+       "no": 0.01,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C08-conflict",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C08-conflict/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C08-conflict/r2",
+    "attempt": 1,
+    "request_sha256": "11e5acfcc7355670589023281b6f9f57d54e85e18879defc50d7c26218246ad8",
+    "response_sha256": "95a4f6de08b138b7da5d51a0acdac43cae89c4a08e9e95f8313c77fff0530737",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.82,
+      "probabilities": {
+       "yes": 0.88,
+       "no": 0.11,
+       "unclear": 0.01
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.96,
+      "probabilities": {
+       "yes": 0.97,
+       "no": 0.03,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C09-irrelevant-feature/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C09-irrelevant-feature/r1",
+    "attempt": 1,
+    "request_sha256": "64c3e7124ab6489c8de75a745090774757704db5e1b69c3493bc875f52e9ce7f",
+    "response_sha256": "12ac5a8cff79e1c461bd402e1433acdb13d5917b59c9bcb3656f721c6fe00616",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C09-irrelevant-feature/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C09-irrelevant-feature/r2",
+    "attempt": 1,
+    "request_sha256": "64c3e7124ab6489c8de75a745090774757704db5e1b69c3493bc875f52e9ce7f",
+    "response_sha256": "12ac5a8cff79e1c461bd402e1433acdb13d5917b59c9bcb3656f721c6fe00616",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B1/C10-irrelevant-same-crate/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C10-irrelevant-same-crate/r1",
+    "attempt": 1,
+    "request_sha256": "81fd4903b3d495f1b3e19534a6ec3f3e40327df652ee7168f0c95af9dad90133",
+    "response_sha256": "bac33bd477375a69dd28ff4614b7b97e0f2eec6070c0c503403ddd999bf16f1e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B1",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B1/C10-irrelevant-same-crate/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B1/C10-irrelevant-same-crate/r2",
+    "attempt": 1,
+    "request_sha256": "81fd4903b3d495f1b3e19534a6ec3f3e40327df652ee7168f0c95af9dad90133",
+    "response_sha256": "bac33bd477375a69dd28ff4614b7b97e0f2eec6070c0c503403ddd999bf16f1e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C01-fixture-pass",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C01-fixture-pass/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C01-fixture-pass/r1",
+    "attempt": 1,
+    "request_sha256": "dc8e4ad780ba3dd709a0c98266288022a42505acff0e33bcff3ae520d936908e",
+    "response_sha256": "8c36a5081725d75f34ce2f10cf6d9829b5ada7c110fb7a6811667fc21e355819",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C01-fixture-pass",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C01-fixture-pass/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C01-fixture-pass/r2",
+    "attempt": 1,
+    "request_sha256": "dc8e4ad780ba3dd709a0c98266288022a42505acff0e33bcff3ae520d936908e",
+    "response_sha256": "8c36a5081725d75f34ce2f10cf6d9829b5ada7c110fb7a6811667fc21e355819",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C02-fixture-fail",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C02-fixture-fail/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C02-fixture-fail/r1",
+    "attempt": 1,
+    "request_sha256": "9e85b02e58e92d9f2219c751cf470fc246978410f2c000ffe7d61a9648d4902c",
+    "response_sha256": "7b7de3b68475ea541e473ce17395ae08d8f65768b0231d591ba6666f3cd6ef51",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C02-fixture-fail",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C02-fixture-fail/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C02-fixture-fail/r2",
+    "attempt": 1,
+    "request_sha256": "9e85b02e58e92d9f2219c751cf470fc246978410f2c000ffe7d61a9648d4902c",
+    "response_sha256": "7b7de3b68475ea541e473ce17395ae08d8f65768b0231d591ba6666f3cd6ef51",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C03-compliant-paraphrase-fn/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C03-compliant-paraphrase-fn/r1",
+    "attempt": 1,
+    "request_sha256": "0ac7b3133b17ee1fbb577e47a653aa888c0e42b5df5bce11342fbeb7deb6e402",
+    "response_sha256": "1178962038df69e8609cd67373d3c1aae493776346dc21c488de8265883eb1b8",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C03-compliant-paraphrase-fn/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C03-compliant-paraphrase-fn/r2",
+    "attempt": 1,
+    "request_sha256": "0ac7b3133b17ee1fbb577e47a653aa888c0e42b5df5bce11342fbeb7deb6e402",
+    "response_sha256": "1178962038df69e8609cd67373d3c1aae493776346dc21c488de8265883eb1b8",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C04-boundary-guarded-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C04-boundary-guarded-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "65f089a1f0f3551841a5122cea7c12d732b8f4b6a16756ca85dbe1abde2e6518",
+    "response_sha256": "c0e6453634ff1c7fecd3e00a99e42290b40b62ecd1361007e2a1cb0aa906ab7e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C04-boundary-guarded-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C04-boundary-guarded-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "65f089a1f0f3551841a5122cea7c12d732b8f4b6a16756ca85dbe1abde2e6518",
+    "response_sha256": "c0e6453634ff1c7fecd3e00a99e42290b40b62ecd1361007e2a1cb0aa906ab7e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C05-silent-other-shape/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C05-silent-other-shape/r1",
+    "attempt": 1,
+    "request_sha256": "7848c5ff961963b123386cbcb56e55287a78128ed80859f03d2c40c97f8dddb4",
+    "response_sha256": "687237ae08275fc597a2770e3c90822a96b9c05134a729f08b42e3bcc9da503d",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C05-silent-other-shape/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C05-silent-other-shape/r2",
+    "attempt": 1,
+    "request_sha256": "7848c5ff961963b123386cbcb56e55287a78128ed80859f03d2c40c97f8dddb4",
+    "response_sha256": "687237ae08275fc597a2770e3c90822a96b9c05134a729f08b42e3bcc9da503d",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.99,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C06-topical-only",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C06-topical-only/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C06-topical-only/r1",
+    "attempt": 1,
+    "request_sha256": "dbb5b878d6703ff19408978aa86389d682bff323b4d6fe305826ef6e3b1a4908",
+    "response_sha256": "0d07757c64f76461131e39957e576cd518c01492467f9d506dbdbeef1c649aa9",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.91,
+      "probabilities": {
+       "yes": 0.94,
+       "no": 0.01,
+       "unclear": 0.05
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 0.99,
+       "unclear": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C06-topical-only",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C06-topical-only/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C06-topical-only/r2",
+    "attempt": 1,
+    "request_sha256": "dbb5b878d6703ff19408978aa86389d682bff323b4d6fe305826ef6e3b1a4908",
+    "response_sha256": "54333c428c8b1c8e1189cd16d784244ec7b13bb787080f0501c013913cbf7749",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.89,
+      "probabilities": {
+       "yes": 0.93,
+       "no": 0.01,
+       "unclear": 0.06
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 0.99,
+       "unclear": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C07-boundary-other-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C07-boundary-other-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "8ed18a64e7dc5eaccc65e4af6abbe12363515c6405acf08a03d300e6de9f3863",
+    "response_sha256": "b0bb4ef3854dcef935fcb9d3cc2a111fcd0f44b832501b9c0bc959ab825933d7",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C07-boundary-other-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C07-boundary-other-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "8ed18a64e7dc5eaccc65e4af6abbe12363515c6405acf08a03d300e6de9f3863",
+    "response_sha256": "b0bb4ef3854dcef935fcb9d3cc2a111fcd0f44b832501b9c0bc959ab825933d7",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C08-conflict",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C08-conflict/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C08-conflict/r1",
+    "attempt": 1,
+    "request_sha256": "094b06c25d506cc2c6163c2c3e7d7c2cb662d3bd30a7979cfbe61fdda5393dfb",
+    "response_sha256": "e69f2f3d7ff5734659619186bb3af871eacc9ee5cdcee11cfa5318fc090aea0e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C08-conflict",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C08-conflict/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C08-conflict/r2",
+    "attempt": 1,
+    "request_sha256": "094b06c25d506cc2c6163c2c3e7d7c2cb662d3bd30a7979cfbe61fdda5393dfb",
+    "response_sha256": "e69f2f3d7ff5734659619186bb3af871eacc9ee5cdcee11cfa5318fc090aea0e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C09-irrelevant-feature/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C09-irrelevant-feature/r1",
+    "attempt": 1,
+    "request_sha256": "2ec1d0026cbe64f2da6813c5271d40a2bd257e23992d6923efcc27b56f244442",
+    "response_sha256": "8441009950338bff470a0b663f02f7e409d54259874234988aa36a9aa9fc01b1",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C09-irrelevant-feature/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C09-irrelevant-feature/r2",
+    "attempt": 1,
+    "request_sha256": "2ec1d0026cbe64f2da6813c5271d40a2bd257e23992d6923efcc27b56f244442",
+    "response_sha256": "8441009950338bff470a0b663f02f7e409d54259874234988aa36a9aa9fc01b1",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B2/C10-irrelevant-same-crate/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C10-irrelevant-same-crate/r1",
+    "attempt": 1,
+    "request_sha256": "d82af3fed0c8f6d592d0ce96731fb19418d0674e5170861f5588d344a77072e5",
+    "response_sha256": "0045df7537fd71b5a56d2436c0b3856cf1e5526e684685b589f04ab17dacff23",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B2",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B2/C10-irrelevant-same-crate/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B2/C10-irrelevant-same-crate/r2",
+    "attempt": 1,
+    "request_sha256": "d82af3fed0c8f6d592d0ce96731fb19418d0674e5170861f5588d344a77072e5",
+    "response_sha256": "0045df7537fd71b5a56d2436c0b3856cf1e5526e684685b589f04ab17dacff23",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C01-fixture-pass",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C01-fixture-pass/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C01-fixture-pass/r1",
+    "attempt": 1,
+    "request_sha256": "de4abb6458487ad89c82163c5adc6a59546d694201794f77599797f71c5f0d9a",
+    "response_sha256": "03e6cc09b1f955efb6c7dd8659ac527da75fc9fc58515780ad71656efefd71eb",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 0.98,
+      "probabilities": {
+       "yes": 0.99,
+       "no": 0.01,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C01-fixture-pass",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C01-fixture-pass/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C01-fixture-pass/r2",
+    "attempt": 1,
+    "request_sha256": "de4abb6458487ad89c82163c5adc6a59546d694201794f77599797f71c5f0d9a",
+    "response_sha256": "fabd8da6fae7fba7225053892c5c97ecaef169c6ff9f7af538896c13b817582b",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C02-fixture-fail",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C02-fixture-fail/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C02-fixture-fail/r1",
+    "attempt": 1,
+    "request_sha256": "7046ed9d15652aba8ee1ec7c855080604d7662226c0ed0c44ea05f50a65483a5",
+    "response_sha256": "a0cd5722aa571b5b8afa8d80e52eb70729f1278176e9aa7b30e5e7d360118de4",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C02-fixture-fail",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C02-fixture-fail/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C02-fixture-fail/r2",
+    "attempt": 1,
+    "request_sha256": "7046ed9d15652aba8ee1ec7c855080604d7662226c0ed0c44ea05f50a65483a5",
+    "response_sha256": "a0cd5722aa571b5b8afa8d80e52eb70729f1278176e9aa7b30e5e7d360118de4",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C03-compliant-paraphrase-fn/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C03-compliant-paraphrase-fn/r1",
+    "attempt": 1,
+    "request_sha256": "43d40e3122c22b32b4fce8e0acfee2d85c82cce85188c720347088706cae0044",
+    "response_sha256": "6b84af1de7358b6ff4b822162a72fa8eaebad9d2653edf45bfc92a86b3561755",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C03-compliant-paraphrase-fn",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C03-compliant-paraphrase-fn/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C03-compliant-paraphrase-fn/r2",
+    "attempt": 1,
+    "request_sha256": "43d40e3122c22b32b4fce8e0acfee2d85c82cce85188c720347088706cae0044",
+    "response_sha256": "6b84af1de7358b6ff4b822162a72fa8eaebad9d2653edf45bfc92a86b3561755",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C04-boundary-guarded-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C04-boundary-guarded-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "2bff32b1e2fca0c261c3b5b5e4639ccced9bcdb80645ee03406254bb710e7183",
+    "response_sha256": "a8f4c46903e94c3830d11a79c2ec94d5ac0502b08b3faa6fe921500344e8ab8e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C04-boundary-guarded-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C04-boundary-guarded-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C04-boundary-guarded-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "2bff32b1e2fca0c261c3b5b5e4639ccced9bcdb80645ee03406254bb710e7183",
+    "response_sha256": "a8f4c46903e94c3830d11a79c2ec94d5ac0502b08b3faa6fe921500344e8ab8e",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C05-silent-other-shape/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C05-silent-other-shape/r1",
+    "attempt": 1,
+    "request_sha256": "78bb18e5260c7568d06ae9587ba223098fedde8b5e336f1f97849aaaf1f69ee9",
+    "response_sha256": "98f4c5b0b5c8b244c348febd60d37494884048c8dc6f85e992acf766f5d2212b",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.92,
+      "probabilities": {
+       "yes": 0.04,
+       "no": 0.95,
+       "unclear": 0.01
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C05-silent-other-shape",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C05-silent-other-shape/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C05-silent-other-shape/r2",
+    "attempt": 1,
+    "request_sha256": "78bb18e5260c7568d06ae9587ba223098fedde8b5e336f1f97849aaaf1f69ee9",
+    "response_sha256": "eca604498dc50c385f39fca105deba4be4d0b008eb9c96468f7c8645cfc65487",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.97,
+      "probabilities": {
+       "yes": 0.02,
+       "no": 0.98,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C06-topical-only",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C06-topical-only/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C06-topical-only/r1",
+    "attempt": 1,
+    "request_sha256": "23614df10d089f047bbf68e2a0f9109bce0bab2bfc9ac9d0c5d5414f21209a45",
+    "response_sha256": "b1bba136cea453c45e6589a6829113a82f4a1f45b1a423c5a60aa92083ba742a",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "unclear",
+      "confidence": 0.4,
+      "probabilities": {
+       "yes": 0.39,
+       "no": 0.01,
+       "unclear": 0.6
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.92,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.95,
+       "unclear": 0.04
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C06-topical-only",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C06-topical-only/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C06-topical-only/r2",
+    "attempt": 1,
+    "request_sha256": "23614df10d089f047bbf68e2a0f9109bce0bab2bfc9ac9d0c5d5414f21209a45",
+    "response_sha256": "cb511ea6612a6004ef6ba1aff19bc33698dac01362793701c2d030e8178a3854",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "unclear",
+      "confidence": 0.37,
+      "probabilities": {
+       "yes": 0.41,
+       "no": 0.01,
+       "unclear": 0.58
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 0.92,
+      "probabilities": {
+       "yes": 0.01,
+       "no": 0.95,
+       "unclear": 0.04
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C07-boundary-other-sibling/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C07-boundary-other-sibling/r1",
+    "attempt": 1,
+    "request_sha256": "aaee862881f10e3cca87804fafc52c7c1cb1046481f6b0592cacde557c3218df",
+    "response_sha256": "245a8d4144478dd14f55d1e497433d0924c6c1302fb8b3486380d823eb97396d",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C07-boundary-other-sibling",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C07-boundary-other-sibling/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C07-boundary-other-sibling/r2",
+    "attempt": 1,
+    "request_sha256": "aaee862881f10e3cca87804fafc52c7c1cb1046481f6b0592cacde557c3218df",
+    "response_sha256": "245a8d4144478dd14f55d1e497433d0924c6c1302fb8b3486380d823eb97396d",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C08-conflict",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C08-conflict/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C08-conflict/r1",
+    "attempt": 1,
+    "request_sha256": "e361e1b2dc8c55cb1205b7c3eec7cfec2199623320907a96b238ac6028ce716a",
+    "response_sha256": "fb5f6cf6380a35dcf35b368be8d4d381684bbd6a1da42554d9c2ca8be1ba8666",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C08-conflict",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C08-conflict/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C08-conflict/r2",
+    "attempt": 1,
+    "request_sha256": "e361e1b2dc8c55cb1205b7c3eec7cfec2199623320907a96b238ac6028ce716a",
+    "response_sha256": "fb5f6cf6380a35dcf35b368be8d4d381684bbd6a1da42554d9c2ca8be1ba8666",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "yes",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 1.0,
+       "no": 0.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C09-irrelevant-feature/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C09-irrelevant-feature/r1",
+    "attempt": 1,
+    "request_sha256": "e9a22c306313bd14a7a0ab9bb2370d7d2684beece3c10bd90f33f7290386dd23",
+    "response_sha256": "7f33c3ca82ef087869b094e181960ac40f9aeac455f5b2e177ebab669a8514a6",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C09-irrelevant-feature",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C09-irrelevant-feature/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C09-irrelevant-feature/r2",
+    "attempt": 1,
+    "request_sha256": "e9a22c306313bd14a7a0ab9bb2370d7d2684beece3c10bd90f33f7290386dd23",
+    "response_sha256": "7f33c3ca82ef087869b094e181960ac40f9aeac455f5b2e177ebab669a8514a6",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 1,
+  "run_id": "v2-ANC-004-planning/B3/C10-irrelevant-same-crate/r1",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C10-irrelevant-same-crate/r1",
+    "attempt": 1,
+    "request_sha256": "7f8965f61bb1806c19aaeb20d8ccb64da15c498448b80dcd9bc9493e5f56c42e",
+    "response_sha256": "395e70ed753c0cac2546ab774e88911e72354c67aa3f1131f7f2906e8400e3db",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ },
+ {
+  "bundle": "B3",
+  "case_id": "C10-irrelevant-same-crate",
+  "repeat": 2,
+  "run_id": "v2-ANC-004-planning/B3/C10-irrelevant-same-crate/r2",
+  "attempts": [
+   {
+    "run_id": "v2-ANC-004-planning/B3/C10-irrelevant-same-crate/r2",
+    "attempt": 1,
+    "request_sha256": "7f8965f61bb1806c19aaeb20d8ccb64da15c498448b80dcd9bc9493e5f56c42e",
+    "response_sha256": "395e70ed753c0cac2546ab774e88911e72354c67aa3f1131f7f2906e8400e3db",
+    "answers": {
+     "relevant": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "addressed": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     },
+     "contradicted": {
+      "type": "choice",
+      "choice": "no",
+      "confidence": 1.0,
+      "probabilities": {
+       "yes": 0.0,
+       "no": 1.0,
+       "unclear": 0.0
+      }
+     }
+    },
+    "model": "jev-1.14.0",
+    "ok": true
+   }
+  ]
+ }
+]

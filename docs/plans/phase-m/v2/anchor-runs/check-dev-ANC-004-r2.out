@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "data": {
+    "gate": "dev",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "ANC-004",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 stops reporting a #[cfg(unix)] transport match arm that sits beside an un-gated loopback TCP enum variant used on Windows. Evidence: test port010_s4_loopback_tcp_sibling passes, showing zero findings for that fixture.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "anchor-runs/fixtures/dev-20261030T154521Z-fixture_ANC-004_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-004",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports the #[cfg(unix)] Unix-socket match arm even though the TcpLoopback enum variant beside it has no #[cfg] guard and serves Windows.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "anchor-runs/fixtures/dev-20261030T154522Z-fixture_ANC-004_fail_1.json"
+      }
+    ],
+    "mismatches": [],
+    "pass": true,
+    "path": "anchor-runs/fixtures",
+    "run_path": "anchor-runs/fixtures",
+    "runs": [
+      "anchor-runs/fixtures/dev-20261030T154521Z-fixture_ANC-004_pass_1.json",
+      "anchor-runs/fixtures/dev-20261030T154522Z-fixture_ANC-004_fail_1.json"
+    ]
+  },
+  "error": null
+}

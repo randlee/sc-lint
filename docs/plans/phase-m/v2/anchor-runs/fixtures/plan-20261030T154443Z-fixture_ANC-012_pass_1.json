@@ -1,0 +1,100 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T154443Z-fixture_ANC-012_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T15:44:43+00:00",
+  "anchors_path": "anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-012:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 214,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-012",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must run cargo clippy steps (clippy, and clippy-windows via xwin) with the PYO3_PYTHON and PATH environment variables pointing at the Python interpreter inside the repository's .bootstrap-venv virtual environment directory.",
+      "quote": "C. `clippy` and `clippy-windows` (xwin) need cargo to see `PYO3_PYTHON` and `PATH` pointing at the `.bootstrap-venv` interpreter (`sc_lint_clippy_prefix` + `_sc-lint-clippy` in the Justfile).",
+      "stated_by": "ISSUE #198 (atm-core comment 2026-10-30)",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v2 re-derivation from REQ/ADR and issue text, 2026-10-30; candidate C10",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 0.0,
+            "no": 1.0,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1078,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 214,
+      "item_shortened": false,
+      "request_bytes": 3286
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

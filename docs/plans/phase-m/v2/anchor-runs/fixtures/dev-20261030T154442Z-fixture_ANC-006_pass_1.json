@@ -1,0 +1,110 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "dev-20261030T154442Z-fixture_ANC-006_pass_1",
+  "gate": "dev",
+  "created_at": "2026-10-30T15:44:42+00:00",
+  "anchors_path": "anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-006:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 170,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 64000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report the declaration #[cfg(unix)] mod x; of a module that is never compiled on Windows.",
+      "quote": "Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S6  Module declared `#[cfg(unix)] mod x;` and items inside it also carry cfg(unix); module is never compiled on Windows. Rows 13 (the decl), 17.",
+      "stated_by": "ISSUE #786 (atm-core per-path verdict table, 2026-10-30)",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v2 re-derivation from REQ/ADR and issue text, 2026-10-30; candidate MS6a",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "dev",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "3c3003769e83070c2318361583df704621657784f6dfbe6c77a894e380f08503",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "yes": 1.0,
+            "no": 0.0,
+            "unclear": 0.0
+          }
+        },
+        "implemented": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.86,
+          "probabilities": {
+            "yes": 0.91,
+            "no": 0.03,
+            "unclear": 0.06
+          }
+        },
+        "violated": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.97,
+          "probabilities": {
+            "yes": 0.01,
+            "no": 0.98,
+            "unclear": 0.01
+          }
+        },
+        "evidenced": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "yes": 0.99,
+            "no": 0.01,
+            "unclear": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.86,
+      "explanation": "The directive was followed and evidenced.",
+      "usage": {
+        "input_tokens": 1264,
+        "output_tokens": 152
+      },
+      "attempts": 1,
+      "item_chars_sent": 170,
+      "item_shortened": false,
+      "request_bytes": 4023
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

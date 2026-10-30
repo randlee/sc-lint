@@ -1,0 +1,131 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T155828Z-fixture_ANC-004_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T15:58:28+00:00",
+  "anchors_path": "docs/plans/phase-m/v2/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-004:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 152,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-004",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's PORT-010 rule must recognize, and not report, a #[cfg(unix)] transport or adapter function or match arm that sits beside a loopback TCP enum variant or function with no #[cfg] guard, which Windows uses instead.",
+      "quote": "Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S4  cfg(unix) transport/adapter fn or match arm beside an unguarded loopback-TCP sibling (enum variant or fn) that serves Windows. Rows 8, 11, 12, 15.",
+      "stated_by": "ISSUE #786 (atm-core per-path verdict table, 2026-10-30)",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v2 re-derivation from REQ/ADR and issue text, 2026-10-30; candidate MS4",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "737db144c12e3e9ea13ab5b71e330d5a1fd1bd5ae15d0e9bbddc030310abc7d9",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+            "unclear": "The item text is too vague to tell what part of the system it touches.",
+            "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+          },
+          "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "At least one part is missing: the item does not mention an unguarded loopback TCP sibling, gives a different sibling such as a `#[cfg(windows)]` function or named pipe, only promises general fixes, or says PORT-010 keeps reporting the item.",
+            "unclear": "The item mentions both PORT-010 and a loopback TCP sibling but it is not possible to tell whether PORT-010 stops reporting the `#[cfg(unix)]` item.",
+            "yes": "Both parts are present: PORT-010 stops reporting (or skips, or treats as covered) the `#[cfg(unix)]` transport or adapter item, and the reason given is a loopback TCP sibling with no `#[cfg]` guard that serves Windows."
+          },
+          "instructions": "Look for one specific change in `item.text`: PORT-010 no longer reports a `#[cfg(unix)]` transport or adapter function or match arm when, beside it, there is a loopback TCP enum variant or function that has no `#[cfg]` guard and is what Windows uses. Is that change present in `item.text`? Both parts must be present: (1) PORT-010 stops reporting the `#[cfg(unix)]` item, and (2) the reason is an unguarded loopback TCP sibling. Judge presence only; do not judge conflict.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Nothing in the item conflicts: it plans to stop reporting the shape, is silent about it, handles a different shape, or keeps reporting only when the loopback TCP sibling is itself `#[cfg]`-guarded.",
+            "unclear": "The item mentions the shape and PORT-010 but it is not possible to tell whether PORT-010 will still report it.",
+            "yes": "The item says PORT-010 still reports, keeps reporting, or is left unchanged for a `#[cfg(unix)]` transport or adapter item beside an unguarded loopback TCP sibling that serves Windows, or says that shape is handled only by an exclusion."
+          },
+          "instructions": "`anchor.statement` requires that PORT-010 not report a `#[cfg(unix)]` transport or adapter function or match arm when a loopback TCP sibling (enum variant or function) with no `#[cfg]` guard beside it serves Windows. Does `item.text` state a plan or outcome that cannot be reconciled with this, such as PORT-010 still reporting that shape, leaving PORT-010 unchanged for it, or relying on a consumer exclusion instead of the rule change? The requirement covers only unguarded siblings: still reporting a `#[cfg(unix)]` item whose loopback TCP sibling is itself `#[cfg]`-guarded is not a conflict. Silence about the shape, or work on a different shape, is not a conflict. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.99,
+            "unclear": 0.0,
+            "yes": 0.01
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1349,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 152,
+      "item_shortened": false,
+      "request_bytes": 3965
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-004"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

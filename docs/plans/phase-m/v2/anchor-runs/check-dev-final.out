@@ -1,0 +1,395 @@
+{
+  "success": true,
+  "data": {
+    "gate": "dev",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "ANC-001",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 stops reporting a private #[cfg(unix)] helper whose only callers are #[cfg(unix)] functions that have #[cfg(windows)] siblings. Evidence: test port010_s1_helper_of_paired_fn passes, showing zero findings for that fixture.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-001_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-001",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports a private #[cfg(unix)] helper even though its only caller has a #[cfg(windows)] sibling.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-001_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-002",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 accepts a differently named #[cfg(windows)] companion such as connect_named_pipe for connect_unix. Evidence: test port010_s2_renamed_companion passes, showing zero findings for that pair.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-002_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-002",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports connect_unix although connect_named_pipe is its #[cfg(windows)] companion.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-002_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-003",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 stops reporting a #[cfg(unix)] item with a same-name #[cfg(not(unix))] sibling in a module, an inherent impl and the crate root. Evidence: test port010_s3_same_name_sibling passes, showing zero findings for all three scopes.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-003_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-003",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 exempts the crate-root main.rs pair only; module and inherent-impl same-name siblings are still reported.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-003_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-004",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 stops reporting a #[cfg(unix)] transport match arm that sits beside an un-gated loopback TCP enum variant used on Windows. Evidence: test port010_s4_loopback_tcp_sibling passes, showing zero findings for that fixture.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-004_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-004",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports the #[cfg(unix)] Unix-socket match arm even though the TcpLoopback enum variant beside it has no #[cfg] guard and serves Windows.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-004_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-005",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 stops reporting a #[cfg(unix)] helper used only inside a #[cfg(unix)] block of a function whose #[cfg(not(unix))] block is in the same body. Evidence: test port010_s5_cfg_blocks_in_one_fn passes, showing zero findings for that fixture.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-005_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-005",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports the helper called from the #[cfg(unix)] block although the same function has a #[cfg(not(unix))] block.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-005_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-006",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 no longer reports a #[cfg(unix)] mod unix_socket; declaration. Evidence: test port010_s6_unix_module_decl passes, showing zero findings for the declaration line.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-006_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-006",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports the #[cfg(unix)] mod unix_socket; declaration line.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-006_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-007",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 no longer reports #[cfg(unix)] items inside a module declared #[cfg(unix)] mod unix_socket;. Evidence: test port010_s6_items_in_unix_module passes, showing zero findings inside that module.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-007_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-007",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports each #[cfg(unix)] function inside the #[cfg(unix)] mod unix_socket module.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-007_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-008",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 stops reporting a #[cfg(unix)] accessor on a cross-platform config type that non-Unix validation rejects with a typed error. Evidence: test port010_s7_rejected_config_accessor passes, showing zero findings for that fixture.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-008_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-008",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 still reports the #[cfg(unix)] get() accessor although validate_config rejects that config on non-Unix with a typed error.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-008_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-009",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "PORT-010 keeps reporting a production #[cfg(unix)] function with no #[cfg(windows)] companion and no portable fallback. Evidence: test port010_real_gap_still_reported passes, showing one finding for that fixture.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-009_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-009",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "PORT-010 now skips every #[cfg(unix)] item in a file once any Windows code exists anywhere in that file.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-009_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-010",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "With runner.python set to .venv, a leading python in a lint step and in a test step runs .venv/bin/python on Unix and .venv\\Scripts\\python.exe on Windows. Evidence: test runner_python_argv passes for a lint step and a test step on Linux, macOS and Windows.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-010_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-010",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "runner.python rewrites a leading python only in lint steps; test steps still run whatever python is on PATH.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-010_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-011",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "With runner.python set, sc-lint prepends the venv's bin directory (Scripts on Windows) to every step's PATH. Evidence: test runner_python_prepends_path passes, showing PATH starts with the venv directory for a lint step and a test step.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-011_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-011",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "runner.python rewrites only the leading python argv, so a helper that spawns python picks up the interpreter on PATH.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-011_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-012",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-lint runs clippy and clippy-windows with PYO3_PYTHON and PATH pointing at the .bootstrap-venv interpreter. Evidence: test clippy_step_env passes, showing both variables point into .bootstrap-venv for both steps.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-012_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-012",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "clippy runs with PYO3_PYTHON unset, so atm-core keeps its sc_lint_clippy_prefix recipe.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-012_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-013",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "sc-lint setup runs the [tool.sc-lint].setup.pre argv before it provisions the kit. Evidence: test setup_pre_runs_before_provisioning passes, showing the stub command ran before provisioning started.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-013_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-013",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "sc-lint setup runs setup.pre only after provisioning has finished.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-013_fail_1.json"
+      },
+      {
+        "anchor_id": "ANC-014",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Adds a module step kind that runs sc_lint.lint_cargo_deny on the sc-lint kit interpreter on every OS. Evidence: test module_step_uses_kit_interpreter passes, showing the step used the kit venv interpreter on Linux, macOS and Windows with no per-OS path in the config.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-014_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-014",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Consumers must still write .sc-lint/venv/bin/python and Scripts\\python.exe per OS to run sc_lint.* helpers.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-014_fail_1.json"
+      }
+    ],
+    "mismatches": [],
+    "pass": true,
+    "path": "docs/plans/phase-m/v2/anchor-runs/fixtures",
+    "run_path": "docs/plans/phase-m/v2/anchor-runs/fixtures",
+    "runs": [
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-001_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-001_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-002_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155815Z-fixture_ANC-002_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-003_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-003_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-004_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-004_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-005_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-005_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-006_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155816Z-fixture_ANC-006_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-007_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-007_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-008_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-008_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-009_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-009_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-010_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-010_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-011_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-011_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155817Z-fixture_ANC-012_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-012_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-013_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-013_fail_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-014_pass_1.json",
+      "docs/plans/phase-m/v2/anchor-runs/fixtures/dev-20261030T155818Z-fixture_ANC-014_fail_1.json"
+    ]
+  },
+  "error": null
+}
