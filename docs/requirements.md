@@ -694,6 +694,14 @@ Phase `C` also closed the shared `sc-lint-portability` follow-on line:
   - production `sh` / `bash` shell-invocation portability checks
 - `PORT-010`
   - production structural `#[cfg(unix)]` companion-parity checks
+  - pending acceptance of the ADR-010 amendment "PORT-010 companion
+    shapes" (Phase M): recognizes the shapes S1 to S7 it defines and does
+    not report them; a
+    production `#[cfg(unix)]` item with no companion and no portable fallback
+    is still reported, and an unresolved proof leaves the finding in place
+  - pending acceptance of ADR-022: a single item may be allowed with
+    `#[sc_lint(allow(PORT-010), reason = "...")]` (ADR-022 decision 4); the
+    report lists each honored allowance with its reason
 
 ## Requirement Management
 

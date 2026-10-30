@@ -38,8 +38,15 @@ current planning surface.
 
 - [`ADR-019-boundary-prefix-patterns-and-feature-independence.md`](./ADR-019-boundary-prefix-patterns-and-feature-independence.md)
 - [`ADR-020-phase-l-atm-core-findings.md`](./ADR-020-phase-l-atm-core-findings.md)
+- [`ADR-022-tools-and-consumer-configuration.md`](./ADR-022-tools-and-consumer-configuration.md)
+  - Pending: sc-lint provides tools and consumer configuration surfaces; consumers own orchestration
   - prefix patterns in boundary dependency allow-lists and opt-in
     `SCB-FEATURE-001` feature independence (Accepted)
+
+## Withdrawn ADRs
+
+- [`ADR-021-consumer-setup-runner-and-cfg-companions.md`](./ADR-021-consumer-setup-runner-and-cfg-companions.md)
+  - Withdrawn, never accepted; superseded by ADR-022. Do not implement.
 
 ## Index Rules
 
