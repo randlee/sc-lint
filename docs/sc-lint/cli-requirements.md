@@ -448,13 +448,20 @@ specialized backend tools and mixed Rust/Python implementations.
   do not execute it. `[tool.sc-lint.runner].python` selects a consumer venv
   for exactly a leading `python` in selected lint/test step argv, using
   `bin/python` on Linux/macOS and `Scripts/python.exe` on Windows.
-  Preserve other argv, scheduling, selected profiles and test selectors.
-  Missing settings preserve existing behavior; malformed settings are
-  configuration errors. The proposed failure codes, recovery context and
+  A leading `python` falls back to kit Python when no repository venv is
+  configured. `sc-lint-python -m sc_lint.<module>` and
+  `python -m sc_lint.<module>` always use the kit interpreter. A configured
+  runner prepends its executable directory to every selected lint/test
+  child's `PATH`, including cargo clippy/xwin;
+  `runner.export_env = ["PYO3_PYTHON"]` additionally exports that absolute
+  interpreter path. Preserve unrelated environment, remaining argv,
+  scheduling, selected profiles and test selectors. List/skipped steps do
+  not require an interpreter. Malformed settings are configuration errors.
+  The proposed failure codes, recovery context and
   precise scope are defined in
   [ADR-021](./adr/ADR-021-consumer-setup-runner-and-cfg-companions.md).
   On acceptance, this narrowly supersedes REQ-CLI-021's exclusion of these
-  settings. It adds no kit-interpreter step form.
+  settings and the explicit kit-interpreter command marker.
 
 ## Contract References
 

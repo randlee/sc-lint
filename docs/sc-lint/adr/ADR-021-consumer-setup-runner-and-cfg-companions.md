@@ -5,79 +5,132 @@
 | ID | ADR-021 |
 | Status | Pending |
 | Deciders | Rand |
-| Related | ADR-010, ADR-016, ADR-020; #198, #720 |
+| Related | ADR-010, ADR-016, ADR-017, ADR-020; #198, #720, #786 |
 
 ## Context
 
-The consumer evidence in #198 requires repository setup before product
-provisioning and a repository Python environment for consumer steps. ADR-020
-decision 9 currently declines both capabilities, and REQ-CLI-021 explicitly
-excludes them. This proposal requires Rand's approval before implementation;
-the accepted restrictions remain effective until then.
+atm-core's [#198 answer](https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954)
+commits to separate repository Python, kit Python and cargo/PyO3 execution.
+Its 29 repository steps include three test steps; twelve OS-specific profile
+entries invoke four wheel-only helpers. Cargo clippy also needs the repository
+interpreter in `PYO3_PYTHON` and its executable directory on child `PATH`.
+ADR-020 decisions 9/13 currently reject these settings. The accepted
+restrictions remain effective until Rand accepts this proposal.
 
-#720 records a second unresolved decision: PORT-010 reports a crate-root
-`#[cfg(unix)]` function even when a same-name `#[cfg(not(unix))]` sibling
-exists in that scope. The existing fixture pins that finding.
+The [#786 shape table](https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641)
+pins 47 findings in 18 paths at atm-core `6ffaa97be`. Seventeen paths are
+classified false positives; `atm_temp.rs` mixes a false positive with three
+deliberate POSIX-only helpers. S3 generalizes #720 beyond the crate root to
+module functions and inherent methods. S8 conflicts with the existing rule
+that separately Unix-gated public items stay checked.
 
 ## Proposed Decision
 
 1. **Consumer setup.** Support `[tool.sc-lint.setup].pre` as one non-empty
-   argv array, for example `pre = ["python3", "tools/setup.py"]`. Bootstrap
-   `setup` runs it once from the repository root, before binary discovery,
-   downloads, wheel environment creation or declared-tool provisioning.
-   Parse and validate configuration before running anything. Execute argv
-   directly, without a shell. A nonzero child status stops setup and is
-   returned unchanged; a spawn failure reports
-   `CLI.SC_LINT_SETUP_PRE_FAILED`, command, cause and recovery, with exit 4.
-   `--check` and `--dry-run` never execute the hook; dry-run displays the
-   intended command. Upgrade, lint, test and exec do not execute it.
-   The bootstrap uses only the standard library to read this input before
-   the wheel exists. An absent hook preserves existing setup behavior.
-2. **Repository Python.** Support `[tool.sc-lint.runner].python` as the
-   non-empty path to a consumer virtual environment. Relative paths resolve
-   from the repository root; absolute paths are accepted. Replace exactly a
-   leading `"python"` in selected consumer lint and test step argv with
-   `<venv>/bin/python` on Linux/macOS or `<venv>/Scripts/python.exe` on
-   Windows. Preserve every subsequent argument, environment and scheduler
-   dependency. Do not replace `python3`, executable paths or later tokens.
-   With no setting, argv remains unchanged. Resolve only selected steps;
-   missing interpreters fail before spawning with
-   `CLI.SC_LINT_RUNNER_PYTHON_UNAVAILABLE`, path, cause, recovery and
-   `sc-lint docs setup`, exit 4. `test --list` needs no interpreter.
-   This selects a process executable at runtime; Rust retains its existing
-   profile planning and scheduling, while bootstrap provisioning and asset
-   generation remain Python/declarative under ADR-016. It adds no Rust
-   scaffolding logic and no second Python profile planner.
-3. **Structural companions.** A crate-root free function guarded by exactly
-   `cfg(unix)` has PORT-010 parity when a non-test, same-name free function
-   in the same item scope has exactly `cfg(not(unix))`. Retain explicit
-   Windows companions and portable fallbacks. A differently named sibling,
-   sibling in another scope, test-only sibling, `not(windows)`, or unrelated
-   cfg does not establish this companion relationship. This decision does
-   not generalize Boolean cfg equivalence or change impl-method parity.
+   argv array. The committed consumer form is `pre = ["just", "bootstrap"]`.
+   Bootstrap `setup` runs it once from the repository root before binary
+   discovery, downloads, wheel creation or declared-tool provisioning. Parse
+   and validate config first; execute argv without a shell. A nonzero child
+   status stops setup and is returned unchanged. Spawn failure reports
+   `CLI.SC_LINT_SETUP_PRE_FAILED`, command, cause, recovery and exit 4.
+   Check and dry-run never execute it; dry-run displays it. Upgrade, lint,
+   test and exec do not run it. The pre-wheel reader uses only the standard
+   library; absent configuration preserves current setup behavior.
+2. **Interpreter selection for lint and test.** Support
+   `[tool.sc-lint.runner].python` as a non-empty consumer venv path;
+   atm-core will use `python = ".bootstrap-venv"`. Resolve relative paths
+   from repo root and accept absolute paths. Exactly a leading `python`
+   selects `<venv>/bin/python` on Linux/macOS or
+   `<venv>/Scripts/python.exe` on Windows. When unset, leading `python`
+   selects the kit interpreter. Preserve subsequent argv, test argument
+   forwarding and scheduler dependencies. Do not rewrite `python3`, explicit
+   executable paths or later `python` tokens. Selection applies equally to
+   selected lint and test steps; list/skipped/unselected steps do not resolve
+   interpreters.
+3. **Kit helpers.** A command `sc-lint-python -m sc_lint.<module> [args...]`
+   explicitly selects the pinned kit interpreter on every OS. Also recognize
+   `python -m sc_lint.<module>` as a kit helper before applying the repository
+   Python rule. `runner.python` never overrides these helper executables.
+   This replaces OS-specific paths without adding one command per helper.
+   Resolve consumer kit Python only from `.sc-lint/venv/bin/python3` or
+   `Scripts/python.exe`, matching bootstrap's wheel environment; never use
+   PATH or source-tree modules if that consumer environment is missing.
+   Existing source-maintainer adapters retain their separate source fallback.
+4. **Child environment.** When `runner.python` is configured, prepend its
+   bin/Scripts directory to each selected consumer step's child `PATH`,
+   including cargo/clippy/xwin and kit-helper steps. Interpreter selection
+   still follows decisions 2–3. Optional
+   `runner.export_env = ["PYO3_PYTHON"]` exports the absolute repository
+   interpreter path to those children. This initial list accepts only
+   `PYO3_PYTHON`; an empty/absent list exports nothing. A non-empty list
+   requires `runner.python`. Explicit runner exports replace inherited
+   values; unrelated inherited environment is preserved. Use host path-list
+   rules, preserve spaces, and never mutate the parent environment.
+5. **S3 companions (#720).** A production `cfg(unix)` free function or
+   inherent-impl method has PORT-010 parity with a non-test, same-kind,
+   same-name sibling guarded by exactly `cfg(not(unix))` in the same lexical
+   module or inherent impl. Apply at crate root, inline modules and file
+   modules. Retain explicit Windows companions and portable fallbacks.
+   Different names/scopes/impls, test-only siblings, `not(windows)` and
+   unrelated cfgs do not establish S3 parity. Trait impls keep their existing
+   treatment. This is syntactic matching, not general Boolean equivalence.
+6. **Reviewed declarations (S2/S4/S7).** Add analyzer-owned
+   `platform_companions` records, separate from unchanged file-pair
+   `platform_adapters`. Each names `unix_file`, `unix_item`,
+   `counterpart_file`, `counterpart_item`, `kind` and non-empty `reason`.
+   Files must be confined existing repository-relative `.rs` files; items
+   resolve uniquely in production AST scopes. Kinds are `function` (S2,
+   differently named Windows/not-unix companion), `transport` (S4, unguarded
+   portable transport), and `refusal` (S7, explicit non-unix config rejection).
+   A refusal counterpart must contain an explicit non-unix error branch;
+   standalone transport endpoints need no shared caller.
+   Qualified item syntax and validation are specified in m-5b. Validate both
+   declarations, applicable cfgs and production reachability; missing, stale,
+   ambiguous or test-only declarations are config errors. Never infer
+   semantic counterparts from spelling or co-location. A record covers its
+   exact Unix item, not the whole file, unrelated public items or arbitrary
+   callers. The reason records reviewed equivalence/refusal; the analyzer
+   checks structure, not behavioral equivalence of platform implementations.
 
-On acceptance, decisions 1–2 supersede ADR-020 decision 9 and amend decision
-13's closed key list to admit `setup` and `runner` under `tool.sc-lint`.
-They supersede ADR-016's
-restriction on setup hooks only for these two declared settings; amend
-REQ-CLI-021 through proposed REQ-CLI-026. Decision 3 extends ADR-010's
-structural parity contract for #720. All other accepted behavior remains.
+Decisions 1–4 supersede ADR-020 decision 9 and amend decision 13's closed key
+list only for nested `setup`/`runner`; root-level tables remain rejected.
+They amend ADR-016 and REQ-CLI-021 only for these runtime settings; proposed
+REQ-CLI-026 becomes effective on acceptance. Bootstrap/scaffolding stay
+Python/declarative. Rust keeps profile planning, scheduling and runtime
+executable/environment selection; no second Python planner is introduced.
+Decisions 5–6 extend ADR-010/ADR-017 structural parity only as stated.
 
-## Configuration Errors
+## Open Rand Ruling — S8
 
-Malformed tables, unknown nested keys, an empty hook argv, non-string argv
-elements, or an empty/non-string environment path fail as
-`CLI.CONFIG_ERROR` (exit 3), with config path, field, cause, recovery and
-`sc-lint docs configuration`. The accepted spelling is under
-`tool.sc-lint`; root-level `setup` and `runner` remain unsupported.
+`atm_temp.rs::is_owned_by_uid` and `current_uid` are public POSIX-only
+helpers without Windows counterparts. Existing public-item policy reports
+them. Rand must decide whether a narrowly reviewed declaration may classify
+them as deliberate exceptions, with a required reason, or public items stay
+reported. No exception is approved here. The third deliberate helper,
+`has_group_or_world_bits`, is private and is evaluated under S1.
 
-## Approval And Scope
+Final acceptance is zero PORT-010 findings on all 18 paths with exclusions
+removed, while true gaps in negative fixtures remain reported. Keeping S8
+diagnostics conflicts with that acceptance; if Rand chooses it, the acceptance
+must be explicitly reconciled before plan approval. The separate S8 human
+gate blocks m-5b's completed implementation. Do not silently exclude public
+helpers or claim the 18-path result early.
 
-Rand's approval must cover both the #198 reversal and the #720
-classification. The Phase M approval gate blocks m-1 and m-3 until this
-record is Accepted and the CLI requirement amendment is activated on the
-planning branch. Draft anchors are not approval.
+## Errors And Approval
 
-This proposal excludes #198's kit-interpreter/module step form and #786's
-18-path classification. It introduces no post hook, shell hook DSL, automatic
-consumer environment creation or additional analyzer dependency.
+Malformed fields, unknown nested keys, unsupported exports and invalid module
+marker argv fail as `CLI.CONFIG_ERROR` (exit 3), naming config path, field,
+cause, recovery and `sc-lint docs configuration`. Missing selected repository
+or kit interpreters fail before spawn with respectively
+`CLI.SC_LINT_RUNNER_PYTHON_UNAVAILABLE` or
+`CLI.SC_LINT_KIT_PYTHON_UNAVAILABLE`, path, recovery, `sc-lint docs setup`,
+exit 4. Rust codes are typed constants in their owning module. Companion
+config errors use the existing analyzer-config envelope with indexed field,
+cause and recovery; rule IDs and finding JSON stay stable.
+
+ADR-021 remains Pending. Its human gate blocks m-1, m-3 and m-5b until Rand
+accepts the applicable decisions and activates the CLI amendment on the
+planning branch. S8 also requires its explicit ruling. m-5a's conservative
+S1/S5/S6 work does not depend on S8 or declarations; it consumes m-1's S3
+proof. Draft anchors are not approval. No post-hook DSL, automatic consumer
+venv creation or new analyzer dependency is proposed.
