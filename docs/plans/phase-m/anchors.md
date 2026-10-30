@@ -22,9 +22,9 @@ Intent: `docs/plans/phase-m/intent.md`
 | GH-786.table | retired | #786 table: none of the 47 findings reported | 2026-10-30 |
 | GH-786.S3 | proposed | #720/S3: same-name cfg(not(unix)) sibling, all scopes | 2026-10-30 |
 | GH-198.setup-pre | retired | #198: [tool.sc-lint].setup.pre | 2026-10-30 |
-| GH-198.runner-argv | proposed | #198: runner.python resolves leading python, lint and test | 2026-10-30 |
+| GH-198.runner-argv | retired | #198: runner.python resolves leading python, lint and test | 2026-10-30 |
 | GH-198.runner-path | retired | #198: runner.python venv dir prepended to child PATH | 2026-10-30 |
-| GH-198.kit-helpers | proposed | #198: sc_lint.* helpers on the kit interpreter | 2026-10-30 |
+| GH-198.kit-helpers | retired | #198: sc_lint.* helpers on the kit interpreter | 2026-10-30 |
 | GH-198.export-env | retired | #198: export PYO3_PYTHON for native steps (Rand scope ruling needed) | 2026-10-30 |
 | GH-136.src-only | retired | #136: source-only scope setting for global_dependency_ownership | 2026-10-30 |
 | GH-136.audit | retired | #136: audit the three atm-core keys, file gaps | 2026-10-30 |
@@ -37,11 +37,17 @@ Intent: `docs/plans/phase-m/intent.md`
 | GH-136.audit-verify | proposed | #136 audit: verify coverage of the three keys | 2026-10-30 |
 | GH-136.audit-gaps | proposed | #136 audit: file a gap per uncovered key | 2026-10-30 |
 | ANC-014 | proposed | #786/#720: no PORT-010 false alarms on atm-core | 2026-10-30 |
-| ANC-015 | proposed | #786/#720: real Windows gaps still reported | 2026-10-30 |
+| ANC-015 | retired | #786/#720: real Windows gaps still reported | 2026-10-30 |
 | ANC-016 | proposed | #136: parity table of atm-core's three boundary settings | 2026-10-30 |
-| ANC-017 | proposed | #786 S8: pub POSIX-only helpers exempt | 2026-10-30 |
+| ANC-017 | retired | #786 S8: pub POSIX-only helpers exempt | 2026-10-30 |
 | GH-786.table.3 | retired | #786: none of the 47 findings reported, exclusions removable | 2026-10-30 |
 | GH-198.export-env.3 | proposed | #198: export PYO3_PYTHON to native steps | 2026-10-30 |
+| ANC-018 | proposed | PORT-010 approved exception path | 2026-10-30 |
+| ANC-019 | proposed | #198: consumer can override the sc_lint.* helper interpreter | 2026-10-30 |
+| ANC-020 | proposed | #786/#720: real Windows gaps reported unless an approved exception | 2026-10-30 |
+| ANC-021 | proposed | #786 S8: pub POSIX-only helpers exempt via approved exception | 2026-10-30 |
+| ANC-022 | proposed | #198: sc_lint.* helpers default to the kit interpreter | 2026-10-30 |
+| GH-198.runner-argv.2 | proposed | #198: runner.python resolves leading python, except sc_lint.* helpers | 2026-10-30 |
 
 ## ANC-001
 
@@ -338,7 +344,7 @@ Anchor: When [tool.sc-lint].runner.python names a venv, a leading python in any 
 
 > (1) a leading `"python"` in any lint **or test** step argv resolves to that venv's interpreter on every OS
 
-Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(1),(3), 2026-10-30. Status: proposed. Version 6.
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(1),(3), 2026-10-30. Status: retired. Version 7.
 
 Summary: #198: runner.python resolves leading python, lint and test
 
@@ -374,7 +380,7 @@ Anchor: sc-lint must always run sc_lint.* wheel helper steps on the sc-lint kit'
 
 > plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b), 2026-10-30. Status: proposed. Version 5.
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b), 2026-10-30. Status: retired. Version 6.
 
 Summary: #198: sc_lint.* helpers on the kit interpreter
 
@@ -625,7 +631,7 @@ Anchor: sc-lint's PORT-010 rule must still report a #[cfg(unix)] item that has n
 > atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.
 Definition question (team-lead, 2026-10-30): "real Windows gap = a cfg(unix) item with no Windows, cfg(not(unix)) or portable counterpart" Rand: "yes"
 
-Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 3.
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: retired. Version 4.
 
 Summary: #786/#720: real Windows gaps still reported
 
@@ -663,7 +669,7 @@ Anchor: sc-lint's PORT-010 rule must not report a pub #[cfg(unix)] function that
 > S8  (only the pub caveat) pub cfg(unix)-only POSIX helpers (`is_owned_by_uid`, `current_uid` in atm_temp.rs) with no Windows counterpart because the concept does not exist; Windows uses a different check. Row 1. Sc-lint docs say pub items stay checked, so the sc-lint team must choose: exempt (S1 transitively) or keep reporting. Not a parity gap.
 Rand ruling (relayed by team-lead 2026-10-30): "S8 = EXEMPT pub POSIX-only helpers"
 
-Said by Rand, Phase M planning; #786 S8 text plus Rand's ruling relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 4.
+Said by Rand, Phase M planning; #786 S8 text plus Rand's ruling relayed by team-lead 2026-10-30, 2026-10-30. Status: retired. Version 5.
 
 Summary: #786 S8: pub POSIX-only helpers exempt
 
@@ -718,3 +724,117 @@ Deterministic check to pair with the development gate: A step-environment test s
 Fixtures:
 - pass: sc-lint can export the runner.python interpreter as PYO3_PYTHON to native steps such as cargo clippy. Evidence: test runner_export_env_pyo3 passes, showing the clippy step's env has PYO3_PYTHON set to the venv interpreter.
 - fail: Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix.
+
+## ANC-018
+
+Anchor: sc-lint's PORT-010 rule must offer an approved exception path through which a consumer knowingly opts a #[cfg(unix)] item out of reporting.
+
+> Conflict question (team-lead, 2026-10-30): "ANC-015 against ANC-017. ANC-015 says to report any `cfg(unix)` item with no portable counterpart. ANC-017 says to exempt public POSIX-only helpers that have no Windows counterpart. They overlap" Rand (2026-10-30): "we must have an approved exception path to knowingly opt out."
+
+Said by Rand, Phase M planning; Rand's ruling on a conflict question from team-lead, 2026-10-30 (lint-uwqw), 2026-10-30. Status: proposed. Version 2.
+
+Summary: PORT-010 approved exception path
+
+Scope: The item changes PORT-010 exemptions, classification or suppression in crates/sc-lint-portability.
+
+Deterministic check to pair with the development gate: A port010 fixture with a no-counterpart cfg(unix) fn reports PORT-010 without a declaration and none with an approved exception declaration naming it.
+
+Fixtures:
+- pass: Adds a reviewed PORT-010 exception declaration that a consumer writes to opt a named cfg(unix) item out. Evidence: test port010_approved_exception passes, showing the item is reported without the declaration and not reported with it.
+- fail: Lets a consumer silence a no-counterpart cfg(unix) item only by excluding its file path or disabling PORT-010.
+
+## ANC-019
+
+Anchor: sc-lint must give a consumer a method to override the interpreter that sc-lint runs sc_lint.* wheel helper steps on.
+
+> Conflict question (team-lead, 2026-10-30): "GH-198.runner-argv against GH-198.kit-helpers. The literal rule \"a leading `python` becomes the `runner.python` interpreter\" would also rewrite `python -m sc_lint.*`. The kit-helpers record says those always use the kit interpreter, never overridden." Rand (2026-10-30): "a consumer must have a method to override behavior."
+
+Said by Rand, Phase M planning; Rand's ruling on a conflict question from team-lead, 2026-10-30 (lint-uwqw), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: consumer can override the sc_lint.* helper interpreter
+
+Scope: The item changes step argv construction, interpreter selection or runner.python handling in crates/sc-lint.
+
+Deterministic check to pair with the development gate: A runner test with the consumer override set shows an sc_lint.lint_cargo_deny step resolves to the override interpreter.
+
+Fixtures:
+- pass: Adds a consumer setting that overrides the interpreter for sc_lint.* helper steps. Evidence: test kit_helper_interpreter_override passes, showing sc_lint.lint_cargo_deny runs on the configured interpreter.
+- fail: Hard-codes sc_lint.* helper steps to the kit interpreter with no consumer setting to change it.
+
+## ANC-020
+
+Anchor: sc-lint's PORT-010 rule must report every #[cfg(unix)] item that has no #[cfg(windows)], #[cfg(not(unix))] or portable counterpart, unless an approved exception declaration opts it out.
+
+> atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.
+Definition question (team-lead, 2026-10-30): "real Windows gap = a cfg(unix) item with no Windows, cfg(not(unix)) or portable counterpart" Rand: "yes"
+Conflict question (team-lead, 2026-10-30): "ANC-015 against ANC-017. ANC-015 says to report any `cfg(unix)` item with no portable counterpart. ANC-017 says to exempt public POSIX-only helpers that have no Windows counterpart. They overlap" Rand (2026-10-30): "we must have an approved exception path to knowingly opt out."
+
+Said by Rand, Phase M planning; Rand approved the sentence, answered 'yes' to the definition question and ruled on the ANC-015/ANC-017 conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #786/#720: real Windows gaps reported unless an approved exception
+
+Scope: The item changes PORT-010 exemptions, classification or suppression in crates/sc-lint-portability.
+
+Deterministic check to pair with the development gate: A port010 fixture with a cfg(unix) fn and no Windows, cfg(not(unix)) or portable counterpart reports PORT-010 when no approved exception declaration names it.
+
+Fixtures:
+- pass: PORT-010 keeps reporting a cfg(unix) fn with no Windows, cfg(not(unix)) or portable counterpart unless an approved exception names it. Evidence: test port010_real_gap_still_reported passes, showing one PORT-010 finding for that fixture with no exception declared.
+- fail: Exempts every cfg(unix) fn in a file once any Windows code exists anywhere in that file.
+
+## ANC-021
+
+Anchor: sc-lint's PORT-010 rule must exempt pub POSIX-only #[cfg(unix)] helpers such as is_owned_by_uid and current_uid in crates/atm-core/src/atm_temp.rs only through an approved exception declaration.
+
+> S8  (only the pub caveat) pub cfg(unix)-only POSIX helpers (`is_owned_by_uid`, `current_uid` in atm_temp.rs) with no Windows counterpart because the concept does not exist; Windows uses a different check. Row 1. Sc-lint docs say pub items stay checked, so the sc-lint team must choose: exempt (S1 transitively) or keep reporting. Not a parity gap.
+Rand ruling (relayed by team-lead 2026-10-30): "S8 = EXEMPT pub POSIX-only helpers"
+Conflict question (team-lead, 2026-10-30): "ANC-015 against ANC-017. ANC-015 says to report any `cfg(unix)` item with no portable counterpart. ANC-017 says to exempt public POSIX-only helpers that have no Windows counterpart. They overlap" Rand (2026-10-30): "we must have an approved exception path to knowingly opt out."
+
+Said by Rand, Phase M planning; #786 S8 text, Rand's S8 ruling and his ruling on the ANC-015/ANC-017 conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #786 S8: pub POSIX-only helpers exempt via approved exception
+
+Scope: The item changes PORT-010 handling of pub items, helper exemptions or exception declarations in crates/sc-lint-portability.
+
+Deterministic check to pair with the development gate: A port010 fixture of atm_temp.rs-style pub is_owned_by_uid/current_uid helpers reports PORT-010 without an exception declaration and reports none with an approved declaration naming them.
+
+Fixtures:
+- pass: atm-core's pub is_owned_by_uid and current_uid helpers are exempted by an approved PORT-010 exception declaration. Evidence: test port010_pub_posix_helper_exception passes, showing the helpers are reported without the declaration and not reported with it.
+- fail: Adds a built-in PORT-010 rule that skips every pub cfg(unix) helper with no Windows counterpart, with no exception declaration.
+
+## ANC-022
+
+Anchor: By default, sc-lint must run sc_lint.* wheel helper steps on the sc-lint kit's own venv interpreter (.sc-lint/venv), even when [tool.sc-lint].runner.python is set.
+
+> plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
+Conflict question (team-lead, 2026-10-30): "GH-198.runner-argv against GH-198.kit-helpers. The literal rule \"a leading `python` becomes the `runner.python` interpreter\" would also rewrite `python -m sc_lint.*`. The kit-helpers record says those always use the kit interpreter, never overridden." Rand (2026-10-30): "a consumer must have a method to override behavior."
+
+Said by Rand, Phase M planning; #198 issue text (https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b)) plus Rand's ruling on the runner-argv/kit-helpers conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: sc_lint.* helpers default to the kit interpreter
+
+Scope: The item adds or changes how sc_lint.* helper steps (deny, manifests, shear, spell) are run in crates/sc-lint.
+
+Deterministic check to pair with the development gate: A runner test with runner.python set and no consumer override shows an sc_lint.lint_cargo_deny step resolves to the kit venv interpreter.
+
+Fixtures:
+- pass: With no consumer override, sc_lint.* wheel helper steps run on the kit interpreter even when runner.python is set. Evidence: test kit_helpers_ignore_runner_python passes, showing sc_lint.lint_cargo_deny resolves to the kit venv with runner.python set.
+- fail: Applies runner.python to every step, including sc_lint.lint_cargo_deny.
+
+## GH-198.runner-argv.2
+
+Anchor: When [tool.sc-lint].runner.python names a venv, a leading python in any lint or test step argv that does not run an sc_lint.* wheel helper must resolve to that venv's interpreter on every OS.
+
+> (1) a leading `"python"` in any lint **or test** step argv resolves to that venv's interpreter on every OS
+plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(1),(3) and (b), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #198: runner.python resolves leading python, except sc_lint.* helpers
+
+Scope: The item changes step argv construction or runner.python handling in crates/sc-lint.
+
+Deterministic check to pair with the development gate: Injected-platform argv tests: bin/python on Unix, Scripts\python.exe on Windows, for a lint step and a test step; a python -m sc_lint.* step is not rewritten.
+
+Fixtures:
+- pass: With runner.python set, a leading python in any lint or test step runs that venv's interpreter on every OS, and python -m sc_lint.* helper steps are left alone. Evidence: test runner_python_argv passes, showing .venv/bin/python on unix and .venv\Scripts\python.exe on windows for a lint step and a test step.
+- fail: Rewrites every leading python to runner.python, including python -m sc_lint.lint_cargo_deny.
