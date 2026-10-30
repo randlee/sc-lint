@@ -20,7 +20,7 @@ Intent: `docs/plans/phase-m/intent.md`
 | ANC-012 | retired | #136: dependency ownership on source files only | 2026-10-30 |
 | ANC-013 | retired | #136: record coverage of atm-core's three boundary settings | 2026-10-30 |
 | GH-786.table | retired | #786 table: none of the 47 findings reported | 2026-10-30 |
-| GH-786.S3 | proposed | #720/S3: same-name cfg(not(unix)) sibling, all scopes | 2026-10-30 |
+| GH-786.S3 | locked | #720/S3: same-name cfg(not(unix)) sibling, all scopes | 2026-10-30 |
 | GH-198.setup-pre | retired | #198: [tool.sc-lint].setup.pre | 2026-10-30 |
 | GH-198.runner-argv | retired | #198: runner.python resolves leading python, lint and test | 2026-10-30 |
 | GH-198.runner-path | retired | #198: runner.python venv dir prepended to child PATH | 2026-10-30 |
@@ -29,28 +29,28 @@ Intent: `docs/plans/phase-m/intent.md`
 | GH-136.src-only | retired | #136: source-only scope setting for global_dependency_ownership | 2026-10-30 |
 | GH-136.audit | retired | #136: audit the three atm-core keys, file gaps | 2026-10-30 |
 | GH-786.table.2 | retired | #786: none of the 47 findings reported, exclusions removable | 2026-10-30 |
-| GH-198.setup-pre.2 | proposed | #198: [tool.sc-lint].setup.pre runs before provisioning | 2026-10-30 |
-| GH-198.runner-path.2 | proposed | #198: runner.python venv dir prepended to every step's PATH | 2026-10-30 |
+| GH-198.setup-pre.2 | locked | #198: [tool.sc-lint].setup.pre runs before provisioning | 2026-10-30 |
+| GH-198.runner-path.2 | locked | #198: runner.python venv dir prepended to every step's PATH | 2026-10-30 |
 | GH-198.export-env.2 | retired | #198: export PYO3_PYTHON to native steps (Rand scope ruling needed) | 2026-10-30 |
-| GH-136.src-only.2 | proposed | #136: source-only scope setting for global_dependency_ownership | 2026-10-30 |
+| GH-136.src-only.2 | locked | #136: source-only scope setting for global_dependency_ownership | 2026-10-30 |
 | GH-136.audit.2 | retired | #136: audit the three atm-core keys, file gaps | 2026-10-30 |
-| GH-136.audit-verify | proposed | #136 audit: verify coverage of the three keys | 2026-10-30 |
-| GH-136.audit-gaps | proposed | #136 audit: file a gap per uncovered key | 2026-10-30 |
-| ANC-014 | proposed | #786/#720: no PORT-010 false alarms on atm-core | 2026-10-30 |
+| GH-136.audit-verify | locked | #136 audit: verify coverage of the three keys | 2026-10-30 |
+| GH-136.audit-gaps | locked | #136 audit: file a gap per uncovered key | 2026-10-30 |
+| ANC-014 | locked | #786/#720: no PORT-010 false alarms on atm-core | 2026-10-30 |
 | ANC-015 | retired | #786/#720: real Windows gaps still reported | 2026-10-30 |
-| ANC-016 | proposed | #136: parity table of atm-core's three boundary settings | 2026-10-30 |
+| ANC-016 | locked | #136: parity table of atm-core's three boundary settings | 2026-10-30 |
 | ANC-017 | retired | #786 S8: pub POSIX-only helpers exempt | 2026-10-30 |
 | GH-786.table.3 | retired | #786: none of the 47 findings reported, exclusions removable | 2026-10-30 |
-| GH-198.export-env.3 | proposed | #198: export PYO3_PYTHON to native steps | 2026-10-30 |
-| ANC-018 | proposed | PORT-010 approved exception path | 2026-10-30 |
-| ANC-019 | proposed | #198: consumer can override the sc_lint.* helper interpreter | 2026-10-30 |
-| ANC-020 | proposed | #786/#720: real Windows gaps reported unless an approved exception | 2026-10-30 |
-| ANC-021 | proposed | #786 S8: pub POSIX-only helpers exempt via approved exception | 2026-10-30 |
-| ANC-022 | proposed | #198: sc_lint.* helpers default to the kit interpreter | 2026-10-30 |
-| GH-198.runner-argv.2 | proposed | #198: runner.python resolves leading python, except sc_lint.* helpers | 2026-10-30 |
-| ANC-023 | proposed | #198: sc-lint runs the consumer setup step (just bootstrap) | 2026-10-30 |
-| ANC-024 | proposed | #198: sc-lint selects the .bootstrap-venv interpreter itself | 2026-10-30 |
-| ANC-025 | proposed | #136: opt-in source-only dependency ownership | 2026-10-30 |
+| GH-198.export-env.3 | locked | #198: export PYO3_PYTHON to native steps | 2026-10-30 |
+| ANC-018 | locked | [pending definition: approved exception path] PORT-010 approved exception path | 2026-10-30 |
+| ANC-019 | locked | #198: consumer can override the sc_lint.* helper interpreter | 2026-10-30 |
+| ANC-020 | locked | [pending definition: approved exception path] #786/#720: real Windows gaps reported unless an approved exception | 2026-10-30 |
+| ANC-021 | locked | [pending definition: approved exception path] #786 S8: pub POSIX-only helpers exempt via approved exception | 2026-10-30 |
+| ANC-022 | locked | #198: sc_lint.* helpers default to the kit interpreter | 2026-10-30 |
+| GH-198.runner-argv.2 | locked | #198: runner.python resolves leading python, except sc_lint.* helpers | 2026-10-30 |
+| ANC-023 | locked | #198: sc-lint runs the consumer setup step (just bootstrap) | 2026-10-30 |
+| ANC-024 | locked | #198: sc-lint selects the .bootstrap-venv interpreter itself | 2026-10-30 |
+| ANC-025 | locked | #136: opt-in source-only dependency ownership | 2026-10-30 |
 
 ## ANC-001
 
@@ -311,7 +311,7 @@ Anchor: PORT-010 must not report a cfg(unix) item that has a same-name #[cfg(not
 
 > S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (S3; generalizes #720), 2026-10-30. Status: proposed. Version 6.
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641 (S3; generalizes #720), 2026-10-30. Status: locked. Version 7.
 
 Summary: #720/S3: same-name cfg(not(unix)) sibling, all scopes
 
@@ -482,7 +482,7 @@ pre = ["just", "bootstrap"]
 […]
 **(c) Commitment:** yes, we commit to this split now and will adopt in the first release that ships it
 
-Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#198 body + https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a),(c), 2026-10-30. Status: proposed. Version 4.
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#198 body + https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a),(c), 2026-10-30. Status: locked. Version 5.
 
 Summary: #198: [tool.sc-lint].setup.pre runs before provisioning
 
@@ -502,7 +502,7 @@ Anchor: When runner.python names a venv, sc-lint must prepend that venv's bin di
 […]
 (plus the PATH prepend in (2) applied to every step)
 
-Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(2) + mismatch paragraph, 2026-10-30. Status: proposed. Version 3.
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(2) + mismatch paragraph, 2026-10-30. Status: locked. Version 4.
 
 Summary: #198: runner.python venv dir prepended to every step's PATH
 
@@ -542,7 +542,7 @@ Anchor: global_dependency_ownership must offer a config setting that restricts i
 […]
 The previous atm-core checker passes on this tree because it scans `src/**/*.rs` and does not treat separate integration-test targets as production source. There is no config setting to preserve that source-only scope. atm-core therefore retains this rule locally pending a released source-only scope; no roots or excludes were added to suppress the findings.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 comment 2026-10-29, 2026-10-30. Status: proposed. Version 5.
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 comment 2026-10-29, 2026-10-30. Status: locked. Version 6.
 
 Summary: #136: source-only scope setting for global_dependency_ownership
 
@@ -578,7 +578,7 @@ Anchor: Each of atm-core's three [boundaries] keys (manifest_dependency_allowlis
 
 > atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2), 2026-10-30. Status: proposed. Version 4.
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2), 2026-10-30. Status: locked. Version 5.
 
 Summary: #136 audit: verify coverage of the three keys
 
@@ -596,7 +596,7 @@ Anchor: A config-surface gap issue must be filed in randlee/sc-lint for each atm
 
 > atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2), 2026-10-30. Status: proposed. Version 4.
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2), 2026-10-30. Status: locked. Version 5.
 
 Summary: #136 audit: file a gap per uncovered key
 
@@ -615,7 +615,7 @@ Anchor: With atm-core's PORT-010 path exclusions removed, sc-lint's PORT-010 rul
 > atm-core can remove its PORT-010 exclusions and get zero false alarms, while real Windows gaps are still reported.
 Definition question (team-lead, 2026-10-30): "false alarm = a finding #786's table classifies as false positive or deliberate exception" Rand: "yes"
 
-Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 4.
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: locked. Version 5.
 
 Summary: #786/#720: no PORT-010 false alarms on atm-core
 
@@ -653,7 +653,7 @@ Anchor: A parity table under docs/plans/phase-m/ must record whether sc-lint cov
 > sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.
 Definition question (team-lead, 2026-10-30): "we know = written in a parity table in the Phase M docs for manifest_dependency_allowlists, global_dependency_ownership, manifest_section_rules" Rand: "yes"
 
-Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 3.
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: locked. Version 4.
 
 Summary: #136: parity table of atm-core's three boundary settings
 
@@ -716,7 +716,7 @@ Anchor: sc-lint must be able to export the [tool.sc-lint].runner.python venv int
 […]
 We need one more knob, e.g. `runner.export_env = ["PYO3_PYTHON"]` (plus the PATH prepend in (2) applied to every step), or a per-step `env`.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 C + mismatch paragraph; in scope per Rand 2026-10-30, 2026-10-30. Status: proposed. Version 4.
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 C + mismatch paragraph; in scope per Rand 2026-10-30, 2026-10-30. Status: locked. Version 5.
 
 Summary: #198: export PYO3_PYTHON to native steps
 
@@ -734,9 +734,9 @@ Anchor: sc-lint's PORT-010 rule must offer an approved exception path through wh
 
 > Conflict question (team-lead, 2026-10-30): "ANC-015 against ANC-017. ANC-015 says to report any `cfg(unix)` item with no portable counterpart. ANC-017 says to exempt public POSIX-only helpers that have no Windows counterpart. They overlap" Rand (2026-10-30): "we must have an approved exception path to knowingly opt out."
 
-Said by Rand, Phase M planning; Rand's ruling on a conflict question from team-lead, 2026-10-30 (lint-uwqw), 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning; Rand's ruling on a conflict question from team-lead, 2026-10-30 (lint-uwqw), 2026-10-30. Status: locked. Version 4.
 
-Summary: PORT-010 approved exception path
+Summary: [pending definition: approved exception path] PORT-010 approved exception path
 
 Scope: The item changes PORT-010 exemptions, classification or suppression in crates/sc-lint-portability.
 
@@ -752,7 +752,7 @@ Anchor: sc-lint must give a consumer a method to override the interpreter that s
 
 > Conflict question (team-lead, 2026-10-30): "GH-198.runner-argv against GH-198.kit-helpers. The literal rule \"a leading `python` becomes the `runner.python` interpreter\" would also rewrite `python -m sc_lint.*`. The kit-helpers record says those always use the kit interpreter, never overridden." Rand (2026-10-30): "a consumer must have a method to override behavior."
 
-Said by Rand, Phase M planning; Rand's ruling on a conflict question from team-lead, 2026-10-30 (lint-uwqw), 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning; Rand's ruling on a conflict question from team-lead, 2026-10-30 (lint-uwqw), 2026-10-30. Status: locked. Version 3.
 
 Summary: #198: consumer can override the sc_lint.* helper interpreter
 
@@ -772,9 +772,9 @@ Anchor: sc-lint's PORT-010 rule must report every #[cfg(unix)] item that has no 
 Definition question (team-lead, 2026-10-30): "real Windows gap = a cfg(unix) item with no Windows, cfg(not(unix)) or portable counterpart" Rand: "yes"
 Conflict question (team-lead, 2026-10-30): "ANC-015 against ANC-017. ANC-015 says to report any `cfg(unix)` item with no portable counterpart. ANC-017 says to exempt public POSIX-only helpers that have no Windows counterpart. They overlap" Rand (2026-10-30): "we must have an approved exception path to knowingly opt out."
 
-Said by Rand, Phase M planning; Rand approved the sentence, answered 'yes' to the definition question and ruled on the ANC-015/ANC-017 conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning; Rand approved the sentence, answered 'yes' to the definition question and ruled on the ANC-015/ANC-017 conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: locked. Version 4.
 
-Summary: #786/#720: real Windows gaps reported unless an approved exception
+Summary: [pending definition: approved exception path] #786/#720: real Windows gaps reported unless an approved exception
 
 Scope: The item changes PORT-010 exemptions, classification or suppression in crates/sc-lint-portability.
 
@@ -792,9 +792,9 @@ Anchor: sc-lint's PORT-010 rule must exempt pub POSIX-only #[cfg(unix)] helpers 
 Rand ruling (relayed by team-lead 2026-10-30): "S8 = EXEMPT pub POSIX-only helpers"
 Conflict question (team-lead, 2026-10-30): "ANC-015 against ANC-017. ANC-015 says to report any `cfg(unix)` item with no portable counterpart. ANC-017 says to exempt public POSIX-only helpers that have no Windows counterpart. They overlap" Rand (2026-10-30): "we must have an approved exception path to knowingly opt out."
 
-Said by Rand, Phase M planning; #786 S8 text, Rand's S8 ruling and his ruling on the ANC-015/ANC-017 conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning; #786 S8 text, Rand's S8 ruling and his ruling on the ANC-015/ANC-017 conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: locked. Version 4.
 
-Summary: #786 S8: pub POSIX-only helpers exempt via approved exception
+Summary: [pending definition: approved exception path] #786 S8: pub POSIX-only helpers exempt via approved exception
 
 Scope: The item changes PORT-010 handling of pub items, helper exemptions or exception declarations in crates/sc-lint-portability.
 
@@ -811,7 +811,7 @@ Anchor: By default, sc-lint must run sc_lint.* wheel helper steps on the sc-lint
 > plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
 Conflict question (team-lead, 2026-10-30): "GH-198.runner-argv against GH-198.kit-helpers. The literal rule \"a leading `python` becomes the `runner.python` interpreter\" would also rewrite `python -m sc_lint.*`. The kit-helpers record says those always use the kit interpreter, never overridden." Rand (2026-10-30): "a consumer must have a method to override behavior."
 
-Said by Rand, Phase M planning; #198 issue text (https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b)) plus Rand's ruling on the runner-argv/kit-helpers conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning; #198 issue text (https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (b)) plus Rand's ruling on the runner-argv/kit-helpers conflict, relayed by team-lead 2026-10-30, 2026-10-30. Status: locked. Version 3.
 
 Summary: #198: sc_lint.* helpers default to the kit interpreter
 
@@ -830,7 +830,7 @@ Anchor: When [tool.sc-lint].runner.python names a venv, a leading python in any 
 > (1) a leading `"python"` in any lint **or test** step argv resolves to that venv's interpreter on every OS
 plain `python` steps use `runner.python`; `sc_lint.*` wheel helpers always use the kit interpreter and `runner.python` must never apply to them.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(1),(3) and (b), 2026-10-30. Status: proposed. Version 2.
+Said by atm-core (GitHub issue text), Issue acceptance text: https://github.com/randlee/sc-lint/issues/198#issuecomment-6513016954 (a)(1),(3) and (b), 2026-10-30. Status: locked. Version 3.
 
 Summary: #198: runner.python resolves leading python, except sc_lint.* helpers
 
@@ -849,7 +849,7 @@ Anchor: sc-lint's setup command must itself run atm-core's setup step, building 
 > atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
 Definition question (team-lead, 2026-10-30): "does \"the setup step\" mean building `.bootstrap-venv` by running `just bootstrap`?" Rand: "yes"
 
-Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 3.
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: locked. Version 4.
 
 Summary: #198: sc-lint runs the consumer setup step (just bootstrap)
 
@@ -868,7 +868,7 @@ Anchor: For the atm-core steps that the Justfile recipes _py, sc_lint_clippy_pre
 > atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.
 Definition question (team-lead, 2026-10-30): "is \"the right Python\" the interpreter those three recipes select today, which is `.bootstrap-venv`?" Rand: "yes"
 
-Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30, 2026-10-30. Status: locked. Version 3.
 
 Summary: #198: sc-lint selects the .bootstrap-venv interpreter itself
 
@@ -887,7 +887,7 @@ Anchor: sc-lint's dependency ownership check (global_dependency_ownership) must 
 > sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.
 Definition question (team-lead, 2026-10-30): "is source-only enforcement the default behavior, or an opt-in setting?" Rand: "opt-in"
 
-Said by Rand, Phase M planning; Rand approved the sentence and answered 'opt-in' to the definition question, relayed by team-lead 2026-10-30 (lint-xccm), 2026-10-30. Status: proposed. Version 2.
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'opt-in' to the definition question, relayed by team-lead 2026-10-30 (lint-xccm), 2026-10-30. Status: locked. Version 3.
 
 Summary: #136: opt-in source-only dependency ownership
 

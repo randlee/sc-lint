@@ -24,4 +24,8 @@ The P1 list is #786 and #720 (`PORT-010`), #198 (consumer setup hook and step ru
 
 ## Anchors
 
-Anchors for this plan live in `anchors.json` (record of truth) and are rendered to `anchors.md`. Requirements and ADRs that govern this plan are listed there too, under their own IDs. Per-item anchors quote Rand's approved sentences; GH-* records carry the GitHub issue acceptance text they cite. All are `proposed` until Rand confirms them.
+Anchors for this plan live in `anchors.json` (record of truth) and are rendered to `anchors.md`. Requirements and ADRs that govern this plan are listed there too, under their own IDs. Per-item anchors quote Rand's approved sentences; GH-* records carry the GitHub issue acceptance text they cite. Rand locked the 18 active records on 2026-10-30: "we can lock the anchors, but if tuning requires updating them, they will need to be changed".
+
+**Amend path for a locked anchor.** A change to a locked statement is a new version that needs Rand's approval. It invalidates every earlier gate and tuning run for that anchor, which must be re-run against the new version. A change to the quote (his words) is a new anchor that retires the old one (`retire --replaced-by`).
+
+ANC-018, ANC-020 and ANC-021 are locked but pending definition: Rand has not yet defined the "approved exception path" they rest on. Their summaries say so.
