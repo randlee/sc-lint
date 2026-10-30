@@ -33,7 +33,9 @@ Intent: `docs/plans/phase-m/intent.md`
 | GH-198.runner-path.2 | proposed | #198: runner.python venv dir prepended to every step's PATH | 2026-10-30 |
 | GH-198.export-env.2 | proposed | #198: export PYO3_PYTHON to native steps (Rand scope ruling needed) | 2026-10-30 |
 | GH-136.src-only.2 | proposed | #136: source-only scope setting for global_dependency_ownership | 2026-10-30 |
-| GH-136.audit.2 | proposed | #136: audit the three atm-core keys, file gaps | 2026-10-30 |
+| GH-136.audit.2 | retired | #136: audit the three atm-core keys, file gaps | 2026-10-30 |
+| GH-136.audit-verify | proposed | #136 audit: verify coverage of the three keys | 2026-10-30 |
+| GH-136.audit-gaps | proposed | #136 audit: file a gap per uncovered key | 2026-10-30 |
 
 ## ANC-001
 
@@ -543,7 +545,7 @@ Anchor: For each of manifest_dependency_allowlists, global_dependency_ownership 
 
 > atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
 
-Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body, 2026-10-30. Status: proposed. Version 2.
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body, 2026-10-30. Status: retired. Version 3.
 
 Summary: #136: audit the three atm-core keys, file gaps
 
@@ -554,3 +556,39 @@ Deterministic check to pair with the development gate: Parity table rows for man
 Fixtures:
 - pass: docs/plans/phase-m/boundary-parity.md has one row per key with the sc-lint-boundary test that covers it, and links issue #NNN for each uncovered key.
 - fail: Checks the keys but records gaps only in a doc, with no gap issues filed.
+
+## GH-136.audit-verify
+
+Anchor: For each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules, phase M must verify whether released sc-lint-boundary covers it.
+
+> atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #136 audit: verify coverage of the three keys
+
+Scope: The item audits atm-core [boundaries] keys against sc-lint-boundary or writes a parity table.
+
+Deterministic check to pair with the development gate: Parity table under docs/plans/phase-m/ has a covered/not-covered row with evidence for each of the three keys.
+
+Fixtures:
+- pass: Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered with evidence.
+- fail: Verifies manifest_dependency_allowlists only and assumes the other two keys are covered.
+
+## GH-136.audit-gaps
+
+Anchor: Phase M must file a config-surface gap issue for each of the three atm-core [boundaries] keys that released sc-lint-boundary does not cover.
+
+> atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.
+
+Said by atm-core (GitHub issue text), Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #136 audit: file a gap per uncovered key
+
+Scope: The item files sc-lint-boundary config-surface gap issues or links them from the parity table.
+
+Deterministic check to pair with the development gate: Each not-covered row in the parity table links a filed GitHub issue labelled as a config-surface gap.
+
+Fixtures:
+- pass: Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover and links it from the table.
+- fail: Records uncovered keys in the parity table without filing any gap issues.

@@ -1390,8 +1390,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
-      "status": "proposed",
+      "version": 3,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -1406,6 +1406,102 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:32:52+00:00",
+          "event": "retired",
+          "replaced_by": "GH-136.audit-verify",
+          "reason": "Split into GH-136.audit-verify and GH-136.audit-gaps (one constraint each); never locked"
+        }
+      ]
+    },
+    {
+      "id": "GH-136.audit-verify",
+      "source_type": "REQ",
+      "source_ref": "GH-136.audit-verify",
+      "statement": "For each of manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules, phase M must verify whether released sc-lint-boundary covers it.",
+      "quote": "atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2)",
+      "summary": "#136 audit: verify coverage of the three keys",
+      "scope": "The item audits atm-core [boundaries] keys against sc-lint-boundary or writes a parity table.",
+      "deterministic_check": "Parity table under docs/plans/phase-m/ has a covered/not-covered row with evidence for each of the three keys.",
+      "fixtures": {
+        "pass": [
+          "Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered with evidence."
+        ],
+        "fail": [
+          "Verifies manifest_dependency_allowlists only and assumes the other two keys are covered."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:32:51+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:32:51+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "GH-136.audit-gaps",
+      "source_type": "REQ",
+      "source_ref": "GH-136.audit-gaps",
+      "statement": "Phase M must file a config-surface gap issue for each of the three atm-core [boundaries] keys that released sc-lint-boundary does not cover.",
+      "quote": "atm-core `[boundaries]` config carries manifest_dependency_allowlists, global_dependency_ownership and manifest_section_rules (.just/lint-config.toml). Released sc-lint-boundary has manifest_policy.rs / package_policy.rs (--rule manifests / --rule dependencies, #73). Verify which of the three atm-core keys are covered and file the remainder as config-surface gaps.",
+      "kind": "directive",
+      "stated_by": "atm-core (GitHub issue text)",
+      "stated_at": "2026-10-30",
+      "context": "Issue acceptance text: sc-lint#136 issue body (split from GH-136.audit.2)",
+      "summary": "#136 audit: file a gap per uncovered key",
+      "scope": "The item files sc-lint-boundary config-surface gap issues or links them from the parity table.",
+      "deterministic_check": "Each not-covered row in the parity table links a filed GitHub issue labelled as a config-surface gap.",
+      "fixtures": {
+        "pass": [
+          "Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover and links it from the table."
+        ],
+        "fail": [
+          "Records uncovered keys in the parity table without filing any gap issues."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T02:32:51+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T02:32:51+00:00",
           "event": "updated",
           "fields": [
             "fixtures"

@@ -1,0 +1,44 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "GH-136.audit-verify",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered with evidence.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/plan-20261030T023252Z-fixture_GH-136.audit-verify_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-136.audit-verify",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Verifies manifest_dependency_allowlists only and assumes the other two keys are covered.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/plan-20261030T023252Z-fixture_GH-136.audit-verify_fail_1.json"
+      }
+    ],
+    "mismatches": [],
+    "pass": true,
+    "path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures",
+    "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures",
+    "runs": [
+      "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/plan-20261030T023252Z-fixture_GH-136.audit-verify_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/plan-20261030T023252Z-fixture_GH-136.audit-verify_fail_1.json"
+    ]
+  },
+  "error": null
+}

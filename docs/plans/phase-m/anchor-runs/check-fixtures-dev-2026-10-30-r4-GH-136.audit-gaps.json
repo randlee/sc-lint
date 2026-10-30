@@ -1,0 +1,46 @@
+{
+  "success": true,
+  "data": {
+    "gate": "dev",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "GH-136.audit-gaps",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover and links it from the table.",
+        "verdict": "asserted_only",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/dev-20261030T023253Z-fixture_GH-136.audit-gaps_pass_1.json"
+      },
+      {
+        "anchor_id": "GH-136.audit-gaps",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Records uncovered keys in the parity table without filing any gap issues.",
+        "verdict": "contradicted",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/dev-20261030T023253Z-fixture_GH-136.audit-gaps_fail_1.json"
+      }
+    ],
+    "mismatches": [
+      "GH-136.audit-gaps:pass:1"
+    ],
+    "pass": false,
+    "path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures",
+    "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures",
+    "runs": [
+      "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/dev-20261030T023253Z-fixture_GH-136.audit-gaps_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r4/fixtures/dev-20261030T023253Z-fixture_GH-136.audit-gaps_fail_1.json"
+    ]
+  },
+  "error": null
+}
