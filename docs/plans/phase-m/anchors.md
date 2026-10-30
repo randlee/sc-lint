@@ -17,7 +17,7 @@ Intent: `docs/plans/phase-m/intent.md`
 | ANC-009 | retired | #786/#720: real Windows gaps still reported | 2026-10-30 |
 | ANC-010 | retired | #198: sc-lint runs the consumer setup step | 2026-10-30 |
 | ANC-011 | retired | #198: sc-lint uses the right Python itself | 2026-10-30 |
-| ANC-012 | proposed | #136: dependency ownership on source files only | 2026-10-30 |
+| ANC-012 | retired | #136: dependency ownership on source files only | 2026-10-30 |
 | ANC-013 | retired | #136: record coverage of atm-core's three boundary settings | 2026-10-30 |
 | GH-786.table | retired | #786 table: none of the 47 findings reported | 2026-10-30 |
 | GH-786.S3 | proposed | #720/S3: same-name cfg(not(unix)) sibling, all scopes | 2026-10-30 |
@@ -50,6 +50,7 @@ Intent: `docs/plans/phase-m/intent.md`
 | GH-198.runner-argv.2 | proposed | #198: runner.python resolves leading python, except sc_lint.* helpers | 2026-10-30 |
 | ANC-023 | proposed | #198: sc-lint runs the consumer setup step (just bootstrap) | 2026-10-30 |
 | ANC-024 | proposed | #198: sc-lint selects the .bootstrap-venv interpreter itself | 2026-10-30 |
+| ANC-025 | proposed | #136: opt-in source-only dependency ownership | 2026-10-30 |
 
 ## ANC-001
 
@@ -255,7 +256,7 @@ Anchor: sc-lint's dependency ownership check (global_dependency_ownership) must 
 
 > sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.
 
-Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: proposed. Version 7.
+Said by Rand, Phase M planning; Rand approved this sentence as his words ('yes'), relayed by team-lead 2026-10-30, 2026-10-30. Status: retired. Version 8.
 
 Summary: #136: dependency ownership on source files only
 
@@ -878,3 +879,23 @@ Deterministic check to pair with the development gate: Runner tests with stub in
 Fixtures:
 - pass: sc-lint selects the .bootstrap-venv interpreter itself for atm-core's python steps and clippy, so atm-core deletes _py, sc_lint_clippy_prefix and _sc-lint-clippy. Evidence: runner tests with stub interpreters pass, showing each step got the .bootstrap-venv interpreter with no consumer per-OS path.
 - fail: Leaves atm-core's _py recipe in place because steps still run whatever python is first on PATH.
+
+## ANC-025
+
+Anchor: sc-lint's dependency ownership check (global_dependency_ownership) must limit enforcement to source files only when a consumer opts in through a setting, and otherwise keep checking all files.
+
+> sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.
+Definition question (team-lead, 2026-10-30): "is source-only enforcement the default behavior, or an opt-in setting?" Rand: "opt-in"
+
+Said by Rand, Phase M planning; Rand approved the sentence and answered 'opt-in' to the definition question, relayed by team-lead 2026-10-30 (lint-xccm), 2026-10-30. Status: proposed. Version 2.
+
+Summary: #136: opt-in source-only dependency ownership
+
+Scope: The item changes global_dependency_ownership or SCB-MANIFEST-004 in crates/sc-lint-boundary, or their config keys.
+
+Deterministic check to pair with the development gate: A boundary test shows that, with the source-only setting on, an ownership violation in src/ is reported and the same import in a tests/ target is not; with the setting off, both are reported.
+
+Fixtures:
+- pass: Adds an opt-in source-only dependency ownership setting; with it on, src/ is checked and tests/ is not, and with it off every file is still checked. Evidence: test ownership_source_only passes, showing a tests/ import is reported only when the setting is off.
+- fail: Dependency ownership keeps checking every file, including tests/, and offers no way to limit it to source files.
+- fail: Makes source-only the new default, so tests/ files stop being checked for every consumer without any setting.

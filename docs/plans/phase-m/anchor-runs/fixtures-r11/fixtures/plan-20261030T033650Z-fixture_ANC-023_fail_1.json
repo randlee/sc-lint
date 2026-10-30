@@ -1,0 +1,104 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261030T033650Z-fixture_ANC-023_fail_1",
+  "gate": "plan",
+  "created_at": "2026-10-30T03:36:50+00:00",
+  "anchors_path": "docs/plans/phase-m/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-023:fail:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 76,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-023",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's setup command must itself run atm-core's setup step, building .bootstrap-venv by running just bootstrap, so atm-core's Justfile glue no longer has to.",
+      "quote": "atm-core can delete its Justfile glue (_py, sc_lint_clippy_prefix, _sc-lint-clippy) because sc-lint runs the setup step and uses the right Python itself.\nDefinition question (team-lead, 2026-10-30): \"does \\\"the setup step\\\" mean building `.bootstrap-venv` by running `just bootstrap`?\" Rand: \"yes\"",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'yes' to the definition question, relayed by team-lead 2026-10-30",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": false
+      },
+      "questions_sha256": "45c142d4b4a63bd5c580d2407d06af54171ebec6302dd62d0ba982450416f8cd",
+      "deterministic_check": "A setup test with a configured just bootstrap stub shows sc-lint setup runs it itself, before provisioning.",
+      "kind": "directive",
+      "leaning": "contradicted",
+      "near_threshold": true,
+      "confirmed": true,
+      "verdict": "contradicted",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.86,
+          "probabilities": {
+            "yes": 0.91,
+            "no": 0.08,
+            "unclear": 0.01
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 0.5,
+          "probabilities": {
+            "yes": 0.26,
+            "no": 0.67,
+            "unclear": 0.07
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.91,
+          "probabilities": {
+            "yes": 0.94,
+            "no": 0.05,
+            "unclear": 0.01
+          }
+        }
+      },
+      "min_confidence": 0.5,
+      "explanation": "This bead proposes something the anchor rules out.",
+      "usage": {
+        "input_tokens": 1034,
+        "output_tokens": 117
+      },
+      "attempts": 2,
+      "item_chars_sent": 76,
+      "item_shortened": false,
+      "request_bytes": 3115
+    }
+  ],
+  "summary": {
+    "counts": {
+      "contradicted": 1
+    },
+    "failing": [
+      "ANC-023"
+    ],
+    "leaning_counts": {
+      "contradicted": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": false
+  }
+}

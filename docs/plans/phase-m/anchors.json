@@ -668,8 +668,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 7,
-      "status": "proposed",
+      "version": 8,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -725,6 +725,12 @@
             "statement"
           ],
           "previous_statement": "sc-lint's dependency ownership check (global_dependency_ownership) must be able to run on source files only, excluding test files."
+        },
+        {
+          "at": "2026-10-30T03:36:41+00:00",
+          "event": "retired",
+          "replaced_by": "ANC-025",
+          "reason": "Rand answered the default-vs-setting question 'opt-in' (2026-10-30); quote extended"
         }
       ]
     },
@@ -2486,6 +2492,52 @@
         },
         {
           "at": "2026-10-30T03:34:10+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ANC-025",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's dependency ownership check (global_dependency_ownership) must limit enforcement to source files only when a consumer opts in through a setting, and otherwise keep checking all files.",
+      "quote": "sc-lint enforces dependency ownership on source files only, and we know which of atm-core's three boundary settings it already covers.\nDefinition question (team-lead, 2026-10-30): \"is source-only enforcement the default behavior, or an opt-in setting?\" Rand: \"opt-in\"",
+      "kind": "directive",
+      "stated_by": "Rand",
+      "stated_at": "2026-10-30",
+      "context": "Phase M planning; Rand approved the sentence and answered 'opt-in' to the definition question, relayed by team-lead 2026-10-30 (lint-xccm)",
+      "summary": "#136: opt-in source-only dependency ownership",
+      "scope": "The item changes global_dependency_ownership or SCB-MANIFEST-004 in crates/sc-lint-boundary, or their config keys.",
+      "deterministic_check": "A boundary test shows that, with the source-only setting on, an ownership violation in src/ is reported and the same import in a tests/ target is not; with the setting off, both are reported.",
+      "fixtures": {
+        "pass": [
+          "Adds an opt-in source-only dependency ownership setting; with it on, src/ is checked and tests/ is not, and with it off every file is still checked. Evidence: test ownership_source_only passes, showing a tests/ import is reported only when the setting is off."
+        ],
+        "fail": [
+          "Dependency ownership keeps checking every file, including tests/, and offers no way to limit it to source files.",
+          "Makes source-only the new default, so tests/ files stop being checked for every consumer without any setting."
+        ]
+      },
+      "question_overrides": {},
+      "version": 2,
+      "status": "proposed",
+      "promoted_to": null,
+      "beads": {
+        "anchor": null,
+        "plan_questions": null,
+        "dev_questions": null
+      },
+      "history": [
+        {
+          "at": "2026-10-30T03:36:41+00:00",
+          "event": "created",
+          "status": "proposed"
+        },
+        {
+          "at": "2026-10-30T03:36:41+00:00",
           "event": "updated",
           "fields": [
             "fixtures"

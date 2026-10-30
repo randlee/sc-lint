@@ -11,7 +11,7 @@ The P1 list is #786 and #720 (`PORT-010`), #198 (consumer setup hook and step ru
 ## What success looks like
 
 - On a release that includes Phase M, atm-core can remove its `PORT-010` exclusions for the #786 paths and the #720 same-name sibling shape in every scope, while real cross-platform parity gaps are still reported (ANC-014, ANC-018, ANC-020, ANC-021, GH-786.S3).
-- atm-core can drop its local source-only ownership checker, because `global_dependency_ownership` offers a source-only scope (ANC-012, GH-136.src-only.2).
+- atm-core can drop its local source-only ownership checker, because `global_dependency_ownership` offers an opt-in source-only scope, with all-files checking still the default (ANC-025, GH-136.src-only.2).
 - Each of atm-core's three `[boundaries]` keys has a recorded coverage verdict, and every remaining gap has an issue (ANC-016, GH-136.audit-verify, GH-136.audit-gaps).
 - Conditional on a new ADR approved by Rand that supersedes ADR-020 decisions 9 and 13 and REQ-CLI-021: atm-core can delete its `_py`, `sc_lint_clippy_prefix`, `_sc-lint-clippy` and `_sc-lint-py` Justfile glue for #198 (ANC-023, ANC-024, ANC-019, ANC-022, GH-198.*).
 - Each sprint traces to its GitHub issue and carries a deterministic regression for the reported consumer failure.
