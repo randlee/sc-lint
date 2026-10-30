@@ -641,15 +641,12 @@ pub(crate) fn execute(
         CommandId::Docs => Ok(CommandSuccess::direct(crate::docs::run(
             context.docs_request(),
         )?)),
-        CommandId::Setup => Ok(CommandSuccess::direct(installer::run_setup(
+        CommandId::Setup | CommandId::Upgrade => execute_installer_with_version_probe(
+            context,
             loaded_config,
-            context.setup_dry_run(),
-        )?)),
-        CommandId::Upgrade => Ok(CommandSuccess::direct(installer::run_upgrade(
-            loaded_config,
-            context.upgrade_check(),
-            context.upgrade_dry_run(),
-        )?)),
+            |binary| installer::probe_version(binary).ok(),
+            installer::managed_payload_complete,
+        ),
         CommandId::Init => Ok(CommandSuccess::direct(crate::config::run_consumer_init(
             context.consumer_init_request(),
         )?)),
@@ -698,6 +695,49 @@ pub(crate) fn execute(
         CommandId::ClippyXwin => workflow::run_clippy(loaded_config, crate::ClippyTarget::Xwin),
         CommandId::Ci => workflow::run_ci(loaded_config),
     }
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "Installer dispatch tests preserve the product's top-level CliError contract."
+)]
+fn execute_installer_with_version_probe(
+    context: &CommandContext,
+    loaded_config: &LoadedConfig,
+    version_probe: impl Fn(&std::path::Path) -> Option<semver::Version>,
+    payload_complete: impl Fn(&std::path::Path) -> bool,
+) -> Result<CommandSuccess, CliError> {
+    match context.id() {
+        CommandId::Setup => Ok(CommandSuccess::direct(installer::run_with_probes(
+            loaded_config,
+            false,
+            context.setup_dry_run(),
+            version_probe,
+            payload_complete,
+        )?)),
+        CommandId::Upgrade => Ok(CommandSuccess::direct(installer::run_with_probes(
+            loaded_config,
+            context.upgrade_check(),
+            context.upgrade_dry_run(),
+            version_probe,
+            payload_complete,
+        )?)),
+        _ => panic!("version-probe dispatch is only for installer commands"),
+    }
+}
+
+#[cfg(test)]
+#[expect(
+    clippy::result_large_err,
+    reason = "Installer dispatch tests preserve the product's top-level CliError contract."
+)]
+pub(crate) fn execute_installer_with_test_probes(
+    context: &CommandContext,
+    loaded_config: &LoadedConfig,
+    version_probe: impl Fn(&std::path::Path) -> Option<semver::Version>,
+    payload_complete: impl Fn(&std::path::Path) -> bool,
+) -> Result<CommandSuccess, CliError> {
+    execute_installer_with_version_probe(context, loaded_config, version_probe, payload_complete)
 }
 
 #[expect(
