@@ -495,14 +495,14 @@
       "deterministic_check": "A setup test with a stub configured command shows sc-lint runs it with no consumer Justfile recipe.",
       "fixtures": {
         "pass": [
-          "Test setup_runs_configured_step shows sc-lint setup runs the consumer's configured setup command with no Justfile recipe; it passes, and atm-core's setup recipe is deleted in the adoption diff."
+          "sc-lint setup runs the consumer's configured setup step itself, so atm-core deletes its Justfile setup recipe. Evidence: test setup_runs_configured_step passes, showing the configured stub command ran during sc-lint setup with no Justfile recipe."
         ],
         "fail": [
           "Documents that consumers keep a Justfile recipe to run their own setup before sc-lint."
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -525,6 +525,13 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -547,14 +554,14 @@
       "deterministic_check": "Runner tests with stub interpreters show each atm-core step class gets its intended interpreter with no consumer per-OS path.",
       "fixtures": {
         "pass": [
-          "Runner tests with stub interpreters show python steps use the repo venv and clippy gets PYO3_PYTHON; the adoption diff deletes _py, sc_lint_clippy_prefix and _sc-lint-clippy."
+          "sc-lint picks the repo venv interpreter for atm-core's python steps and clippy itself, so atm-core deletes _py, sc_lint_clippy_prefix and _sc-lint-clippy. Evidence: runner tests with stub interpreters pass, showing each step got the venv interpreter with no consumer per-OS path."
         ],
         "fail": [
           "Leaves atm-core's _py recipe in place because steps still run whatever python is first on PATH."
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -577,6 +584,13 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -599,14 +613,14 @@
       "deterministic_check": "A boundary test shows an ownership violation in src/ is reported and the same import in a tests/ target is not, under the source-only setting.",
       "fixtures": {
         "pass": [
-          "Test ownership_source_only reports an ownership violation in src/ and not the same import in tests/ under the source-only setting; it passes."
+          "Adds a source-only dependency ownership setting that checks src/ files and not tests/. Evidence: test ownership_source_only passes, showing a src/ violation is reported and the same import in tests/ is not."
         ],
         "fail": [
-          "Tells atm-core to list its tests/ directories as allowed source roots to silence ownership findings."
+          "Dependency ownership keeps checking every file, including tests/, and offers no way to limit it to source files."
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 5,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -629,6 +643,20 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:57+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -747,14 +775,14 @@
       "deterministic_check": "port010 fixtures for module, inherent-impl and crate-root same-name cfg(unix)/cfg(not(unix)) pairs report nothing.",
       "fixtures": {
         "pass": [
-          "Fixtures port010/same_name_sibling/{module,inherent_impl,crate_root} each pair cfg(unix) and cfg(not(unix)) fns; test port010_same_name_sibling reports zero findings for all three and passes."
+          "PORT-010 stops reporting a cfg(unix) item that has a same-name cfg(not(unix)) sibling in a module, an inherent impl or the crate root. Evidence: test port010_same_name_sibling passes, showing zero findings for fixtures of all three scopes."
         ],
         "fail": [
           "Exempts the crate-root main.rs pair only; module and inherent-impl siblings are still reported."
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -777,6 +805,13 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -850,14 +885,14 @@
       "deterministic_check": "Injected-platform argv tests: bin/python on Unix, Scripts\\python.exe on Windows, for both a lint step and a test step.",
       "fixtures": {
         "pass": [
-          "Test runner_python_argv asserts a leading python in a lint step and a test step resolves to .venv/bin/python on unix and .venv\\Scripts\\python.exe on windows; it passes."
+          "With runner.python set, a leading python in any lint or test step runs that venv's interpreter on every OS. Evidence: test runner_python_argv passes, showing .venv/bin/python on unix and .venv\\Scripts\\python.exe on windows for a lint step and a test step."
         ],
         "fail": [
           "Applies runner.python to lint steps only; test steps still run python from PATH."
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -880,6 +915,13 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -953,14 +995,14 @@
       "deterministic_check": "A runner test with runner.python set shows an sc_lint.lint_cargo_deny step still resolves to the kit venv interpreter.",
       "fixtures": {
         "pass": [
-          "Test kit_helpers_ignore_runner_python sets runner.python and asserts an sc_lint.lint_cargo_deny step still resolves to the kit venv interpreter; it passes."
+          "sc_lint.* wheel helper steps always run on the kit interpreter, and runner.python is never applied to them. Evidence: test kit_helpers_ignore_runner_python passes, showing sc_lint.lint_cargo_deny resolves to the kit venv with runner.python set."
         ],
         "fail": [
           "Applies runner.python to every step, including sc_lint.lint_cargo_deny."
         ]
       },
       "question_overrides": {},
-      "version": 3,
+      "version": 4,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -983,6 +1025,13 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -1203,14 +1252,14 @@
       "deterministic_check": "Config-parse test accepts [tool.sc-lint].setup.pre; a stub-command test records it ran before provisioning.",
       "fixtures": {
         "pass": [
-          "Test setup_pre_runs_before_provisioning configures setup.pre = [stub], runs just setup, and asserts the stub's recorded timestamp precedes provisioning; it passes."
+          "[tool.sc-lint].setup.pre takes an argv that just setup runs before sc-lint provisioning. Evidence: test setup_pre_runs_before_provisioning passes, showing the stub command ran before provisioning started."
         ],
         "fail": [
           "Runs setup.pre after sc-lint provisioning has finished."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -1226,6 +1275,13 @@
         },
         {
           "at": "2026-10-30T02:31:23+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -1248,14 +1304,14 @@
       "deterministic_check": "A step-environment test with injected platform shows PATH starts with the venv bin or Scripts directory for a python step and a native step.",
       "fixtures": {
         "pass": [
-          "Test runner_python_prepends_path asserts PATH starts with .venv/bin on unix and .venv\\Scripts on windows for both a python step and a cargo step; it passes."
+          "With runner.python set, sc-lint prepends the venv's bin (Scripts on Windows) directory to every step's PATH. Evidence: test runner_python_prepends_path passes, showing PATH starts with the venv directory for a python step and a cargo step."
         ],
         "fail": [
           "Rewrites only the leading python argv, so a helper that spawns python picks up the PATH interpreter."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -1271,6 +1327,13 @@
         },
         {
           "at": "2026-10-30T02:31:23+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -1293,14 +1356,14 @@
       "deterministic_check": "A step-environment test shows a cargo clippy step receives PYO3_PYTHON set to the runner.python interpreter when configured.",
       "fixtures": {
         "pass": [
-          "Test runner_export_env_pyo3 configures runner.export_env = [\"PYO3_PYTHON\"] and asserts a cargo clippy step's env has PYO3_PYTHON = the venv interpreter path; it passes."
+          "sc-lint can export the runner.python interpreter as PYO3_PYTHON to native steps such as cargo clippy. Evidence: test runner_export_env_pyo3 passes, showing the clippy step's env has PYO3_PYTHON set to the venv interpreter."
         ],
         "fail": [
           "Leaves PYO3_PYTHON unset for clippy, so atm-core keeps sc_lint_clippy_prefix."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -1316,6 +1379,13 @@
         },
         {
           "at": "2026-10-30T02:31:23+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -1338,14 +1408,14 @@
       "deterministic_check": "Boundary test reproducing the #136 tree: the seven crates/*/tests/ findings disappear under the setting and crates/atm/src/commands/mod.rs is still reported.",
       "fixtures": {
         "pass": [
-          "Test issue136_source_only_scope reproduces the #136 tree: with the setting, the seven crates/*/tests/ findings are gone and crates/atm/src/commands/mod.rs is still reported; it passes."
+          "global_dependency_ownership gains a source-only scope setting that checks src/**/*.rs and not integration-test targets, with no roots or excludes added. Evidence: test issue136_source_only_scope passes, showing the seven crates/*/tests/ findings gone and crates/atm/src/commands/mod.rs still reported."
         ],
         "fail": [
           "Adds atm-core's tests/ directories to allowed_source_roots instead of adding a setting."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -1361,6 +1431,13 @@
         },
         {
           "at": "2026-10-30T02:31:24+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -1434,14 +1511,14 @@
       "deterministic_check": "Parity table under docs/plans/phase-m/ has a covered/not-covered row with evidence for each of the three keys.",
       "fixtures": {
         "pass": [
-          "Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered with evidence."
+          "Verifies each of the three atm-core keys against released sc-lint-boundary and records covered or not covered. Evidence: docs/plans/phase-m/boundary-parity.md has one row per key citing the sc-lint-boundary test or code that covers it."
         ],
         "fail": [
           "Verifies manifest_dependency_allowlists only and assumes the other two keys are covered."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -1457,6 +1534,13 @@
         },
         {
           "at": "2026-10-30T02:32:51+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"
@@ -1479,14 +1563,14 @@
       "deterministic_check": "Each not-covered row in the parity table links a filed GitHub issue labelled as a config-surface gap.",
       "fixtures": {
         "pass": [
-          "Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover and links it from the table."
+          "Files one config-surface gap issue for each atm-core key that sc-lint-boundary does not cover. Evidence: each not-covered row in docs/plans/phase-m/boundary-parity.md links its filed GitHub issue number."
         ],
         "fail": [
           "Records uncovered keys in the parity table without filing any gap issues."
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "proposed",
       "promoted_to": null,
       "beads": {
@@ -1502,6 +1586,13 @@
         },
         {
           "at": "2026-10-30T02:32:51+00:00",
+          "event": "updated",
+          "fields": [
+            "fixtures"
+          ]
+        },
+        {
+          "at": "2026-10-30T02:33:43+00:00",
           "event": "updated",
           "fields": [
             "fixtures"

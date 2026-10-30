@@ -1,0 +1,46 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "dry_run": false,
+    "fixture": false,
+    "checks": [
+      {
+        "anchor_id": "ANC-012",
+        "kind": "pass",
+        "index": 1,
+        "sentence": "Adds a source-only dependency ownership setting that checks src/ files and not tests/. Evidence: test ownership_source_only passes, showing a src/ violation is reported and the same import in tests/ is not.",
+        "verdict": "satisfied",
+        "expected": [
+          "satisfied"
+        ],
+        "expected_ok": true,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r5b/fixtures/plan-20261030T023358Z-fixture_ANC-012_pass_1.json"
+      },
+      {
+        "anchor_id": "ANC-012",
+        "kind": "fail",
+        "index": 1,
+        "sentence": "Dependency ownership keeps checking every file, including tests/, and offers no way to limit it to source files.",
+        "verdict": "underspecified",
+        "expected": [
+          "not_addressed",
+          "contradicted"
+        ],
+        "expected_ok": false,
+        "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r5b/fixtures/plan-20261030T023358Z-fixture_ANC-012_fail_1.json"
+      }
+    ],
+    "mismatches": [
+      "ANC-012:fail:1"
+    ],
+    "pass": false,
+    "path": "docs/plans/phase-m/anchor-runs/fixtures-r5b/fixtures",
+    "run_path": "docs/plans/phase-m/anchor-runs/fixtures-r5b/fixtures",
+    "runs": [
+      "docs/plans/phase-m/anchor-runs/fixtures-r5b/fixtures/plan-20261030T023358Z-fixture_ANC-012_pass_1.json",
+      "docs/plans/phase-m/anchor-runs/fixtures-r5b/fixtures/plan-20261030T023358Z-fixture_ANC-012_fail_1.json"
+    ]
+  },
+  "error": null
+}
