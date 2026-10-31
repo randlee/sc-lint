@@ -24,9 +24,10 @@ The atm-core P1 issues show the pattern:
   `self::cron::`, `super::cron::` and `crate::cron::` as imports of the `cron`
   crate. Owner `tests/` targets are expressed today by per-entry
   `allowed_source_roots`.
-- **#786/#720.** PORT-010 needs to recognise valid companion shapes. For a
-  deliberate POSIX-only public helper (S8), sc-lint has no narrow per-site
-  allowance outside the boundary analyzer.
+- **#786/#720.** PORT-010 misses two common companion forms (a same-name
+  `#[cfg(not(unix))]` sibling and a `#[cfg(unix)] mod x;` file). For the
+  remaining shapes and for deliberate POSIX-only helpers, sc-lint has no
+  narrow per-site allowance outside the boundary analyzer.
 
 Meanwhile REQ-CLI-021, ADR-012 and ADR-016 fix entry points, recipe shapes
 and interpreter choice. That is orchestration, and it is where most
@@ -53,28 +54,18 @@ consumer friction arises.
    | CLI flags | per-invocation selection (`--config`, `--profile`, `--platform-scope`, `--rule-filter`, `--fail-fast`, `--list`) |
    | Environment variables | binary and install location only (`SC_LINT_BIN`, `SC_LINT_INSTALL_DIR`, `SC_LINT_RELEASE_BASE_URL`) |
 
-   A new consumer setting goes on one of these surfaces. Adding a surface
-   needs an ADR.
+   A new consumer setting goes on one of these surfaces.
 
-3. **Consistency rules.**
-   1. Every surface rejects unknown keys with the same typed error, naming the
-      surface, the key and the accepted keys. This includes the top-level
-      analyzer tables (`[portability]`, `[line_counts]`, ...) the CLI passes
-      through today.
-   2. Parallel constructs accept parallel keys. A lint step and a test command
-      selector accept the same execution keys: `command`, `env`, `cwd`,
-      platform restriction and `after_all`.
-   3. Precedence is fixed: a CLI flag overrides `sc-lint.toml`, which overrides
-      the product default. A source attribute governs only its own item.
-   4. Every exclusion or allowance carries a `reason` that sc-lint records in
-      its output. An exclusion with no reason is a configuration error.
+3. **Parallel keys.** A lint step and a test command selector accept the same
+   execution keys: `command`, `env`, `cwd`, platform restriction and
+   `after_all`.
 
-4. **Allowances.** Every rule an analyzer reports from source can be allowed
-   at a single site with `#[sc_lint(allow(<RULE>), reason = "...")]`. A
-   site allowance is the approved exception path for a deliberate,
-   non-parity case such as #786 S8. Blanket suppression stays out of scope:
-   there is no repository-wide switch that disables a rule's findings without
-   naming paths or sites.
+4. **PORT-010 site allowance.** PORT-010 can be allowed at a single site with
+   `#[sc_lint(allow(PORT-010), reason = "...")]`. This is the exception path
+   for a deliberate POSIX-only item or a companion shape PORT-010 does not
+   recognise. The report lists each honoured allowance with its reason. There
+   is no repository-wide switch that disables a rule without naming paths or
+   sites.
 
 5. **Managed files are templates, not requirements.** `.sc-lint/bootstrap.py`,
    the managed `Justfile` block and the generated `sc-lint.toml` are a
@@ -91,7 +82,7 @@ consumer friction arises.
 
 If accepted:
 
-- **ADR-016 "How To Extend".** Unchanged. Decision 3.2 enforces its
+- **ADR-016 "How To Extend".** Unchanged. Decision 3 enforces its
   "per-step/per-layer `env`" promise on lint steps.
 - **ADR-020 decision 9.** The outcome stands: `setup.pre` and `runner.python`
   are not added. The reason becomes decision 6 here.
@@ -104,16 +95,14 @@ If accepted:
 - **ADR-012 and REQ-CLI-021.** The required recipe shapes, the `python` /
   `python3` choice and bootstrap-only entry become properties of the
   managed template (decision 5), not consumer obligations.
-- **REQ-PRODUCT-023.** `reason` changes from accepted-and-ignored to
-  required and reported (decision 3.4).
 - **Directive grammar** (`docs/sc-lint-directives/requirements.md`). `allow`
-  is extended from the boundary scope to every source-scanning analyzer
-  (decision 4). The existing grammar stays backward compatible.
+  is extended from the boundary scope to PORT-010 (decision 4). The existing
+  grammar stays backward compatible.
 
 ## Consequences
 
 - #198 reduces to adding `env` and `cwd` to lint steps.
 - #136 reduces to fixing the local-module false positive in SCB-MANIFEST-004
   and documenting owner `tests/` roots in `allowed_source_roots`.
-- #786 S8 has a defined exception path.
-- Unknown-key handling becomes one shared check.
+- #786 shapes PORT-010 does not recognise, including S8, have a defined
+  exception path.

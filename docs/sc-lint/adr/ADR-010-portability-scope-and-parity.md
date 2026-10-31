@@ -101,69 +101,31 @@ repo-configured suppression of production portability leaf rules. See
 | Status | Pending (Rand) |
 | Source | #720, #786 ([shape table](https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641)); ADR-022 |
 
-This amendment extends Decision 6. The structural parity rule (PORT-010)
-recognizes the shapes below as a companion or portable fallback and does not
-report the `#[cfg(unix)]` item. All matching is syntactic over the package
-source; there is no rustc or cargo subprocess, no Boolean cfg equivalence and
-no name heuristic.
-
-- **Reported items.** PORT-010 reports `fn` items, `mod` declarations and
-  inherent `impl` methods. A shape suppresses the finding on one of these.
-- **Gated.** A Unix gate is `#[cfg(unix)]` or `#[cfg(any(unix, test))]`. A
-  non-Unix gate is `#[cfg(windows)]`, `#[cfg(not(unix))]`,
-  `#[cfg(any(windows, test))]` or `#[cfg(any(not(unix), test))]`. The `test`
-  alternative keeps the item in production builds on that platform, so it
-  counts. Stacked predicates, `all(...)` and `not(windows)` do not count.
-- **References.** A reference from code gated `#[cfg(test)]`, inside a
-  `#[cfg(test)]` module, or in a `#[test]` function is ignored. A shape that
-  needs "at least one reference" needs one production reference.
+This amendment extends Decision 6. PORT-010 recognises the two shapes below
+and does not report the `#[cfg(unix)]` item. Matching is syntactic; there is
+no rustc or cargo subprocess, no Boolean cfg equivalence and no name
+heuristic.
 
 1. **S3, same-name sibling.** A non-test item of the same kind and name gated
-   `#[cfg(not(unix))]` or `#[cfg(any(not(unix), test))]` in the same lexical scope: crate root, inline module,
+   `#[cfg(not(unix))]` in the same lexical scope: crate root, inline module,
    file module or the same inherent `impl` block. Trait impls keep their
    existing treatment.
-2. **S1, helper of paired callers.** A private or `pub(crate)` helper with at
-   least one reference, where every reference resolves to a call inside a
-   Unix-gated item that itself has a companion by any rule in this amendment,
-   including S1. S1 is computed as a fixed point over the package; a cycle
-   with no other companion gives no proof. Resolved forms are direct path calls through `use` aliases,
-   `self::`, `crate::`, `super::`, `Self::` and `Type::`. Method-receiver
-   calls, function pointers and calls inside macro token streams are
-   unresolved.
-3. **S5, helper inside cfg blocks.** A helper with at least one reference,
-   where every reference sits inside a `#[cfg(unix)]`-attributed block,
-   statement or expression of a function whose body also has a
-   `#[cfg(not(unix))]`-attributed block or statement. `cfg!()` does not count.
-   S5 has no visibility restriction.
-4. **S2, renamed companion.** A Unix-gated function and a non-Unix-gated
-   function with the same return type; parameters may differ. Each is called only from the matching gated branch of
-   one caller. The caller may be one function with gated blocks or a gated
-   item pair from S3. Neither function is called from anywhere else.
-5. **S4, portable sibling.** A Unix-gated transport or adapter function whose
-   every production reference is in a Unix-gated branch of one caller, where
-   that caller's non-Unix branch calls an un-gated function or constructs an
-   un-gated enum variant instead (for example loopback TCP). When the caller
-   dispatches through a `match`, the Unix-gated arm calls the function and an
-   un-gated arm handles the alternative. The reported item is the function;
-   match arms are never reported themselves.
-6. **S7, rejected configuration.** A `#[cfg(unix)]` accessor of a
-   configuration type `T`, with a `#[cfg(not(unix))]` function or block in
-   the same scope that takes `T` (as a parameter or `Self`) and whose every
-   return path is `Err(..)`.
-7. **S6, unix-only module.** The declaration `#[cfg(unix)] mod x;` and the
-   `#[cfg(unix)]` items inside that module tree. Out-of-line resolution
-   follows `x.rs`, `x/mod.rs` and `#[path]`. An item in a module that is
-   compiled on Windows is not covered.
+2. **S6, unix-only module.** The declaration `#[cfg(unix)] mod x;` and the
+   items inside that module's files, which are never compiled on Windows.
+   Out-of-line resolution follows `x.rs`, `x/mod.rs` and `#[path]`. An item in
+   a module that is compiled on Windows is not covered.
 
-**Fail closed.** An unresolved reference, an ambiguous match or a missing
-module file gives no proof, and the finding stays. A production
-`#[cfg(unix)]` item with no companion and no portable fallback is still
-reported.
+**Fail closed.** A missing or ambiguous module file gives no proof, and the
+finding stays. A production `#[cfg(unix)]` item with no companion and no
+portable fallback is still reported.
 
-**Per-site allowance.** A deliberate POSIX-only item with no parity concept
-(#786 S8) uses `#[sc_lint(allow(PORT-010), reason = "...")]` from ADR-022
-decision 4. The report lists each honored allowance with its reason.
+**Everything else uses a site allowance.** The other #786 shapes (helpers of
+paired callers, helpers inside cfg blocks, renamed companions, portable
+siblings, rejected configuration) and deliberate POSIX-only items use
+`#[sc_lint(allow(PORT-010), reason = "...")]` (ADR-022 decision 4). These
+shapes depend on call-graph analysis that would grow PORT-010's heuristics
+and could hide real gaps; a reasoned allowance at the site is cheaper and
+explicit.
 
 **Open for Rand.** Whether S6 covers `pub` modules and `pub` items, or only
-non-public modules, with `pub` ones needing a site allowance. Withdrawn
-ADR-021 decision 7 would have kept S6 reported.
+non-public modules, with `pub` ones needing a site allowance.
