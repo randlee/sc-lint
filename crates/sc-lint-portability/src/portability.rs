@@ -44,12 +44,16 @@ use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
+use sc_lint_schema::AllowedFinding;
 
-mod findings;
+pub(super) mod findings;
 mod parity;
 
 use self::findings::PortabilityFinding;
 use self::findings::convert_findings;
+
+type AnalyzedFinding = (Finding, Option<RepoRelativePath>);
+type PortabilityAnalysis = (Vec<AnalyzedFinding>, Vec<AllowedFinding<RuleId>>);
 
 pub(super) fn repo_relative_source_path(
     root: &Path,
@@ -174,7 +178,7 @@ pub(crate) fn analyze_portability(
     _settings: &AnalyzerSettings,
     analyzer_keys: &AnalyzerPortabilityKeys,
     platform_adapters: &platform_adapters::PlatformAdapters,
-) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
+) -> Result<PortabilityAnalysis> {
     let config = load_portability_config(document, analyzer_keys)?;
     let source_files = discover_source_files_with_metadata(workspace)?;
     let file_findings = source_files
@@ -193,6 +197,10 @@ pub(crate) fn analyze_portability(
                 )
             })?;
 
+            let allowances =
+                crate::site_allow::collect_site_allowances(&parsed, &file_context.source_path)
+                    .map_err(anyhow::Error::new)?;
+
             let mut collector = PortabilityCollector::new(file_context, &config);
             collector.visit_file_items(&parsed);
             let mut findings = collector.findings;
@@ -202,14 +210,23 @@ pub(crate) fn analyze_portability(
                 &config,
                 platform_adapters,
             ));
-            Ok(findings)
+            Ok((findings, allowances))
         })
-        .collect::<Vec<Result<Vec<_>>>>()
+        .collect::<Vec<Result<_>>>()
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
-    let findings = file_findings.into_iter().flatten().collect();
-
-    convert_findings(root, findings)
+    let mut findings = Vec::new();
+    let mut allowances = Vec::new();
+    for (file_findings, file_allowances) in file_findings {
+        findings.extend(file_findings);
+        allowances.extend(file_allowances);
+    }
+    let (findings, mut allowed) = crate::site_allow::apply_site_allowances(findings, allowances);
+    for entry in &mut allowed {
+        entry.source_path =
+            repo_relative_source_path(root, Path::new(&entry.source_path))?.to_string();
+    }
+    Ok((convert_findings(root, findings)?, allowed))
 }
 
 pub(crate) fn count_scanned_crates(workspace: &WorkspaceMetadata) -> usize {

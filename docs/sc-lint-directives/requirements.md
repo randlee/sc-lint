@@ -10,6 +10,11 @@ The crate provides one canonical parse model for supported source directives.
   analyzer-to-analyzer dependencies.
 - `REQ-SCB-001` through `REQ-SCB-007` define the boundary directives and
   validation behavior consumed by this crate.
+- ADR-022 decision 4 adds item-scoped portability syntax
+  `allow(PORT-010), reason = "..."`, represented as `Directive::SiteAllow`
+  separately from boundary `Allow`. Boundary analysis ignores site allowances
+  and portability ignores boundary-scoped directives. The literal reason must
+  be non-empty, and the exception never cascades to child items.
 
 ## Scope Rules
 

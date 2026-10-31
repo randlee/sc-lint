@@ -97,6 +97,7 @@ fn machine_report_matches_frozen_json_contract() {
         schema_version: "0.1.0",
         status: ReportStatus::Fail,
         scanned_crates: 1,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: RuleId::ScbRuntime001,
             kind: "contract_fixture".into(),
@@ -126,6 +127,7 @@ fn findings_report_text_is_stable() {
         schema_version: "0.1.0",
         status: ReportStatus::Pass,
         scanned_crates: 2,
+        allowed: Vec::new(),
         findings: Vec::new(),
     };
     assert_eq!(
@@ -142,6 +144,7 @@ fn findings_report_text_renders_failure_status_and_count() {
         schema_version: "0.1.0",
         status: ReportStatus::Fail,
         scanned_crates: 3,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: RuleId::ScbRuntime001,
             kind: "condvar_wait".into(),

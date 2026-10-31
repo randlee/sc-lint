@@ -4,6 +4,7 @@ use sc_lint_schema::NodeId;
 use sc_lint_schema::OwnerId;
 use sc_lint_schema::ReportStatus;
 use sc_lint_schema::analyzer_report_schema;
+use sc_lint_schema::analyzer_report_v1_schema;
 use sc_lint_schema::validate_analyzer_report;
 
 #[test]
@@ -29,6 +30,7 @@ fn findings_report_matches_frozen_json_contract() {
         schema_version: "0.1.0",
         status: ReportStatus::Fail,
         scanned_crates: 1,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: "RULE-001",
             kind: "contract_fixture".into(),
@@ -105,9 +107,50 @@ fn published_analyzer_report_schema_rejects_unknown_keys() {
     // Mutation check: the same documents pass once `additionalProperties: false`
     // is removed, so the rejections above come from those two keywords.
     let mut relaxed: serde_json::Value =
-        serde_json::from_str(analyzer_report_schema()).expect("published schema is JSON");
+        serde_json::from_str(analyzer_report_v1_schema()).expect("v1 schema is JSON");
     without_additional_properties(&mut relaxed);
     let relaxed = jsonschema::validator_for(&relaxed).expect("relaxed schema compiles");
     assert!(relaxed.is_valid(&top_level));
     assert!(relaxed.is_valid(&in_finding));
+}
+
+#[test]
+fn analyzer_report_v1_and_v2_dispatch_preserve_closed_contracts() {
+    let v1: serde_json::Value = serde_json::from_str(include_str!("fixtures/findings-report.json"))
+        .expect("v1 fixture is JSON");
+    let v2: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/findings-report-v2.json"))
+            .expect("v2 fixture is JSON");
+    assert_eq!(validate_analyzer_report(&v1), Ok(()));
+    assert_eq!(validate_analyzer_report(&v2), Ok(()));
+
+    let v1_schema: serde_json::Value = serde_json::from_str(analyzer_report_v1_schema()).unwrap();
+    let old_validator = jsonschema::validator_for(&v1_schema).unwrap();
+    assert!(
+        !old_validator.is_valid(&v2),
+        "the strict v1 validator rejects v2's allowed property"
+    );
+
+    let mut unknown = v2.clone();
+    unknown["allowed"][0]["unexpected"] = serde_json::json!(true);
+    assert!(validate_analyzer_report(&unknown).is_err());
+    let mut malformed = v2;
+    malformed["allowed"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("reason");
+    let error = validate_analyzer_report(&malformed).expect_err("allowed entries require reasons");
+    assert!(error.instance_path.starts_with("/allowed/0"), "{error}");
+}
+
+#[test]
+fn v1_rejects_allowed_and_unknown_versions_are_rejected() {
+    let mut v1: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/findings-report.json"))
+            .expect("v1 fixture is JSON");
+    v1["allowed"] = serde_json::json!([]);
+    assert!(validate_analyzer_report(&v1).is_err());
+    v1["schema_version"] = serde_json::json!("0.3.0");
+    let error = validate_analyzer_report(&v1).expect_err("unknown schema versions fail");
+    assert_eq!(error.instance_path, "/schema_version");
 }

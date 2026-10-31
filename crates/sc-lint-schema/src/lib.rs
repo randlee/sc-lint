@@ -7,7 +7,10 @@ mod adapter_payload;
 mod analyzer_report;
 
 pub use adapter_payload::{PayloadDrift, validate_adapter_payload};
-pub use analyzer_report::{AnalyzerReportDrift, analyzer_report_schema, validate_analyzer_report};
+pub use analyzer_report::{
+    AnalyzerReportDrift, analyzer_report_schema, analyzer_report_v1_schema,
+    validate_analyzer_report,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -244,6 +247,21 @@ where
     pub status: ReportStatus,
     pub scanned_crates: usize,
     pub findings: Vec<Finding<R>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub allowed: Vec<AllowedFinding<R>>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct AllowedFinding<R>
+where
+    R: Serialize,
+{
+    pub rule_id: R,
+    pub reason: String,
+    pub source_path: String,
+    pub line: usize,
+    pub owner_ids: Vec<OwnerId>,
+    pub node_ids: Vec<NodeId>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]

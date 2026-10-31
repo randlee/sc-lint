@@ -141,6 +141,7 @@ fn text_report_rendering_is_shared_and_stable() {
         schema_version: "0.1.0",
         status: ReportStatus::Pass,
         scanned_crates: 2,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: TestRule::Shared,
             kind: FindingKind::new("shared"),

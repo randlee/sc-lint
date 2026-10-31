@@ -163,6 +163,7 @@ fn disabled_report() -> FindingsReport {
         schema_version: SC_LINT_SCHEMA_VERSION,
         status: ReportStatus::Pass,
         scanned_crates: 0,
+        allowed: Vec::new(),
         findings: Vec::new(),
     }
 }
@@ -583,6 +584,7 @@ fn findings_report(scanned_crates: usize, findings: Vec<Finding>) -> FindingsRep
         status,
         scanned_crates,
         findings,
+        allowed: Vec::new(),
     }
 }
 

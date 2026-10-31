@@ -90,6 +90,7 @@ fn machine_report_matches_frozen_json_contract() {
         schema_version: "0.1.0",
         status: ReportStatus::Fail,
         scanned_crates: 1,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: RuleId::Port001,
             kind: "contract_fixture".into(),
@@ -105,7 +106,7 @@ fn machine_report_matches_frozen_json_contract() {
 
     assert_eq!(
         expected["schema_version"].as_str(),
-        Some(SC_LINT_SCHEMA_VERSION),
+        Some(SC_LINT_SCHEMA_VERSION_V1),
         "golden schema_version must match analyzer reports"
     );
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
@@ -172,6 +173,7 @@ fn findings_report_text_is_stable() {
         schema_version: "0.1.0",
         status: ReportStatus::Pass,
         scanned_crates: 2,
+        allowed: Vec::new(),
         findings: Vec::new(),
     };
     assert_eq!(
@@ -188,6 +190,7 @@ fn findings_report_text_renders_failure_status_and_count() {
         schema_version: "0.1.0",
         status: ReportStatus::Fail,
         scanned_crates: 4,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: RuleId::Port004,
             kind: "ungated_std_os_unix_import".into(),
@@ -2676,6 +2679,172 @@ fn port010_unix_fn_in_unpaired_file_reported() {
             .any(|finding| finding.message.contains("helper")),
         "{port010:#?}"
     );
+}
+
+#[test]
+fn port010_site_allow() {
+    let report = analyze_single_source(
+        r#"
+        pub struct User;
+        impl User {
+            #[doc = "Unix uid accessor"]
+            #[cfg(unix)]
+            #[inline]
+            #[sc_lint(allow(PORT-010), reason = "This public helper intentionally exposes the POSIX uid API.")]
+            pub fn current_uid(&self) -> u32 { 0 }
+        }
+
+        #[cfg(unix)]
+        pub fn sibling() {}
+
+        #[sc_lint(allow(PORT-010), reason = "The module is intentionally platform-specific.")] mod nested { #[cfg(unix)] pub fn inner() {} }
+        "#,
+    );
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+    assert_eq!(port010.len(), 2, "{port010:#?}");
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("sibling"))
+    );
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("inner"))
+    );
+    assert_eq!(report.allowed.len(), 1, "{:#?}", report.allowed);
+    assert_eq!(report.allowed[0].rule_id, RuleId::Port010);
+    assert_eq!(
+        report.allowed[0].reason,
+        "This public helper intentionally exposes the POSIX uid API."
+    );
+    assert_eq!(report.schema_version, "0.2.0");
+    let json = serde_json::to_value(&report).expect("report serializes");
+    assert_eq!(
+        json["allowed"][0]["source_path"],
+        "crates/example/src/lib.rs"
+    );
+    sc_lint_schema::validate_analyzer_report(&json).expect("v2 report satisfies its schema");
+}
+
+#[test]
+fn site_allow_attribute_path_and_no_cascade() {
+    let report = analyze_single_source(
+        r#"
+        #[sc_lint(allow(PORT-010), reason = "The impl is intentionally Unix-only.")]
+        impl Example {
+            #[cfg(unix)]
+            pub fn method(&self) {}
+        }
+
+        #[cfg(unix)]
+        #[sc_lint_attributes::sc_lint(reason = "This function is deliberately POSIX-only.", allow(PORT-010))]
+        pub fn deliberate() {}
+
+        #[cfg(unix)]
+        pub fn sibling() {}
+        "#,
+    );
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+    assert_eq!(port010.len(), 2, "{port010:#?}");
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("method"))
+    );
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("sibling"))
+    );
+    assert_eq!(report.allowed.len(), 1, "{:#?}", report.allowed);
+}
+
+#[test]
+fn site_allow_unknown_rule_has_source_location() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[sc_lint(allow(PORT-999), reason = \"future rule\")]\n#[cfg(unix)]\npub fn only_unix() {}\n",
+    );
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .expect_err("unknown portability rule is rejected");
+    let message = error.to_string();
+    assert!(message.contains("lib.rs:1"), "{message}");
+    assert!(
+        message.contains("unknown portability rule id `PORT-999`"),
+        "{message}"
+    );
+}
+
+#[test]
+fn malformed_site_allow_is_a_typed_source_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[sc_lint(allow(PORT-010))]\n#[cfg(unix)]\npub fn only_unix() {}\n",
+    );
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .expect_err("missing reason is rejected");
+    assert!(matches!(
+        error,
+        PortabilityError::InvalidSiteAllow { line: 1, .. }
+    ));
+    assert!(error.to_string().contains("lib.rs:1"));
+}
+
+#[test]
+fn portability_ignores_boundary_allow_directives() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(unix)]
+        #[sc_lint(boundary.allow("PORT-010"))]
+        pub fn still_needs_a_windows_companion() {}
+        "#,
+    );
+    assert!(report.findings.iter().any(|finding| {
+        finding.rule_id == RuleId::Port010
+            && finding.message.contains("still_needs_a_windows_companion")
+    }));
+    assert!(report.allowed.is_empty());
+    assert_eq!(report.schema_version, "0.1.0");
+}
+
+#[test]
+fn portability_ignores_allowances_owned_by_other_analyzers() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(unix)]
+        #[sc_lint(allow(SCB-MANIFEST-004), reason = "owned by a different analyzer")]
+        pub fn still_needs_a_windows_companion() {}
+        "#,
+    );
+    assert!(report.findings.iter().any(|finding| {
+        finding.rule_id == RuleId::Port010
+            && finding.message.contains("still_needs_a_windows_companion")
+    }));
+    assert!(report.allowed.is_empty());
+    assert_eq!(report.schema_version, "0.1.0");
 }
 
 #[test]

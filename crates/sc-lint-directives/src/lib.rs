@@ -1,5 +1,6 @@
 use syn::Error;
 use syn::Ident;
+use syn::LitInt;
 use syn::LitStr;
 use syn::Result;
 use syn::Token;
@@ -14,6 +15,7 @@ pub(crate) enum Scope {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Directive {
     Allow(Vec<String>),
+    SiteAllow { rules: Vec<String>, reason: String },
     InternalOnly,
     ForbidExternalImpls,
 }
@@ -26,15 +28,92 @@ pub struct AttributeInput {
 impl Parse for AttributeInput {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let mut directives = Vec::new();
+        let mut site_rules: Option<Vec<String>> = None;
+        let mut site_reason: Option<String> = None;
         while !input.is_empty() {
-            directives.push(parse_directive(input)?);
+            if input.peek(Ident) && !input.peek2(Token![.]) {
+                let key = input.parse::<Ident>()?;
+                match key.to_string().as_str() {
+                    "allow" => {
+                        if site_rules.is_some() {
+                            return Err(Error::new(key.span(), "multiple site allow elements"));
+                        }
+                        site_rules = Some(parse_site_rules(input, &key)?);
+                    }
+                    "reason" => {
+                        if site_reason.is_some() {
+                            return Err(Error::new(key.span(), "duplicate site allow reason"));
+                        }
+                        input.parse::<Token![=]>()?;
+                        let literal = input.parse::<LitStr>()?;
+                        let reason = literal.value();
+                        if reason.trim().is_empty() {
+                            return Err(Error::new(
+                                literal.span(),
+                                "site allow reason must not be empty",
+                            ));
+                        }
+                        site_reason = Some(reason);
+                    }
+                    _ => return Err(Error::new(key.span(), "unknown site directive element")),
+                }
+            } else {
+                directives.push(parse_directive(input)?);
+            }
             if input.is_empty() {
                 break;
             }
             input.parse::<Token![,]>()?;
         }
+        if let Some(rules) = site_rules {
+            let reason =
+                site_reason.ok_or_else(|| input.error("site allow requires `reason = \"...\"`"))?;
+            directives.push(Directive::SiteAllow { rules, reason });
+        } else if site_reason.is_some() {
+            return Err(input.error("reason requires a site allow"));
+        }
         Ok(Self { directives })
     }
+}
+
+fn parse_site_rules(input: ParseStream<'_>, allow_ident: &Ident) -> Result<Vec<String>> {
+    let content;
+    syn::parenthesized!(content in input);
+    let mut rules = Vec::new();
+    while !content.is_empty() {
+        let first = content.parse::<Ident>()?;
+        let mut rule = first.to_string();
+        loop {
+            content.parse::<Token![-]>()?;
+            if content.peek(Ident) {
+                rule.push('-');
+                rule.push_str(&content.parse::<Ident>()?.to_string());
+            } else if content.peek(LitInt) {
+                rule.push('-');
+                rule.push_str(&content.parse::<LitInt>()?.to_string());
+                break;
+            } else {
+                return Err(content.error("malformed site allow rule id"));
+            }
+        }
+        if rules.contains(&rule) {
+            return Err(Error::new(
+                allow_ident.span(),
+                "duplicate site allow rule id",
+            ));
+        }
+        rules.push(rule);
+        if !content.is_empty() {
+            content.parse::<Token![,]>()?;
+        }
+    }
+    if rules.is_empty() {
+        return Err(Error::new(
+            allow_ident.span(),
+            "site allow requires at least one rule id",
+        ));
+    }
+    Ok(rules)
 }
 
 pub(crate) fn parse_directive(input: ParseStream<'_>) -> Result<Directive> {
@@ -109,6 +188,84 @@ mod tests {
                 "cycle.type_method_self_loop".to_string()
             ])]
         );
+    }
+
+    #[test]
+    fn site_allow_grammar_corpus() {
+        let accepted = [
+            (
+                quote!(allow(PORT - 010), reason = "POSIX-only item"),
+                vec!["PORT-010"],
+            ),
+            (
+                quote!(
+                    allow(PORT - 001, PORT - 010),
+                    reason = "two deliberate exceptions"
+                ),
+                vec!["PORT-001", "PORT-010"],
+            ),
+            (
+                quote!(reason = "POSIX-only item", allow(PORT - 010,),),
+                vec!["PORT-010"],
+            ),
+            (
+                quote!(allow(SCB - MANIFEST - 004), reason = "other analyzer rule"),
+                vec!["SCB-MANIFEST-004"],
+            ),
+        ];
+        for (tokens, expected_rules) in accepted {
+            let parsed: AttributeInput = syn::parse2(tokens).expect("accepted site allowance");
+            assert!(
+                matches!(&parsed.directives[..], [Directive::SiteAllow { rules, reason }]
+                if rules == &expected_rules.iter().map(|rule| rule.to_string()).collect::<Vec<_>>() && !reason.is_empty())
+            );
+        }
+        let combined: AttributeInput = syn::parse2(quote!(
+            boundary.allow("B"),
+            allow(PORT - 010),
+            reason = "combined"
+        ))
+        .expect("boundary and site directives coexist");
+        assert!(
+            matches!(&combined.directives[..], [Directive::Allow(values), Directive::SiteAllow { .. }] if values == &["B"])
+        );
+
+        for (tokens, label) in [
+            (
+                quote!(allow("PORT-010"), reason = "quoted id"),
+                "quoted rule id",
+            ),
+            (quote!(allow(PORT - 010)), "missing reason"),
+            (quote!(allow(), reason = "missing id"), "empty rules"),
+            (quote!(allow(PORT - 010), reason = "  "), "empty reason"),
+            (quote!(reason = "x"), "reason without allow"),
+            (
+                quote!(allow(PORT - 010, PORT - 010), reason = "duplicate"),
+                "duplicate rule",
+            ),
+            (
+                quote!(allow(PORT - 010), allow(PORT - 002), reason = "multiple"),
+                "multiple allows",
+            ),
+            (
+                quote!(allow(PORT - 010), reason = "x", reason = "y"),
+                "duplicate reason",
+            ),
+            (
+                quote!(allow(PORT - 010), note = "wrong key"),
+                "unknown element",
+            ),
+            (
+                quote!(allow(PORT-), reason = "malformed"),
+                "malformed rule id",
+            ),
+            (
+                quote!(allow(PORT - 010), reason = variable),
+                "nonliteral reason",
+            ),
+        ] {
+            assert!(syn::parse2::<AttributeInput>(tokens).is_err(), "{label}");
+        }
     }
 
     #[test]

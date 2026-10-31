@@ -12,15 +12,15 @@ use crate::OwnerId;
 use crate::RuleId;
 
 #[derive(Debug, Clone)]
-pub(super) struct PortabilityFinding {
-    pub(super) rule_id: RuleId,
-    pub(super) kind: &'static str,
-    pub(super) message: String,
-    pub(super) source_path: PathBuf,
-    pub(super) line: usize,
-    pub(super) package: sc_lint_analyzer_support::PackageName,
-    pub(super) target: sc_lint_analyzer_support::TargetName,
-    pub(super) node_label: String,
+pub(crate) struct PortabilityFinding {
+    pub(crate) rule_id: RuleId,
+    pub(crate) kind: &'static str,
+    pub(crate) message: String,
+    pub(crate) source_path: PathBuf,
+    pub(crate) line: usize,
+    pub(crate) package: sc_lint_analyzer_support::PackageName,
+    pub(crate) target: sc_lint_analyzer_support::TargetName,
+    pub(crate) node_label: String,
 }
 
 pub(super) fn convert_findings(

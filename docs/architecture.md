@@ -358,7 +358,9 @@ For release `0.2.x`, this means:
 
 - `sc-lint-boundary` and `sc-lint-attributes` may depend on
   `sc-lint-directives` for shared directive parsing/types, and
-  `sc-lint-portability` and `sc-lint-runtime` may depend on
+  `sc-lint-portability` may depend on `sc-lint-directives` for the shared
+  site-allowance directive model (ADR-022 decision 4). `sc-lint-portability`
+  and `sc-lint-runtime` may depend on
   `sc-lint-analyzer-support` for the ADR-013 rule-neutral scanner/rendering
   implementation
 - `sc-lint-boundary`, `sc-lint-portability` and `sc-lint-runtime` may depend
