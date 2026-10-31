@@ -14,6 +14,8 @@ mod profile_plan;
 pub(crate) mod python_adapter;
 mod render;
 mod scheduler;
+mod step_exec;
+mod step_logs;
 mod test_selectors;
 mod workflow;
 

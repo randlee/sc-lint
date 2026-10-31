@@ -10,6 +10,7 @@ use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::analyzer_settings_from;
 use sc_lint_analyzer_support::load_workspace_metadata;
 use sc_lint_analyzer_support::read_config_document;
+use sc_lint_directives::{DirectiveError, SiteRuleId};
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
@@ -22,10 +23,12 @@ mod module_cfg;
 mod platform_adapters;
 mod portability;
 mod predicates;
+mod site_allow;
 #[cfg(test)]
 mod tests;
 
-const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
+const SC_LINT_SCHEMA_VERSION_V1: &str = "0.1.0";
+const SC_LINT_SCHEMA_VERSION_V2: &str = "0.2.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 const ALL_PORT_IDS: &[CatalogRuleId] = &[
     CatalogRuleId::new("PORT-001"),
@@ -116,6 +119,18 @@ impl From<anyhow_crate::Error> for PortabilityErrorSource {
 
 #[derive(Debug, Error)]
 pub enum PortabilityError {
+    #[error("PORTABILITY.INVALID_SITE_ALLOW at {}:{line}: {error}", path.display())]
+    InvalidSiteAllow {
+        path: PathBuf,
+        line: usize,
+        error: DirectiveError,
+    },
+    #[error("PORTABILITY.UNKNOWN_RULE at {}:{line}: unsupported portability rule `{rule}`; recovery: use PORT-010 or remove the allowance", path.display())]
+    UnknownRule {
+        path: PathBuf,
+        line: usize,
+        rule: SiteRuleId,
+    },
     #[error("failed to analyze portability findings for root `{}`: {source:#}", root.display())]
     AnalyzeFindings {
         root: PathBuf,
@@ -190,9 +205,9 @@ fn analyze_workspace_configured_with_metadata_loader(
         .map_err(scan_error)?
         .unwrap_or_default();
     let platform_adapters = platform_adapters::validate(&options.root, records, &module_cfg)?;
-    let (findings, scanned_crates) =
+    let (findings, allowed, scanned_crates) =
         if let Some(workspace) = workspace.as_ref().filter(|_| settings.enabled) {
-            let findings = portability::analyze_portability(
+            let (findings, allowed) = portability::analyze_portability(
                 &options.root,
                 workspace,
                 &document,
@@ -201,25 +216,42 @@ fn analyze_workspace_configured_with_metadata_loader(
                 &platform_adapters,
                 &module_cfg,
             )
-            .map_err(|source| PortabilityError::AnalyzeFindings {
-                root: options.root.clone(),
-                source: source.into(),
-            })?;
+            .map_err(|source| map_portability_analysis_error(source, &options.root))?;
             let scanned_crates = portability::count_scanned_crates(workspace);
-            (findings, scanned_crates)
+            (findings, allowed, scanned_crates)
         } else {
-            (Vec::new(), 0)
+            (Vec::new(), Vec::new(), 0)
         };
     let (findings, status) =
         settings.apply(findings, |rule_id| CatalogRuleId::new(rule_id.as_str()));
     Ok(FindingsReport {
         tool: "sc-lint-portability",
         version: env!("CARGO_PKG_VERSION"),
-        schema_version: SC_LINT_SCHEMA_VERSION,
+        schema_version: if allowed.is_empty() {
+            SC_LINT_SCHEMA_VERSION_V1
+        } else {
+            SC_LINT_SCHEMA_VERSION_V2
+        },
         status,
         scanned_crates,
         findings,
+        allowed,
     })
+}
+
+fn map_portability_analysis_error(source: anyhow_crate::Error, root: &Path) -> PortabilityError {
+    match source.downcast::<site_allow::SiteAllowError>() {
+        Ok(site_allow::SiteAllowError::InvalidDirective { path, line, error }) => {
+            PortabilityError::InvalidSiteAllow { path, line, error }
+        }
+        Ok(site_allow::SiteAllowError::UnknownRule { path, line, rule }) => {
+            PortabilityError::UnknownRule { path, line, rule }
+        }
+        Err(source) => PortabilityError::AnalyzeFindings {
+            root: root.to_path_buf(),
+            source: source.into(),
+        },
+    }
 }
 
 pub fn render_findings_report(report: &FindingsReport) -> String {

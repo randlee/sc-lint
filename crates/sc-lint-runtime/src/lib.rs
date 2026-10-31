@@ -159,6 +159,7 @@ fn analyze_workspace_configured_with_metadata_loader(
         status,
         scanned_crates,
         findings,
+        allowed: Vec::new(),
     })
 }
 

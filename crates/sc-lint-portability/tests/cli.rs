@@ -97,6 +97,51 @@ fn run_invalid_adapter_config(config: &str) -> std::process::Output {
         .unwrap()
 }
 
+fn run_site_allow_error(source: &str) -> std::process::Output {
+    let root = TempDir::new().unwrap();
+    fs::write(
+        root.path().join("Cargo.toml"),
+        "[workspace]\nmembers = [\"crates/example\"]\nresolver = \"2\"\n",
+    )
+    .unwrap();
+    let package = root.path().join("crates/example");
+    fs::create_dir_all(package.join("src")).unwrap();
+    fs::write(
+        package.join("Cargo.toml"),
+        "[package]\nname = \"example\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    fs::write(package.join("src/lib.rs"), source).unwrap();
+
+    Command::new(env!("CARGO_BIN_EXE_sc-lint-portability"))
+        .args(["analyze", "--root"])
+        .arg(root.path())
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn site_allow_errors_exit_as_configuration_errors() {
+    for (source, code, recovery) in [
+        (
+            "#[sc_lint(allow(PORT-010))]\n#[cfg(unix)] pub fn only_unix() {}\n",
+            "PORTABILITY.INVALID_SITE_ALLOW",
+            "DIRECTIVE.SITE_ALLOW.MISSING_REASON",
+        ),
+        (
+            "#[sc_lint(allow(PORT-001), reason = \"unsupported\")]\n#[cfg(unix)] pub fn only_unix() {}\n",
+            "PORTABILITY.UNKNOWN_RULE",
+            "recovery: use PORT-010",
+        ),
+    ] {
+        let output = run_site_allow_error(source);
+        assert_eq!(output.status.code(), Some(3));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(code), "{stderr}");
+        assert!(stderr.contains(recovery), "{stderr}");
+    }
+}
+
 fn port010_findings(shape: &str) -> Vec<serde_json::Value> {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/port010")

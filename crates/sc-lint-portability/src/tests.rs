@@ -90,6 +90,7 @@ fn machine_report_matches_frozen_json_contract() {
         schema_version: "0.1.0",
         status: ReportStatus::Fail,
         scanned_crates: 1,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: RuleId::Port001,
             kind: "contract_fixture".into(),
@@ -105,7 +106,7 @@ fn machine_report_matches_frozen_json_contract() {
 
     assert_eq!(
         expected["schema_version"].as_str(),
-        Some(SC_LINT_SCHEMA_VERSION),
+        Some(SC_LINT_SCHEMA_VERSION_V1),
         "golden schema_version must match analyzer reports"
     );
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
@@ -172,6 +173,7 @@ fn findings_report_text_is_stable() {
         schema_version: "0.1.0",
         status: ReportStatus::Pass,
         scanned_crates: 2,
+        allowed: Vec::new(),
         findings: Vec::new(),
     };
     assert_eq!(
@@ -188,6 +190,7 @@ fn findings_report_text_renders_failure_status_and_count() {
         schema_version: "0.1.0",
         status: ReportStatus::Fail,
         scanned_crates: 4,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: RuleId::Port004,
             kind: "ungated_std_os_unix_import".into(),
@@ -2679,6 +2682,234 @@ fn port010_unix_fn_in_unpaired_file_reported() {
 }
 
 #[test]
+fn port010_site_allow() {
+    let source = r#"
+        pub struct User;
+        impl User {
+            #[doc = "Unix uid accessor"]
+            #[cfg(unix)]
+            #[inline]
+            #[sc_lint(allow(PORT-010), reason = "This public helper intentionally exposes the POSIX uid API.")]
+            pub fn current_uid(&self) -> u32 { 0 }
+        }
+
+        #[cfg(unix)]
+        pub fn sibling() {}
+
+        #[cfg(unix)]
+        #[sc_lint(allow(PORT-010), reason = "This public function intentionally uses a POSIX-only API.")]
+        pub fn deliberately_platform_only() {}
+
+        #[sc_lint(allow(PORT-010), reason = "The module is intentionally platform-specific.")] mod nested { #[cfg(unix)] pub fn inner() {} }
+        "#;
+    let source_lines = source.lines().collect::<Vec<_>>();
+    let function_line = source_lines
+        .iter()
+        .position(|line| line.contains("pub fn deliberately_platform_only"))
+        .expect("free function is present");
+    let expected_line = source_lines[..function_line]
+        .iter()
+        .rposition(|line| line.contains("#[cfg(unix)]"))
+        .expect("free function has a cfg attribute")
+        + 1;
+    let report = analyze_single_source(source);
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+    assert_eq!(port010.len(), 2, "{port010:#?}");
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("sibling"))
+    );
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("inner"))
+    );
+    assert_eq!(report.allowed.len(), 2, "{:#?}", report.allowed);
+    let method_allowance = report
+        .allowed
+        .iter()
+        .find(|entry| entry.item() == "User::current_uid")
+        .expect("inherent method allowance");
+    assert_eq!(*method_allowance.rule_id(), RuleId::Port010);
+    assert_eq!(
+        method_allowance.reason(),
+        "This public helper intentionally exposes the POSIX uid API."
+    );
+    let function_allowance = report
+        .allowed
+        .iter()
+        .find(|entry| entry.item() == "deliberately_platform_only")
+        .expect("free function allowance");
+    assert_eq!(*function_allowance.rule_id(), RuleId::Port010);
+    assert_eq!(
+        function_allowance.reason(),
+        "This public function intentionally uses a POSIX-only API."
+    );
+    assert_eq!(function_allowance.line(), expected_line);
+    assert_eq!(report.schema_version, "0.2.0");
+    let json = serde_json::to_value(&report).expect("report serializes");
+    assert_eq!(
+        json["allowed"][0]["source_path"],
+        "crates/example/src/lib.rs"
+    );
+    sc_lint_schema::validate_analyzer_report(&json).expect("v2 report satisfies its schema");
+}
+
+#[test]
+fn site_allow_no_cascade() {
+    let report = analyze_single_source(
+        r#"
+        #[sc_lint(allow(PORT-010), reason = "The impl is intentionally Unix-only.")]
+        impl Example {
+            #[cfg(unix)]
+            pub fn method(&self) {}
+        }
+
+        #[cfg(unix)]
+        #[sc_lint_attributes::sc_lint(reason = "This function is deliberately POSIX-only.", allow(PORT-010))]
+        pub fn deliberate() {}
+
+        #[cfg(unix)]
+        pub fn sibling() {}
+        "#,
+    );
+    let port010 = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .collect::<Vec<_>>();
+    assert_eq!(port010.len(), 2, "{port010:#?}");
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("method"))
+    );
+    assert!(
+        port010
+            .iter()
+            .any(|finding| finding.message.contains("sibling"))
+    );
+    assert_eq!(report.allowed.len(), 1, "{:#?}", report.allowed);
+    assert_eq!(report.allowed[0].item(), "deliberate");
+    assert_eq!(
+        report.allowed[0].reason(),
+        "This function is deliberately POSIX-only."
+    );
+}
+
+#[test]
+fn site_allow_unknown_rule() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[sc_lint(allow(PORT-999), reason = \"future rule\")]\n#[cfg(unix)]\npub fn only_unix() {}\n",
+    );
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .expect_err("unknown portability rule is rejected");
+    let message = error.to_string();
+    assert!(message.contains("lib.rs:1"), "{message}");
+    assert!(matches!(
+        error,
+        PortabilityError::UnknownRule { line: 1, .. }
+    ));
+    assert!(message.contains("PORTABILITY.UNKNOWN_RULE"), "{message}");
+    assert!(message.contains("recovery: use PORT-010"), "{message}");
+}
+
+#[test]
+fn site_allow_unsupported_rule_is_unknown_rule() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[sc_lint(allow(PORT-001), reason = \"not a site-allow rule\")]\n#[cfg(unix)]\npub fn only_unix() {}\n",
+    );
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .expect_err("PORT-001 has no item-scoped allowance behavior");
+    assert!(matches!(
+        error,
+        PortabilityError::UnknownRule { line: 1, .. }
+    ));
+    assert!(error.to_string().contains("PORTABILITY.UNKNOWN_RULE"));
+}
+
+#[test]
+fn malformed_site_allow_is_a_typed_source_error() {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        "#[sc_lint(allow(PORT-010))]\n#[cfg(unix)]\npub fn only_unix() {}\n",
+    );
+    let error = analyze_workspace(&AnalyzeOptions {
+        root: fixture.root().to_path_buf(),
+        format: OutputFormat::Json,
+    })
+    .expect_err("missing reason is rejected");
+    assert!(matches!(
+        error,
+        PortabilityError::InvalidSiteAllow { line: 1, .. }
+    ));
+    let message = error.to_string();
+    assert!(message.contains("lib.rs:1"));
+    assert!(message.contains("PORTABILITY.INVALID_SITE_ALLOW"));
+    assert!(message.contains("DIRECTIVE.SITE_ALLOW.MISSING_REASON"));
+    assert!(message.contains("recovery: add reason"));
+}
+
+#[test]
+fn portability_ignores_boundary_allow_directives() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(unix)]
+        #[sc_lint(boundary.allow("PORT-010"))]
+        pub fn still_needs_a_windows_companion() {}
+        "#,
+    );
+    assert!(report.findings.iter().any(|finding| {
+        finding.rule_id == RuleId::Port010
+            && finding.message.contains("still_needs_a_windows_companion")
+    }));
+    assert!(report.allowed.is_empty());
+    assert_eq!(report.schema_version, "0.1.0");
+}
+
+#[test]
+fn portability_ignores_allowances_owned_by_other_analyzers() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(unix)]
+        #[sc_lint(allow(SCB-MANIFEST-004), reason = "owned by a different analyzer")]
+        pub fn still_needs_a_windows_companion() {}
+        "#,
+    );
+    assert!(report.findings.iter().any(|finding| {
+        finding.rule_id == RuleId::Port010
+            && finding.message.contains("still_needs_a_windows_companion")
+    }));
+    assert!(report.allowed.is_empty());
+    assert_eq!(report.schema_version, "0.1.0");
+}
+
+#[test]
 fn port010_pub_unix_item_in_paired_file_keeps_parity_check() {
     let fixture = paired_adapter_fixture_with_portable_alias(
         "#[cfg(unix)] pub fn exposed() {}\n#[cfg(unix)] pub(crate) fn restricted() {}\n#[cfg(unix)] pub(super) fn super_restricted() {}\n#[cfg(unix)] pub(in crate) fn crate_restricted() {}\n",
@@ -3244,6 +3475,59 @@ fn phase_m_port010_items(report: &FindingsReport) -> Vec<String> {
         .collect::<Vec<_>>();
     names.sort();
     names
+}
+
+#[test]
+fn port010_companions_and_site_allowances_coexist() {
+    let fixture = phase_m_fixture(&[
+        (
+            "lib.rs",
+            r#"
+            #[cfg(unix)] mod unix_only;
+            mod portable;
+            #[cfg(unix)] fn paired() {}
+            #[cfg(not(unix))] fn paired() {}
+            #[cfg(unix)] fn root_gap() {}
+            #[cfg(unix)]
+            #[sc_lint(allow(PORT-010), reason = "This function exposes the POSIX uid API.")]
+            pub fn intentional() {}
+            mod inline {
+                #[cfg(unix)]
+                #[sc_lint(allow(PORT-010), reason = "This helper exposes the POSIX uid API.")]
+                pub fn intentional() {}
+            }
+            "#,
+        ),
+        ("unix_only.rs", "#[cfg(unix)] pub fn unix_api() {}"),
+        (
+            "portable.rs",
+            r#"
+            #[cfg(unix)] fn paired() {}
+            #[cfg(not(unix))] fn paired() {}
+            #[cfg(unix)] pub fn file_gap() {}
+            #[cfg(unix)]
+            #[sc_lint(allow(PORT-010), reason = "This file helper exposes the POSIX uid API.")]
+            pub fn intentional() {}
+            "#,
+        ),
+    ]);
+    let report = analyze_fixture(&fixture);
+    assert_eq!(phase_m_port010_items(&report), ["file_gap", "root_gap"]);
+    let mut allowed_items = report
+        .allowed
+        .iter()
+        .map(|entry| entry.item())
+        .collect::<Vec<_>>();
+    allowed_items.sort();
+    assert_eq!(
+        allowed_items,
+        [
+            "inline::intentional",
+            "intentional",
+            "portable::intentional"
+        ]
+    );
+    assert_eq!(report.schema_version, "0.2.0");
 }
 
 #[test]

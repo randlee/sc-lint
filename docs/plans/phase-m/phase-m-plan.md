@@ -10,6 +10,7 @@ relationships; the issue closure checks live on the closure beads.
 | --- | --- | --- |
 | [ADR-022](../../sc-lint/adr/ADR-022-tools-and-consumer-configuration.md) | Pending | lint-t6i7 blocks m-4 only |
 | [ADR-010 amendment 2026-10-30](../../sc-lint/adr/ADR-010-portability-scope-and-parity.md) | Accepted (Rand 2026-10-31) | lint-m-adr010 closed; m-1 unblocked |
+| [ADR-020 amendment 2026-10-31](../../sc-lint/adr/ADR-020-phase-l-atm-core-findings.md) | Accepted (Rand 2026-10-31) | m-2 implements it |
 | ADR-021 | Withdrawn | none |
 | REQ-PRODUCT-004AA, REQ-SCB-019, REQ-CLI-021 | Accepted | existing contracts remain effective |
 | [v3 anchors](v3/anchors.json) | Eight kept locked anchors | sealed planning questions unchanged |
@@ -32,26 +33,26 @@ lists and replaces the crate-root-main limitation regression.
 ## Stacks And Shared Files
 
 ```text
-develop
+integrate/phase-m
 ├── A: m-1
 ├── B: m-4
 ├── C: m-2
 └── D: m-3
 ```
 
-Each stack is one layer rooted on develop. Stack operations follow
+Each stack is rooted on integrate/phase-m. Stack operations follow
 [CLAUDE.md](../../../CLAUDE.md); the lead is the stack writer. The sprint
 beads have no cross-stack must_follow edges. Capacity is two owners:
 clint runs m-1 then m-2; cfast runs m-4 then m-3. These are owner schedules,
 not new dependency gates. m-1's lint-m-adr010 gate is closed; m-4 waits for
 lint-t6i7. m-2 is governed by REQ-SCB-019 and ADR-020, with the SCB-CYCLE-001
-amendment Pending Rand acceptance before dispatch. m-3 implements existing
+amendment, which Rand accepted on 2026-10-31 before dispatch. m-3 implements existing
 ADR-016, REQ-CLI-023 and ADR-020 decisions 7/9. ADR-022 is context for m-2
 and m-3, not their dispatch gate. Plan review and the planning
 gate supply evidence; lint-phase-m-plan-qa blocks no sprint or dev bead.
 
 m-1 and m-4 share portability's parity.rs, lib.rs and tests.rs. m-4 lands
-first; whichever lands second receives develop merged forward by the stack
+first; whichever lands second receives integrate/phase-m merged forward by the stack
 writer. This merge is a stack operation, not another sprint. m-2's
 manifest-policy/lib.rs changes and m-4's boundary graph directive match are
 separate edits; the stack writer resolves any integration conflict.
@@ -93,5 +94,3 @@ test. No extra adoption run or CI gate is introduced.
 ## Pending Decisions For Rand
 
 1. Accept ADR-022 (lint-t6i7).
-2. Accept the ADR-020 Amendment 2026-10-31 extending path-less exclusions to
-   SCB-CYCLE-001 before m-2 dispatch.

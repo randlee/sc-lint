@@ -44,12 +44,16 @@ use sc_lint_analyzer_support::count_scanned_crates_with_metadata as count_crates
 use sc_lint_analyzer_support::discover_source_files_with_metadata;
 use sc_lint_analyzer_support::relative_slash_path;
 use sc_lint_analyzer_support::span_start_line;
+use sc_lint_schema::AllowedFinding;
 
-mod findings;
+pub(super) mod findings;
 mod parity;
 
 use self::findings::PortabilityFinding;
 use self::findings::convert_findings;
+
+type AnalyzedFinding = (Finding, Option<RepoRelativePath>);
+type PortabilityAnalysis = (Vec<AnalyzedFinding>, Vec<AllowedFinding<RuleId>>);
 
 pub(super) fn repo_relative_source_path(
     root: &Path,
@@ -175,7 +179,7 @@ pub(crate) fn analyze_portability(
     analyzer_keys: &AnalyzerPortabilityKeys,
     platform_adapters: &platform_adapters::PlatformAdapters,
     module_cfg: &crate::module_cfg::ModuleCfg,
-) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
+) -> Result<PortabilityAnalysis> {
     let config = load_portability_config(document, analyzer_keys)?;
     let source_files = discover_source_files_with_metadata(workspace)?;
     let file_findings = source_files
@@ -194,6 +198,10 @@ pub(crate) fn analyze_portability(
                 )
             })?;
 
+            let allowances =
+                crate::site_allow::collect_site_allowances(&parsed, &file_context.source_path)
+                    .map_err(anyhow::Error::new)?;
+
             let mut collector = PortabilityCollector::new(file_context, &config);
             collector.visit_file_items(&parsed);
             let mut findings = collector.findings;
@@ -204,14 +212,31 @@ pub(crate) fn analyze_portability(
                 platform_adapters,
                 module_cfg.is_unix_only_file(&file_context.source_path),
             ));
-            Ok(findings)
+            Ok((findings, allowances))
         })
-        .collect::<Vec<Result<Vec<_>>>>()
+        .collect::<Vec<Result<_>>>()
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
-    let findings = file_findings.into_iter().flatten().collect();
-
-    convert_findings(root, findings)
+    let mut findings = Vec::new();
+    let mut allowances = Vec::new();
+    for (file_findings, file_allowances) in file_findings {
+        findings.extend(file_findings);
+        allowances.extend(file_allowances);
+    }
+    let (findings, mut allowed) = crate::site_allow::apply_site_allowances(findings, allowances);
+    for entry in &mut allowed {
+        let source_path =
+            repo_relative_source_path(root, Path::new(entry.source_path()))?.to_string();
+        *entry = AllowedFinding::new(
+            *entry.rule_id(),
+            entry.reason(),
+            entry.item(),
+            source_path,
+            entry.line(),
+        )
+        .expect("relative source path preserves AllowedFinding invariants");
+    }
+    Ok((convert_findings(root, findings)?, allowed))
 }
 
 pub(crate) fn count_scanned_crates(workspace: &WorkspaceMetadata) -> usize {
@@ -476,6 +501,7 @@ impl<'a> PortabilityCollector<'a> {
                 ),
                 source_path: self.file_context.source_path.clone(),
                 line,
+                item: None,
                 package: self.file_context.package.clone(),
                 target: self.file_context.target.clone(),
                 node_label: format!(
@@ -554,6 +580,7 @@ impl<'a> PortabilityCollector<'a> {
                         ),
                         source_path: self.file_context.source_path.clone(),
                         line: span_start_line(lit.span()),
+                        item: None,
                         package: self.file_context.package.clone(),
                         target: self.file_context.target.clone(),
                         node_label: format!(
@@ -592,6 +619,7 @@ impl<'a> PortabilityCollector<'a> {
             ),
             source_path: self.file_context.source_path.clone(),
             line: span_start_line(expr_call.span()),
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -612,6 +640,7 @@ impl<'a> PortabilityCollector<'a> {
             message: "PORT-003 std::env::set_var() in test code mutates global process state; prefer cmd.env(\"KEY\", \"value\") or temp_env::with_var for scoped isolation".to_string(),
             source_path: self.file_context.source_path.clone(),
             line: span_start_line(expr_call.span()),
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -667,6 +696,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             message,
             source_path: self.file_context.source_path.clone(),
             line,
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -685,6 +715,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             ),
             source_path: self.file_context.source_path.clone(),
             line,
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -703,6 +734,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             ),
             source_path: self.file_context.source_path.clone(),
             line,
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(

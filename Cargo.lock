@@ -1121,6 +1121,7 @@ dependencies = [
  "clap",
  "rayon",
  "sc-lint-analyzer-support",
+ "sc-lint-directives",
  "sc-lint-schema",
  "serde",
  "serde_json",

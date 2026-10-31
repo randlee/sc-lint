@@ -130,7 +130,6 @@ fn path_less_exclusion_uses_dunce_root_for_windows_verbatim_case() {
 #[test]
 fn per_rule_exclusions_reject_every_boundary_rule_without_source_paths() {
     let pathless_rules = [
-        "SCB-CYCLE-001",
         "SCB-BOUNDARY-001",
         "SCB-BOUNDARY-002",
         "SCB-BOUNDARY-003",
@@ -187,9 +186,9 @@ fn global_path_exclusions_leave_pathless_rule_findings_unchanged() {
     )
     .expect("global path exclusions are valid for path-addressable findings");
     let finding = Finding {
-        rule_id: RuleId::ScbCycle001,
-        kind: "cycle_without_source_path".into(),
-        message: "cycle finding without source paths".to_owned(),
+        rule_id: RuleId::ScbBoundary001,
+        kind: "boundary_without_source_path".into(),
+        message: "boundary finding without source paths".to_owned(),
         owner_ids: Vec::new(),
         node_ids: Vec::new(),
     };
@@ -288,6 +287,7 @@ fn machine_report_matches_frozen_json_contract() {
         schema_version: "0.2.0",
         status: ReportStatus::Fail,
         scanned_crates: 1,
+        allowed: Vec::new(),
         findings: vec![Finding {
             rule_id: RuleId::ScbBoundary001,
             kind: "contract_fixture".into(),
@@ -338,6 +338,7 @@ fn findings_report_text_is_stable() {
         schema_version: "0.2.0",
         status: ReportStatus::Pass,
         scanned_crates: 2,
+        allowed: Vec::new(),
         findings: Vec::new(),
     };
     assert_eq!(
