@@ -34,7 +34,7 @@ required work behind an advisory alias.
 Lint steps also accept `env` and `cwd`, with the same meaning as these fields
 on test command selectors. Values are passed literally to the child process;
 sc-lint does not expand variables or resolve environment values as paths.
-`cwd` is relative to the directory containing `sc-lint.toml`.
+`cwd` is relative to the repository root.
 
 ```toml
 [[tool.sc-lint.lint]]

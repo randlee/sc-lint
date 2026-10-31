@@ -38,8 +38,8 @@ Steps run in parallel (cargo steps serialized in declaration order) and fail
 slow, reporting every failed step; `--fail-fast` stops starting new cargo-lane
 and `after_all` steps after the first failure.
 Lint steps accept `env` and `cwd` just like test command selectors. `env`
-values reach the child verbatim and `cwd` is relative to the consumer config
-directory. With `--log-root`, every executed step writes stdout and stderr
+values reach the child verbatim and `cwd` is relative to the repository root.
+With `--log-root`, every executed step writes stdout and stderr
 under `<log-root>/steps/`; both streams are shown when a step fails.
 
 ## Output and CI

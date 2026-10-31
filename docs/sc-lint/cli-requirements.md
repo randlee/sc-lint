@@ -446,7 +446,9 @@ specialized backend tools and mixed Rust/Python implementations.
   `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`, including passing
   steps. The expanded-plan index is zero-based, safe names replace every byte
   outside ASCII letters, digits, `_` and `-` with `_`, and each run overwrites
-  the prior file for that step. This does not change the logger root or step
+  the prior file for that step. With no configured log root, no per-step log
+  files or `steps/` directory are created; failed-step stdout and stderr remain
+  visible in the command error. This does not change the logger root or step
   scheduling semantics.
 
 ## Contract References

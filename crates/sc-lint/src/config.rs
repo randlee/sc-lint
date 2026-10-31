@@ -825,24 +825,28 @@ fn profile_step_execution(
         return Ok((std::collections::BTreeMap::new(), None));
     }
     let parse_error = |error: crate::step_exec::StepExecError| {
-        let detail_code = if error.field == "env" || error.field.starts_with("env.") {
-            crate::profile_plan::ProfilePlanDetailCode::InvalidStepEnv
-        } else {
-            crate::profile_plan::ProfilePlanDetailCode::InvalidStepCwd
+        let detail_code = match error.kind {
+            crate::step_exec::StepExecErrorKind::Env => {
+                crate::profile_plan::ProfilePlanDetailCode::InvalidStepEnv
+            }
+            crate::step_exec::StepExecErrorKind::Cwd => {
+                crate::profile_plan::ProfilePlanDetailCode::InvalidStepCwd
+            }
         };
+        let subject = format!("lint step `{name}`");
         crate::profile_plan::profile_plan_config_error(
             crate::profile_plan::ProfilePlanError::new(
                 detail_code,
                 Some(name),
                 Some(&error.field),
-                error.message.replace("selector", "lint step"),
+                error.message(&subject),
                 format!("Correct the `{}` field on lint step `{name}`.", error.field),
             ),
             path,
         )
     };
-    let env = crate::step_exec::parse_env(name, step.env.as_ref()).map_err(parse_error)?;
-    let cwd = crate::step_exec::parse_cwd(name, step.cwd.as_ref()).map_err(parse_error)?;
+    let env = crate::step_exec::parse_env(step.env.as_ref()).map_err(parse_error)?;
+    let cwd = crate::step_exec::parse_cwd(step.cwd.as_ref()).map_err(parse_error)?;
     Ok((env, cwd))
 }
 

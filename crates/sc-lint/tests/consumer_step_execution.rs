@@ -67,6 +67,24 @@ fn consumer_failed_step_prints_both_streams() {
 }
 
 #[test]
+fn consumer_failed_step_without_log_root_prints_both_streams() {
+    let fixture = TempDir::new().expect("fixture");
+    write_config(
+        fixture.path(),
+        &[("env-cwd", "7", false), ("pass", "", false)],
+    );
+    let output = run_lint_without_log_root(fixture.path());
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("controlled stdout"), "{stderr}");
+    assert!(stderr.contains("controlled stderr"), "{stderr}");
+    assert!(
+        !fixture.path().join("sc-lint/steps").exists(),
+        "steps directory must not be created without a configured log root"
+    );
+}
+
+#[test]
 fn consumer_log_root_writes_every_step() {
     let fixture = TempDir::new().expect("fixture");
     write_config(
@@ -129,4 +147,14 @@ fn run_lint(root: &Path, logs: &Path) -> std::process::Output {
         .args(["lint", "ci", "--consumer"])
         .output()
         .expect("sc-lint consumer lint runs")
+}
+
+fn run_lint_without_log_root(root: &Path) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_sc-lint"))
+        .current_dir(root)
+        .env("HOME", root)
+        .env("USERPROFILE", root)
+        .args(["--json", "lint", "ci", "--consumer"])
+        .output()
+        .expect("sc-lint consumer lint runs without a step log root")
 }

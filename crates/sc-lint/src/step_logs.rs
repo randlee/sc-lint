@@ -22,6 +22,11 @@ pub(crate) fn step_log_file_name(expanded_plan_index: usize, name: &str) -> Stri
     )
 }
 
+pub(crate) fn step_log_path(root: &Path, expanded_plan_index: usize, name: &str) -> PathBuf {
+    root.join("steps")
+        .join(step_log_file_name(expanded_plan_index, name))
+}
+
 pub(crate) fn write_step_output(
     root: &Path,
     expanded_plan_index: usize,
@@ -29,9 +34,9 @@ pub(crate) fn write_step_output(
     stdout: &[u8],
     stderr: &[u8],
 ) -> io::Result<PathBuf> {
-    let directory = root.join("steps");
-    fs::create_dir_all(&directory)?;
-    let destination = directory.join(step_log_file_name(expanded_plan_index, name));
+    let destination = step_log_path(root, expanded_plan_index, name);
+    let directory = destination.parent().expect("step log path has a parent");
+    fs::create_dir_all(directory)?;
     let mut file = fs::File::create(&destination)?;
     use std::io::Write;
     file.write_all(b"[stdout]\n")?;
@@ -65,11 +70,17 @@ mod tests {
     #[test]
     fn step_logs_overwrite_per_run() {
         let root = tempfile::tempdir().expect("log root");
-        let path = write_step_output(root.path(), 0, "check", b"old\n", b"old error\n")
-            .expect("first write");
+        let path = write_step_output(
+            root.path(),
+            0,
+            "check",
+            b"old stdout with a longer tail\n",
+            b"old stderr with a longer tail\n",
+        )
+        .expect("first write");
         write_step_output(root.path(), 0, "check", b"new\n", b"new error\n")
             .expect("replacement write");
-        assert_eq!(path, root.path().join("steps/0000-check.log"));
+        assert_eq!(path, step_log_path(root.path(), 0, "check"));
         assert_eq!(
             fs::read(path).expect("read log"),
             b"[stdout]\nnew\n[stderr]\nnew error\n"

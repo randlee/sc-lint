@@ -4223,34 +4223,127 @@ fn lint_step_env_and_cwd_plan() {
         panic!("Windows xwin target should run on Linux");
     };
     assert!(planned.uses_cargo_xwin());
+    let xwin = crate::workflow::StepPlan::from_planned(planned);
     assert_eq!(
-        planned.env().get("PYO3_PYTHON").map(String::as_str),
-        Some(".bootstrap-venv/bin/python")
+        xwin.env(),
+        &[(
+            OsString::from("PYO3_PYTHON"),
+            OsString::from(".bootstrap-venv/bin/python"),
+        )]
     );
-    assert_eq!(planned.cwd(), Some(Path::new("crates/x")));
+    assert_eq!(xwin.cwd(), Some(Path::new("crates/x")));
+    assert_eq!(
+        xwin.display_command(),
+        "cargo xwin check --target x86_64-pc-windows-msvc"
+    );
+
+    let windows_decisions = crate::profile_plan::plan_consumer_lint(
+        &input.steps,
+        None,
+        PlatformScope::All,
+        crate::profile_plan::Platform::Windows,
+    )
+    .expect("plan native Windows target");
+    let crate::profile_plan::PlanDecision::Run(native) = &windows_decisions[0] else {
+        panic!("Windows host should run its native target");
+    };
+    let native = crate::workflow::StepPlan::from_planned(native);
+    assert_eq!(
+        native.env(),
+        &[(
+            OsString::from("PYO3_PYTHON"),
+            OsString::from(".bootstrap-venv/bin/python"),
+        )]
+    );
+    assert_eq!(native.cwd(), Some(Path::new("crates/x")));
+    assert_eq!(
+        native.display_command(),
+        "cargo check --target x86_64-pc-windows-msvc"
+    );
 }
 
 #[test]
 fn lint_step_env_cwd_errors() {
     let cases = [
-        ("env = \"bad\"", "env", "PROFILE.INVALID_STEP_ENV"),
         (
+            "bad env table",
+            "env = \"bad\"",
+            "env",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env must be a table of strings",
+        ),
+        (
+            "non-string env value",
             "env = { PYO3_PYTHON = 7 }",
             "env.PYO3_PYTHON",
             "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env must be a table of strings",
         ),
-        ("cwd = \"../outside\"", "cwd", "PROFILE.INVALID_STEP_CWD"),
+        (
+            "empty env key",
+            r#"env = { "" = "value" }"#,
+            "env.",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env key `` is empty or contains `=` or NUL",
+        ),
+        (
+            "equals env key",
+            r#"env = { "BAD=KEY" = "value" }"#,
+            "env.BAD=KEY",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env key `BAD=KEY` is empty or contains `=` or NUL",
+        ),
+        (
+            "NUL env key",
+            r#"env = { "BAD\u0000KEY" = "value" }"#,
+            "env.BAD\0KEY",
+            "PROFILE.INVALID_STEP_ENV",
+            "lint step `invalid` env key `BAD\0KEY` is empty or contains `=` or NUL",
+        ),
+        (
+            "escaping cwd",
+            "cwd = \"../outside\"",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
+        (
+            "empty cwd",
+            "cwd = \"\"",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
+        (
+            "absolute cwd",
+            "cwd = \"/outside\"",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
+        (
+            "non-string cwd",
+            "cwd = 7",
+            "cwd",
+            "PROFILE.INVALID_STEP_CWD",
+            "lint step `invalid` cwd must be a non-empty repo-root-relative path without `..`",
+        ),
     ];
-    for (field_line, field, detail_code) in cases {
+    for (label, field_line, field, detail_code, message) in cases {
         let rows = format!(
             "[[tool.sc-lint.lint]]\nname = \"invalid\"\ncommand = [\"true\"]\n{field_line}\n"
         );
         let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
-        let error = loaded.expect_err("malformed step execution field");
+        let error = loaded.expect_err(label);
         assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE);
         assert_eq!(error.details["detail_code"], detail_code);
         assert_eq!(error.details["field"], field);
         assert_eq!(error.details["step"], "invalid");
+        assert_eq!(
+            error.message,
+            format!("consumer lint profile configuration is invalid: {message}"),
+            "{label}"
+        );
     }
 }
 

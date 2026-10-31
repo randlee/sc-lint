@@ -83,9 +83,8 @@ profile name cannot shadow a step name or `all`.
 
 Lint steps also accept `env` and `cwd`, with the same meaning as those keys on
 test command selectors. Environment values are passed verbatim to the child;
-`cwd` is a non-empty path relative to the directory containing
-`sc-lint.toml`, without `..` components. Other undeclared lint-step keys remain
-configuration errors.
+`cwd` is a non-empty path relative to the repository root, without `..`
+components. Other undeclared lint-step keys remain configuration errors.
 
 ```toml
 [[tool.sc-lint.lint]]

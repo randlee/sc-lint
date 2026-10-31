@@ -543,10 +543,11 @@ fn parse_selector(
             )));
         }
     };
-    let env = crate::step_exec::parse_env(name, fields.get("env"))
-        .map_err(|error| malformed(error.message))?;
-    let cwd = crate::step_exec::parse_cwd(name, fields.get("cwd"))
-        .map_err(|error| malformed(error.message))?;
+    let subject = format!("selector `{name}`");
+    let env = crate::step_exec::parse_env(fields.get("env"))
+        .map_err(|error| malformed(error.message(&subject)))?;
+    let cwd = crate::step_exec::parse_cwd(fields.get("cwd"))
+        .map_err(|error| malformed(error.message(&subject)))?;
     let platforms = parse_platforms(name, fields.get("platforms"), malformed)?;
     let after_all = parse_after_all(name, &body, fields.get("after_all"), source)?;
     Ok(TestSelector {

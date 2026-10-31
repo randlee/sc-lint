@@ -345,8 +345,7 @@ impl SystemAdapter for HostSystemAdapter {
                     .with_detail(
                         "destination",
                         json!(
-                            root.join("steps")
-                                .join(crate::step_logs::step_log_file_name(*index, step.name()))
+                            crate::step_logs::step_log_path(root, *index, step.name())
                                 .display()
                                 .to_string()
                         ),
