@@ -42,7 +42,7 @@ make mid-sprint. Approval of this record gates dispatch only.
    files of the finding's `node_ids`; the finding is excluded when any such
    file matches an exclusion. The shared `Finding` schema in `sc-lint-schema`
    is unchanged.
-   **Amendment 2026-10-31 — Status: Pending (Rand).** Extend decision 5's
+   **Amendment 2026-10-31 — Status: Accepted (Rand 2026-10-31).** Extend decision 5's
    path-less exclusion behavior to `SCB-CYCLE-001`, alongside 002/003. Use
    the source-file set of `node_ids` and exclude a finding when any such file
    matches `exclude_paths_by_rule`. No shared Finding schema change and no

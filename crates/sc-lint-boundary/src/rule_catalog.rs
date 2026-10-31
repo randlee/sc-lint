@@ -187,6 +187,7 @@ pub const DEFAULT_FAIL_IDS: &[CatalogRuleId] = &[
 
 /// Rules with findings that can be matched to repository source paths.
 pub const PATH_ADDRESSABLE_IDS: &[CatalogRuleId] = &[
+    rule(RuleId::ScbCycle001),
     rule(RuleId::ScbCycle002),
     rule(RuleId::ScbCycle003),
     rule(RuleId::ScbManifest001),

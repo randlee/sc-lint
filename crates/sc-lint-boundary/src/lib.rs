@@ -719,7 +719,7 @@ fn apply_configured_rule_filter_with_canonicalizer(
     report
 }
 
-/// SCB-CYCLE-002/003 findings carry no path; they are excluded when any
+/// SCB-CYCLE-001/002/003 findings carry no path; they are excluded when any
 /// source file of their nodes matches a global or per-rule path exclusion.
 fn path_less_finding_excluded(
     finding: &Finding,
@@ -728,7 +728,10 @@ fn path_less_finding_excluded(
     canonical_root: Option<&Path>,
     node_paths: &NodeSourcePaths,
 ) -> bool {
-    if !matches!(finding.rule_id, RuleId::ScbCycle002 | RuleId::ScbCycle003) {
+    if !matches!(
+        finding.rule_id,
+        RuleId::ScbCycle001 | RuleId::ScbCycle002 | RuleId::ScbCycle003
+    ) {
         return false;
     }
     let paths = finding_source_paths(finding, root, canonical_root, node_paths);
