@@ -98,7 +98,7 @@ repo-configured suppression of production portability leaf rules. See
 
 | Field | Value |
 | --- | --- |
-| Status | Pending (Rand) |
+| Status | Accepted (Rand 2026-10-31) |
 | Source | #720, #786 ([shape table](https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641)); ADR-022 |
 
 This amendment extends Decision 6. PORT-010 recognises the two shapes below
@@ -115,8 +115,10 @@ heuristic.
    Out-of-line resolution follows `x.rs`, `x/mod.rs` and `#[path]`. An item in
    a module that is compiled on Windows is not covered.
 
-**Fail closed.** A missing or ambiguous module file gives no proof, and the
-finding stays. A production `#[cfg(unix)]` item with no companion and no
+**Fail closed.** A missing or ambiguous module file gives no Unix-only
+proof for items in that file; their findings stay. The exact
+`#[cfg(unix)] mod x;` declaration is exempt independently of file resolution.
+A production `#[cfg(unix)]` item outside S3/S6 with no companion and no
 portable fallback is still reported.
 
 **Everything else uses a site allowance.** The other #786 shapes (helpers of
@@ -127,5 +129,6 @@ shapes depend on call-graph analysis that would grow PORT-010's heuristics
 and could hide real gaps; a reasoned allowance at the site is cheaper and
 explicit.
 
-**Open for Rand.** Whether S6 covers `pub` modules and `pub` items, or only
-non-public modules, with `pub` ones needing a site allowance.
+**Accepted public scope.** S6 covers `pub` modules and `pub` items inside
+`#[cfg(unix)] mod x;`, as accepted by Rand on 2026-10-31. Visibility does not
+make a Unix-only module compile on Windows.

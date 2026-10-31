@@ -35,9 +35,15 @@ entries suppress only the named rule's findings at the listed paths; they do
 not hide other findings in the same file. See
 [configuration](../configuration.md) for syntax and filter precedence.
 
-Known limitation: a crate-root `main.rs` with a `#[cfg(unix)]` function and a
-`#[cfg(not(unix))]` sibling is still reported by PORT-010. This behavior is
-tracked for follow-up in GitHub issue #720.
+PORT-010 recognizes a non-test, same-name, same-kind `#[cfg(not(unix))]`
+sibling in the same lexical scope: crate root (including `main.rs`), inline or
+file module, or the same inherent impl (S3). Trait impls retain their existing
+treatment. It also recognizes `#[cfg(unix)] mod x;` declarations and items in
+proven Unix-only out-of-line modules, including public items (S6). Resolution
+follows `x.rs`, `x/mod.rs` and `#[path]`. Missing or ambiguous files give no
+Unix-only proof for their items; the exact Unix-gated module declaration is
+exempt independently of resolution. Other shapes or deliberate Unix-only
+items use a reasoned `#[sc_lint(allow(PORT-010), reason = "...")]` site allowance.
 
 ## Finding interpretation and CI
 

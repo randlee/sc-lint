@@ -588,7 +588,7 @@
       "id": "ANC-009",
       "source_type": "ANC",
       "source_ref": null,
-      "statement": "sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.",
+      "statement": "sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported unless that item carries its own reasoned #[sc_lint(allow(PORT-010), reason = \"...\")] (ANC-010).",
       "quote": "REQ-PRODUCT-004AA/PORT-010 (docs/requirements.md): \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"\n\nADR-010 decision 6 (Accepted): \"Explicit `#[cfg(unix)]` production boundaries are treated as structural parity questions for the shared portability family. Leaf rules may suppress inside those items, with the companion-or-fallback decision owned by the structural parity rule family instead of parallel per-rule allowlists.\"\n\nIssue #786 (atm-core verdict table, 2026-10-30): \"#720 covers only the crate-root main.rs shape; this issue tracks the complete remaining inventory and asks for per-case classification, not blanket suppression of real parity gaps.\"",
       "kind": "prohibition",
       "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
@@ -606,7 +606,7 @@
         ]
       },
       "question_overrides": {},
-      "version": 2,
+      "version": 3,
       "status": "locked",
       "promoted_to": null,
       "beads": {
@@ -645,6 +645,14 @@
             "lint-m-4"
           ],
           "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
+        },
+        {
+          "at": "2026-10-31T20:57:19+00:00",
+          "event": "updated",
+          "fields": [
+            "statement"
+          ],
+          "previous_statement": "sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported."
         }
       ]
     },

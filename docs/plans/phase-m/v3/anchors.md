@@ -214,7 +214,7 @@ Fixtures:
 
 ## ANC-009
 
-Anchor: sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.
+Anchor: sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported unless that item carries its own reasoned #[sc_lint(allow(PORT-010), reason = "...")] (ANC-010).
 
 > REQ-PRODUCT-004AA/PORT-010 (docs/requirements.md): "`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks"
 
@@ -222,7 +222,7 @@ ADR-010 decision 6 (Accepted): "Explicit `#[cfg(unix)]` production boundaries ar
 
 Issue #786 (atm-core verdict table, 2026-10-30): "#720 covers only the crate-root main.rs shape; this issue tracks the complete remaining inventory and asks for per-case classification, not blanket suppression of real parity gaps."
 
-Said by REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786, Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P9, 2026-10-30. Status: locked. Version 2.
+Said by REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786, Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P9, 2026-10-30. Status: locked. Version 3.
 
 Summary: P9
 
