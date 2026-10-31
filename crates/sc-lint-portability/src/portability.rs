@@ -174,6 +174,7 @@ pub(crate) fn analyze_portability(
     _settings: &AnalyzerSettings,
     analyzer_keys: &AnalyzerPortabilityKeys,
     platform_adapters: &platform_adapters::PlatformAdapters,
+    module_cfg: &crate::module_cfg::ModuleCfg,
 ) -> Result<Vec<(Finding, Option<RepoRelativePath>)>> {
     let config = load_portability_config(document, analyzer_keys)?;
     let source_files = discover_source_files_with_metadata(workspace)?;
@@ -201,6 +202,7 @@ pub(crate) fn analyze_portability(
                 file_context,
                 &config,
                 platform_adapters,
+                module_cfg.is_unix_only_file(&file_context.source_path),
             ));
             Ok(findings)
         })

@@ -10,9 +10,12 @@ use crate::RuleId;
 use crate::platform_adapters::PlatformAdapters;
 use crate::predicates::attr_is_cfg_unix;
 use crate::predicates::attr_is_cfg_windows;
+use crate::predicates::attr_is_exact_cfg_unix;
 use crate::predicates::attr_is_platform_cfg;
+use crate::predicates::has_not_unix_companion;
 use crate::predicates::has_portable_fallback;
 use crate::predicates::has_windows_companion;
+use crate::predicates::impl_method_has_not_unix_companion;
 use crate::predicates::impl_method_has_portable_fallback;
 use crate::predicates::impl_method_has_windows_companion;
 use crate::predicates::impl_method_is_cfg_unix_production_item;
@@ -30,13 +33,19 @@ use sc_lint_analyzer_support::span_start_line;
 pub(super) struct ParityContext<'a> {
     config: &'a PortabilityConfig,
     platform_adapters: Option<&'a PlatformAdapters>,
+    file_is_unix_only: bool,
 }
 
 impl<'a> ParityContext<'a> {
-    fn configured(config: &'a PortabilityConfig, platform_adapters: &'a PlatformAdapters) -> Self {
+    fn configured(
+        config: &'a PortabilityConfig,
+        platform_adapters: &'a PlatformAdapters,
+        file_is_unix_only: bool,
+    ) -> Self {
         Self {
             config,
             platform_adapters: Some(platform_adapters),
+            file_is_unix_only,
         }
     }
 
@@ -44,6 +53,7 @@ impl<'a> ParityContext<'a> {
         Self {
             config,
             platform_adapters: None,
+            file_is_unix_only: false,
         }
     }
 }
@@ -53,6 +63,7 @@ pub(super) fn collect_unix_portability_findings(
     file_context: &FileContext,
     config: &PortabilityConfig,
     platform_adapters: &PlatformAdapters,
+    file_is_unix_only: bool,
 ) -> Vec<PortabilityFinding> {
     let mut findings = Vec::new();
     let initial_scope = if file_context.is_test_file {
@@ -60,7 +71,7 @@ pub(super) fn collect_unix_portability_findings(
     } else {
         ScopeKind::NonTest
     };
-    let context = ParityContext::configured(config, platform_adapters);
+    let context = ParityContext::configured(config, platform_adapters, file_is_unix_only);
     visit_items_for_unix_portability(
         &file.items,
         initial_scope,
@@ -209,7 +220,7 @@ fn collect_parity_findings(
     findings: &mut Vec<PortabilityFinding>,
     context: ParityContext<'_>,
 ) {
-    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated || context.file_is_unix_only {
         return;
     }
     for item in items {
@@ -225,6 +236,9 @@ fn collect_parity_findings(
             || private_adapter_item
             || configured_exemption
             || has_windows_companion(item, items)
+            || has_not_unix_companion(item, items)
+            || matches!(item, Item::Mod(module)
+                if module.content.is_none() && module.attrs.iter().any(attr_is_exact_cfg_unix))
             || has_portable_fallback(item, items, inherited_scope)
         {
             continue;
@@ -243,7 +257,7 @@ pub(super) fn collect_impl_method_parity_findings(
     findings: &mut Vec<PortabilityFinding>,
     context: ParityContext<'_>,
 ) {
-    if inherited_scope != ScopeKind::NonTest {
+    if inherited_scope != ScopeKind::NonTest || context.file_is_unix_only {
         return;
     }
     for impl_item in &item_impl.items {
@@ -258,6 +272,8 @@ pub(super) fn collect_impl_method_parity_findings(
         if !impl_method_is_cfg_unix_production_item(unix_method, inherited_scope)
             || private_adapter_method
             || impl_method_has_windows_companion(unix_method, &item_impl.items)
+            || (item_impl.trait_.is_none()
+                && impl_method_has_not_unix_companion(unix_method, &item_impl.items))
             || impl_method_has_portable_fallback(unix_method, &item_impl.items, inherited_scope)
         {
             continue;

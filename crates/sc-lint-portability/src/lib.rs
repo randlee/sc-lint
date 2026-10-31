@@ -18,6 +18,7 @@ use serde::Serialize;
 use serde::Serializer;
 use thiserror::Error;
 
+mod module_cfg;
 mod platform_adapters;
 mod portability;
 mod predicates;
@@ -163,45 +164,52 @@ fn analyze_workspace_configured_with_metadata_loader(
     let settings = analyzer_settings_from(&PORTABILITY_CATALOG, &document, rule_filter)?;
     let analyzer_keys = portability::AnalyzerPortabilityKeys::from_settings(&settings)?;
     portability::validate_legacy_portability_config(&document)?;
-    let mut workspace = None;
-    let platform_adapters = platform_adapters::validate(
-        &options.root,
-        analyzer_keys.platform_adapter_records(),
-        &mut workspace,
-        &mut load_metadata,
-    )?;
-    let (findings, scanned_crates) = if settings.enabled {
-        if workspace.is_none() {
-            workspace = Some(load_metadata(&options.root).map_err(|source| {
-                PortabilityError::AnalyzeFindings {
-                    root: options.root.clone(),
-                    source: source.into(),
-                }
-            })?);
-        }
-        let Some(workspace) = workspace.as_ref() else {
-            return Err(PortabilityError::AnalyzeFindings {
+    let records = analyzer_keys.platform_adapter_records();
+    let scan_error = |source: anyhow_crate::Error| {
+        if records.is_empty() {
+            PortabilityError::AnalyzeFindings {
                 root: options.root.clone(),
-                source: anyhow_crate::anyhow!("workspace metadata was not loaded").into(),
-            });
-        };
-        let findings = portability::analyze_portability(
-            &options.root,
-            workspace,
-            &document,
-            &settings,
-            &analyzer_keys,
-            &platform_adapters,
-        )
-        .map_err(|source| PortabilityError::AnalyzeFindings {
-            root: options.root.clone(),
-            source: source.into(),
-        })?;
-        let scanned_crates = portability::count_scanned_crates(workspace);
-        (findings, scanned_crates)
-    } else {
-        (Vec::new(), 0)
+                source: source.into(),
+            }
+        } else {
+            PortabilityError::AdapterScan {
+                root: options.root.clone(),
+                source: source.into(),
+            }
+        }
     };
+    let workspace = if settings.enabled || !records.is_empty() {
+        Some(load_metadata(&options.root).map_err(scan_error)?)
+    } else {
+        None
+    };
+    let module_cfg = workspace
+        .as_ref()
+        .map(module_cfg::ModuleCfg::collect)
+        .transpose()
+        .map_err(scan_error)?
+        .unwrap_or_default();
+    let platform_adapters = platform_adapters::validate(&options.root, records, &module_cfg)?;
+    let (findings, scanned_crates) =
+        if let Some(workspace) = workspace.as_ref().filter(|_| settings.enabled) {
+            let findings = portability::analyze_portability(
+                &options.root,
+                workspace,
+                &document,
+                &settings,
+                &analyzer_keys,
+                &platform_adapters,
+                &module_cfg,
+            )
+            .map_err(|source| PortabilityError::AnalyzeFindings {
+                root: options.root.clone(),
+                source: source.into(),
+            })?;
+            let scanned_crates = portability::count_scanned_crates(workspace);
+            (findings, scanned_crates)
+        } else {
+            (Vec::new(), 0)
+        };
     let (findings, status) =
         settings.apply(findings, |rule_id| CatalogRuleId::new(rule_id.as_str()));
     Ok(FindingsReport {

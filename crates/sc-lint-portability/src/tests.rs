@@ -3218,6 +3218,205 @@ fn issue372_filter_keeps_configured_pair_valid_when_adapter_file_is_excluded() {
     );
 }
 
+fn phase_m_fixture(sources: &[(&str, &str)]) -> WorkspaceFixture {
+    let fixture = WorkspaceFixture::new();
+    fixture.write_workspace_root();
+    fixture.write_package_manifest("example");
+    for (path, source) in sources {
+        fixture.write_source("example", path, source);
+    }
+    fixture
+}
+
+fn phase_m_port010_items(report: &FindingsReport) -> Vec<String> {
+    let mut names = report
+        .findings
+        .iter()
+        .filter(|finding| finding.rule_id == RuleId::Port010)
+        .map(|finding| {
+            finding
+                .message
+                .split('`')
+                .nth(1)
+                .expect("item name")
+                .to_owned()
+        })
+        .collect::<Vec<_>>();
+    names.sort();
+    names
+}
+
+#[test]
+fn port010_s3_same_name_sibling() {
+    let fixture = phase_m_fixture(&[
+        (
+            "lib.rs",
+            r#"
+            #[cfg(unix)] fn library() {}
+            #[cfg(not(unix))] fn library() {}
+            mod inline {
+                #[cfg(unix)] fn paired() {}
+                #[cfg(not(unix))] fn paired() {}
+            }
+            struct Widget;
+            impl Widget {
+                #[cfg(unix)] fn paired(&self) {}
+                #[cfg(not(unix))] fn paired(&self) {}
+            }
+            #[cfg(unix)] mod paired_module {}
+            #[cfg(not(unix))] mod paired_module {}
+            mod file_scope;
+        "#,
+        ),
+        (
+            "file_scope.rs",
+            "#[cfg(unix)] fn paired() {}\n#[cfg(not(unix))] fn paired() {}",
+        ),
+        (
+            "main.rs",
+            "#[cfg(unix)] fn paired() {}\n#[cfg(not(unix))] fn paired() {}\nfn main() {}",
+        ),
+        (
+            "bin/extra.rs",
+            "#[cfg(unix)] fn paired() {}\n#[cfg(not(unix))] fn paired() {}\nfn main() {}",
+        ),
+    ]);
+    assert_eq!(
+        phase_m_port010_items(&analyze_fixture(&fixture)),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn port010_s3_negatives() {
+    let report = analyze_single_source(
+        r#"
+        #[cfg(unix)] fn different_kind() {}
+        #[cfg(not(unix))] mod different_kind {}
+        #[cfg(unix)] fn test_only() {}
+        #[cfg(all(test, not(unix)))] fn test_only() {}
+        #[cfg(unix)] fn separate_test_attr() {}
+        #[cfg(test)] #[cfg(not(unix))] fn separate_test_attr() {}
+        #[cfg(unix)] fn unrelated_cfg() {}
+        #[cfg(not(windows))] fn unrelated_cfg() {}
+        #[cfg(unix)] fn other_scope() {}
+        mod elsewhere { #[cfg(not(unix))] fn other_scope() {} }
+        #[cfg(unix)] fn absent() {}
+        struct Widget;
+        impl Widget { #[cfg(unix)] fn other_impl(&self) {} }
+        impl Widget { #[cfg(not(unix))] fn other_impl(&self) {} }
+        trait Probe { fn trait_method(&self); }
+        impl Probe for Widget {
+            #[cfg(unix)] fn trait_method(&self) {}
+            #[cfg(not(unix))] fn trait_method(&self) {}
+        }
+    "#,
+    );
+    assert_eq!(
+        phase_m_port010_items(&report),
+        [
+            "absent",
+            "different_kind",
+            "other_impl",
+            "other_scope",
+            "separate_test_attr",
+            "test_only",
+            "trait_method",
+            "unrelated_cfg",
+        ]
+    );
+}
+
+#[test]
+fn port010_s6_unix_module() {
+    let fixture = phase_m_fixture(&[
+        (
+            "lib.rs",
+            "#[cfg(unix)] pub mod flat;\n#[cfg(unix)] mod directory;\n#[cfg(unix)] #[path = \"special/implementation.rs\"] pub mod alias;",
+        ),
+        ("flat.rs", "#[cfg(unix)] pub fn flat_item() {}"),
+        (
+            "directory/mod.rs",
+            "#[cfg(unix)] pub(crate) fn directory_item() {}",
+        ),
+        (
+            "special/implementation.rs",
+            "#[cfg(unix)] fn path_item() {}",
+        ),
+    ]);
+    assert!(phase_m_port010_items(&analyze_fixture(&fixture)).is_empty());
+}
+
+#[test]
+fn port010_s6_file_module_items() {
+    let fixture = phase_m_fixture(&[
+        ("lib.rs", "#[cfg(unix)] pub mod outer;"),
+        (
+            "outer.rs",
+            "pub mod child;\npub mod inline { #[path = \"nested_file.rs\"] pub mod nested; }",
+        ),
+        (
+            "outer/child.rs",
+            r#"
+            use std::os::unix::fs::MetadataExt;
+            #[cfg(unix)] pub fn public_item() {}
+            #[cfg(unix)] pub(crate) fn restricted_item() {}
+            struct Widget;
+            impl Widget { #[cfg(unix)] pub fn method(&self) {} }
+            trait Probe { fn probe(&self); }
+            impl Probe for Widget { #[cfg(unix)] fn probe(&self) {} }
+        "#,
+        ),
+        (
+            "outer/inline/nested_file.rs",
+            "#[cfg(unix)] pub fn deeply_nested() {}",
+        ),
+    ]);
+    let report = analyze_fixture(&fixture);
+    assert!(phase_m_port010_items(&report).is_empty());
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.rule_id == RuleId::Port004),
+        "S6 changes parity only; it must not disable the independent leaf rules"
+    );
+}
+
+#[test]
+fn port010_s6_negatives() {
+    let fixture = phase_m_fixture(&[
+        (
+            "lib.rs",
+            r#"
+            #[cfg(any(unix, windows))] mod portable;
+            #[cfg(unix)] mod ambiguous;
+            #[cfg(unix)] #[path = "absent.rs"] mod missing;
+            #[path = "shared.rs"] mod portable_alias;
+            #[cfg(unix)] #[path = "shared.rs"] mod unix_alias;
+            #[cfg(unix)] #[path = "lib.rs"] mod root_alias;
+            #[cfg(unix)] fn root_gap() {}
+        "#,
+        ),
+        ("portable.rs", "#[cfg(unix)] fn portable_item() {}"),
+        ("ambiguous.rs", "#[cfg(unix)] fn ambiguous_flat() {}"),
+        ("ambiguous/mod.rs", "#[cfg(unix)] fn ambiguous_mod() {}"),
+        ("orphan.rs", "#[cfg(unix)] fn orphan() {}"),
+        ("shared.rs", "#[cfg(unix)] fn shared_item() {}"),
+    ]);
+    assert_eq!(
+        phase_m_port010_items(&analyze_fixture(&fixture)),
+        [
+            "ambiguous_flat",
+            "ambiguous_mod",
+            "orphan",
+            "portable_item",
+            "root_gap",
+            "shared_item",
+        ]
+    );
+}
+
 struct WorkspaceFixture {
     tempdir: TempDir,
 }

@@ -41,6 +41,20 @@ pub(crate) fn attr_is_cfg_unix(attr: &Attribute) -> bool {
     attr_is_cfg_target(attr, "unix")
 }
 
+pub(crate) fn attr_is_exact_cfg_unix(attr: &Attribute) -> bool {
+    attr.path().is_ident("cfg")
+        && attr
+            .parse_args::<syn::Ident>()
+            .is_ok_and(|name| name == "unix")
+}
+
+fn attr_is_exact_cfg_not_unix(attr: &Attribute) -> bool {
+    attr.path().is_ident("cfg")
+        && matches!(attr.parse_args::<Meta>(), Ok(Meta::List(list))
+            if list.path.is_ident("not")
+                && list.parse_args::<syn::Ident>().is_ok_and(|name| name == "unix"))
+}
+
 pub(crate) fn attr_is_platform_cfg(attr: &Attribute) -> bool {
     attr_is_unix_family_cfg(attr) || attr_is_cfg_target(attr, "windows")
 }
@@ -137,7 +151,17 @@ pub(crate) fn is_cfg_unix_production_item(item: &Item, inherited_scope: ScopeKin
 
 pub(crate) fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
     sibling_items.iter().any(|candidate| {
-        same_item_identifier(unix_item, candidate) && item_has_cfg_windows(candidate)
+        same_item_identifier(unix_item, candidate)
+            && !item_is_test_scoped(candidate, ScopeKind::NonTest)
+            && item_has_cfg_windows(candidate)
+    })
+}
+
+pub(crate) fn has_not_unix_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
+    sibling_items.iter().any(|candidate| {
+        same_item_identifier(unix_item, candidate)
+            && !item_is_test_scoped(candidate, ScopeKind::NonTest)
+            && item_attrs(candidate).iter().any(attr_is_exact_cfg_not_unix)
     })
 }
 
@@ -154,7 +178,8 @@ pub(crate) fn has_portable_fallback(
 }
 
 pub(crate) fn same_item_identifier(left: &Item, right: &Item) -> bool {
-    item_identifier(left) == item_identifier(right)
+    std::mem::discriminant(left) == std::mem::discriminant(right)
+        && item_identifier(left) == item_identifier(right)
 }
 
 pub(crate) fn item_has_cfg_windows(item: &Item) -> bool {
@@ -197,7 +222,22 @@ pub(crate) fn impl_method_has_windows_companion(
             return false;
         };
         unix_method.sig.ident == candidate_fn.sig.ident
+            && classify_scope(&candidate_fn.attrs, ScopeKind::NonTest, None) == ScopeKind::NonTest
             && candidate_fn.attrs.iter().any(attr_is_cfg_windows)
+    })
+}
+
+pub(crate) fn impl_method_has_not_unix_companion(
+    unix_method: &ImplItemFn,
+    sibling_items: &[ImplItem],
+) -> bool {
+    sibling_items.iter().any(|candidate| {
+        let ImplItem::Fn(candidate) = candidate else {
+            return false;
+        };
+        unix_method.sig.ident == candidate.sig.ident
+            && classify_scope(&candidate.attrs, ScopeKind::NonTest, None) == ScopeKind::NonTest
+            && candidate.attrs.iter().any(attr_is_exact_cfg_not_unix)
     })
 }
 
