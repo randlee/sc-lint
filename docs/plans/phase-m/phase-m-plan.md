@@ -23,38 +23,40 @@ sprints fit together.
 | m-1 port010-same-name-siblings | A1 | clint | #720, #786 S3 | ANC-003, ANC-009 |
 | m-5a port010-helper-shapes | A2 | clint | #786 S1, S5 | ANC-001, ANC-005, ANC-009 |
 | m-5b port010-renamed-and-rejected-config | A3 | clint | #786 S2, S7 | ANC-002, ANC-008, ANC-009 |
-| m-5c port010-portable-sibling-and-unix-module | A4 | clint | #786 S4, S6 | ANC-004, ANC-006, ANC-007, ANC-009 |
-| m-6 port010-atm-core-closure | A5 | clint | #786, #720 | ANC-009, ANC-010 |
+| m-5c port010-portable-sibling-and-unix-module | A4 (top) | clint | #786 S4, S6; #786/#720 closure tests | ANC-004, ANC-006, ANC-007, ANC-009, ANC-010 |
 | m-4 port010-site-allow | B1 | cfast | #786 S8 | ANC-010, ANC-009 |
 | m-2 manifest004-local-module-paths | C1 | cfast | #136 | ANC-013 |
 | m-3 lint-step-env-cwd | D1 | cfast | #198 | ANC-011, ANC-012 |
+| m-7 consumer-step-visible-output | E1 | cfast | #195 (visible output) | none |
+| m-8 boundary-cycle-finding-paths | F1 | cfast | #385 (path-less cycle findings) | none |
 
 ## Branch Stacks And Parallelism
 
 ```text
 develop
-├── A (clint): m-1 ─► m-5a ─► m-5b ─► m-5c ─► m-6 ◄── merges B forward
+├── A (clint): m-1 ─► m-5a ─► m-5b ─► m-5c ◄── develop merged in after B lands
 ├── B (cfast): m-4
 ├── C (cfast): m-2
-└── D (cfast): m-3
+├── D (cfast): m-3
+├── E (cfast): m-7
+└── F (cfast): m-8
 ```
 
-Stack A has five layers, one above the four-layer guideline. Every layer
-edits `parity.rs`, `companion_index.rs` and the port010 fixtures, and each
-shape builds on the companion index of the layer below, so splitting A would
-create parallel edits to the same files. m-6 is a short closure layer.
+Stack A has four layers. Every layer edits `parity.rs`, `companion_index.rs`
+and the port010 fixtures, and each shape builds on the companion index of the
+layer below, so splitting A would create parallel edits to the same files.
 
 No owner works two stacks at once: clint owns A; cfast takes C, then B, then
-D. B and D also wait for lint-t6i7.
+D, E and F. B and D also wait for lint-t6i7.
 
 Shared files between stacks:
 
 | File | Stacks | Owner of the merge |
 | --- | --- | --- |
-| `crates/sc-lint-portability/src/portability/parity.rs` | A (all layers), B (one `site_allow::allowance_for` call) | m-6 |
-| `crates/sc-lint-portability/src/lib.rs` | A (m-5a module list), B (module list, error variants) | m-6 |
-| `crates/sc-lint-portability/Cargo.toml` | B (directives dependency) | m-6 |
-| `crates/sc-lint-portability/src/tests.rs` | A, B | m-6 |
+| `crates/sc-lint-portability/src/portability/parity.rs` | A (all layers), B (one `site_allow::allowance_for` call) | m-5c (after B lands) |
+| `crates/sc-lint-portability/src/lib.rs` | A (m-5a module list), B (module list, error variants) | m-5c (after B lands) |
+| `crates/sc-lint-portability/Cargo.toml` | B (directives dependency) | m-5c (after B lands) |
+| `crates/sc-lint-portability/src/tests.rs` | A, B | m-5c (after B lands) |
 
 ### Stack protocol
 
@@ -65,34 +67,58 @@ Shared files between stacks:
    `gh stack link --base develop <bottom-pr> ... <top-pr>`, or appends with
    `gh stack link <stack#> <pr>`.
 3. **Merge forward.** A lower layer's later commits reach the layers above by
-   merge, never by `gh stack sync` or `gh stack rebase`. m-6 merges the m-4
-   branch forward.
+   merge, never by `gh stack sync` or `gh stack rebase`. Once stack B lands on
+   develop, the stack writer merges develop into m-5c; this is a stack step,
+   not a sprint.
 4. **Land.** Stacks B, C and D land independently with
-   `gh stack merge <stack#> --yes --merge`. Stack A lands after m-6, with B
-   already merged or carried in m-6.
+   `gh stack merge <stack#> --yes --merge`. Stack A lands after B, carrying
+   develop merged into m-5c.
 
 | Sprint | Stack | Runs in parallel with | Waits for | Unblocked when |
 | --- | --- | --- | --- | --- |
 | m-1 | A | m-2, m-4, m-3 | lint-phase-m-plan-qa, lint-m-adr010 | gates close |
 | m-5a | A | m-2, m-4, m-3 | m-1 unblock milestone | ScopeKey, ItemKind, per-package fixtures and atm_core_inventory.toml committed on sprint/m-1-port010-same-name-siblings |
 | m-5b | A | m-4, m-3 | m-5a unblock milestone | companion_index.rs with CompanionIndex::build, production_callers_of, gate_of, has_companion committed on sprint/m-5a-port010-helper-shapes |
-| m-5c | A | m-4, m-3 | m-5b unblock milestone | callers_by_branch and the S2 arm of has_companion committed on sprint/m-5b-port010-renamed-and-rejected-config |
-| m-6 | A | none | m-5c unblock milestone, m-4 done | S4 and S6 arms committed on sprint/m-5c-port010-portable-sibling-and-unix-module, and m-4 complete on sprint/m-4-port010-site-allow |
+| m-5c | A | m-4, m-3 | m-5b unblock milestone; m-4 landed before its closure tests | callers_by_branch and the S2 arm of has_companion committed on sprint/m-5b-port010-renamed-and-rejected-config |
 | m-2 | C | A | lint-phase-m-plan-qa | gate closes |
 | m-4 | B | A | lint-phase-m-plan-qa, lint-t6i7, m-2 complete (owner) | gates close |
 | m-3 | D | A | lint-phase-m-plan-qa, lint-t6i7, m-4 complete (owner) | gates close |
+| m-7 | E | A | lint-phase-m-plan-qa | gate closes |
+| m-8 | F | A | lint-phase-m-plan-qa | gate closes |
 
 CI and QA run alongside the next layer; they do not delay its start.
 
 Unblock milestones for issues: #136 closes when stack C lands; #198 when
-stack D lands; #786 and #720 when stack A (carrying B) lands with the live
-atm-core run clean, and atm-core removes its 18 PORT-010 exclusions.
+stack D lands; #786 and #720 when stack A lands after B. Each then closes
+through its closure bead below, and atm-core removes its 18 PORT-010
+exclusions after the release.
+
+## Issue Closure
+
+Phase M is not complete until every closure bead is closed (lint-phase-m
+depends on lint-8h3t). Every open issue labelled 0.8.3 or earlier closes only with quality-mgr
+evidence posted on the issue (epic lint-8h3t, one closure bead per issue).
+The checks were agreed with atm-core on 2026-10-31 (lint-419k).
+
+| Issue | Closure check | Waits for |
+| --- | --- | --- |
+| #786, #720 | 0 PORT-010 findings over all 18 atm-core paths at its current head, exclusions removed | m-5c |
+| #136 | 0 SCB-MANIFEST-004 findings at atm-core head (incl. `commands/mod.rs`), non-owner mutation still reported | m-2 |
+| #198 | lint step `env` `PYO3_PYTHON` makes clippy pass with PATH python < 3.11, via bare `sc-lint` | m-3 |
+| #643, #376, #192, #586 | the issue's repro; for #643/#376 also atm-core 6ffaa97be clean = 0 and injected faults reported | closed 2026-10-31 with evidence |
+| #195 | both streams printed for a failed step; `<log-root>/<step>.log` for every step | m-7 |
+| #385 | `exclude_paths_by_rule` removes an SCB-CYCLE-001 finding in one file only | m-8 |
+| #777, #778, #782 | 0.8.3 release assets; #782 also needs Rand's go for winget-pkgs | 0.8.3 release (lint-8h3t.1) |
+
+Stack A also checks `port010_inventory_burndown` in every layer, so a shape
+that leaves its own atm-core findings reported fails in that layer.
 
 ## Determinism
 
 Every gating test uses committed fixtures: no sleeps, retries, network, clock
-or host-dependent paths. The m-6 live atm-core run is a developer-run
-acceptance check, not a CI test, and a non-zero result fails m-6.
+or host-dependent paths. Sprints test atm-core code only through committed
+fixture replays. Runs against atm-core itself belong to the closure beads,
+which quality-mgr runs after the sprint lands, not to sprint acceptance.
 
 ## Pending Decisions For Rand
 

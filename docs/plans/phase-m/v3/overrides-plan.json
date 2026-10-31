@@ -286,7 +286,7 @@
           "unclear": "`item.text` states an outcome close to this that cannot be read as the full commitment or not.",
           "yes": "`item.text` states, in any wording, that PORT-010 does not report such an item in modules, inherent impls and crate roots, with no scope or item kind carved out."
         },
-        "instructions": "`anchor.statement` requires that PORT-010 not report a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same module, inherent impl or crate root. Does `item.text` commit to that outcome as part of this item? Saying 'crate root' covers lib.rs, main.rs and src/bin files. Still reporting pairs that differ in name, kind or scope is consistent with the commitment. Judge commitment only, not conflict.",
+        "instructions": "`anchor.statement` requires that PORT-010 not report a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same module, inherent impl or crate root. Does `item.text` commit to that outcome as part of this item? Saying 'crate root' covers lib.rs, main.rs and src/bin files. Still reporting pairs that differ in name, kind or scope is consistent with the commitment. Judge commitment only, not conflict. Work on other shapes, such as un-gated or differently named alternatives, helpers of paired callers or rejected-config accessors, commits nothing to this outcome, even when it also stops a PORT-010 report.",
         "type": "choice"
       },
       "contradicted": {
@@ -300,11 +300,11 @@
       },
       "relevant": {
         "criteria": {
-          "no": "`item.text` covers only other PORT-010 shapes that involve no same-name #[cfg(not(unix))] sibling (helpers of paired callers, differently named or renamed companions, un-gated loopback TCP alternatives, unix-only modules, unix-only-by-design sites allowed per site), other rules, configuration, or release work. Merely saying that earlier sprints' tests still pass is not work on this subject.",
-          "unclear": "`item.text` describes PORT-010 companion work that cannot be placed as same-name sibling handling or as another subject.",
-          "yes": "`item.text` names #786 S3 or #720, or describes PORT-010 and a #[cfg(unix)] item with a same-name #[cfg(not(unix))] item in the same module, impl or crate root, or builds what that handling directly needs."
+          "no": "The item works only on other PORT-010 shapes that involve no same-name #[cfg(not(unix))] sibling (helpers of paired callers, differently named or renamed companions, un-gated loopback TCP alternatives, rejected-config accessors, unix-only modules, unix-only-by-design sites allowed per site), other rules, configuration, or release work, or mentions same-name pairs only as context or as earlier tests to keep passing.",
+          "unclear": "The item mentions same-name pairs in a way that cannot be told to be work on their PORT-010 result or only context.",
+          "yes": "The item works on PORT-010's result for the #[cfg(unix)] item of such a same-name pair, in any wording and in any direction, alone or with other shapes."
         },
-        "instructions": "`anchor.scope` covers one subject: how PORT-010 treats a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same scope, where the scope is a module, an inherent impl, or a crate root (lib.rs, main.rs or a src/bin file) (#720, #786 shape S3). Is that subject, or a direct prerequisite for handling it, present in `item.text`? Judge subject presence only, whatever the item plans; do not judge whether the item obeys `anchor.statement`.",
+        "instructions": "Does `item.text` decide, change, keep or defer whether PORT-010 reports a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same scope, where the scope is a module, an inherent impl, or a crate root (lib.rs, main.rs or a src/bin file) (#720, #786 shape S3), or build what that decision directly needs? Items that mention such same-name pairs only as context for another shape (for example as the callers of renamed functions or of helpers) without changing whether PORT-010 reports the #[cfg(unix)] item of the pair, and items that only require earlier S3 tests or an inventory burn-down to keep passing, are no. Judge subject presence only, whatever the item plans; do not judge whether the item obeys `anchor.statement`.",
         "type": "choice"
       }
     }
