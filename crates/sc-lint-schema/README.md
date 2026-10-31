@@ -22,8 +22,9 @@ Representative shared schema types include:
 - `validate_adapter_payload` and `PayloadDrift` for checking the shape of the
   Python adapter transport payload before normalization
 - `validate_analyzer_report` and `AnalyzerReportDrift` for checking Rust
-  analyzer output against the published
-  [`analyzer-report-v1` JSON Schema](schema/analyzer-report-v1.schema.json)
+  analyzer output against the published schema selected by `schema_version`:
+  [`analyzer-report-v1` for `0.1.0`](schema/analyzer-report-v1.schema.json) or
+  [`analyzer-report-v2` for `0.2.0`](schema/analyzer-report-v2.schema.json)
 - finding records
   - stable rule id, location, message, and severity fields
 - analyzer report payloads

@@ -701,10 +701,10 @@ Phase `C` also closed the shared `sc-lint-portability` follow-on line:
     `#[cfg(unix)]` item outside these cases with no companion or portable
     fallback remains reported; unresolved file-module proof does not exempt
     its items
-  - pending acceptance of ADR-022: a single item may be allowed with
-    `#[sc_lint(allow(PORT-010), reason = "...")]` (ADR-022 decision 4); the
+  - ADR-022 decision 4 allows a single item with
+    `#[sc_lint(allow(PORT-010), reason = "...")]`; the
     report lists each honored allowance with its reason
-    (the site-allowance surface is implemented separately in Phase M m-4)
+    (implemented in Phase M m-4)
 
 ## Requirement Management
 

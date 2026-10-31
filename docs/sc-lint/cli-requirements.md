@@ -450,6 +450,8 @@ specialized backend tools and mixed Rust/Python implementations.
   files or `steps/` directory are created; failed-step stdout and stderr remain
   visible in the command error. This does not change the logger root or step
   scheduling semantics.
+  (Source: #195, Phase M m-3; Status: Accepted — Rand, 2026-10-31; ADR-022
+  decisions 3 and 6 provide related configuration context.)
 
 ## Contract References
 
