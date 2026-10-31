@@ -87,7 +87,7 @@ fn machine_report_matches_frozen_json_contract() {
     let report = FindingsReport {
         tool: "sc-lint-portability",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1,
         status: ReportStatus::Fail,
         scanned_crates: 1,
         allowed: Vec::new(),
@@ -106,7 +106,7 @@ fn machine_report_matches_frozen_json_contract() {
 
     assert_eq!(
         expected["schema_version"].as_str(),
-        Some(SC_LINT_SCHEMA_VERSION_V1),
+        Some(sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1),
         "golden schema_version must match analyzer reports"
     );
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
@@ -170,7 +170,7 @@ fn findings_report_text_is_stable() {
     let report = FindingsReport {
         tool: "sc-lint-portability",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1,
         status: ReportStatus::Pass,
         scanned_crates: 2,
         allowed: Vec::new(),
@@ -187,7 +187,7 @@ fn findings_report_text_renders_failure_status_and_count() {
     let report = FindingsReport {
         tool: "sc-lint-portability",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1,
         status: ReportStatus::Fail,
         scanned_crates: 4,
         allowed: Vec::new(),
@@ -2751,7 +2751,10 @@ fn port010_site_allow() {
         "This public function intentionally uses a POSIX-only API."
     );
     assert_eq!(function_allowance.line(), expected_line);
-    assert_eq!(report.schema_version, "0.2.0");
+    assert_eq!(
+        report.schema_version,
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    );
     let json = serde_json::to_value(&report).expect("report serializes");
     assert_eq!(
         json["allowed"][0]["source_path"],
@@ -2889,7 +2892,10 @@ fn portability_ignores_boundary_allow_directives() {
             && finding.message.contains("still_needs_a_windows_companion")
     }));
     assert!(report.allowed.is_empty());
-    assert_eq!(report.schema_version, "0.1.0");
+    assert_eq!(
+        report.schema_version,
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1
+    );
 }
 
 #[test]
@@ -2906,7 +2912,10 @@ fn portability_ignores_allowances_owned_by_other_analyzers() {
             && finding.message.contains("still_needs_a_windows_companion")
     }));
     assert!(report.allowed.is_empty());
-    assert_eq!(report.schema_version, "0.1.0");
+    assert_eq!(
+        report.schema_version,
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1
+    );
 }
 
 #[test]
@@ -3527,7 +3536,10 @@ fn port010_companions_and_site_allowances_coexist() {
             "portable::intentional"
         ]
     );
-    assert_eq!(report.schema_version, "0.2.0");
+    assert_eq!(
+        report.schema_version,
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    );
 }
 
 #[test]
@@ -3863,4 +3875,127 @@ fn platform_adapter_reason_rejects_empty_and_blank_text() {
     assert_eq!(NonEmptyReason::new(String::new()), None);
     assert_eq!(NonEmptyReason::new(" \t\n".to_owned()), None);
     assert!(NonEmptyReason::new("Reviewed private transport adapter.".to_owned()).is_some());
+}
+
+#[test]
+fn site_allow_respects_analyzer_settings() {
+    let fixture = phase_m_fixture(&[(
+        "lib.rs",
+        r#"
+        #[cfg(unix)]
+        #[sc_lint(allow(PORT-010), reason = "This function exposes a POSIX-only API.")]
+        pub fn intentional() {}
+    "#,
+    )]);
+    for (config, filter, expected) in [
+        ("", None, 1),
+        ("", Some("PORT-004"), 0),
+        (r#"exclude_rules = ["PORT-010"]"#, None, 0),
+        (r#"exclude_rules = ["PORT-010"]"#, Some("PORT-010"), 1),
+        (r#"exclude_paths = ["crates/example/src/lib.rs"]"#, None, 0),
+        (
+            r#"exclude_paths = ["crates/example/src/other.rs"]"#,
+            None,
+            1,
+        ),
+        (
+            "[tool.sc-lint.analyzers.portability.exclude_paths_by_rule]\n\"PORT-010\" = [\"crates/example/src/lib.rs\"]",
+            None,
+            0,
+        ),
+    ] {
+        fixture.write_lint_config(&format!("[tool.sc-lint.analyzers.portability]\n{config}\n"));
+        let report = analyze_workspace_configured(
+            &AnalyzeOptions {
+                root: fixture.root().to_path_buf(),
+                format: OutputFormat::Json,
+            },
+            None,
+            filter,
+        )
+        .expect("valid settings");
+        assert_eq!(
+            report.allowed.len(),
+            expected,
+            "config={config:?}, filter={filter:?}"
+        );
+        assert_eq!(
+            report.schema_version,
+            if expected == 0 {
+                sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1
+            } else {
+                sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+            }
+        );
+    }
+}
+
+#[test]
+fn nested_items_keep_unix_file_context_and_site_allowances() {
+    let fixture = phase_m_fixture(&[
+        ("lib.rs", "#[cfg(unix)] mod unix_only; mod portable;"),
+        (
+            "unix_only.rs",
+            r#"
+            pub fn outer() {
+                #[cfg(unix)] fn unix_nested() {}
+                struct Local;
+                impl Local { #[cfg(unix)] pub fn method(&self) {} }
+            }
+        "#,
+        ),
+        (
+            "portable.rs",
+            r#"
+            pub fn outer() {
+                #[cfg(unix)]
+                #[sc_lint(allow(PORT-010), reason = "This nested helper exposes a POSIX-only API.")]
+                fn intentional() {}
+                #[cfg(unix)] fn nested_gap() {}
+                {
+                    #[cfg(unix)] fn paired() {}
+                    #[cfg(not(unix))] fn paired() {}
+                    #[cfg(unix)]
+                    #[sc_lint(allow(PORT-010), reason = "This block helper exposes a POSIX-only API.")]
+                    fn block_intentional() {}
+                }
+                struct Local;
+                impl Local { #[cfg(unix)] pub fn real_gap(&self) {} }
+            }
+            struct Host;
+            impl Host {
+                pub fn run() {
+                    #[cfg(unix)]
+                    #[sc_lint(allow(PORT-010), reason = "This method-local helper exposes a POSIX-only API.")]
+                    fn method_intentional() {}
+                }
+            }
+            trait Action { fn perform(); }
+            impl Action for Host {
+                fn perform() {
+                    #[cfg(unix)]
+                    #[sc_lint(allow(PORT-010), reason = "This trait-method-local helper exposes a POSIX-only API.")]
+                    fn trait_intentional() {}
+                }
+            }
+        "#,
+        ),
+    ]);
+    let report = analyze_fixture(&fixture);
+    assert_eq!(phase_m_port010_items(&report), ["nested_gap", "real_gap"]);
+    let mut allowed = report
+        .allowed
+        .iter()
+        .map(|entry| entry.item())
+        .collect::<Vec<_>>();
+    allowed.sort();
+    assert_eq!(
+        allowed,
+        [
+            "portable::Host::method_intentional",
+            "portable::Host::trait_intentional",
+            "portable::block_intentional",
+            "portable::intentional"
+        ]
+    );
 }

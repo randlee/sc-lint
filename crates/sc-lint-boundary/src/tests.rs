@@ -284,7 +284,7 @@ fn machine_report_matches_frozen_json_contract() {
     let report = FindingsReport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.2.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
         status: ReportStatus::Fail,
         scanned_crates: 1,
         allowed: Vec::new(),
@@ -303,7 +303,7 @@ fn machine_report_matches_frozen_json_contract() {
 
     assert_eq!(
         expected["schema_version"].as_str(),
-        Some(SC_LINT_SCHEMA_VERSION),
+        Some(sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2),
         "golden schema_version must match analyzer reports"
     );
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
@@ -335,7 +335,7 @@ fn findings_report_text_is_stable() {
     let report = super::FindingsReport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.2.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
         status: ReportStatus::Pass,
         scanned_crates: 2,
         allowed: Vec::new(),
@@ -352,14 +352,17 @@ fn graph_export_serializes_tool_metadata() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.2.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
         nodes: Vec::new(),
         edges: Vec::new(),
     };
     let json = serde_json::to_string(&graph).unwrap();
     assert!(json.contains("\"tool\":\"sc-lint-boundary\""));
     assert!(json.contains("\"version\":\"0.1.0\""));
-    assert!(json.contains("\"schema_version\":\"0.2.0\""));
+    assert!(json.contains(&format!(
+        "\"schema_version\":\"{}\"",
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    )));
 }
 
 #[test]
@@ -367,7 +370,7 @@ fn render_graph_export_json_includes_nodes_edges_and_optional_fields() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.2.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
         nodes: vec![GraphNode {
             id: NodeId::new("crate::example::example"),
             kind: "type",
@@ -409,7 +412,7 @@ fn render_graph_export_turtle_escapes_special_characters_and_attributes() {
     let graph = GraphExport {
         tool: "sc-lint-boundary",
         version: "0.1.0",
-        schema_version: "0.2.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2,
         nodes: vec![GraphNode {
             id: NodeId::new("crate::example::example"),
             kind: "type",
@@ -735,7 +738,10 @@ fn renders_graph_as_turtle() {
     assert!(turtle.contains("rdf:type sc:type ."));
     assert!(turtle.contains("sc:visibility \"public\" ."));
     assert!(turtle.contains("sc:label \"Example\" ."));
-    assert!(turtle.contains("sc:schemaVersion \"0.2.0\" ."));
+    assert!(turtle.contains(&format!(
+        "sc:schemaVersion \"{}\" .",
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    )));
 }
 
 #[test]
@@ -5640,7 +5646,10 @@ fn schema_v02_fixture_captures_trait_method_id_migration_in_json_and_turtle() {
         hex_encode(b"Legacy")
     ));
 
-    assert_eq!(graph.schema_version, "0.2.0");
+    assert_eq!(
+        graph.schema_version,
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    );
     assert!(graph.nodes.iter().any(|node| node.id == owner_id));
     assert!(graph.nodes.iter().any(|node| node.id == inherent_id));
     assert!(graph.nodes.iter().any(|node| node.id == typed_id));
@@ -5656,12 +5665,18 @@ fn schema_v02_fixture_captures_trait_method_id_migration_in_json_and_turtle() {
 
     let graph_json: serde_json::Value =
         serde_json::from_str(&render_graph_export_json(&graph)).unwrap();
-    assert_eq!(graph_json["schema_version"], "0.2.0");
+    assert_eq!(
+        graph_json["schema_version"],
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    );
     assert!(graph_json.to_string().contains(typed_id.as_str()));
     assert!(graph_json.to_string().contains(legacy_id.as_str()));
 
     let turtle = render_graph_export_turtle(&graph);
-    assert!(turtle.contains("sc:schemaVersion \"0.2.0\" ."));
+    assert!(turtle.contains(&format!(
+        "sc:schemaVersion \"{}\" .",
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    )));
     assert!(turtle.contains(&typed_id.to_string()));
     assert!(turtle.contains(&legacy_id.to_string()));
 
@@ -5672,7 +5687,10 @@ fn schema_v02_fixture_captures_trait_method_id_migration_in_json_and_turtle() {
     })
     .unwrap();
     let findings_json = serde_json::to_value(&report).unwrap();
-    assert_eq!(findings_json["schema_version"], "0.2.0");
+    assert_eq!(
+        findings_json["schema_version"],
+        sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
+    );
 }
 
 #[test]

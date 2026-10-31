@@ -50,12 +50,15 @@ impl<'a> ParityContext<'a> {
         }
     }
 
-    pub(super) fn without_adapters(config: &'a PortabilityConfig) -> Self {
+    pub(super) fn without_adapters(self) -> Self {
         Self {
-            config,
             platform_adapters: None,
-            file_is_unix_only: false,
+            ..self
         }
+    }
+
+    pub(super) fn config(self) -> &'a PortabilityConfig {
+        self.config
     }
 }
 
@@ -82,27 +85,25 @@ pub(super) fn collect_unix_portability_findings(
     findings
 }
 
-pub(super) fn visit_item_for_unix_portability(
-    item: &Item,
-    inherited_scope: ScopeKind,
-    inherited_unix_gated: bool,
-    inherited_platform_gated: bool,
+pub(super) fn visit_block_items_for_unix_portability(
+    block: &syn::Block,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
     context: ParityContext<'_>,
+    module_path: &[String],
+    platform_gated: bool,
 ) {
     let mut visitor = ParityVisitor {
         file_context,
         findings,
         context,
-        module_path: source_file_module_path(&file_context.source_path),
+        module_path: module_path.to_vec(),
     };
-    visitor.visit_item(
-        item,
-        inherited_scope,
-        inherited_unix_gated,
-        inherited_platform_gated,
-    );
+    let items = block.stmts.iter().filter_map(|stmt| match stmt {
+        syn::Stmt::Item(item) => Some(item),
+        _ => None,
+    });
+    visitor.visit_items(items, ScopeKind::NonTest, false, platform_gated);
 }
 
 struct ParityVisitor<'a> {
@@ -113,14 +114,14 @@ struct ParityVisitor<'a> {
 }
 
 impl ParityVisitor<'_> {
-    fn visit_items(
+    fn visit_items<'a>(
         &mut self,
-        items: &[Item],
+        items: impl Clone + IntoIterator<Item = &'a Item>,
         inherited_scope: ScopeKind,
         inherited_unix_gated: bool,
         inherited_platform_gated: bool,
     ) {
-        self.collect_parity_findings(items, inherited_scope, inherited_unix_gated);
+        self.collect_parity_findings(items.clone(), inherited_scope, inherited_unix_gated);
         for item in items {
             self.visit_item(
                 item,
@@ -179,7 +180,8 @@ impl ParityVisitor<'_> {
                 item,
                 self.file_context,
                 self.findings,
-                self.context.config,
+                self.context,
+                &self.module_path,
             );
         }
         self.visit_suppressor_attributes(attrs, scope);
@@ -228,9 +230,9 @@ impl ParityVisitor<'_> {
         }
     }
 
-    fn collect_parity_findings(
+    fn collect_parity_findings<'a>(
         &mut self,
-        items: &[Item],
+        items: impl Clone + IntoIterator<Item = &'a Item>,
         inherited_scope: ScopeKind,
         inherited_unix_gated: bool,
     ) {
@@ -240,9 +242,9 @@ impl ParityVisitor<'_> {
         {
             return;
         }
-        for item in items {
+        for item in items.clone() {
             let line = span_start_line(item.span());
-            if !self.should_report_item(item, items, inherited_scope, line) {
+            if !self.should_report_item(item, items.clone(), inherited_scope, line) {
                 continue;
             }
             let detail = item_identifier(item)
@@ -256,10 +258,10 @@ impl ParityVisitor<'_> {
         }
     }
 
-    fn should_report_item(
+    fn should_report_item<'a>(
         &self,
         item: &Item,
-        siblings: &[Item],
+        siblings: impl Clone + IntoIterator<Item = &'a Item>,
         scope: ScopeKind,
         line: usize,
     ) -> bool {
@@ -274,8 +276,8 @@ impl ParityVisitor<'_> {
         is_cfg_unix_production_item(item, scope)
             && !private_adapter_item
             && !configured_exemption
-            && !has_windows_companion(item, siblings)
-            && !has_not_unix_companion(item, siblings)
+            && !has_windows_companion(item, siblings.clone())
+            && !has_not_unix_companion(item, siblings.clone())
             && !matches!(item, Item::Mod(module)
                 if module.content.is_none() && module.attrs.iter().any(attr_is_exact_cfg_unix))
             && !has_portable_fallback(item, siblings, scope)

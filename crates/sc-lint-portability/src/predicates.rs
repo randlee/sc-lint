@@ -149,28 +149,34 @@ pub(crate) fn is_cfg_unix_production_item(item: &Item, inherited_scope: ScopeKin
         && item_identifier(item).is_some()
 }
 
-pub(crate) fn has_windows_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
-    sibling_items.iter().any(|candidate| {
+pub(crate) fn has_windows_companion<'a>(
+    unix_item: &Item,
+    sibling_items: impl IntoIterator<Item = &'a Item>,
+) -> bool {
+    sibling_items.into_iter().any(|candidate| {
         same_item_identifier(unix_item, candidate)
             && !item_is_test_scoped(candidate, ScopeKind::NonTest)
             && item_has_cfg_windows(candidate)
     })
 }
 
-pub(crate) fn has_not_unix_companion(unix_item: &Item, sibling_items: &[Item]) -> bool {
-    sibling_items.iter().any(|candidate| {
+pub(crate) fn has_not_unix_companion<'a>(
+    unix_item: &Item,
+    sibling_items: impl IntoIterator<Item = &'a Item>,
+) -> bool {
+    sibling_items.into_iter().any(|candidate| {
         same_item_identifier(unix_item, candidate)
             && !item_is_test_scoped(candidate, ScopeKind::NonTest)
             && item_attrs(candidate).iter().any(attr_is_exact_cfg_not_unix)
     })
 }
 
-pub(crate) fn has_portable_fallback(
+pub(crate) fn has_portable_fallback<'a>(
     unix_item: &Item,
-    sibling_items: &[Item],
+    sibling_items: impl IntoIterator<Item = &'a Item>,
     inherited_scope: ScopeKind,
 ) -> bool {
-    sibling_items.iter().any(|candidate| {
+    sibling_items.into_iter().any(|candidate| {
         same_item_identifier(unix_item, candidate)
             && !item_has_any_cfg(candidate)
             && !item_is_test_scoped(candidate, inherited_scope)

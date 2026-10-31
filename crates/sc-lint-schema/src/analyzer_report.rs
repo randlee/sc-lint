@@ -2,6 +2,8 @@ use std::error::Error;
 use std::fmt;
 use std::sync::OnceLock;
 
+use crate::{ANALYZER_REPORT_SCHEMA_VERSION_V1, ANALYZER_REPORT_SCHEMA_VERSION_V2};
+
 use jsonschema::Validator;
 use serde_json::Value;
 
@@ -37,8 +39,12 @@ pub fn validate_analyzer_report(value: &Value) -> Result<(), AnalyzerReportDrift
         .and_then(Value::as_str)
         .unwrap_or("");
     let (schema_text, cache) = match version {
-        "0.1.0" => (ANALYZER_REPORT_V1_SCHEMA, &ANALYZER_REPORT_V1_VALIDATOR),
-        "0.2.0" => (ANALYZER_REPORT_V2_SCHEMA, &ANALYZER_REPORT_V2_VALIDATOR),
+        ANALYZER_REPORT_SCHEMA_VERSION_V1 => {
+            (ANALYZER_REPORT_V1_SCHEMA, &ANALYZER_REPORT_V1_VALIDATOR)
+        }
+        ANALYZER_REPORT_SCHEMA_VERSION_V2 => {
+            (ANALYZER_REPORT_V2_SCHEMA, &ANALYZER_REPORT_V2_VALIDATOR)
+        }
         other => {
             return Err(AnalyzerReportDrift {
                 instance_path: "/schema_version".to_string(),
