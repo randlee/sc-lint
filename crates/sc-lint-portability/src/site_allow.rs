@@ -145,13 +145,15 @@ impl<'ast> Visit<'ast> for SiteAllowVisitor<'_> {
                 let type_name = item_type_name(&item_impl.self_ty);
                 let item_path = qualified_item(&self.module_path, type_name.clone());
                 self.visit_attrs(&item_impl.attrs, item_impl.span().start().line, &item_path);
-                if item_impl.trait_.is_none() {
-                    self.module_path.push(type_name);
-                    for child in &item_impl.items {
+                self.module_path.push(type_name);
+                for child in &item_impl.items {
+                    if item_impl.trait_.is_none() {
                         self.visit_impl_item(child);
+                    } else if let ImplItem::Fn(method) = child {
+                        self.visit_block(&method.block);
                     }
-                    self.module_path.pop();
                 }
+                self.module_path.pop();
             }
             _ => {
                 let name = sc_lint_analyzer_support::item_identifier(item)
@@ -159,6 +161,7 @@ impl<'ast> Visit<'ast> for SiteAllowVisitor<'_> {
                     .unwrap_or_else(|| "item".to_string());
                 let item_path = qualified_item(&self.module_path, name);
                 self.visit_attrs(item.attrs(), item.span().start().line, &item_path);
+                syn::visit::visit_item(self, item);
             }
         }
     }
@@ -173,6 +176,7 @@ impl<'ast> Visit<'ast> for SiteAllowVisitor<'_> {
                 method.span().start().line,
                 &qualified_item(&self.module_path, method.sig.ident.to_string()),
             );
+            self.visit_block(&method.block);
         }
     }
 }

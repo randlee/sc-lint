@@ -12,6 +12,11 @@ pub use analyzer_report::{
     validate_analyzer_report,
 };
 
+/// Analyzer report version without an `allowed` extension.
+pub const ANALYZER_REPORT_SCHEMA_VERSION_V1: &str = "0.1.0";
+/// Analyzer report version supporting reasoned `allowed` entries.
+pub const ANALYZER_REPORT_SCHEMA_VERSION_V2: &str = "0.2.0";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputFormat {

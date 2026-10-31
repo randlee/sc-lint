@@ -94,7 +94,7 @@ fn machine_report_matches_frozen_json_contract() {
     let report = FindingsReport {
         tool: "sc-lint-runtime",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1,
         status: ReportStatus::Fail,
         scanned_crates: 1,
         allowed: Vec::new(),
@@ -113,7 +113,7 @@ fn machine_report_matches_frozen_json_contract() {
 
     assert_eq!(
         expected["schema_version"].as_str(),
-        Some(SC_LINT_SCHEMA_VERSION),
+        Some(sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1),
         "golden schema_version must match analyzer reports"
     );
     assert_eq!(serde_json::to_value(report).unwrap(), expected);
@@ -124,7 +124,7 @@ fn findings_report_text_is_stable() {
     let report = FindingsReport {
         tool: "sc-lint-runtime",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1,
         status: ReportStatus::Pass,
         scanned_crates: 2,
         allowed: Vec::new(),
@@ -141,7 +141,7 @@ fn findings_report_text_renders_failure_status_and_count() {
     let report = FindingsReport {
         tool: "sc-lint-runtime",
         version: "0.1.0",
-        schema_version: "0.1.0",
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1,
         status: ReportStatus::Fail,
         scanned_crates: 3,
         allowed: Vec::new(),

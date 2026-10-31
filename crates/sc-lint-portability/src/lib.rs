@@ -27,8 +27,6 @@ mod site_allow;
 #[cfg(test)]
 mod tests;
 
-const SC_LINT_SCHEMA_VERSION_V1: &str = "0.1.0";
-const SC_LINT_SCHEMA_VERSION_V2: &str = "0.2.0";
 const DEFAULT_RULES_TOML: &str = include_str!("../config/defaults.toml");
 const ALL_PORT_IDS: &[CatalogRuleId] = &[
     CatalogRuleId::new("PORT-001"),
@@ -205,7 +203,7 @@ fn analyze_workspace_configured_with_metadata_loader(
         .map_err(scan_error)?
         .unwrap_or_default();
     let platform_adapters = platform_adapters::validate(&options.root, records, &module_cfg)?;
-    let (findings, allowed, scanned_crates) =
+    let (findings, mut allowed, scanned_crates) =
         if let Some(workspace) = workspace.as_ref().filter(|_| settings.enabled) {
             let (findings, allowed) = portability::analyze_portability(
                 &options.root,
@@ -224,13 +222,18 @@ fn analyze_workspace_configured_with_metadata_loader(
         };
     let (findings, status) =
         settings.apply(findings, |rule_id| CatalogRuleId::new(rule_id.as_str()));
+    allowed.retain(|entry| {
+        let path = sc_lint_analyzer_support::RepoRelativePath::parse(entry.source_path())
+            .expect("analyzer allowances already have validated repository-relative paths");
+        settings.includes(CatalogRuleId::new(entry.rule_id().as_str()), Some(&path))
+    });
     Ok(FindingsReport {
         tool: "sc-lint-portability",
         version: env!("CARGO_PKG_VERSION"),
         schema_version: if allowed.is_empty() {
-            SC_LINT_SCHEMA_VERSION_V1
+            sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1
         } else {
-            SC_LINT_SCHEMA_VERSION_V2
+            sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V2
         },
         status,
         scanned_crates,

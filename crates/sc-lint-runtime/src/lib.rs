@@ -24,7 +24,6 @@ mod sleep;
 #[cfg(test)]
 mod tests;
 
-const SC_LINT_SCHEMA_VERSION: &str = "0.1.0";
 const SC_LINT_RUNTIME_TOOL: &str = "sc-lint-runtime";
 const SC_LINT_RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -155,7 +154,7 @@ fn analyze_workspace_configured_with_metadata_loader(
     Ok(FindingsReport {
         tool: SC_LINT_RUNTIME_TOOL,
         version: SC_LINT_RUNTIME_VERSION,
-        schema_version: SC_LINT_SCHEMA_VERSION,
+        schema_version: sc_lint_schema::ANALYZER_REPORT_SCHEMA_VERSION_V1,
         status,
         scanned_crates,
         findings,

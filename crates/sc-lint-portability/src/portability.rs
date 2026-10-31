@@ -253,7 +253,8 @@ fn collect_production_path_literal_findings(
     item: &Item,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
-    config: &PortabilityConfig,
+    context: parity::ParityContext<'_>,
+    module_path: &[String],
 ) {
     match item {
         Item::Fn(item_fn) => visit_block_for_unix_portability(
@@ -263,7 +264,8 @@ fn collect_production_path_literal_findings(
             false,
             file_context,
             findings,
-            config,
+            context,
+            module_path,
             block_reads_env(&item_fn.block, "USERNAME"),
         ),
         Item::Const(item_const) => visit_expr_for_unix_portability(
@@ -273,7 +275,8 @@ fn collect_production_path_literal_findings(
             false,
             file_context,
             findings,
-            config,
+            context,
+            module_path,
             false,
         ),
         Item::Static(item_static) => visit_expr_for_unix_portability(
@@ -283,10 +286,13 @@ fn collect_production_path_literal_findings(
             false,
             file_context,
             findings,
-            config,
+            context,
+            module_path,
             false,
         ),
         Item::Impl(item_impl) => {
+            let mut method_path = module_path.to_vec();
+            method_path.push(crate::site_allow::item_type_name(&item_impl.self_ty));
             for impl_item in &item_impl.items {
                 if let ImplItem::Fn(item_fn) = impl_item {
                     let fn_scope = classify_scope(&item_fn.attrs, ScopeKind::NonTest, None);
@@ -299,7 +305,8 @@ fn collect_production_path_literal_findings(
                             false,
                             file_context,
                             findings,
-                            config,
+                            context,
+                            &method_path,
                             block_reads_env(&item_fn.block, "USERNAME"),
                         );
                     }
@@ -318,47 +325,21 @@ fn visit_block_for_unix_portability(
     inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
-    config: &PortabilityConfig,
+    context: parity::ParityContext<'_>,
+    module_path: &[String],
     username_read: bool,
 ) {
-    for stmt in &block.stmts {
-        match stmt {
-            Stmt::Item(item) => parity::visit_item_for_unix_portability(
-                item,
-                inherited_scope,
-                inherited_unix_gated,
-                inherited_platform_gated,
-                file_context,
-                findings,
-                parity::ParityContext::without_adapters(config),
-            ),
-            Stmt::Local(local) => {
-                if let Some(init) = &local.init {
-                    visit_expr_for_unix_portability(
-                        &init.expr,
-                        inherited_scope,
-                        inherited_unix_gated,
-                        inherited_platform_gated,
-                        file_context,
-                        findings,
-                        config,
-                        username_read,
-                    );
-                }
-            }
-            Stmt::Expr(expr, _) => visit_expr_for_unix_portability(
-                expr,
-                inherited_scope,
-                inherited_unix_gated,
-                inherited_platform_gated,
-                file_context,
-                findings,
-                config,
-                username_read,
-            ),
-            Stmt::Macro(_) => {}
-        }
+    if inherited_scope != ScopeKind::NonTest || inherited_unix_gated || inherited_platform_gated {
+        return;
     }
+    let mut visitor = ProductionPathLiteralVisitor::new(
+        file_context,
+        findings,
+        context,
+        module_path,
+        username_read,
+    );
+    visitor.visit_block(block);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -369,14 +350,20 @@ fn visit_expr_for_unix_portability(
     inherited_platform_gated: bool,
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
-    config: &PortabilityConfig,
+    context: parity::ParityContext<'_>,
+    module_path: &[String],
     username_read: bool,
 ) {
     if inherited_scope != ScopeKind::NonTest || inherited_unix_gated || inherited_platform_gated {
         return;
     }
-    let mut visitor =
-        ProductionPathLiteralVisitor::new(file_context, findings, config, username_read);
+    let mut visitor = ProductionPathLiteralVisitor::new(
+        file_context,
+        findings,
+        context,
+        module_path,
+        username_read,
+    );
     visitor.visit_expr(expr);
 }
 
@@ -660,7 +647,8 @@ struct ProductionPathLiteralVisitor<'a, 'b> {
     file_context: &'a FileContext,
     findings: &'b mut Vec<PortabilityFinding>,
     platform_gated_depth: usize,
-    config: &'a PortabilityConfig,
+    context: parity::ParityContext<'a>,
+    module_path: &'a [String],
     username_read: bool,
 }
 
@@ -668,14 +656,16 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
     fn new(
         file_context: &'a FileContext,
         findings: &'b mut Vec<PortabilityFinding>,
-        config: &'a PortabilityConfig,
+        context: parity::ParityContext<'a>,
+        module_path: &'a [String],
         username_read: bool,
     ) -> Self {
         Self {
             file_context,
             findings,
             platform_gated_depth: 0,
-            config,
+            context,
+            module_path,
             username_read,
         }
     }
@@ -746,6 +736,22 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
 }
 
 impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
+    fn visit_item(&mut self, _item: &'ast Item) {
+        // Block items are analyzed together by parity with their lexical siblings.
+    }
+
+    fn visit_block(&mut self, block: &'ast Block) {
+        parity::visit_block_items_for_unix_portability(
+            block,
+            self.file_context,
+            self.findings,
+            self.context.without_adapters(),
+            self.module_path,
+            self.platform_gated_depth > 0,
+        );
+        syn::visit::visit_block(self, block);
+    }
+
     fn visit_expr_block(&mut self, node: &'ast syn::ExprBlock) {
         let is_platform_gated = node.attrs.iter().any(attr_is_platform_cfg);
         if is_platform_gated {
@@ -782,7 +788,7 @@ impl<'ast> Visit<'ast> for ProductionPathLiteralVisitor<'_, '_> {
             let value = lit.value();
             if is_unix_shell_path_literal(&value) {
                 self.push_shell_finding(&value, span_start_line(lit.span()));
-            } else if self.config.unix_path_prefix_match(&value) {
+            } else if self.context.config().unix_path_prefix_match(&value) {
                 self.push_path_finding(RuleId::Port006, &value, span_start_line(lit.span()));
             } else if let Some(rule_id) = production_path_rule_id(&value) {
                 self.push_path_finding(rule_id, &value, span_start_line(lit.span()));
