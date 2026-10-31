@@ -1,0 +1,28 @@
+# m-1: port010-same-name-siblings
+
+## Description
+
+### Goal
+#720 and #786 S3/S6: recognise same-name cfg(not(unix)) siblings and Unix-only out-of-line modules (ADR-010 amendment 2026-10-30).
+### Deliverables
+1. S3 (ANC-003): PORT-010 does not report a #[cfg(unix)] item with a non-test same-name, same-kind #[cfg(not(unix))] sibling in the same lexical scope: crate root lib.rs, main.rs or src/bin/*.rs, inline module, file module or the same inherent impl block. Trait impls retain their current treatment. Test port010_s3_same_name_sibling covers each scope; replace port010_fixture_crate_root_main_current_behaviour with the zero-finding S3 assertion.
+2. S6 (ANC-006/007): PORT-010 does not report the declaration #[cfg(unix)] mod x; or #[cfg(unix)] items inside that module's files, because that module is never compiled on Windows. Resolve x.rs, x/mod.rs and #[path], including nested file modules. Reuse the file-module cfg propagation already implemented in platform_adapters.rs; no caller index is needed. Add port010_s6_unix_module and port010_s6_file_module_items. Dispatch waits on lint-m-adr010, whose Rand ruling resolves public-module/item scope before this deliverable is implemented.
+3. ANC-009 negatives: port010_s3_negatives retains kind mismatch, test-only sibling, not(windows), same name in another module or impl and no companion. port010_s6_negatives retains missing/ambiguous module files, a module compiled on Windows and an unrelated unpaired Unix item outside the Unix-only module. Those findings stay reported.
+4. Update the existing atm_core_* fixture exact-list tests in crates/sc-lint-portability/tests/cli.rs to the S3/S6 results and update their README. Own the existing atm_core_* fixture roots and their README. Record their exact develop-baseline finding lists first, then encode the post-S3/S6 expected lists in the same regression tests; no new inventory mechanism.
+5. Reconcile the PORT-010 bullets at docs/requirements.md:697-699 to S3/S6 recognition plus the other shapes through a site allowance, consistent with the cut ADR-010 amendment and ADR-022.
+### Does Not Close
+Other #786 shapes use the m-4 site allowance. No automatic helper/call-graph exemptions, general Boolean cfg solver or path exclusion. The post-release 18-path consumer check belongs to lint-8h3t.2.
+### Active Trace
+ANC-003, ANC-006, ANC-007, ANC-009; REQ-PRODUCT-004AA; ADR-010 decision 6 and amendment 2026-10-30.
+
+## Acceptance criteria
+
+### Acceptance Criteria
+- ANC-003 / #720: port010_s3_same_name_sibling proves no PORT-010 findings for same-name, same-kind cfg(not(unix)) siblings in every listed module, inherent-impl and crate-root scope; the old crate-root-main limitation assertion is replaced.
+- ANC-006/007: port010_s6_unix_module and port010_s6_file_module_items prove no PORT-010 findings on the Unix-only file-module declaration and its Unix items; x.rs, x/mod.rs, #[path] and nested resolution are covered. lint-m-adr010 must record Rand's ruling first: if pub modules/items are covered, positive tests assert no finding; if restricted, an unallowed pub item remains a finding and its reasoned site allowance is covered by m-4. Test both the accepted scope and a disallowed/compiled-on-Windows case. No implementer chooses the ruling.
+- ANC-009: port010_s3_negatives and port010_s6_negatives retain real gaps. Existing atm_core_* tests record the exact develop baseline and post-change lists, reflecting only S3/S6 changes. The README and PORT-010 requirements describe those changes.
+### Validation
+- cargo test -p sc-lint-portability --no-fail-fast
+- just lint
+- just test
+Record new regressions failing on develop before applying the fix.

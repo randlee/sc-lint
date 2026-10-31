@@ -1,0 +1,31 @@
+# m-2: manifest004-local-module-paths and cycle paths
+
+## Description
+
+### Goal
+#136: SCB-MANIFEST-004 must not report a use self::X::..., use crate::X::... or use super::X::... path as a use of the owned crate X when X is a local module. That is not a configured ownership violation (REQ-SCB-019).
+### Deliverables
+1. Replace the textual crate-name match in global_dependency_ownership with a syn-based first-segment rule over every path (syn::visit::Visit::visit_path: types, expressions, patterns, struct literals, trait bounds, impl headers, qualified paths, attributes) plus extern crate. A path is a use of crate X only when its first segment is X or ::X. Paths starting with self, crate or super are never uses of an owned crate. A bare X:: path is exempt when the same module declares mod X. Macro bodies keep the current textual rule.
+2. Test manifest004_local_module_path, non-owner crate with a local mod cron: use self::cron::X, use super::cron::X, use crate::cron::X, use crate::commands::cron::X, a multi-line grouped use, nested group paths, and bare cron::X with a local mod cron report nothing.
+3. Test manifest004_owned_crate_positions_still_reported: without a local mod, cron:: in a use, type, expression, pattern, struct literal, trait bound, impl header, qualified path, attribute and macro argument, plus ::cron::X and extern crate cron, are still reported; the same positions with self::, crate:: or super:: are not.
+4. Regression replay of atm-core's crates/atm/src/commands/mod.rs (Cron(self::cron::CronCommand)) at 6ffaa97be as a committed fixture: zero findings.
+5. Boundary package docs: an owner's integration tests are allowed by listing the owner's tests/ root in allowed_source_roots, with an example.
+6. #385 (ADR-020 Amendment 2026-10-31, Pending Rand): include RuleId::ScbCycle001 in path_less_finding_excluded (lib.rs:722-735), alongside existing ScbCycle002/003, so exclude_paths_by_rule filters its node source paths. Test boundary_cycle_exclude_paths_by_rule with independent cycles in a.rs and b.rs: excluding SCB-CYCLE-001 on a.rs removes only that cycle.
+### Does Not Close
+No change to allowed_source_roots semantics, no new scope key, no exclusion and no consumer rename. Manifest ([dependencies]) ownership checks are unchanged.
+### Active Trace
+ANC-013. REQ-SCB-019, REQ-PRODUCT-023; ADR-020 decision 5 and Amendment 2026-10-31. ADR-022 is context, not a dispatch dependency.
+
+## Acceptance criteria
+
+### Acceptance Criteria
+- issue:#136: every exempt form in manifest004_local_module_path reports nothing; the atm-core commands/mod.rs replay reports nothing.
+- REQ-SCB-019: every owned-crate position in manifest004_owned_crate_positions_still_reported is still reported; manifest ownership findings are unchanged; existing issue136 tests pass.
+- Boundary docs show owner tests/ roots in allowed_source_roots as the supported configuration.
+- issue:#385: boundary_cycle_exclude_paths_by_rule passes for two files/two cycles, preserving the non-excluded finding and existing 002/003 behavior.
+- manifest004_macro_body_textual preserves the legacy macro-token check; manifest004_parse_failure_fails_closed proves malformed Rust retains textual findings; manifest004_doc_and_string_not_uses proves comments/string contents are not imports.
+### Validation
+- cargo test -p sc-lint-boundary --no-fail-fast
+- just lint
+- just test
+Record the new tests failing on the develop baseline first.

@@ -1,0 +1,127 @@
+[
+  {
+    "id": "lint-m-4",
+    "title": "m-4: port010-site-allow",
+    "description": "## Goal\n#786 S8 and the other shapes beyond S3/S6: PORT-010 must be allowable at a single site. An item carrying #[sc_lint(allow(PORT-010), reason = \"...\")] is not reported by PORT-010 (ADR-022 decision 4). This is the exception path for deliberate POSIX-only public helpers such as current_uid and is_owned_by_uid.\n## Deliverables\n1. Directive grammar (design): add Directive::SiteAllow { rules, reason }, separate from Allow. Rule ids are unquoted tokens (PORT-010); reason = \"...\" is required and non-empty. boundary.* directives parse exactly as before (frozen corpus test unchanged); boundary ignores SiteAllow and portability ignores boundary.* directives.\n2. Portability honours it: PORT-010 does not report an item carrying #[sc_lint(...)] or #[sc_lint_attributes::sc_lint(...)] with allow(PORT-010). The allowance covers only that item; an allow on an impl block does not cascade to its methods, and nothing covers a module's contents, a file or a sibling.\n3. Errors: malformed site allows and unknown PORT rule ids are typed errors with file and line; ids owned by other analyzers are ignored by portability.\n4. Report (REQ-PRODUCT-002DA; ADR-011): FindingsReport gains an optional allowed array for allowances that suppressed a finding. Existing no-allowance reports keep schema_version 0.1.0 and omit allowed. Reports containing allowed use schema_version 0.2.0 and the new analyzer-report-v2.schema.json, which explicitly declares allowed optional and keeps additionalProperties:false. Preserve analyzer-report-v1.schema.json as the old closed contract and own both schema artifacts and fixtures. The validator dispatches by version and accepts old fixtures plus new valid allowed entries; unknown fields/malformed entries still fail. A version bump is required because an old strict v1 validator rejects this new property; it is not claimed wire-compatible with old validators. Upgrade consumers before using the new report form.\n5. Tests: port010_site_allow (annotated pub #[cfg(unix)] fn current_uid not reported, unannotated sibling reported, one allowed entry), site_allow_grammar_corpus (every accepted and rejected form in the design table), site_allow_unknown_rule, site_allow_no_cascade. Fold analyzer isolation and omission-when-empty assertions into the frozen directive corpus and existing json_contract tests. Include stacked cfg/doc/inline attributes, an inherent impl method and a public function in port010_site_allow.\n6. Keep sc-lint-attributes a no-op for behavior and public API; it builds on stable Linux, macOS and Windows through the existing CI matrix. Document adoption in docs-bundle/packages/sc-lint-portability.md: add the sc-lint-attributes dependency and list it in each consumer crate's boundary allowed_dependencies so SCB-DEPENDENCY stays clean. Every allowance reason names the item's actual cause.\n7. Update docs/architecture.md Backend Crate Isolation and docs/sc-lint-portability/** for the portability -\u003e directives edge under ADR-022 decision 4 and ADR-013; add the PORT-010 allowance traceability entry to docs/sc-lint-directives/requirements.md. Existing forbidden_edges against sc-lint-attributes stay unchanged; only the declared allowed_dependencies gains sc-lint-directives.\n## Does Not Close\nNo repository-wide switch or path exclusion. Extending allow to other analyzers is later ADR-022 work.\n## Active Trace\nANC-010, ANC-009. ADR-022 decision 4; ADR-010 amendment 2026-10-30 (per-site allowance).",
+    "design": "Baseline: directives::Directive currently has Allow(Vec\u003cString\u003e), InternalOnly and ForbidExternalImpls; attribute parsing uses syn::Error and portability reads no site directives. The macro and analyzers share one parser, with existing boundary.* syntax preserved.\nGrammar: args := element (\",\" element)* \",\"?; element := boundary-scoped | allow(rule_id (\",\" rule_id)* \",\"?) | reason=\"literal\". rule_id := IDENT (\"-\" IDENT)* \"-\" INT, unquoted, normalized to its catalog spelling (PORT-010; SCB-MANIFEST-004 parses but portability ignores it).\n| Input | Result |\n| --- | --- |\n| allow(PORT-010), reason=\"x\" | one allowance |\n| reason=\"x\", allow(PORT-010), | same; order free, trailing comma allowed |\n| allow(PORT-010, PORT-011,), reason=\"x\" | grammar accepts; unknown PORT-011 is a portability catalog error |\n| allow() | EmptyRules error |\n| allow(PORT-010) | MissingReason error |\n| allow(PORT-010), reason=\"  \" | EmptyReason error |\n| allow(\"PORT-010\"), reason=\"x\" | QuotedRuleId error |\n| allow(PORT-010, PORT-010), reason=\"x\" | DuplicateRuleId error |\n| reason=\"x\" | ReasonWithoutAllow error |\n| two allow(...) elements | MultipleAllow error |\n| allow(PORT-010), reason=\"x\", reason=\"y\" | DuplicateReason error |\n| unknown_element | UnknownElement error |\n| allow(PORT-), reason=\"x\" | MalformedRuleId error |\n| allow(PORT-010), reason=variable | NonLiteralReason error |\n| allow(PORT-999), reason=\"x\" | UnknownRule error from portability |\n| allow(SCB-MANIFEST-004), reason=\"x\" | parsed; ignored by portability |\n| boundary.allow(\"B\"), allow(PORT-010), reason=\"x\" | both directives; boundary grammar unchanged |\nDirective::SiteAllow holds validated SiteRuleId values and a SiteAllowReason. SiteRuleId has a private String and a checked parser; SiteAllowReason has a private String and rejects a trim-empty value. Constructors are the only entry points; serialization exposes strings, not unchecked construction. Preserve the item's supplied reason content after validation. New DirectiveError is #[non_exhaustive]; the existing PortabilityError remains exhaustive, and the new variants are recorded as a Rust API change under ADR-011 rather than claimed source-compatible. Do not retroactively mark unrelated public enums non_exhaustive.\nStable DirectiveError codes: DIRECTIVE.SITE_ALLOW.EMPTY_RULES, MISSING_REASON, EMPTY_REASON, QUOTED_RULE_ID, DUPLICATE_RULE_ID, REASON_WITHOUT_ALLOW, MULTIPLE_ALLOW, DUPLICATE_REASON, UNKNOWN_ELEMENT, MALFORMED_RULE_ID and NON_LITERAL_REASON (each shares the DIRECTIVE.SITE_ALLOW prefix). Cause identifies the offending attribute token/item. Recovery respectively supplies a rule, adds a reason, replaces a blank reason, removes quotes, removes a duplicate rule, adds allow or removes reason, merges allow elements, removes a duplicate reason, removes the unknown element, uses PREFIX-NNN, or uses a string literal. The macro emits compile_error! with code/cause/recovery; analyzer diagnostics carry file/line/item. Documentation reference: docs/sc-lint-directives/requirements.md#scope-rules.\nPortabilityError::InvalidSiteAllow { path, line, error: DirectiveError } uses PORTABILITY.INVALID_SITE_ALLOW and the parser recovery; PortabilityError::UnknownRule { path, line, rule: SiteRuleId } uses PORTABILITY.UNKNOWN_RULE with recovery to use a supported PORT rule or remove the attribute. Both use the existing configuration-error exit path and docs/sc-lint-portability/requirements.md. Record these codes/recovery in docs/sc-lint/cli-contract.md.\nAllowedEntry.item is the crate-relative qualified lexical path (module::function, module::Type::method for inherent methods, without a file-system prefix); source_path is the repository-relative file path and line is one-based. Each entry has rule_id and a validated non-empty reason; only an actual suppressed finding creates an entry. A stale allowance is not an error and is absent from allowed. New AllowedEntry is #[non_exhaustive] with constructors/accessors; its Rust type and error additions are included in the ADR-011 API compatibility assessment. Backend validation is in sc-lint-schema; analyzer-specific suppression stays in portability, shared support owns no PORT rule policy.\nShared files with m-1: portability/parity.rs, lib.rs and tests.rs. m-4 lands first; the lead merges develop into the second landing branch. No must_follow edge. Update only portability allowed_dependencies for sc-lint-directives and the directives allowed_dependents; forbidden_edges against sc-lint-attributes remain unchanged.",
+    "acceptance_criteria": "## Acceptance Criteria\n- issue:#786 S8: an item annotated #[sc_lint(allow(PORT-010), reason = \"...\")] produces no PORT-010 finding and appears in allowed with its reason; an unannotated sibling in the same file is still reported (port010_site_allow).\n- Every row of the grammar table behaves as specified (site_allow_grammar_corpus); unknown PORT ids are typed errors; an impl-block allow does not cover its methods; boundary.* parsing and boundary results are unchanged; the frozen directive corpus and existing json_contract tests cover analyzer isolation and omission of an empty allowed array in unchanged 0.1.0 reports.\n- Boundary inventories admit the new portability -\u003e directives edge and the boundary check passes; docs/sc-lint-directives/requirements.md documents the grammar.\n- atm-core sign-off 01M69P0C2R3S1BH78TYKHM9RPW: port010_site_allow covers stacked cfg/doc/inline attributes, an inherent impl method and a pub fn. sc-lint-attributes remains a no-op for behavior/public API and builds in the existing stable Linux/macOS/Windows CI matrix. Adoption docs explain dependency/boundary registration and item-specific reasons.\n- REQ-PRODUCT-002DA / ADR-011: json_contract accepts the original closed v1 fixture and a v2 (0.2.0) fixture with declared optional allowed entries, rejects unknown keys and malformed allowed entries, and proves an old v1 validator rejects the new property. Report version selection and upgrade guidance match deliverable 4; no version bump is hidden.\n- Directive error codes/recovery and RuleId/reason invariants match the design; docs/architecture.md, portability docs and directives traceability match the approved edge, with forbidden_edges unchanged.\n## Validation\n- cargo test -p sc-lint-directives -p sc-lint-attributes -p sc-lint-boundary -p sc-lint-schema -p sc-lint-analyzer-support -p sc-lint-portability -p sc-lint --no-fail-fast\n- just lint\n- just test\nRecord the new tests failing on the develop baseline first.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-10-30T01:24:42Z",
+    "updated_at": "2026-10-31T19:45:36Z",
+    "metadata": {
+      "adrs": [
+        "ADR-010",
+        "ADR-022",
+        "ADR-004",
+        "ADR-007",
+        "ADR-011",
+        "ADR-013",
+        "ADR-020"
+      ],
+      "branch": "sprint/m-4-port010-site-allow",
+      "closure_type": "integration",
+      "difficulty": "normal",
+      "layer": 1,
+      "model_class": "",
+      "owned_paths": [
+        "crates/sc-lint-directives/**",
+        "crates/sc-lint-attributes/**",
+        "crates/sc-lint-boundary/src/graph/mod.rs",
+        "crates/sc-lint-schema/src/lib.rs",
+        "crates/sc-lint-schema/tests/json_contract.rs",
+        "crates/sc-lint-analyzer-support/src/render.rs",
+        "crates/sc-lint-portability/Cargo.toml",
+        "crates/sc-lint-portability/src/lib.rs",
+        "crates/sc-lint-portability/src/portability.rs",
+        "crates/sc-lint-portability/src/portability/findings.rs",
+        "crates/sc-lint-portability/src/site_allow.rs",
+        "crates/sc-lint-portability/src/portability/parity.rs",
+        "crates/sc-lint-portability/tests/site_allow.rs",
+        "boundaries/sc-lint-directives/directive-model.toml",
+        "boundaries/sc-lint-portability/portability-analyzer.toml",
+        "docs/sc-lint-directives/requirements.md",
+        "docs-bundle/packages/sc-lint-portability.md",
+        "crates/sc-lint-portability/src/tests.rs",
+        "crates/sc-lint-schema/schema/analyzer-report-v1.schema.json",
+        "crates/sc-lint-schema/schema/analyzer-report-v2.schema.json",
+        "crates/sc-lint-schema/src/analyzer_report.rs",
+        "crates/sc-lint-schema/tests/fixtures/**",
+        "docs/architecture.md",
+        "docs/sc-lint-portability/**",
+        "docs/sc-lint/cli-contract.md"
+      ],
+      "owner": "cfast",
+      "phase": "m",
+      "pr_target": "develop",
+      "relation": "parallel_safe",
+      "release_train": "",
+      "requirements": [
+        "REQ-PRODUCT-004AA",
+        "REQ-PRODUCT-003",
+        "REQ-PRODUCT-004D",
+        "REQ-PRODUCT-002DA",
+        "REQ-SCB-001",
+        "REQ-SCB-007"
+      ],
+      "sprint": "m-4",
+      "stack": "phase-m-b",
+      "stack_base": "develop",
+      "target_boundary": "BOUNDARY-ScLintPortabilityAnalyzer",
+      "worktree": "../sc-lint-worktrees/sprint/m-4-port010-site-allow"
+    },
+    "labels": [
+      "phase-m",
+      "stack:phase-m-b",
+      "stage:sprint"
+    ],
+    "dependencies": [
+      {
+        "id": "lint-phase-m",
+        "title": "phase-m: atm-core P1 tool fixes (PORT-010, SCB-MANIFEST-004, lint-step env/cwd)",
+        "description": "Phase M fixes: see docs/plans/phase-m/phase-m-plan.md and sprint beads lint-m-1, lint-m-2, lint-m-3 and lint-m-4 for scope, authority and acceptance.",
+        "design": "Four independent one-layer stacks A-D rooted on develop; scope, integration and pending ADR decisions are in docs/plans/phase-m/phase-m-plan.md. Phase completion is tracked by standalone lint-phase-m-done to avoid cycles through sprint parent-child links.",
+        "acceptance_criteria": "Phase M is complete when lint-phase-m-done closes after lint-8h3t.2 (#786/#720), .4 (#136), .5 (#198), .8 (#385) and .9 (#195), with QA evidence posted on the issues. Sprint deliverables and acceptance remain on the four sprint beads.",
+        "status": "open",
+        "priority": 1,
+        "issue_type": "epic",
+        "created_at": "2026-10-30T01:24:42Z",
+        "updated_at": "2026-10-31T19:24:02Z",
+        "metadata": {
+          "integration_branch": "develop",
+          "phase": "m",
+          "plan_scope": "epic"
+        },
+        "labels": [
+          "phase-m",
+          "scope:epic"
+        ],
+        "dependency_type": "parent-child"
+      },
+      {
+        "id": "lint-t6i7",
+        "title": "Phase M: Rand acceptance of ADR-022",
+        "description": "Rand acceptance of the cut ADR-022. Formal Status: Accepted on the planning branch gates m-4 PORT-010 site-allowance dispatch only. m-3 env/cwd is covered by the existing lint-step/test-selector parallel contract and has no dependency on this gate.",
+        "status": "open",
+        "priority": 2,
+        "issue_type": "gate",
+        "owner": "randlee@users.noreply.github.com",
+        "created_at": "2026-10-30T01:24:54Z",
+        "created_by": "clint",
+        "updated_at": "2026-10-31T19:16:57Z",
+        "labels": [
+          "phase-m"
+        ],
+        "await_type": "human",
+        "dependency_type": "blocks"
+      }
+    ],
+    "parent": "lint-phase-m",
+    "dependent_count": 5,
+    "dependency_count": 2,
+    "comment_count": 3,
+    "comments_omitted": true,
+    "revision": "808731926002722521"
+  }
+]

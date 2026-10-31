@@ -20,7 +20,7 @@ relationships; the issue closure checks live on the closure beads.
 | --- | --- | --- | --- | --- |
 | lint-m-1 port010-same-name-siblings | A1 | clint | #720, #786 S3 same-name cfg(not(unix)) siblings and S6 out-of-line Unix-only modules | ANC-003, ANC-006, ANC-007, ANC-009 |
 | lint-m-4 port010-site-allow | B1 | cfast | #786 S8 and every other shape through reasoned item allowances; allowed entries in reports | ANC-010, ANC-009 |
-| lint-m-2 manifest004-local-module-paths and cycle paths | C1 | cfast | #136 local-module paths; #385 SCB-CYCLE-001 path exclusions | ANC-013 |
+| lint-m-2 manifest004-local-module-paths and cycle paths | C1 | clint | #136 local-module paths; #385 SCB-CYCLE-001 path exclusions | ANC-013 |
 | lint-m-3 lint-step-env-cwd and visible output | D1 | cfast | #198 lint env/cwd; #195 both failed-step streams and every step's output log | ANC-011, ANC-012 |
 
 m-5a, m-5b, m-5c, m-7 and m-8 and their dev/sanity/QA groups are superseded.
@@ -41,8 +41,13 @@ develop
 
 Each stack is one layer rooted on develop. Stack operations follow
 [CLAUDE.md](../../../CLAUDE.md); the lead is the stack writer. The sprint
-beads have no owner-based waits between m-2, m-3 and m-4. Only m-1 waits for
-lint-m-adr010 and only m-4 waits for lint-t6i7. Plan review and the planning
+beads have no cross-stack must_follow edges. Capacity is two owners:
+clint runs m-1 then m-2; cfast runs m-4 then m-3. These are owner schedules,
+not new dependency gates. Only m-1 waits for
+lint-m-adr010 and only m-4 waits for lint-t6i7. m-2 is governed by REQ-SCB-019 and ADR-020, with the SCB-CYCLE-001
+amendment Pending Rand acceptance before dispatch. m-3 implements existing
+ADR-016, REQ-CLI-023 and ADR-020 decisions 7/9. ADR-022 is context for m-2
+and m-3, not their dispatch gate. Plan review and the planning
 gate supply evidence; lint-phase-m-plan-qa blocks no sprint or dev bead.
 
 m-1 and m-4 share portability's parity.rs, lib.rs and tests.rs. m-4 lands
@@ -91,3 +96,5 @@ test. No extra adoption run or CI gate is introduced.
 2. Accept the ADR-010 amendment (lint-m-adr010).
 3. S6 public scope: whether pub modules/items are covered or require a site
    allowance. ANC-006/007 remain locked as written until Rand decides.
+4. Accept the ADR-020 Amendment 2026-10-31 extending path-less exclusions to
+   SCB-CYCLE-001 before m-2 dispatch.
