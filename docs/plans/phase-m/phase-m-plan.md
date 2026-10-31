@@ -103,7 +103,7 @@ acceptance check, not a CI test, and a non-zero result fails m-6.
    or only non-public ones (ANC-006/007 as locked say all)?
 4. Review the anchor rewrites. On Rand's direction "rewrite to match the
    plan", each statement now describes the behaviour the plan builds. Quotes
-   are unchanged. The plan questions were retuned against a frozen oracle,
+   are unchanged. The plan questions were tuned again against a frozen oracle,
    and plan gate r11 passes all 8 beads with every anchor covered.
    - ANC-001 v4: the S1 helper rule covers any caller with a companion PORT-010
      recognises (a sibling, a renamed counterpart, a portable alternative, or
