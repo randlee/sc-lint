@@ -31,6 +31,25 @@ concurrently (cargo steps serialized in declaration order) and every failed
 entry is reported. Keep commands explicit and reproducible; do not hide
 required work behind an advisory alias.
 
+Lint steps also accept `env` and `cwd`, with the same meaning as these fields
+on test command selectors. Values are passed literally to the child process;
+sc-lint does not expand variables or resolve environment values as paths.
+`cwd` is relative to the repository root.
+
+```toml
+[[tool.sc-lint.lint]]
+name = "atm-core-clippy"
+command = ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" }
+cwd = "crates/atm-core"
+```
+
+Here `PYO3_PYTHON` is passed verbatim; the child tool decides how to interpret
+it. `[tool.sc-lint].setup` and `[tool.sc-lint].runner` are not supported keys.
+When `--log-root` is set, each executed profile step writes both output streams
+to `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`. Failed steps also
+show stdout and stderr in the command error.
+
 Instead of rows, `[tool.sc-lint.test]` may be a table of named selectors with
 an optional `default`:
 

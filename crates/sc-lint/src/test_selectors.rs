@@ -11,7 +11,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
-use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -544,8 +543,11 @@ fn parse_selector(
             )));
         }
     };
-    let env = parse_env(name, fields.get("env"), malformed)?;
-    let cwd = parse_cwd(name, fields.get("cwd"), malformed)?;
+    let subject = format!("selector `{name}`");
+    let env = crate::step_exec::parse_env(fields.get("env"))
+        .map_err(|error| malformed(error.message(&subject)))?;
+    let cwd = crate::step_exec::parse_cwd(fields.get("cwd"))
+        .map_err(|error| malformed(error.message(&subject)))?;
     let platforms = parse_platforms(name, fields.get("platforms"), malformed)?;
     let after_all = parse_after_all(name, &body, fields.get("after_all"), source)?;
     Ok(TestSelector {
@@ -618,62 +620,6 @@ fn parse_group(
                 .ok_or_else(|| malformed(format!("group selector `{name}` lists a blank name")))
         })
         .collect()
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Selector validation returns the shared top-level CliError contract."
-)]
-fn parse_env(
-    name: &str,
-    value: Option<&toml::Value>,
-    malformed: &dyn Fn(String) -> CliError,
-) -> Result<BTreeMap<String, String>, CliError> {
-    let Some(value) = value else {
-        return Ok(BTreeMap::new());
-    };
-    let invalid = || malformed(format!("selector `{name}` env must be a table of strings"));
-    let toml::Value::Table(table) = value else {
-        return Err(invalid());
-    };
-    let mut env = BTreeMap::new();
-    for (key, value) in table {
-        if key.is_empty() || key.contains('=') || key.contains('\0') {
-            return Err(malformed(format!(
-                "selector `{name}` env key `{key}` is empty or contains `=` or NUL"
-            )));
-        }
-        let toml::Value::String(value) = value else {
-            return Err(invalid());
-        };
-        env.insert(key.clone(), value.clone());
-    }
-    Ok(env)
-}
-
-#[expect(
-    clippy::result_large_err,
-    reason = "Selector validation returns the shared top-level CliError contract."
-)]
-fn parse_cwd(
-    name: &str,
-    value: Option<&toml::Value>,
-    malformed: &dyn Fn(String) -> CliError,
-) -> Result<Option<PathBuf>, CliError> {
-    let Some(value) = value else {
-        return Ok(None);
-    };
-    let relative = value.as_str().map(PathBuf::from).filter(|path| {
-        !path.as_os_str().is_empty()
-            && path
-                .components()
-                .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
-    });
-    relative.map(Some).ok_or_else(|| {
-        malformed(format!(
-            "selector `{name}` cwd must be a non-empty repo-root-relative path without `..`"
-        ))
-    })
 }
 
 #[expect(

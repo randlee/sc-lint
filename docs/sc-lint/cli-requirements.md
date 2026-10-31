@@ -439,6 +439,18 @@ specialized backend tools and mixed Rust/Python implementations.
   (Added phase L, #647. Status: Accepted — Rand, 2026-10-27. See
   [ADR-020](./adr/ADR-020-phase-l-atm-core-findings.md), Sprint l-10.)
 
+- `REQ-CLI-027`
+  Consumer profile failures show both child stdout and stderr, including when
+  both streams are non-empty. When a log root is configured, every executed
+  step writes both raw streams to
+  `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`, including passing
+  steps. The expanded-plan index is zero-based, safe names replace every byte
+  outside ASCII letters, digits, `_` and `-` with `_`, and each run overwrites
+  the prior file for that step. With no configured log root, no per-step log
+  files or `steps/` directory are created; failed-step stdout and stderr remain
+  visible in the command error. This does not change the logger root or step
+  scheduling semantics.
+
 ## Contract References
 
 - See [cli-contract.md](./cli-contract.md) for:
