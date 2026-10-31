@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "yes",
+   "confidence": 0.98
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 0.98
+  }
+ },
+ "bundle": "B3",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-012\", \"statement\": \"sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.\", \"scope\": \"The item adds or changes consumer setup, hook or interpreter-selection configuration keys in sc-lint.toml.\"}, \"item\": {\"id\": \"fix1t-ANC-012/FX-PASS-1\", \"title\": \"ANC-012 pass fixture\", \"text\": \"Lint steps gain env and cwd; no setup or runner key is added. Evidence: config test rejects [tool.sc-lint].setup and [tool.sc-lint].runner as unknown keys.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"No such commitment is written, or the item adds a setup, hook or interpreter key.\", \"unclear\": \"A sentence touches this but cannot be read as the commitment or not.\", \"yes\": \"Such a commitment is written in the item.\"}, \"instructions\": \"Is there a sentence in `item.text` committing that sc-lint.toml gains no setup-hook key and no interpreter-selection key (for example setup or runner stay unknown keys)? Plans that add such a key contain no such commitment. Judge only whether the commitment is written.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"The item plans no such key.\", \"unclear\": \"The item plans a key whose role cannot be told.\", \"yes\": \"The item plans a setup-hook or interpreter-selection key.\"}, \"instructions\": \"Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work. Does `item.text` plan such a conflicting key? Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"No: the item changes no such configuration; it is about analyzer rules, output, logging or other work.\", \"unclear\": \"The item text is too vague to tell.\", \"yes\": \"Yes: the item adds, changes or rules on step-execution, setup, hook or interpreter configuration keys in sc-lint.toml.\"}, \"instructions\": \"`anchor.statement` forbids adding a setup-hook or interpreter-selection key to sc-lint.toml. Work that adds or changes how consumers configure step execution there (env, cwd, setup, hooks, runner or interpreter keys) is on this subject, whether or not it follows the statement. Is `item.text` on this subject?\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "9123f4b49e6c81f27e2b851a6e2b119104a8b5e6dfb9ffbfe9e0451ac1ff7b5f",
+ "case_id": "FX-PASS-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":0.98,\"probabilities\":{\"no\":0.01,\"unclear\":0.0,\"yes\":0.99}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":0.98,\"probabilities\":{\"no\":0.01,\"unclear\":0.0,\"yes\":0.99}}},\"usage\":{\"input_tokens\":967,\"output_tokens\":117}}",
+ "raw_response_sha256": "0fdfeda0fc1c66613d3069e114d1f00d55f49390d8080482ccd2dd68f3ac195a",
+ "repeat": 2,
+ "run_id": "fix1t-ANC-012/B3/FX-PASS-1/r2",
+ "semantic_verdict": "satisfied",
+ "spec": {
+  "addressed": "A3",
+  "contradicted": "K3",
+  "relevant": "R3"
+ }
+}

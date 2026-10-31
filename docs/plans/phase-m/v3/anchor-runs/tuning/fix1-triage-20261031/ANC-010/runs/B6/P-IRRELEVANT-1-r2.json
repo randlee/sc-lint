@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "no",
+   "confidence": 1.0
+  }
+ },
+ "bundle": "B6",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-010\", \"statement\": \"PORT-010, a rule sc-lint's portability analyzer reports from source, must be allowable at a single site: an item carrying #[sc_lint(allow(PORT-010), reason = \\\"...\\\")] is not reported by PORT-010.\", \"scope\": \"The item adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))], in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes.\"}, \"item\": {\"id\": \"fix1t-ANC-010/P-IRRELEVANT-1\", \"title\": \"Sprint M4: env and cwd on lint steps (#198)\", \"text\": \"Let lint steps accept env and cwd exactly as test command selectors do (ADR-016 per-step env; ADR-022 decision 3.2). No setup hook or interpreter-selection key is added. Add a deterministic regression for atm-core's #198 case.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"No such commitment is written.\", \"unclear\": \"A sentence touches this but cannot be read as the commitment or not.\", \"yes\": \"Such a commitment is written in the item.\"}, \"instructions\": \"Is there a sentence in `item.text` committing, as this item's own outcome, that PORT-010 leaves an item carrying `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]` unreported? Pointers to an allowance delivered elsewhere, investigation, docs wording, attribute changes with no stated outcome, and plans where annotated items stay reported or the attribute is ignored contain no such commitment. Judge only whether the commitment is written; do not judge conflict.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances.\", \"unclear\": \"The item says something about PORT-010 allowances that might or might not leave an annotated item reported.\", \"yes\": \"The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided.\"}, \"instructions\": \"Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item plans or states nothing about that treatment; it is about other shapes, other rules or other work, and any allowance mention is context, another item's work, or docs wording.\", \"unclear\": \"The item mentions the allowance in a way that cannot be placed as its own plan or only context.\", \"yes\": \"The item plans or states PORT-010's treatment of an item carrying a per-site allow(PORT-010) attribute, in any direction.\"}, \"instructions\": \"`anchor.scope` is per-site allowance of PORT-010 findings through #[sc_lint(allow(...))]. Does `item.text` plan or state anything about how PORT-010 treats an item carrying such an attribute (honouring it, ignoring it, parsing it, removing or replacing it, or whether the annotated item is reported)? An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. Judge subject presence only, whatever the item plans; do not judge whether the item obeys `anchor.statement`.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "c6ce4a193d6b00d23f4703ba113e241395bd4f98d848158ce0f97b0c18679ae1",
+ "case_id": "P-IRRELEVANT-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}}},\"usage\":{\"input_tokens\":1272,\"output_tokens\":117}}",
+ "raw_response_sha256": "3fc756cf2de9d1f62b46a7f73eaf864fc45ab2913b037f98aa20f8ac1a813649",
+ "repeat": 2,
+ "run_id": "fix1t-ANC-010/B6/P-IRRELEVANT-1/r2",
+ "semantic_verdict": "not_applicable",
+ "spec": {
+  "addressed": "A3",
+  "contradicted": "K0",
+  "relevant": "R6"
+ }
+}

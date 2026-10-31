@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "yes",
+   "confidence": 1.0
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 0.97
+  }
+ },
+ "bundle": "B1",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-012\", \"statement\": \"sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.\", \"scope\": \"The item adds or changes consumer setup, hook or interpreter-selection configuration keys in sc-lint.toml.\"}, \"item\": {\"id\": \"fix1t-ANC-012/P-BOUNDARY-1\", \"title\": \"Lint-step env passes PYO3_PYTHON verbatim\", \"text\": \"A [[tool.sc-lint.lint]] step accepts env = { PYO3_PYTHON = \\\".venv/bin/python\\\" }; sc-lint passes the value to the child verbatim and does not resolve or select an interpreter. No setup or runner key is added; both stay rejected.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item does not state that: it is silent about such keys, or it adds a setup, hook or interpreter key.\", \"unclear\": \"The item mentions such keys but it cannot be told whether it keeps them out.\", \"yes\": \"The item states that no setup or interpreter-selection key is added, or that setup and runner keys stay rejected or unknown.\"}, \"instructions\": \"Does `item.text` state that no setup-hook or interpreter-selection configuration key is added to sc-lint.toml, for example that [tool.sc-lint].setup and [tool.sc-lint].runner stay rejected? Judge whether this commitment is stated; an item that adds such a key does not state it.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"The item adds no such key.\", \"unclear\": \"The item describes a key whose role as a setup hook or interpreter selection cannot be told.\", \"yes\": \"The item adds or keeps such a setup-hook or interpreter-selection key.\"}, \"instructions\": \"Does `item.text` plan a setup-hook or interpreter-selection configuration key that `anchor.statement` forbids? Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item adds or changes no consumer configuration key of that kind: it changes analyzer rules, output or logging, or other work.\", \"unclear\": \"The item text is too vague to tell whether it touches such configuration keys.\", \"yes\": \"The item adds, changes, removes or rules on a consumer setup, hook, interpreter-selection or per-step execution key in sc-lint.toml (for example env or cwd on a lint step, a setup or runner table).\"}, \"instructions\": \"`anchor.scope` covers consumer configuration keys in sc-lint.toml for setting up or running steps: setup or hook keys, interpreter-selection keys, and per-step execution settings such as a lint step's env or cwd. Does `item.text` add, change or remove such a key, or decide which of them exist? Judge subject overlap only; do not judge whether the item obeys `anchor.statement`.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "f8770ff0770cded824af6498f695716f14fc293e9714eb9052115a41b1fc442a",
+ "case_id": "P-BOUNDARY-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":0.97,\"probabilities\":{\"no\":0.02,\"unclear\":0.0,\"yes\":0.98}}},\"usage\":{\"input_tokens\":1094,\"output_tokens\":117}}",
+ "raw_response_sha256": "c11a0b2eeb1b561476eb7446ba74a14e4c1710e47082f7184a8d238f88c0349a",
+ "repeat": 2,
+ "run_id": "fix1t-ANC-012/B1/P-BOUNDARY-1/r2",
+ "semantic_verdict": "satisfied",
+ "spec": {
+  "addressed": "A1",
+  "contradicted": "K1",
+  "relevant": "R1"
+ }
+}

@@ -1,0 +1,33 @@
+{
+  "success": true,
+  "data": {
+    "gate": "plan",
+    "item": "lint-m-3",
+    "prev": "plan-20261031T191655Z-lint-m-3",
+    "next": "plan-20261031T191803Z-lint-m-3",
+    "changed": [
+      {
+        "anchor_id": "ANC-012",
+        "from": "underspecified",
+        "to": "satisfied",
+        "improved": true
+      }
+    ],
+    "added": [],
+    "removed": [],
+    "regressions": [],
+    "pass_to_fail": [],
+    "fail_to_pass": [
+      "ANC-012"
+    ],
+    "item_size": {
+      "before_chars": 3500,
+      "after_chars": 3496,
+      "delta_chars": -4,
+      "grew": false
+    },
+    "pass_before": false,
+    "pass_after": true
+  },
+  "error": null
+}

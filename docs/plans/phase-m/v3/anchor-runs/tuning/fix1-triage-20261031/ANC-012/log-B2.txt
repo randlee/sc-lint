@@ -1,0 +1,2 @@
+{"anchor": "ANC-012", "bundle": "B2", "file": "oracle.json", "retries": 0}
+{"anchor": "ANC-012", "bundle": "B2", "file": "diagnostic.json", "retries": 0}

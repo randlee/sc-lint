@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "no",
+   "confidence": 1.0
+  }
+ },
+ "bundle": "B2",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-012\", \"statement\": \"sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.\", \"scope\": \"The item adds or changes consumer setup, hook or interpreter-selection configuration keys in sc-lint.toml.\"}, \"item\": {\"id\": \"fix1t-ANC-012/P-IRR-2\", \"title\": \"Failed-step output and step logs (#195)\", \"text\": \"Failed lint steps print both stdout and stderr, and every executed step writes both streams to <log-root>/steps/<step>.log under the existing --log-root.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item says no such thing, or it adds a setup, hook or interpreter key.\", \"unclear\": \"The item touches such keys in wording that cannot be read either way.\", \"yes\": \"The item explicitly says no setup-hook or interpreter-selection key is added, or that keys such as setup or runner stay rejected.\"}, \"instructions\": \"`anchor.statement` forbids a setup-hook or interpreter-selection configuration key. Does `item.text` explicitly keep that prohibition, by saying such keys are not added or stay rejected? An item that adds such a key does not keep it. Judge presence of the explicit commitment only.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"No such key is added.\", \"unclear\": \"It cannot be told whether a planned key runs setup or hook commands or selects an interpreter.\", \"yes\": \"Yes, such a key is added or kept.\"}, \"instructions\": \"Would `item.text`, as planned, add a key to sc-lint.toml through which sc-lint runs setup or hook commands, or picks the interpreter or runner for a step? Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item touches no such key: it is about analyzer rules, report or log output, or other work.\", \"unclear\": \"The item text is too vague to tell.\", \"yes\": \"The item adds, changes, removes or keeps out such a key.\"}, \"instructions\": \"Does the work in `item.text` touch how consumers configure the setup or execution of sc-lint steps through keys in sc-lint.toml, such as a lint step's env or cwd, a setup or hook table, or an interpreter or runner key? Judge subject overlap only, not whether the item obeys `anchor.statement`.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "58732cd3070c44f7bfb08778db79df6b281127fdffe3cb266b90acd3b9bc9ba4",
+ "case_id": "P-IRR-2",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}}},\"usage\":{\"input_tokens\":997,\"output_tokens\":117}}",
+ "raw_response_sha256": "16f0ec5308e426aae891b6738dd2980046a4db1c1a738c3fe5aafb3db8534d2e",
+ "repeat": 2,
+ "run_id": "fix1t-ANC-012/B2/P-IRR-2/r2",
+ "semantic_verdict": "not_applicable",
+ "spec": {
+  "addressed": "A2",
+  "contradicted": "K2",
+  "relevant": "R2"
+ }
+}

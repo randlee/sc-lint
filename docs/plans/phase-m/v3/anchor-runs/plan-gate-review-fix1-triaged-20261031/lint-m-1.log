@@ -1,0 +1,786 @@
+{
+  "success": true,
+  "data": {
+    "schema": "plan-anchoring/run/1",
+    "run_id": "plan-20261031T195949Z-lint-m-1",
+    "gate": "plan",
+    "created_at": "2026-10-31T19:59:49+00:00",
+    "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+    "plan": "phase-m",
+    "item": {
+      "id": "lint-m-1",
+      "title": "m-1: port010-same-name-siblings",
+      "source": "docs/plans/phase-m/v3/anchor-runs/plan-gate-review-fix1-triaged-20261031/lint-m-1.item.txt",
+      "chars": 3954,
+      "truncated": false,
+      "chars_before_reduction": 3954,
+      "code_reduced": {
+        "blocks": 0,
+        "lines": 0
+      }
+    },
+    "model_requested": "jev-latest",
+    "model_answered": "jev-1.14.0",
+    "threshold": 0.6,
+    "max_request_bytes": 24000,
+    "min_item_chars": 2000,
+    "dry_run": false,
+    "fixture": false,
+    "results": [
+      {
+        "anchor_id": "ANC-003",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same scope, whether that scope is a module, an inherent impl or a crate root (lib.rs, main.rs or a src/bin file).",
+        "quote": "Issue #786 (atm-core verdict table, 2026-10-30): \"Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.\"\n\nREQ-PRODUCT-004AA (docs/requirements.md), rule list: \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"",
+        "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P3e",
+        "anchor_version": 4,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "e4bec1cdb23e5183528a532f3db79b3044e26f3099634fbd85bfcc2490b4fe33",
+        "deterministic_check": "",
+        "kind": "directive",
+        "leaning": "satisfied",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "The item works only on other PORT-010 shapes that involve no same-name #[cfg(not(unix))] sibling (helpers of paired callers, differently named or renamed companions, un-gated loopback TCP alternatives, rejected-config accessors, unix-only modules, unix-only-by-design sites allowed per site), other rules, configuration, or release work, or mentions same-name pairs only as context or as earlier tests to keep passing.",
+              "unclear": "The item mentions same-name pairs in a way that cannot be told to be work on their PORT-010 result or only context.",
+              "yes": "The item works on PORT-010's result for the #[cfg(unix)] item of such a same-name pair, in any wording and in any direction, alone or with other shapes."
+            },
+            "instructions": "Does `item.text` decide, change, keep or defer whether PORT-010 reports a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same scope, where the scope is a module, an inherent impl, or a crate root (lib.rs, main.rs or a src/bin file) (#720, #786 shape S3), or build what that decision directly needs? Items that mention such same-name pairs only as context for another shape (for example as the callers of renamed functions or of helpers) without changing whether PORT-010 reports the #[cfg(unix)] item of the pair, and items that only require earlier S3 tests or an inventory burn-down to keep passing, are no. Judge subject presence only, whatever the item plans; do not judge whether the item obeys `anchor.statement`.",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "`item.text` does not commit: it names the issue or shape but leaves the approach to be decided, does groundwork only, covers other shapes only, keeps the finding or hides it with allows, or carves out a scope (such as src/bin files or inherent impls) or an item kind (such as consts or types).",
+              "unclear": "`item.text` states an outcome close to this that cannot be read as the full commitment or not.",
+              "yes": "`item.text` states, in any wording, that PORT-010 does not report such an item in modules, inherent impls and crate roots, with no scope or item kind carved out."
+            },
+            "instructions": "`anchor.statement` requires that PORT-010 not report a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same module, inherent impl or crate root. Does `item.text` commit to that outcome as part of this item? Saying 'crate root' covers lib.rs, main.rs and src/bin files. Still reporting pairs that differ in name, kind or scope is consistent with the commitment. Judge commitment only, not conflict. Work on other shapes, such as un-gated or differently named alternatives, helpers of paired callers or rejected-config accessors, commits nothing to this outcome, even when it also stops a PORT-010 report.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "`item.text` does not: it removes the finding in all those scopes, is silent, defers, or keeps findings only outside that situation.",
+              "unclear": "`item.text` describes PORT-010's treatment of such items in wording that cannot be read either way.",
+              "yes": "`item.text` says or sets a rule under which such an item keeps its PORT-010 finding in some listed scope or for some item kind."
+            },
+            "instructions": "Does `item.text` plan that PORT-010 keeps a finding, shown or hidden, on a #[cfg(unix)] item whose #[cfg(not(unix))] sibling has the same name and kind and sits in the same module, inherent impl or crate root (lib.rs, main.rs or a src/bin file)? Examples: PORT-010 reports or keeps reporting such an item in any of those scopes; the exemption covers only some scopes (for example lib.rs and main.rs but not src/bin files, or not inherent impls); only #[cfg(windows)] twins count; only some item kinds count while same-name, same-kind consts, statics or types stay reported; or the finding is kept and hidden with a per-site allow, exclusion or allowlist. Not this: planning that such items stop being reported; silence; deferral or groundwork; work on other shapes; still reporting an item whose #[cfg(not(unix))] counterpart is in a different scope, has a different name, or is a different kind of item. Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "satisfied",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.0,
+              "yes": 1.0
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.01,
+              "unclear": 0.0,
+              "yes": 0.99
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.99,
+              "unclear": 0.0,
+              "yes": 0.01
+            }
+          }
+        },
+        "min_confidence": 0.98,
+        "explanation": "The directive is carried forward.",
+        "usage": {
+          "input_tokens": 2669,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 8921
+      },
+      {
+        "anchor_id": "ANC-006",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report the declaration #[cfg(unix)] mod x; of a module that is never compiled on Windows.",
+        "quote": "Issue #786 (atm-core verdict table, 2026-10-30): \"Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S6  Module declared `#[cfg(unix)] mod x;` and items inside it also carry cfg(unix); module is never compiled on Windows. Rows 13 (the decl), 17.\"\n\nREQ-PRODUCT-004AA (docs/requirements.md), rule list: \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"",
+        "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P6d",
+        "anchor_version": 3,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "74ebc53c7418e16ae7467f24a78b3201d7ba33df285fe2f8df89a20312f575e6",
+        "deterministic_check": "",
+        "kind": "directive",
+        "leaning": "satisfied",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "The item's PORT-010 rule change is confined to other named shapes or cases, or the item concerns another rule, configuration, or unrelated work; fixture collection, finding inventories, and generic not-closed notes do not count as touching the declaration.",
+              "unclear": "The item changes PORT-010 behaviour without identifying the shapes or cases it covers, so it cannot be told whether the cfg(unix) module declaration is included.",
+              "yes": "The item's PORT-010 work includes, names, or defers by name the `#[cfg(unix)] mod ...;` declaration or shape S6, or undertakes to fix every #786 PORT-010 false positive."
+            },
+            "instructions": "`anchor.statement` governs whether sc-lint's PORT-010 rule reports the declaration line of a `#[cfg(unix)] mod x;` module (shape S6 in atm-core issue #786). First identify which PORT-010 shapes or cases `item.text` says its rule change covers. The subject is touched when that coverage includes the cfg(unix) module declaration or S6, when the item names that declaration or S6 to keep, suppress, refactor, or defer it, or when the item undertakes to fix every #786 PORT-010 false positive. The subject is not touched when the rule change is limited to other named shapes or cases, even if the item also re-extracts every #786 file as a fixture, labels findings by shape, or lists other shapes as not closed; nor by work on other rules or configuration. Judge subject overlap only, not whether the item obeys the anchor.",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "The item text does not state that outcome: it is silent about the module declaration, mentions #786 or PORT-010 only generally, defers S6, keeps the report, or exempts only the module's inner items.",
+              "unclear": "The item text mentions the cfg(unix) module declaration but it cannot be told whether PORT-010 will stop reporting it.",
+              "yes": "The item text says PORT-010 produces no finding for a `#[cfg(unix)] mod ...;` declaration or shape S6, in any wording such as stop reporting, no longer reports, exempt, skip, yields no finding, treat as unix-only by design, or a test asserting zero findings on the declaration line."
+            },
+            "instructions": "Does `item.text` state that PORT-010 will not report the declaration line of a `#[cfg(unix)] mod x;` module (#786 shape S6) because that module is never compiled on Windows? The item must name the module-declaration case specifically and state the no-report outcome. A general promise to fix #786 or PORT-010 false positives, a refactor that states no outcome, a deferral, or exempting only the items inside the module does not count. Judge presence of this outcome only, not conflict.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "The item text says nothing that leaves the declaration reported: it stops reporting it, does not mention it, defers it, or concerns other work.",
+              "unclear": "The item text touches the declaration handling in a way that might leave it reported, but it cannot be told.",
+              "yes": "The item text states that PORT-010 will continue to report the `#[cfg(unix)] mod ...;` declaration, or that consumers must suppress that declaration's finding."
+            },
+            "instructions": "Does `item.text` plan an outcome in which PORT-010 still reports the declaration line of a `#[cfg(unix)] mod x;` module (#786 shape S6)? Conflict includes keeping or restoring that report, leaving the declaration reported while exempting only the module's inner items, or requiring consumers to silence the declaration with a per-site allow, a configuration exclusion, or a disabled rule. Silence about the declaration, deferring S6 to later work, work on other shapes, and unrelated work are not conflict. Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "satisfied",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.0,
+              "yes": 1.0
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.0,
+              "yes": 1.0
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          }
+        },
+        "min_confidence": 1.0,
+        "explanation": "The directive is carried forward.",
+        "usage": {
+          "input_tokens": 2498,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 8255
+      },
+      {
+        "anchor_id": "ANC-007",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "sc-lint's PORT-010 rule must recognize, and not report, items carrying #[cfg(unix)] inside a module declared #[cfg(unix)] mod x;, since that module is never compiled on Windows.",
+        "quote": "REQ-PRODUCT-004AA (docs/requirements.md), rule list: \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"\n\nIssue #786 (atm-core verdict table, 2026-10-30): \"Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S6  Module declared `#[cfg(unix)] mod x;` and items inside it also carry cfg(unix); module is never compiled on Windows. Rows 13 (the decl), 17.\"",
+        "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P7b",
+        "anchor_version": 3,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "5328690d6675ba258570be51db4a99aa72cba5b024a1827708813a50466e876b",
+        "deterministic_check": "",
+        "kind": "directive",
+        "leaning": "satisfied",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "No part of the item concerns that situation: it covers other rules, other configuration, or other PORT-010 shapes only.",
+              "unclear": "The item is too vague to tell whether any part of it concerns `#[cfg(unix)]` items inside a `#[cfg(unix)]`-declared module.",
+              "yes": "Some part of the item plans, tests, reviews, or describes PORT-010's treatment of `#[cfg(unix)]` items inside a `#[cfg(unix)] mod x;` module."
+            },
+            "instructions": "`anchor.scope` names the exact situation the anchor governs. Does `item.text` describe work that falls inside `anchor.scope`, that is, work on how PORT-010 treats `#[cfg(unix)]` items inside a module declared `#[cfg(unix)] mod x;`? Work on PORT-010 for other shapes, or on other rules, falls outside the scope even when it mentions the same issue number. Judge overlap with the scope only, not obedience.",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "The item does not state that outcome: it is silent about it, only reviews, documents, or adds fixtures without the expected result, or says the items keep being reported or need consumer changes.",
+              "unclear": "The item names this situation and an intended change, but it cannot be told whether PORT-010 will stop reporting the items inside the module.",
+              "yes": "The item states, as a step, goal, or acceptance condition, that PORT-010 will not report `#[cfg(unix)]` items inside a `#[cfg(unix)] mod x;` module, alone or as part of a larger change."
+            },
+            "instructions": "Does `item.text` commit to the outcome that PORT-010 does not report items carrying `#[cfg(unix)]` when they sit inside a module declared `#[cfg(unix)] mod x;`? Wording such as skip, exempt, do not flag, produce no finding, or treat the module as never compiled on Windows counts. Adding a fixture, a test, or an investigation without stating that PORT-010 stops reporting those items does not count. Judge presence of this outcome only; do not judge conflict.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "The item has no such plan or outcome for items inside a `#[cfg(unix)] mod x;` module, whether it complies, is silent, or is about something else.",
+              "unclear": "The item is ambiguous enough that it might or might not leave those items reported or offloaded to the consumer.",
+              "yes": "The item states a plan or outcome under which PORT-010 still reports, or the consumer must suppress or work around, `#[cfg(unix)]` items inside a `#[cfg(unix)] mod x;` module."
+            },
+            "instructions": "Does `item.text` propose something that `anchor.statement` rules out? The statement rules out PORT-010 reporting `#[cfg(unix)]` items inside a module declared `#[cfg(unix)] mod x;`. A conflict is an item that keeps those findings, reports only some of them less (for example the declaration but not the items inside), or hands those findings to the consumer to suppress or work around. Silence about this module situation is not a conflict, and an item about a different shape or rule does not conflict. Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "satisfied",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.0,
+              "yes": 1.0
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.0,
+              "yes": 1.0
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.91,
+            "probabilities": {
+              "no": 0.94,
+              "unclear": 0.01,
+              "yes": 0.05
+            }
+          }
+        },
+        "min_confidence": 0.91,
+        "explanation": "The directive is carried forward.",
+        "usage": {
+          "input_tokens": 2343,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 7534
+      },
+      {
+        "anchor_id": "ANC-009",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.",
+        "quote": "REQ-PRODUCT-004AA/PORT-010 (docs/requirements.md): \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"\n\nADR-010 decision 6 (Accepted): \"Explicit `#[cfg(unix)]` production boundaries are treated as structural parity questions for the shared portability family. Leaf rules may suppress inside those items, with the companion-or-fallback decision owned by the structural parity rule family instead of parallel per-rule allowlists.\"\n\nIssue #786 (atm-core verdict table, 2026-10-30): \"#720 covers only the crate-root main.rs shape; this issue tracks the complete remaining inventory and asks for per-case classification, not blanket suppression of real parity gaps.\"",
+        "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P9",
+        "anchor_version": 2,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "1c924d8f81dc177e488827941b4d2da3faddcbe3df8f6b564a8b22fafbfba6e7",
+        "deterministic_check": "",
+        "kind": "prohibition",
+        "leaning": "satisfied",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+              "unclear": "The item text is too vague to tell what part of the system it touches.",
+              "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+            },
+            "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "The item does not say so, or it suppresses such items broadly.",
+              "unclear": "The item mentions this in wording that cannot be read either way.",
+              "yes": "The item explicitly says real gaps (unpaired, unannotated or negative-case items) are still reported."
+            },
+            "instructions": "`anchor.statement` requires that a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback still be reported. Does `item.text` explicitly keep that, for example by saying unpaired or unannotated items or negative cases stay reported? A plan that suppresses many items at once does not keep it. Judge presence only.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "The item plans no blanket suppression.",
+              "unclear": "The item plans a suppression whose reach cannot be told.",
+              "yes": "The item plans such a blanket suppression."
+            },
+            "instructions": "Does `item.text` plan a blanket suppression of PORT-010 findings: skipping #[cfg(unix)] items by file, module, path, crate, name pattern or a switch, regardless of whether each has a companion, a portable fallback or its own per-site allowance? Not blanket suppression: recognising a specific companion shape (for example a same-name #[cfg(not(unix))] sibling), honouring a reasoned allowance on one annotated item, silence, or unrelated work. Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "satisfied",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.0,
+              "yes": 1.0
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "yes",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 0.0,
+              "unclear": 0.0,
+              "yes": 1.0
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.82,
+            "probabilities": {
+              "no": 0.88,
+              "unclear": 0.0,
+              "yes": 0.12
+            }
+          }
+        },
+        "min_confidence": 0.82,
+        "explanation": "The directive is carried forward.",
+        "usage": {
+          "input_tokens": 2095,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 6720
+      },
+      {
+        "anchor_id": "ANC-010",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "PORT-010, a rule sc-lint's portability analyzer reports from source, must be allowable at a single site: an item carrying #[sc_lint(allow(PORT-010), reason = \"...\")] is not reported by PORT-010.",
+        "quote": "ADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 4: \"Every rule an analyzer reports from source can be allowed at a single site with `#[sc_lint(allow(<RULE>), reason = \\\"...\\\")]`. A site allowance is the approved exception path for a deliberate, non-parity case such as #786 S8.\"",
+        "stated_by": "ADR-022 decision 4 + #786 S8 + Rand S8 ruling",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P10c",
+        "anchor_version": 3,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "06fa80eb3b21e6fac0ee1207e58dd7175aa328229a28d69c1268e7ea03c178fc",
+        "deterministic_check": "",
+        "kind": "directive",
+        "leaning": "not_applicable",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "The item does not touch PORT-010 site allowances: it changes which shapes PORT-010 reports without mentioning allow attributes, concerns allowances for other rules only, mentions the PORT-010 allowance only as another item's work or in docs wording, or is other work such as lint-step env or cwd, SCB-MANIFEST rules or release work.",
+              "unclear": "The item text is too vague to tell whether it touches PORT-010 site allowances.",
+              "yes": "The item adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism. An item that states whether PORT-010 reports an item carrying allow(PORT-010) is yes."
+            },
+            "instructions": "Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute? PORT-010 work that never mentions site allowances, such as recognising companion shapes or keeping real parity gaps reported, is a different subject, and so are site allowances for rules other than PORT-010. An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "The item does not state that outcome as its own commitment.",
+              "unclear": "The item names an outcome for an annotated item, but its wording leaves open whether PORT-010 still reports it.",
+              "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+            },
+            "instructions": "Does `item.text` itself commit that PORT-010 does not report an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, as new work or by keeping it working? Accept honour, skip, suppress, exempt, records no finding or not reported for the annotated item. It does not commit when it only investigates or documents allowances, only refers to an allowance another item delivers, changes the attribute without stating the outcome, or says annotated items are still reported or the attribute is ignored. Judge presence of the outcome only; do not judge conflict. If the item makes PORT-010 ignore or drop the attribute, or uses an exclusion or other mechanism instead of it, the annotated item is still reported by PORT-010, so the outcome is not committed.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances, including items that defer or leave the allowance behaviour to be decided.",
+              "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
+              "yes": "The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided."
+            },
+            "instructions": "Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Leaving the allowance behaviour to be decided later, reworking it without stating an outcome, or deferring it is not a conflict. Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "not_applicable",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.74,
+            "probabilities": {
+              "no": 0.83,
+              "unclear": 0.0,
+              "yes": 0.17
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.77,
+            "probabilities": {
+              "no": 0.85,
+              "unclear": 0.04,
+              "yes": 0.11
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.91,
+            "probabilities": {
+              "no": 0.94,
+              "unclear": 0.01,
+              "yes": 0.05
+            }
+          }
+        },
+        "min_confidence": 0.74,
+        "explanation": "The anchor does not govern this bead.",
+        "usage": {
+          "input_tokens": 2549,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 8581
+      },
+      {
+        "anchor_id": "ANC-011",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "A [[tool.sc-lint.lint]] step in sc-lint.toml must accept an env table and a cwd key, applied to that step's child process, with the same meaning they have on a test command selector.",
+        "quote": "ADR-016 (Accepted), How To Extend: \"Use declarative `sc-lint.toml` lint profiles, test layers, per-analyzer tables, step argv/exclusions, platform conditionals and per-step/per-layer `env`.\"\n\nADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 3.2: \"Parallel constructs accept parallel keys. A lint step and a test command selector accept the same execution keys: `command`, `env`, `cwd`, platform restriction and `after_all`.\"",
+        "stated_by": "ADR-016 How To Extend + ADR-022 decision 3.2 + #198",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P11",
+        "anchor_version": 3,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "10eefa98726ec3e9052fb7dd87f76498304787dfa8853dd3fca1f35f446acc82",
+        "deterministic_check": "",
+        "kind": "directive",
+        "leaning": "not_applicable",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "The item works on something other than lint-step configuration or launching, such as a lint rule, an analyzer, or another crate.",
+              "unclear": "The item text is too vague to tell whether it works on lint steps.",
+              "yes": "The item works on lint-step keys or on how lint steps are run."
+            },
+            "instructions": "Does `item.text` work on sc-lint's `[[tool.sc-lint.lint]]` lint steps? Signals: the item names lint steps or `[[tool.sc-lint.lint]]`, adds or rejects a lint-step key, or changes how the lint runner spawns a step's command. Work on a lint rule such as PORT-010 or SCB-MANIFEST-004 is not work on lint steps. Answer about subject matter only; do not judge whether the item follows `anchor.statement`.",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "The item does not plan that behaviour: it is silent about it, names only the issue or lint-step configuration in general, adds a different key, supports only one of `env` and `cwd`, or keeps lint steps rejecting them.",
+              "unclear": "The item mentions lint-step environment or working directory, but its wording leaves it open whether lint steps will accept and apply both `env` and `cwd`.",
+              "yes": "The item says lint steps accept `env` and `cwd` (environment variables and working directory, in any wording) and that they apply to the step's command or child process, or that lint steps share the test command selector's handling of these keys."
+            },
+            "instructions": "`anchor.statement` requires one specific behaviour: a `[[tool.sc-lint.lint]]` step accepts both an `env` table and a `cwd` key, and sc-lint applies them to that step's child process with the same meaning they have on a test command selector. Does `item.text` plan for, or state as an outcome, that behaviour, with both `env` and `cwd`? Judge presence of this behaviour only; do not judge conflict.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "Nothing in the item conflicts: it follows the requirement, is silent about it, adds or rejects other keys, or concerns other work.",
+              "unclear": "The item describes lint-step keys in a way that might or might not leave `env` or `cwd` unsupported.",
+              "yes": "The item states that lint steps reject or do not support `env` or `cwd`, or gives them a meaning other than setting the step's child environment and working directory."
+            },
+            "instructions": "`anchor.statement` requires `[[tool.sc-lint.lint]]` steps to accept an `env` table and a `cwd` key, applied to the step's child process with the same meaning as on test command selectors. Does `item.text` plan or state something that cannot be reconciled with that requirement, for example lint steps still rejecting `env` or `cwd`, lint steps limited to keys that exclude them, or env/cwd applied somewhere other than the step's child process? Silence is not conflict. Adding a different key is not conflict. Continuing to reject other unknown keys is not conflict. Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "not_applicable",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          }
+        },
+        "min_confidence": 1.0,
+        "explanation": "The anchor does not govern this bead.",
+        "usage": {
+          "input_tokens": 2278,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 7446
+      },
+      {
+        "anchor_id": "ANC-012",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.",
+        "quote": "ADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 6: \"sc-lint does not add setup hooks or interpreter-selection policy. These are consumer orchestration. A consumer expresses them with step argv, step `env` and its own recipes.\"\n\nADR-020 decision 9 (Accepted): \"**#198 (setup hook).** Won't-do. ADR-016's hook restriction is unchanged; `setup.pre` and `runner.python` are not added.\"",
+        "stated_by": "ADR-022 decision 6 + ADR-020 decision 9",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P12",
+        "anchor_version": 2,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "e6360d8cadafbdfec1ba6524690d207530a0e06b33385f1f5ef676051ef98937",
+        "deterministic_check": "",
+        "kind": "prohibition",
+        "leaning": "not_applicable",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "No: the item changes no such configuration; it is about analyzer rules, output, logging or other work.",
+              "unclear": "The item text is too vague to tell.",
+              "yes": "Yes: the item adds, changes or rules on step-execution, setup, hook or interpreter configuration keys in sc-lint.toml."
+            },
+            "instructions": "`anchor.statement` forbids adding a setup-hook or interpreter-selection key to sc-lint.toml. Work that adds or changes how consumers configure step execution there (env, cwd, setup, hooks, runner or interpreter keys) is on this subject, whether or not it follows the statement. Is `item.text` on this subject?",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "No such commitment is written, or the item adds a setup, hook or interpreter key.",
+              "unclear": "A sentence touches this but cannot be read as the commitment or not.",
+              "yes": "Such a commitment is written in the item."
+            },
+            "instructions": "Is there a sentence in `item.text` committing that sc-lint.toml gains no setup-hook key and no interpreter-selection key (for example setup or runner stay unknown keys)? Plans that add such a key contain no such commitment. Judge only whether the commitment is written.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "The item plans no such key.",
+              "unclear": "The item plans a key whose role cannot be told.",
+              "yes": "The item plans a setup-hook or interpreter-selection key."
+            },
+            "instructions": "Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work. Does `item.text` plan such a conflicting key? Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "not_applicable",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          }
+        },
+        "min_confidence": 1.0,
+        "explanation": "The anchor does not govern this bead.",
+        "usage": {
+          "input_tokens": 2021,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 6421
+      },
+      {
+        "anchor_id": "ANC-013",
+        "source_type": "ANC",
+        "source_ref": null,
+        "statement": "sc-lint's SCB-MANIFEST-004 check must not report a self::X, crate::X or super::X path, in a use declaration or anywhere else in the code, as a use of the owned crate X, nor a bare X:: path in a module that declares its own mod X.",
+        "quote": "Issue #136 (atm-core, 2026-10-30): \"`mod.rs:11` is `pub mod cron;` (file `commands/cron.rs`), and `crates/atm/Cargo.toml` has no `cron` dependency, so nothing imports the cron crate: it is **not a true violation and should not be reported**. [...] in a scratch file with no external dependency, 0.8.2 flags `use self::cron::X;`, `use crate::cron::X;` and `use super::cron::X;`, i.e. it matches the first path segment textually and does not distinguish a local module from the extern crate.\"\n\nREQ-SCB-019 (docs/sc-lint-boundary/requirements.md): \"Manifest findings use `SCB-MANIFEST-003` for a disallowed configured dependency, `-004` for a configured ownership violation, [...]\"",
+        "stated_by": "REQ-SCB-019 + #136 atm-core answer 5",
+        "stated_at": "2026-10-30",
+        "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P13f",
+        "anchor_version": 3,
+        "question_set": {
+          "gate": "plan",
+          "version": 1,
+          "overridden": true
+        },
+        "questions_sha256": "63af50ace17903d96073d6af7e658175ff215e5db8d24fa3f9c58c0d8b93e477",
+        "deterministic_check": "",
+        "kind": "directive",
+        "leaning": "not_applicable",
+        "questions": {
+          "relevant": {
+            "criteria": {
+              "no": "The item is about a different rule or activity, for example PORT-010, SCB-MANIFEST-003 or other Cargo.toml dependency-table handling, lint step configuration, or release work, and does not touch how SCB-MANIFEST-004 classifies source paths.",
+              "unclear": "The item mentions sc-lint-boundary or manifest rules, but it is not possible to tell whether it touches how SCB-MANIFEST-004 classifies source paths.",
+              "yes": "The item changes, keeps, or depends on SCB-MANIFEST-004's decision about whether a source path (use statements, self::, crate:: or super:: paths, extern crate, ::name or bare crate paths) is a use of an owned dependency, including any plan to resolve atm-core #136 for that check, whether by code, configuration or documentation."
+            },
+            "instructions": "Does `item.text` plan, change, or depend on how the SCB-MANIFEST-004 check (also called global_dependency_ownership or the dependency-ownership rule, in crates/sc-lint-boundary) decides that a path in Rust source is a use of an owned dependency? Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+            "type": "choice"
+          },
+          "addressed": {
+            "criteria": {
+              "no": "The item does not state that outcome: it is silent about these paths, covers only one or two of the three prefixes, only names issue #136 or improving path handling without saying these paths stop being reported, says they keep being reported, or is about another rule.",
+              "unclear": "The item talks about how self::, crate:: or super:: paths are treated, but it cannot be determined whether local-module paths with all three prefixes stop being reported.",
+              "yes": "The item states that self::, crate:: and super:: paths whose next segment is a local module (or all such qualified paths) are not reported by SCB-MANIFEST-004, using words such as skips, no finding, not reported, not counted as a use of the crate, or resolved to the local module instead of the owned crate."
+            },
+            "instructions": "Does `item.text` state that SCB-MANIFEST-004 will not report a path beginning with self::, crate:: or super:: as a use of an owned crate when the segment after the prefix is a local module of the crate? All three prefixes must be covered, either named or by a rule that applies to all qualified paths. Judge presence of this outcome only; do not judge conflict.",
+            "type": "choice"
+          },
+          "contradicted": {
+            "criteria": {
+              "no": "The item does not make or keep such paths reported; it fixes them, is silent, or concerns something else.",
+              "unclear": "It is not possible to tell from the item whether such paths would stay reported.",
+              "yes": "The item says such paths are or stay reported, or explicitly keeps the current matching unchanged."
+            },
+            "instructions": "Would carrying out `item.text` leave SCB-MANIFEST-004 reporting a self::X, crate::X or super::X path as a use of owned crate X when X is a local module, because the item says so or explicitly keeps the current matching unchanged? Silence is not a conflict. Judge conflict only.",
+            "type": "choice"
+          }
+        },
+        "verdict": "not_applicable",
+        "answers": {
+          "relevant": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 1.0,
+            "probabilities": {
+              "no": 1.0,
+              "unclear": 0.0,
+              "yes": 0.0
+            }
+          },
+          "addressed": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.98,
+            "probabilities": {
+              "no": 0.99,
+              "unclear": 0.0,
+              "yes": 0.01
+            }
+          },
+          "contradicted": {
+            "type": "choice",
+            "choice": "no",
+            "confidence": 0.97,
+            "probabilities": {
+              "no": 0.98,
+              "unclear": 0.01,
+              "yes": 0.01
+            }
+          }
+        },
+        "min_confidence": 0.97,
+        "explanation": "The anchor does not govern this bead.",
+        "usage": {
+          "input_tokens": 2343,
+          "output_tokens": 117
+        },
+        "attempts": 1,
+        "item_chars_sent": 3954,
+        "item_shortened": false,
+        "request_bytes": 7586
+      }
+    ],
+    "summary": {
+      "counts": {
+        "satisfied": 4,
+        "not_applicable": 4
+      },
+      "failing": [],
+      "leaning_counts": {
+        "not_applicable": 4,
+        "satisfied": 4
+      },
+      "unstable": [],
+      "errors": [],
+      "shortened": [],
+      "pass": true
+    },
+    "path": "docs/plans/phase-m/v3/anchor-runs/plan-gate-review-fix1-triaged-20261031/lint-m-1.run.json",
+    "run_path": "docs/plans/phase-m/v3/anchor-runs/plan-gate-review-fix1-triaged-20261031/lint-m-1.run.json"
+  },
+  "error": null
+}

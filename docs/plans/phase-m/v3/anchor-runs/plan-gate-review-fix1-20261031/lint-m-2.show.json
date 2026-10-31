@@ -1,0 +1,81 @@
+[
+  {
+    "id": "lint-m-2",
+    "title": "m-2: manifest004-local-module-paths and cycle paths",
+    "description": "## Goal\n#136: SCB-MANIFEST-004 must not report a use self::X::..., use crate::X::... or use super::X::... path as a use of the owned crate X when X is a local module. That is not a configured ownership violation (REQ-SCB-019).\n## Deliverables\n1. Replace the textual crate-name match in global_dependency_ownership with a syn-based first-segment rule over every path (syn::visit::Visit::visit_path: types, expressions, patterns, struct literals, trait bounds, impl headers, qualified paths, attributes) plus extern crate. A path is a use of crate X only when its first segment is X or ::X. Paths starting with self, crate or super are never uses of an owned crate. A bare X:: path is exempt when the same module declares mod X. Macro bodies keep the current textual rule.\n2. Test manifest004_local_module_path, non-owner crate with a local mod cron: use self::cron::X, use super::cron::X, use crate::cron::X, use crate::commands::cron::X, a multi-line grouped use, nested group paths, and bare cron::X with a local mod cron report nothing.\n3. Test manifest004_owned_crate_positions_still_reported: without a local mod, cron:: in a use, type, expression, pattern, struct literal, trait bound, impl header, qualified path, attribute and macro argument, plus ::cron::X and extern crate cron, are still reported; the same positions with self::, crate:: or super:: are not.\n4. Regression replay of atm-core's crates/atm/src/commands/mod.rs (Cron(self::cron::CronCommand)) at 6ffaa97be as a committed fixture: zero findings.\n5. Boundary package docs: an owner's integration tests are allowed by listing the owner's tests/ root in allowed_source_roots, with an example.\n6. #385 (ADR-020 Amendment 2026-10-31, Pending Rand): include RuleId::ScbCycle001 in path_less_finding_excluded (lib.rs:722-735), alongside existing ScbCycle002/003, so exclude_paths_by_rule filters its node source paths. Test boundary_cycle_exclude_paths_by_rule with independent cycles in a.rs and b.rs: excluding SCB-CYCLE-001 on a.rs removes only that cycle.\n## Does Not Close\nNo change to allowed_source_roots semantics, no new scope key, no exclusion and no consumer rename. Manifest ([dependencies]) ownership checks are unchanged.\n## Active Trace\nANC-013. REQ-SCB-019, REQ-PRODUCT-023; ADR-020 decision 5 and Amendment 2026-10-31. ADR-022 is context, not a dispatch dependency.",
+    "design": "Baseline: manifest_dependency_policy/ownership.rs analyze() scans each source file; source_mentions_dependency() (71) and path_mentions() (84) match the crate name textually line by line, so self::cron::, doc comments and string literals all match. syn 2 (full, visit) is already a sc-lint-boundary dependency: parse the file, collect local mod names per module, implement Visit::visit_path and visit_item_extern_crate, and for Macro token streams apply path_mentions to the tokens' text. Doc comments and string literals no longer count as uses (tested). A file that fails to parse keeps the current textual behaviour (fail closed). Finding kind, RuleId and message unchanged.\n#385 baseline: path_less_finding_excluded early-returns for SCB-CYCLE-001; node_paths/finding_source_paths and settings.excluded_by_any_path already implement 002/003 filtering. Extend the existing match to 001 and retain the existing finding wire shape; no cycle-detector or schema change.\nConfine all legacy textual matching to source_mentions_dependency_textual_fallback(source: \u0026str, dependency: \u0026str) -\u003e bool, called only for macro token bodies and whole-file parse failure. Successful AST parsing never falls back for ordinary paths, doc comments or string literals. Delete this fallback only when a separately approved macro/parse-error replacement preserves the same fail-closed tests; no silent relaxation. REQ-SCB-019 governs the ownership correction; ADR-022 is context only.",
+    "acceptance_criteria": "## Acceptance Criteria\n- issue:#136: every exempt form in manifest004_local_module_path reports nothing; the atm-core commands/mod.rs replay reports nothing.\n- REQ-SCB-019: every owned-crate position in manifest004_owned_crate_positions_still_reported is still reported; manifest ownership findings are unchanged; existing issue136 tests pass.\n- Boundary docs show owner tests/ roots in allowed_source_roots as the supported configuration.\n- issue:#385: boundary_cycle_exclude_paths_by_rule passes for two files/two cycles, preserving the non-excluded finding and existing 002/003 behavior.\n- manifest004_macro_body_textual preserves the legacy macro-token check; manifest004_parse_failure_fails_closed proves malformed Rust retains textual findings; manifest004_doc_and_string_not_uses proves comments/string contents are not imports.\n## Validation\n- cargo test -p sc-lint-boundary --no-fail-fast\n- just lint\n- just test\nRecord the new tests failing on the develop baseline first.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-10-30T01:24:42Z",
+    "updated_at": "2026-10-31T19:46:33Z",
+    "metadata": {
+      "adrs": [
+        "ADR-020"
+      ],
+      "branch": "sprint/m-2-manifest004-local-module-paths",
+      "closure_type": "integration",
+      "difficulty": "normal",
+      "layer": 1,
+      "model_class": "",
+      "owned_paths": [
+        "crates/sc-lint-boundary/src/manifest_dependency_policy/**",
+        "crates/sc-lint-boundary/tests/**",
+        "crates/sc-lint-boundary/README.md",
+        "docs-bundle/packages/sc-lint-boundary.md",
+        "crates/sc-lint-boundary/src/lib.rs",
+        "docs/sc-lint/adr/ADR-020-phase-l-atm-core-findings.md"
+      ],
+      "owner": "clint",
+      "phase": "m",
+      "pr_target": "develop",
+      "relation": "parallel_safe",
+      "release_train": "",
+      "requirements": [
+        "REQ-SCB-019",
+        "REQ-PRODUCT-023"
+      ],
+      "sprint": "m-2",
+      "stack": "phase-m-c",
+      "stack_base": "develop",
+      "target_boundary": "BOUNDARY-ScLintBoundaryAnalyzer",
+      "worktree": "../sc-lint-worktrees/sprint/m-2-manifest004-local-module-paths"
+    },
+    "labels": [
+      "phase-m",
+      "stack:phase-m-c",
+      "stage:sprint"
+    ],
+    "dependencies": [
+      {
+        "id": "lint-phase-m",
+        "title": "phase-m: atm-core P1 tool fixes (PORT-010, SCB-MANIFEST-004, lint-step env/cwd)",
+        "description": "Phase M fixes: see docs/plans/phase-m/phase-m-plan.md and sprint beads lint-m-1, lint-m-2, lint-m-3 and lint-m-4 for scope, authority and acceptance.",
+        "design": "Four independent one-layer stacks A-D rooted on develop; scope, integration and pending ADR decisions are in docs/plans/phase-m/phase-m-plan.md. Phase completion is tracked by standalone lint-phase-m-done to avoid cycles through sprint parent-child links.",
+        "acceptance_criteria": "Phase M is complete when lint-phase-m-done closes after lint-8h3t.2 (#786/#720), .4 (#136), .5 (#198), .8 (#385) and .9 (#195), with QA evidence posted on the issues. Sprint deliverables and acceptance remain on the four sprint beads.",
+        "status": "open",
+        "priority": 1,
+        "issue_type": "epic",
+        "created_at": "2026-10-30T01:24:42Z",
+        "updated_at": "2026-10-31T19:24:02Z",
+        "metadata": {
+          "integration_branch": "develop",
+          "phase": "m",
+          "plan_scope": "epic"
+        },
+        "labels": [
+          "phase-m",
+          "scope:epic"
+        ],
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "lint-phase-m",
+    "dependent_count": 5,
+    "dependency_count": 1,
+    "comment_count": 3,
+    "comments_omitted": true,
+    "revision": "5954855792580726899"
+  }
+]

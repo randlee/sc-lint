@@ -1,0 +1,129 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261031T195930Z-fixture_ANC-006_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-31T19:59:30+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-006:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 170,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-006",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report the declaration #[cfg(unix)] mod x; of a module that is never compiled on Windows.",
+      "quote": "Issue #786 (atm-core verdict table, 2026-10-30): \"Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S6  Module declared `#[cfg(unix)] mod x;` and items inside it also carry cfg(unix); module is never compiled on Windows. Rows 13 (the decl), 17.\"\n\nREQ-PRODUCT-004AA (docs/requirements.md), rule list: \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"",
+      "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P6d",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "74ebc53c7418e16ae7467f24a78b3201d7ba33df285fe2f8df89a20312f575e6",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item's PORT-010 rule change is confined to other named shapes or cases, or the item concerns another rule, configuration, or unrelated work; fixture collection, finding inventories, and generic not-closed notes do not count as touching the declaration.",
+            "unclear": "The item changes PORT-010 behaviour without identifying the shapes or cases it covers, so it cannot be told whether the cfg(unix) module declaration is included.",
+            "yes": "The item's PORT-010 work includes, names, or defers by name the `#[cfg(unix)] mod ...;` declaration or shape S6, or undertakes to fix every #786 PORT-010 false positive."
+          },
+          "instructions": "`anchor.statement` governs whether sc-lint's PORT-010 rule reports the declaration line of a `#[cfg(unix)] mod x;` module (shape S6 in atm-core issue #786). First identify which PORT-010 shapes or cases `item.text` says its rule change covers. The subject is touched when that coverage includes the cfg(unix) module declaration or S6, when the item names that declaration or S6 to keep, suppress, refactor, or defer it, or when the item undertakes to fix every #786 PORT-010 false positive. The subject is not touched when the rule change is limited to other named shapes or cases, even if the item also re-extracts every #786 file as a fixture, labels findings by shape, or lists other shapes as not closed; nor by work on other rules or configuration. Judge subject overlap only, not whether the item obeys the anchor.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item text does not state that outcome: it is silent about the module declaration, mentions #786 or PORT-010 only generally, defers S6, keeps the report, or exempts only the module's inner items.",
+            "unclear": "The item text mentions the cfg(unix) module declaration but it cannot be told whether PORT-010 will stop reporting it.",
+            "yes": "The item text says PORT-010 produces no finding for a `#[cfg(unix)] mod ...;` declaration or shape S6, in any wording such as stop reporting, no longer reports, exempt, skip, yields no finding, treat as unix-only by design, or a test asserting zero findings on the declaration line."
+          },
+          "instructions": "Does `item.text` state that PORT-010 will not report the declaration line of a `#[cfg(unix)] mod x;` module (#786 shape S6) because that module is never compiled on Windows? The item must name the module-declaration case specifically and state the no-report outcome. A general promise to fix #786 or PORT-010 false positives, a refactor that states no outcome, a deferral, or exempting only the items inside the module does not count. Judge presence of this outcome only, not conflict.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "The item text says nothing that leaves the declaration reported: it stops reporting it, does not mention it, defers it, or concerns other work.",
+            "unclear": "The item text touches the declaration handling in a way that might leave it reported, but it cannot be told.",
+            "yes": "The item text states that PORT-010 will continue to report the `#[cfg(unix)] mod ...;` declaration, or that consumers must suppress that declaration's finding."
+          },
+          "instructions": "Does `item.text` plan an outcome in which PORT-010 still reports the declaration line of a `#[cfg(unix)] mod x;` module (#786 shape S6)? Conflict includes keeping or restoring that report, leaving the declaration reported while exempting only the module's inner items, or requiring consumers to silence the declaration with a per-site allow, a configuration exclusion, or a disabled rule. Silence about the declaration, deferring S6 to later work, work on other shapes, and unrelated work are not conflict. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1438,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 170,
+      "item_shortened": false,
+      "request_bytes": 4433
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

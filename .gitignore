@@ -44,3 +44,9 @@ reports/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+
+# Plan-anchoring run evidence (raw Jev requests/responses) stays out of git;
+# archive under ../_evidence/<phase>/ instead.
+docs/plans/*/anchor-runs/
+docs/plans/*/*/anchor-runs/
+docs/plans/*/phase-*-dag.html

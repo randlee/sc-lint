@@ -1,0 +1,32 @@
+# m-3: lint-step-env-cwd and visible output
+
+## Description
+
+### Goal
+#198: a [[tool.sc-lint.lint]] step in sc-lint.toml accepts an env table and a cwd key, applied to that step's child process, with the same meaning they have on a test command selector (ADR-016 "per-step/per-layer env" and REQ-CLI-023; ADR-022 decision 3 is context).
+### Deliverables
+1. Accept env and cwd on [[tool.sc-lint.lint]] steps using the test-selector parsers, and carry them on the data path ConsumerProfileStep -> PlannedStep -> StepPlan so they survive cargo-xwin and target adaptation. env values are passed to the child verbatim (no expansion or path resolution); cwd is relative to the repository root.
+2. Error contract: malformed env or cwd on a lint step raises ProfilePlanError with new ProfilePlanDetailCode::InvalidStepEnv or InvalidStepCwd, field set to env.<KEY> or cwd and the step named; the test-selector error text is unchanged.
+3. Tests: lint_step_env_and_cwd (integration test in crates/sc-lint/tests: a lint step with env = { PYO3_PYTHON = ".bootstrap-venv/bin/python" } and cwd = "crates/x" spawns the sc-lint test binary as a helper that reports its env and cwd; the child sees exactly that literal and that directory, both sides canonicalized before comparison); lint_step_env_and_cwd_plan and lint_step_env_cwd_errors (unit tests in src/tests.rs on StepPlan values, including after xwin/target adaptation). Existing UnknownStepField tests continue to reject setup/runner keys. No parent-environment mutation.
+4. #195: failed steps print both stdout and stderr, including stdout when stderr is non-empty. Write both output streams for every executed step, passing steps included, to <log-root>/steps/<step>.log. Keep --log-root as the existing logger root. Tests consumer_failed_step_prints_both_streams and consumer_log_root_writes_every_step use one controlled failing child and one passing child, asserting both stream contents and the exact log paths.
+5. Update the lint-step key list/error text and docs-bundle/configuration.md, docs-bundle/packages/sc-lint.md and docs/sc-lint/cli-contract.md. Put the atm-core clippy example in docs-bundle/configuration.md under lint-step env/cwd; PYO3_PYTHON is passed verbatim, so its interpretation belongs to the child tool. Reconcile docs/architecture.md Consumer profile implementation boundaries: profile_plan.rs owns profile error codes/construction; scheduler.rs owns scheduling. Update docs/sc-lint/logging.md for the steps/ subdirectory.
+6. Add REQ-CLI-027 to owned docs/sc-lint/cli-requirements.md: both failed-step streams are visible; every executed step stores both streams under <log-root>/steps/<expanded-plan-index>-<safe-name>.log, overwriting its prior-run file, without changing the logger root or scheduling semantics. REQ-CLI-026 is historically used and is not reused.
+### Does Not Close
+No setup hook or interpreter-selection key: [tool.sc-lint].setup and [tool.sc-lint].runner stay rejected under ADR-016 and ADR-020 decision 9 (ADR-022 decision 6 is context). PATH or venv activation stays in the consumer's recipe.
+### Active Trace
+ANC-011, ANC-012. ADR-016, ADR-017, ADR-020 decisions 7/9; REQ-CLI-021/023/027, REQ-LOG-002/003/004. ADR-022 decisions 3/6 are context only, with no dispatch gate.
+
+## Acceptance criteria
+
+### Acceptance Criteria
+- issue:#198: a [[tool.sc-lint.lint]] step with env and cwd runs its child with exactly those values (lint_step_env_and_cwd), and the StepPlan carries them after adaptation (lint_step_env_and_cwd_plan).
+- Malformed env or cwd fails with ProfilePlanDetailCode::InvalidStepEnv or InvalidStepCwd (lint_step_env_cwd_errors); steps without env or cwd behave exactly as today.
+- ANC-012: [tool.sc-lint].setup and [tool.sc-lint].runner remain rejected as unknown keys (existing UnknownStepField tests); no setup-hook or interpreter-selection key is added.
+- issue:#195: consumer_failed_step_prints_both_streams and consumer_log_root_writes_every_step pass: both failed-step streams are visible; every executed step has its output at <log-root>/steps/<step>.log, including successful steps. Existing scheduling, keep-going and fail-fast behavior is unchanged.
+- Deliverable 5: documented lint keys, verbatim env/cwd and the named clippy example match tested behavior; docs/architecture.md reflects actual error/scheduler ownership; logging docs preserve the existing root.
+- REQ-CLI-027: step_log_file_name sanitizes separators and dot components; expanded-plan ordinals disambiguate equal sanitized names and adapted variants. step_log_names_safe_and_unique and step_logs_overwrite_per_run assert the exact names and replacement behavior. Existing steps without env/cwd, selector errors, xwin adaptation, skip/list paths, declaration-order output, keep-going and fail-fast behavior remain unchanged in their existing tests.
+### Validation
+- cargo test -p sc-lint --no-fail-fast
+- just lint
+- just test
+Record the new tests failing on the develop baseline first.

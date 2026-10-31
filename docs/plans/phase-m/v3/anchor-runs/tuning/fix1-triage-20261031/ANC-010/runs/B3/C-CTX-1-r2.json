@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 0.97
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 0.77
+  },
+  "relevant": {
+   "choice": "no",
+   "confidence": 0.98
+  }
+ },
+ "bundle": "B3",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-010\", \"statement\": \"PORT-010, a rule sc-lint's portability analyzer reports from source, must be allowable at a single site: an item carrying #[sc_lint(allow(PORT-010), reason = \\\"...\\\")] is not reported by PORT-010.\", \"scope\": \"The item adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))], in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes.\"}, \"item\": {\"id\": \"fix1t-ANC-010/C-CTX-1\", \"title\": \"PORT-010 same-name siblings (#786 S3)\", \"text\": \"In crates/sc-lint-portability, PORT-010 does not report a #[cfg(unix)] item with a same-name #[cfg(not(unix))] sibling in the same module. Other #786 shapes are not changed here; they use the per-site PORT-010 allowance that a later sprint delivers.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item does not state that outcome: it is silent about PORT-010 site allowances, only investigates or mentions them, changes the attribute without saying PORT-010 skips the annotated item, uses another suppression mechanism, or says annotated items are still reported.\", \"unclear\": \"The item names an outcome for an allow(PORT-010) annotated item, but its wording leaves open whether PORT-010 still reports that item.\", \"yes\": \"The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason.\"}, \"instructions\": \"Does `item.text` commit to this outcome, either as new work or by keeping it working: an item that carries `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]` is not reported by PORT-010? Accept words such as honour, skip, suppress, exempt, records no finding, or not reported for the annotated item, function or declaration. Investigating, discussing or documenting site allowances without committing to that outcome does not count, and neither does a change to the attribute that never says PORT-010 leaves the annotated item unreported. Judge presence of the outcome only; do not judge conflict.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances.\", \"unclear\": \"The item says something about PORT-010 allowances that might or might not leave an annotated item reported.\", \"yes\": \"The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided.\"}, \"instructions\": \"Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item plans no such work: it works on other PORT-010 shapes, other rules or other subjects, and any allowance mention is context, another item's work, or docs wording.\", \"unclear\": \"It cannot be told whether the item plans code work on PORT-010 site-allowance handling.\", \"yes\": \"The item plans code work on PORT-010 site-allowance handling in those crates, in any direction.\"}, \"instructions\": \"`anchor.scope` covers work that adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))] in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes. Is that work part of `item.text`, in either direction (honouring, ignoring, removing or replacing the allowance)? Mentioning a site allowance only as the route that other shapes or remaining findings take, as work another item delivers, or describing it in requirement or documentation text, without changing how code in the listed crates parses or honours #[sc_lint(allow(...))] for PORT-010, is not this subject. Judge subject presence only, whatever the item plans.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "08fd26acbc3ee729a71d69ddf12fc8f01fbd3fc8735eb3ea9965647b7028225a",
+ "case_id": "C-CTX-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.97,\"probabilities\":{\"no\":0.98,\"unclear\":0.01,\"yes\":0.01}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.77,\"probabilities\":{\"no\":0.85,\"unclear\":0.03,\"yes\":0.12}},\"relevant\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.98,\"probabilities\":{\"no\":0.99,\"unclear\":0.0,\"yes\":0.01}}},\"usage\":{\"input_tokens\":1410,\"output_tokens\":117}}",
+ "raw_response_sha256": "1245f6bea0c4f6e20edf67efcb2e28b4dcda562f56579d05cc5217861978cc25",
+ "repeat": 2,
+ "run_id": "fix1t-ANC-010/B3/C-CTX-1/r2",
+ "semantic_verdict": "not_applicable",
+ "spec": {
+  "addressed": "A0",
+  "contradicted": "K0",
+  "relevant": "R3"
+ }
+}

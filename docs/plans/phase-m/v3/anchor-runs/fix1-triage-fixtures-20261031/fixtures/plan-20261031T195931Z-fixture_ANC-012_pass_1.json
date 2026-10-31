@@ -1,0 +1,129 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261031T195931Z-fixture_ANC-012_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-31T19:59:31+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-012:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 155,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-012",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.",
+      "quote": "ADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 6: \"sc-lint does not add setup hooks or interpreter-selection policy. These are consumer orchestration. A consumer expresses them with step argv, step `env` and its own recipes.\"\n\nADR-020 decision 9 (Accepted): \"**#198 (setup hook).** Won't-do. ADR-016's hook restriction is unchanged; `setup.pre` and `runner.python` are not added.\"",
+      "stated_by": "ADR-022 decision 6 + ADR-020 decision 9",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P12",
+      "anchor_version": 2,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "e6360d8cadafbdfec1ba6524690d207530a0e06b33385f1f5ef676051ef98937",
+      "deterministic_check": "",
+      "kind": "prohibition",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "No: the item changes no such configuration; it is about analyzer rules, output, logging or other work.",
+            "unclear": "The item text is too vague to tell.",
+            "yes": "Yes: the item adds, changes or rules on step-execution, setup, hook or interpreter configuration keys in sc-lint.toml."
+          },
+          "instructions": "`anchor.statement` forbids adding a setup-hook or interpreter-selection key to sc-lint.toml. Work that adds or changes how consumers configure step execution there (env, cwd, setup, hooks, runner or interpreter keys) is on this subject, whether or not it follows the statement. Is `item.text` on this subject?",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "No such commitment is written, or the item adds a setup, hook or interpreter key.",
+            "unclear": "A sentence touches this but cannot be read as the commitment or not.",
+            "yes": "Such a commitment is written in the item."
+          },
+          "instructions": "Is there a sentence in `item.text` committing that sc-lint.toml gains no setup-hook key and no interpreter-selection key (for example setup or runner stay unknown keys)? Plans that add such a key contain no such commitment. Judge only whether the commitment is written.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "The item plans no such key.",
+            "unclear": "The item plans a key whose role cannot be told.",
+            "yes": "The item plans a setup-hook or interpreter-selection key."
+          },
+          "instructions": "Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work. Does `item.text` plan such a conflicting key? Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 957,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 155,
+      "item_shortened": false,
+      "request_bytes": 2584
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

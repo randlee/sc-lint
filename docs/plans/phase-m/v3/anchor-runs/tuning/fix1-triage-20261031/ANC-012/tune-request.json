@@ -1,0 +1,142 @@
+{
+ "authority": {
+  "anchors": {
+   "records": [
+    {
+     "beads": {
+      "anchor": null,
+      "dev_questions": null,
+      "plan_questions": null,
+      "sprints": [
+       "lint-m-3"
+      ]
+     },
+     "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P12",
+     "deterministic_check": "",
+     "fixtures": {
+      "fail": [
+       "Add [tool.sc-lint.runner].python so a leading 'python' in step argv resolves to the consumer venv interpreter."
+      ],
+      "pass": [
+       "Lint steps gain env and cwd; no setup or runner key is added. Evidence: config test rejects [tool.sc-lint].setup and [tool.sc-lint].runner as unknown keys."
+      ]
+     },
+     "history": [
+      {
+       "at": "2026-10-30T16:42:46+00:00",
+       "event": "created",
+       "status": "proposed"
+      },
+      {
+       "at": "2026-10-30T16:42:46+00:00",
+       "event": "updated",
+       "fields": [
+        "fixtures"
+       ]
+      },
+      {
+       "at": "2026-10-30T17:00:00+00:00",
+       "event": "locked",
+       "note": "Locked for tuning under Rand's ruling: \"we can 'lock the anchors', but if tuning requires updating them, they will need to be changed\". Statement and fixtures still need Rand's review (PR #788).",
+       "status": "locked"
+      },
+      {
+       "at": "2026-10-31T19:15:02+00:00",
+       "event": "sprint_mapping_updated",
+       "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged.",
+       "sprints": [
+        "lint-m-3"
+       ]
+      }
+     ],
+     "id": "ANC-012",
+     "kind": "prohibition",
+     "promoted_to": null,
+     "question_overrides": {},
+     "quote": "ADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 6: \"sc-lint does not add setup hooks or interpreter-selection policy. These are consumer orchestration. A consumer expresses them with step argv, step `env` and its own recipes.\"\n\nADR-020 decision 9 (Accepted): \"**#198 (setup hook).** Won't-do. ADR-016's hook restriction is unchanged; `setup.pre` and `runner.python` are not added.\"",
+     "scope": "The item adds or changes consumer setup, hook or interpreter-selection configuration keys in sc-lint.toml.",
+     "source_ref": null,
+     "source_type": "ANC",
+     "stated_at": "2026-10-30",
+     "stated_by": "ADR-022 decision 6 + ADR-020 decision 9",
+     "statement": "sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.",
+     "status": "locked",
+     "summary": "P12",
+     "version": 2
+    }
+   ],
+   "sha256": "70449b71c399122b85163c8b5d55ae4799798dfdb1123d2db818208faa9763d4"
+  },
+  "intent": {
+   "content": "# Intent - phase-m (v3)\n\nDrafted 2026-10-30 for Rand's review. It frames every Phase M anchor. Jev\njudges plan items against the anchors, not this document.\n\n## Governing direction\n\nRand (2026-10-30): \"I think a lot of sc-lint issues come from attempts to\nmandate how the sc-lint tools are orchestrated where the focus should be aimed\nat creation of tools that provide consistent/flexible consumer configuration.\"\n\nRand (2026-10-30): \"atm-core should be able to delete its workarounds: when\nsc-lint is done, every item on its P1 list passes as the GitHub issue\ndescribes, with nothing hidden.\"\n\nRand (2026-10-30), on the anchors: \"the anchors must be derived from the\nreq/adr and the issues we have failed to fix in 2-days of continuous work\"\nand \"anchors need to be based on requirements\".\n\nADR-022 records the direction. sc-lint provides tools and a consistent\nconsumer configuration surface. The consumer owns orchestration. Rand\n(2026-10-30), on ADR-022: \"This is a positive step.  This should guide both\nanchors and decisions about how atm-core fixes are handled.  Proceed\". Its\nformal Status stays Pending until Rand accepts the text.\n\n## What this plan is for\n\nResolve atm-core's P1 issues #786, #720, #198 and #136 by improving the tools\nand the configuration surfaces ADR-022 names, not by prescribing how\nconsumers run sc-lint.\n\n## What success looks like\n\n- **#786 and #720.** PORT-010 recognises S3 same-name siblings and S6 Unix-only modules\n  under the approved 2026-10-31 cut. Other shapes use reasoned site allowances;\n  unallowed real parity gaps still report.\n- **#786 other shapes, including S8.** These use a per-site\n  `#[sc_lint(allow(PORT-010), reason = \"...\")]` (ADR-022 decision 4).\n- **#198.** Lint steps accept `env` and `cwd` exactly as test command\n  selectors do (ADR-016 \"per-step/per-layer `env`\"; ADR-022 decision 3.2). No\n  setup hook or interpreter-selection key is added (ADR-022 decision 6).\n- **#136.** SCB-MANIFEST-004 does not report a `self::`, `super::` or\n  `crate::` path, or a local `mod`, named like an owned dependency, because\n  that is not \"a configured ownership violation\" (REQ-SCB-019). Owner `tests/`\n  roots in `allowed_source_roots` are documented as the supported\n  configuration.\n- **#385 and #195.** m-2 adds SCB-CYCLE-001 path filtering; m-3 preserves\n  both failed-step streams and writes every step output under the logger\n  root's steps/ directory.\n- **Every sprint** traces to its issue and to the REQ or ADR it implements,\n  and carries a deterministic regression for atm-core's reported case.\n\n## Out of scope\n\n- Blanket suppression: disabling a rule, a repository-wide exclusion, or\n  widening allowed roots beyond the owner's own targets.\n- New orchestration in the product: setup hooks, interpreter selection, or\n  required recipe or CI shapes.\n- atm-core gaps not on the P1 list (#783, #784), the 0.8.3\n  release-platform work, and process or tooling changes.\n- The rest of ADR-022, such as the shared unknown-key check and required\n  `reason`. It becomes later work unless a P1 item needs it.\n\n## Anchors\n\nAnchors live in `anchors.json` beside this file (v3; v2 is superseded). Each\nquotes a REQ or ADR sentence, together with the issue evidence that shows the\ngap. Anchors that quote ADR-022 rest on Rand's direction above.\n",
+   "id": "phase-m-intent-v3",
+   "sha256": "be7bdec8ba9ae053efdbef2386bf6334f67dadd97a9800e0391a125322ad1241",
+   "version": "be7bdec8"
+  }
+ },
+ "candidate_minimum": 3,
+ "confidence_reference_threshold": 0.8,
+ "correlation_id": "fix1t-ANC-012",
+ "current_questions": {
+  "addressed": {
+   "criteria": {
+    "no": "The item text is silent about the directive: it neither includes the directive's specific content nor references it.",
+    "unclear": "The item text alludes to the directive's topic but it is not possible to tell whether the directive itself is included.",
+    "yes": "The item text contains the directive's specific content, in its own words or the user's, as a step, constraint, or stated starting point."
+   },
+   "instructions": "Does `item.text` explicitly carry out, preserve, or plan for the directive given in `anchor.statement`? Look for the directive's specific content being present in the item: the same starting point, the same method, the same constraint, or an explicit step that does what the statement asks. A generic mention of the topic without the directive's specific content does not count. Judge presence of the directive only, not whether the item conflicts with it.",
+   "type": "choice"
+  },
+  "contradicted": {
+   "criteria": {
+    "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+    "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+    "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+   },
+   "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only.",
+   "type": "choice"
+  },
+  "relevant": {
+   "criteria": {
+    "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+    "unclear": "The item text is too vague to tell what part of the system it touches.",
+    "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+   },
+   "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+   "type": "choice"
+  }
+ },
+ "diagnostic_plan": {
+  "read_only": true,
+  "sha256": "0be161815940d5a270a8deea0ac1e2a20ecab533865979c9400ebba15d470fc3",
+  "source_kind": "markdown",
+  "source_ref": "docs/plans/phase-m/v3/anchor-runs/plan-gate-review-fix1-20261031/lint-m-3.item.txt"
+ },
+ "gate": "planning",
+ "operation": "tune",
+ "production_confidence_threshold": 0.6,
+ "repeat_count": 2,
+ "runtime": {
+  "agent": "anchor-tuning",
+  "contract_script": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/.claude/skills/plan-anchoring/scripts/anchor_tuning_contract.py",
+  "contract_sha256": "54994057b438af143467e1d71ab6395b519cc7771ef14a699cad3f07a5b41da2",
+  "harness": "claude",
+  "model": "opus",
+  "script": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/.claude/skills/plan-anchoring/scripts/jev_judge.py",
+  "sha256": "04d78dae03229cf83fb4f9d66338f0f68e1b038ecc441ad9b1bdbec9f33b7e36",
+  "version": "0.4.5",
+  "workspace": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m"
+ },
+ "schema_version": "2.0.0",
+ "template": {
+  "id": "anchor-tuning-tune-request",
+  "sha256": "d8d6796121bb8155af53277053b25fe9cf99ead86ba55f51b19df8962b441ed3",
+  "version": "0.4.1"
+ },
+ "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+ "tuning_history": {
+  "events": [],
+  "history_id": "fix1-ANC-012-planning",
+  "schema": "plan-anchor/tuning-history/2"
+ }
+}

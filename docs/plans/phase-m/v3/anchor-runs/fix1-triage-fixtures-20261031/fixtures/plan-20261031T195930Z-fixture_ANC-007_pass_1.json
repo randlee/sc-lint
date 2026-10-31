@@ -1,0 +1,129 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261031T195930Z-fixture_ANC-007_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-31T19:59:30+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-007:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 198,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-007",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's PORT-010 rule must recognize, and not report, items carrying #[cfg(unix)] inside a module declared #[cfg(unix)] mod x;, since that module is never compiled on Windows.",
+      "quote": "REQ-PRODUCT-004AA (docs/requirements.md), rule list: \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"\n\nIssue #786 (atm-core verdict table, 2026-10-30): \"Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S6  Module declared `#[cfg(unix)] mod x;` and items inside it also carry cfg(unix); module is never compiled on Windows. Rows 13 (the decl), 17.\"",
+      "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P7b",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "5328690d6675ba258570be51db4a99aa72cba5b024a1827708813a50466e876b",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "No part of the item concerns that situation: it covers other rules, other configuration, or other PORT-010 shapes only.",
+            "unclear": "The item is too vague to tell whether any part of it concerns `#[cfg(unix)]` items inside a `#[cfg(unix)]`-declared module.",
+            "yes": "Some part of the item plans, tests, reviews, or describes PORT-010's treatment of `#[cfg(unix)]` items inside a `#[cfg(unix)] mod x;` module."
+          },
+          "instructions": "`anchor.scope` names the exact situation the anchor governs. Does `item.text` describe work that falls inside `anchor.scope`, that is, work on how PORT-010 treats `#[cfg(unix)]` items inside a module declared `#[cfg(unix)] mod x;`? Work on PORT-010 for other shapes, or on other rules, falls outside the scope even when it mentions the same issue number. Judge overlap with the scope only, not obedience.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item does not state that outcome: it is silent about it, only reviews, documents, or adds fixtures without the expected result, or says the items keep being reported or need consumer changes.",
+            "unclear": "The item names this situation and an intended change, but it cannot be told whether PORT-010 will stop reporting the items inside the module.",
+            "yes": "The item states, as a step, goal, or acceptance condition, that PORT-010 will not report `#[cfg(unix)]` items inside a `#[cfg(unix)] mod x;` module, alone or as part of a larger change."
+          },
+          "instructions": "Does `item.text` commit to the outcome that PORT-010 does not report items carrying `#[cfg(unix)]` when they sit inside a module declared `#[cfg(unix)] mod x;`? Wording such as skip, exempt, do not flag, produce no finding, or treat the module as never compiled on Windows counts. Adding a fixture, a test, or an investigation without stating that PORT-010 stops reporting those items does not count. Judge presence of this outcome only; do not judge conflict.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "The item has no such plan or outcome for items inside a `#[cfg(unix)] mod x;` module, whether it complies, is silent, or is about something else.",
+            "unclear": "The item is ambiguous enough that it might or might not leave those items reported or offloaded to the consumer.",
+            "yes": "The item states a plan or outcome under which PORT-010 still reports, or the consumer must suppress or work around, `#[cfg(unix)]` items inside a `#[cfg(unix)] mod x;` module."
+          },
+          "instructions": "Does `item.text` propose something that `anchor.statement` rules out? The statement rules out PORT-010 reporting `#[cfg(unix)]` items inside a module declared `#[cfg(unix)] mod x;`. A conflict is an item that keeps those findings, reports only some of them less (for example the declaration but not the items inside), or hands those findings to the consumer to suppress or work around. Silence about this module situation is not a conflict, and an item about a different shape or rule does not conflict. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1290,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 198,
+      "item_shortened": false,
+      "request_bytes": 3740
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}
