@@ -1,154 +1,93 @@
-# Phase M Plan — atm-core P1 Tool Fixes
+# Phase M Plan — atm-core Tool Fixes
 
-Phase M resolves atm-core's P1 issues #786, #720, #198 and #136 by improving
-sc-lint's tools and consumer configuration surfaces (ADR-022). The beads are
-the source of truth for each sprint's deliverables. This page shows how the
-sprints fit together.
+Rand approved the four-sprint cut on 2026-10-31. The authoritative scope,
+design and acceptance live on the sprint beads. This page describes their
+relationships; the issue closure checks live on the closure beads.
 
 ## Authority
 
-| Document | Status | Approved by | Gate bead |
-| --- | --- | --- | --- |
-| [ADR-022](../../sc-lint/adr/ADR-022-tools-and-consumer-configuration.md) tools and consumer configuration | Pending | — | lint-t6i7 blocks dispatch of m-3, m-4 |
-| [ADR-010 amendment 2026-10-30](../../sc-lint/adr/ADR-010-portability-scope-and-parity.md) PORT-010 companion shapes | Pending | — | lint-m-adr010 blocks dispatch of m-1 (and so all of stack A) |
-| ADR-021 | Withdrawn | — | none; superseded by ADR-022 and the ADR-010 amendment |
-| REQ-PRODUCT-004AA (PORT-010), REQ-SCB-019, REQ-CLI-021 | Accepted | — | none; the PORT-010 shape sub-bullets are contingent on the ADR-010 amendment |
-| Anchors `v3/anchors.json` ANC-001..013 | Locked; ANC-001/002/003/004/005/008/011/013 rewritten to match the plan, pending review | — | planning and development gates |
-| Intent `v3/intent.md` | Rand direction 2026-10-30 | — | framing only |
+| Document | Status | Dispatch effect |
+| --- | --- | --- |
+| [ADR-022](../../sc-lint/adr/ADR-022-tools-and-consumer-configuration.md) | Pending | lint-t6i7 blocks m-4 only |
+| [ADR-010 amendment 2026-10-30](../../sc-lint/adr/ADR-010-portability-scope-and-parity.md) | Pending | lint-m-adr010 blocks m-1 |
+| ADR-021 | Withdrawn | none |
+| REQ-PRODUCT-004AA, REQ-SCB-019, REQ-CLI-021 | Accepted | existing contracts remain effective |
+| [v3 anchors](v3/anchors.json) | Eight kept locked anchors | sealed planning questions unchanged |
 
 ## Sprints
 
-| Sprint | Stack / layer | Owner | Issue | Anchors |
+| Sprint bead | Stack / layer | Owner | Issues and scope | Anchors |
 | --- | --- | --- | --- | --- |
-| m-1 port010-same-name-siblings | A1 | clint | #720, #786 S3 | ANC-003, ANC-009 |
-| m-5a port010-helper-shapes | A2 | clint | #786 S1, S5 | ANC-001, ANC-005, ANC-009 |
-| m-5b port010-renamed-and-rejected-config | A3 | clint | #786 S2, S7 | ANC-002, ANC-008, ANC-009 |
-| m-5c port010-portable-sibling-and-unix-module | A4 (top) | clint | #786 S4, S6; #786/#720 closure tests | ANC-004, ANC-006, ANC-007, ANC-009, ANC-010 |
-| m-4 port010-site-allow | B1 | cfast | #786 S8 | ANC-010, ANC-009 |
-| m-2 manifest004-local-module-paths | C1 | cfast | #136 | ANC-013 |
-| m-3 lint-step-env-cwd | D1 | cfast | #198 | ANC-011, ANC-012 |
-| m-7 consumer-step-visible-output | E1 | cfast | #195 (visible output) | none |
-| m-8 boundary-cycle-finding-paths | F1 | cfast | #385 (path-less cycle findings) | none |
+| lint-m-1 port010-same-name-siblings | A1 | clint | #720, #786 S3 same-name cfg(not(unix)) siblings and S6 out-of-line Unix-only modules | ANC-003, ANC-006, ANC-007, ANC-009 |
+| lint-m-4 port010-site-allow | B1 | cfast | #786 S8 and every other shape through reasoned item allowances; allowed entries in reports | ANC-010, ANC-009 |
+| lint-m-2 manifest004-local-module-paths and cycle paths | C1 | cfast | #136 local-module paths; #385 SCB-CYCLE-001 path exclusions | ANC-013 |
+| lint-m-3 lint-step-env-cwd and visible output | D1 | cfast | #198 lint env/cwd; #195 both failed-step streams and every step's output log | ANC-011, ANC-012 |
 
-## Branch Stacks And Parallelism
+m-5a, m-5b, m-5c, m-7 and m-8 and their dev/sanity/QA groups are superseded.
+m-6 was already folded into the former plan and stays closed. There is no
+caller index, finding inventory, burndown, hash test, extraction script or
+adoption-bead deliverable. m-1 updates the existing atm_core_* fixture exact
+lists and replaces the crate-root-main limitation regression.
+
+## Stacks And Shared Files
 
 ```text
 develop
-├── A (clint): m-1 ─► m-5a ─► m-5b ─► m-5c ◄── develop merged in after B lands
-├── B (cfast): m-4
-├── C (cfast): m-2
-├── D (cfast): m-3
-├── E (cfast): m-7
-└── F (cfast): m-8
+├── A: m-1
+├── B: m-4
+├── C: m-2
+└── D: m-3
 ```
 
-Stack A has four layers. Every layer edits `parity.rs`, `companion_index.rs`
-and the port010 fixtures, and each shape builds on the companion index of the
-layer below, so splitting A would create parallel edits to the same files.
+Each stack is one layer rooted on develop. Stack operations follow
+[CLAUDE.md](../../../CLAUDE.md); the lead is the stack writer. The sprint
+beads have no owner-based waits between m-2, m-3 and m-4. Only m-1 waits for
+lint-m-adr010 and only m-4 waits for lint-t6i7. Plan review and the planning
+gate supply evidence; lint-phase-m-plan-qa blocks no sprint or dev bead.
 
-No owner works two stacks at once: clint owns A; cfast takes C, then B, then
-D, E and F. B and D also wait for lint-t6i7.
-
-Shared files between stacks:
-
-| File | Stacks | Owner of the merge |
-| --- | --- | --- |
-| `crates/sc-lint-portability/src/portability/parity.rs` | A (all layers), B (one `site_allow::allowance_for` call) | m-5c (after B lands) |
-| `crates/sc-lint-portability/src/lib.rs` | A (m-5a module list), B (module list, error variants) | m-5c (after B lands) |
-| `crates/sc-lint-portability/Cargo.toml` | B (directives dependency) | m-5c (after B lands) |
-| `crates/sc-lint-portability/src/tests.rs` | A, B | m-5c (after B lands) |
-
-### Stack protocol
-
-1. **Create.** The lead cuts the bottom layer's worktree from `develop` and
-   each higher layer from the pushed head of the layer below.
-2. **Link.** After the first push the lead opens the PR (bottom base
-   `develop`, higher bases the layer below) and links the stack with one
-   `gh stack link --base develop <bottom-pr> ... <top-pr>`, or appends with
-   `gh stack link <stack#> <pr>`.
-3. **Merge forward.** A lower layer's later commits reach the layers above by
-   merge, never by `gh stack sync` or `gh stack rebase`. Once stack B lands on
-   develop, the stack writer merges develop into m-5c; this is a stack step,
-   not a sprint.
-4. **Land.** Stacks B, C and D land independently with
-   `gh stack merge <stack#> --yes --merge`. Stack A lands after B, carrying
-   develop merged into m-5c.
-
-| Sprint | Stack | Runs in parallel with | Waits for | Unblocked when |
-| --- | --- | --- | --- | --- |
-| m-1 | A | m-2, m-4, m-3 | lint-phase-m-plan-qa, lint-m-adr010 | gates close |
-| m-5a | A | m-2, m-4, m-3 | m-1 unblock milestone | ScopeKey, ItemKind, per-package fixtures and atm_core_inventory.toml committed on sprint/m-1-port010-same-name-siblings |
-| m-5b | A | m-4, m-3 | m-5a unblock milestone | companion_index.rs with CompanionIndex::build, production_callers_of, gate_of, has_companion committed on sprint/m-5a-port010-helper-shapes |
-| m-5c | A | m-4, m-3 | m-5b unblock milestone; m-4 landed before its closure tests | callers_by_branch and the S2 arm of has_companion committed on sprint/m-5b-port010-renamed-and-rejected-config |
-| m-2 | C | A | lint-phase-m-plan-qa | gate closes |
-| m-4 | B | A | lint-phase-m-plan-qa, lint-t6i7, m-2 complete (owner) | gates close |
-| m-3 | D | A | lint-phase-m-plan-qa, lint-t6i7, m-4 complete (owner) | gates close |
-| m-7 | E | A | lint-phase-m-plan-qa | gate closes |
-| m-8 | F | A | lint-phase-m-plan-qa | gate closes |
-
-CI and QA run alongside the next layer; they do not delay its start.
-
-Unblock milestones for issues: #136 closes when stack C lands; #198 when
-stack D lands; #786 and #720 when stack A lands after B. Each then closes
-through its closure bead below, and atm-core removes its 18 PORT-010
-exclusions after the release.
+m-1 and m-4 share portability's parity.rs, lib.rs and tests.rs. m-4 lands
+first; whichever lands second receives develop merged forward by the stack
+writer. This merge is a stack operation, not another sprint. m-2's
+manifest-policy/lib.rs changes and m-4's boundary graph directive match are
+separate edits; the stack writer resolves any integration conflict.
 
 ## Issue Closure
 
-Phase M is not complete until every closure bead is closed (lint-phase-m
-depends on lint-8h3t). Every open issue labelled 0.8.3 or earlier closes only with quality-mgr
-evidence posted on the issue (epic lint-8h3t, one closure bead per issue).
-The checks were agreed with atm-core on 2026-10-31 (lint-419k).
+Each sprint QA group confirms that delivery matches the issue's **Planned
+delivery (Phase M)** comment and posts its approval on that issue. Sprint QA
+covers #720/#786 for m-1, #786 for m-4, #136/#385 for m-2 and #198/#195 for
+m-3. It does not close the issues ahead of the closure evidence.
 
-| Issue | Closure check | Waits for |
+Phase M is complete when the standalone lint-phase-m-done gate closes.
+That gate depends only on the five closure beads below. The phase epic has
+no closure edges: its sprint parent-child links would create a dependency
+cycle. The whole overdue-issue epic lint-8h3t and other release/platform
+issues stay outside this phase. lint-8h3t.3 (#720) is merged into lint-8h3t.2 (#786 and #720).
+
+| Issues | Closure bead | Check / prerequisites |
 | --- | --- | --- |
-| #786, #720 | 0 PORT-010 findings over all 18 atm-core paths at its current head, exclusions removed | m-5c |
-| #136 | 0 SCB-MANIFEST-004 findings at atm-core head (incl. `commands/mod.rs`), non-owner mutation still reported | m-2 |
-| #198 | lint step `env` `PYO3_PYTHON` makes clippy pass with PATH python < 3.11, via bare `sc-lint` | m-3 |
-| #643, #376, #192, #586 | the issue's repro; for #643/#376 also atm-core 6ffaa97be clean = 0 and injected faults reported | closed 2026-10-31 with evidence |
-| #195 | both streams printed for a failed step; `<log-root>/<step>.log` for every step | m-7 |
-| #385 | `exclude_paths_by_rule` removes an SCB-CYCLE-001 finding in one file only | m-8 |
-| #777, #778, #782 | 0.8.3 release assets; #782 also needs Rand's go for winget-pkgs | 0.8.3 release (lint-8h3t.1) |
+| #786, #720 | lint-8h3t.2 | After 0.8.3 ships with m-1 and m-4: atm-core at its head, all 18 PORT-010 exclusions removed, site allowances on remaining items; zero PORT-010 findings over those paths and a reason on every allow. The allowance count is measured from that run, not the estimate. Depends on m-1, m-4 and release bead lint-8h3t.1, plus atm-core sign-off. |
+| #136 | lint-8h3t.4 | After m-2: atm-core at head with ownership restored and owner tests/ roots configured reports no SCB-MANIFEST-004 findings; an injected non-owner mutation still reports. |
+| #198 | lint-8h3t.5 | After m-3: bare sc-lint runs clippy with a step PYO3_PYTHON env value on a host whose PATH python is older than 3.11. |
+| #385 | lint-8h3t.8 | Cite m-2's boundary_cycle_exclude_paths_by_rule result: two cycles in two files, only the excluded cycle disappears. Do not rerun the sprint test. |
+| #195 | lint-8h3t.9 | Cite m-3's consumer_failed_step_prints_both_streams and consumer_log_root_writes_every_step results: both failed-step streams visible; every step writes <log-root>/steps/<step>.log. Do not rerun the sprint tests. |
 
-Stack A also checks `port010_inventory_burndown` in every layer, so a shape
-that leaves its own atm-core findings reported fails in that layer.
+The existing logger root meaning of --log-root stays intact. Consumer
+adoption of m-4 adds sc-lint-attributes to Cargo dependencies and each crate's
+boundary allowed_dependencies; every reason names the item's actual cause.
+The attribute remains a no-op for behavior/public API and builds through the
+existing stable Linux, macOS and Windows CI matrix.
 
 ## Determinism
 
-Every gating test uses committed fixtures: no sleeps, retries, network, clock
-or host-dependent paths. Sprints test atm-core code only through committed
-fixture replays. Runs against atm-core itself belong to the closure beads,
-which quality-mgr runs after the sprint lands, not to sprint acceptance.
+Gating tests use committed fixtures and controlled inputs, with no sleeps,
+retries, network, clock, host-dependent paths, races or event-loop ordering.
+Consumer runs belong to closure checks; sprints end with just lint and just
+test. No extra adoption run or CI gate is introduced.
 
 ## Pending Decisions For Rand
 
 1. Accept ADR-022 (lint-t6i7).
-2. Accept the ADR-010 amendment (lint-m-adr010), including the `any(unix,
-   test)` gate forms and test-reference rule added after review.
-3. S6 scope: do `pub` modules and items inside a `#[cfg(unix)] mod x;` count,
-   or only non-public ones (ANC-006/007 as locked say all)?
-4. Review the anchor rewrites. On Rand's direction "rewrite to match the
-   plan", each statement now describes the behaviour the plan builds. Quotes
-   are unchanged. The plan questions were tuned again against a frozen oracle,
-   and plan gate r11 passes all 8 beads with every anchor covered.
-   - ANC-001 v4: the S1 helper rule covers any caller with a companion PORT-010
-     recognises (a sibling, a renamed counterpart, a portable alternative, or
-     another such helper). New fixtures, including the helper of an S4 pair.
-   - ANC-002: renamed pairs need the same return type, and each function is
-     called only from the matching gated branch of one caller.
-   - ANC-003 v4: siblings must have the same name and kind and be in the same
-     scope (a module, an inherent impl or a crate root, including `main.rs`
-     and `src/bin`).
-   - ANC-004 v4: a Unix transport function is not reported when its caller's
-     non-Unix branch or match arm uses an un-gated loopback TCP alternative.
-     This replaces the match-arm wording.
-   - ANC-005: helpers of any visibility, called only inside `#[cfg(unix)]`
-     blocks of a function that also has a `#[cfg(not(unix))]` block.
-   - ANC-008: the portable fallback takes the config type and returns an error
-     on every path.
-   - ANC-011: the pass fixture uses an absolute `PYO3_PYTHON`.
-   - ANC-013: `self::`, `crate::` and `super::` paths anywhere in the code, and
-     bare `X::` in a module declaring its own `mod X`.
-5. The ANC-003 tuner left one case open: a bead that states the outcome for
-   only some of the module / inherent impl / crate-root scopes. Recommendation:
-   add a fail fixture for that case.
+2. Accept the ADR-010 amendment (lint-m-adr010).
+3. S6 public scope: whether pub modules/items are covered or require a site
+   allowance. ANC-006/007 remain locked as written until Rand decides.

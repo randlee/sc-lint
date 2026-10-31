@@ -1,0 +1,97 @@
+[
+  {
+    "id": "lint-m-1",
+    "title": "m-1: port010-same-name-siblings",
+    "description": "## Goal\n#720 and #786 S3/S6: recognise same-name cfg(not(unix)) siblings and Unix-only out-of-line modules (ADR-010 amendment 2026-10-30).\n## Deliverables\n1. S3 (ANC-003): PORT-010 does not report a #[cfg(unix)] item with a non-test same-name, same-kind #[cfg(not(unix))] sibling in the same lexical scope: crate root lib.rs, main.rs or src/bin/*.rs, inline module, file module or the same inherent impl block. Trait impls retain their current treatment. Test port010_s3_same_name_sibling covers each scope; replace port010_fixture_crate_root_main_current_behaviour with the zero-finding S3 assertion.\n2. S6 (ANC-006/007): PORT-010 does not report the declaration #[cfg(unix)] mod x; or #[cfg(unix)] items inside that module's files, because that module is never compiled on Windows. Resolve x.rs, x/mod.rs and #[path], including nested file modules. Reuse the file-module cfg propagation already implemented in platform_adapters.rs; no caller index is needed. Add port010_s6_unix_module and port010_s6_file_module_items. Public-module/item scope remains pending Rand's ruling before implementation.\n3. ANC-009 negatives: port010_s3_negatives retains kind mismatch, test-only sibling, not(windows), same name in another module or impl and no companion. port010_s6_negatives retains missing/ambiguous module files, a module compiled on Windows and an unrelated unpaired Unix item outside the Unix-only module. Those findings stay reported.\n4. Update the existing atm_core_* fixture exact-list tests in crates/sc-lint-portability/tests/cli.rs to the S3/S6 results and update their README. Keep the existing committed fixture roots; no 47-entry inventory, hash test, extraction script or burndown mechanism.\n## Does Not Close\nOther #786 shapes use the m-4 site allowance. No automatic helper/call-graph exemptions, general Boolean cfg solver, path exclusion or blanket suppression. The post-release 18-path consumer check belongs to lint-8h3t.2.\n## Active Trace\nANC-003, ANC-006, ANC-007, ANC-009; REQ-PRODUCT-004AA; ADR-010 decision 6 and amendment 2026-10-30.",
+    "design": "Baseline: predicates.rs:53 only accepts cfg(windows) for the companion gate; parity.rs collects free-item and inherent-method findings. Match exactly cfg(not(unix)) by name/kind in the existing lexical sibling list; do not compare across scopes or separate impl blocks.\nportability.rs:189 parses each file independently. platform_adapters.rs:383 inherit_file_module_cfg already propagates file-module cfg facts to a fixed point. Reuse that resolution/propagation for PORT-010 S6, preserving x.rs, x/mod.rs and #[path] resolution. Missing/ambiguous files establish no proof; leave the finding. Preserve RuleId, messages and JSON shape. Replace the existing crate-root limitation regression and update existing per-file exact lists instead of introducing a new inventory. m-1 and m-4 share parity.rs/lib.rs/tests.rs; the stack writer merges develop into whichever lands second.",
+    "acceptance_criteria": "## Acceptance Criteria\n- ANC-003 / #720: port010_s3_same_name_sibling proves no PORT-010 findings for same-name, same-kind cfg(not(unix)) siblings in every listed module, inherent-impl and crate-root scope; the old crate-root-main limitation assertion is replaced.\n- ANC-006/007: port010_s6_unix_module and port010_s6_file_module_items prove no PORT-010 findings on the Unix-only file-module declaration and its Unix items; x.rs, x/mod.rs, #[path] and nested resolution are covered. Resolve the pending pub scope before implementation.\n- ANC-009: port010_s3_negatives and port010_s6_negatives retain real gaps. Existing atm_core_* exact-list tests reflect only the S3/S6 changes.\n## Validation\n- cargo test -p sc-lint-portability --no-fail-fast\n- just lint\n- just test\nRecord new regressions failing on develop before applying the fix.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-10-30T01:24:42Z",
+    "updated_at": "2026-10-31T19:13:30Z",
+    "metadata": {
+      "adrs": [
+        "ADR-010"
+      ],
+      "branch": "sprint/m-1-port010-same-name-siblings",
+      "closure_type": "integration",
+      "difficulty": "normal",
+      "layer": 1,
+      "model_class": "",
+      "owned_paths": [
+        "crates/sc-lint-portability/src/predicates.rs",
+        "crates/sc-lint-portability/src/portability/parity.rs",
+        "crates/sc-lint-portability/src/tests.rs",
+        "crates/sc-lint-portability/tests/cli.rs",
+        "crates/sc-lint-portability/tests/fixtures/port010/**",
+        "crates/sc-lint-portability/src/platform_adapters.rs",
+        "crates/sc-lint-portability/src/portability.rs",
+        "crates/sc-lint-portability/src/lib.rs"
+      ],
+      "owner": "clint",
+      "phase": "m",
+      "pr_target": "develop",
+      "relation": "parallel_safe",
+      "release_train": "",
+      "requirements": [
+        "REQ-PRODUCT-004AA"
+      ],
+      "sprint": "m-1",
+      "stack": "phase-m-a",
+      "stack_base": "develop",
+      "target_boundary": "BOUNDARY-ScLintPortabilityAnalyzer",
+      "worktree": "../sc-lint-worktrees/sprint/m-1-port010-same-name-siblings"
+    },
+    "labels": [
+      "phase-m",
+      "stack:phase-m-a",
+      "stage:sprint"
+    ],
+    "dependencies": [
+      {
+        "id": "lint-m-adr010",
+        "title": "Phase M: Rand acceptance of ADR-010 amendment (PORT-010 companion shapes)",
+        "description": "The ADR-010 amendment 2026-10-30 (PORT-010 companion shapes S1-S7, gate forms, test references, fail closed, per-site allowance) is Pending. Formal acceptance (Status: Accepted on the planning branch) gates dispatch of m-1, and through stack A of m-5a, m-5b, m-5c and m-6. Open for Rand: whether S6 covers pub modules and items.",
+        "status": "open",
+        "priority": 2,
+        "issue_type": "gate",
+        "owner": "randlee@users.noreply.github.com",
+        "created_at": "2026-10-30T18:31:55Z",
+        "created_by": "team-lead",
+        "updated_at": "2026-10-30T18:31:55Z",
+        "labels": [
+          "phase-m"
+        ],
+        "dependency_type": "blocks"
+      },
+      {
+        "id": "lint-phase-m",
+        "title": "phase-m: atm-core P1 tool fixes (PORT-010, SCB-MANIFEST-004, lint-step env/cwd)",
+        "description": "Phase M fixes: see docs/plans/phase-m/phase-m-plan.md and sprint beads lint-m-1, lint-m-2, lint-m-3 and lint-m-4 for scope, authority and acceptance.",
+        "design": "Four independent one-layer stacks A-D rooted on develop; shared-file integration and pending ADR decisions are in docs/plans/phase-m/phase-m-plan.md. The phase depends only on closure beads for the issues it fixes.",
+        "acceptance_criteria": "Complete lint-8h3t.2 (#786/#720), lint-8h3t.4 (#136), lint-8h3t.5 (#198), lint-8h3t.8 (#385) and lint-8h3t.9 (#195), with QA evidence posted on the issues. Sprint deliverables and acceptance remain on the four sprint beads.",
+        "status": "open",
+        "priority": 1,
+        "issue_type": "epic",
+        "created_at": "2026-10-30T01:24:42Z",
+        "updated_at": "2026-10-31T19:15:53Z",
+        "metadata": {
+          "phase": "m",
+          "plan_scope": "epic"
+        },
+        "labels": [
+          "phase-m",
+          "scope:epic"
+        ],
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "lint-phase-m",
+    "dependent_count": 3,
+    "dependency_count": 2,
+    "comment_count": 3,
+    "comments_omitted": true,
+    "revision": "9177798202138583936"
+  }
+]

@@ -1,0 +1,84 @@
+[
+  {
+    "id": "lint-m-3",
+    "title": "m-3: lint-step-env-cwd and visible output",
+    "description": "## Goal\n#198: a [[tool.sc-lint.lint]] step in sc-lint.toml accepts an env table and a cwd key, applied to that step's child process, with the same meaning they have on a test command selector (ADR-016 \"per-step/per-layer env\"; ADR-022 decision 3).\n## Deliverables\n1. Accept env and cwd on [[tool.sc-lint.lint]] steps using the test-selector parsers, and carry them on the data path ConsumerProfileStep -\u003e PlannedStep -\u003e StepPlan so they survive cargo-xwin and target adaptation. env values are passed to the child verbatim (no expansion or path resolution); cwd is relative to the repository root.\n2. Error contract: malformed env or cwd on a lint step raises ProfilePlanError with new ProfilePlanDetailCode::InvalidStepEnv or InvalidStepCwd, field set to env.\u003cKEY\u003e or cwd and the step named; the test-selector error text is unchanged.\n3. Tests: lint_step_env_and_cwd (integration test in crates/sc-lint/tests: a lint step with env = { PYO3_PYTHON = \".bootstrap-venv/bin/python\" } and cwd = \"crates/x\" spawns the sc-lint test binary as a helper that reports its env and cwd; the child sees exactly that literal and that directory, both sides canonicalized before comparison); lint_step_env_and_cwd_plan and lint_step_env_cwd_errors (unit tests in src/tests.rs on StepPlan values, including after xwin/target adaptation). Existing UnknownStepField tests continue to reject setup/runner keys. No parent-environment mutation.\n4. #195: failed steps print both stdout and stderr, including stdout when stderr is non-empty. Write both output streams for every executed step, passing steps included, to \u003clog-root\u003e/steps/\u003cstep\u003e.log. Keep --log-root as the existing logger root. Tests consumer_failed_step_prints_both_streams and consumer_log_root_writes_every_step use one controlled failing child and one passing child, asserting both stream contents and the exact log paths.\n5. Update the lint-step key list in the error text and the sc-lint.toml docs. The atm-core clippy example sets PYO3_PYTHON and states that the value is passed verbatim, so its meaning belongs to the tool that reads it.\n## Does Not Close\nNo setup hook and no interpreter-selection key: [tool.sc-lint].setup and [tool.sc-lint].runner stay rejected as unknown keys (ADR-022 decision 6). PATH or venv activation stays in the consumer's recipe.\n## Active Trace\nANC-011, ANC-012. ADR-016; ADR-022 decisions 3 and 6; REQ-CLI-021.",
+    "design": "Baseline: profile_plan.rs decode_lint_step_fields rejects every key except name/command/platform/target/after_all with ProfilePlanDetailCode::UnknownStepField (PROFILE.UNKNOWN_STEP_FIELD; key list text at 554); PlannedStep (369, pub(crate)) has no env/cwd; StepPlan (workflow.rs:63, pub(crate)) is spawned with .current_dir and .envs(step.env()); test_selectors.rs has parse_env (627) and parse_cwd (658). Move parse_env/parse_cwd to a shared private module step_exec.rs (declared in lib.rs), add env/cwd to PlannedStep, and map errors in profile_plan_config_error (975). Existing UnknownStepField assertions in src/tests.rs are updated for the new key list.\n#195 baseline: workflow.rs:293-297 selects stderr as the failure cause and omits stdout from visible diagnostics when both exist. Retain both streams in the error rendering. logging.rs:81-125 resolves --log-root for the logger; leave that meaning intact and use its steps/ subdirectory for captured step output. Preserve the existing structured step/command/root/exit-code/stdout/stderr error details; use the existing CLI I/O error path for log creation/write failures with the destination path and cause. Test subprocess output is controlled, without changing scheduler semantics.",
+    "acceptance_criteria": "## Acceptance Criteria\n- issue:#198: a [[tool.sc-lint.lint]] step with env and cwd runs its child with exactly those values (lint_step_env_and_cwd), and the StepPlan carries them after adaptation (lint_step_env_and_cwd_plan).\n- Malformed env or cwd fails with ProfilePlanDetailCode::InvalidStepEnv or InvalidStepCwd (lint_step_env_cwd_errors); steps without env or cwd behave exactly as today.\n- ANC-012: [tool.sc-lint].setup and [tool.sc-lint].runner remain rejected as unknown keys (existing UnknownStepField tests); no setup-hook or interpreter-selection key is added.\n- issue:#195: consumer_failed_step_prints_both_streams and consumer_log_root_writes_every_step pass: both failed-step streams are visible; every executed step has its output at \u003clog-root\u003e/steps/\u003cstep\u003e.log, including successful steps. Existing scheduling, keep-going and fail-fast behavior is unchanged.\n## Validation\n- cargo test -p sc-lint --no-fail-fast\n- just lint\n- just test\nRecord the new tests failing on the develop baseline first.",
+    "status": "open",
+    "priority": 1,
+    "issue_type": "task",
+    "created_at": "2026-10-30T01:24:42Z",
+    "updated_at": "2026-10-31T19:17:56Z",
+    "metadata": {
+      "adrs": [
+        "ADR-016",
+        "ADR-022"
+      ],
+      "branch": "sprint/m-3-lint-step-env-cwd",
+      "closure_type": "integration",
+      "difficulty": "normal",
+      "layer": 1,
+      "model_class": "",
+      "owned_paths": [
+        "crates/sc-lint/src/profile_plan.rs",
+        "crates/sc-lint/src/test_selectors.rs",
+        "crates/sc-lint/src/config.rs",
+        "crates/sc-lint/src/workflow.rs",
+        "crates/sc-lint/src/step_exec.rs",
+        "crates/sc-lint/src/lib.rs",
+        "crates/sc-lint/src/tests.rs",
+        "crates/sc-lint/tests/**",
+        "docs/sc-lint/**",
+        "crates/sc-lint/src/logging.rs"
+      ],
+      "owner": "cfast",
+      "phase": "m",
+      "pr_target": "develop",
+      "relation": "parallel_safe",
+      "release_train": "",
+      "requirements": [
+        "REQ-CLI-021"
+      ],
+      "sprint": "m-3",
+      "stack": "phase-m-d",
+      "stack_base": "develop",
+      "target_boundary": "BOUNDARY-ScLintCli",
+      "worktree": "../sc-lint-worktrees/sprint/m-3-lint-step-env-cwd"
+    },
+    "labels": [
+      "phase-m",
+      "stack:phase-m-d",
+      "stage:sprint"
+    ],
+    "dependencies": [
+      {
+        "id": "lint-phase-m",
+        "title": "phase-m: atm-core P1 tool fixes (PORT-010, SCB-MANIFEST-004, lint-step env/cwd)",
+        "description": "Phase M fixes: see docs/plans/phase-m/phase-m-plan.md and sprint beads lint-m-1, lint-m-2, lint-m-3 and lint-m-4 for scope, authority and acceptance.",
+        "design": "Four independent one-layer stacks A-D rooted on develop; scope, integration and pending ADR decisions are in docs/plans/phase-m/phase-m-plan.md. Phase completion is tracked by standalone lint-phase-m-done to avoid cycles through sprint parent-child links.",
+        "acceptance_criteria": "Phase M is complete when lint-phase-m-done closes after lint-8h3t.2 (#786/#720), .4 (#136), .5 (#198), .8 (#385) and .9 (#195), with QA evidence posted on the issues. Sprint deliverables and acceptance remain on the four sprint beads.",
+        "status": "open",
+        "priority": 1,
+        "issue_type": "epic",
+        "created_at": "2026-10-30T01:24:42Z",
+        "updated_at": "2026-10-31T19:17:25Z",
+        "metadata": {
+          "phase": "m",
+          "plan_scope": "epic"
+        },
+        "labels": [
+          "phase-m",
+          "scope:epic"
+        ],
+        "dependency_type": "parent-child"
+      }
+    ],
+    "parent": "lint-phase-m",
+    "dependent_count": 5,
+    "dependency_count": 1,
+    "comment_count": 3,
+    "comments_omitted": true,
+    "revision": "7780883978810400525"
+  }
+]

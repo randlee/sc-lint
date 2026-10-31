@@ -6,3 +6,6 @@ de
 # Plan-anchor ids (ANC-001) in docs/plans/*/anchors.json and anchor-runs.
 anc
 statics
+# Variable names in preserved plan-anchor tuning harness evidence.
+ans
+noth

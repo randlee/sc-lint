@@ -27,8 +27,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
-      "status": "locked",
+      "version": 5,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -70,6 +70,12 @@
             "fixtures"
           ],
           "previous_statement": "sc-lint's PORT-010 companion-parity check must count a private or pub(crate) #[cfg(unix)] helper as having a companion, and not report it, when its only callers are #[cfg(unix)] items that themselves have a #[cfg(windows)] or #[cfg(not(unix))] sibling."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "retired",
+          "replaced_by": null,
+          "reason": "Rand 2026-10-31: cut to 4 sprints; shape handled by the PORT-010 site allowance"
         }
       ]
     },
@@ -95,8 +101,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
-      "status": "locked",
+      "version": 5,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -136,6 +142,12 @@
             "statement"
           ],
           "previous_statement": "sc-lint's PORT-010 companion-parity check must count a differently named #[cfg(windows)] function that does the same job, such as connect_named_pipe for connect_unix, as the companion of a #[cfg(unix)] function, and not report the #[cfg(unix)] function."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "retired",
+          "replaced_by": null,
+          "reason": "Rand 2026-10-31: cut to 4 sprints; shape handled by the PORT-010 site allowance"
         }
       ]
     },
@@ -167,7 +179,10 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-1"
+        ]
       },
       "history": [
         {
@@ -202,6 +217,14 @@
             "statement"
           ],
           "previous_statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report a #[cfg(unix)] item that has a same-name #[cfg(not(unix))] sibling in the same scope, whether that scope is a module, an inherent impl or the crate root."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-1"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     },
@@ -227,8 +250,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
-      "status": "locked",
+      "version": 5,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -270,6 +293,12 @@
             "fixtures"
           ],
           "previous_statement": "sc-lint's PORT-010 rule must recognize, and not report, a #[cfg(unix)] transport or adapter function or match arm that sits beside a loopback TCP enum variant or function with no #[cfg] guard, which Windows uses instead."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "retired",
+          "replaced_by": null,
+          "reason": "Rand 2026-10-31: cut to 4 sprints; shape handled by the PORT-010 site allowance"
         }
       ]
     },
@@ -295,8 +324,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
-      "status": "locked",
+      "version": 5,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -336,6 +365,12 @@
             "statement"
           ],
           "previous_statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report a #[cfg(unix)] helper used only inside a #[cfg(unix)] block of a function whose #[cfg(not(unix))] block is in the same function body."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "retired",
+          "replaced_by": null,
+          "reason": "Rand 2026-10-31: cut to 4 sprints; shape handled by the PORT-010 site allowance"
         }
       ]
     },
@@ -367,7 +402,10 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-1"
+        ]
       },
       "history": [
         {
@@ -394,6 +432,14 @@
           "fields": [
             "scope"
           ]
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-1"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     },
@@ -425,7 +471,10 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-1"
+        ]
       },
       "history": [
         {
@@ -452,6 +501,14 @@
           "fields": [
             "scope"
           ]
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-1"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     },
@@ -477,8 +534,8 @@
         ]
       },
       "question_overrides": {},
-      "version": 4,
-      "status": "locked",
+      "version": 5,
+      "status": "retired",
       "promoted_to": null,
       "beads": {
         "anchor": null,
@@ -518,6 +575,12 @@
             "statement"
           ],
           "previous_statement": "sc-lint's PORT-010 companion-parity check must count non-Unix code that rejects a cross-platform config type with a typed error as the portable fallback for a #[cfg(unix)] accessor or consumer of that type, and not report it."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "retired",
+          "replaced_by": null,
+          "reason": "Rand 2026-10-31: cut to 4 sprints; shape handled by the PORT-010 site allowance"
         }
       ]
     },
@@ -549,7 +612,11 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-1",
+          "lint-m-4"
+        ]
       },
       "history": [
         {
@@ -569,6 +636,15 @@
           "event": "locked",
           "status": "locked",
           "note": "Locked for tuning under Rand's ruling: \"we can 'lock the anchors', but if tuning requires updating them, they will need to be changed\". Statement and fixtures still need Rand's review (PR #788)."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-1",
+            "lint-m-4"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     },
@@ -600,7 +676,10 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-4"
+        ]
       },
       "history": [
         {
@@ -627,6 +706,14 @@
           "fields": [
             "scope"
           ]
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-4"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     },
@@ -658,7 +745,10 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-3"
+        ]
       },
       "history": [
         {
@@ -685,6 +775,14 @@
           "fields": [
             "fixtures"
           ]
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-3"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     },
@@ -716,7 +814,10 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-3"
+        ]
       },
       "history": [
         {
@@ -736,6 +837,14 @@
           "event": "locked",
           "status": "locked",
           "note": "Locked for tuning under Rand's ruling: \"we can 'lock the anchors', but if tuning requires updating them, they will need to be changed\". Statement and fixtures still need Rand's review (PR #788)."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-3"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     },
@@ -767,7 +876,10 @@
       "beads": {
         "anchor": null,
         "plan_questions": null,
-        "dev_questions": null
+        "dev_questions": null,
+        "sprints": [
+          "lint-m-2"
+        ]
       },
       "history": [
         {
@@ -795,6 +907,14 @@
             "statement"
           ],
           "previous_statement": "sc-lint's SCB-MANIFEST-004 check must not report a use self::X::..., use crate::X::... or use super::X::... path as a use of the owned crate X when X is a local module."
+        },
+        {
+          "at": "2026-10-31T19:15:02+00:00",
+          "event": "sprint_mapping_updated",
+          "sprints": [
+            "lint-m-2"
+          ],
+          "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged."
         }
       ]
     }

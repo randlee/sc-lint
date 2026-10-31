@@ -31,9 +31,10 @@ consumers run sc-lint.
 
 ## What success looks like
 
-- **#786 and #720.** PORT-010 recognises the valid companion shapes S1 to S7
-  and does not report them. It still reports a real parity gap.
-- **#786 S8.** S8 is allowed through a per-site
+- **#786 and #720.** PORT-010 recognises S3 same-name siblings and S6 Unix-only modules
+  under the approved 2026-10-31 cut. Other shapes use reasoned site allowances;
+  unallowed real parity gaps still report.
+- **#786 other shapes, including S8.** These use a per-site
   `#[sc_lint(allow(PORT-010), reason = "...")]` (ADR-022 decision 4).
 - **#198.** Lint steps accept `env` and `cwd` exactly as test command
   selectors do (ADR-016 "per-step/per-layer `env`"; ADR-022 decision 3.2). No
@@ -43,6 +44,9 @@ consumers run sc-lint.
   that is not "a configured ownership violation" (REQ-SCB-019). Owner `tests/`
   roots in `allowed_source_roots` are documented as the supported
   configuration.
+- **#385 and #195.** m-2 adds SCB-CYCLE-001 path filtering; m-3 preserves
+  both failed-step streams and writes every step output under the logger
+  root's steps/ directory.
 - **Every sprint** traces to its issue and to the REQ or ADR it implements,
   and carries a deterministic regression for atm-core's reported case.
 
@@ -52,7 +56,7 @@ consumers run sc-lint.
   widening allowed roots beyond the owner's own targets.
 - New orchestration in the product: setup hooks, interpreter selection, or
   required recipe or CI shapes.
-- atm-core gaps not on the P1 list (#783, #784, #195, #385), the 0.8.3
+- atm-core gaps not on the P1 list (#783, #784), the 0.8.3
   release-platform work, and process or tooling changes.
 - The rest of ADR-022, such as the shared unknown-key check and required
   `reason`. It becomes later work unless a P1 item needs it.
