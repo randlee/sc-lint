@@ -427,7 +427,7 @@ pub fn analyze_workspace(
 }
 
 /// Source file of every graph node, keyed by node id. Path-less findings
-/// (SCB-CYCLE-002/003) resolve their files from it for path exclusions.
+/// (SCB-CYCLE-001/002/003) resolve their files from it for path exclusions.
 type NodeSourcePaths = BTreeMap<NodeId, PathBuf>;
 
 /// `analyze_workspace` plus the source file of every graph node. The
