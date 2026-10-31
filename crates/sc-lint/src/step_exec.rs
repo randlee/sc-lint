@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StepExecError {
-    pub(crate) field: &'static str,
+    pub(crate) field: String,
     pub(crate) message: String,
 }
 
@@ -18,7 +18,7 @@ pub(crate) fn parse_env(
         return Ok(BTreeMap::new());
     };
     let invalid = || StepExecError {
-        field: "env",
+        field: "env".to_owned(),
         message: format!("selector `{name}` env must be a table of strings"),
     };
     let toml::Value::Table(table) = value else {
@@ -28,14 +28,17 @@ pub(crate) fn parse_env(
     for (key, value) in table {
         if key.is_empty() || key.contains('=') || key.contains('\0') {
             return Err(StepExecError {
-                field: "env",
+                field: format!("env.{key}"),
                 message: format!(
                     "selector `{name}` env key `{key}` is empty or contains `=` or NUL"
                 ),
             });
         }
         let toml::Value::String(value) = value else {
-            return Err(invalid());
+            return Err(StepExecError {
+                field: format!("env.{key}"),
+                message: format!("selector `{name}` env must be a table of strings"),
+            });
         };
         env.insert(key.clone(), value.clone());
     }
@@ -56,7 +59,7 @@ pub(crate) fn parse_cwd(
                 .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
     });
     relative.map(Some).ok_or_else(|| StepExecError {
-        field: "cwd",
+        field: "cwd".to_owned(),
         message: format!(
             "selector `{name}` cwd must be a non-empty repo-root-relative path without `..`"
         ),

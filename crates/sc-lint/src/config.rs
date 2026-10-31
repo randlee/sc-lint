@@ -825,7 +825,7 @@ fn profile_step_execution(
         return Ok((std::collections::BTreeMap::new(), None));
     }
     let parse_error = |error: crate::step_exec::StepExecError| {
-        let detail_code = if error.field == "env" {
+        let detail_code = if error.field == "env" || error.field.starts_with("env.") {
             crate::profile_plan::ProfilePlanDetailCode::InvalidStepEnv
         } else {
             crate::profile_plan::ProfilePlanDetailCode::InvalidStepCwd
@@ -834,7 +834,7 @@ fn profile_step_execution(
             crate::profile_plan::ProfilePlanError::new(
                 detail_code,
                 Some(name),
-                Some(error.field),
+                Some(&error.field),
                 error.message.replace("selector", "lint step"),
                 format!("Correct the `{}` field on lint step `{name}`.", error.field),
             ),

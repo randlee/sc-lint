@@ -4234,6 +4234,11 @@ fn lint_step_env_and_cwd_plan() {
 fn lint_step_env_cwd_errors() {
     let cases = [
         ("env = \"bad\"", "env", "PROFILE.INVALID_STEP_ENV"),
+        (
+            "env = { PYO3_PYTHON = 7 }",
+            "env.PYO3_PYTHON",
+            "PROFILE.INVALID_STEP_ENV",
+        ),
         ("cwd = \"../outside\"", "cwd", "PROFILE.INVALID_STEP_CWD"),
     ];
     for (field_line, field, detail_code) in cases {
