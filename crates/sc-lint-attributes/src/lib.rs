@@ -97,4 +97,35 @@ mod tests {
             .to_string()
         );
     }
+
+    #[test]
+    fn site_allow_macro_accepts_valid_input_and_reports_structured_errors() {
+        let item = quote!(
+            #[cfg(unix)]
+            pub fn current_uid() -> u32 {
+                0
+            }
+        );
+        let expanded = expand_sc_lint(
+            quote!(allow(PORT - 010), reason = "intentionally POSIX-only"),
+            item.clone(),
+        )
+        .expect("valid site allowance parses");
+        assert_eq!(expanded.to_string(), item.to_string());
+
+        let error = expand_sc_lint(
+            quote!(allow(PORT - 010)),
+            quote!(
+                pub fn missing_reason() {}
+            ),
+        )
+        .expect_err("invalid site allowance is rejected");
+        let diagnostic = error.to_string();
+        assert!(
+            diagnostic.contains("DIRECTIVE.SITE_ALLOW.MISSING_REASON"),
+            "{diagnostic}"
+        );
+        assert!(diagnostic.contains("site allow requires"), "{diagnostic}");
+        assert!(diagnostic.contains("recovery: add reason"), "{diagnostic}");
+    }
 }

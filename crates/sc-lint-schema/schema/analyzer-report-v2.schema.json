@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/randlee/sc-lint/blob/develop/crates/sc-lint-schema/schema/analyzer-report-v2.schema.json",
+  "title": "sc-lint analyzer report v2",
+  "description": "JSON emitted by Rust analyzer backends and normalized by sc-lint. Version 2 optionally includes site allowances.",
+  "type": "object",
+  "required": [
+    "tool",
+    "version",
+    "schema_version",
+    "status",
+    "scanned_crates",
+    "findings"
+  ],
+  "properties": {
+    "tool": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_version": { "const": "0.2.0" },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
+    "scanned_crates": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rule_id",
+          "kind",
+          "message",
+          "owner_ids",
+          "node_ids"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string"
+          },
+          "owner_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "allowed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rule_id",
+          "reason",
+          "item",
+          "source_path",
+          "line"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "item": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

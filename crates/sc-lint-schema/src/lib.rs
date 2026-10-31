@@ -7,7 +7,10 @@ mod adapter_payload;
 mod analyzer_report;
 
 pub use adapter_payload::{PayloadDrift, validate_adapter_payload};
-pub use analyzer_report::{AnalyzerReportDrift, analyzer_report_schema, validate_analyzer_report};
+pub use analyzer_report::{
+    AnalyzerReportDrift, analyzer_report_schema, analyzer_report_v1_schema,
+    validate_analyzer_report,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -244,7 +247,99 @@ where
     pub status: ReportStatus,
     pub scanned_crates: usize,
     pub findings: Vec<Finding<R>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub allowed: Vec<AllowedFinding<R>>,
 }
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AllowedFinding<R>
+where
+    R: Serialize,
+{
+    rule_id: R,
+    reason: String,
+    item: String,
+    source_path: String,
+    line: usize,
+}
+
+impl<R> AllowedFinding<R>
+where
+    R: Serialize,
+{
+    pub fn new(
+        rule_id: R,
+        reason: impl Into<String>,
+        item: impl Into<String>,
+        source_path: impl Into<String>,
+        line: usize,
+    ) -> Result<Self, AllowedFindingError> {
+        let reason = reason.into();
+        let item = item.into();
+        let source_path = source_path.into();
+        if reason.trim().is_empty() {
+            return Err(AllowedFindingError::EmptyReason);
+        }
+        if item.trim().is_empty() {
+            return Err(AllowedFindingError::EmptyItem);
+        }
+        if source_path.trim().is_empty() {
+            return Err(AllowedFindingError::EmptySourcePath);
+        }
+        if line == 0 {
+            return Err(AllowedFindingError::InvalidLine);
+        }
+        Ok(Self {
+            rule_id,
+            reason,
+            item,
+            source_path,
+            line,
+        })
+    }
+
+    pub fn rule_id(&self) -> &R {
+        &self.rule_id
+    }
+
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+
+    pub fn item(&self) -> &str {
+        &self.item
+    }
+
+    pub fn source_path(&self) -> &str {
+        &self.source_path
+    }
+
+    pub fn line(&self) -> usize {
+        self.line
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllowedFindingError {
+    EmptyReason,
+    EmptyItem,
+    EmptySourcePath,
+    InvalidLine,
+}
+
+impl fmt::Display for AllowedFindingError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::EmptyReason => "allowed finding reason must not be empty",
+            Self::EmptyItem => "allowed finding item must not be empty",
+            Self::EmptySourcePath => "allowed finding source path must not be empty",
+            Self::InvalidLine => "allowed finding line must be one-based",
+        })
+    }
+}
+
+impl std::error::Error for AllowedFindingError {}
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

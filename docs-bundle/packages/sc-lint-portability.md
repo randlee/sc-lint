@@ -46,6 +46,48 @@ reviewed platform fallback or a configured private-adapter exemption applies.
 CI should run the complete profile and retain the normalized report for all
 supported targets.
 
+### Reviewed PORT-010 site allowance
+
+Use an item-level allowance only when the public API is deliberately
+Unix-specific and its reason names that cause:
+
+```rust
+#[cfg(unix)]
+#[sc_lint(allow(PORT-010), reason = "This helper intentionally exposes the POSIX uid API.")]
+pub fn current_uid() -> u32 { /* ... */ }
+```
+
+The exception covers only the annotated item. It does not cover an impl's
+methods, siblings, a module, or a file. Consumers using the attribute add the
+version-matched macro crate and admit it in each annotated crate's boundary:
+
+```toml
+[dependencies]
+sc-lint-attributes = "0.8.2"
+```
+
+Add `sc-lint-attributes` to the `dependencies.allowed_dependencies` array in
+the existing boundary record for every annotated consumer crate. For example,
+the complete top-level record shape is:
+
+```toml
+boundary_id = "BOUNDARY-Example"
+owner_package = "example"
+owner_crate_path = "example"
+name = "Example"
+
+[public]
+facade = "example::api"
+
+[dependencies]
+allowed_dependencies = ["sc-lint-attributes", "existing-package"]
+```
+
+Reports containing suppressed findings use schema version `0.2.0` and include
+the `allowed` array with the rule, reason, path, line, and item identity. Empty
+allowance reports remain schema version `0.1.0` and omit `allowed`. Consumers
+must upgrade strict v1 validators before enabling the new report form.
+
 ## Common failures
 
 Missing companion implementations, ungated platform APIs, and hard-coded shell
