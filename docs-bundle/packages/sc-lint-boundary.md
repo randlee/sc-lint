@@ -181,9 +181,11 @@ position (use, type, expression, pattern, struct literal, trait bound, impl
 header, qualified path or attribute). Paths starting with `self`, `crate` or
 `super` are never uses, and a bare `db_driver::` path is a local module path
 when the same module declares `mod db_driver`. Comments, doc comments and
-string literals are not uses. Macro and attribute token bodies keep a textual
-match on `db_driver::`, `use db_driver` and `extern crate db_driver`, as does
-a whole file that fails to parse.
+string literals are not uses. Attribute argument lists such as
+`#[derive(db_driver::Row)]` are checked as paths. Macro token bodies keep a
+textual match on `db_driver::`, `use db_driver` and `extern crate db_driver`
+after dropping paths that start with `self`, `crate` or `super`; a whole file
+that fails to parse keeps the textual match unchanged.
 
 The manifest allowlist matches the dependency's Cargo package identity,
 including renamed dependency entries. Ownership checks consider both manifest

@@ -13,7 +13,9 @@ use syn::MacroDelimiter;
 use syn::Meta;
 use syn::Path;
 use syn::QSelf;
+use syn::Token;
 use syn::UseTree;
+use syn::punctuated::Punctuated;
 use syn::visit::Visit;
 
 /// Whether `source` uses `crate_name` (its underscore spelling). A file that
@@ -79,15 +81,18 @@ impl DependencyUses<'_> {
         }
     }
 
-    /// Macro and attribute token bodies are not parsed, so they keep the
-    /// textual rule over their tokens rendered with their delimiters.
-    fn check_tokens(&mut self, delimiter: &MacroDelimiter, tokens: &impl Display) {
+    /// Macro token bodies are not parsed, so they keep the textual rule over
+    /// their tokens rendered with their delimiters. Paths starting with
+    /// `self`, `crate` or `super` (also `$crate`) are dropped first: as in
+    /// every other position, they are never uses.
+    fn check_macro_tokens(&mut self, delimiter: &MacroDelimiter, tokens: &impl Display) {
         let (open, close) = match delimiter {
             MacroDelimiter::Paren(_) => ('(', ')'),
             MacroDelimiter::Brace(_) => ('{', '}'),
             MacroDelimiter::Bracket(_) => ('[', ']'),
         };
-        let text = format!("{open}{tokens}{close}").replace(" ::", "::");
+        let text = format!("{open}{tokens}{close}").replace(" :: ", "::");
+        let text = without_relative_paths(&text);
         if source_mentions_dependency_textual_fallback(&text, self.crate_name) {
             self.found = true;
         }
@@ -161,15 +166,61 @@ impl<'ast> Visit<'ast> for DependencyUses<'_> {
     }
 
     fn visit_macro(&mut self, mac: &'ast syn::Macro) {
-        self.check_tokens(&mac.delimiter, &mac.tokens);
+        self.check_macro_tokens(&mac.delimiter, &mac.tokens);
         syn::visit::visit_macro(self, mac);
     }
 
+    /// Attribute argument lists such as `#[derive(cron::Row)]` are checked as
+    /// paths when they parse as nested meta items; other argument lists
+    /// carry no paths this rule reads.
     fn visit_meta(&mut self, meta: &'ast Meta) {
-        if let Meta::List(list) = meta {
-            self.check_tokens(&list.delimiter, &list.tokens);
-        }
         syn::visit::visit_meta(self, meta);
+        if let Meta::List(list) = meta
+            && let Ok(nested) =
+                list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+        {
+            for item in &nested {
+                self.visit_meta(item);
+            }
+        }
+    }
+}
+
+/// Replaces every path whose first segment is `self`, `crate` or `super`
+/// with a space, leaving the rest of the rendered token text unchanged.
+fn without_relative_paths(text: &str) -> String {
+    let mut kept = String::with_capacity(text.len());
+    let mut index = 0;
+    while index < text.len() {
+        let rest = &text[index..];
+        if at_word_start(text, index)
+            && ["self::", "crate::", "super::"]
+                .iter()
+                .any(|prefix| rest.starts_with(prefix))
+        {
+            index += relative_path_len(rest);
+            kept.push(' ');
+            continue;
+        }
+        let next = rest.chars().next().expect("index is below the text length");
+        kept.push(next);
+        index += next.len_utf8();
+    }
+    kept
+}
+
+/// Byte length of the `ident::ident::...` chain at the start of `path`.
+fn relative_path_len(path: &str) -> usize {
+    let mut length = 0;
+    loop {
+        length += path[length..]
+            .bytes()
+            .take_while(|byte| is_word_byte(*byte))
+            .count();
+        if !path[length..].starts_with("::") {
+            return length;
+        }
+        length += 2;
     }
 }
 
@@ -355,9 +406,31 @@ mod tests {
     }
 
     #[test]
-    fn attribute_token_lists_keep_the_textual_rule() {
+    fn attribute_argument_lists_are_checked_as_paths() {
         let mentions = |source| source_mentions_dependency(source, "db_driver");
         assert!(mentions("#[derive(db_driver::Row)]\nstruct S;"));
+        assert!(mentions(
+            "#[cfg_attr(test, derive(::db_driver::Row))]\nstruct S;"
+        ));
         assert!(!mentions("#[derive(Debug)]\nstruct S;"));
+        assert!(!mentions("#[derive(self::db_driver::Row)]\nstruct S;"));
+        assert!(!mentions(
+            "#[serde(with = \"db_driver::codec\")]\nstruct S;"
+        ));
+    }
+
+    #[test]
+    fn macro_tokens_drop_relative_paths_before_the_textual_rule() {
+        let mentions = |source| source_mentions_dependency(source, "db_driver");
+        assert!(!mentions("fn f() { m!(self::db_driver::X); }"));
+        assert!(!mentions("fn f() { m!(crate::a::db_driver::X); }"));
+        assert!(!mentions("fn f() { m!(super::super::db_driver::X); }"));
+        assert!(!mentions(
+            "macro_rules! m { () => { $crate::db_driver::X }; }"
+        ));
+        assert!(mentions("fn f() { m!(self::a::X, db_driver::Y); }"));
+        assert!(mentions("fn f() { m!(::db_driver::X); }"));
+        assert!(mentions("fn f() { m!(other::db_driver::X); }"));
+        assert!(mentions("fn f() { m!(myself::db_driver::X); }"));
     }
 }

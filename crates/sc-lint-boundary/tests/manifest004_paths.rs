@@ -172,6 +172,7 @@ fn manifest004_owned_crate_positions_still_reported() {
         ("impl header", "struct S;\nimpl cron::Tick for S {}\n"),
         ("qualified path", "fn f() { <S as cron::Tick>::tick(); }\n"),
         ("attribute", "#[cron::job]\nfn f() {}\n"),
+        ("attribute argument", "#[derive(cron::Job)]\nstruct S;\n"),
         (
             "macro argument",
             "fn f() { println!(\"{:?}\", cron::Schedule::new()); }\n",
@@ -218,6 +219,14 @@ fn manifest004_owned_crate_positions_still_reported() {
                 "attribute",
                 format!("#[{prefix}::cron::job]\nfn f() {{}}\n"),
             ),
+            (
+                "attribute argument",
+                format!("#[derive({prefix}::cron::Job)]\nstruct S;\n"),
+            ),
+            (
+                "macro argument",
+                format!("fn f() {{ println!(\"{{:?}}\", {prefix}::cron::Schedule::new()); }}\n"),
+            ),
         ];
         for (name, source) in local {
             assert_not_reported(&format!("{prefix} {name}"), &source);
@@ -227,11 +236,16 @@ fn manifest004_owned_crate_positions_still_reported() {
 
 #[test]
 fn manifest004_macro_body_textual() {
-    // Macro token bodies keep the textual rule, so any `cron::` there counts,
-    // including a local-module path and a string literal.
-    assert_reported(
-        "macro local path",
+    // Macro token bodies keep the textual rule, so a `cron::` there counts,
+    // including a string literal and a bare path with a local mod; only paths
+    // starting with `self`, `crate` or `super` are dropped first (D3).
+    assert_not_reported(
+        "macro self local path",
         "mod cron { pub struct X; }\nfn f() { let _ = vec![self::cron::X]; }\n",
+    );
+    assert_reported(
+        "macro bare local path",
+        "mod cron { pub struct X; }\nfn f() { let _ = vec![cron::X]; }\n",
     );
     assert_reported("macro string", "fn f() { println!(\"cron::Schedule\"); }\n");
     assert_reported(

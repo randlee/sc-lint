@@ -1,6 +1,6 @@
 # ADR-020 — Phase L decisions for the atm-core findings
 
-Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025.
+Status: Accepted — Rand, 2026-10-27 (drafted 2026-10-26 on `plans/phase-l`). Plan-review clarifications for sprints l-1 to l-9: Accepted — Rand, 2026-10-27. The Sprint l-10 clarification: Status: Accepted — Rand, 2026-10-27, together with REQ-CLI-025. Amendment 2026-10-31 to decision 5 (SCB-CYCLE-001 path-less exclusions): Accepted — Rand, 2026-10-31.
 
 Related: ADR-006, ADR-007, ADR-010, ADR-013, ADR-015, ADR-016, ADR-017, REQ-SCB-017,
 REQ-PRODUCT-004AA, REQ-PRODUCT-004C, REQ-PRODUCT-004D, REQ-PRODUCT-023, REQ-CLI-005C,
@@ -46,7 +46,7 @@ make mid-sprint. Approval of this record gates dispatch only.
    path-less exclusion behavior to `SCB-CYCLE-001`, alongside 002/003. Use
    the source-file set of `node_ids` and exclude a finding when any such file
    matches `exclude_paths_by_rule`. No shared Finding schema change and no
-   change to cycle detection. Phase M m-2 implements the extension after
+   change to cycle detection. Phase M m-2 implemented the extension after
    acceptance; REQ-PRODUCT-023 governs reasoned exclusions.
 6. **Tokio sleep rule (#82, REQ-PRODUCT-004C as amended).** The rule is
    `SCB-RUNTIME-003` in `sc-lint-runtime`, reached by the existing
