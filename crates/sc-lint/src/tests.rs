@@ -4132,6 +4132,8 @@ fn test_profile_rejects_invalid_members_and_targets() {
         ProfilePlanDetailCode::UnknownMember,
         ProfilePlanDetailCode::AmbiguousName,
         ProfilePlanDetailCode::UnknownStepField,
+        ProfilePlanDetailCode::InvalidStepEnv,
+        ProfilePlanDetailCode::InvalidStepCwd,
         ProfilePlanDetailCode::TargetRequiresPlatform,
         ProfilePlanDetailCode::TargetOsMismatch,
         ProfilePlanDetailCode::UnsupportedCommandShape,
@@ -4144,6 +4146,8 @@ fn test_profile_rejects_invalid_members_and_targets() {
             "PROFILE.UNKNOWN_MEMBER",
             "PROFILE.AMBIGUOUS_NAME",
             "PROFILE.UNKNOWN_STEP_FIELD",
+            "PROFILE.INVALID_STEP_ENV",
+            "PROFILE.INVALID_STEP_CWD",
             "PROFILE.TARGET_REQUIRES_PLATFORM",
             "PROFILE.TARGET_OS_MISMATCH",
             "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
@@ -4199,6 +4203,49 @@ fn test_profile_rejects_unsupported_test_row_fields() {
         );
         assert_eq!(error.details["field"], field, "{label}");
         assert_eq!(error.details["step"], "unit", "{label}");
+    }
+}
+
+#[test]
+fn lint_step_env_and_cwd_plan() {
+    let rows = "[[tool.sc-lint.lint]]\nname = \"adapted\"\ncommand = [\"cargo\", \"check\"]\nplatform = \"windows\"\ntarget = \"x86_64-pc-windows-msvc\"\nenv = { PYO3_PYTHON = \".bootstrap-venv/bin/python\" }\ncwd = \"crates/x\"\n";
+    let (_fixture, loaded) = load_consumer_toml(&consumer_toml(rows));
+    let loaded = loaded.expect("lint step execution config");
+    let input = loaded.consumer_lint_inputs(None).expect("lint input");
+    let decisions = crate::profile_plan::plan_consumer_lint(
+        &input.steps,
+        None,
+        PlatformScope::All,
+        crate::profile_plan::Platform::Linux,
+    )
+    .expect("plan adapted step");
+    let crate::profile_plan::PlanDecision::Run(planned) = &decisions[0] else {
+        panic!("Windows xwin target should run on Linux");
+    };
+    assert!(planned.uses_cargo_xwin());
+    assert_eq!(
+        planned.env().get("PYO3_PYTHON").map(String::as_str),
+        Some(".bootstrap-venv/bin/python")
+    );
+    assert_eq!(planned.cwd(), Some(Path::new("crates/x")));
+}
+
+#[test]
+fn lint_step_env_cwd_errors() {
+    let cases = [
+        ("env = \"bad\"", "env", "PROFILE.INVALID_STEP_ENV"),
+        ("cwd = \"../outside\"", "cwd", "PROFILE.INVALID_STEP_CWD"),
+    ];
+    for (field_line, field, detail_code) in cases {
+        let rows = format!(
+            "[[tool.sc-lint.lint]]\nname = \"invalid\"\ncommand = [\"true\"]\n{field_line}\n"
+        );
+        let (_fixture, loaded) = load_consumer_toml(&consumer_toml(&rows));
+        let error = loaded.expect_err("malformed step execution field");
+        assert_eq!(error.code(), PROFILE_PLAN_ERROR_CODE);
+        assert_eq!(error.details["detail_code"], detail_code);
+        assert_eq!(error.details["field"], field);
+        assert_eq!(error.details["step"], "invalid");
     }
 }
 

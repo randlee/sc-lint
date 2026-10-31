@@ -221,6 +221,10 @@ Planned implementation note:
 - the A.1a implementation resolves one base log root and lets the built-in
   logger file sink place the active file at:
   - `<log_root>/logs/<service>.log.jsonl`
+- consumer lint and test commands also write each executed step's raw stdout
+  and stderr to `<log_root>/steps/<expanded-plan-index>-<safe-name>.log`.
+  These files are replaced on the next run of that expanded step; the logger's
+  root and JSONL path are unchanged.
 
 ## Sink Model
 

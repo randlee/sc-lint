@@ -359,7 +359,10 @@ Cargo manifest, or analyzer package:
 - `sc-lint lint --consumer --config sc-lint.toml ci` and `sc-lint test
   --config sc-lint.toml` load the configuration beside the consumer project.
 - profile commands are argv arrays, not shell strings. Each command runs in
-  the configuration directory (or a test selector's `cwd` below it). Steps
+  the configuration directory (or a step's `cwd` below it). Lint steps accept
+  `env` and `cwd` with the same rules as test command selectors: environment
+  values are passed verbatim, and `cwd` is relative to the configuration
+  directory. Steps
   run in parallel (cargo `argv[0]` steps serialized in declaration order,
   `after_all` steps last) and fail slow: every step runs, and any failure
   fails the aggregate command with one `profile.steps_failed` error.
@@ -372,6 +375,9 @@ Cargo manifest, or analyzer package:
   `{"index", "name", "reason": "fail-fast"}` per step that never started.
 - a missing configured executable is a failed step whose `message` starts
   with `<name> failed to start` and includes the spawn error.
+- when a log root is configured, every executed step writes both output streams
+  to `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`; failed-step
+  errors include stdout and stderr even when both are non-empty.
 - `sc-lint test --list` runs nothing and returns
   `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
   [{"name", "kind": "command"|"group", "command": [...] | "group": [...],

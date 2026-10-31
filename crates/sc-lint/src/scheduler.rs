@@ -305,7 +305,7 @@ fn run_one(
     failed: &AtomicBool,
 ) -> StepOutcome {
     let result = catch_unwind(AssertUnwindSafe(|| match step.planned {
-        Some(planned) => adapter.run_planned_step(repo_root, planned),
+        Some(planned) => adapter.run_planned_step_with_plan(repo_root, planned, &step.plan),
         None => adapter.run_step(repo_root, &step.plan),
     }));
     let outcome = match result {

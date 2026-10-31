@@ -77,8 +77,12 @@ pub enum ProfilePlanDetailCode {
     /// A profile name is empty, reserved, or equals a step name.
     AmbiguousName,
     /// A lint row has a key other than `name`, `command`, `platform`, `target`,
-    /// or an unusable `platform` value.
+    /// `after_all`, `env`, `cwd`, or an unusable `platform` value.
     UnknownStepField,
+    /// A lint step has malformed child environment data.
+    InvalidStepEnv,
+    /// A lint step has malformed working-directory data.
+    InvalidStepCwd,
     /// A step declares `target` without `platform`.
     TargetRequiresPlatform,
     /// A step's `target` is malformed or names a different OS than `platform`.
@@ -96,6 +100,8 @@ impl ProfilePlanDetailCode {
             Self::UnknownMember => "PROFILE.UNKNOWN_MEMBER",
             Self::AmbiguousName => "PROFILE.AMBIGUOUS_NAME",
             Self::UnknownStepField => "PROFILE.UNKNOWN_STEP_FIELD",
+            Self::InvalidStepEnv => "PROFILE.INVALID_STEP_ENV",
+            Self::InvalidStepCwd => "PROFILE.INVALID_STEP_CWD",
             Self::TargetRequiresPlatform => "PROFILE.TARGET_REQUIRES_PLATFORM",
             Self::TargetOsMismatch => "PROFILE.TARGET_OS_MISMATCH",
             Self::UnsupportedCommandShape => "PROFILE.UNSUPPORTED_COMMAND_SHAPE",
@@ -123,7 +129,7 @@ pub struct ProfilePlanError {
 }
 
 impl ProfilePlanError {
-    fn new(
+    pub(crate) fn new(
         detail_code: ProfilePlanDetailCode,
         step: Option<&str>,
         field: Option<&str>,
@@ -374,6 +380,8 @@ pub struct PlannedStep {
     target: Option<Target>,
     cargo_verb: Option<CargoVerb>,
     after_all: bool,
+    env: BTreeMap<String, String>,
+    cwd: Option<std::path::PathBuf>,
 }
 
 impl PlannedStep {
@@ -417,6 +425,14 @@ impl PlannedStep {
     /// Whether the step starts only after every other step has finished.
     pub const fn after_all(&self) -> bool {
         self.after_all
+    }
+
+    pub(crate) fn env(&self) -> &BTreeMap<String, String> {
+        &self.env
+    }
+
+    pub(crate) fn cwd(&self) -> Option<&Path> {
+        self.cwd.as_deref()
     }
 
     /// Whether this step runs through the `cargo xwin` subcommand.
@@ -537,7 +553,7 @@ pub(crate) fn validate_lint_step(step: &ConsumerProfileStep) -> Result<(), Profi
 ///
 /// # Errors
 /// Returns `UNKNOWN_STEP_FIELD` for any key outside `name`, `command`,
-/// `platform`, `target`, `after_all` (decoded by the loader), or a `platform` that is not `linux|macos|windows`;
+/// `platform`, `target`, `after_all`, `env`, `cwd` (decoded by the loader), or a `platform` that is not `linux|macos|windows`;
 /// returns `TARGET_OS_MISMATCH` for a malformed `target` triple.
 pub(crate) fn decode_lint_step_fields(
     step: &str,
@@ -551,7 +567,7 @@ pub(crate) fn decode_lint_step_fields(
             Some(step),
             Some(key),
             format!("lint step `{step}` has unknown field `{key}`"),
-            "Lint steps accept only `name`, `command`, `platform`, `target` and `after_all`.",
+            "Lint steps accept only `name`, `command`, `platform`, `target`, `after_all`, `env` and `cwd`.",
         ));
     }
     let platform = platform
@@ -865,6 +881,8 @@ fn planned(
         target: step.target().cloned(),
         cargo_verb: CargoVerb::from_argv(step.command()),
         after_all: step.after_all(),
+        env: step.env().clone(),
+        cwd: step.cwd().map(Path::to_path_buf),
     })
 }
 
@@ -915,6 +933,8 @@ pub(crate) struct ConsumerProfileStep {
     platform: Option<Platform>,
     target: Option<Target>,
     after_all: bool,
+    env: BTreeMap<String, String>,
+    cwd: Option<std::path::PathBuf>,
 }
 
 impl ConsumerProfileStep {
@@ -932,6 +952,8 @@ impl ConsumerProfileStep {
             platform,
             target,
             after_all: false,
+            env: BTreeMap::new(),
+            cwd: None,
         }
     }
 
@@ -939,6 +961,24 @@ impl ConsumerProfileStep {
     pub(crate) const fn with_after_all(mut self, after_all: bool) -> Self {
         self.after_all = after_all;
         self
+    }
+
+    pub(crate) fn with_execution(
+        mut self,
+        env: BTreeMap<String, String>,
+        cwd: Option<std::path::PathBuf>,
+    ) -> Self {
+        self.env = env;
+        self.cwd = cwd;
+        self
+    }
+
+    pub(crate) fn env(&self) -> &BTreeMap<String, String> {
+        &self.env
+    }
+
+    pub(crate) fn cwd(&self) -> Option<&Path> {
+        self.cwd.as_deref()
     }
 
     pub(crate) const fn after_all(&self) -> bool {
