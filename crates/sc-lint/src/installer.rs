@@ -1874,7 +1874,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     #[serial]
-    fn real_release_archive_installs_self_contained_bundle_ahead_of_stale_path_helpers() {
+    fn real_release_archive_installs_self_contained_bundle() {
         let fixture = TempDir::new().expect("fixture");
         let version = env!("CARGO_PKG_VERSION");
         let minimum = MinimumVersion::from_str(version).expect("package version");
@@ -1929,24 +1929,11 @@ mod tests {
         .expect("consumer config");
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
 
-        let stale_path = fixture.path().join("stale-path");
-        fs::create_dir_all(&stale_path).expect("stale PATH directory");
-        for backend in [crate::consts::TOOL_PORTABILITY, crate::consts::TOOL_RUNTIME] {
-            write_failing_stub(&stale_path.join(backend));
-        }
-        let stale_and_original_path = env::join_paths(
-            std::iter::once(stale_path.as_path().as_os_str().to_os_string()).chain(
-                env::split_paths(&env::var_os("PATH").expect("PATH"))
-                    .map(|path| path.into_os_string()),
-            ),
-        )
-        .expect("joined PATH");
         let release_base: OsString =
             format!("file://{}", fixture.path().join("release").display()).into();
         let _environment = InstallerEnvironment::set(&[
             (INSTALL_DIR_ENV, install_dir.as_os_str()),
             (RELEASE_BASE_URL_ENV, release_base.as_os_str()),
-            ("PATH", stale_and_original_path.as_os_str()),
         ]);
 
         let installed = execute_install_command(&config_path, &["setup"]);

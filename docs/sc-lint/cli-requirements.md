@@ -443,13 +443,15 @@ specialized backend tools and mixed Rust/Python implementations.
   Consumer profile failures show both child stdout and stderr, including when
   both streams are non-empty. When a log root is configured, every executed
   step writes both raw streams to
-  `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`, including passing
-  steps. The expanded-plan index is zero-based, safe names replace every byte
-  outside ASCII letters, digits, `_` and `-` with `_`, and each run overwrites
-  the prior file for that step. With no configured log root, no per-step log
-  files or `steps/` directory are created; failed-step stdout and stderr remain
-  visible in the command error. This does not change the logger root or step
-  scheduling semantics.
+  `<log-root>/steps/<sanitized-step-name>.log`, including passing steps. The
+  sanitizer preserves ASCII letters, digits, `_` and `-` and replaces every
+  other byte with `_`; an empty sanitized name becomes `step`. When sanitized
+  names collide, suffixes `-2`, `-3` and so on are assigned in declaration
+  order, with unique filenames. Each run overwrites the prior file for that
+  step. With no configured log root, no per-step log files or `steps/`
+  directory are created; failed-step stdout and stderr remain visible in the
+  command error. This does not change the logger root or step scheduling
+  semantics.
 
 ## Contract References
 

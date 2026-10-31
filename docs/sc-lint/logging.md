@@ -222,9 +222,11 @@ Planned implementation note:
   logger file sink place the active file at:
   - `<log_root>/logs/<service>.log.jsonl`
 - consumer lint and test commands also write each executed step's raw stdout
-  and stderr to `<log_root>/steps/<expanded-plan-index>-<safe-name>.log`.
-  These files are replaced on the next run of that expanded step; the logger's
-  root and JSONL path are unchanged.
+  and stderr to `<log_root>/steps/<sanitized-step-name>.log`. Names preserve
+  ASCII letters, digits, `_` and `-`, replacing other bytes with `_`; empty
+  names become `step`. Sanitized-name collisions receive `-2`, `-3` and later
+  suffixes in declaration order. These files are replaced on the next run of
+  that step; the logger's root and JSONL path are unchanged.
 
 ## Sink Model
 

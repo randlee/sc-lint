@@ -69,7 +69,7 @@ pub(crate) struct StepPlan {
     env: Vec<(OsString, OsString)>,
     cwd: Option<PathBuf>,
     after_all: bool,
-    output_log: Option<(PathBuf, usize)>,
+    output_log: Option<(PathBuf, String)>,
 }
 
 impl StepPlan {
@@ -112,9 +112,9 @@ impl StepPlan {
     pub(crate) fn with_output_log(
         mut self,
         root: Option<&Path>,
-        expanded_plan_index: usize,
+        file_name: impl Into<String>,
     ) -> Self {
-        self.output_log = root.map(|root| (root.to_path_buf(), expanded_plan_index));
+        self.output_log = root.map(|root| (root.to_path_buf(), file_name.into()));
         self
     }
 
@@ -331,27 +331,11 @@ impl SystemAdapter for HostSystemAdapter {
                 diagnostic
             })?;
 
-        if let Some((root, index)) = &step.output_log {
-            crate::step_logs::write_step_output(
-                root,
-                *index,
-                step.name(),
-                &output.stdout,
-                &output.stderr,
-            )
-            .map_err(|error| {
-                CliError::internal(format!("failed to write output for step `{}`", step.name()))
-                    .with_source(error)
-                    .with_detail(
-                        "destination",
-                        json!(
-                            crate::step_logs::step_log_path(root, *index, step.name())
-                                .display()
-                                .to_string()
-                        ),
-                    )
-            })?;
-        }
+        let log_write_error = step.output_log.as_ref().and_then(|(root, file_name)| {
+            crate::step_logs::write_step_output(root, file_name, &output.stdout, &output.stderr)
+                .err()
+                .map(|error| (crate::step_logs::step_log_path(root, file_name), error))
+        });
 
         if !output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -364,8 +348,25 @@ impl SystemAdapter for HostSystemAdapter {
                 .with_detail(consts::FIELD_EXIT_CODE, json!(output.status.code()))
                 .with_detail("stdout", json!(stdout))
                 .with_detail("stderr", json!(stderr));
+            if let Some((destination, log_error)) = log_write_error {
+                error = error
+                    .with_detail(
+                        "step_log_destination",
+                        json!(destination.display().to_string()),
+                    )
+                    .with_detail("step_log_error", json!(log_error.to_string()));
+            }
             error = error.with_cause(cause);
             return Err(error);
+        }
+
+        if let Some((destination, log_error)) = log_write_error {
+            return Err(CliError::internal(format!(
+                "failed to write output for step `{}`",
+                step.name()
+            ))
+            .with_source(log_error)
+            .with_detail("destination", json!(destination.display().to_string())));
         }
 
         Ok(StepReport::success(step))
@@ -487,6 +488,13 @@ pub(crate) fn run_consumer_lint_with(
         adapter.host_platform(),
     )?;
     preflight_xwin(input.root, adapter, &decisions)?;
+    let log_names = crate::step_logs::step_log_file_names(decisions.iter().filter_map(
+        |decision| match decision {
+            PlanDecision::Run(step) => Some(step.name()),
+            PlanDecision::Skip(_) => None,
+        },
+    ));
+    let mut log_names = log_names.into_iter();
     let scheduled = decisions
         .iter()
         .enumerate()
@@ -496,7 +504,7 @@ pub(crate) fn run_consumer_lint_with(
                     position,
                     StepPlan::from_planned(step).with_output_log(
                         loaded_config.logging_root().map(PathBuf::as_path),
-                        position,
+                        log_names.next().expect("each run step has a log name"),
                     ),
                 )
                 .with_planned(step),
@@ -562,6 +570,13 @@ pub(crate) fn run_consumer_test_with(
     let expanded = selectors.expand(request.selector())?;
     selectors.check_forwarded_args(request)?;
     let host = adapter.host_platform();
+    let log_names = crate::step_logs::step_log_file_names(
+        expanded
+            .iter()
+            .filter(|selector| selector.runs_on(host))
+            .map(|selector| selector.name()),
+    );
+    let mut log_names = log_names.into_iter();
     let scheduled = expanded
         .iter()
         .enumerate()
@@ -569,9 +584,10 @@ pub(crate) fn run_consumer_test_with(
         .map(|(position, selector)| {
             ScheduledStep::new(
                 position,
-                selector
-                    .step_plan(request.args())
-                    .with_output_log(loaded_config.logging_root().map(PathBuf::as_path), position),
+                selector.step_plan(request.args()).with_output_log(
+                    loaded_config.logging_root().map(PathBuf::as_path),
+                    log_names.next().expect("each run selector has a log name"),
+                ),
             )
         })
         .collect::<Vec<_>>();

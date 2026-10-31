@@ -1,4 +1,4 @@
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
@@ -143,6 +143,7 @@ pub fn run_sc_portability(
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
     run_delegated_backend(
+        context,
         loaded_config,
         consts::TOOL_PORTABILITY,
         context.rule_filter(),
@@ -157,7 +158,12 @@ pub fn run_sc_runtime(
     context: &CommandContext,
     loaded_config: &LoadedConfig,
 ) -> Result<CommandSuccess, CliError> {
-    run_delegated_backend(loaded_config, consts::TOOL_RUNTIME, context.rule_filter())
+    run_delegated_backend(
+        context,
+        loaded_config,
+        consts::TOOL_RUNTIME,
+        context.rule_filter(),
+    )
 }
 
 #[expect(
@@ -186,12 +192,13 @@ pub fn normalize_backend_json(tool: &str, raw: &str) -> Result<Value, CliError> 
     reason = "Delegated backend failures must remain in the shared top-level CliError contract."
 )]
 fn run_delegated_backend(
+    context: &CommandContext,
     loaded_config: &LoadedConfig,
     tool: &'static str,
     rule_filter: Option<&str>,
 ) -> Result<CommandSuccess, CliError> {
     let repo_root = loaded_config.require_repo_root()?;
-    let backend_binary = backend_binary_for_dispatch(tool)?;
+    let backend_binary = backend_binary_for_dispatch(tool, context.backend_search_path())?;
     let output = ProcessCommand::new(&backend_binary)
         .args(backend_args(
             repo_root,
@@ -271,11 +278,14 @@ fn run_delegated_backend(
     clippy::result_large_err,
     reason = "Backend resolution failures remain in the shared top-level CliError contract."
 )]
-fn backend_binary_for_dispatch(tool: &str) -> Result<PathBuf, CliError> {
+fn backend_binary_for_dispatch(
+    tool: &str,
+    search_path: Option<&OsStr>,
+) -> Result<PathBuf, CliError> {
     if let Some(binary) = find_sibling_backend_binary(tool) {
         return Ok(binary);
     }
-    match find_backend_on_path(tool) {
+    match find_backend_on_path(tool, search_path) {
         Some(binary) => {
             validate_path_backend(tool, &binary)?;
             Ok(binary)
@@ -351,8 +361,8 @@ fn find_sibling_backend_binary(tool: &str) -> Option<PathBuf> {
         .and_then(|current_exe| find_backend_binary_from_exe(&current_exe, tool))
 }
 
-fn find_backend_on_path(tool: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
+fn find_backend_on_path(tool: &str, search_path: Option<&OsStr>) -> Option<PathBuf> {
+    let path = search_path?;
     std::env::split_paths(&path).find_map(|directory| {
         let candidate = if cfg!(windows) {
             let executable = directory.join(format!("{tool}.exe"));

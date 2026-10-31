@@ -376,8 +376,10 @@ Cargo manifest, or analyzer package:
 - a missing configured executable is a failed step whose `message` starts
   with `<name> failed to start` and includes the spawn error.
 - when a log root is configured, every executed step writes both output streams
-  to `<log-root>/steps/<expanded-plan-index>-<safe-name>.log`; failed-step
-  errors include stdout and stderr even when both are non-empty.
+  to `<log-root>/steps/<sanitized-step-name>.log`; unsafe bytes become `_`,
+  and sanitized-name collisions receive `-2`, `-3` and later suffixes in
+  declaration order. Failed-step errors include stdout and stderr even when
+  both are non-empty.
 - `sc-lint test --list` runs nothing and returns
   `{"status": "pass", "profile": "test", "default": <name|null>, "selectors":
   [{"name", "kind": "command"|"group", "command": [...] | "group": [...],
