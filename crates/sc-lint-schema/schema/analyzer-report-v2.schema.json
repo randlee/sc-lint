@@ -78,10 +78,9 @@
         "required": [
           "rule_id",
           "reason",
+          "item",
           "source_path",
-          "line",
-          "owner_ids",
-          "node_ids"
+          "line"
         ],
         "properties": {
           "rule_id": {
@@ -92,6 +91,10 @@
             "type": "string",
             "minLength": 1
           },
+          "item": {
+            "type": "string",
+            "minLength": 1
+          },
           "source_path": {
             "type": "string",
             "minLength": 1
@@ -99,18 +102,6 @@
           "line": {
             "type": "integer",
             "minimum": 1
-          },
-          "owner_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "node_ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           }
         },
         "additionalProperties": false

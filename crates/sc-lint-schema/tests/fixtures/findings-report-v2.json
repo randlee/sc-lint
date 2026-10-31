@@ -9,10 +9,9 @@
     {
       "rule_id": "PORT-010",
       "reason": "This helper intentionally exposes the POSIX uid API.",
+      "item": "current_uid",
       "source_path": "crates/example/src/lib.rs",
-      "line": 12,
-      "owner_ids": ["crate::example::example"],
-      "node_ids": ["crate::example::example::portability"]
+      "line": 12
     }
   ]
 }

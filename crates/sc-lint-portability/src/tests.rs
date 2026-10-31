@@ -2717,11 +2717,12 @@ fn port010_site_allow() {
             .any(|finding| finding.message.contains("inner"))
     );
     assert_eq!(report.allowed.len(), 1, "{:#?}", report.allowed);
-    assert_eq!(report.allowed[0].rule_id, RuleId::Port010);
+    assert_eq!(*report.allowed[0].rule_id(), RuleId::Port010);
     assert_eq!(
-        report.allowed[0].reason,
+        report.allowed[0].reason(),
         "This public helper intentionally exposes the POSIX uid API."
     );
+    assert_eq!(report.allowed[0].item(), "User::current_uid");
     assert_eq!(report.schema_version, "0.2.0");
     let json = serde_json::to_value(&report).expect("report serializes");
     assert_eq!(
@@ -2785,10 +2786,11 @@ fn site_allow_unknown_rule_has_source_location() {
     .expect_err("unknown portability rule is rejected");
     let message = error.to_string();
     assert!(message.contains("lib.rs:1"), "{message}");
-    assert!(
-        message.contains("unknown portability rule id `PORT-999`"),
-        "{message}"
-    );
+    assert!(matches!(
+        error,
+        PortabilityError::UnknownRule { line: 1, .. }
+    ));
+    assert!(message.contains("PORTABILITY.UNKNOWN_RULE"), "{message}");
 }
 
 #[test]

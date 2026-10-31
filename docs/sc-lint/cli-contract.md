@@ -553,6 +553,36 @@ validates each report against the published
 before normalization. A shape mismatch fails as `backend_protocol` with code
 `backend_payload_drift` and the failing instance path in `key_path`.
 
+### Portability site allowances
+
+Portability site allowances use `#[sc_lint(allow(PORT-010), reason = "...")]`.
+They apply only to a matching finding on the annotated item. A suppressed
+finding is reported in schema `0.2.0` as an `allowed` entry containing
+`rule_id`, `reason`, the crate-relative qualified `item`, `source_path`, and
+one-based `line`.
+
+Malformed directives return `PORTABILITY.INVALID_SITE_ALLOW` with the source
+path, line, stable directive code, cause, and recovery. Directive codes and
+recoveries are:
+
+| Code | Cause | Recovery |
+| --- | --- | --- |
+| `EMPTY_RULES` | No rule ids were supplied. | Provide at least one unquoted rule id. |
+| `MISSING_REASON` | `allow(...)` has no reason. | Add `reason = "..."`. |
+| `EMPTY_REASON` | The reason is empty or whitespace. | Provide a non-empty reason. |
+| `QUOTED_RULE_ID` | A rule id was written as a string literal. | Write an identifier such as `PORT-010`. |
+| `DUPLICATE_RULE_ID` | A rule id appears more than once. | List each id once. |
+| `REASON_WITHOUT_ALLOW` | A reason was supplied without `allow(...)`. | Add an allowance or remove the reason. |
+| `MULTIPLE_ALLOW` | More than one `allow(...)` element was supplied. | Combine ids into one element. |
+| `DUPLICATE_REASON` | More than one reason was supplied. | Provide one reason. |
+| `UNKNOWN_ELEMENT` | An unsupported element was supplied. | Remove unsupported elements. |
+| `MALFORMED_RULE_ID` | A rule id does not have an analyzer prefix and numeric suffix. | Use a form such as `PORT-010`. |
+| `NON_LITERAL_REASON` | The reason is not a string literal. | Use a string literal. |
+
+`PORTABILITY.UNKNOWN_RULE` identifies a syntactically valid but unknown
+portability rule id and provides the source path and line. Use a rule id
+declared by the portability analyzer.
+
 ### Python adapter backend
 
 For Python-backed utility paths in A.3:

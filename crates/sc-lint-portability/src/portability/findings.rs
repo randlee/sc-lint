@@ -18,6 +18,7 @@ pub(crate) struct PortabilityFinding {
     pub(crate) message: String,
     pub(crate) source_path: PathBuf,
     pub(crate) line: usize,
+    pub(crate) item: Option<String>,
     pub(crate) package: sc_lint_analyzer_support::PackageName,
     pub(crate) target: sc_lint_analyzer_support::TargetName,
     pub(crate) node_label: String,

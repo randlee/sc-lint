@@ -223,8 +223,16 @@ pub(crate) fn analyze_portability(
     }
     let (findings, mut allowed) = crate::site_allow::apply_site_allowances(findings, allowances);
     for entry in &mut allowed {
-        entry.source_path =
-            repo_relative_source_path(root, Path::new(&entry.source_path))?.to_string();
+        let source_path =
+            repo_relative_source_path(root, Path::new(entry.source_path()))?.to_string();
+        *entry = AllowedFinding::new(
+            *entry.rule_id(),
+            entry.reason(),
+            entry.item(),
+            source_path,
+            entry.line(),
+        )
+        .expect("relative source path preserves AllowedFinding invariants");
     }
     Ok((convert_findings(root, findings)?, allowed))
 }
@@ -313,15 +321,20 @@ fn visit_block_for_unix_portability(
 ) {
     for stmt in &block.stmts {
         match stmt {
-            Stmt::Item(item) => parity::visit_item_for_unix_portability(
-                item,
-                inherited_scope,
-                inherited_unix_gated,
-                inherited_platform_gated,
-                file_context,
-                findings,
-                parity::ParityContext::without_adapters(config),
-            ),
+            Stmt::Item(item) => {
+                let mut module_path =
+                    crate::site_allow::source_file_module_path(&file_context.source_path);
+                parity::visit_item_for_unix_portability(
+                    item,
+                    inherited_scope,
+                    inherited_unix_gated,
+                    inherited_platform_gated,
+                    file_context,
+                    findings,
+                    parity::ParityContext::without_adapters(config),
+                    &mut module_path,
+                )
+            }
             Stmt::Local(local) => {
                 if let Some(init) = &local.init {
                     visit_expr_for_unix_portability(
@@ -491,6 +504,7 @@ impl<'a> PortabilityCollector<'a> {
                 ),
                 source_path: self.file_context.source_path.clone(),
                 line,
+                item: None,
                 package: self.file_context.package.clone(),
                 target: self.file_context.target.clone(),
                 node_label: format!(
@@ -569,6 +583,7 @@ impl<'a> PortabilityCollector<'a> {
                         ),
                         source_path: self.file_context.source_path.clone(),
                         line: span_start_line(lit.span()),
+                        item: None,
                         package: self.file_context.package.clone(),
                         target: self.file_context.target.clone(),
                         node_label: format!(
@@ -607,6 +622,7 @@ impl<'a> PortabilityCollector<'a> {
             ),
             source_path: self.file_context.source_path.clone(),
             line: span_start_line(expr_call.span()),
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -627,6 +643,7 @@ impl<'a> PortabilityCollector<'a> {
             message: "PORT-003 std::env::set_var() in test code mutates global process state; prefer cmd.env(\"KEY\", \"value\") or temp_env::with_var for scoped isolation".to_string(),
             source_path: self.file_context.source_path.clone(),
             line: span_start_line(expr_call.span()),
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -682,6 +699,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             message,
             source_path: self.file_context.source_path.clone(),
             line,
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -700,6 +718,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             ),
             source_path: self.file_context.source_path.clone(),
             line,
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(
@@ -718,6 +737,7 @@ impl<'a, 'b> ProductionPathLiteralVisitor<'a, 'b> {
             ),
             source_path: self.file_context.source_path.clone(),
             line,
+            item: None,
             package: self.file_context.package.clone(),
             target: self.file_context.target.clone(),
             node_label: format!(

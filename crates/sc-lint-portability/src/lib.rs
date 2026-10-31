@@ -10,6 +10,7 @@ use sc_lint_analyzer_support::WorkspaceMetadata;
 use sc_lint_analyzer_support::analyzer_settings_from;
 use sc_lint_analyzer_support::load_workspace_metadata;
 use sc_lint_analyzer_support::read_config_document;
+use sc_lint_directives::{DirectiveError, SiteRuleId};
 use sc_lint_schema::CrateId;
 use sc_lint_schema::NodeId;
 use sc_lint_schema::OutputFormat;
@@ -117,11 +118,17 @@ impl From<anyhow_crate::Error> for PortabilityErrorSource {
 
 #[derive(Debug, Error)]
 pub enum PortabilityError {
-    #[error("invalid site allowance at {}:{line}: {message}", path.display())]
+    #[error("invalid site allowance at {}:{line}: {error}", path.display())]
     InvalidSiteAllow {
         path: PathBuf,
         line: usize,
-        message: String,
+        error: DirectiveError,
+    },
+    #[error("PORTABILITY.UNKNOWN_RULE at {}:{line}: unknown rule `{rule}`", path.display())]
+    UnknownRule {
+        path: PathBuf,
+        line: usize,
+        rule: SiteRuleId,
     },
     #[error("failed to analyze portability findings for root `{}`: {source:#}", root.display())]
     AnalyzeFindings {
@@ -203,10 +210,25 @@ fn analyze_workspace_configured_with_metadata_loader(
         )
         .map_err(
             |source| match source.downcast::<site_allow::SiteAllowError>() {
+                Ok(error) if error.error.code() == "UNKNOWN_RULE" => {
+                    let rule = error.error.cause().split('`').nth(1).unwrap_or_default();
+                    match SiteRuleId::parse(rule.to_owned()) {
+                        Ok(rule) => PortabilityError::UnknownRule {
+                            path: error.path,
+                            line: error.line,
+                            rule,
+                        },
+                        Err(directive_error) => PortabilityError::InvalidSiteAllow {
+                            path: error.path,
+                            line: error.line,
+                            error: directive_error,
+                        },
+                    }
+                }
                 Ok(error) => PortabilityError::InvalidSiteAllow {
                     path: error.path,
                     line: error.line,
-                    message: error.message,
+                    error: error.error,
                 },
                 Err(source) => PortabilityError::AnalyzeFindings {
                     root: options.root.clone(),

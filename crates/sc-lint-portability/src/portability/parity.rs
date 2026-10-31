@@ -18,6 +18,7 @@ use crate::predicates::impl_method_has_windows_companion;
 use crate::predicates::impl_method_is_cfg_unix_production_item;
 use crate::predicates::is_cfg_unix_production_item;
 use crate::predicates::item_is_private;
+use crate::site_allow::{item_type_name, qualified_item, source_file_module_path};
 use sc_lint_analyzer_support::FileContext;
 use sc_lint_analyzer_support::ScopeKind;
 use sc_lint_analyzer_support::classify_scope;
@@ -61,6 +62,7 @@ pub(super) fn collect_unix_portability_findings(
         ScopeKind::NonTest
     };
     let context = ParityContext::configured(config, platform_adapters);
+    let mut module_path = source_file_module_path(&file_context.source_path);
     visit_items_for_unix_portability(
         &file.items,
         initial_scope,
@@ -69,6 +71,7 @@ pub(super) fn collect_unix_portability_findings(
         file_context,
         &mut findings,
         context,
+        &mut module_path,
     );
     findings
 }
@@ -81,6 +84,7 @@ fn visit_items_for_unix_portability(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
     context: ParityContext<'_>,
+    module_path: &mut Vec<String>,
 ) {
     collect_parity_findings(
         items,
@@ -89,6 +93,7 @@ fn visit_items_for_unix_portability(
         file_context,
         findings,
         context,
+        module_path,
     );
     for item in items {
         visit_item_for_unix_portability(
@@ -99,6 +104,7 @@ fn visit_items_for_unix_portability(
             file_context,
             findings,
             context,
+            module_path,
         );
     }
 }
@@ -111,6 +117,7 @@ pub(super) fn visit_item_for_unix_portability(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
     context: ParityContext<'_>,
+    module_path: &mut Vec<String>,
 ) {
     let attrs = item_attrs(item);
     let scope = classify_scope(attrs, inherited_scope, item_name_hint_is_tests(item));
@@ -122,7 +129,14 @@ pub(super) fn visit_item_for_unix_portability(
         && let Item::Impl(item_impl) = item
         && !attrs.iter().any(attr_is_cfg_windows)
     {
-        collect_impl_method_parity_findings(item_impl, scope, file_context, findings, context);
+        collect_impl_method_parity_findings(
+            item_impl,
+            scope,
+            file_context,
+            findings,
+            context,
+            module_path,
+        );
     }
 
     if scope == ScopeKind::NonTest && !platform_gated {
@@ -143,6 +157,7 @@ pub(super) fn visit_item_for_unix_portability(
                     message: "PORT-005 #[cfg_attr(not(unix), allow(dead_code))] is not an approved portability suppressor in production code; gate the item with #[cfg(unix)] or provide a real cross-platform implementation".to_string(),
                     source_path: file_context.source_path.clone(),
                     line: span_start_line(attr.span()),
+                    item: None,
                     package: file_context.package.clone(),
                     target: file_context.target.clone(),
                     node_label: format!("crate::{}::{}::portability", file_context.package, file_context.target),
@@ -159,6 +174,7 @@ pub(super) fn visit_item_for_unix_portability(
                 message: "PORT-004 ungated std::os::unix import in production code; wrap the item with #[cfg(unix)] or move the import behind a Unix-only boundary".to_string(),
                 source_path: file_context.source_path.clone(),
                 line: span_start_line(item_use.span()),
+                item: None,
                 package: file_context.package.clone(),
                 target: file_context.target.clone(),
                 node_label: format!("crate::{}::{}::portability", file_context.package, file_context.target),
@@ -169,6 +185,7 @@ pub(super) fn visit_item_for_unix_portability(
     if let Item::Mod(item_mod) = item
         && let Some((_, items)) = &item_mod.content
     {
+        module_path.push(item_mod.ident.to_string());
         visit_items_for_unix_portability(
             items,
             scope,
@@ -177,7 +194,9 @@ pub(super) fn visit_item_for_unix_portability(
             file_context,
             findings,
             context,
+            module_path,
         );
+        module_path.pop();
     }
 }
 
@@ -186,6 +205,7 @@ fn push_cfg_parity_finding(
     file_context: &FileContext,
     line: usize,
     detail: &str,
+    item_path: String,
 ) {
     findings.push(PortabilityFinding {
         rule_id: RuleId::Port010,
@@ -195,6 +215,7 @@ fn push_cfg_parity_finding(
         ),
         source_path: file_context.source_path.clone(),
         line,
+        item: Some(item_path),
         package: file_context.package.clone(),
         target: file_context.target.clone(),
         node_label: format!("crate::{}::{}::portability", file_context.package, file_context.target),
@@ -208,6 +229,7 @@ fn collect_parity_findings(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
     context: ParityContext<'_>,
+    module_path: &[String],
 ) {
     if inherited_scope != ScopeKind::NonTest || inherited_unix_gated {
         return;
@@ -232,7 +254,11 @@ fn collect_parity_findings(
         let detail = item_identifier(item)
             .map(ToString::to_string)
             .unwrap_or_else(|| "cfg(unix) item".to_string());
-        push_cfg_parity_finding(findings, file_context, line, &detail);
+        let item_path = item_identifier(item)
+            .map(ToString::to_string)
+            .map(|name| qualified_item(module_path, name))
+            .unwrap_or_else(|| qualified_item(module_path, detail.clone()));
+        push_cfg_parity_finding(findings, file_context, line, &detail, item_path);
     }
 }
 
@@ -242,6 +268,7 @@ pub(super) fn collect_impl_method_parity_findings(
     file_context: &FileContext,
     findings: &mut Vec<PortabilityFinding>,
     context: ParityContext<'_>,
+    module_path: &[String],
 ) {
     if inherited_scope != ScopeKind::NonTest {
         return;
@@ -267,6 +294,14 @@ pub(super) fn collect_impl_method_parity_findings(
             file_context,
             span_start_line(unix_method.span()),
             &unix_method.sig.ident.to_string(),
+            qualified_item(
+                module_path,
+                format!(
+                    "{}::{}",
+                    item_type_name(&item_impl.self_ty),
+                    unix_method.sig.ident
+                ),
+            ),
         );
     }
 }
