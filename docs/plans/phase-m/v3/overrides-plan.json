@@ -127,29 +127,29 @@
     "questions": {
       "addressed": {
         "criteria": {
-          "no": "The item does not state that outcome: it is silent about PORT-010 site allowances, only investigates or mentions them, changes the attribute without saying PORT-010 skips the annotated item, uses another suppression mechanism, or says annotated items are still reported.",
-          "unclear": "The item names an outcome for an allow(PORT-010) annotated item, but its wording leaves open whether PORT-010 still reports that item.",
+          "no": "The item does not state that outcome as its own commitment.",
+          "unclear": "The item names an outcome for an annotated item, but its wording leaves open whether PORT-010 still reports it.",
           "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
         },
-        "instructions": "Does `item.text` commit to this outcome, either as new work or by keeping it working: an item that carries `#[sc_lint(allow(PORT-010), reason = \"...\")]` is not reported by PORT-010? Accept words such as honour, skip, suppress, exempt, records no finding, or not reported for the annotated item, function or declaration. Investigating, discussing or documenting site allowances without committing to that outcome does not count, and neither does a change to the attribute that never says PORT-010 leaves the annotated item unreported. Judge presence of the outcome only; do not judge conflict.",
+        "instructions": "Does `item.text` itself commit that PORT-010 does not report an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, as new work or by keeping it working? Accept honour, skip, suppress, exempt, records no finding or not reported for the annotated item. It does not commit when it only investigates or documents allowances, only refers to an allowance another item delivers, changes the attribute without stating the outcome, or says annotated items are still reported or the attribute is ignored. Judge presence of the outcome only; do not judge conflict. If the item makes PORT-010 ignore or drop the attribute, or uses an exclusion or other mechanism instead of it, the annotated item is still reported by PORT-010, so the outcome is not committed.",
         "type": "choice"
       },
       "contradicted": {
         "criteria": {
-          "no": "Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances.",
+          "no": "Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances, including items that defer or leave the allowance behaviour to be decided.",
           "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
           "yes": "The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided."
         },
-        "instructions": "Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Judge conflict only.",
+        "instructions": "Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Leaving the allowance behaviour to be decided later, reworking it without stating an outcome, or deferring it is not a conflict. Judge conflict only.",
         "type": "choice"
       },
       "relevant": {
         "criteria": {
-          "no": "The item does not touch PORT-010 site allowances: it changes which shapes PORT-010 reports without mentioning allow attributes, concerns allowances for other rules only, or is other work such as lint-step env or cwd, SCB-MANIFEST rules or release work.",
+          "no": "The item does not touch PORT-010 site allowances: it changes which shapes PORT-010 reports without mentioning allow attributes, concerns allowances for other rules only, mentions the PORT-010 allowance only as another item's work or in docs wording, or is other work such as lint-step env or cwd, SCB-MANIFEST rules or release work.",
           "unclear": "The item text is too vague to tell whether it touches PORT-010 site allowances.",
-          "yes": "The item adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism."
+          "yes": "The item adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism. An item that states whether PORT-010 reports an item carrying allow(PORT-010) is yes."
         },
-        "instructions": "Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute? PORT-010 work that never mentions site allowances, such as recognising companion shapes or keeping real parity gaps reported, is a different subject, and so are site allowances for rules other than PORT-010. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+        "instructions": "Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute? PORT-010 work that never mentions site allowances, such as recognising companion shapes or keeping real parity gaps reported, is a different subject, and so are site allowances for rules other than PORT-010. An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
         "type": "choice"
       }
     }
@@ -336,6 +336,68 @@
           "yes": "The item's PORT-010 work includes, names, or defers by name the `#[cfg(unix)] mod ...;` declaration or shape S6, or undertakes to fix every #786 PORT-010 false positive."
         },
         "instructions": "`anchor.statement` governs whether sc-lint's PORT-010 rule reports the declaration line of a `#[cfg(unix)] mod x;` module (shape S6 in atm-core issue #786). First identify which PORT-010 shapes or cases `item.text` says its rule change covers. The subject is touched when that coverage includes the cfg(unix) module declaration or S6, when the item names that declaration or S6 to keep, suppress, refactor, or defer it, or when the item undertakes to fix every #786 PORT-010 false positive. The subject is not touched when the rule change is limited to other named shapes or cases, even if the item also re-extracts every #786 file as a fixture, labels findings by shape, or lists other shapes as not closed; nor by work on other rules or configuration. Judge subject overlap only, not whether the item obeys the anchor.",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-012": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "No such commitment is written, or the item adds a setup, hook or interpreter key.",
+          "unclear": "A sentence touches this but cannot be read as the commitment or not.",
+          "yes": "Such a commitment is written in the item."
+        },
+        "instructions": "Is there a sentence in `item.text` committing that sc-lint.toml gains no setup-hook key and no interpreter-selection key (for example setup or runner stay unknown keys)? Plans that add such a key contain no such commitment. Judge only whether the commitment is written.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "The item plans no such key.",
+          "unclear": "The item plans a key whose role cannot be told.",
+          "yes": "The item plans a setup-hook or interpreter-selection key."
+        },
+        "instructions": "Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work. Does `item.text` plan such a conflicting key? Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "No: the item changes no such configuration; it is about analyzer rules, output, logging or other work.",
+          "unclear": "The item text is too vague to tell.",
+          "yes": "Yes: the item adds, changes or rules on step-execution, setup, hook or interpreter configuration keys in sc-lint.toml."
+        },
+        "instructions": "`anchor.statement` forbids adding a setup-hook or interpreter-selection key to sc-lint.toml. Work that adds or changes how consumers configure step execution there (env, cwd, setup, hooks, runner or interpreter keys) is on this subject, whether or not it follows the statement. Is `item.text` on this subject?",
+        "type": "choice"
+      }
+    }
+  },
+  "ANC-009": {
+    "questions": {
+      "addressed": {
+        "criteria": {
+          "no": "The item does not say so, or it suppresses such items broadly.",
+          "unclear": "The item mentions this in wording that cannot be read either way.",
+          "yes": "The item explicitly says real gaps (unpaired, unannotated or negative-case items) are still reported."
+        },
+        "instructions": "`anchor.statement` requires that a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback still be reported. Does `item.text` explicitly keep that, for example by saying unpaired or unannotated items or negative cases stay reported? A plan that suppresses many items at once does not keep it. Judge presence only.",
+        "type": "choice"
+      },
+      "contradicted": {
+        "criteria": {
+          "no": "The item plans no blanket suppression.",
+          "unclear": "The item plans a suppression whose reach cannot be told.",
+          "yes": "The item plans such a blanket suppression."
+        },
+        "instructions": "Does `item.text` plan a blanket suppression of PORT-010 findings: skipping #[cfg(unix)] items by file, module, path, crate, name pattern or a switch, regardless of whether each has a companion, a portable fallback or its own per-site allowance? Not blanket suppression: recognising a specific companion shape (for example a same-name #[cfg(not(unix))] sibling), honouring a reasoned allowance on one annotated item, silence, or unrelated work. Judge conflict only.",
+        "type": "choice"
+      },
+      "relevant": {
+        "criteria": {
+          "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+          "unclear": "The item text is too vague to tell what part of the system it touches.",
+          "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+        },
+        "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
         "type": "choice"
       }
     }

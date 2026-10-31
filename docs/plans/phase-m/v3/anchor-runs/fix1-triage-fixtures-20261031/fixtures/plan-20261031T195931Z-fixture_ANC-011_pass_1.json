@@ -1,0 +1,129 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261031T195931Z-fixture_ANC-011_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-31T19:59:31+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-011:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 234,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-011",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "A [[tool.sc-lint.lint]] step in sc-lint.toml must accept an env table and a cwd key, applied to that step's child process, with the same meaning they have on a test command selector.",
+      "quote": "ADR-016 (Accepted), How To Extend: \"Use declarative `sc-lint.toml` lint profiles, test layers, per-analyzer tables, step argv/exclusions, platform conditionals and per-step/per-layer `env`.\"\n\nADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 3.2: \"Parallel constructs accept parallel keys. A lint step and a test command selector accept the same execution keys: `command`, `env`, `cwd`, platform restriction and `after_all`.\"",
+      "stated_by": "ADR-016 How To Extend + ADR-022 decision 3.2 + #198",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P11",
+      "anchor_version": 3,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "10eefa98726ec3e9052fb7dd87f76498304787dfa8853dd3fca1f35f446acc82",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item works on something other than lint-step configuration or launching, such as a lint rule, an analyzer, or another crate.",
+            "unclear": "The item text is too vague to tell whether it works on lint steps.",
+            "yes": "The item works on lint-step keys or on how lint steps are run."
+          },
+          "instructions": "Does `item.text` work on sc-lint's `[[tool.sc-lint.lint]]` lint steps? Signals: the item names lint steps or `[[tool.sc-lint.lint]]`, adds or rejects a lint-step key, or changes how the lint runner spawns a step's command. Work on a lint rule such as PORT-010 or SCB-MANIFEST-004 is not work on lint steps. Answer about subject matter only; do not judge whether the item follows `anchor.statement`.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "The item does not plan that behaviour: it is silent about it, names only the issue or lint-step configuration in general, adds a different key, supports only one of `env` and `cwd`, or keeps lint steps rejecting them.",
+            "unclear": "The item mentions lint-step environment or working directory, but its wording leaves it open whether lint steps will accept and apply both `env` and `cwd`.",
+            "yes": "The item says lint steps accept `env` and `cwd` (environment variables and working directory, in any wording) and that they apply to the step's command or child process, or that lint steps share the test command selector's handling of these keys."
+          },
+          "instructions": "`anchor.statement` requires one specific behaviour: a `[[tool.sc-lint.lint]]` step accepts both an `env` table and a `cwd` key, and sc-lint applies them to that step's child process with the same meaning they have on a test command selector. Does `item.text` plan for, or state as an outcome, that behaviour, with both `env` and `cwd`? Judge presence of this behaviour only; do not judge conflict.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "Nothing in the item conflicts: it follows the requirement, is silent about it, adds or rejects other keys, or concerns other work.",
+            "unclear": "The item describes lint-step keys in a way that might or might not leave `env` or `cwd` unsupported.",
+            "yes": "The item states that lint steps reject or do not support `env` or `cwd`, or gives them a meaning other than setting the step's child environment and working directory."
+          },
+          "instructions": "`anchor.statement` requires `[[tool.sc-lint.lint]]` steps to accept an `env` table and a `cwd` key, applied to the step's child process with the same meaning as on test command selectors. Does `item.text` plan or state something that cannot be reconciled with that requirement, for example lint steps still rejecting `env` or `cwd`, lint steps limited to keys that exclude them, or env/cwd applied somewhere other than the step's child process? Silence is not conflict. Adding a different key is not conflict. Continuing to reject other unknown keys is not conflict. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 1.0,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1238,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 234,
+      "item_shortened": false,
+      "request_bytes": 3692
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

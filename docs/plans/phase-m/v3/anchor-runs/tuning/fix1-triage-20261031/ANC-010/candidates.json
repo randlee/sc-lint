@@ -1,0 +1,249 @@
+{
+ "bundles": {
+  "B0": {
+   "addressed": "A0",
+   "contradicted": "K0",
+   "relevant": "R0"
+  },
+  "B1": {
+   "addressed": "A0",
+   "contradicted": "K0",
+   "relevant": "R1"
+  },
+  "B10": {
+   "addressed": "A2",
+   "contradicted": "K1",
+   "relevant": "R4"
+  },
+  "B11": {
+   "addressed": "A2",
+   "contradicted": "K2",
+   "relevant": "R4"
+  },
+  "B12": {
+   "addressed": "A2",
+   "contradicted": "K3",
+   "relevant": "R4"
+  },
+  "B13": {
+   "addressed": "A4",
+   "contradicted": "K1",
+   "relevant": "R4"
+  },
+  "B2": {
+   "addressed": "A0",
+   "contradicted": "K0",
+   "relevant": "R2"
+  },
+  "B3": {
+   "addressed": "A0",
+   "contradicted": "K0",
+   "relevant": "R3"
+  },
+  "B4": {
+   "addressed": "A1",
+   "contradicted": "K0",
+   "relevant": "R4"
+  },
+  "B5": {
+   "addressed": "A2",
+   "contradicted": "K0",
+   "relevant": "R5"
+  },
+  "B6": {
+   "addressed": "A3",
+   "contradicted": "K0",
+   "relevant": "R6"
+  },
+  "B7": {
+   "addressed": "A4",
+   "contradicted": "K0",
+   "relevant": "R4"
+  },
+  "B8": {
+   "addressed": "A5",
+   "contradicted": "K0",
+   "relevant": "R4"
+  },
+  "B9": {
+   "addressed": "A6",
+   "contradicted": "K0",
+   "relevant": "R4"
+  }
+ },
+ "candidates": {
+  "addressed": {
+   "A0": {
+    "criteria": {
+     "no": "The item does not state that outcome: it is silent about PORT-010 site allowances, only investigates or mentions them, changes the attribute without saying PORT-010 skips the annotated item, uses another suppression mechanism, or says annotated items are still reported.",
+     "unclear": "The item names an outcome for an allow(PORT-010) annotated item, but its wording leaves open whether PORT-010 still reports that item.",
+     "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+    },
+    "instructions": "Does `item.text` commit to this outcome, either as new work or by keeping it working: an item that carries `#[sc_lint(allow(PORT-010), reason = \"...\")]` is not reported by PORT-010? Accept words such as honour, skip, suppress, exempt, records no finding, or not reported for the annotated item, function or declaration. Investigating, discussing or documenting site allowances without committing to that outcome does not count, and neither does a change to the attribute that never says PORT-010 leaves the annotated item unreported. Judge presence of the outcome only; do not judge conflict.",
+    "type": "choice"
+   },
+   "A1": {
+    "criteria": {
+     "no": "The item does not state that outcome: it is silent about PORT-010 site allowances, only investigates or mentions them, changes the attribute without saying PORT-010 skips the annotated item, uses another suppression mechanism, only refers to an allowance another item delivers, or says annotated items are still reported.",
+     "unclear": "The item names an outcome for an allow(PORT-010) annotated item, but its wording leaves open whether PORT-010 still reports that item.",
+     "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+    },
+    "instructions": "Does `item.text` commit to this outcome, either as new work or by keeping it working: an item that carries `#[sc_lint(allow(PORT-010), reason = \"...\")]` is not reported by PORT-010? Accept words such as honour, skip, suppress, exempt, records no finding, or not reported for the annotated item, function or declaration. Investigating, discussing or documenting site allowances without committing to that outcome does not count, and neither does a change to the attribute that never says PORT-010 leaves the annotated item unreported. Judge presence of the outcome only; do not judge conflict. Referring to an allowance that another item delivers, or using the allowance as the route for findings this item does not handle, does not commit to the outcome.",
+    "type": "choice"
+   },
+   "A2": {
+    "criteria": {
+     "no": "The item does not state that outcome as its own commitment.",
+     "unclear": "The item names an outcome for an annotated item, but its wording leaves open whether PORT-010 still reports it.",
+     "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+    },
+    "instructions": "Does `item.text` itself commit that PORT-010 does not report an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, as new work or by keeping it working? Accept honour, skip, suppress, exempt, records no finding or not reported for the annotated item. It does not commit when it only investigates or documents allowances, only refers to an allowance another item delivers, changes the attribute without stating the outcome, or says annotated items are still reported or the attribute is ignored. Judge presence of the outcome only; do not judge conflict.",
+    "type": "choice"
+   },
+   "A3": {
+    "criteria": {
+     "no": "No such commitment is written.",
+     "unclear": "A sentence touches this but cannot be read as the commitment or not.",
+     "yes": "Such a commitment is written in the item."
+    },
+    "instructions": "Is there a sentence in `item.text` committing, as this item's own outcome, that PORT-010 leaves an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]` unreported? Pointers to an allowance delivered elsewhere, investigation, docs wording, attribute changes with no stated outcome, and plans where annotated items stay reported or the attribute is ignored contain no such commitment. Judge only whether the commitment is written; do not judge conflict.",
+    "type": "choice"
+   },
+   "A4": {
+    "criteria": {
+     "no": "The item does not state that outcome as its own commitment.",
+     "unclear": "The item names an outcome for an annotated item, but its wording leaves open whether PORT-010 still reports it.",
+     "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+    },
+    "instructions": "Does `item.text` itself commit that PORT-010 does not report an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, as new work or by keeping it working? Accept honour, skip, suppress, exempt, records no finding or not reported for the annotated item. It does not commit when it only investigates or documents allowances, only refers to an allowance another item delivers, changes the attribute without stating the outcome, or says annotated items are still reported or the attribute is ignored. Judge presence of the outcome only; do not judge conflict. If the item makes PORT-010 ignore or drop the attribute, or uses an exclusion or other mechanism instead of it, the annotated item is still reported by PORT-010, so the outcome is not committed.",
+    "type": "choice"
+   },
+   "A5": {
+    "criteria": {
+     "no": "The item does not state that outcome: it is silent about PORT-010 site allowances, only investigates or mentions them, changes the attribute without saying PORT-010 skips the annotated item, makes PORT-010 ignore the attribute, uses an exclusion or another mechanism instead, only refers to an allowance another item delivers, or says annotated items are still reported.",
+     "unclear": "The item names an outcome for an allow(PORT-010) annotated item, but its wording leaves open whether PORT-010 still reports that item.",
+     "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+    },
+    "instructions": "Does `item.text` commit to this outcome, either as new work or by keeping it working: an item that carries `#[sc_lint(allow(PORT-010), reason = \"...\")]` is not reported by PORT-010? Accept words such as honour, skip, suppress, exempt, records no finding, or not reported for the annotated item, function or declaration. Investigating, discussing or documenting site allowances without committing to that outcome does not count, and neither does a change to the attribute that never says PORT-010 leaves the annotated item unreported. Judge presence of the outcome only; do not judge conflict. If the item makes PORT-010 ignore or drop the attribute, or uses an exclusion or other mechanism instead of it, the annotated item is still reported by PORT-010, so the outcome is not committed. Referring to an allowance another item delivers does not commit either.",
+    "type": "choice"
+   },
+   "A6": {
+    "criteria": {
+     "no": "The item does not state that outcome, or its plan leaves the annotated item reported.",
+     "unclear": "The item names an outcome for an annotated item whose wording leaves it open.",
+     "yes": "The item states that PORT-010 leaves the annotated item unreported."
+    },
+    "instructions": "After the work in `item.text` is done, as this item states it, does PORT-010 leave an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]` unreported? Answer yes only when the item itself states that outcome (honour, skip, suppress, exempt, records no finding, not reported). Answer no when the item does not state it, only investigates, documents or refers to an allowance another item delivers, or plans that PORT-010 ignores or drops the attribute or uses an exclusion instead, since then the annotated item is still reported. Judge the stated outcome only; do not judge conflict.",
+    "type": "choice"
+   }
+  },
+  "contradicted": {
+   "K0": {
+    "criteria": {
+     "no": "Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances.",
+     "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
+     "yes": "The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided."
+    },
+    "instructions": "Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Judge conflict only.",
+    "type": "choice"
+   },
+   "K1": {
+    "criteria": {
+     "no": "Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances, including items that defer or leave the allowance behaviour to be decided.",
+     "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
+     "yes": "The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided."
+    },
+    "instructions": "Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Leaving the allowance behaviour to be decided later, reworking it without stating an outcome, or deferring it is not a conflict. Judge conflict only.",
+    "type": "choice"
+   },
+   "K2": {
+    "criteria": {
+     "no": "The item states none of those: it honours the allowance, is silent, investigates, or defers the behaviour.",
+     "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
+     "yes": "The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided."
+    },
+    "instructions": "Does `item.text` state that PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores, drops or refuses that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead? Leaving the allowance behaviour to be decided later, reworking it without stating an outcome, or deferring it is not a conflict. Silence, investigation, requiring the reason, or limiting the allowance to the annotated item or to PORT-010 is not a conflict either. Judge conflict only.",
+    "type": "choice"
+   },
+   "K3": {
+    "criteria": {
+     "no": "The item states no such plan.",
+     "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
+     "yes": "The item states such a conflicting plan."
+    },
+    "instructions": "Conflict with `anchor.statement` means the item states a plan in which an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]` stays reported: PORT-010 ignores, drops or refuses the attribute, or per-item allowances are replaced by a broader mechanism. Leaving the allowance behaviour to be decided later, reworking it without stating an outcome, or deferring it is not a conflict. Silence, investigation, requiring the reason and per-item or per-rule limits are not conflict. Does `item.text` state such a conflicting plan? Judge conflict only.",
+    "type": "choice"
+   }
+  },
+  "relevant": {
+   "R0": {
+    "criteria": {
+     "no": "The item does not touch PORT-010 site allowances: it changes which shapes PORT-010 reports without mentioning allow attributes, concerns allowances for other rules only, or is other work such as lint-step env or cwd, SCB-MANIFEST rules or release work.",
+     "unclear": "The item text is too vague to tell whether it touches PORT-010 site allowances.",
+     "yes": "The item adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism."
+    },
+    "instructions": "Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute? PORT-010 work that never mentions site allowances, such as recognising companion shapes or keeping real parity gaps reported, is a different subject, and so are site allowances for rules other than PORT-010. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+    "type": "choice"
+   },
+   "R1": {
+    "criteria": {
+     "no": "The item does not do that work: it changes which shapes PORT-010 reports, mentions the allowance only as another item's work or as where other cases go, updates wording about it in docs or requirements only, concerns allowances for other rules, or is other work.",
+     "unclear": "The item text is too vague to tell whether it changes PORT-010 site-allowance handling itself.",
+     "yes": "The item itself adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism."
+    },
+    "instructions": "Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute, in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes? Mentioning a site allowance only as the route that other shapes or remaining findings take, as work another item delivers, or describing it in requirement or documentation text, without changing how code in the listed crates parses or honours #[sc_lint(allow(...))] for PORT-010, is not this subject. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+    "type": "choice"
+   },
+   "R2": {
+    "criteria": {
+     "no": "Nothing the item builds or changes is PORT-010 site-allowance handling; any allowance mention is context, another item's work, or docs or requirement wording.",
+     "unclear": "The item mentions PORT-010 site allowances in a way that cannot be placed as its own work or only context.",
+     "yes": "One thing the item builds or changes is PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance."
+    },
+    "instructions": "List what `item.text` itself builds or changes. Is one of those things PORT-010's handling of a per-site `#[sc_lint(allow(...))]` attribute: parsing allow(PORT-010), whether PORT-010 honours it, or replacing it with another mechanism? Mentioning a site allowance only as the route that other shapes or remaining findings take, as work another item delivers, or describing it in requirement or documentation text, without changing how code in the listed crates parses or honours #[sc_lint(allow(...))] for PORT-010, is not this subject. Judge subject presence only.",
+    "type": "choice"
+   },
+   "R3": {
+    "criteria": {
+     "no": "The item plans no such work: it works on other PORT-010 shapes, other rules or other subjects, and any allowance mention is context, another item's work, or docs wording.",
+     "unclear": "It cannot be told whether the item plans code work on PORT-010 site-allowance handling.",
+     "yes": "The item plans code work on PORT-010 site-allowance handling in those crates, in any direction."
+    },
+    "instructions": "`anchor.scope` covers work that adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))] in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes. Is that work part of `item.text`, in either direction (honouring, ignoring, removing or replacing the allowance)? Mentioning a site allowance only as the route that other shapes or remaining findings take, as work another item delivers, or describing it in requirement or documentation text, without changing how code in the listed crates parses or honours #[sc_lint(allow(...))] for PORT-010, is not this subject. Judge subject presence only, whatever the item plans.",
+    "type": "choice"
+   },
+   "R4": {
+    "criteria": {
+     "no": "The item does not touch PORT-010 site allowances: it changes which shapes PORT-010 reports without mentioning allow attributes, concerns allowances for other rules only, mentions the PORT-010 allowance only as another item's work or in docs wording, or is other work such as lint-step env or cwd, SCB-MANIFEST rules or release work.",
+     "unclear": "The item text is too vague to tell whether it touches PORT-010 site allowances.",
+     "yes": "The item adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism. An item that states whether PORT-010 reports an item carrying allow(PORT-010) is yes."
+    },
+    "instructions": "Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute? PORT-010 work that never mentions site allowances, such as recognising companion shapes or keeping real parity gaps reported, is a different subject, and so are site allowances for rules other than PORT-010. An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+    "type": "choice"
+   },
+   "R5": {
+    "criteria": {
+     "no": "The item does not: it works on other PORT-010 shapes, other rules or other subjects, and any mention of the allowance is context, another item's work, or docs wording.",
+     "unclear": "The item text is too vague to tell whether it sets PORT-010 site-allowance handling.",
+     "yes": "The item itself sets or changes PORT-010's handling of a per-site allow(PORT-010) attribute, or states whether an annotated item is reported."
+    },
+    "instructions": "Does `item.text` itself set, add, change or remove whether or how PORT-010 honours a per-site `#[sc_lint(allow(...))]` attribute, including stating that an annotated item is or is not reported, parsing allow(PORT-010), or replacing per-item PORT-010 allowances with another mechanism? An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. PORT-010 work that only recognises companion shapes or keeps real gaps reported, and allowances for other rules, are also different subjects. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+    "type": "choice"
+   },
+   "R6": {
+    "criteria": {
+     "no": "The item plans or states nothing about that treatment; it is about other shapes, other rules or other work, and any allowance mention is context, another item's work, or docs wording.",
+     "unclear": "The item mentions the allowance in a way that cannot be placed as its own plan or only context.",
+     "yes": "The item plans or states PORT-010's treatment of an item carrying a per-site allow(PORT-010) attribute, in any direction."
+    },
+    "instructions": "`anchor.scope` is per-site allowance of PORT-010 findings through #[sc_lint(allow(...))]. Does `item.text` plan or state anything about how PORT-010 treats an item carrying such an attribute (honouring it, ignoring it, parsing it, removing or replacing it, or whether the annotated item is reported)? An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. Judge subject presence only, whatever the item plans; do not judge whether the item obeys `anchor.statement`.",
+    "type": "choice"
+   }
+  }
+ },
+ "roles": {
+  "compliance": "addressed",
+  "conflict": "contradicted",
+  "relevance": "relevant"
+ }
+}

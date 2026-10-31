@@ -38,7 +38,7 @@ or new tests are claimed here: the changes specify the future sprint work.
 - No new global cross-analyzer rule-prefix ownership gate/test. The requested
   grammar's other-analyzer ignore case remains in the existing corpus work.
 
-## Planning gate results
+## Initial planning gate results
 
 All four changed beads were judged once with unchanged sealed questions.
 Run IDs are plan-20261031T194639Z-lint-m-1 through lint-m-4. Reports are
@@ -55,7 +55,7 @@ the judged beads. No post-gate bead edit was made to obtain a pass.
 m-2 passes. The other three fail as recorded; there is no planning-gate
 PASS claim. The lead sent these cells to independent anchor-tuning triage
 and instructed no push until that ruling. Statements, scopes, fixtures and
-questions are unchanged by this fix task.
+questions were unchanged in that initial repair iteration.
 
 ## Anchor coverage (plan)
 
@@ -83,4 +83,47 @@ Uncovered anchors (no item satisfies them): ANC-006, ANC-012
   diagnostics were preserved outside the checkout; no archived questions or
   gate evidence were altered.
 - Final just lint: PASS. Final just test: PASS.
-- Push held for the lead's triage ruling.
+- Initial push hold: resolved by the follow-up ruling below.
+
+## Approved triage follow-up
+
+Lead ruling 01M69RNHZNCNMMETK3MYN0G5R6 separates one plan defect from three
+independently proven question defects. m-1 now states the exact ANC-006
+rule: the cfg(unix) mod declaration is never reported, regardless of the
+item-scope ruling. Only items inside the module remain subject to Rand's
+public-scope decision (ANC-007).
+
+The independent frozen-oracle results for ANC-009/010/012 were accepted by
+the lead. The planner verified their oracle hashes, sealed question contents
+and provenance, and copied overrides-plan.proposed.json byte-for-byte.
+Only those three question sets changed; no anchor statement, scope, fixture
+or production threshold changed. Full triage evidence and provenance are
+retained in v3/anchor-runs/tuning/fix1-triage-20261031/.
+
+Fixture checks: 16 PASS, zero mismatches. The three affected sprint gates
+PASS; m-2 retains its prior pass. Latest run IDs:
+
+- plan-20261031T195949Z-lint-m-1
+- plan-20261031T195949Z-lint-m-3
+- plan-20261031T195949Z-lint-m-4
+- plan-20261031T194639Z-lint-m-2 (unchanged sprint).
+
+## Anchor coverage (plan)
+
+| Anchor | lint-m-1 | lint-m-2 | lint-m-3 | lint-m-4 | Covered |
+| --- | --- | --- | --- | --- | --- |
+| ANC-003 | satisfied | not applicable | not applicable | not applicable | yes |
+| ANC-006 | satisfied | not applicable | not applicable | not applicable | yes |
+| ANC-007 | satisfied | not applicable | not applicable | not applicable | yes |
+| ANC-009 | satisfied | not applicable | not applicable | satisfied | yes |
+| ANC-010 | not applicable | not applicable | not applicable | satisfied | yes |
+| ANC-011 | not applicable | not applicable | satisfied | not applicable | yes |
+| ANC-012 | not applicable | not applicable | satisfied | not applicable | yes |
+| ANC-013 | not applicable | satisfied | not applicable | not applicable | yes |
+
+
+
+All four latest sprint gates pass; all eight kept anchors are covered.
+Live and offline validate-plan, codespell, final just lint and final just
+test all PASS. The single push is authorized by the lead's conditional
+triage ruling now that every latest sprint passes and coverage is complete.

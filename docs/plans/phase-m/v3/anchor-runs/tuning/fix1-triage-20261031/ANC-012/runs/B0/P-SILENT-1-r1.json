@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 0.86
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 0.89
+  },
+  "relevant": {
+   "choice": "no",
+   "confidence": 0.68
+  }
+ },
+ "bundle": "B0",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-012\", \"statement\": \"sc-lint must not add a setup-hook or interpreter-selection configuration key, such as [tool.sc-lint].setup.pre or [tool.sc-lint].runner.python.\", \"scope\": \"The item adds or changes consumer setup, hook or interpreter-selection configuration keys in sc-lint.toml.\"}, \"item\": {\"id\": \"fix1t-ANC-012/P-SILENT-1\", \"title\": \"Lint-step env and cwd\", \"text\": \"A [[tool.sc-lint.lint]] step in sc-lint.toml accepts an env table and a cwd key, applied to that step's child process, with the same meaning they have on a test command selector.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item text is silent about the directive: it neither includes the directive's specific content nor references it.\", \"unclear\": \"The item text alludes to the directive's topic but it is not possible to tell whether the directive itself is included.\", \"yes\": \"The item text contains the directive's specific content, in its own words or the user's, as a step, constraint, or stated starting point.\"}, \"instructions\": \"Does `item.text` explicitly carry out, preserve, or plan for the directive given in `anchor.statement`? Look for the directive's specific content being present in the item: the same starting point, the same method, the same constraint, or an explicit step that does what the statement asks. A generic mention of the topic without the directive's specific content does not count. Judge presence of the directive only, not whether the item conflicts with it.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.\", \"unclear\": \"The item text is ambiguous enough that it might or might not conflict with the directive.\", \"yes\": \"The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement.\"}, \"instructions\": \"Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.\", \"unclear\": \"The item text is too vague to tell what part of the system it touches.\", \"yes\": \"The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.\"}, \"instructions\": \"The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "10602417de5bd5a02895a68d0c30c98b3599783a2e02170a2b673012adec50bd",
+ "case_id": "P-SILENT-1",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.86,\"probabilities\":{\"no\":0.91,\"unclear\":0.03,\"yes\":0.06}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.89,\"probabilities\":{\"no\":0.93,\"unclear\":0.0,\"yes\":0.07}},\"relevant\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.68,\"probabilities\":{\"no\":0.79,\"unclear\":0.01,\"yes\":0.2}}},\"usage\":{\"input_tokens\":1063,\"output_tokens\":117}}",
+ "raw_response_sha256": "2a1d874f67822c15ebbc5689397ebaeb9bb39cc66ccde7fa29a0025b41c4e07b",
+ "repeat": 1,
+ "run_id": "fix1t-ANC-012/B0/P-SILENT-1/r1",
+ "semantic_verdict": "not_applicable",
+ "spec": {
+  "addressed": "A0",
+  "contradicted": "K0",
+  "relevant": "R0"
+ }
+}

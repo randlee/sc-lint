@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 0.82
+  },
+  "contradicted": {
+   "choice": "no",
+   "confidence": 0.92
+  },
+  "relevant": {
+   "choice": "no",
+   "confidence": 0.97
+  }
+ },
+ "bundle": "B10",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-010\", \"statement\": \"PORT-010, a rule sc-lint's portability analyzer reports from source, must be allowable at a single site: an item carrying #[sc_lint(allow(PORT-010), reason = \\\"...\\\")] is not reported by PORT-010.\", \"scope\": \"The item adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))], in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes.\"}, \"item\": {\"id\": \"fix1t-ANC-010/C-CTX-2\", \"title\": \"PORT-010 Unix-only modules (#786 S6)\", \"text\": \"In crates/sc-lint-portability, PORT-010 does not report the declaration #[cfg(unix)] mod x; of a module never compiled on Windows, or the non-public items in its files. Whether pub items are covered waits on a ruling; if they are not, a pub item stays a finding, and its reasoned site allowance is tested in the allowance sprint.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item does not state that outcome as its own commitment.\", \"unclear\": \"The item names an outcome for an annotated item, but its wording leaves open whether PORT-010 still reports it.\", \"yes\": \"The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason.\"}, \"instructions\": \"Does `item.text` itself commit that PORT-010 does not report an item carrying `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]`, as new work or by keeping it working? Accept honour, skip, suppress, exempt, records no finding or not reported for the annotated item. It does not commit when it only investigates or documents allowances, only refers to an allowance another item delivers, changes the attribute without stating the outcome, or says annotated items are still reported or the attribute is ignored. Judge presence of the outcome only; do not judge conflict.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances, including items that defer or leave the allowance behaviour to be decided.\", \"unclear\": \"The item says something about PORT-010 allowances that might or might not leave an annotated item reported.\", \"yes\": \"The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided.\"}, \"instructions\": \"Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \\\"...\\\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Leaving the allowance behaviour to be decided later, reworking it without stating an outcome, or deferring it is not a conflict. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item does not touch PORT-010 site allowances: it changes which shapes PORT-010 reports without mentioning allow attributes, concerns allowances for other rules only, mentions the PORT-010 allowance only as another item's work or in docs wording, or is other work such as lint-step env or cwd, SCB-MANIFEST rules or release work.\", \"unclear\": \"The item text is too vague to tell whether it touches PORT-010 site allowances.\", \"yes\": \"The item adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism. An item that states whether PORT-010 reports an item carrying allow(PORT-010) is yes.\"}, \"instructions\": \"Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute? PORT-010 work that never mentions site allowances, such as recognising companion shapes or keeping real parity gaps reported, is a different subject, and so are site allowances for rules other than PORT-010. An item that mentions a site allowance only as the route other shapes or remaining findings take, as something another item delivers or tests, or only in requirement or documentation wording, without itself setting how PORT-010 treats an annotated item, is a different subject. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "cb0d3d0d3b2fb3a38565b31e1f796c0aa081e4857e1630175e99a82d6e03bc3b",
+ "case_id": "C-CTX-2",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.82,\"probabilities\":{\"no\":0.88,\"unclear\":0.1,\"yes\":0.02}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.92,\"probabilities\":{\"no\":0.95,\"unclear\":0.01,\"yes\":0.04}},\"relevant\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":0.97,\"probabilities\":{\"no\":0.98,\"unclear\":0.0,\"yes\":0.02}}},\"usage\":{\"input_tokens\":1498,\"output_tokens\":117}}",
+ "raw_response_sha256": "673acc0768eef7b3f3e0ab2fb1f01c4fed724981138c596316a43c3e4e46ec24",
+ "repeat": 1,
+ "run_id": "fix1t-ANC-010/B10/C-CTX-2/r1",
+ "semantic_verdict": "not_applicable",
+ "spec": {
+  "addressed": "A2",
+  "contradicted": "K1",
+  "relevant": "R4"
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "answers": {
+  "addressed": {
+   "choice": "no",
+   "confidence": 1.0
+  },
+  "contradicted": {
+   "choice": "yes",
+   "confidence": 1.0
+  },
+  "relevant": {
+   "choice": "yes",
+   "confidence": 1.0
+  }
+ },
+ "bundle": "B4",
+ "canonical_request": "{\"model\": \"jev-latest\", \"state\": {\"anchor\": {\"id\": \"ANC-009\", \"statement\": \"sc-lint's PORT-010 (sc-lint's rule that reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) changes must not blanket-suppress real parity gaps: a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback must still be reported.\", \"scope\": \"The item changes when PORT-010 reports or stops reporting a #[cfg(unix)] item.\"}, \"item\": {\"id\": \"fix1t-ANC-009/P-CONFLICT-PATH\", \"title\": \"PORT-010 path exclusion\", \"text\": \"sc-lint.toml gains a PORT-010 exclude list; PORT-010 skips every #[cfg(unix)] item under a listed path such as src/platform/**.\"}}, \"questions\": {\"addressed\": {\"criteria\": {\"no\": \"The item does not say so, or it suppresses such items broadly.\", \"unclear\": \"The item mentions this in wording that cannot be read either way.\", \"yes\": \"The item explicitly says real gaps (unpaired, unannotated or negative-case items) are still reported.\"}, \"instructions\": \"`anchor.statement` requires that a production #[cfg(unix)] item with no #[cfg(windows)] companion and no portable fallback still be reported. Does `item.text` explicitly keep that, for example by saying unpaired or unannotated items or negative cases stay reported? A plan that suppresses many items at once does not keep it. Judge presence only.\", \"type\": \"choice\"}, \"contradicted\": {\"criteria\": {\"no\": \"The item plans no blanket suppression.\", \"unclear\": \"The item plans a suppression whose reach cannot be told.\", \"yes\": \"The item plans such a blanket suppression.\"}, \"instructions\": \"An item whose #[cfg(unix)] item has a recognised counterpart, such as a same-name #[cfg(not(unix))] sibling, a differently named Windows twin or code compiled only on Unix, has a companion or fallback; recognising such a shape leaves real gaps reported and is not conflict. Does `item.text` plan to blanket-suppress real parity gaps, so that PORT-010 stops reporting #[cfg(unix)] items that have no companion, no portable fallback and no allowance of their own? Examples: skipping every item in a file, module, path or crate, a repository-wide switch or exclusion, or name heuristics. A reasoned per-site allowance that covers only the one annotated item (for example #[sc_lint(allow(PORT-010), reason = \\\"...\\\")]) and recognising a specific companion shape are not blanket suppression. Silence and unrelated work are not conflict. Judge conflict only.\", \"type\": \"choice\"}, \"relevant\": {\"criteria\": {\"no\": \"The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.\", \"unclear\": \"The item text is too vague to tell what part of the system it touches.\", \"yes\": \"The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite.\"}, \"instructions\": \"The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.\", \"type\": \"choice\"}}}",
+ "canonical_request_sha256": "e510f42436c7eacadbd412cc9976677bbd063d8eff97c39bcce77df7d561b92d",
+ "case_id": "P-CONFLICT-PATH",
+ "failed_attempts": [],
+ "model_answered": "jev-1.14.0",
+ "raw_response": "{\"model\":\"jev-1.14.0\",\"answers\":{\"addressed\":{\"type\":\"choice\",\"choice\":\"no\",\"confidence\":1.0,\"probabilities\":{\"no\":1.0,\"unclear\":0.0,\"yes\":0.0}},\"contradicted\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}},\"relevant\":{\"type\":\"choice\",\"choice\":\"yes\",\"confidence\":1.0,\"probabilities\":{\"no\":0.0,\"unclear\":0.0,\"yes\":1.0}}},\"usage\":{\"input_tokens\":1129,\"output_tokens\":117}}",
+ "raw_response_sha256": "1db872a8b177e3f0042e88a01ff003ef16fe3a3b0ebf74aea39565517e753d7d",
+ "repeat": 2,
+ "run_id": "fix1t-ANC-009/B4/P-CONFLICT-PATH/r2",
+ "semantic_verdict": "contradicted",
+ "spec": {
+  "addressed": "A2",
+  "contradicted": "K4",
+  "relevant": "R0"
+ }
+}

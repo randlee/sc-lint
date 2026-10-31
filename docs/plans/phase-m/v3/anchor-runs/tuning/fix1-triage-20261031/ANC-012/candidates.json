@@ -1,0 +1,145 @@
+{
+ "bundles": {
+  "B0": {
+   "addressed": "A0",
+   "contradicted": "K0",
+   "relevant": "R0"
+  },
+  "B1": {
+   "addressed": "A1",
+   "contradicted": "K1",
+   "relevant": "R1"
+  },
+  "B2": {
+   "addressed": "A2",
+   "contradicted": "K2",
+   "relevant": "R2"
+  },
+  "B3": {
+   "addressed": "A3",
+   "contradicted": "K3",
+   "relevant": "R3"
+  }
+ },
+ "candidates": {
+  "addressed": {
+   "A0": {
+    "criteria": {
+     "no": "The item text is silent about the directive: it neither includes the directive's specific content nor references it.",
+     "unclear": "The item text alludes to the directive's topic but it is not possible to tell whether the directive itself is included.",
+     "yes": "The item text contains the directive's specific content, in its own words or the user's, as a step, constraint, or stated starting point."
+    },
+    "instructions": "Does `item.text` explicitly carry out, preserve, or plan for the directive given in `anchor.statement`? Look for the directive's specific content being present in the item: the same starting point, the same method, the same constraint, or an explicit step that does what the statement asks. A generic mention of the topic without the directive's specific content does not count. Judge presence of the directive only, not whether the item conflicts with it.",
+    "type": "choice"
+   },
+   "A1": {
+    "criteria": {
+     "no": "The item does not state that: it is silent about such keys, or it adds a setup, hook or interpreter key.",
+     "unclear": "The item mentions such keys but it cannot be told whether it keeps them out.",
+     "yes": "The item states that no setup or interpreter-selection key is added, or that setup and runner keys stay rejected or unknown."
+    },
+    "instructions": "Does `item.text` state that no setup-hook or interpreter-selection configuration key is added to sc-lint.toml, for example that [tool.sc-lint].setup and [tool.sc-lint].runner stay rejected? Judge whether this commitment is stated; an item that adds such a key does not state it.",
+    "type": "choice"
+   },
+   "A2": {
+    "criteria": {
+     "no": "The item says no such thing, or it adds a setup, hook or interpreter key.",
+     "unclear": "The item touches such keys in wording that cannot be read either way.",
+     "yes": "The item explicitly says no setup-hook or interpreter-selection key is added, or that keys such as setup or runner stay rejected."
+    },
+    "instructions": "`anchor.statement` forbids a setup-hook or interpreter-selection configuration key. Does `item.text` explicitly keep that prohibition, by saying such keys are not added or stay rejected? An item that adds such a key does not keep it. Judge presence of the explicit commitment only.",
+    "type": "choice"
+   },
+   "A3": {
+    "criteria": {
+     "no": "No such commitment is written, or the item adds a setup, hook or interpreter key.",
+     "unclear": "A sentence touches this but cannot be read as the commitment or not.",
+     "yes": "Such a commitment is written in the item."
+    },
+    "instructions": "Is there a sentence in `item.text` committing that sc-lint.toml gains no setup-hook key and no interpreter-selection key (for example setup or runner stay unknown keys)? Plans that add such a key contain no such commitment. Judge only whether the commitment is written.",
+    "type": "choice"
+   }
+  },
+  "contradicted": {
+   "K0": {
+    "criteria": {
+     "no": "Nothing in the item text conflicts with the directive, whether or not the directive is mentioned.",
+     "unclear": "The item text is ambiguous enough that it might or might not conflict with the directive.",
+     "yes": "The item text states a plan, approach, or decision that cannot be reconciled with the directive in the anchor statement."
+    },
+    "instructions": "Does `item.text` propose doing something that `anchor.statement` rules out, or propose a different approach than the one `anchor.statement` requires? Examples of contradiction: the anchor says to start from an existing implementation and the item plans a fresh implementation; the anchor forbids a dependency and the item adds it; the anchor fixes an order of work and the item reverses it. Silence about the directive is not a contradiction. Judge conflict only.",
+    "type": "choice"
+   },
+   "K1": {
+    "criteria": {
+     "no": "The item adds no such key.",
+     "unclear": "The item describes a key whose role as a setup hook or interpreter selection cannot be told.",
+     "yes": "The item adds or keeps such a setup-hook or interpreter-selection key."
+    },
+    "instructions": "Does `item.text` plan a setup-hook or interpreter-selection configuration key that `anchor.statement` forbids? Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work. Judge conflict only.",
+    "type": "choice"
+   },
+   "K2": {
+    "criteria": {
+     "no": "No such key is added.",
+     "unclear": "It cannot be told whether a planned key runs setup or hook commands or selects an interpreter.",
+     "yes": "Yes, such a key is added or kept."
+    },
+    "instructions": "Would `item.text`, as planned, add a key to sc-lint.toml through which sc-lint runs setup or hook commands, or picks the interpreter or runner for a step? Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work.",
+    "type": "choice"
+   },
+   "K3": {
+    "criteria": {
+     "no": "The item plans no such key.",
+     "unclear": "The item plans a key whose role cannot be told.",
+     "yes": "The item plans a setup-hook or interpreter-selection key."
+    },
+    "instructions": "Conflict means the item adds or keeps a sc-lint.toml key that runs setup or hook commands (for example [tool.sc-lint].setup.pre or a per-step before or pre hook) or that selects the interpreter or runner sc-lint uses for a step (for example [tool.sc-lint].runner.python or a per-step python key). Not conflict: env or cwd on a step, env values passed verbatim to the child even if they name an interpreter, rejecting setup or runner keys, silence, or unrelated work. Does `item.text` plan such a conflicting key? Judge conflict only.",
+    "type": "choice"
+   }
+  },
+  "relevant": {
+   "R0": {
+    "criteria": {
+     "no": "The item is about a different part of the system or a different activity, and completing it would neither follow nor break the anchor.",
+     "unclear": "The item text is too vague to tell what part of the system it touches.",
+     "yes": "The item plans, changes, or depends on the thing the anchor statement is about, directly or as a clear prerequisite."
+    },
+    "instructions": "The state holds one planning item (`item.title`, `item.text`) and one anchor: a directive the user stated verbatim in `anchor.statement`, with the area it governs in `anchor.scope`. Does the work described in `item.text` touch the subject that `anchor.statement` talks about? Judge overlap of subject matter only. Do not judge whether the item obeys the anchor.",
+    "type": "choice"
+   },
+   "R1": {
+    "criteria": {
+     "no": "The item adds or changes no consumer configuration key of that kind: it changes analyzer rules, output or logging, or other work.",
+     "unclear": "The item text is too vague to tell whether it touches such configuration keys.",
+     "yes": "The item adds, changes, removes or rules on a consumer setup, hook, interpreter-selection or per-step execution key in sc-lint.toml (for example env or cwd on a lint step, a setup or runner table)."
+    },
+    "instructions": "`anchor.scope` covers consumer configuration keys in sc-lint.toml for setting up or running steps: setup or hook keys, interpreter-selection keys, and per-step execution settings such as a lint step's env or cwd. Does `item.text` add, change or remove such a key, or decide which of them exist? Judge subject overlap only; do not judge whether the item obeys `anchor.statement`.",
+    "type": "choice"
+   },
+   "R2": {
+    "criteria": {
+     "no": "The item touches no such key: it is about analyzer rules, report or log output, or other work.",
+     "unclear": "The item text is too vague to tell.",
+     "yes": "The item adds, changes, removes or keeps out such a key."
+    },
+    "instructions": "Does the work in `item.text` touch how consumers configure the setup or execution of sc-lint steps through keys in sc-lint.toml, such as a lint step's env or cwd, a setup or hook table, or an interpreter or runner key? Judge subject overlap only, not whether the item obeys `anchor.statement`.",
+    "type": "choice"
+   },
+   "R3": {
+    "criteria": {
+     "no": "No: the item changes no such configuration; it is about analyzer rules, output, logging or other work.",
+     "unclear": "The item text is too vague to tell.",
+     "yes": "Yes: the item adds, changes or rules on step-execution, setup, hook or interpreter configuration keys in sc-lint.toml."
+    },
+    "instructions": "`anchor.statement` forbids adding a setup-hook or interpreter-selection key to sc-lint.toml. Work that adds or changes how consumers configure step execution there (env, cwd, setup, hooks, runner or interpreter keys) is on this subject, whether or not it follows the statement. Is `item.text` on this subject?",
+    "type": "choice"
+   }
+  }
+ },
+ "roles": {
+  "compliance": "addressed",
+  "conflict": "contradicted",
+  "relevance": "relevant"
+ }
+}

@@ -1,0 +1,129 @@
+{
+  "schema": "plan-anchoring/run/1",
+  "run_id": "plan-20261031T195930Z-fixture_ANC-003_pass_1",
+  "gate": "plan",
+  "created_at": "2026-10-31T19:59:30+00:00",
+  "anchors_path": "docs/plans/phase-m/v3/anchors.json",
+  "plan": "phase-m",
+  "item": {
+    "id": "fixture:ANC-003:pass:1",
+    "title": "fixture",
+    "source": "fixtures",
+    "chars": 233,
+    "truncated": false
+  },
+  "model_requested": "jev-latest",
+  "model_answered": "jev-1.14.0",
+  "threshold": 0.6,
+  "max_request_bytes": 24000,
+  "min_item_chars": 2000,
+  "dry_run": false,
+  "fixture": false,
+  "results": [
+    {
+      "anchor_id": "ANC-003",
+      "source_type": "ANC",
+      "source_ref": null,
+      "statement": "sc-lint's PORT-010 rule (which reports a production #[cfg(unix)] item lacking a #[cfg(windows)] companion or portable fallback) must not report a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same scope, whether that scope is a module, an inherent impl or a crate root (lib.rs, main.rs or a src/bin file).",
+      "quote": "Issue #786 (atm-core verdict table, 2026-10-30): \"Result: **no TRUE POSITIVE found**. All 18 paths have a Windows (or portable) counterpart, or are unix-only by design. [...]\n\n## Distinct shapes (what a rule must recognize)\n\n- S3  cfg(unix) item with a same-name `#[cfg(not(unix))]` sibling in the same scope (module, inherent impl, or crate root). Rows 2, 4, 6, 14, 18. This is #720 generalized beyond crate-root main.rs.\"\n\nREQ-PRODUCT-004AA (docs/requirements.md), rule list: \"`PORT-010` - production structural `#[cfg(unix)]` companion-parity checks\"",
+      "stated_by": "REQ-PRODUCT-004AA PORT-010 + ADR-010 decision 6 + #786",
+      "stated_at": "2026-10-30",
+      "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P3e",
+      "anchor_version": 4,
+      "question_set": {
+        "gate": "plan",
+        "version": 1,
+        "overridden": true
+      },
+      "questions_sha256": "e4bec1cdb23e5183528a532f3db79b3044e26f3099634fbd85bfcc2490b4fe33",
+      "deterministic_check": "",
+      "kind": "directive",
+      "leaning": "satisfied",
+      "questions": {
+        "relevant": {
+          "criteria": {
+            "no": "The item works only on other PORT-010 shapes that involve no same-name #[cfg(not(unix))] sibling (helpers of paired callers, differently named or renamed companions, un-gated loopback TCP alternatives, rejected-config accessors, unix-only modules, unix-only-by-design sites allowed per site), other rules, configuration, or release work, or mentions same-name pairs only as context or as earlier tests to keep passing.",
+            "unclear": "The item mentions same-name pairs in a way that cannot be told to be work on their PORT-010 result or only context.",
+            "yes": "The item works on PORT-010's result for the #[cfg(unix)] item of such a same-name pair, in any wording and in any direction, alone or with other shapes."
+          },
+          "instructions": "Does `item.text` decide, change, keep or defer whether PORT-010 reports a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same scope, where the scope is a module, an inherent impl, or a crate root (lib.rs, main.rs or a src/bin file) (#720, #786 shape S3), or build what that decision directly needs? Items that mention such same-name pairs only as context for another shape (for example as the callers of renamed functions or of helpers) without changing whether PORT-010 reports the #[cfg(unix)] item of the pair, and items that only require earlier S3 tests or an inventory burn-down to keep passing, are no. Judge subject presence only, whatever the item plans; do not judge whether the item obeys `anchor.statement`.",
+          "type": "choice"
+        },
+        "addressed": {
+          "criteria": {
+            "no": "`item.text` does not commit: it names the issue or shape but leaves the approach to be decided, does groundwork only, covers other shapes only, keeps the finding or hides it with allows, or carves out a scope (such as src/bin files or inherent impls) or an item kind (such as consts or types).",
+            "unclear": "`item.text` states an outcome close to this that cannot be read as the full commitment or not.",
+            "yes": "`item.text` states, in any wording, that PORT-010 does not report such an item in modules, inherent impls and crate roots, with no scope or item kind carved out."
+          },
+          "instructions": "`anchor.statement` requires that PORT-010 not report a #[cfg(unix)] item that has a #[cfg(not(unix))] sibling of the same name and kind in the same module, inherent impl or crate root. Does `item.text` commit to that outcome as part of this item? Saying 'crate root' covers lib.rs, main.rs and src/bin files. Still reporting pairs that differ in name, kind or scope is consistent with the commitment. Judge commitment only, not conflict. Work on other shapes, such as un-gated or differently named alternatives, helpers of paired callers or rejected-config accessors, commits nothing to this outcome, even when it also stops a PORT-010 report.",
+          "type": "choice"
+        },
+        "contradicted": {
+          "criteria": {
+            "no": "`item.text` does not: it removes the finding in all those scopes, is silent, defers, or keeps findings only outside that situation.",
+            "unclear": "`item.text` describes PORT-010's treatment of such items in wording that cannot be read either way.",
+            "yes": "`item.text` says or sets a rule under which such an item keeps its PORT-010 finding in some listed scope or for some item kind."
+          },
+          "instructions": "Does `item.text` plan that PORT-010 keeps a finding, shown or hidden, on a #[cfg(unix)] item whose #[cfg(not(unix))] sibling has the same name and kind and sits in the same module, inherent impl or crate root (lib.rs, main.rs or a src/bin file)? Examples: PORT-010 reports or keeps reporting such an item in any of those scopes; the exemption covers only some scopes (for example lib.rs and main.rs but not src/bin files, or not inherent impls); only #[cfg(windows)] twins count; only some item kinds count while same-name, same-kind consts, statics or types stay reported; or the finding is kept and hidden with a per-site allow, exclusion or allowlist. Not this: planning that such items stop being reported; silence; deferral or groundwork; work on other shapes; still reporting an item whose #[cfg(not(unix))] counterpart is in a different scope, has a different name, or is a different kind of item. Judge conflict only.",
+          "type": "choice"
+        }
+      },
+      "verdict": "satisfied",
+      "answers": {
+        "relevant": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 0.98,
+          "probabilities": {
+            "no": 0.01,
+            "unclear": 0.0,
+            "yes": 0.99
+          }
+        },
+        "addressed": {
+          "type": "choice",
+          "choice": "yes",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 0.0,
+            "unclear": 0.0,
+            "yes": 1.0
+          }
+        },
+        "contradicted": {
+          "type": "choice",
+          "choice": "no",
+          "confidence": 1.0,
+          "probabilities": {
+            "no": 1.0,
+            "unclear": 0.0,
+            "yes": 0.0
+          }
+        }
+      },
+      "min_confidence": 0.98,
+      "explanation": "The directive is carried forward.",
+      "usage": {
+        "input_tokens": 1628,
+        "output_tokens": 117
+      },
+      "attempts": 1,
+      "item_chars_sent": 233,
+      "item_shortened": false,
+      "request_bytes": 5162
+    }
+  ],
+  "summary": {
+    "counts": {
+      "satisfied": 1
+    },
+    "failing": [],
+    "leaning_counts": {
+      "satisfied": 1
+    },
+    "unstable": [],
+    "errors": [],
+    "shortened": [],
+    "pass": true
+  }
+}

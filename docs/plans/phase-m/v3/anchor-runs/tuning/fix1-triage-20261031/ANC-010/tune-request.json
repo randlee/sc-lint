@@ -1,0 +1,977 @@
+{
+ "authority": {
+  "anchors": {
+   "records": [
+    {
+     "beads": {
+      "anchor": null,
+      "dev_questions": null,
+      "plan_questions": null,
+      "sprints": [
+       "lint-m-4"
+      ]
+     },
+     "context": "Phase M v3: requirement/ADR-based derivation under ADR-022 direction, 2026-10-30; candidate P10c",
+     "deterministic_check": "",
+     "fixtures": {
+      "fail": [
+       "PORT-010 still reports a pub #[cfg(unix)] fn current_uid even though it carries #[sc_lint(allow(PORT-010), reason = \"POSIX uid has no Windows concept\")]."
+      ],
+      "pass": [
+       "A pub #[cfg(unix)] fn current_uid annotated #[sc_lint(allow(PORT-010), reason = \"POSIX uid has no Windows concept\")] produces no PORT-010 finding. Evidence: test port010_site_allow passes, showing zero findings for the annotated item and one finding for an identical unannotated item."
+      ]
+     },
+     "history": [
+      {
+       "at": "2026-10-30T16:42:46+00:00",
+       "event": "created",
+       "status": "proposed"
+      },
+      {
+       "at": "2026-10-30T16:42:46+00:00",
+       "event": "updated",
+       "fields": [
+        "fixtures"
+       ]
+      },
+      {
+       "at": "2026-10-30T17:00:00+00:00",
+       "event": "locked",
+       "note": "Locked for tuning under Rand's ruling: \"we can 'lock the anchors', but if tuning requires updating them, they will need to be changed\". Statement and fixtures still need Rand's review (PR #788).",
+       "status": "locked"
+      },
+      {
+       "at": "2026-10-30T17:22:38+00:00",
+       "event": "updated",
+       "fields": [
+        "scope"
+       ]
+      },
+      {
+       "at": "2026-10-31T19:15:02+00:00",
+       "event": "sprint_mapping_updated",
+       "note": "Rand 2026-10-31 approved four-sprint cut; questions, statement and scope unchanged.",
+       "sprints": [
+        "lint-m-4"
+       ]
+      }
+     ],
+     "id": "ANC-010",
+     "kind": "directive",
+     "promoted_to": null,
+     "question_overrides": {},
+     "quote": "ADR-022 (Rand 2026-10-30: \"This is a positive step.  This should guide both anchors and decisions about how atm-core fixes are handled.  Proceed\"), decision 4: \"Every rule an analyzer reports from source can be allowed at a single site with `#[sc_lint(allow(<RULE>), reason = \\\"...\\\")]`. A site allowance is the approved exception path for a deliberate, non-parity case such as #786 S8.\"",
+     "scope": "The item adds or changes per-site allowance of PORT-010 findings through #[sc_lint(allow(...))], in crates/sc-lint-portability, crates/sc-lint-directives or crates/sc-lint-attributes.",
+     "source_ref": null,
+     "source_type": "ANC",
+     "stated_at": "2026-10-30",
+     "stated_by": "ADR-022 decision 4 + #786 S8 + Rand S8 ruling",
+     "statement": "PORT-010, a rule sc-lint's portability analyzer reports from source, must be allowable at a single site: an item carrying #[sc_lint(allow(PORT-010), reason = \"...\")] is not reported by PORT-010.",
+     "status": "locked",
+     "summary": "P10c",
+     "version": 3
+    }
+   ],
+   "sha256": "70449b71c399122b85163c8b5d55ae4799798dfdb1123d2db818208faa9763d4"
+  },
+  "intent": {
+   "content": "# Intent - phase-m (v3)\n\nDrafted 2026-10-30 for Rand's review. It frames every Phase M anchor. Jev\njudges plan items against the anchors, not this document.\n\n## Governing direction\n\nRand (2026-10-30): \"I think a lot of sc-lint issues come from attempts to\nmandate how the sc-lint tools are orchestrated where the focus should be aimed\nat creation of tools that provide consistent/flexible consumer configuration.\"\n\nRand (2026-10-30): \"atm-core should be able to delete its workarounds: when\nsc-lint is done, every item on its P1 list passes as the GitHub issue\ndescribes, with nothing hidden.\"\n\nRand (2026-10-30), on the anchors: \"the anchors must be derived from the\nreq/adr and the issues we have failed to fix in 2-days of continuous work\"\nand \"anchors need to be based on requirements\".\n\nADR-022 records the direction. sc-lint provides tools and a consistent\nconsumer configuration surface. The consumer owns orchestration. Rand\n(2026-10-30), on ADR-022: \"This is a positive step.  This should guide both\nanchors and decisions about how atm-core fixes are handled.  Proceed\". Its\nformal Status stays Pending until Rand accepts the text.\n\n## What this plan is for\n\nResolve atm-core's P1 issues #786, #720, #198 and #136 by improving the tools\nand the configuration surfaces ADR-022 names, not by prescribing how\nconsumers run sc-lint.\n\n## What success looks like\n\n- **#786 and #720.** PORT-010 recognises S3 same-name siblings and S6 Unix-only modules\n  under the approved 2026-10-31 cut. Other shapes use reasoned site allowances;\n  unallowed real parity gaps still report.\n- **#786 other shapes, including S8.** These use a per-site\n  `#[sc_lint(allow(PORT-010), reason = \"...\")]` (ADR-022 decision 4).\n- **#198.** Lint steps accept `env` and `cwd` exactly as test command\n  selectors do (ADR-016 \"per-step/per-layer `env`\"; ADR-022 decision 3.2). No\n  setup hook or interpreter-selection key is added (ADR-022 decision 6).\n- **#136.** SCB-MANIFEST-004 does not report a `self::`, `super::` or\n  `crate::` path, or a local `mod`, named like an owned dependency, because\n  that is not \"a configured ownership violation\" (REQ-SCB-019). Owner `tests/`\n  roots in `allowed_source_roots` are documented as the supported\n  configuration.\n- **#385 and #195.** m-2 adds SCB-CYCLE-001 path filtering; m-3 preserves\n  both failed-step streams and writes every step output under the logger\n  root's steps/ directory.\n- **Every sprint** traces to its issue and to the REQ or ADR it implements,\n  and carries a deterministic regression for atm-core's reported case.\n\n## Out of scope\n\n- Blanket suppression: disabling a rule, a repository-wide exclusion, or\n  widening allowed roots beyond the owner's own targets.\n- New orchestration in the product: setup hooks, interpreter selection, or\n  required recipe or CI shapes.\n- atm-core gaps not on the P1 list (#783, #784), the 0.8.3\n  release-platform work, and process or tooling changes.\n- The rest of ADR-022, such as the shared unknown-key check and required\n  `reason`. It becomes later work unless a P1 item needs it.\n\n## Anchors\n\nAnchors live in `anchors.json` beside this file (v3; v2 is superseded). Each\nquotes a REQ or ADR sentence, together with the issue evidence that shows the\ngap. Anchors that quote ADR-022 rest on Rand's direction above.\n",
+   "id": "phase-m-intent-v3",
+   "sha256": "be7bdec8ba9ae053efdbef2386bf6334f67dadd97a9800e0391a125322ad1241",
+   "version": "be7bdec8"
+  }
+ },
+ "candidate_minimum": 3,
+ "confidence_reference_threshold": 0.8,
+ "correlation_id": "fix1t-ANC-010",
+ "current_questions": {
+  "addressed": {
+   "criteria": {
+    "no": "The item does not state that outcome: it is silent about PORT-010 site allowances, only investigates or mentions them, changes the attribute without saying PORT-010 skips the annotated item, uses another suppression mechanism, or says annotated items are still reported.",
+    "unclear": "The item names an outcome for an allow(PORT-010) annotated item, but its wording leaves open whether PORT-010 still reports that item.",
+    "yes": "The item states that PORT-010 does not report, or keeps not reporting, an item carrying an allow(PORT-010) site attribute with a reason."
+   },
+   "instructions": "Does `item.text` commit to this outcome, either as new work or by keeping it working: an item that carries `#[sc_lint(allow(PORT-010), reason = \"...\")]` is not reported by PORT-010? Accept words such as honour, skip, suppress, exempt, records no finding, or not reported for the annotated item, function or declaration. Investigating, discussing or documenting site allowances without committing to that outcome does not count, and neither does a change to the attribute that never says PORT-010 leaves the annotated item unreported. Judge presence of the outcome only; do not judge conflict.",
+   "type": "choice"
+  },
+  "contradicted": {
+   "criteria": {
+    "no": "Nothing in the item conflicts with PORT-010 leaving an annotated item unreported, whether or not the item mentions site allowances.",
+    "unclear": "The item says something about PORT-010 allowances that might or might not leave an annotated item reported.",
+    "yes": "The item states that an allow(PORT-010) annotated item is still reported, that PORT-010 ignores, drops or refuses the site allowance, or that per-item PORT-010 allowances are not provided."
+   },
+   "instructions": "Does `item.text` state a plan or outcome that `anchor.statement` rules out? It does when the item says PORT-010 still reports an item carrying `#[sc_lint(allow(PORT-010), reason = \"...\")]`, that PORT-010 ignores or no longer supports that site allowance, or that per-item PORT-010 allowances will not be provided and a broader mechanism is used instead. Silence about site allowances, planning only to investigate them, requiring the `reason`, or limiting the allowance to the annotated item or to the PORT-010 rule is not a conflict. Judge conflict only.",
+   "type": "choice"
+  },
+  "relevant": {
+   "criteria": {
+    "no": "The item does not touch PORT-010 site allowances: it changes which shapes PORT-010 reports without mentioning allow attributes, concerns allowances for other rules only, or is other work such as lint-step env or cwd, SCB-MANIFEST rules or release work.",
+    "unclear": "The item text is too vague to tell whether it touches PORT-010 site allowances.",
+    "yes": "The item adds, changes, removes or reworks PORT-010's handling of a per-site #[sc_lint(allow(...))] allowance, including parsing allow(PORT-010) or replacing per-item PORT-010 allowances with another mechanism."
+   },
+   "instructions": "Does the work in `item.text` add, change or remove how a per-site `#[sc_lint(allow(...))]` attribute allows PORT-010 findings, or set whether PORT-010 honours such an attribute? PORT-010 work that never mentions site allowances, such as recognising companion shapes or keeping real parity gaps reported, is a different subject, and so are site allowances for rules other than PORT-010. Judge overlap of subject matter only. Do not judge whether the item obeys `anchor.statement`.",
+   "type": "choice"
+  }
+ },
+ "diagnostic_plan": {
+  "read_only": true,
+  "sha256": "5bc75cab74535344f568998f87491a7ed8117e7c90c978d88ed796cb6509f0c3",
+  "source_kind": "markdown",
+  "source_ref": "docs/plans/phase-m/v3/anchor-runs/plan-gate-review-fix1-20261031/lint-m-1.item.txt"
+ },
+ "gate": "planning",
+ "operation": "tune",
+ "production_confidence_threshold": 0.6,
+ "repeat_count": 2,
+ "runtime": {
+  "agent": "anchor-tuning",
+  "contract_script": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/.claude/skills/plan-anchoring/scripts/anchor_tuning_contract.py",
+  "contract_sha256": "54994057b438af143467e1d71ab6395b519cc7771ef14a699cad3f07a5b41da2",
+  "harness": "claude",
+  "model": "opus",
+  "script": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m/.claude/skills/plan-anchoring/scripts/jev_judge.py",
+  "sha256": "04d78dae03229cf83fb4f9d66338f0f68e1b038ecc441ad9b1bdbec9f33b7e36",
+  "version": "0.4.5",
+  "workspace": "/Users/randlee/github/sc-lint-worktrees/plan/phase-m"
+ },
+ "schema_version": "2.0.0",
+ "template": {
+  "id": "anchor-tuning-tune-request",
+  "sha256": "d8d6796121bb8155af53277053b25fe9cf99ead86ba55f51b19df8962b441ed3",
+  "version": "0.4.1"
+ },
+ "tournament_protocol_version": "plan-anchor/question-tournament/2.0.0",
+ "tuning_history": {
+  "events": [
+   {
+    "authority": {
+     "anchor_id": "ANC-010",
+     "anchor_record_sha256": "438bab4a07531912550a21079a5c2b78d43727f3c2f506cd10a685e32a6f46fb",
+     "anchor_version": 2,
+     "intent_id": "phase-m-intent-v3",
+     "intent_sha256": "d3c5601faf00d84efa049558b468ab551dbaed7796edea489d51e6ef91c6cdb5",
+     "intent_version": "c12b6f2c"
+    },
+    "candidate": {
+     "candidate_id": "C3",
+     "question_sha256": "b15e5a2814997b8374716908fd24d93608353f84cbb78f87d1aef4de36aa134f"
+    },
+    "decision": {
+     "question_set_sha256": null,
+     "reason_code": "TOURNAMENT.RANKED_BELOW_SELECTED",
+     "status": "rejected"
+    },
+    "event": "candidate_evaluated",
+    "event_index": 1,
+    "evidence": {
+     "canonical_request_sha256": [
+      "02bd3dfe733274609530f32b2e91156acd7b3e0e418311ca02597b6037e2fe01",
+      "12a7e2153706f39605316afa68a19a5b82364658b8436c15afa1011810575a7d",
+      "1527d4de2c7474515ada81875e1c201c3aa775521412a87132a015ed89066e91",
+      "1695a9175f466b19f7651ff9d96b3805bf0a6373c945f87477d9db23a87e0627",
+      "1fc1480ad25c6acc908458271b0d1feefa99c6cd5490d64392a756dc9684efa9",
+      "21efd914956b05ed30ae032c3dc820fecf909c83de221c3c21f34e804ed73b55",
+      "22a2c0314ee753c729f9a3b935229ad30e282c5234d799745e8fb19b4ee84353",
+      "5ce4e0b7cc17459a2fa8ee783f0ac75a63aa9bea8a280d16cc274d9fede9a477",
+      "65689d247e5dd13d5e1cf8aa49f043248f214ad68389de40c5cba7b5bbc47209",
+      "6835b8d1ecccfdfb0dd184c1026633f72dd0baf7e704b74f9f3de9005bd6593a",
+      "98f8bce53bd86548b491571bc16c73d55c7729c8ad59ab9de934958cf939e873",
+      "b33fa99ca34b169cb35ce39bc60adf5679e56685f5bd76e87005a89bc2a9e091",
+      "b5b1e051d6d2f07d89e51a2705fd87f291b2884c8d9b9fe49e180f3d40a79fd9",
+      "b6f652f821f6abe371c3220cba5702bb428f9ab73d5e4e0296394088cf2414e3",
+      "b7872e521053c840138ce6ec0b99b87d419a8e02eb3280d7271b53f9339e1eb8",
+      "ebc86b69dbcda80a9e836c235bc0848b9495987f97086791cebe8b41b9842b35",
+      "fffff09b3b9c3a2b55536ddf98f0a6face7cc31d03c7ff1a4c47438c7b2c4e55"
+     ],
+     "raw_response_sha256": [
+      "af74f1b4e9b43a3963582b75bae55540168ea140639b8f04c1afdf9596dccdf9",
+      "af74f1b4e9b43a3963582b75bae55540168ea140639b8f04c1afdf9596dccdf9",
+      "c0a5f9b158df89686e6154d2e7b497e3f0e7b6e683af94a35bf361cafee35311",
+      "4bfc4cef07731c0b44b21ede1a79486d3fe401b23524ab0b1711e45bd8dd8422",
+      "ccf59b6aa68002d5bb90081d733cabe370ad8c96dbb0bd60a101d287031c6e3c",
+      "ccf59b6aa68002d5bb90081d733cabe370ad8c96dbb0bd60a101d287031c6e3c",
+      "597b91293993671331d81d0d0b26d339b829f458789937b951427f1268449c5f",
+      "597b91293993671331d81d0d0b26d339b829f458789937b951427f1268449c5f",
+      "f68e010a8bb619d05696ed7380ae4001c87e5020abe0ed60ed070c747fe1afa9",
+      "f68e010a8bb619d05696ed7380ae4001c87e5020abe0ed60ed070c747fe1afa9",
+      "9ed6c2964eb31742d7ad773fe829aa0351c84ebdd9f926e3de609caac07f5700",
+      "9ed6c2964eb31742d7ad773fe829aa0351c84ebdd9f926e3de609caac07f5700",
+      "58872f9e1a76d2f127e57bd45bcd33ec28d98a4225c5717f25125839c0bbdc93",
+      "402f9ffec2c78052a1fd93680b1af061d850f8bbf662ef4c8d0622ba1bec41c3",
+      "ccd3d06219431515fe171b157b8d9579136f9576a430c1ca1b5ade7f8edf5ed3",
+      "ccd3d06219431515fe171b157b8d9579136f9576a430c1ca1b5ade7f8edf5ed3",
+      "32f20be23a04e1118be21fb6957569690f3bad96fd534ebae769d54f5029f5ab",
+      "32f20be23a04e1118be21fb6957569690f3bad96fd534ebae769d54f5029f5ab",
+      "2c3c9b8b9d722c2710c117fdd9f53f14076b225004e52f2d93c9be520c1668f4",
+      "2c3c9b8b9d722c2710c117fdd9f53f14076b225004e52f2d93c9be520c1668f4",
+      "84d7322d82d1bf7b9aefe0a1b99eda75ed2e6a59c9ebe1b261505222014748bd",
+      "84d7322d82d1bf7b9aefe0a1b99eda75ed2e6a59c9ebe1b261505222014748bd",
+      "96210344c1f79800eaa44f1b3ebafd701e6154629e8b978bc0cddbb2257373e2",
+      "ebb04ae5b195d4a90bf98c95e2c1bc0ecae985bfdbca2e3796c63e6f9155fc9c",
+      "468bf1dd92273da2546c55af416e1ee09f519407da7d54a84fcb66fdf0778a37",
+      "468bf1dd92273da2546c55af416e1ee09f519407da7d54a84fcb66fdf0778a37",
+      "53ac1322c5ede0df7205a32ac9b70755bd39ac9f2032491880b7a1b63f7e7d08",
+      "53ac1322c5ede0df7205a32ac9b70755bd39ac9f2032491880b7a1b63f7e7d08",
+      "febd327eab1d0c5216bf31ec66948b76d66ca37f018d95792cf14b993803af8c",
+      "febd327eab1d0c5216bf31ec66948b76d66ca37f018d95792cf14b993803af8c",
+      "62bf4ccc898914fca42b412b274b7d625d36024f5c7afc2e8056773362b91366",
+      "62bf4ccc898914fca42b412b274b7d625d36024f5c7afc2e8056773362b91366",
+      "ebc042e0fe300cba74fc623f4eccc4579970287d4a650829f4085c901c762ec0",
+      "c772ae811757d063989f8b97f58873d5076ae479892bf7e3966c3f4235a9f8f1"
+     ],
+     "run_ids": [
+      "v3-ANC-010-planning/C3/FX-PASS-1/r1",
+      "v3-ANC-010-planning/C3/FX-PASS-1/r2",
+      "v3-ANC-010-planning/C3/FX-FAIL-1/r1",
+      "v3-ANC-010-planning/C3/FX-FAIL-1/r2",
+      "v3-ANC-010-planning/C3/P-COMPLY-1/r1",
+      "v3-ANC-010-planning/C3/P-COMPLY-1/r2",
+      "v3-ANC-010-planning/C3/P-COMPLY-2/r1",
+      "v3-ANC-010-planning/C3/P-COMPLY-2/r2",
+      "v3-ANC-010-planning/C3/P-PRESERVE/r1",
+      "v3-ANC-010-planning/C3/P-PRESERVE/r2",
+      "v3-ANC-010-planning/C3/P-SILENT-1/r1",
+      "v3-ANC-010-planning/C3/P-SILENT-1/r2",
+      "v3-ANC-010-planning/C3/P-SILENT-2/r1",
+      "v3-ANC-010-planning/C3/P-SILENT-2/r2",
+      "v3-ANC-010-planning/C3/P-TOPICAL/r1",
+      "v3-ANC-010-planning/C3/P-TOPICAL/r2",
+      "v3-ANC-010-planning/C3/P-CONFLICT-1/r1",
+      "v3-ANC-010-planning/C3/P-CONFLICT-1/r2",
+      "v3-ANC-010-planning/C3/P-CONFLICT-2/r1",
+      "v3-ANC-010-planning/C3/P-CONFLICT-2/r2",
+      "v3-ANC-010-planning/C3/P-CONFLICT-3/r1",
+      "v3-ANC-010-planning/C3/P-CONFLICT-3/r2",
+      "v3-ANC-010-planning/C3/P-BLANKET/r1",
+      "v3-ANC-010-planning/C3/P-BLANKET/r2",
+      "v3-ANC-010-planning/C3/P-REASON/r1",
+      "v3-ANC-010-planning/C3/P-REASON/r2",
+      "v3-ANC-010-planning/C3/P-RULE-SPECIFIC/r1",
+      "v3-ANC-010-planning/C3/P-RULE-SPECIFIC/r2",
+      "v3-ANC-010-planning/C3/P-SINGLE-SITE/r1",
+      "v3-ANC-010-planning/C3/P-SINGLE-SITE/r2",
+      "v3-ANC-010-planning/C3/P-IRRELEVANT-1/r1",
+      "v3-ANC-010-planning/C3/P-IRRELEVANT-1/r2",
+      "v3-ANC-010-planning/C3/P-IRRELEVANT-2/r1",
+      "v3-ANC-010-planning/C3/P-IRRELEVANT-2/r2"
+     ]
+    },
+    "oracle": {
+     "case_count": 17,
+     "case_ids": [
+      "FX-PASS-1",
+      "FX-FAIL-1",
+      "P-COMPLY-1",
+      "P-COMPLY-2",
+      "P-PRESERVE",
+      "P-SILENT-1",
+      "P-SILENT-2",
+      "P-TOPICAL",
+      "P-CONFLICT-1",
+      "P-CONFLICT-2",
+      "P-CONFLICT-3",
+      "P-BLANKET",
+      "P-REASON",
+      "P-RULE-SPECIFIC",
+      "P-SINGLE-SITE",
+      "P-IRRELEVANT-1",
+      "P-IRRELEVANT-2"
+     ],
+     "repeat_count": 2,
+     "sha256": "55859baae6a39557803daf733ff5382fe37f0457a00b728b0685d982e56ae067"
+    },
+    "previous_event_sha256": null,
+    "protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "score": {
+     "confidence": {
+      "cells_at_or_above_threshold": 49,
+      "mean": 0.9845,
+      "median": 1.0,
+      "minimum": 0.68,
+      "p10": 0.98,
+      "threshold": 0.8,
+      "total_cells": 51
+     },
+     "exact_role_cells": 51,
+     "exact_semantic_verdicts": 17,
+     "regressions": 0,
+     "stable_cases": 17,
+     "total_cases": 17,
+     "total_role_cells": 51,
+     "total_semantic_verdicts": 17
+    },
+    "supersedes": {
+     "decision_sha256": "890c3293c445c2926eb3241bd91e6ba02ac5dfeeb616714d5da422410313813e",
+     "protocol_version": "plan-anchor/tuning-history/2:genesis"
+    }
+   },
+   {
+    "authority": {
+     "anchor_id": "ANC-010",
+     "anchor_record_sha256": "438bab4a07531912550a21079a5c2b78d43727f3c2f506cd10a685e32a6f46fb",
+     "anchor_version": 2,
+     "intent_id": "phase-m-intent-v3",
+     "intent_sha256": "d3c5601faf00d84efa049558b468ab551dbaed7796edea489d51e6ef91c6cdb5",
+     "intent_version": "c12b6f2c"
+    },
+    "candidate": {
+     "candidate_id": "C2",
+     "question_sha256": "816be7376d19eae5a1cb322fc9d55d6da52c709d44a5f27301e80282c21ab5a2"
+    },
+    "decision": {
+     "question_set_sha256": null,
+     "reason_code": "TOURNAMENT.RANKED_BELOW_SELECTED",
+     "status": "rejected"
+    },
+    "event": "candidate_evaluated",
+    "event_index": 2,
+    "evidence": {
+     "canonical_request_sha256": [
+      "0a814a97a5176a65fc624b90ff689919d08f7acf7b97511f7b1a0a1ac9a33286",
+      "26aff81a748b3bc174e721ba6e2f98ef9f93ee0106001d01de4bf2c96d1ef90b",
+      "301290b42b95a53d090d235e605badc930139c33565cfc5284a1b7716b05673c",
+      "4b7a6bb10ba2354d2e0b2ceeff93843e63de7b3562ec068dda2db77514efa465",
+      "4cd91a357e35d53e2a5fa12b1faed01fecef77bbf148134ee0a0f141f0e12731",
+      "4d14328b6538259d106857d55f4a4fc9cbb491a40e3e8755926b3fc47571bd5f",
+      "5dacee41316b0216e4feb006ca9732a3f29dcdf6dd3bd06b1c21b78e1d9b45ee",
+      "64f50d49a8a13187eada9f3f9fbd843c946a0df399fb384f6c7e55b2372d16a3",
+      "7c38765721bb4348eaa695b8f5a165ca913320a715380052e8b90b883d037eec",
+      "917830708bfe24c42fececb124a74533d194949c49579c51df1b80f68687cc80",
+      "95a5352ced8a8a9581d93da10852f73f66f17aa3d01358ab57011548b61bee8f",
+      "a7e553927f470985e109aeb98ad735573328934b84f041236a7bb7d225a38ba2",
+      "b14fbeba96ade45063399e58f833814f5639231caf236c24b92c1ee79929ec5c",
+      "cf9759ad7e2d7e82f0f6d1be24919668296169328c67ce60cf9b8369a779f98f",
+      "d7cb01ddfab83cc87c5aaac612b622c300ccd92b91fe02392950a9d01c5f55f8",
+      "df82dd0f796967c51f20f5f8d42d85b7c56f8db2b4c0fd7cd02e18b161f8d389",
+      "e778fc0641f3adf392552cfa6a1a09f7c3fb6cebb1e9c5b27b7d5900365ff93e"
+     ],
+     "raw_response_sha256": [
+      "88fac52e806271c90d317e5c81be11c51dd2c0ebaffc2fd93b3a7f780af4f279",
+      "351cbe9c7891a9459fc2fad270ba3892df287cbd06bbfc899764f542d8d0f500",
+      "9c6d9a7e01fcec1dd7ca036f9c3cd375550fc3991d20aa369434ba6abd9c8749",
+      "9c6d9a7e01fcec1dd7ca036f9c3cd375550fc3991d20aa369434ba6abd9c8749",
+      "d274ec2be14730a0951c352327f37188aa850639a903d4a802b72dc0eb0ff041",
+      "d274ec2be14730a0951c352327f37188aa850639a903d4a802b72dc0eb0ff041",
+      "fe54d710fa30d4288a2b0fc28ed4bc2a83735dc92f008db45ed0456ab87b00a0",
+      "fe54d710fa30d4288a2b0fc28ed4bc2a83735dc92f008db45ed0456ab87b00a0",
+      "ac4524a6d501fc3905e6350ff753e6e3f7959660034cfe1f524e73a5dd2df536",
+      "ac4524a6d501fc3905e6350ff753e6e3f7959660034cfe1f524e73a5dd2df536",
+      "d1b349327269e533231d8788bc41c67dab1c60986c8cf7bc4cffc5cdbc7a2074",
+      "d1b349327269e533231d8788bc41c67dab1c60986c8cf7bc4cffc5cdbc7a2074",
+      "959c129663f020cd594cc5f09a1dc5131923f7e3561697c80e486d1e71a6faca",
+      "959c129663f020cd594cc5f09a1dc5131923f7e3561697c80e486d1e71a6faca",
+      "b6b78c1f79af2ca109ac6fd9fe3bb085f85a6203085689df232cd8cef98c104f",
+      "b6b78c1f79af2ca109ac6fd9fe3bb085f85a6203085689df232cd8cef98c104f",
+      "40e58297cb640fb28103fdb55a8297c90cf5f3abdfde1df4290e3d3ef232e9c4",
+      "96c6b8e2ab97cae16ea7e0da01f73dcd324c8daafcb7e5bd7eed6e8f1022330f",
+      "c36d6d2ff2d8825549633c00819ebe6a3369eb4ec610778840be74fa0eaf3bdc",
+      "c36d6d2ff2d8825549633c00819ebe6a3369eb4ec610778840be74fa0eaf3bdc",
+      "96c7d8cdd3f62b48de2b679010f7de2e24330a8fe8f556369eeebf7db1bfb599",
+      "96c7d8cdd3f62b48de2b679010f7de2e24330a8fe8f556369eeebf7db1bfb599",
+      "a032416d2cb6abaab318196b8738cd049ae7e86803e35502c08dc98bc9077f41",
+      "b3c3da93c00dcba0194c74ad8a7e2b07af71037ed306e1266d3246e9d6c385fc",
+      "4cfc0ed3d0cab9ab0ed17233f6f8f13c462295bf575d6b920f3c75d28f2e1089",
+      "4cfc0ed3d0cab9ab0ed17233f6f8f13c462295bf575d6b920f3c75d28f2e1089",
+      "27d1e8474519d4d43f94d251a576c7a5c4126407bf0cfa0080d6aae32ca6d830",
+      "27d1e8474519d4d43f94d251a576c7a5c4126407bf0cfa0080d6aae32ca6d830",
+      "3070911d2372773f4f0450635313ae4ea4982a546c1df6f03cc5e3e79e25af8e",
+      "dacbed9b606701c144fa9548768dcd1efe72e4d9eff903f46e9d65fce3545dca",
+      "d3d622ef3b9fe3ede186352e39496560de8a6d7dabd48a5c2bbd09f070cfdf9f",
+      "d3d622ef3b9fe3ede186352e39496560de8a6d7dabd48a5c2bbd09f070cfdf9f",
+      "dd365d717c2eaffd7ac1fb4a419193402428390924fda5623a5a75f57717ca7c",
+      "4ef52226c2babb3a8a379bae017110a65ab8e0fcbd21e59f15c3b3ff91c4c9c7"
+     ],
+     "run_ids": [
+      "v3-ANC-010-planning/C2/FX-PASS-1/r1",
+      "v3-ANC-010-planning/C2/FX-PASS-1/r2",
+      "v3-ANC-010-planning/C2/FX-FAIL-1/r1",
+      "v3-ANC-010-planning/C2/FX-FAIL-1/r2",
+      "v3-ANC-010-planning/C2/P-COMPLY-1/r1",
+      "v3-ANC-010-planning/C2/P-COMPLY-1/r2",
+      "v3-ANC-010-planning/C2/P-COMPLY-2/r1",
+      "v3-ANC-010-planning/C2/P-COMPLY-2/r2",
+      "v3-ANC-010-planning/C2/P-PRESERVE/r1",
+      "v3-ANC-010-planning/C2/P-PRESERVE/r2",
+      "v3-ANC-010-planning/C2/P-SILENT-1/r1",
+      "v3-ANC-010-planning/C2/P-SILENT-1/r2",
+      "v3-ANC-010-planning/C2/P-SILENT-2/r1",
+      "v3-ANC-010-planning/C2/P-SILENT-2/r2",
+      "v3-ANC-010-planning/C2/P-TOPICAL/r1",
+      "v3-ANC-010-planning/C2/P-TOPICAL/r2",
+      "v3-ANC-010-planning/C2/P-CONFLICT-1/r1",
+      "v3-ANC-010-planning/C2/P-CONFLICT-1/r2",
+      "v3-ANC-010-planning/C2/P-CONFLICT-2/r1",
+      "v3-ANC-010-planning/C2/P-CONFLICT-2/r2",
+      "v3-ANC-010-planning/C2/P-CONFLICT-3/r1",
+      "v3-ANC-010-planning/C2/P-CONFLICT-3/r2",
+      "v3-ANC-010-planning/C2/P-BLANKET/r1",
+      "v3-ANC-010-planning/C2/P-BLANKET/r2",
+      "v3-ANC-010-planning/C2/P-REASON/r1",
+      "v3-ANC-010-planning/C2/P-REASON/r2",
+      "v3-ANC-010-planning/C2/P-RULE-SPECIFIC/r1",
+      "v3-ANC-010-planning/C2/P-RULE-SPECIFIC/r2",
+      "v3-ANC-010-planning/C2/P-SINGLE-SITE/r1",
+      "v3-ANC-010-planning/C2/P-SINGLE-SITE/r2",
+      "v3-ANC-010-planning/C2/P-IRRELEVANT-1/r1",
+      "v3-ANC-010-planning/C2/P-IRRELEVANT-1/r2",
+      "v3-ANC-010-planning/C2/P-IRRELEVANT-2/r1",
+      "v3-ANC-010-planning/C2/P-IRRELEVANT-2/r2"
+     ]
+    },
+    "oracle": {
+     "case_count": 17,
+     "case_ids": [
+      "FX-PASS-1",
+      "FX-FAIL-1",
+      "P-COMPLY-1",
+      "P-COMPLY-2",
+      "P-PRESERVE",
+      "P-SILENT-1",
+      "P-SILENT-2",
+      "P-TOPICAL",
+      "P-CONFLICT-1",
+      "P-CONFLICT-2",
+      "P-CONFLICT-3",
+      "P-BLANKET",
+      "P-REASON",
+      "P-RULE-SPECIFIC",
+      "P-SINGLE-SITE",
+      "P-IRRELEVANT-1",
+      "P-IRRELEVANT-2"
+     ],
+     "repeat_count": 2,
+     "sha256": "55859baae6a39557803daf733ff5382fe37f0457a00b728b0685d982e56ae067"
+    },
+    "previous_event_sha256": "2e9b1625ec2b43b6b362722e4766c43f770fcf129dcc5dd4ee01ecb254f2a97e",
+    "protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "score": {
+     "confidence": {
+      "cells_at_or_above_threshold": 49,
+      "mean": 0.9741,
+      "median": 1.0,
+      "minimum": 0.67,
+      "p10": 0.91,
+      "threshold": 0.8,
+      "total_cells": 51
+     },
+     "exact_role_cells": 51,
+     "exact_semantic_verdicts": 17,
+     "regressions": 0,
+     "stable_cases": 17,
+     "total_cases": 17,
+     "total_role_cells": 51,
+     "total_semantic_verdicts": 17
+    },
+    "supersedes": {
+     "decision_sha256": "890c3293c445c2926eb3241bd91e6ba02ac5dfeeb616714d5da422410313813e",
+     "protocol_version": "plan-anchor/tuning-history/2:genesis"
+    }
+   },
+   {
+    "authority": {
+     "anchor_id": "ANC-010",
+     "anchor_record_sha256": "438bab4a07531912550a21079a5c2b78d43727f3c2f506cd10a685e32a6f46fb",
+     "anchor_version": 2,
+     "intent_id": "phase-m-intent-v3",
+     "intent_sha256": "d3c5601faf00d84efa049558b468ab551dbaed7796edea489d51e6ef91c6cdb5",
+     "intent_version": "c12b6f2c"
+    },
+    "candidate": {
+     "candidate_id": "C0",
+     "question_sha256": "8e9e29b043185ff7a76912e1d28726222bcd3fc867dcabb78a9bef523029ec05"
+    },
+    "decision": {
+     "question_set_sha256": null,
+     "reason_code": "TOURNAMENT.SEMANTIC_MISMATCH",
+     "status": "rejected"
+    },
+    "event": "candidate_evaluated",
+    "event_index": 3,
+    "evidence": {
+     "canonical_request_sha256": [
+      "06295e94c14bc2a5a074fc1c8fcc40079927014dfc6409e65e69ceb93c0c2a79",
+      "0b2b05d6e21d5d0ea3deaae08f26d8130ed229ba21702476f21f91f74ecaa651",
+      "1026e3ee456f705dc89585206200457836388426e0241e684591cb875ff28ac0",
+      "1d41f01579284c894f2490d07053b470d226c29594a8950afc7bdfcd22a60338",
+      "21d87d71c5cb0295e02ccfb80b686be2f2911a2331b5b74ae3e3213dc7f9a7ee",
+      "280aeba6639d999d5d286f3b35eae87bfb4287d7095803e2c02c2834c834a26a",
+      "53aeb8e9dd4e2bf986dec6f839b37543db9f675315f29adcb8a86e46661ffac9",
+      "5875034b3cab1e104121893c339842a75b7c0a3d7398b210dbbc7bd483a9cd5a",
+      "5b53a510d6baf2c01ad5d649b385ba18cf8a1cdf36755420cfc8a61c91f563f9",
+      "5e766c0b2b649718fbc3055e5874d98c1173a2ee52b9c289bc76e4840b0f4e6b",
+      "65cc8266bbb21b960def69b1ddb504f22a21fe050c038af452c04d043f3cfde4",
+      "6f92922ed1c66dd2896677032abc057576995698e3d61e129ce88da81c9ba69b",
+      "ae0b8d4d33e0be0361afe3dd9b0f492d92a9d66430ef9e27a82eac4d93424e1a",
+      "bde7290a87b87c4601f0262251136808cce56aad1b528ffc1abd006c4ffa99d9",
+      "d3be146339a8b6a3f5cc42a42c1366b44d19e52f972bd30c0e56e97b25ae685e",
+      "eacedb041f8cb786f998e49fbf1cfe933451003458120a28d1a04dabdd8dcdd1",
+      "ec151b069a18e5fb0a109c479f4e6e9a52e0264f35dc63c50b011de0b79b33c1"
+     ],
+     "raw_response_sha256": [
+      "0a3968f31f1f6fbcd9f65a12145a61082854ff4159eb2da4dadbbf881593144e",
+      "2f79562779b12578e84e4766a05c588e4912fa79caf5928f7c47ec41381db03a",
+      "425ea037841e70f77d5eeb5c28068447dfa62df10dceace415367d46b71ec0c5",
+      "28f4f30e10ef461744e6ac1e69e532e24ae40602523c050eb9bc2292011fd699",
+      "5a6bc28fbc709e22e1da285d8fddb4491ad6446af92224f15856b8480a86d23f",
+      "926c150a7758ce743e30078487832b86478a63f43730eaba9538ee1b8244892a",
+      "b582c71898e2742c573b312db4cba847308bec779659c513791b68f8601195c5",
+      "6d271fe4ae67eb8f48b18f64536af50aca36dd2a2fe4be0989f2c5faf0b47020",
+      "139f1f7e09b733cee426d2ed62e283d27c581a5fed35a334ec9434bac871e8de",
+      "139f1f7e09b733cee426d2ed62e283d27c581a5fed35a334ec9434bac871e8de",
+      "a9a23cb89926bcff247d165267edcd55db52d3f1df0f49942bd4fabe71cb2b45",
+      "78c318e2986f03f01be790455eaedb2bd95bdfdc02275e1486812ab3634b41e6",
+      "8a0d0b9623c5426c560cb0ff6fe3303a566acdf19abc5fce2b83548099143511",
+      "ceacf8733cc6582055490b650f050c7844aaccbf4f2899c9226be020a07f0807",
+      "7eb5ca5e6ec22e1eee170e521997de2d26ee369076f3b09e3df61dbd6fcac5b4",
+      "625a59e42d6ed1ab8a7cdd559fb4762b8d0552c48b5b938d4bd66b60c0008128",
+      "37c974317e84bea30361f05c25ee3b1a766fcd70124aba40385eb998cee75513",
+      "6f76374353c532132aacaec43cdc3b6ee2b2227662f01d048ec2874d3b5c3f7e",
+      "4f903358e94fa27d325e92c644871617360cef472da378806945bc352b66fd96",
+      "d3e907f4248277e60378fd5c4812db754e76a48a07bef01366c2436b3bd60083",
+      "73e9ad48146cb05e789a77660057cc61a1d4e466c00b6013c56b61f2200b0292",
+      "21923bb90057027a1fb1a06d84c8c0bb4f4fe479cea1737a90e28212d823b145",
+      "6ce306c59c326fd372dea6b4c9a62a6e3a5336f4f30d91923a5e751e4858209f",
+      "11683e6015578041c6e0ad546c0cf68c539ad0b660fabb66b64b09580d23891a",
+      "f2361a7bc65fc6ace6d696eb2e682601a43ed000fc56c78551bd1d89e89871ae",
+      "c859a86c6aca530ace41249295001d633f445fc0c4f3ec3ab16ec3c6db6c3c25",
+      "4b8a35b5394e5fe83f631543539ac15975aa4455e07d15002c493ccb4bf8e2f6",
+      "7f2483f70eb71cb8410a624c4f583c930070125a5de8cccf3f60543f87964c92",
+      "9f7e849765a946963043c0710b0c66c54f6a9d7595e084ffc780607a6c82ee7e",
+      "9b8ec76477f366253f905db4afef069cf06fba85baf81ed7f084bf41b218622f",
+      "ef2b4ea500feefa6c3f05e3873ef15d0db931203fb3dfe2dfa77058c92646dff",
+      "ef2b4ea500feefa6c3f05e3873ef15d0db931203fb3dfe2dfa77058c92646dff",
+      "ae4e61e303f72385fab5ce721d5de4e13fddfb45bc5248953dcc937f5de00069",
+      "1e3a49e7ddaa97df4ba2f278e11012fe66ad658c0056aa88a049fc9af10e601c"
+     ],
+     "run_ids": [
+      "v3-ANC-010-planning/C0/FX-PASS-1/r1",
+      "v3-ANC-010-planning/C0/FX-PASS-1/r2",
+      "v3-ANC-010-planning/C0/FX-FAIL-1/r1",
+      "v3-ANC-010-planning/C0/FX-FAIL-1/r2",
+      "v3-ANC-010-planning/C0/P-COMPLY-1/r1",
+      "v3-ANC-010-planning/C0/P-COMPLY-1/r2",
+      "v3-ANC-010-planning/C0/P-COMPLY-2/r1",
+      "v3-ANC-010-planning/C0/P-COMPLY-2/r2",
+      "v3-ANC-010-planning/C0/P-PRESERVE/r1",
+      "v3-ANC-010-planning/C0/P-PRESERVE/r2",
+      "v3-ANC-010-planning/C0/P-SILENT-1/r1",
+      "v3-ANC-010-planning/C0/P-SILENT-1/r2",
+      "v3-ANC-010-planning/C0/P-SILENT-2/r1",
+      "v3-ANC-010-planning/C0/P-SILENT-2/r2",
+      "v3-ANC-010-planning/C0/P-TOPICAL/r1",
+      "v3-ANC-010-planning/C0/P-TOPICAL/r2",
+      "v3-ANC-010-planning/C0/P-CONFLICT-1/r1",
+      "v3-ANC-010-planning/C0/P-CONFLICT-1/r2",
+      "v3-ANC-010-planning/C0/P-CONFLICT-2/r1",
+      "v3-ANC-010-planning/C0/P-CONFLICT-2/r2",
+      "v3-ANC-010-planning/C0/P-CONFLICT-3/r1",
+      "v3-ANC-010-planning/C0/P-CONFLICT-3/r2",
+      "v3-ANC-010-planning/C0/P-BLANKET/r1",
+      "v3-ANC-010-planning/C0/P-BLANKET/r2",
+      "v3-ANC-010-planning/C0/P-REASON/r1",
+      "v3-ANC-010-planning/C0/P-REASON/r2",
+      "v3-ANC-010-planning/C0/P-RULE-SPECIFIC/r1",
+      "v3-ANC-010-planning/C0/P-RULE-SPECIFIC/r2",
+      "v3-ANC-010-planning/C0/P-SINGLE-SITE/r1",
+      "v3-ANC-010-planning/C0/P-SINGLE-SITE/r2",
+      "v3-ANC-010-planning/C0/P-IRRELEVANT-1/r1",
+      "v3-ANC-010-planning/C0/P-IRRELEVANT-1/r2",
+      "v3-ANC-010-planning/C0/P-IRRELEVANT-2/r1",
+      "v3-ANC-010-planning/C0/P-IRRELEVANT-2/r2"
+     ]
+    },
+    "oracle": {
+     "case_count": 17,
+     "case_ids": [
+      "FX-PASS-1",
+      "FX-FAIL-1",
+      "P-COMPLY-1",
+      "P-COMPLY-2",
+      "P-PRESERVE",
+      "P-SILENT-1",
+      "P-SILENT-2",
+      "P-TOPICAL",
+      "P-CONFLICT-1",
+      "P-CONFLICT-2",
+      "P-CONFLICT-3",
+      "P-BLANKET",
+      "P-REASON",
+      "P-RULE-SPECIFIC",
+      "P-SINGLE-SITE",
+      "P-IRRELEVANT-1",
+      "P-IRRELEVANT-2"
+     ],
+     "repeat_count": 2,
+     "sha256": "55859baae6a39557803daf733ff5382fe37f0457a00b728b0685d982e56ae067"
+    },
+    "previous_event_sha256": "125260f414a8846f68e2504bcdc160887b91c673bb863af91a6016cd78377297",
+    "protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "score": {
+     "confidence": {
+      "cells_at_or_above_threshold": 38,
+      "mean": 0.8365,
+      "median": 0.97,
+      "minimum": 0.13,
+      "p10": 0.42,
+      "threshold": 0.8,
+      "total_cells": 51
+     },
+     "exact_role_cells": 48,
+     "exact_semantic_verdicts": 16,
+     "regressions": 0,
+     "stable_cases": 16,
+     "total_cases": 17,
+     "total_role_cells": 51,
+     "total_semantic_verdicts": 17
+    },
+    "supersedes": {
+     "decision_sha256": "890c3293c445c2926eb3241bd91e6ba02ac5dfeeb616714d5da422410313813e",
+     "protocol_version": "plan-anchor/tuning-history/2:genesis"
+    }
+   },
+   {
+    "authority": {
+     "anchor_id": "ANC-010",
+     "anchor_record_sha256": "438bab4a07531912550a21079a5c2b78d43727f3c2f506cd10a685e32a6f46fb",
+     "anchor_version": 2,
+     "intent_id": "phase-m-intent-v3",
+     "intent_sha256": "d3c5601faf00d84efa049558b468ab551dbaed7796edea489d51e6ef91c6cdb5",
+     "intent_version": "c12b6f2c"
+    },
+    "candidate": {
+     "candidate_id": "C1",
+     "question_sha256": "4e580a4a89b7972c853f66af5a18df04f1f91cbb9feac3983f163caab4399616"
+    },
+    "decision": {
+     "question_set_sha256": "4e580a4a89b7972c853f66af5a18df04f1f91cbb9feac3983f163caab4399616",
+     "reason_code": "TOURNAMENT.SEALED",
+     "status": "sealed"
+    },
+    "event": "question_set_sealed",
+    "event_index": 4,
+    "evidence": {
+     "canonical_request_sha256": [
+      "015669f8c54f9c359e07f5ea7c4f1c93d12639224348dd9c2470f9b75e521b85",
+      "043d0dbba3a13b639c0699cce7c1a8d3f9bf25b646777ea667ee121b82f38b13",
+      "23dd9a4821015e3aedb3aadf305501ce0f130619061ac724a212ea21b03dbb68",
+      "4057e8c5a204f4a07bf4b2b1bca373f7d6d39dae3b55e25ca86721d61e128a36",
+      "4b89fdc0384d98892ec603b7164259dfbfc4073cf77b7f980811899fe00334bc",
+      "6ad3138a35cf9ed88e82f656a61c5e94145ccd58dd95a266f5cd52d14a75cff7",
+      "6ba023f775ed02d2f4ce3f2a136fd8ec2b5a2f8c1124a94f7ae5be4c421a0ce0",
+      "879a374482760d8557538e1eea254d1026bb8a4e1354ab18f72a00c920e934b0",
+      "94aaaefa25a7051c33e431fb7f0adbec25550b5f3a755ce83e9b87f2419d3a71",
+      "9e1bcfdfa270df6d62b955fa07d67e04d412e91171b03bd4b454c58a49021752",
+      "9eb3a4bb310acf7d199b44410ed88e7b34bf020d397be657317f19148d92f908",
+      "9febfeb8db225d98055be6c7b274a0699e2fb0a3c566bfd80e93bc0ca12f1b18",
+      "c0501fc307006d44414abc74a2326ee689cf33c10d95d5bffd51de74150161bd",
+      "c4a833615d0d73a977ee2ea35545988703c56af089ec90f2de397fb104e657bd",
+      "cb3cee1ca29394191f20c3a4cf00c5dc918ff76d33279e7bab014ca02ca6bc00",
+      "fadba390a353061d23bf38095f4d53cafe10818311f8d419d759dc6ae89b1bf5",
+      "fe980baee7b2062449133563291f748f5d8e42482270d14bb28092d380d651d2"
+     ],
+     "raw_response_sha256": [
+      "0cee65e6717e8d8246508edd44c0e60c1e8e0defecfca76811252839063a8de4",
+      "0cee65e6717e8d8246508edd44c0e60c1e8e0defecfca76811252839063a8de4",
+      "adbc7a0a61ac855e600e15fb16759db8b24ce34c8e89e8f1cf4be7b48061c5ac",
+      "5bd9d0dab95bb86663067f3375623160a642f07e51a9408d8b3759d989fe5e78",
+      "6fad78fd159d9f9217d69b08641523f00912c50fd677e576901955273d78806d",
+      "6fad78fd159d9f9217d69b08641523f00912c50fd677e576901955273d78806d",
+      "9c31924ed10598e1dfce40056e61bbd91940842df303ad9ec3f96dae39bc8781",
+      "9c31924ed10598e1dfce40056e61bbd91940842df303ad9ec3f96dae39bc8781",
+      "0338d8d1cda54783cd2a03a2cb4a9280160ab43a49d3110ebcec98f6f5d1b105",
+      "0338d8d1cda54783cd2a03a2cb4a9280160ab43a49d3110ebcec98f6f5d1b105",
+      "8a8737c1c0b9359488d84d0fc0bdd703e3d5a9543c6de7b0c9e31fa67a59aefc",
+      "154f7b9c7263e3994b43c28b642baab897efd908615839f74d9a8199346e6286",
+      "79d5371554db32f0290aa8bc004ec080f087a91642cfaa01ac93a594df751fb8",
+      "854d8c78e403149e9a8191289161bd6d028991d88664acaf4d80898977284238",
+      "bc0341d833522828605a11707a20f1e1ebace29985d4264549c5e7f8e1ac7b53",
+      "bc0341d833522828605a11707a20f1e1ebace29985d4264549c5e7f8e1ac7b53",
+      "f5f4cacca7a8221b4205a9c91fdd75813f6ce4b9df19b1216a85f3b3906af23f",
+      "f5f4cacca7a8221b4205a9c91fdd75813f6ce4b9df19b1216a85f3b3906af23f",
+      "da31a5e1445c3ac0050bb07448ff9d9afd354246034eaadc3968f3d10d7cfee3",
+      "da31a5e1445c3ac0050bb07448ff9d9afd354246034eaadc3968f3d10d7cfee3",
+      "c70e2cab850b6d961322453c7c705cba7e44ff1427812289479380a11b1c3074",
+      "c70e2cab850b6d961322453c7c705cba7e44ff1427812289479380a11b1c3074",
+      "e48ceead27eb5770c3bf4a96e5c764b24bead336da57873288eb0c0503d41d86",
+      "ba4fd55d39d1f4d0e8bfba6b47da0fcb08029899555cf13a7283418613aec41f",
+      "a42bf082d33aa70a22fce788614d079df5173b8cc06973e35fb10e758c322f42",
+      "a42bf082d33aa70a22fce788614d079df5173b8cc06973e35fb10e758c322f42",
+      "a399034bd49cfb4ca6cb5c76ef9aad151f33706fe4617f79887989a1491b1833",
+      "a399034bd49cfb4ca6cb5c76ef9aad151f33706fe4617f79887989a1491b1833",
+      "04a5a7fb620d467355daaac8002c072c539fbac93050016a04d988bbc12121d3",
+      "04a5a7fb620d467355daaac8002c072c539fbac93050016a04d988bbc12121d3",
+      "2f36018bcdfca7b2885600489d4874c23993b7281a9faba453b86a3e5a4d4bd2",
+      "2f36018bcdfca7b2885600489d4874c23993b7281a9faba453b86a3e5a4d4bd2",
+      "2459e9dd1161346ab00b2b276024a435770dec3412f622c4ec154c7942656bb8",
+      "2459e9dd1161346ab00b2b276024a435770dec3412f622c4ec154c7942656bb8"
+     ],
+     "run_ids": [
+      "v3-ANC-010-planning/C1/FX-PASS-1/r1",
+      "v3-ANC-010-planning/C1/FX-PASS-1/r2",
+      "v3-ANC-010-planning/C1/FX-FAIL-1/r1",
+      "v3-ANC-010-planning/C1/FX-FAIL-1/r2",
+      "v3-ANC-010-planning/C1/P-COMPLY-1/r1",
+      "v3-ANC-010-planning/C1/P-COMPLY-1/r2",
+      "v3-ANC-010-planning/C1/P-COMPLY-2/r1",
+      "v3-ANC-010-planning/C1/P-COMPLY-2/r2",
+      "v3-ANC-010-planning/C1/P-PRESERVE/r1",
+      "v3-ANC-010-planning/C1/P-PRESERVE/r2",
+      "v3-ANC-010-planning/C1/P-SILENT-1/r1",
+      "v3-ANC-010-planning/C1/P-SILENT-1/r2",
+      "v3-ANC-010-planning/C1/P-SILENT-2/r1",
+      "v3-ANC-010-planning/C1/P-SILENT-2/r2",
+      "v3-ANC-010-planning/C1/P-TOPICAL/r1",
+      "v3-ANC-010-planning/C1/P-TOPICAL/r2",
+      "v3-ANC-010-planning/C1/P-CONFLICT-1/r1",
+      "v3-ANC-010-planning/C1/P-CONFLICT-1/r2",
+      "v3-ANC-010-planning/C1/P-CONFLICT-2/r1",
+      "v3-ANC-010-planning/C1/P-CONFLICT-2/r2",
+      "v3-ANC-010-planning/C1/P-CONFLICT-3/r1",
+      "v3-ANC-010-planning/C1/P-CONFLICT-3/r2",
+      "v3-ANC-010-planning/C1/P-BLANKET/r1",
+      "v3-ANC-010-planning/C1/P-BLANKET/r2",
+      "v3-ANC-010-planning/C1/P-REASON/r1",
+      "v3-ANC-010-planning/C1/P-REASON/r2",
+      "v3-ANC-010-planning/C1/P-RULE-SPECIFIC/r1",
+      "v3-ANC-010-planning/C1/P-RULE-SPECIFIC/r2",
+      "v3-ANC-010-planning/C1/P-SINGLE-SITE/r1",
+      "v3-ANC-010-planning/C1/P-SINGLE-SITE/r2",
+      "v3-ANC-010-planning/C1/P-IRRELEVANT-1/r1",
+      "v3-ANC-010-planning/C1/P-IRRELEVANT-1/r2",
+      "v3-ANC-010-planning/C1/P-IRRELEVANT-2/r1",
+      "v3-ANC-010-planning/C1/P-IRRELEVANT-2/r2"
+     ]
+    },
+    "oracle": {
+     "case_count": 17,
+     "case_ids": [
+      "FX-PASS-1",
+      "FX-FAIL-1",
+      "P-COMPLY-1",
+      "P-COMPLY-2",
+      "P-PRESERVE",
+      "P-SILENT-1",
+      "P-SILENT-2",
+      "P-TOPICAL",
+      "P-CONFLICT-1",
+      "P-CONFLICT-2",
+      "P-CONFLICT-3",
+      "P-BLANKET",
+      "P-REASON",
+      "P-RULE-SPECIFIC",
+      "P-SINGLE-SITE",
+      "P-IRRELEVANT-1",
+      "P-IRRELEVANT-2"
+     ],
+     "repeat_count": 2,
+     "sha256": "55859baae6a39557803daf733ff5382fe37f0457a00b728b0685d982e56ae067"
+    },
+    "previous_event_sha256": "1c4797523903cc1367e2e087455be2ffd7909bec60cd2fe6454cc643c6129fb4",
+    "protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "score": {
+     "confidence": {
+      "cells_at_or_above_threshold": 51,
+      "mean": 0.991,
+      "median": 1.0,
+      "minimum": 0.89,
+      "p10": 0.97,
+      "threshold": 0.8,
+      "total_cells": 51
+     },
+     "exact_role_cells": 51,
+     "exact_semantic_verdicts": 17,
+     "regressions": 0,
+     "stable_cases": 17,
+     "total_cases": 17,
+     "total_role_cells": 51,
+     "total_semantic_verdicts": 17
+    },
+    "supersedes": {
+     "decision_sha256": "890c3293c445c2926eb3241bd91e6ba02ac5dfeeb616714d5da422410313813e",
+     "protocol_version": "plan-anchor/tuning-history/2:genesis"
+    }
+   },
+   {
+    "authority": {
+     "anchor_id": "ANC-010",
+     "anchor_record_sha256": "6e9da0417b6dc5623a55ed3125fddf207abef35ef1de93a007b65e5f2316620f",
+     "anchor_version": 3,
+     "intent_id": "phase-m-intent-v3",
+     "intent_sha256": "d3c5601faf00d84efa049558b468ab551dbaed7796edea489d51e6ef91c6cdb5",
+     "intent_version": "c12b6f2c"
+    },
+    "candidate": {
+     "candidate_id": "010-planning-anc3-c1",
+     "question_sha256": "3b9e9da448027003a3592b4768153d0eb6592e9f2254d54410aa83ea521874e9"
+    },
+    "decision": {
+     "question_set_sha256": "3b9e9da448027003a3592b4768153d0eb6592e9f2254d54410aa83ea521874e9",
+     "reason_code": "TOURNAMENT.EXACT_STABLE",
+     "status": "sealed"
+    },
+    "event": "question_set_sealed",
+    "event_index": 5,
+    "evidence": {
+     "canonical_request_sha256": [
+      "eb1ae9e07a5da3fe38ef1d29bd46db0070e0d875225b72752922e20f3e33f2b9",
+      "eb1ae9e07a5da3fe38ef1d29bd46db0070e0d875225b72752922e20f3e33f2b9",
+      "1022b577cf91c8b4181feba071e481f5f2f3bb866d99eef774e17642a1a73f14",
+      "1022b577cf91c8b4181feba071e481f5f2f3bb866d99eef774e17642a1a73f14",
+      "723c4ae709cff5ccbb66568918660e5bc020cd343d66c9205c53e767d8eab041",
+      "723c4ae709cff5ccbb66568918660e5bc020cd343d66c9205c53e767d8eab041",
+      "7978666c9abcb21fb6f3bbb9494d4b9dbbcfa035094c685b2c57680e8492d9d8",
+      "7978666c9abcb21fb6f3bbb9494d4b9dbbcfa035094c685b2c57680e8492d9d8",
+      "10713aca463161dadb646dc7ac6be1a6e1c036a385f7acf05cf91e1e2301d220",
+      "10713aca463161dadb646dc7ac6be1a6e1c036a385f7acf05cf91e1e2301d220",
+      "ac093a580501f9e170763e97e82a6d3c668deec77311d68fedb34fec484b1adc",
+      "ac093a580501f9e170763e97e82a6d3c668deec77311d68fedb34fec484b1adc",
+      "e7a25aa975e47d4e642732af9433e71acaf97650541ab0c2525b8a754e9136e1",
+      "e7a25aa975e47d4e642732af9433e71acaf97650541ab0c2525b8a754e9136e1",
+      "893faf290f5a9a2ecec81c2a0d3fc9905d19f21a982ab1e57649bd826ca4d7ec",
+      "893faf290f5a9a2ecec81c2a0d3fc9905d19f21a982ab1e57649bd826ca4d7ec",
+      "145cff5dd63161a4e2a37dc4989cd741a43e813a900e7192972abeabe141853a",
+      "145cff5dd63161a4e2a37dc4989cd741a43e813a900e7192972abeabe141853a",
+      "51122de019e6bf0358d41ff7e915d3be4e92ab996854462146a03d75f6c44004",
+      "51122de019e6bf0358d41ff7e915d3be4e92ab996854462146a03d75f6c44004",
+      "0a54629aebdde9c0c877b464798b1b0daf414cbe703c47c13464fae495dd539e",
+      "0a54629aebdde9c0c877b464798b1b0daf414cbe703c47c13464fae495dd539e",
+      "876e77c067e0ce4e7e8821ea77e584a2bb59daf3b6cb2b294740bf8ba3813d97",
+      "876e77c067e0ce4e7e8821ea77e584a2bb59daf3b6cb2b294740bf8ba3813d97",
+      "b44b914e9dac8057ee8d45c405ad9f9119bd31c0b89803100c26fdb966dcc71a",
+      "b44b914e9dac8057ee8d45c405ad9f9119bd31c0b89803100c26fdb966dcc71a",
+      "327ce4f0be32d17f65fa28af7649630f15385abdb5c8f6b7f1d3e178c7f5e61d",
+      "327ce4f0be32d17f65fa28af7649630f15385abdb5c8f6b7f1d3e178c7f5e61d",
+      "7360272de1a52930af9fc56f548fdffd56e777c56994b76250eb00eb518816df",
+      "7360272de1a52930af9fc56f548fdffd56e777c56994b76250eb00eb518816df",
+      "581e242a3d8e8ff43f74643c6dbcdca8613fbd6246d0f7bc558566be00dcaaf3",
+      "581e242a3d8e8ff43f74643c6dbcdca8613fbd6246d0f7bc558566be00dcaaf3",
+      "7dedc92160cdbee03c9974e705ccf13f01ccc9c2ed509bc9f9f9e556dd95cc6b",
+      "7dedc92160cdbee03c9974e705ccf13f01ccc9c2ed509bc9f9f9e556dd95cc6b"
+     ],
+     "raw_response_sha256": [
+      "ef920061d89405e5fb3e8144014072102c21cdd18534b1c56ce46c3a9d43ce55",
+      "34e682181db69a481d17ce6786a1404096bff5e60626d16a9a70a87846fd8717",
+      "4141bf0af689f72c77bcfd007a06eee4a5adb8ede7dcae22d61756083de520a7",
+      "d43d056461a5344744c66ec8aa1840df13a98901b4ee574c7320f2f2ecfe87e9",
+      "47ab455fc05c2ffebad10d6873f96e6f2f9d92b40b099e68f41ff42e7a0edebd",
+      "47ab455fc05c2ffebad10d6873f96e6f2f9d92b40b099e68f41ff42e7a0edebd",
+      "1ffab61ea4877677fac740f68693a55f2f9ed3c9138b4b765e0d3b2615911eb9",
+      "4b2fe4e7ce5f48bcc2a96ffee9ef982dd75098afdc7c892d28d5503e07dfa83e",
+      "1a3746ea722e66464128b637c6e1282f146bf0275bfdfcdbf7167192807af0c9",
+      "1a3746ea722e66464128b637c6e1282f146bf0275bfdfcdbf7167192807af0c9",
+      "36c74235d68be938d3169c7fd3bf365df7033af03b9ed94997efda39be0b35fa",
+      "c4345581a3350955b1152eb51c3896198efe4e56b307c6b90175c327ce64fd5d",
+      "3b4ac668621c36232a8bd3bbd6ea31705073b9c06e4aba99a441f44872b7f6d6",
+      "3b4ac668621c36232a8bd3bbd6ea31705073b9c06e4aba99a441f44872b7f6d6",
+      "3960bb521c54e1f6297dec5e402ef3dfdf5929012e80a113f5c6d18b4dddcd66",
+      "3960bb521c54e1f6297dec5e402ef3dfdf5929012e80a113f5c6d18b4dddcd66",
+      "4fa100ee02a5892c19dc24758ca0ba6858be7a9fc49a7682d213139e01daad12",
+      "4fa100ee02a5892c19dc24758ca0ba6858be7a9fc49a7682d213139e01daad12",
+      "80cc3f2f78ece84da95bd640b185b4ee9820de5df5587ea2be0f0aacf9b43791",
+      "80cc3f2f78ece84da95bd640b185b4ee9820de5df5587ea2be0f0aacf9b43791",
+      "9cb7b5d0f4fd4c45b305df9988972a21ce7c01a8fb60ae4173a9363e2cf49847",
+      "9cb7b5d0f4fd4c45b305df9988972a21ce7c01a8fb60ae4173a9363e2cf49847",
+      "6276997bf68ffe4d72d1a73ac26daaf5df330a5d42af9a7395cf9ea6010fc326",
+      "6276997bf68ffe4d72d1a73ac26daaf5df330a5d42af9a7395cf9ea6010fc326",
+      "d098f01e424b0643c20c9dcb55cb007edbe816c7051062a9f087d60da55b3c2f",
+      "d098f01e424b0643c20c9dcb55cb007edbe816c7051062a9f087d60da55b3c2f",
+      "41f257e4fa1fce008a5dd53a6e950363edf9ce68153e1d55b7576ba281dd650d",
+      "41f257e4fa1fce008a5dd53a6e950363edf9ce68153e1d55b7576ba281dd650d",
+      "c4e3ac644b63015add21ad5fe2868d004eda515f86f6c21086234c33bee660b7",
+      "c4e3ac644b63015add21ad5fe2868d004eda515f86f6c21086234c33bee660b7",
+      "bb576b63649a5f00692ceaaaf3b34ebed368e0081e344e752903da9662d7ab4c",
+      "bb576b63649a5f00692ceaaaf3b34ebed368e0081e344e752903da9662d7ab4c",
+      "09c88f5d248eaae771cd1bd0076eabbfc14253e1421090725284a194d91b92ca",
+      "2a8d082cee8613527dbd12fbbb06d804ed8380a9718cb38fba0171fc10580e3e"
+     ],
+     "run_ids": [
+      "v3s-ANC-010-planning-c1-FX-FAIL-1-r1",
+      "v3s-ANC-010-planning-c1-FX-FAIL-1-r2",
+      "v3s-ANC-010-planning-c1-FX-PASS-1-r1",
+      "v3s-ANC-010-planning-c1-FX-PASS-1-r2",
+      "v3s-ANC-010-planning-c1-P-BLANKET-r1",
+      "v3s-ANC-010-planning-c1-P-BLANKET-r2",
+      "v3s-ANC-010-planning-c1-P-COMPLY-1-r1",
+      "v3s-ANC-010-planning-c1-P-COMPLY-1-r2",
+      "v3s-ANC-010-planning-c1-P-COMPLY-2-r1",
+      "v3s-ANC-010-planning-c1-P-COMPLY-2-r2",
+      "v3s-ANC-010-planning-c1-P-CONFLICT-1-r1",
+      "v3s-ANC-010-planning-c1-P-CONFLICT-1-r2",
+      "v3s-ANC-010-planning-c1-P-CONFLICT-2-r1",
+      "v3s-ANC-010-planning-c1-P-CONFLICT-2-r2",
+      "v3s-ANC-010-planning-c1-P-CONFLICT-3-r1",
+      "v3s-ANC-010-planning-c1-P-CONFLICT-3-r2",
+      "v3s-ANC-010-planning-c1-P-IRRELEVANT-1-r1",
+      "v3s-ANC-010-planning-c1-P-IRRELEVANT-1-r2",
+      "v3s-ANC-010-planning-c1-P-IRRELEVANT-2-r1",
+      "v3s-ANC-010-planning-c1-P-IRRELEVANT-2-r2",
+      "v3s-ANC-010-planning-c1-P-OTHER-RULE-ALLOW-r1",
+      "v3s-ANC-010-planning-c1-P-OTHER-RULE-ALLOW-r2",
+      "v3s-ANC-010-planning-c1-P-PARSER-ONLY-r1",
+      "v3s-ANC-010-planning-c1-P-PARSER-ONLY-r2",
+      "v3s-ANC-010-planning-c1-P-REASON-r1",
+      "v3s-ANC-010-planning-c1-P-REASON-r2",
+      "v3s-ANC-010-planning-c1-P-RULE-SPECIFIC-r1",
+      "v3s-ANC-010-planning-c1-P-RULE-SPECIFIC-r2",
+      "v3s-ANC-010-planning-c1-P-SHAPES-ONLY-r1",
+      "v3s-ANC-010-planning-c1-P-SHAPES-ONLY-r2",
+      "v3s-ANC-010-planning-c1-P-SINGLE-SITE-r1",
+      "v3s-ANC-010-planning-c1-P-SINGLE-SITE-r2",
+      "v3s-ANC-010-planning-c1-P-TOPICAL-r1",
+      "v3s-ANC-010-planning-c1-P-TOPICAL-r2"
+     ]
+    },
+    "oracle": {
+     "case_count": 17,
+     "case_ids": [
+      "FX-PASS-1",
+      "FX-FAIL-1",
+      "P-COMPLY-1",
+      "P-COMPLY-2",
+      "P-PARSER-ONLY",
+      "P-TOPICAL",
+      "P-SHAPES-ONLY",
+      "P-CONFLICT-1",
+      "P-CONFLICT-2",
+      "P-CONFLICT-3",
+      "P-BLANKET",
+      "P-REASON",
+      "P-RULE-SPECIFIC",
+      "P-SINGLE-SITE",
+      "P-OTHER-RULE-ALLOW",
+      "P-IRRELEVANT-1",
+      "P-IRRELEVANT-2"
+     ],
+     "repeat_count": 2,
+     "sha256": "046514db9ed23f273ee5898ca24d14a99ed60c0e4d954727923f9126ce6eb1bd"
+    },
+    "previous_event_sha256": "f7ad911fa959d3e2a8d9f1a21fd8d983738df568a7a1665e0ebfb7bf4a603a60",
+    "protocol_version": "plan-anchor/question-tournament/2.0.0",
+    "score": {
+     "confidence": {
+      "cells_at_or_above_threshold": 96,
+      "mean": 0.969,
+      "median": 1.0,
+      "minimum": 0.28,
+      "p10": 0.94,
+      "threshold": 0.8,
+      "total_cells": 102
+     },
+     "exact_role_cells": 102,
+     "exact_semantic_verdicts": 34,
+     "regressions": 0,
+     "stable_cases": 17,
+     "total_cases": 17,
+     "total_role_cells": 102,
+     "total_semantic_verdicts": 34
+    },
+    "supersedes": {
+     "decision_sha256": "e5bba497fd5a8e619249f0da2bbe21ccddf65346212a90d79f2f927699bfe2bb",
+     "protocol_version": "plan-anchor/question-tournament/2.0.0"
+    }
+   }
+  ],
+  "history_id": "v3-ANC-010-planning",
+  "schema": "plan-anchor/tuning-history/2"
+ }
+}
