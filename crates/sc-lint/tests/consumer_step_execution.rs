@@ -124,11 +124,12 @@ fn consumer_failed_step_reports_log_write_failure_with_step_output() {
             .contains("controlled stderr")
     );
     assert!(failed_step["step_log_error"].is_string());
+    let destination = failed_step["step_log_destination"]
+        .as_str()
+        .expect("step log destination");
     assert!(
-        failed_step["step_log_destination"]
-            .as_str()
-            .unwrap()
-            .ends_with("steps/env-cwd.log")
+        Path::new(destination).ends_with(Path::new("steps").join("env-cwd.log")),
+        "unexpected step log destination: {destination}"
     );
 }
 

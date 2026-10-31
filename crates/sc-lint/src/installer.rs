@@ -1491,8 +1491,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn swapped_real_backend_is_rejected_from_staged_and_installed_bundles() {
-        build_release_binaries();
         let fixture = TempDir::new().expect("fixture");
+        let built_binaries = build_release_binaries(&fixture.path().join("cargo-target"));
         let staged_root = fixture.path().join("staged");
         let staged_bin = staged_root.join("bin");
         let staged_docs = staged_root.join("share/sc-lint/sc-lint-docs");
@@ -1501,11 +1501,11 @@ mod tests {
         fs::write(staged_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("staged launcher");
         for backend in MANAGED_BACKENDS {
-            fs::copy(built_backend_binary(backend), staged_bin.join(backend))
+            fs::copy(&built_binaries[*backend], staged_bin.join(backend))
                 .expect("copy staged real backend");
         }
         fs::copy(
-            built_backend_binary(crate::consts::TOOL_RUNTIME),
+            &built_binaries[crate::consts::TOOL_RUNTIME],
             staged_bin.join(crate::consts::TOOL_PORTABILITY),
         )
         .expect("swap staged portability backend");
@@ -1529,11 +1529,11 @@ mod tests {
         fs::write(installed_bin.join(ReleaseTarget::binary_name()), "launcher")
             .expect("installed launcher");
         for backend in MANAGED_BACKENDS {
-            fs::copy(built_backend_binary(backend), installed_bin.join(backend))
+            fs::copy(&built_binaries[*backend], installed_bin.join(backend))
                 .expect("copy installed real backend");
         }
         fs::copy(
-            built_backend_binary(crate::consts::TOOL_RUNTIME),
+            &built_binaries[crate::consts::TOOL_RUNTIME],
             installed_bin.join(crate::consts::TOOL_PORTABILITY),
         )
         .expect("swap installed portability backend");
@@ -1885,17 +1885,18 @@ mod tests {
         let payload_dir = fixture.path().join("payload");
         let archive_root = payload_dir.join(format!("sc-lint_{version}_{}", target.triple));
         let bin_dir = archive_root.join("bin");
-        build_release_binaries();
         fs::create_dir_all(&release_dir).expect("release directory");
         fs::create_dir_all(&bin_dir).expect("archive bin directory");
-        let debug_dir = built_cli_binary()
-            .parent()
-            .expect("debug directory")
-            .to_path_buf();
+        let built_binaries = build_release_binaries(&fixture.path().join("cargo-target"));
         for name in
             std::iter::once(ReleaseTarget::binary_name()).chain(MANAGED_BACKENDS.iter().copied())
         {
-            fs::copy(debug_dir.join(name), bin_dir.join(name)).expect("copy release binary");
+            let binary = built_binaries
+                .get(name)
+                .unwrap_or_else(|| panic!("Cargo build did not produce release binary `{name}`"));
+            fs::copy(binary, bin_dir.join(name)).unwrap_or_else(|error| {
+                panic!("copy release binary `{}`: {error}", binary.display())
+            });
         }
         copy_directory(
             &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs-bundle"),
@@ -1928,6 +1929,18 @@ mod tests {
         )
         .expect("consumer config");
         let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+        let stale_path = fixture.path().join("stale-path");
+        fs::create_dir_all(&stale_path).expect("stale PATH directory");
+        for backend in [crate::consts::TOOL_PORTABILITY, crate::consts::TOOL_RUNTIME] {
+            write_failing_stub(&stale_path.join(backend));
+        }
+        let original_path = env::var_os("PATH").expect("PATH");
+        let controlled_search_path = env::join_paths(
+            std::iter::once(stale_path.as_os_str().to_os_string())
+                .chain(env::split_paths(&original_path).map(|path| path.into_os_string())),
+        )
+        .expect("joined controlled search path");
 
         let release_base: OsString =
             format!("file://{}", fixture.path().join("release").display()).into();
@@ -1973,6 +1986,7 @@ mod tests {
             let output = Command::new(&managed_binary)
                 .args(&args)
                 .current_dir(&workspace)
+                .env("PATH", &controlled_search_path)
                 .output()
                 .expect("managed command starts");
             assert!(
@@ -2110,45 +2124,18 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn built_cli_binary() -> PathBuf {
-        built_artifact_directory().join(ReleaseTarget::binary_name())
-    }
-
-    #[cfg(unix)]
-    fn built_backend_binary(name: &str) -> PathBuf {
-        let name = if cfg!(windows) {
-            format!("{name}.exe")
-        } else {
-            name.to_string()
-        };
-        built_artifact_directory().join(name)
-    }
-
-    #[cfg(unix)]
-    fn built_artifact_directory() -> PathBuf {
-        env::current_exe()
-            .expect("test executable")
-            .parent()
-            .and_then(Path::parent)
-            .expect("target debug directory")
-            .to_path_buf()
-    }
-
-    #[cfg(unix)]
-    fn build_release_binaries() {
-        // `cargo test -p sc-lint --lib` builds the test executable but not the
-        // companion backend executables this fixture copies from target/debug.
-        // Derive Cargo's target directory from the test executable so an
-        // explicit `cargo test --target-dir` is honored by this nested build.
+    fn build_release_binaries(target_dir: &Path) -> std::collections::HashMap<String, PathBuf> {
+        // Build the archive payload into this test's private target directory.
+        // Reusing target/debug lets another test's build state determine which
+        // companion binaries exist when this fixture copies its archive.
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let artifact_directory = built_artifact_directory();
-        let target_dir = artifact_directory.parent().expect("Cargo target directory");
         let mut build = Command::new("cargo");
         build
             .arg("build")
             .arg("--quiet")
             .arg("--target-dir")
             .arg(target_dir)
+            .arg("--message-format=json-render-diagnostics")
             .args([
                 "-p",
                 "sc-lint",
@@ -2161,7 +2148,20 @@ mod tests {
             ])
             .current_dir(&workspace_root);
         build.process_group(0);
+        build.stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut child = build.spawn().expect("build release backend binaries");
+        let stdout = child.stdout.take().expect("Cargo stdout");
+        let stderr = child.stderr.take().expect("Cargo stderr");
+        let stdout_reader = thread::spawn(move || {
+            let mut output = Vec::new();
+            std::io::Read::read_to_end(&mut std::io::BufReader::new(stdout), &mut output)
+                .map(|_| output)
+        });
+        let stderr_reader = thread::spawn(move || {
+            let mut output = Vec::new();
+            std::io::Read::read_to_end(&mut std::io::BufReader::new(stderr), &mut output)
+                .map(|_| output)
+        });
         let build_status = wait_for_backend_probe(
             &mut child,
             Path::new("cargo build"),
@@ -2170,7 +2170,48 @@ mod tests {
             Duration::from_secs(300),
         )
         .expect("release fixture build completes before its deadline");
-        assert!(build_status.success(), "backend binaries build");
+        let stdout = stdout_reader
+            .join()
+            .expect("Cargo stdout reader")
+            .expect("read Cargo stdout");
+        let stderr = stderr_reader
+            .join()
+            .expect("Cargo stderr reader")
+            .expect("read Cargo stderr");
+        assert!(
+            build_status.success(),
+            "release fixture binaries build: {}",
+            String::from_utf8_lossy(&stderr)
+        );
+
+        let mut binaries = std::collections::HashMap::new();
+        for line in String::from_utf8_lossy(&stdout).lines() {
+            let Ok(message) = serde_json::from_str::<Value>(line) else {
+                continue;
+            };
+            if message["reason"] != "compiler-artifact"
+                || !message["target"]["kind"]
+                    .as_array()
+                    .is_some_and(|kinds| kinds.iter().any(|kind| kind == "bin"))
+            {
+                continue;
+            }
+            if let (Some(name), Some(executable)) = (
+                message["target"]["name"].as_str(),
+                message["executable"].as_str(),
+            ) {
+                binaries.insert(name.to_owned(), PathBuf::from(executable));
+            }
+        }
+        for name in
+            std::iter::once(ReleaseTarget::binary_name()).chain(MANAGED_BACKENDS.iter().copied())
+        {
+            assert!(
+                binaries.get(name).is_some_and(|path| path.is_file()),
+                "Cargo did not produce binary `{name}` in its isolated target directory"
+            );
+        }
+        binaries
     }
 
     #[cfg(unix)]
