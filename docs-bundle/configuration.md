@@ -67,12 +67,12 @@ Each analyzer reads only its own `[tool.sc-lint.analyzers.<name>]` table, where
 - `exclude_paths` (globs relative to the workspace root; `**` spans
   directories) drops findings in matching files. In Boundary, only
   `SCB-MANIFEST-001` through `SCB-MANIFEST-006` carry a finding path;
-  `SCB-CYCLE-002` and `SCB-CYCLE-003` instead use the source files behind
+  `SCB-CYCLE-001`, `SCB-CYCLE-002` and `SCB-CYCLE-003` instead use the source files behind
   their nodes, and are excluded when any such file matches.
 - `exclude_paths_by_rule` maps exact rule ids to arrays of workspace-relative
   globs. It drops only findings from that rule at matching paths; other rules
   in the same file still run. Boundary supports `SCB-MANIFEST-001` through
-  `SCB-MANIFEST-006`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
+  `SCB-MANIFEST-006`, `SCB-CYCLE-001`, `SCB-CYCLE-002`, and `SCB-CYCLE-003`. Entries for all
   other Boundary rules are configuration errors naming the rule because their
   findings have no source path; configuration loading rejects them before
   analysis. Remove the entry or choose a rule with source paths.

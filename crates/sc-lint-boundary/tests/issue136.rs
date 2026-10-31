@@ -331,7 +331,7 @@ fn issue136_ownership() {
     fixture.workspace();
     fixture.write(
         "crates/app/src/lib.rs",
-        "// dep::Dep in a comment is ignored.\nconst MENTION: &str = \"dep::Dep\";\n",
+        "// dep::Dep in a comment is ignored.\nconst MENTION: Option<dep::Dep> = None;\n",
     );
     fixture.write("sc-lint.toml", ownership_config);
     let report = analyze_workspace_configured(

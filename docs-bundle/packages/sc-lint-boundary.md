@@ -91,7 +91,10 @@ from the full rule set; it takes precedence over `exclude_rules`, while path
 exclusions still apply and `fail_rules` still determines the verdict. The
 `exclude_paths_by_rule` map takes exact rule IDs and drops only that rule's
 findings at matching paths. For example, excluding one manifest rule does not
-suppress a different rule reported for the same manifest. See
+suppress a different rule reported for the same manifest. `SCB-CYCLE-001`,
+`-002` and `-003` findings carry no path; they are excluded when any source
+file behind their nodes matches, so excluding `SCB-CYCLE-001` on one file
+removes only the cycles built from that file. See
 [configuration](../configuration.md) for the complete filter contract.
 
 `SCB-DEPENDENCY-004` identifies a stale incoming permission. In a neutral
@@ -157,6 +160,32 @@ dependency_package = "fixture-kit"
 allowed_sections = ["dev-dependencies", "target.cfg(unix).dev-dependencies"]
 message = "fixture-kit belongs in declared test sections."
 ```
+
+`allowed_source_roots` lists every source root that may use the owned crate;
+no root is implied. An owner's integration tests live outside its `src`, so
+allow them by listing the owner's `tests/` root as well:
+
+```toml
+[[tool.sc-lint.analyzers.boundary.global_dependency_ownership]]
+dependency = "db-driver"
+allowed_manifest_paths = ["crates/store/Cargo.toml"]
+allowed_source_roots = ["crates/store/src", "crates/store/tests"]
+manifest_message = "Only store may depend on db-driver."
+source_message = "Only store and its integration tests may import db-driver."
+```
+
+A source file outside those roots reports `SCB-MANIFEST-004` when it uses the
+owned crate: a path whose first segment is the crate (`db_driver::Client`,
+`::db_driver::Client`, `use db_driver;`) or `extern crate db_driver`, in any
+position (use, type, expression, pattern, struct literal, trait bound, impl
+header, qualified path or attribute). Paths starting with `self`, `crate` or
+`super` are never uses, and a bare `db_driver::` path is a local module path
+when the same module declares `mod db_driver`. Comments, doc comments and
+string literals are not uses. Attribute argument lists such as
+`#[derive(db_driver::Row)]` are checked as paths. Macro token bodies keep a
+textual match on `db_driver::`, `use db_driver` and `extern crate db_driver`
+after dropping paths that start with `self`, `crate` or `super`; a whole file
+that fails to parse keeps the textual match unchanged.
 
 The manifest allowlist matches the dependency's Cargo package identity,
 including renamed dependency entries. Ownership checks consider both manifest
