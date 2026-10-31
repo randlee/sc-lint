@@ -208,34 +208,7 @@ fn analyze_workspace_configured_with_metadata_loader(
             &analyzer_keys,
             &platform_adapters,
         )
-        .map_err(
-            |source| match source.downcast::<site_allow::SiteAllowError>() {
-                Ok(error) if error.error.code() == "UNKNOWN_RULE" => {
-                    let rule = error.error.cause().split('`').nth(1).unwrap_or_default();
-                    match SiteRuleId::parse(rule.to_owned()) {
-                        Ok(rule) => PortabilityError::UnknownRule {
-                            path: error.path,
-                            line: error.line,
-                            rule,
-                        },
-                        Err(directive_error) => PortabilityError::InvalidSiteAllow {
-                            path: error.path,
-                            line: error.line,
-                            error: directive_error,
-                        },
-                    }
-                }
-                Ok(error) => PortabilityError::InvalidSiteAllow {
-                    path: error.path,
-                    line: error.line,
-                    error: error.error,
-                },
-                Err(source) => PortabilityError::AnalyzeFindings {
-                    root: options.root.clone(),
-                    source: source.into(),
-                },
-            },
-        )?;
+        .map_err(|source| map_portability_analysis_error(source, &options.root))?;
         let scanned_crates = portability::count_scanned_crates(workspace);
         (findings, allowed, scanned_crates)
     } else {
@@ -256,6 +229,35 @@ fn analyze_workspace_configured_with_metadata_loader(
         findings,
         allowed,
     })
+}
+
+fn map_portability_analysis_error(source: anyhow_crate::Error, root: &Path) -> PortabilityError {
+    match source.downcast::<site_allow::SiteAllowError>() {
+        Ok(error) if error.error.code() == "UNKNOWN_RULE" => {
+            let id = error.error.cause().split('`').nth(1).unwrap_or_default();
+            match SiteRuleId::parse(id.to_owned()) {
+                Ok(rule) => PortabilityError::UnknownRule {
+                    path: error.path,
+                    line: error.line,
+                    rule,
+                },
+                Err(directive_error) => PortabilityError::InvalidSiteAllow {
+                    path: error.path,
+                    line: error.line,
+                    error: directive_error,
+                },
+            }
+        }
+        Ok(error) => PortabilityError::InvalidSiteAllow {
+            path: error.path,
+            line: error.line,
+            error: error.error,
+        },
+        Err(source) => PortabilityError::AnalyzeFindings {
+            root: root.to_path_buf(),
+            source: source.into(),
+        },
+    }
 }
 
 pub fn render_findings_report(report: &FindingsReport) -> String {

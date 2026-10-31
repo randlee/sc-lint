@@ -321,20 +321,15 @@ fn visit_block_for_unix_portability(
 ) {
     for stmt in &block.stmts {
         match stmt {
-            Stmt::Item(item) => {
-                let mut module_path =
-                    crate::site_allow::source_file_module_path(&file_context.source_path);
-                parity::visit_item_for_unix_portability(
-                    item,
-                    inherited_scope,
-                    inherited_unix_gated,
-                    inherited_platform_gated,
-                    file_context,
-                    findings,
-                    parity::ParityContext::without_adapters(config),
-                    &mut module_path,
-                )
-            }
+            Stmt::Item(item) => parity::visit_item_for_unix_portability(
+                item,
+                inherited_scope,
+                inherited_unix_gated,
+                inherited_platform_gated,
+                file_context,
+                findings,
+                parity::ParityContext::without_adapters(config),
+            ),
             Stmt::Local(local) => {
                 if let Some(init) = &local.init {
                     visit_expr_for_unix_portability(
