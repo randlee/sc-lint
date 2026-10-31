@@ -115,8 +115,10 @@ heuristic.
    Out-of-line resolution follows `x.rs`, `x/mod.rs` and `#[path]`. An item in
    a module that is compiled on Windows is not covered.
 
-**Fail closed.** A missing or ambiguous module file gives no proof, and the
-finding stays. A production `#[cfg(unix)]` item with no companion and no
+**Fail closed.** A missing or ambiguous module file gives no Unix-only
+proof for items in that file; their findings stay. The exact
+`#[cfg(unix)] mod x;` declaration is exempt independently of file resolution.
+A production `#[cfg(unix)]` item outside S3/S6 with no companion and no
 portable fallback is still reported.
 
 **Everything else uses a site allowance.** The other #786 shapes (helpers of

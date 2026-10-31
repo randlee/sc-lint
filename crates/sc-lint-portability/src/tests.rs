@@ -3288,6 +3288,12 @@ fn port010_s3_same_name_sibling() {
 }
 
 #[test]
+fn port010_real_gap_still_reported() {
+    let report = analyze_single_source("#[cfg(unix)] fn real_gap() {}");
+    assert_eq!(phase_m_port010_items(&report), ["real_gap"]);
+}
+
+#[test]
 fn port010_s3_negatives() {
     let report = analyze_single_source(
         r#"
@@ -3337,7 +3343,7 @@ fn port010_s3_negatives() {
 }
 
 #[test]
-fn port010_s6_unix_module() {
+fn port010_s6_unix_module_decl() {
     let fixture = phase_m_fixture(&[
         (
             "lib.rs",
@@ -3357,7 +3363,7 @@ fn port010_s6_unix_module() {
 }
 
 #[test]
-fn port010_s6_file_module_items() {
+fn port010_s6_items_in_unix_module() {
     let fixture = phase_m_fixture(&[
         ("lib.rs", "#[cfg(unix)] pub mod outer;"),
         (

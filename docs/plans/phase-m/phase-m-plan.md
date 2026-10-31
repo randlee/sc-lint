@@ -9,7 +9,7 @@ relationships; the issue closure checks live on the closure beads.
 | Document | Status | Dispatch effect |
 | --- | --- | --- |
 | [ADR-022](../../sc-lint/adr/ADR-022-tools-and-consumer-configuration.md) | Pending | lint-t6i7 blocks m-4 only |
-| [ADR-010 amendment 2026-10-30](../../sc-lint/adr/ADR-010-portability-scope-and-parity.md) | Pending | lint-m-adr010 blocks m-1 |
+| [ADR-010 amendment 2026-10-30](../../sc-lint/adr/ADR-010-portability-scope-and-parity.md) | Accepted (Rand 2026-10-31) | lint-m-adr010 closed; m-1 unblocked |
 | ADR-021 | Withdrawn | none |
 | REQ-PRODUCT-004AA, REQ-SCB-019, REQ-CLI-021 | Accepted | existing contracts remain effective |
 | [v3 anchors](v3/anchors.json) | Eight kept locked anchors | sealed planning questions unchanged |
@@ -43,8 +43,8 @@ Each stack is one layer rooted on develop. Stack operations follow
 [CLAUDE.md](../../../CLAUDE.md); the lead is the stack writer. The sprint
 beads have no cross-stack must_follow edges. Capacity is two owners:
 clint runs m-1 then m-2; cfast runs m-4 then m-3. These are owner schedules,
-not new dependency gates. Only m-1 waits for
-lint-m-adr010 and only m-4 waits for lint-t6i7. m-2 is governed by REQ-SCB-019 and ADR-020, with the SCB-CYCLE-001
+not new dependency gates. m-1's lint-m-adr010 gate is closed; m-4 waits for
+lint-t6i7. m-2 is governed by REQ-SCB-019 and ADR-020, with the SCB-CYCLE-001
 amendment Pending Rand acceptance before dispatch. m-3 implements existing
 ADR-016, REQ-CLI-023 and ADR-020 decisions 7/9. ADR-022 is context for m-2
 and m-3, not their dispatch gate. Plan review and the planning
@@ -93,8 +93,5 @@ test. No extra adoption run or CI gate is introduced.
 ## Pending Decisions For Rand
 
 1. Accept ADR-022 (lint-t6i7).
-2. Accept the ADR-010 amendment (lint-m-adr010).
-3. S6 public scope: whether pub modules/items are covered or require a site
-   allowance. ANC-006/007 remain locked as written until Rand decides.
-4. Accept the ADR-020 Amendment 2026-10-31 extending path-less exclusions to
+2. Accept the ADR-020 Amendment 2026-10-31 extending path-less exclusions to
    SCB-CYCLE-001 before m-2 dispatch.
