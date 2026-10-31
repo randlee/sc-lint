@@ -2614,18 +2614,18 @@ fn issue372_retains_public_and_unrelated_parity() {
         "unrelated_restricted_api",
         "unrelated_sibling_api",
         "unrelated_child_api",
-        "unpaired_unix_only",
     ] {
         assert!(
             port010.iter().any(|finding| finding.message.contains(name)),
             "PORT-010 must retain `{name}`: {port010:#?}"
         );
     }
+    assert_eq!(port010.len(), 4, "{port010:#?}");
     assert!(
         port010
             .iter()
-            .all(|finding| !finding.message.contains("unix_socket")),
-        "the adapter pair must suppress only its own module: {port010:#?}"
+            .all(|finding| !finding.message.contains("unpaired_unix_only")),
+        "S6 also recognizes an unpaired Unix-only file-module declaration"
     );
     let port004 = report
         .findings
@@ -2660,7 +2660,7 @@ fn port010_unix_fn_in_unpaired_file_reported() {
     fixture.write_source(
         "example",
         "lib.rs",
-        "#[cfg(unix)] mod unix_socket;\n#[cfg(windows)] mod named_pipe;\n#[cfg(unix)] mod other;\n",
+        "#[cfg(unix)] mod unix_socket;\n#[cfg(windows)] mod named_pipe;\nmod other;\n",
     );
     fixture.write_source("example", "other.rs", "#[cfg(unix)] fn helper() {}\n");
     let report = analyze_fixture(&fixture);
@@ -2680,7 +2680,7 @@ fn port010_unix_fn_in_unpaired_file_reported() {
 
 #[test]
 fn port010_pub_unix_item_in_paired_file_keeps_parity_check() {
-    let fixture = paired_adapter_fixture(
+    let fixture = paired_adapter_fixture_with_portable_alias(
         "#[cfg(unix)] pub fn exposed() {}\n#[cfg(unix)] pub(crate) fn restricted() {}\n#[cfg(unix)] pub(super) fn super_restricted() {}\n#[cfg(unix)] pub(in crate) fn crate_restricted() {}\n",
     );
     let report = analyze_fixture(&fixture);
@@ -2705,7 +2705,7 @@ fn port010_pub_unix_item_in_paired_file_keeps_parity_check() {
 
 #[test]
 fn port010_private_unix_method_in_paired_adapter_file_not_reported() {
-    let fixture = paired_adapter_fixture(
+    let fixture = paired_adapter_fixture_with_portable_alias(
         "pub struct Conn;\nimpl Conn {\n#[cfg(unix)] fn private_helper(&self) {}\n#[cfg(unix)] pub fn public_helper(&self) {}\n}\n",
     );
     let report = analyze_fixture(&fixture);
@@ -2731,7 +2731,7 @@ fn port010_private_unix_method_in_paired_adapter_file_not_reported() {
 
 #[test]
 fn port010_trait_impl_unix_method_in_paired_file_keeps_parity_check() {
-    let fixture = paired_adapter_fixture(
+    let fixture = paired_adapter_fixture_with_portable_alias(
         "pub struct Conn;\npub trait Probe { fn probe(&self); }\nimpl Probe for Conn { #[cfg(unix)] fn probe(&self) {} }\n",
     );
     let report = analyze_fixture(&fixture);
@@ -3302,6 +3302,12 @@ fn port010_s3_negatives() {
         #[cfg(unix)] fn other_scope() {}
         mod elsewhere { #[cfg(not(unix))] fn other_scope() {} }
         #[cfg(unix)] fn absent() {}
+        #[cfg(unix)] fn windows_kind() {}
+        #[cfg(windows)] mod windows_kind {}
+        #[cfg(unix)] fn windows_test() {}
+        #[cfg(test)] #[cfg(windows)] fn windows_test() {}
+        #[cfg(unix)] fn fallback_kind() {}
+        mod fallback_kind {}
         struct Widget;
         impl Widget { #[cfg(unix)] fn other_impl(&self) {} }
         impl Widget { #[cfg(not(unix))] fn other_impl(&self) {} }
@@ -3317,12 +3323,15 @@ fn port010_s3_negatives() {
         [
             "absent",
             "different_kind",
+            "fallback_kind",
             "other_impl",
             "other_scope",
             "separate_test_attr",
             "test_only",
             "trait_method",
             "unrelated_cfg",
+            "windows_kind",
+            "windows_test",
         ]
     );
 }
@@ -3516,6 +3525,22 @@ fn paired_adapter_fixture(unix_source: &str) -> WorkspaceFixture {
         "example",
         "named_pipe.rs",
         "#[cfg(unix)] fn windows_private_helper() {}\n",
+    );
+    fixture
+}
+
+/// The same source also has a portable declaration, so S6 cannot prove
+/// Unix-only compilation. This isolates the original adapter visibility rule.
+fn paired_adapter_fixture_with_portable_alias(unix_source: &str) -> WorkspaceFixture {
+    let fixture = paired_adapter_fixture(unix_source);
+    fixture.write_source(
+        "example",
+        "lib.rs",
+        r#"
+        #[path = "unix_socket.rs"] mod portable_alias;
+        #[cfg(unix)] mod unix_socket;
+        #[cfg(windows)] mod named_pipe;
+    "#,
     );
     fixture
 }

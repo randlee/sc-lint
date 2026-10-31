@@ -98,7 +98,7 @@ repo-configured suppression of production portability leaf rules. See
 
 | Field | Value |
 | --- | --- |
-| Status | Pending (Rand) |
+| Status | Accepted (Rand 2026-10-31) |
 | Source | #720, #786 ([shape table](https://github.com/randlee/sc-lint/issues/786#issuecomment-6513016641)); ADR-022 |
 
 This amendment extends Decision 6. PORT-010 recognises the two shapes below
@@ -127,5 +127,6 @@ shapes depend on call-graph analysis that would grow PORT-010's heuristics
 and could hide real gaps; a reasoned allowance at the site is cheaper and
 explicit.
 
-**Open for Rand.** Whether S6 covers `pub` modules and `pub` items, or only
-non-public modules, with `pub` ones needing a site allowance.
+**Accepted public scope.** S6 covers `pub` modules and `pub` items inside
+`#[cfg(unix)] mod x;`, as accepted by Rand on 2026-10-31. Visibility does not
+make a Unix-only module compile on Windows.
